@@ -14,7 +14,7 @@ STRENGTH_CARD_PREFIX = "strength-"
 
 
 def render_strength_artifact(session: dict, outbox: Outbox, today: str, *,
-                             root: Path = strength_card.ROOT) -> Path:
+                             root: Path | None = None) -> Path:
     target = outbox.target(f"{STRENGTH_CARD_PREFIX}{today}.png")
     selection = selection_for(session, today)
     _, built = strength_card.render_card(selection, target, root=root)

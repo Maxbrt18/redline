@@ -42,7 +42,10 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.model import commands  # noqa: E402
+from scripts.model import (  # noqa: E402
+    commands,
+    paths,
+)
 
 if TYPE_CHECKING:
     from scripts.storage import OperationalStore
@@ -185,7 +188,7 @@ def _correction(args, _) -> dict:
     """
     from scripts.model import correction_replay
 
-    journal = ROOT / correction_replay.CORRECTIONS
+    journal = paths.vault_root() / correction_replay.CORRECTIONS
     known = {entry.key for entry in correction_replay.entries(journal.read_text(encoding="utf-8"))}
     entry = args.entry.strip()
     if entry not in known:

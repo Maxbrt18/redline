@@ -56,7 +56,7 @@ def test_morning_card_is_rendered_by_the_service_not_the_agent(
         "gates": [],
     })
     rendered = []
-    def render(session, outbox, day):
+    def render(session, outbox, day, *, root):
         rendered.append((session["id"], day))
         return outbox.target(f"strength-{day}.png")
 

@@ -197,7 +197,7 @@ def test_exact_renfo_command_is_deterministic_and_idempotent(
     })
     outbox = Outbox(tmp_path / "outbox")
 
-    def render(session, selected_outbox, day):
+    def render(session, selected_outbox, day, *, root):
         target = selected_outbox.target(f"strength-{day}.png")
         target.write_bytes(b"png")
         return target

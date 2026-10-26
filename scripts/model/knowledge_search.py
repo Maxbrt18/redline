@@ -9,7 +9,8 @@ import unicodedata
 from pathlib import Path
 from typing import TypedDict
 
-ROOT = Path(__file__).resolve().parents[2]
+from scripts.model import paths
+
 STOP = frozenset({"avec", "dans", "pour", "plus", "moins", "comment", "quelle",
                   "quelles", "quel", "quels", "leurs", "notre", "cette", "sont",
                   "avoir", "faire", "entre", "chez", "depuis", "apres", "avant"})
@@ -29,13 +30,14 @@ def words(value: str) -> set[str]:
     return {word for word in re.findall(r"[a-z0-9]{3,}", ascii_text) if word not in STOP}
 
 
-def search(query: str, limit: int = 6) -> list[SearchHit]:
+def search(query: str, limit: int = 6, *, root: Path | None = None) -> list[SearchHit]:
+    root = root or paths.vault_root()
     terms = words(query)
     if not terms:
         return []
     results: list[SearchHit] = []
     for folder in ("concepts", "episodes"):
-        for path in (ROOT / folder).glob("*.md"):
+        for path in (root / folder).glob("*.md"):
             lines = path.read_text(encoding="utf-8").splitlines()
             heading_lines = [line for line in lines[:20]
                              if line.startswith(("# ", "aliases:", "title:"))]
@@ -63,7 +65,7 @@ def search(query: str, limit: int = 6) -> list[SearchHit]:
             line_number, excerpt = max(
                 matches, key=lambda item: (len(terms & words(item[1])),
                                            -len(words(item[1])), item[0] <= 20, -item[0]))
-            results.append({"path": str(path.relative_to(ROOT)), "line": line_number,
+            results.append({"path": str(path.relative_to(root)), "line": line_number,
                             "score": score, "excerpt": excerpt[:280],
                             "heading": heading[:180]})
     return sorted(results, key=lambda row: (-row["score"], row["path"]))[:limit]

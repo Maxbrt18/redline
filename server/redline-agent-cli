@@ -66,4 +66,13 @@ case "$python_bin" in
     ;;
 esac
 
-exec "$python_bin" "scripts/$script" "$@"
+# Le moteur et le vault peuvent être deux dossiers : le script vient du moteur
+# vérifié ci-dessus, et s'exécute DANS le vault (`VAULT_PATH`, comme le service),
+# où le coach a remis ses fichiers de tour. Sans VAULT_PATH, les deux ne font qu'un.
+vault=${VAULT_PATH:-$repo}
+[ -d "$vault" ] || {
+  echo "agent-cli: vault introuvable ($vault)" >&2
+  exit 1
+}
+cd "$vault"
+exec "$python_bin" "$repo/scripts/$script" "$@"

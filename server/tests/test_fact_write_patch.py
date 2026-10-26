@@ -154,7 +154,7 @@ def test_une_correction_n_entre_en_base_qu_ecrite_au_journal(tmp_path, monkeypat
     entry = "2026-09-17 — Une distance disponible sur Strava dite invérifiable"
     (tmp_path / "coaching").mkdir()
     (tmp_path / "coaching" / "corrections.md").write_text(f"## {entry}\n\nTexte.\n")
-    monkeypatch.setattr(fact_write, "ROOT", tmp_path)
+    monkeypatch.setenv("VAULT_PATH", str(tmp_path))
     args = parse("correction", "--correction-key", "k", "--summary", "s", "--entry", entry)
     _, kind, payload = fact_write._payload(args)
     assert kind == "correction.register"

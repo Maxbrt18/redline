@@ -204,10 +204,11 @@ def test_root_owned_launcher_refuses_a_cli_modified_during_the_turn(tmp_path):
     fake_bin = tmp_path / ".venvs" / "redline" / "bin"
     fake_bin.mkdir(parents=True)
     fake_python = fake_bin / "python"
-    fake_python.write_text("#!/bin/sh\nprintf '%s\\n' \"$@\"\n", encoding="utf-8")
+    fake_python.write_text("#!/bin/sh\nprintf '%s\\n' \"$@\" \"cwd=$(pwd -P)\"\n",
+                           encoding="utf-8")
     fake_python.chmod(0o755)
     environment = {
-        **os.environ,
+        **{name: value for name, value in os.environ.items() if name != "VAULT_PATH"},
         "PATH": f"{fake_bin}:/usr/bin:/bin",
         "REDLINE_REPO": str(repo),
         "REDLINE_TURN_ID": "0f6b1c2e-3a4d-4e5f-8a9b-0c1d2e3f4a5b",
@@ -229,6 +230,18 @@ def test_root_owned_launcher_refuses_a_cli_modified_during_the_turn(tmp_path):
         env=environment, text=True, capture_output=True, check=False)
     assert clean.returncode == 0
     assert "scripts/ledger.py" in clean.stdout
+
+    # Moteur et vault séparés : le script reste celui du moteur vérifié, il tourne
+    # dans le vault, là où le tour a remis ses fichiers.
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    split = subprocess.run(
+        [launcher, "ledger.py", "--semaine", "2026-W35"],
+        env={**environment, "VAULT_PATH": str(vault)},
+        text=True, capture_output=True, check=False)
+    assert split.returncode == 0
+    assert f"{repo}/scripts/ledger.py" in split.stdout
+    assert f"cwd={vault.resolve()}" in split.stdout
 
     target.write_text("print('code injecté')\n", encoding="utf-8")
     dirty = subprocess.run(

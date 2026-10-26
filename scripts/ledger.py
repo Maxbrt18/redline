@@ -36,7 +36,12 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.model import daily, programme, rulebook  # noqa: E402
+from scripts.model import (  # noqa: E402
+    daily,
+    paths,
+    programme,
+    rulebook,
+)
 from scripts.model import ledger as table  # noqa: E402
 
 POINTS_PER_EQ_HOUR = 14.0          # calibrated 2026-07-19, coaching/protocols.md
@@ -1103,8 +1108,6 @@ def week_report(store: LedgerStore, rows: list[Row], instruments: dict, targets:
 
 # -------------------------------------------------------------------------------- CLI
 
-ROOT = Path(__file__).resolve().parent.parent
-
 # The export's column names, unchanged: whatever reads this CSV reads these headers.
 CSV_HEADERS = ["date", "semaine", "type", "km", "duree_h", "fc_moy", "cad",
                "dplus", "dmoins", "rpe", "dlr", "plaisir", "note"]
@@ -1125,7 +1128,7 @@ def _export_csv(rows: list[Row]) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--root", default=ROOT, type=Path)
+    parser.add_argument("--root", default=paths.vault_root(), type=Path)
     parser.add_argument("--semaine", dest="week", help="ex. 2026-W30")
     parser.add_argument("--tendance-douleur", dest="pain_weeks", type=int, metavar="N")
     parser.add_argument("--csv", action="store_true", help="export normalisé sur stdout")

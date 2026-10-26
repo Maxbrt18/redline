@@ -7,10 +7,8 @@ import json
 from pathlib import Path
 
 from scripts.cards import html, render
-from scripts.model import strength_log
+from scripts.model import paths, strength_log
 from scripts.model.programme import load
-
-ROOT = Path(__file__).resolve().parents[2]
 
 
 def exercise_row(index: int, prescription) -> str:
@@ -52,7 +50,8 @@ def page_session(built: dict, history: dict) -> dict:
     return session
 
 
-def snapshot(built: dict, *, root: Path = ROOT) -> dict:
+def snapshot(built: dict, *, root: Path | None = None) -> dict:
+    root = root or paths.vault_root()
     history = strength_log.last_by_slug(root / strength_log.PATH)
     return page_session(built, history)
 
@@ -71,9 +70,10 @@ def default_session_id(out: Path, built: dict) -> str:
     return f"{out.stem[:53]}-{digest}"
 
 
-def render_card(selection: dict, out: Path, *, root: Path = ROOT,
+def render_card(selection: dict, out: Path, *, root: Path | None = None,
                 html_only: bool = False) -> tuple[Path, dict]:
     """Valide, résout et rend la carte ; les erreurs remontent au propriétaire."""
+    root = root or paths.vault_root()
     selection = dict(selection)
     explicit_sid = "sid" in selection
     selection.setdefault("sid", out.stem)

@@ -1786,7 +1786,8 @@ ne demande pas de confirmation artificielle."""
 
         assert session is not None
         try:
-            target = render_strength_artifact(session, self._outbox, today)
+            target = render_strength_artifact(session, self._outbox, today,
+                                              root=Path(self._config.vault_path))
         except Exception as exc:
             log.exception("Rendu déterministe de la carte de renfo impossible")
             self._log_incident(
