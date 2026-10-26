@@ -86,10 +86,16 @@ const dailyChoices = {
 };
 const hrChoices = [['sommeil', 'Nuit courte'], ['rhume', 'Début de rhume'], ['chaleur', 'Chaleur ou terrain'], ['rien', 'Rien de spécial']];
 export const fieldSpec = {
-  pain: {label: 'Douleur injury, au pic', name: 'la douleur', values: [0, 0.5, 1, 1.5, 2, 2.5, 3]},
+  pain: {label: 'Douleur, au pic', name: 'la douleur', values: [0, 0.5, 1, 1.5, 2, 2.5, 3]},
   rpe: {label: 'RPE, séance entière', name: 'le RPE', values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]},
   enjoyment: {label: 'Plaisir', name: 'le plaisir', values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}
 };
+// « pain:genou » : la douleur d'une zone, nommée par son libellé.
+export function specOf(field, labels) {
+  if (!field.startsWith('pain:')) return fieldSpec[field];
+  const label = (labels || {})[field] || field.slice(5);
+  return {...fieldSpec.pain, label: 'Douleur ' + label + ', au pic', name: 'la douleur (' + label + ')'};
+}
 async function answer(ask, value, card, picked) {
   card.querySelectorAll('button').forEach(node => { node.disabled = true; });
   if (picked) picked.classList.add('n-picked');
@@ -122,10 +128,11 @@ function choices(label, hint, options, ask, card) {
   return add(el('div', null, 'n-field'), head, row);
 }
 function morning(list) {
-  const wake = list.find(ask => ask.type === 'wake'), daily = list.find(ask => ask.type === 'daily');
-  if (!wake && !daily) return null;
+  const wakes = list.filter(ask => ask.type === 'wake'), daily = list.find(ask => ask.type === 'daily');
+  if (!wakes.length && !daily) return null;
   const card = el('div', null, 'n-check');
-  if (wake) card.append(choices('Trace injury', wake.after_effort ? 'après la séance d’hier' : 'sans séance hier', traces, wake.id, card));
+  // Une trace par zone surveillée, chacune son geste.
+  wakes.forEach(wake => card.append(choices('Trace · ' + wake.label, wake.after_effort ? 'après la séance d’hier' : 'sans séance hier', traces, wake.id, card)));
   if (daily) daily.fields.forEach(field => card.append(choices(dailyChoices[field][0], '', dailyChoices[field][1], daily.id + ':' + field, card)));
   card.append(el('p', 'Un geste par ligne. Le coach ne t’écrit que si ça sort de l’ordinaire.', 'n-note'));
   return card;
@@ -138,17 +145,19 @@ function hrCard(ask) {
 }
 // Le débrief, une question à la fois : la première qui manque, son rang parmi les trois,
 // et ce qui suivra. Chaque réponse recalcule l'écran, qui passe à la suivante.
-const CELLS = ['pain', 'rpe', 'enjoyment'];
+// Le total : une douleur par zone surveillée, puis le RPE et le plaisir.
+export const cellCount = ask => Object.keys(ask.labels || {}).length + 2;
 function cellsCard(ask, target) {
   const card = el('div', null, 'n-check');
-  const metric = ask.fields[0], spec = fieldSpec[metric], label = el('span', spec.label);
+  const metric = ask.fields[0], spec = specOf(metric, ask.labels), label = el('span', spec.label);
   if (metric === 'rpe' && target && target.rpe_max != null) label.append(el('small', 'visé ' + rpeRange(target)));
-  const head = add(el('p', null, 'n-check-head'), label, el('span', (CELLS.length - ask.fields.length + 1) + ' sur ' + CELLS.length, 'n-of'));
+  const total = cellCount(ask);
+  const head = add(el('p', null, 'n-check-head'), label, el('span', (total - ask.fields.length + 1) + ' sur ' + total, 'n-of'));
   add(card, head, chips(spec.values, ask.id + ':' + metric, card));
-  const next = ask.fields.slice(1).map(field => fieldSpec[field].name);
+  const next = ask.fields.slice(1).map(field => specOf(field, ask.labels).name);
   const notes = [];
   if (next.length) notes.push('Puis ' + next.join(' et ') + (next.length > 1 ? ', un geste chacun.' : '.'));
-  if (metric === 'pain') notes.push('Plus de 3 ? Dis-le au coach dans Messenger.');
+  if (metric.startsWith('pain:')) notes.push('Plus de 3 ? Dis-le au coach dans Messenger.');
   if (notes.length) card.append(el('p', notes.join(' '), 'n-note'));
   return card;
 }
@@ -327,11 +336,14 @@ function landmarks(data) {
   week.setAttribute('aria-label', 'Semaine ' + weekNumber(data.week) + ' : ' + fmt(totals.km_done) + ' kilomètres courus' + (totals.km_target ? ' sur environ ' + fmt(totals.km_target) : ''));
   grid.append(add(week, add(el('span'), tvalue(fmt(totals.km_done), totals.km_target ? '/' + fmt(totals.km_target) + ' km' : 'km'),
     el('small', runs)), weekBars(data.strip)));
-  const peak = (data.pain.weeks[data.pain.weeks.length - 1] || {}).peak;
-  const pain = tvalue(peak == null ? '—' : fmt(peak), '/10');
-  if (peak > data.pain.cap) pain.classList.add('n-over');
-  grid.append(add(tile('Injury', () => push({k: 'injury'}), 'tib', 'tib'), pain, el('small', 'pic de la semaine'),
-    add(el('span', null, 'n-tfoot'), painPlot(data.pain))));
+  // Une tuile par zone surveillée ; aucune quand l'instance n'en surveille pas.
+  data.pain.zones.forEach(item => {
+    const peak = (item.weeks[item.weeks.length - 1] || {}).peak;
+    const pain = tvalue(peak == null ? '—' : fmt(peak), '/10');
+    if (peak > data.pain.cap) pain.classList.add('n-over');
+    grid.append(add(tile(item.label, () => push({k: 'injury', zone: item.zone}), 'tib', 'tib'), pain, el('small', 'pic de la semaine'),
+      add(el('span', null, 'n-tfoot'), painPlot({cap: data.pain.cap, weeks: item.weeks}))));
+  });
   const race = data.race;
   if (race) {
     const date = day(race.date).toLocaleDateString('fr-FR', {weekday: 'short', day: 'numeric', month: 'long'});

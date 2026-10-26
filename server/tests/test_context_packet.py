@@ -14,8 +14,8 @@ class Store:
             "idempotency_key": "strava:42", "note": "facile",
             "measurements": {
                 "distance_km": {"state": "known", "value": 7.2},
-                "pain": {"state": "pending", "value": None},
             },
+            "pains": {"injury": {"state": "pending", "value": None}},
         }]
 
     def daily_rows(self):
@@ -48,7 +48,7 @@ class Store:
     def strength_history(self):
         return [{
             "performed_on": dt.date(2026, 8, 22), "workout": "a",
-            "duration_minutes": 60, "shin_before": 0, "shin_after": 1,
+            "duration_minutes": 60, "pains": {"injury": {"before": 0, "after": 1}},
             "note": "Planche unipodale trop dure, une série faite sur les deux pieds.",
             "exercises": [{
                 "exercise_slug": "plank-toe", "difficulty": 8, "sets": [],
@@ -60,11 +60,11 @@ def test_n1_packet_contains_recent_facts_but_not_decision_context():
     packet = render_context_packet(Store(), "N1", dt.date(2026, 8, 23))
 
     assert "distance_km" not in packet and "km=7.2" in packet
-    assert "attend=pain" in packet
+    assert "attend=pain:injury" in packet
     assert "État quotidien récent" in packet
     assert "Renfo récent, déjà enregistré par la page" in packet
     assert "plank-toe=8/10" in packet
-    assert "injury 0->1/10" in packet
+    assert "douleur injury 0->1/10" in packet
     assert "Fils ouverts" not in packet
 
 
@@ -126,7 +126,7 @@ def test_failed_section_is_unknown_without_losing_other_known_sections():
     packet = render_context_packet(source, 'N2', dt.date(2026, 8, 23))
     assert "Observations : lecture échouée, état inconnu" in packet
     assert "private connection detail" not in packet
-    assert "injury 0->1/10" in packet
+    assert "douleur injury 0->1/10" in packet
     assert "4 nuit | 2/5 orange" in packet
     assert "Aucun état déclaré pour aujourd'hui" in packet
 
@@ -153,7 +153,7 @@ def test_failed_missing_cell_read_does_not_invent_another_questionnaire(make_bot
 def test_morning_history_survives_the_recent_activity_limit_without_mixing_series():
     def observation(day, kind, key, value=1):
         return {'occurred_on': day, 'kind': kind, 'idempotency_key': key,
-                'measurements': {'pain': {'state': 'known', 'value': value}}}
+                'measurements': {}, 'pains': {'injury': {'state': 'known', 'value': value}}}
 
     today = dt.date(2026, 9, 6)
     rows = [observation(today, 'EF', f'activity:{i}') for i in range(12)]
@@ -179,7 +179,7 @@ def test_qualitative_morning_history_is_not_converted_into_a_numeric_score():
     store.observation_rows = MagicMock(return_value=[{
         'occurred_on': dt.date(2026, 9, 5), 'kind': 'reveil', 'idempotency_key': 'morning:q',
         'note': 'Probablement comme hier, comparaison incertaine.',
-        'measurements': {'pain': {'state': 'not_applicable'}},
+        'measurements': {}, 'pains': {'injury': {'state': 'not_applicable'}},
     }])
     packet = render_context_packet(store, 'N1', dt.date(2026, 9, 6))
     assert 'comparaison incertaine' in packet

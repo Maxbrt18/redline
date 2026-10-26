@@ -9,7 +9,7 @@ turn). What arrives is a SELECTION of the programme -- exercises, doses, title a
 `coaching/exercises/*.md` and `coaching/workouts/renfo-*.md`, and the morning run
 picks and modulates rather than retyping nine exercises.
 
-The `gate` field of that schema is the day's shin guardrail -- {shin_max, drop, say},
+The `gate` field of that schema is the day's pain guardrail -- {zone?, pain_max, drop, say},
 applied by the interactive page if the injury moved between the message and the moment
 Sam opens the link. It is OPTIONAL, so omitting it raises nothing and simply leaves
 the session unguarded: name it whenever the session carries impact or the pain trend

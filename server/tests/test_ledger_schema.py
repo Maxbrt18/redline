@@ -5,10 +5,15 @@ import datetime as dt
 from scripts import ledger
 from scripts.model import ledger as table
 
+PENDING = {"state": "pending"}
 
-def typed_observation(day: dt.date, kind="EF", *, strava=123, **measurements) -> dict:
+
+def typed_observation(day: dt.date, kind="EF", *, strava=123, pains=None,
+                      **measurements) -> dict:
+    """La douleur de la zone fictive naît `pending`, comme le repository la crée."""
     return {"occurred_on": day, "kind": kind, "strava_activity_id": strava,
-            "measurements": measurements}
+            "measurements": measurements,
+            "pains": {"injury": PENDING} if pains is None else pains}
 
 
 def test_every_session_type_is_classified():
@@ -31,7 +36,8 @@ def test_only_declarative_inputs_may_be_unavailable():
     base = {"Date": "2026-08-20", "Type": "EF"}
     assert table.INPUT_SCHEMA.errors({**base, "km": "?"}, "observation")
     assert table.INPUT_SCHEMA.errors(
-        {**base, "RPE": "?", "Dlr": "?", "Plaisir": "?"}, "observation") == []
+        {**base, "RPE": "?", "Plaisir": "?"}, "observation") == []
+    assert table.pain_reading("?") == {"state": "unavailable"}
 
 
 def test_notes_accept_pipes_because_the_markdown_table_is_gone():
@@ -46,13 +52,26 @@ def test_typed_completeness_reads_metric_states():
         rpe={"state": "pending"},
     )
     assert table.missing_observation_fields(observation) == [
-        "RPE", "Dlr", "Plaisir", "D+", "D-"]
+        "RPE", "Plaisir", "Dlr:injury", "D+", "D-"]
+
+
+def test_each_watched_zone_is_claimed_under_its_own_name():
+    observation = typed_observation(
+        dt.date(2026, 8, 4), strava=None, rpe={"state": "known", "value": 3},
+        enjoyment={"state": "known", "value": 6},
+        pains={"genou": PENDING, "cheville": {"state": "known", "value": 1}})
+    assert table.missing_observation_fields(observation) == ["Dlr:genou"]
+
+
+def test_without_a_watched_zone_no_pain_is_claimed():
+    observation = typed_observation(dt.date(2026, 8, 4), strava=None, pains={})
+    assert table.missing_observation_fields(observation) == ["RPE", "Plaisir"]
 
 
 def test_unavailable_only_resolves_declarative_metrics():
     unavailable = {"state": "unavailable"}
     observation = typed_observation(
-        dt.date(2026, 8, 4), rpe=unavailable, pain=unavailable,
+        dt.date(2026, 8, 4), rpe=unavailable, pains={"injury": unavailable},
         enjoyment=unavailable, elevation_gain_m=unavailable,
         elevation_loss_m=unavailable,
     )
@@ -62,7 +81,7 @@ def test_unavailable_only_resolves_declarative_metrics():
 def test_readings_require_pain_but_palpation_requires_no_number():
     reading = typed_observation(dt.date(2026, 8, 4), kind="reveil", strava=None)
     palpation = typed_observation(dt.date(2026, 8, 4), kind="palpation", strava=None)
-    assert table.missing_observation_fields(reading) == ["Dlr"]
+    assert table.missing_observation_fields(reading) == ["Dlr:injury"]
     assert table.missing_observation_fields(palpation) == []
 
 
@@ -80,10 +99,10 @@ def test_completeness_does_not_rewrite_history():
 
 
 def test_unavailable_is_never_read_as_a_value():
-    unavailable = {"measurements": {"pain": {"state": "unavailable", "value": None}}}
-    known = {"measurements": {"pain": {"state": "known", "value": 1.5}}}
-    assert ledger._known(unavailable, "pain") is None
-    assert ledger._known(known, "pain") == 1.5
+    unavailable = {"measurements": {"rpe": {"state": "unavailable", "value": None}}}
+    known = {"measurements": {"rpe": {"state": "known", "value": 1.5}}}
+    assert ledger._known(unavailable, "rpe") is None
+    assert ledger._known(known, "rpe") == 1.5
 
 
 def test_cell_key_is_stable_and_metric_specific():

@@ -68,13 +68,6 @@ class Injury:
     label: str
 
 
-#: Le registre ne porte qu'UNE série de douleur (effort + réveil), sans zone. Deux zones
-#: déclarées y verseraient leurs notes dans la même colonne, et une hausse au genou se
-#: lirait comme une hausse à la cheville. Refusé tant que la douleur n'est pas rangée
-#: par zone en base.
-MAX_TRACKED_INJURIES = 1
-
-
 @dataclass(frozen=True)
 class Instance:
     athlete_name: str
@@ -82,10 +75,6 @@ class Instance:
     injuries: tuple[Injury, ...]
     capabilities: tuple[Capability, ...]
 
-    @property
-    def injury(self) -> Injury | None:
-        """La zone suivie, ou None : l'instance n'en surveille aucune."""
-        return self.injuries[0] if self.injuries else None
 
     def capability_label(self, slug: str) -> str:
         """Le libellé déclaré, sinon celui que porte le slug."""
@@ -129,10 +118,9 @@ def parse(text: str) -> Instance:
     if len(set(slugs)) != len(slugs):
         raise InstanceError(f"{FILENAME} : slug de capacité en double ({', '.join(slugs)})")
     injuries = payload.get("injuries", [])
-    if len(injuries) > MAX_TRACKED_INJURIES:
-        raise InstanceError(
-            f"{FILENAME} : {len(injuries)} zones déclarées, le moteur n'en suit qu'une "
-            "(le registre ne range pas encore la douleur par zone)")
+    zones = [entry["slug"] for entry in injuries]
+    if len(set(zones)) != len(zones):
+        raise InstanceError(f"{FILENAME} : zone surveillée en double ({', '.join(zones)})")
     return Instance(
         athlete_name=payload["athlete"]["name"],
         place=payload["notebook"]["place"],

@@ -52,8 +52,10 @@ export async function send() {
     // Date civile du PREMIER exercice, pas celle du serveur au moment où un
     // téléphone hors ligne réussira finalement à poster le compte-rendu.
     performed_on: state.performedOn,
-    shin_before: state.shinBefore,
-    shin: state.shin,
+    // Seules les zones lues partent ; une zone sans chiffre n'est pas un zéro.
+    pains: Object.fromEntries(Object.entries(state.pains)
+      .filter(([, moments]) => moments.before != null || moments.after != null)
+      .map(([slug, moments]) => [slug, {before: moments.before ?? null, after: moments.after ?? null}])),
     minutes: state.minutes,
     note: (state.note || '').slice(0, MAX_NOTE),
     exercises: session.exercises.map((exercise, index) => {

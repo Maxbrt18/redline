@@ -134,7 +134,6 @@ MEASUREMENT_DEFINITIONS: dict[str, tuple[Any, str]] = {
     "elevation_loss_m": (sa.Integer, "value BETWEEN 0 AND 20000"),
     "wbgt_c": (sa.Numeric(4, 1), "value BETWEEN -50 AND 60"),
     "rpe": (sa.Numeric(3, 1), "value BETWEEN 0 AND 10"),
-    "pain": (sa.Numeric(3, 1), "value BETWEEN 0 AND 10"),
     "enjoyment": (sa.Numeric(3, 1), "value BETWEEN 0 AND 10"),
     "carbs_g_h": (sa.Numeric(5, 1), "value BETWEEN 0 AND 200"),
     "gut_symptoms": (sa.Numeric(3, 1), "value BETWEEN 0 AND 10"),
@@ -178,6 +177,42 @@ observation_metrics = sa.Table(
     sa.CheckConstraint(
         "hr_doubt IS NULL OR (hr_doubt IN ('sans_brassard','contexte') "
         "AND hr_avg_bpm_state = 'known')", name="ck_observation_metrics_hr_doubt"),
+)
+
+# Les zones que l'instance surveille (`[[injuries]]` de redline.toml), synchronisées
+# au démarrage : la référence des lectures de douleur. Une zone retirée de la config
+# passe inactive, jamais supprimée -- son historique reste lisible et rattaché.
+PAIN_ZONE_PATTERN = "^[a-z0-9][a-z0-9-]{0,39}$"
+pain_zones = sa.Table(
+    "pain_zones", metadata,
+    sa.Column("athlete_id", sa.Text, sa.ForeignKey("redline.athletes.id"), primary_key=True),
+    sa.Column("slug", sa.Text, primary_key=True),
+    sa.Column("label", sa.Text, nullable=False),
+    sa.Column("active", sa.Boolean, nullable=False, server_default=sa.true()),
+    sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=UTC_NOW),
+    sa.CheckConstraint(f"slug ~ '{PAIN_ZONE_PATTERN}'", name="ck_pain_zones_slug"),
+    sa.CheckConstraint("label <> '' AND char_length(label) <= 40", name="ck_pain_zones_label"),
+)
+
+# La douleur d'une observation, UNE LIGNE PAR ZONE : deux zones ne partagent jamais une
+# colonne, sinon une hausse au genou se lirait comme une hausse à la cheville. Mêmes
+# états et même immuabilité que les autres mesures (`observation_metrics`).
+pain_readings = sa.Table(
+    "pain_readings", metadata,
+    sa.Column("observation_id", UUID_PK,
+              sa.ForeignKey("redline.observations.id", ondelete="CASCADE"), primary_key=True),
+    sa.Column("zone", sa.Text, primary_key=True),
+    sa.Column("athlete_id", sa.Text, nullable=False),
+    sa.Column("state", sa.Text, nullable=False),
+    sa.Column("value", sa.Numeric(3, 1)),
+    sa.Column("recorded_at", sa.DateTime(timezone=True), nullable=False, server_default=UTC_NOW),
+    sa.ForeignKeyConstraint(["athlete_id", "zone"],
+                            ["redline.pain_zones.athlete_id", "redline.pain_zones.slug"],
+                            name="fk_pain_readings_zone"),
+    sa.CheckConstraint(f"state IN {MEASUREMENT_STATES}", name="ck_pain_readings_state"),
+    sa.CheckConstraint(
+        "(state = 'known' AND value IS NOT NULL AND value BETWEEN 0 AND 10) OR "
+        "(state <> 'known' AND value IS NULL)", name="ck_pain_readings_value"),
 )
 
 # Une exposition est une intention/dose déclarée, pas une cause reconstruite depuis une
@@ -282,8 +317,6 @@ strength_sessions = sa.Table(
     sa.Column("session_key", sa.Text, nullable=False),
     sa.Column("performed_on", sa.Date, nullable=False),
     sa.Column("workout", sa.Text),
-    sa.Column("shin_before", sa.SmallInteger),
-    sa.Column("shin_after", sa.SmallInteger),
     sa.Column("duration_minutes", sa.SmallInteger),
     sa.Column("note", sa.Text, nullable=False, server_default=""),
     sa.Column("prescription", JSONB(none_as_null=True)),
@@ -293,13 +326,26 @@ strength_sessions = sa.Table(
                        name="ck_strength_sessions_key"),
     sa.CheckConstraint("workout IS NULL OR workout IN ('a','b','assimilation')",
                        name="ck_strength_sessions_workout"),
-    sa.CheckConstraint("shin_before IS NULL OR shin_before BETWEEN 0 AND 10",
-                       name="ck_strength_sessions_shin_before"),
-    sa.CheckConstraint("shin_after IS NULL OR shin_after BETWEEN 0 AND 10",
-                       name="ck_strength_sessions_shin_after"),
     sa.CheckConstraint("duration_minutes IS NULL OR duration_minutes BETWEEN 0 AND 300",
                        name="ck_strength_sessions_duration"),
     sa.CheckConstraint("char_length(note) <= 300", name="ck_strength_sessions_note"),
+)
+
+# La douleur d'une séance de renfo, avant et après, par zone surveillée.
+strength_pain_readings = sa.Table(
+    "strength_pain_readings", metadata,
+    sa.Column("strength_session_id", UUID_PK,
+              sa.ForeignKey("redline.strength_sessions.id", ondelete="CASCADE"),
+              primary_key=True),
+    sa.Column("zone", sa.Text, primary_key=True),
+    sa.Column("moment", sa.Text, primary_key=True),
+    sa.Column("athlete_id", sa.Text, nullable=False),
+    sa.Column("value", sa.SmallInteger, nullable=False),
+    sa.ForeignKeyConstraint(["athlete_id", "zone"],
+                            ["redline.pain_zones.athlete_id", "redline.pain_zones.slug"],
+                            name="fk_strength_pain_readings_zone"),
+    sa.CheckConstraint("moment IN ('before','after')", name="ck_strength_pain_readings_moment"),
+    sa.CheckConstraint("value BETWEEN 0 AND 10", name="ck_strength_pain_readings_value"),
 )
 
 strength_results = sa.Table(
@@ -749,6 +795,8 @@ coach_predictions = sa.Table(
     # se solde seule ; la date passée sans elle, elle passe en `void`, jamais en faux.
     sa.Column("resolves_kind", sa.Text),
     sa.Column("resolves_on", sa.Date),
+    # La zone dont la douleur au réveil tranche la prédiction.
+    sa.Column("resolves_zone", sa.Text),
     sa.Column("success_op", sa.Text),
     sa.Column("success_value", sa.Numeric(4, 1)),
     sa.UniqueConstraint("athlete_id", "prediction_key", name="uq_coach_predictions_key"),
@@ -764,11 +812,15 @@ coach_predictions = sa.Table(
         "(status = 'void' AND outcome IS NULL AND brier_score IS NULL AND resolved_at IS NOT NULL)",
         name="ck_coach_predictions_resolution"),
     sa.CheckConstraint(
-        "(resolves_kind IS NULL AND resolves_on IS NULL AND success_op IS NULL "
-        "AND success_value IS NULL) OR (resolves_kind IN ('reveil') "
-        "AND resolves_on IS NOT NULL AND success_op IN ('<=','<','>=','>','=') "
+        "(resolves_kind IS NULL AND resolves_on IS NULL AND resolves_zone IS NULL "
+        "AND success_op IS NULL AND success_value IS NULL) OR (resolves_kind IN ('reveil') "
+        "AND resolves_on IS NOT NULL AND resolves_zone IS NOT NULL "
+        "AND success_op IN ('<=','<','>=','>','=') "
         "AND success_value IS NOT NULL AND resolves_on <= due_on)",
         name="ck_coach_predictions_resolves"),
+    sa.ForeignKeyConstraint(["athlete_id", "resolves_zone"],
+                            ["redline.pain_zones.athlete_id", "redline.pain_zones.slug"],
+                            name="fk_coach_predictions_zone"),
 )
 
 # Permis EF (décision du 2026-09-27) : le choix du coach pour une EF déléguée, scellé
@@ -1065,6 +1117,7 @@ audit_events = sa.Table(
 # d'inconnu -- et les tests SQL d'UPDATE/DELETE prouvent que leurs corps MORDENT.
 TRIGGERS: dict[str, str] = {
     "trg_measurement_history": "observation_metrics",
+    "trg_pain_reading_history": "pain_readings",
     "trg_plan_revision_contiguous": "plan_revisions",
     "trg_plan_revision_immutable": "plan_revisions",
     "trg_audit_event_immutable": "audit_events",

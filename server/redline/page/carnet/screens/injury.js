@@ -1,6 +1,7 @@
-import {add, el} from '../../shared/dom.js';
+import {add, button, el} from '../../shared/dom.js';
 import {SVG, content, shape, zone} from '../ui.js';
 import {day, fmt, weekNumber} from '../format.js';
+import {swap} from '../nav.js';
 
 // ------------------------------------------------------------ Injury
 // Poussé depuis la tuile des repères (maquette validée le 2026-10-09) : un point par
@@ -37,7 +38,15 @@ function painChart(data) {
   data.wakes.forEach(item => shape('rect', {x: x(item.date) - 8.5, y: y(item.pain) - 3.5, width: 7, height: 7, rx: 1.5, class: 'wk'}, svg));
   return svg;
 }
+// Plusieurs zones surveillées : un sélecteur en tête, une zone affichée à la fois.
+function zonePicker(data) {
+  const row = el('div', null, 'n-choices' + (data.zones.length === 2 ? ' two' : ''));
+  data.zones.forEach(item => row.append(button(item.label, () => swap({k: 'injury', zone: item.zone}),
+    item.zone === data.zone ? 'n-picked' : '')));
+  return row;
+}
 export function renderInjury(data) {
+  if (data.zones.length > 1) content.append(zonePicker(data));
   const current = data.weeks[data.weeks.length - 1] || {};
   add(content, add(el('div', null, 'n-tbig'), el('b', current.peak == null ? '—' : fmt(current.peak), current.peak > data.cap ? 'n-over' : null),
     add(el('span'), 'pic cette semaine', el('br'), 'plafond ', el('b', fmt(data.cap)))));

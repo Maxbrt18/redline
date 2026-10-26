@@ -7,6 +7,7 @@ import logging
 from collections.abc import Callable, Iterable
 from typing import TYPE_CHECKING, Any
 
+from scripts.model import ledger as ledger_model
 from scripts.model import rulebook
 from scripts.storage import StorageError
 
@@ -17,7 +18,7 @@ log = logging.getLogger("redline")
 
 METRICS = (
     ("distance_km", "km"), ("duration_s", "s"), ("hr_avg_bpm", "FC"),
-    ("rpe", "RPE"), ("pain", "douleur"), ("enjoyment", "plaisir"),
+    ("rpe", "RPE"), ("enjoyment", "plaisir"),
     ("wbgt_c", "WBGT"),
 )
 
@@ -35,8 +36,10 @@ def _observation(row: dict) -> str:
         measure = (row.get("measurements") or {}).get(key) or {}
         if measure.get("state") == "known":
             parts.append(f"{label}={measure.get('value')}")
+    parts.extend(ledger_model.pain_facts(row.get("pains") or {}))
     pending = [key for key, measure in (row.get("measurements") or {}).items()
                if measure.get("state") == "pending"]
+    pending += ledger_model.pending_pains(row.get("pains") or {})
     if pending:
         parts.append("attend=" + ",".join(sorted(pending)))
     if row.get("note"):
@@ -104,13 +107,8 @@ def render_context_packet(store: OperationalStore, depth: str, today: dt.date) -
             ]
             if session.get("duration_minutes") is not None:
                 detail.append(f"{session['duration_minutes']} min")
-            if (session.get("shin_before") is not None
-                    or session.get("shin_after") is not None):
-                before = ("?" if session.get("shin_before") is None
-                          else session["shin_before"])
-                after = ("?" if session.get("shin_after") is None
-                         else session["shin_after"])
-                detail.append(f"injury {before}->{after}/10")
+            detail.extend("douleur " + fact for fact in
+                          ledger_model.strength_pain_facts(session.get("pains") or {}))
             difficult = [
                 f"{exercise['exercise_slug']}={exercise['difficulty']}/10"
                 for exercise in session.get("exercises", [])

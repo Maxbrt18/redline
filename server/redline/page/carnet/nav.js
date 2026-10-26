@@ -26,7 +26,8 @@ export function screen() {
   if (route.k === 'week') return {key: 'week:' + route.label, path: 'week/' + route.label, label: route.label};
   if (route.k === 'weeks') return {key: 'weeks', path: 'weeks'};
   if (route.k === 'archive') return {key: 'archive', path: 'entries'};
-  if (route.k === 'injury') return {key: 'injury', path: 'injury'};
+  // Une zone surveillée par écran : la clé et la requête la nomment.
+  if (route.k === 'injury') return {key: 'injury:' + (route.zone || ''), path: 'injury' + (route.zone ? '?zone=' + encodeURIComponent(route.zone) : '')};
   if (route.k === 'session') return {key: 'session:' + route.id, path: 'session/' + encodeURIComponent(route.id), title: route.title};
   return {key: 'entry:' + route.id, path: 'entries/' + encodeURIComponent(route.id), title: route.title};
 }
@@ -40,7 +41,7 @@ function heading(view, data) {
   }
   if (view.key === 'weeks') return ['Toutes les semaines', data && data.weeks ? data.weeks.length + ' semaines au registre' : ''];
   if (view.key === 'archive') return ['Archives', 'bilans, monthly et cartes'];
-  if (view.key === 'injury') return ['Injury', data ? 'Douleur au pic, sur 10 · ' + data.weeks.length + ' semaines' : ''];
+  if (view.key.startsWith('injury:')) return [data ? data.label : 'Douleur', data ? 'Douleur au pic, sur 10 · ' + data.weeks.length + ' semaines' : ''];
   if (view.key.startsWith('session:')) {
     if (!data) return [view.title || '', ''];
     const start = startedAt(data.fact);
@@ -78,7 +79,7 @@ export function render(y) {
   else if (view.key.startsWith('week:')) renderWeek(data, view.root);
   else if (view.key === 'weeks') renderWeeks(data);
   else if (view.key === 'archive') renderArchive(data);
-  else if (view.key === 'injury') renderInjury(data);
+  else if (view.key.startsWith('injury:')) renderInjury(data);
   else if (view.key.startsWith('session:')) renderOutcome(data);
   else renderEntry(data);
   content.querySelectorAll('details > summary').forEach(node => { if (opened.has(node.textContent)) node.parentElement.open = true; });
@@ -162,6 +163,14 @@ export function push(route) {
   if (!below) return;
   startMove(freeze(), below, false, was, 1);
   animate(0, DURATION);
+}
+// Remplace l'écran du dessus sans l'empiler : passer d'une zone surveillée à l'autre
+// n'est pas un pas de plus dans la navigation.
+export function swap(route) {
+  app.generation++;
+  const stack = app.stacks[app.active];
+  stack[stack.length - 1] = route;
+  render(0); ensure();
 }
 // Recule d'un cran, ou jusqu'à la racine ; l'écran retrouve sa position.
 export function leave(toRoot) {

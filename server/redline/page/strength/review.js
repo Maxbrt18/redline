@@ -1,7 +1,7 @@
 /* Around the exercises: the preparation, the opening shin reading and its gate,
  * the end-of-session review. */
 import {$, el} from '../shared/dom.js';
-import {MAX_NOTE, clampInt, previousSession, progressOf, save, session, state} from './session.js';
+import {MAX_NOTE, clampInt, painOf, previousSession, progressOf, save, session, setPain, state, watchedZones} from './session.js';
 import {undoButton} from './actions.js';
 import {btn, feedbackBlock, loadText} from './control.js';
 import {renderSession} from './render.js';
@@ -72,7 +72,10 @@ export function scoreScale(read, write, after) {
   return row;
 }
 
-/* L'OUVERTURE. Le injury se demandait une fois, à la FIN — un chiffre sans
+/* Les zones que le garde-fou regarde : la sienne s'il en nomme une, sinon toutes. */
+const gateZones = () => watchedZones.filter(item => !session.gate || !session.gate.zone || item.zone === session.gate.zone);
+
+/* L'OUVERTURE. La douleur se demandait une fois, à la FIN — un chiffre sans
  * référence : « 2/10 après » ne dit rien si on ignore ce qu'il valait avant. Le
  * registre sépare d'ailleurs depuis le 2026-07-29 deux séries qui ne se
  * mélangent pas, le pic à l'effort et la lecture au repos ; la page n'en
@@ -88,18 +91,23 @@ export function renderOpening() {
   const box = $('open');
   box.hidden = false;
   box.replaceChildren();
-  box.appendChild(el('h2', 'Le injury, là, avant de commencer', 'p-open__title'));
+  const asked = gateZones();
+  box.appendChild(el('h2', 'La douleur, là, avant de commencer', 'p-open__title'));
   box.appendChild(el('p', '0 = rien du tout, 10 = ça fait mal en marchant. Trois secondes, et le '
     + 'chiffre de la fin devient lisible : sans celui-ci, il n\'a rien à quoi '
     + 'se comparer.', 'p-open__hint'));
-  box.appendChild(scoreScale(() => state.shinBefore, (value) => {
-    state.shinBefore = value;
-    state.opened = value != null;
-  }, () => { save(); renderSession(); }));
+  // Une échelle par zone ; l'ouverture se ferme quand chacune a sa lecture.
+  asked.forEach(item => {
+    if (asked.length > 1) box.appendChild(el('p', item.label, 'p-score__name'));
+    box.appendChild(scoreScale(() => painOf(item.zone, 'before'), (value) => {
+      setPain(item.zone, 'before', value);
+      state.opened = asked.every(other => painOf(other.zone, 'before') != null);
+    }, () => { save(); renderSession(); }));
+  });
   const actions = el('div', null, 'p-actions');
   actions.appendChild(btn('Je passe', () => {
     state.opened = true;
-    state.shinBefore = null;
+    asked.forEach(item => setPain(item.zone, 'before', null));
     save();
     renderSession();
   }, 'p-btn--quiet'));
@@ -107,11 +115,12 @@ export function renderOpening() {
 }
 
 /* Le garde-fou : une DONNÉE écrite par le coach le matin, jamais une règle que
- * la page invente. Elle lit un seuil, une liste et une phrase, et n'interprète
- * rien -- `strength.md` dit « si le injury est >2/10 : version dégradée de A, B
- * annulée », mais ce que ça veut dire aujourd'hui appartient au coach. */
-export const gateFired = () => !!(session.gate && state.shinBefore != null
-                           && state.shinBefore > session.gate.shin_max);
+ * la page invente. Elle lit une zone, un seuil, une liste et une phrase, et
+ * n'interprète rien : une seule zone regardée au-dessus du seuil suffit. */
+export const gateFired = () => !!(session.gate && gateZones().some(item => {
+  const before = painOf(item.zone, 'before');
+  return before != null && before > session.gate.pain_max;
+}));
 
 export function applyGate() {
   if (!gateFired()) return;
@@ -143,10 +152,12 @@ export function renderReview() {
     box.appendChild(group);
   });
 
-  const shin = el('div', null, 'p-score');
-  shin.appendChild(el('p', 'Injury, maintenant', 'p-score__name'));
-  shin.appendChild(scoreScale(() => state.shin, (value) => { state.shin = value; }));
-  box.appendChild(shin);
+  watchedZones.forEach(item => {
+    const pain = el('div', null, 'p-score');
+    pain.appendChild(el('p', item.label + ', maintenant', 'p-score__name'));
+    pain.appendChild(scoreScale(() => painOf(item.zone, 'after'), (value) => { setPain(item.zone, 'after', value); }));
+    box.appendChild(pain);
+  });
 
   // Séance entièrement passée : aucun geste, donc aucune durée à proposer. Le
   // champ reste vide plutôt que d'inventer un chiffre.

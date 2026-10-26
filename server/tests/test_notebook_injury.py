@@ -6,7 +6,7 @@ import datetime as dt
 from pathlib import Path
 
 from redline.notebook_board import Board
-from scripts.ledger import Row
+from scripts.ledger import PainZone, Row
 
 TODAY = dt.date(2026, 10, 9)
 
@@ -14,18 +14,21 @@ TODAY = dt.date(2026, 10, 9)
 def board(rows, observations=()):
     view = Board(None, None, Path('.'), TODAY, dt.datetime(2026, 10, 9, 9, tzinfo=dt.UTC))
     view._rows, view._observations = list(rows), list(observations)
+    view._zones = [PainZone("injury", "Injury")]
     return view
 
 
 def test_injury_counts_each_calendar_week_even_without_a_note():
-    rows = [Row(dt.date(2026, 9, 8), 'EF', pain=0.5), Row(dt.date(2026, 9, 13), 'SL', pain=1.0),
-            Row(dt.date(2026, 9, 18), 'reveil', pain=1.0), Row(dt.date(2026, 10, 3), 'SL', pain=1.5),
-            Row(dt.date(2026, 10, 7), 'EF', pain=1.0), Row(dt.date(2026, 10, 7), 'EF'),
-            Row(dt.date(2026, 8, 30), 'EF', pain=2.5)]
-    observations = [{'kind': 'reveil', 'occurred_on': dt.date(2026, 10, 7), 'measurements': {}},
+    rows = [Row(dt.date(2026, 9, 8), 'EF', pains={'injury': 0.5}), Row(dt.date(2026, 9, 13), 'SL', pains={'injury': 1.0}),
+            Row(dt.date(2026, 9, 18), 'reveil', pains={'injury': 1.0}), Row(dt.date(2026, 10, 3), 'SL', pains={'injury': 1.5}),
+            Row(dt.date(2026, 10, 7), 'EF', pains={'injury': 1.0}), Row(dt.date(2026, 10, 7), 'EF'),
+            Row(dt.date(2026, 8, 30), 'EF', pains={'injury': 2.5})]
+    observations = [{'kind': 'reveil', 'occurred_on': dt.date(2026, 10, 7), 'measurements': {},
+                     'pains': {'injury': {'state': 'pending'}}},
                     {'kind': 'reveil', 'occurred_on': dt.date(2026, 10, 8),
-                     'measurements': {'pain': {'state': 'known', 'value': 0}}},
-                    {'kind': 'reveil', 'occurred_on': dt.date(2026, 9, 20), 'measurements': {}}]
+                     'measurements': {}, 'pains': {'injury': {'state': 'known', 'value': 0}}},
+                    {'kind': 'reveil', 'occurred_on': dt.date(2026, 9, 20), 'measurements': {},
+                     'pains': {'injury': {'state': 'pending'}}}]
     view = board(rows, observations).injury_view()
     assert view['start'] == '2026-09-07' and view['cap'] == 2.0
     assert [(w['week'][-3:], w['peak'], w['n'], w['wake']) for w in view['weeks']] == [

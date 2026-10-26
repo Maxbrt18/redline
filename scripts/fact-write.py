@@ -176,6 +176,10 @@ def _prediction(args, _) -> dict:
                              "--success-if vont ensemble")
         payload["resolves_on"] = {"kind": args.resolves, "date": args.resolves_on.isoformat(),
                                   "success_if": args.success_if}
+        if args.resolves_zone:
+            payload["resolves_on"]["zone"] = args.resolves_zone
+    elif args.resolves_zone:
+        raise SystemExit("--resolves-zone ne vaut que pour une prédiction rattachée")
     return payload
 
 
@@ -419,6 +423,9 @@ def parser() -> argparse.ArgumentParser:
         help="observation qui solde seule la prédiction à son écriture (void si la date "
              "passe sans elle)")
     prediction.add_argument("--resolves-on", type=day, metavar="AAAA-MM-JJ")
+    prediction.add_argument(
+        "--resolves-zone", metavar="ZONE",
+        help="la zone surveillée dont la trace tranche ; obligatoire s'il y en a plusieurs")
     prediction.add_argument(
         "--success-if", metavar="CRITÈRE",
         help="seuil sur la valeur observée, ex. '<=1' (trace au réveil : 0 aucune, "

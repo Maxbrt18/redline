@@ -3,7 +3,7 @@ import {chevron, content, kindIcon, message, pastille, shape, SVG} from '../ui.j
 import {api} from '../api.js';
 import {dm, fmt, kindName, paceOf, rpeRange, weekNumber} from '../format.js';
 import {gauges} from './week.js';
-import {fieldSpec} from './today.js';
+import {cellCount, specOf} from './today.js';
 import {ensure, loadToday} from '../data.js';
 
 // ------------------------------------------------------------ Détail d'une séance faite
@@ -136,25 +136,31 @@ async function sdAnswer(ask, value, card, picked) {
   }
 }
 function sdAsk(data) {
-  const ask = data.ask, metric = ask.fields[0], spec = fieldSpec[metric], card = el('div', null, 'n-check');
+  const ask = data.ask, metric = ask.fields[0], spec = specOf(metric, ask.labels), card = el('div', null, 'n-check');
   const label = el('span', spec.label), target = (data.plan || {}).targets;
   if (metric === 'rpe' && target && target.rpe_max != null) label.append(el('small', 'visé ' + rpeRange(target)));
-  card.append(add(el('p', null, 'n-check-head'), label, el('span', (3 - ask.fields.length + 1) + ' sur 3', 'n-of')));
+  const total = cellCount(ask);
+  card.append(add(el('p', null, 'n-check-head'), label, el('span', (total - ask.fields.length + 1) + ' sur ' + total, 'n-of')));
   const row = el('div', null, 'n-chips');
   row.style.setProperty('--cols', String(spec.values.length <= 7 ? spec.values.length : Math.ceil(spec.values.length / 2)));
   spec.values.forEach(value => row.append(button(fmt(value), node => sdAnswer(ask.id + ':' + metric, value, card, node), '')));
   card.append(row);
-  const next = ask.fields.slice(1).map(field => fieldSpec[field].name);
+  const next = ask.fields.slice(1).map(field => specOf(field, ask.labels).name);
   if (next.length) card.append(el('p', 'Puis ' + next.join(' et ') + (next.length > 1 ? ', un geste chacun.' : '.'), 'n-note'));
-  if (metric === 'pain') card.append(el('p', 'Plus de 3 ? Dis-le au coach dans Messenger.', 'n-note'));
+  if (metric.startsWith('pain:')) card.append(el('p', 'Plus de 3 ? Dis-le au coach dans Messenger.', 'n-note'));
   return card;
 }
 function sdFeelings(data) {
   const ask = data.ask, missing = ask ? ask.fields : [];
   const box = add(el('section', null, 'n-dsec'), sdHead('Ressenti', ask ? 'un geste par valeur' : 'déclaré après la séance'));
   const grid = el('div', null, 'n-dtiles');
-  [['pain', 'Douleur injury', 'tib'], ['rpe', 'Effort (RPE)', ''], ['enjoyment', 'Plaisir', '']].forEach(([metric, label, cls]) => {
-    const value = data.fact[metric];
+  // Une tuile de douleur par zone surveillée, connue ou encore demandée.
+  const known = Object.fromEntries((data.fact.pains || []).map(item => ['pain:' + item.zone, item]));
+  const watched = Object.keys(ask ? ask.labels : {}).length ? Object.entries(ask.labels)
+    : (data.fact.pains || []).map(item => ['pain:' + item.zone, item.label]);
+  const feelings = watched.map(([field, label]) => [field, 'Douleur ' + label, 'tib', (known[field] || {}).value]);
+  feelings.push(['rpe', 'Effort (RPE)', '', data.fact.rpe], ['enjoyment', 'Plaisir', '', data.fact.enjoyment]);
+  feelings.forEach(([metric, label, cls, value]) => {
     if (value == null) {
       const now = missing[0] === metric;
       grid.append(sdTile(label, null, now ? '?' : '—', null, el('small', now ? 'en cours' : missing.includes(metric) ? 'ensuite' : 'non noté'), 'todo'));
@@ -162,15 +168,18 @@ function sdFeelings(data) {
   });
   box.append(grid);
   if (ask) box.append(sdAsk(data));
-  const wake = data.wake, parts = [];
-  if (wake.before != null) parts.push(el('span', 'Réveil du jour ' + fmt(wake.before) + '/10'));
-  if (wake.after != null) parts.push(el('span', 'réveil du lendemain ' + fmt(wake.after) + '/10'));
-  else if (wake.after_due) parts.push(add(el('span'), 'lendemain : ', el('span', 'à noter au réveil', 'n-dpend')));
-  if (parts.length) {
-    const line = el('p', null, 'n-dfoot');
-    parts.forEach((part, index) => line.append(index ? ' · ' : '', part));
-    box.append(line);
-  }
+  const several = data.wake.zones.length > 1;
+  data.wake.zones.forEach(wake => {
+    const parts = [], who = several ? ' · ' + wake.label : '';
+    if (wake.before != null) parts.push(el('span', 'Réveil du jour' + who + ' ' + fmt(wake.before) + '/10'));
+    if (wake.after != null) parts.push(el('span', 'réveil du lendemain ' + fmt(wake.after) + '/10'));
+    else if (data.wake.after_due) parts.push(add(el('span'), 'lendemain' + (wake.before == null ? who : '') + ' : ', el('span', 'à noter au réveil', 'n-dpend')));
+    if (parts.length) {
+      const line = el('p', null, 'n-dfoot');
+      parts.forEach((part, index) => line.append(index ? ' · ' : '', part));
+      box.append(line);
+    }
+  });
   return box;
 }
 
@@ -396,7 +405,10 @@ function sdPrevious(data) {
   if (data.quality && repDplus != null && before.rep_dplus != null) rows.push(['Montée par rép.', '+' + repDplus + ' m', '+' + before.rep_dplus + ' m']);
   if (data.quality && repBeat != null && before.rep_hr != null) rows.push(['FC moy des rép.', String(repBeat), String(before.rep_hr)]);
   if (!data.quality) rows.push(['Distance', num(fact.km), num(before.km)], ['FC moyenne', num(fact.hr_avg, 0), num(before.hr_avg, 0)]);
-  rows.push(['Effort (RPE)', num(fact.rpe), num(before.rpe)], ['Douleur injury', num(fact.pain), num(before.pain)], ['Plaisir', num(fact.enjoyment), num(before.enjoyment)]);
+  const then = Object.fromEntries((before.pains || []).map(item => [item.zone, item.value]));
+  rows.push(['Effort (RPE)', num(fact.rpe), num(before.rpe)]);
+  (fact.pains || []).forEach(item => rows.push(['Douleur ' + item.label, num(item.value), num(then[item.zone])]));
+  rows.push(['Plaisir', num(fact.enjoyment), num(before.enjoyment)]);
   const card = add(el('div', null, 'n-dcard'), add(el('div', null, 'n-dcrow head'), el('span'), el('span', dm(data.date)), el('span', dm(before.date))));
   rows.forEach(([label, now, then]) => card.append(add(el('div', null, 'n-dcrow'), el('span', label), el('span', now), el('span', then))));
   if (data.quality && repDplus != null && before.rep_dplus != null && Math.abs(repDplus - before.rep_dplus) > 0.2 * Math.max(repDplus, before.rep_dplus)) {

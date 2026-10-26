@@ -52,6 +52,9 @@ def clean_database():
         names = ", ".join(f"redline.{table.name}" for table in metadata.sorted_tables)
         connection.execute(sa.text(f"TRUNCATE TABLE {names} RESTART IDENTITY CASCADE"))
         connection.execute(sa.text("INSERT INTO redline.athletes(id) VALUES ('sam')"))
+        # La zone surveillée de l'instance fictive, comme le service la synchronise.
+        connection.execute(sa.text(
+            "INSERT INTO redline.pain_zones(athlete_id, slug, label) VALUES ('sam', 'injury', 'Injury')"))
     yield
     database.dispose()
 
@@ -428,7 +431,7 @@ def test_strength_report_completes_cycle_and_cancels_false_missed_job(store, lat
         assert state.missed_session_is_current(job_id)
     assert store.accept_strength_report({
         "session_key": "strength-a", "performed_on": dt.date(2026, 8, 11),
-        "workout": "a", "duration_minutes": 61, "shin_after": 1,
+        "workout": "a", "duration_minutes": 61, "pains": {"injury": {"after": 1}},
         "psid": "4242", "message_id": "strength:strength-a", "message": "Renfo A fait",
     }, 8) == "accepted"
     assert store.session_cycle_status()[0]["state"] == "completed"
@@ -606,7 +609,7 @@ def test_a_removed_gate_requires_an_existing_canonical_observation(store):
         "occurred_on": dt.date(2026, 8, 14), "kind": "reveil",
         "idempotency_key": "messenger:2026-08-14:reveil",
         "note": "Aucune gêne dans les dix premiers pas.",
-        "measurements": {"pain": {"state": "unavailable"}},
+        "pains": {"injury": {"state": "unavailable"}},
     })
     store.append_plan_revision("2026-W33", second)
     assert store.load_plan("2026-W33")["revisions"][-1]["revision"] == 2
@@ -1489,7 +1492,7 @@ def test_a_bad_gate_resolution_is_refused_before_it_can_cancel_same_turn_facts(s
     store.stage_command(turn_id, "observation:reveil", "observation.add", {
         "occurred_on": "2026-08-14", "kind": "reveil",
         "idempotency_key": "messenger:reveil", "note": "injury plus calme",
-        "measurements": {"pain": {"state": "unavailable"}},
+        "pains": {"injury": {"state": "unavailable"}},
     })
     second = build_revision(
         2, sessions=[], computed_at="2026-08-14T09:10:00+02:00", gates=[])
@@ -1523,7 +1526,7 @@ def test_a_missing_plan_no_longer_swallows_the_facts_of_the_turn(store):
 
 def test_strength_quota_refuses_without_consuming_an_extra_claim(store):
     payload = {"session_key": "sid-1", "performed_on": dt.date(2026, 8, 20),
-               "workout": "a", "shin_before": 1, "shin_after": 2,
+               "workout": "a", "pains": {"injury": {"before": 1, "after": 2}},
                "duration_minutes": 31, "note": "soléaire chargé", "exercises": [],
                "message_id": "strength:sid-1", "psid": "4242", "message": "terminée"}
     assert store.accept_strength_report(payload, 1) == "accepted"
@@ -1535,8 +1538,12 @@ def test_strength_quota_refuses_without_consuming_an_extra_claim(store):
             "select session_key from redline.strength_report_claims order by session_key"
         )).scalars().all()
         session = connection.execute(sa.text(
-            "select shin_before, shin_after, duration_minutes, note "
-            "from redline.strength_sessions where session_key = 'sid-1'"
+            "select (select value from redline.strength_pain_readings p "
+            "        where p.strength_session_id = s.id and p.moment = 'before'), "
+            "       (select value from redline.strength_pain_readings p "
+            "        where p.strength_session_id = s.id and p.moment = 'after'), "
+            "       duration_minutes, note "
+            "from redline.strength_sessions s where session_key = 'sid-1'"
         )).one()
         inbound = connection.execute(sa.text(
             "select message_id, status, body from redline.inbound_messages "
@@ -2425,7 +2432,7 @@ def _wake(store, day, value, *, state="known"):
     return store.add_observation({
         "occurred_on": day, "kind": "reveil", "source": "carnet",
         "idempotency_key": f"carnet:reveil:{day.isoformat()}",
-        "measurements": {"pain": measurement}})
+        "pains": {"injury": measurement}})
 
 
 def _bound(store, key, day, success_if="<=1", probability=.8):
@@ -2488,3 +2495,80 @@ def test_a_completed_wake_cell_settles_and_a_missing_wake_voids_never_falsifies(
     assert (rows["cellule"]["status"], rows["cellule"]["outcome"]) == ("resolved", False)
     assert (rows["absent"]["status"], rows["absent"]["outcome"]) == ("void", None)
     assert (rows["indisponible"]["status"], rows["indisponible"]["outcome"]) == ("void", None)
+
+
+# ------------------------------------------------------------ douleur par zone
+
+def _second_zone(store):
+    store.sync_pain_zones([("injury", "Injury"), ("genou", "Genou")])
+
+
+def test_each_watched_zone_gets_its_own_reading(store):
+    _second_zone(store)
+    observation_id = store.add_observation({
+        "occurred_on": dt.date(2026, 10, 12), "kind": "EF", "idempotency_key": "zones:ef",
+        "measurements": {}, "pains": {"genou": {"state": "known", "value": 2.5}}})
+    row = next(row for row in store.observation_rows() if row["id"] == observation_id)
+    assert row["pains"] == {"genou": {"state": "known", "value": 2.5},
+                            "injury": {"state": "pending", "value": None}}
+    store.complete_measurement(observation_id, "pain", 1.0, zone="injury")
+    with pytest.raises(StorageError, match="déjà connue"):
+        store.complete_measurement(observation_id, "pain", 3.0, zone="genou")
+    with pytest.raises(StorageError, match="nomme la zone"):
+        store.complete_measurement(observation_id, "pain", 3.0)
+
+
+def test_a_zone_the_instance_no_longer_watches_is_refused_but_its_history_stays(store):
+    store.add_observation({
+        "occurred_on": dt.date(2026, 10, 12), "kind": "EF", "idempotency_key": "zones:old",
+        "measurements": {}, "pains": {"injury": {"state": "known", "value": 1.0}}})
+    store.sync_pain_zones([("genou", "Genou")])
+    assert [(zone["slug"], zone["active"]) for zone in store.pain_zones()] == [
+        ("genou", True), ("injury", False)]
+    with pytest.raises(StorageError, match="inconnue ou inactive"):
+        store.add_observation({
+            "occurred_on": dt.date(2026, 10, 13), "kind": "EF",
+            "idempotency_key": "zones:new", "measurements": {},
+            "pains": {"injury": {"state": "known", "value": 1.0}}})
+    old = next(row for row in store.observation_rows()
+               if row["idempotency_key"] == "zones:old")
+    assert old["pains"] == {"injury": {"state": "known", "value": 1.0}}
+
+
+def test_without_a_watched_zone_an_effort_claims_no_pain(store):
+    store.sync_pain_zones([])
+    observation_id = store.add_observation({
+        "occurred_on": dt.date(2026, 10, 12), "kind": "EF", "idempotency_key": "zones:none",
+        "measurements": {}})
+    row = next(row for row in store.observation_rows() if row["id"] == observation_id)
+    assert row["pains"] == {}
+
+
+def test_a_wake_prediction_waits_for_the_zone_it_names(store):
+    _second_zone(store)
+    day = dt.date(2026, 10, 12)
+    with pytest.raises(StorageError, match="nomme sa zone"):
+        _bound(store, "sans-zone", day)
+    store.upsert_prediction({
+        "prediction_key": "genou-calme", "domain": "corps", "statement": "genou calme",
+        "probability": .7, "due_on": day + dt.timedelta(days=2),
+        "resolves_on": {"kind": "reveil", "date": day.isoformat(), "success_if": "<=1",
+                        "zone": "genou"}})
+    store.add_observation({
+        "occurred_on": day, "kind": "reveil", "idempotency_key": "zones:reveil",
+        "measurements": {}, "pains": {"injury": {"state": "known", "value": 2.0},
+                                      "genou": {"state": "known", "value": 0.5}}})
+    [row] = [row for row in store.prediction_rows() if row["prediction_key"] == "genou-calme"]
+    assert (row["status"], row["outcome"]) == ("resolved", True)
+
+
+def test_a_strength_report_keeps_each_zone_before_and_after(store):
+    _second_zone(store)
+    payload = {"session_key": "zones-renfo", "performed_on": dt.date(2026, 10, 12),
+               "workout": "a", "duration_minutes": 30, "note": "", "exercises": [],
+               "pains": {"genou": {"before": 1, "after": 3}, "injury": {"after": 0}},
+               "message_id": "strength:zones-renfo", "psid": "4242", "message": "x"}
+    assert store.accept_strength_report(payload, max_per_day=8) == "accepted"
+    [session] = [row for row in store.strength_history() if row["session_key"] == "zones-renfo"]
+    assert session["pains"] == {"genou": {"before": 1, "after": 3},
+                                "injury": {"before": None, "after": 0}}

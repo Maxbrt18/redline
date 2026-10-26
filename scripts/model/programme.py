@@ -106,17 +106,20 @@ VARIANT_SCHEMA = Schema("variante", [
     field("add", list, required=False, item=field("slug", str)),
 ])
 
-# Le garde-fou injury de la séance du jour. IL EST UNE DONNÉE ÉCRITE PAR LE COACH
-# LE MATIN, jamais une règle que la page invente : `strength.md` § Placement dit
-# « si le injury est >2/10 : version dégradée de A, B annulée », et c'est au coach
-# de décider ce que ça veut dire aujourd'hui. La page lit un seuil, une liste et
-# une phrase — elle n'interprète rien.
+# Le garde-fou de douleur de la séance du jour. IL EST UNE DONNÉE ÉCRITE PAR LE
+# COACH LE MATIN, jamais une règle que la page invente : la note de renfo dit par
+# exemple « si la zone est >2/10 : version dégradée », et c'est au coach de décider ce
+# que ça veut dire aujourd'hui. La page lit une zone, un seuil, une liste et une
+# phrase — elle n'interprète rien. Sans `zone`, le seuil vaut pour chaque zone
+# surveillée : une seule au-dessus suffit.
 #
 # Pourquoi la page redemande alors que le coach a déjà demandé le matin : le lien
 # arrive avec le message et traîne souvent une heure ou deux dans le téléphone
 # avant le premier exercice. L'état de 8 h n'est pas celui de 18 h.
 GATE_SCHEMA = Schema("garde-fou", [
-    field("shin_max", int, minimum=0, maximum=10,
+    field("zone", str, required=False, pattern=r"[a-z0-9][a-z0-9-]{0,39}",
+          note="la zone surveillée que le seuil regarde ; absente, toutes"),
+    field("pain_max", int, minimum=0, maximum=10,
           note="au-DESSUS de ce chiffre, le garde-fou se déclenche"),
     field("drop", list, required=False, item=field("slug", str),
           note="les exercices retirés quand il se déclenche"),
@@ -143,7 +146,7 @@ SELECTION_SCHEMA = Schema("séance du jour", [
     field("note", str, required=False, maximum=300, note="la ligne de bas de card"),
     field("duration_min", int, required=False, minimum=5, maximum=120),
     field("gate", dict, required=False, schema=GATE_SCHEMA,
-          note="le garde-fou injury du jour : {shin_max, drop, say}"),
+          note="le garde-fou de douleur du jour : {zone?, pain_max, drop, say}"),
 ])
 
 ADDED_SCHEMA = Schema("ajout", [

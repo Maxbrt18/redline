@@ -68,6 +68,11 @@ def main() -> None:
             "PostgreSQL indisponible ou schéma en retard : démarrage refusé sans "
             f"stockage canonique à la révision {expected_revision}")
     operational_store = OperationalStore(database)
+    # Les zones de `[[injuries]]` deviennent la référence des lectures de douleur :
+    # une zone ajoutée s'ouvre, une zone retirée passe inactive avec son historique.
+    operational_store.sync_pain_zones(
+        [(injury.slug, injury.label) for injury in config.instance.injuries],
+        actor="startup")
     # Au démarrage, où aucun tour n'est en vol : les traces de mécanique périmées
     # Les marqueurs proactifs périmés s'effacent. Jamais un fait ni une clé d'idempotence.
     purged = operational_store.purge_expired()

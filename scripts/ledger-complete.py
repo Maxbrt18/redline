@@ -4,6 +4,9 @@
 `--fc-douteuse sans_brassard|contexte --cause "<ses mots>"` déclare douteuse une FC
 moyenne déjà connue (2026-10-20) : sans brassard elle ne compte plus nulle part ;
 en contexte (repas, maladie) elle sort des comparaisons de FC à allure, donc de la porte.
+
+La douleur se complète par zone : `--metric pain --zone genou --value 2`. `--zone` peut
+se taire quand l'observation ne porte qu'une zone.
 """
 
 from __future__ import annotations
@@ -61,6 +64,8 @@ def main() -> int:
     parser.add_argument("--type", dest="kind", default="",
                         help="lève l'ambiguïté quand une date porte plusieurs lignes")
     parser.add_argument("--metric", choices=METRICS)
+    parser.add_argument("--zone", default=None,
+                        help="la zone surveillée, pour --metric pain")
     parser.add_argument("--fc-douteuse", dest="hr_doubt", choices=("sans_brassard", "contexte"),
                         help="déclare douteuse la FC moyenne connue de l'observation")
     parser.add_argument("--cause", default="", help="la cause déclarée par Sam, ses mots")
@@ -83,6 +88,8 @@ def main() -> int:
             parser.error("--fc-douteuse exige --cause : la raison donnée par Sam")
     elif not args.metric or (args.value is None and not args.unavailable):
         parser.error("--metric et (--value ou --unavailable) obligatoires")
+    if args.zone is not None and args.metric != "pain":
+        parser.error("--zone ne vaut que pour --metric pain")
 
     store = OperationalStore(Database(args.database_url, application_name="ledger-complete"))
     # Résolu AVANT la mise en scène : une commande de tour préparée sur une clé
@@ -117,6 +124,8 @@ def main() -> int:
     if turn_id:
         payload = {"idempotency_key": key, "metric": args.metric,
                    "value": args.value, "unavailable": args.unavailable}
+        if args.zone is not None:
+            payload["zone"] = args.zone
         digest = hashlib.sha256(json.dumps(
             payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()[:16]
         store.stage_command(turn_id, f"measurement:{key}:{args.metric}:{digest}",
@@ -124,12 +133,13 @@ def main() -> int:
         print(f"{key} : {args.metric} préparée pour le tour.")
         return 0
     try:
-        store.complete_measurement(observation_id, args.metric, args.value,
+        store.complete_measurement(observation_id, args.metric, args.value, zone=args.zone,
                                    unavailable=args.unavailable, actor="ledger-complete")
     except StorageError as exc:
         print(str(exc), file=sys.stderr)
         return 1
-    print(f"{key} : {args.metric} complétée.")
+    what = f"{args.metric} {args.zone}" if args.zone else args.metric
+    print(f"{key} : {what} complétée.")
     return 0
 
 

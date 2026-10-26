@@ -27,12 +27,18 @@ from scripts.model import ledger as table
     ("D+", "64.7", "65"),            # elevation_gain
     ("WBGT", "-3.4", "-3"),          # une nuit d'hiver, et le signe compte
     ("km", "6.8396", "6.84"),
-    ("Dlr", "1.55", "1.6"),
     ("FCmoy", "156,61", "157"),      # la virgule décimale vient de la même prose
 ])
 def test_strava_rend_des_flottants_et_la_colonne_les_veut_entiers(column, source, written):
     """LE test de la panne : la source ment sur le type, l'arrondi vit ici."""
     assert table.canonical_value(column, source) == written
+
+
+def test_la_douleur_d_une_zone_s_arrondit_au_dixieme():
+    assert table.pain_reading("1.55") == {"state": "known", "value": 1.6}
+    assert table.pain_reading("?") == {"state": "unavailable"}
+    with pytest.raises(table.LedgerError):
+        table.pain_reading("11")
 
 
 def test_une_cellule_deja_conforme_nest_jamais_retouchee():
@@ -48,7 +54,7 @@ def test_une_cellule_deja_conforme_nest_jamais_retouchee():
     conforming = {
         "Date": "2026-08-10", "Type": "EF", "km": "6.84", "Temps": "0:41:56",
         "Allure": "6:08", "FCmoy": "157", "FCmax": "168", "Cad": "169",
-        "D+": "65", "D-": "64", "WBGT": "20", "RPE": "2", "Dlr": "1.5",
+        "D+": "65", "D-": "64", "WBGT": "20", "RPE": "2",
         "Plaisir": "6", "Strava": "90000000003", "Note": "EF du jour",
     }
     for name, value in conforming.items():
@@ -87,11 +93,18 @@ def test_lecrivain_type_refuse_en_nommant_la_colonne(monkeypatch, capsys):
     assert "Type" in capsys.readouterr().err
 
 
+def _zones(monkeypatch, add, zones=("injury",)):
+    """Les zones surveillées vivent en base : la CLI les lit, le test les fixe."""
+    monkeypatch.setenv("DATABASE_URL", "postgresql://test")
+    monkeypatch.setattr(add, "_active_zones", lambda url: list(zones))
+
+
 @pytest.mark.parametrize("trace", ["", "?"])
 def test_un_reveil_sans_trace_ne_sécrit_pas(monkeypatch, capsys, trace):
     """Audit du 2026-10-11 : sans `--dlr`, la mesure naissait `pending` sans bruit et la
     réponse de Sam ne vivait que dans la note. La porte ne la lisait jamais."""
     add = _load_writer()
+    _zones(monkeypatch, add)
     argv = ["ledger-add.py", "--dry-run", "--date", "2026-10-11", "--type", "reveil",
             "--note", "Trace légère déclarée par Sam"]
     monkeypatch.setattr(sys, "argv", argv + (["--dlr", trace] if trace else []))
@@ -103,11 +116,46 @@ def test_un_reveil_sans_trace_ne_sécrit_pas(monkeypatch, capsys, trace):
                                          ("très légère", "0.5"), ("nette", "2")])
 def test_le_mot_de_alex_devient_la_valeur(monkeypatch, capsys, word, value):
     add = _load_writer()
+    _zones(monkeypatch, add)
     monkeypatch.setattr(sys, "argv", [
         "ledger-add.py", "--dry-run", "--date", "2026-10-11", "--type", "reveil",
         "--dlr", word])
     assert add.main() == 0
-    assert f"'Dlr': '{value}'" in capsys.readouterr().out
+    assert f"'Dlr': {{'injury': '{value}'}}" in capsys.readouterr().out
+
+
+def test_avec_plusieurs_zones_chaque_douleur_nomme_la_sienne(monkeypatch, capsys):
+    add = _load_writer()
+    _zones(monkeypatch, add, ("genou", "cheville"))
+    monkeypatch.setattr(sys, "argv", [
+        "ledger-add.py", "--dry-run", "--date", "2026-10-11", "--type", "EF",
+        "--dlr", "genou=2", "--dlr", "cheville=?"])
+    assert add.main() == 0
+    assert "'Dlr': {'genou': '2', 'cheville': '?'}" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("given, refused", [
+    (["2"], "nomme la zone"), (["hanche=1"], "zone inconnue"),
+    (["genou=1", "genou=2"], "deux fois")])
+def test_une_douleur_sans_zone_claire_est_refusee(monkeypatch, capsys, given, refused):
+    add = _load_writer()
+    _zones(monkeypatch, add, ("genou", "cheville"))
+    argv = ["ledger-add.py", "--dry-run", "--date", "2026-10-11", "--type", "EF"]
+    for value in given:
+        argv += ["--dlr", value]
+    monkeypatch.setattr(sys, "argv", argv)
+    assert add.main() == 1
+    assert refused in capsys.readouterr().err
+
+
+def test_un_reveil_exige_une_trace_par_zone(monkeypatch, capsys):
+    add = _load_writer()
+    _zones(monkeypatch, add, ("genou", "cheville"))
+    monkeypatch.setattr(sys, "argv", [
+        "ledger-add.py", "--dry-run", "--date", "2026-10-11", "--type", "reveil",
+        "--dlr", "genou=aucune"])
+    assert add.main() == 1
+    assert "réveil sans trace pour cheville" in capsys.readouterr().err
 
 
 def _load_writer():
@@ -133,7 +181,7 @@ def test_existing_observation_is_rejected_before_staging(monkeypatch):
     monkeypatch.setattr(scripts.storage, "Database", MagicMock())
     monkeypatch.setattr(scripts.storage, "OperationalStore", lambda *args: store)
     with pytest.raises(writer.table.LedgerError, match=r"ledger-complete\.py"):
-        writer._write_database("test", {"Date": "2026-09-11", "Type": "EF"},
+        writer._write_database("test", {"Date": "2026-09-11", "Type": "EF"}, {},
                                "strava:90000000004")
     store.stage_command.assert_not_called()
     store.add_observation.assert_not_called()

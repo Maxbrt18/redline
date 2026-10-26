@@ -7,6 +7,7 @@ import hashlib
 import re
 import secrets
 import uuid
+from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -14,7 +15,13 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from .database import Database
 from .schema import notebook_credentials as credentials
 from .schema import notebook_entries as entries
-from .schema import outbound_deliveries, strength_results, strength_sessions, strength_sets
+from .schema import (
+    outbound_deliveries,
+    strength_pain_readings,
+    strength_results,
+    strength_sessions,
+    strength_sets,
+)
 
 DEVICE_SECONDS = 365 * 24 * 3600
 LINK_SECONDS = 24 * 3600
@@ -157,8 +164,15 @@ class NotebookStore:
                 strength_sessions.c.session_key == session_key)).mappings().one_or_none()
             if row is None:
                 return None
-            result = {key: str(row[key]) if row[key] is not None else None
-                      for key in ("performed_on", "duration_minutes", "shin_before", "shin_after", "note")}
+            result: dict[str, Any] = {
+                key: str(row[key]) if row[key] is not None else None
+                for key in ("performed_on", "duration_minutes", "note")}
+            pains: dict[str, dict[str, str | None]] = {}
+            for reading in connection.execute(sa.select(strength_pain_readings).where(
+                    strength_pain_readings.c.strength_session_id == row["id"])).mappings():
+                pains.setdefault(reading["zone"], {"before": None, "after": None})[
+                    reading["moment"]] = str(reading["value"])
+            result["pains"] = pains
             exercises = []
             for exercise in connection.execute(sa.select(strength_results).where(
                 strength_results.c.session_id == row["id"]).order_by(strength_results.c.position)).mappings():

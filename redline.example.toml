@@ -10,11 +10,16 @@ name = "[Prénom]"
 # Le lieu de la météo des séances qui n'en déclarent pas (geocodage Open-Meteo).
 place = "[Ville]"
 
-# La zone que le coach surveille, s'il y en a une : sans bloc [[injuries]], aucune.
-# Une seule pour l'instant : le registre ne range pas encore la douleur par zone.
+# Les zones que le coach surveille, une par bloc : la douleur se note et se suit zone
+# par zone, jamais mélangée. Sans bloc [[injuries]], aucune. Le slug est l'identité
+# stable de la zone en base ; le libellé, ce que le carnet et les messages affichent.
 # [[injuries]]
 # slug = "genou"
 # label = "Genou"
+#
+# [[injuries]]
+# slug = "cheville"
+# label = "Cheville"
 
 # Les capacités que le cockpit suit, dans l'ordre d'affichage. Le slug est celui que
 # `fact-write.py capability` enregistre ; le libellé est ce que le carnet affiche.

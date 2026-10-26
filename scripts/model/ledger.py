@@ -56,8 +56,6 @@ INPUTS = (
                      note="°C, charge thermique — jamais un plafond"),
     ObservationInput("RPE", r"(10|\d)(\.\d)?", metric="rpe", decimals=1,
                      unavailable=True),
-    ObservationInput("Dlr", r"(10|\d)(\.\d)?", metric="pain", decimals=1,
-                     unavailable=True, note="le pic de la séance, pas la moyenne"),
     ObservationInput("Plaisir", r"10|\d", metric="enjoyment", decimals=0,
                      unavailable=True),
     ObservationInput("Strava", STRAVA_ID_PATTERN),
@@ -108,15 +106,100 @@ def canonical_value(name: str, value: str) -> str:
 
 
 def required_columns(kind: str) -> tuple[str, ...]:
-    """Les ressentis nécessaires pour qu'une observation ait une valeur clinique."""
-    if kind in REST_TYPES:
-        return ("Dlr",)
+    """Les ressentis hors douleur nécessaires pour qu'une observation ait une valeur
+    clinique. La douleur se réclame par zone (`requires_pain`)."""
     needed: list[str] = []
     if kind in EFFORT_TYPES:
-        needed += ["RPE", "Dlr"]
+        needed.append("RPE")
     if kind in ENJOYMENT_TYPES:
         needed.append("Plaisir")
     return tuple(needed)
+
+
+# ----------------------------------------------------------- douleur par zone
+#: La colonne de douleur d'une zone, telle qu'un manque la nomme : « Dlr:genou ».
+PAIN_COLUMN = "Dlr"
+PAIN_PATTERN = r"(10|\d)(\.\d)?"
+PAIN_NOTE = "le pic de la séance, pas la moyenne"
+
+
+def requires_pain(kind: str) -> bool:
+    """La douleur de chaque zone surveillée est due pour l'effort et le repos."""
+    return kind in REST_TYPES or kind in EFFORT_TYPES
+
+
+def pain_column(zone: str) -> str:
+    return f"{PAIN_COLUMN}:{zone}"
+
+
+def column_base(column: str) -> str:
+    """« Dlr:genou » → « Dlr » ; les autres colonnes restent elles-mêmes."""
+    return column.split(":", 1)[0]
+
+
+def column_zone(column: str) -> str | None:
+    base, _, zone = column.partition(":")
+    return zone or None if base == PAIN_COLUMN else None
+
+
+def parse_pains(values: list[str], zones: list[str]) -> dict[str, str]:
+    """`--dlr genou=2 --dlr cheville=?` → {zone: valeur brute}.
+
+    Une valeur sans zone n'est permise que s'il n'y a qu'une zone surveillée : deviner
+    laquelle d'entre plusieurs reviendrait à ranger la douleur d'un genou sur une
+    cheville. Une zone inconnue, nommée deux fois, ou une valeur illisible est refusée.
+    """
+    readings: dict[str, str] = {}
+    for raw in values:
+        zone, sep, value = raw.partition("=")
+        if not sep:
+            if len(zones) != 1:
+                raise LedgerError(
+                    "--dlr : nomme la zone, ex. --dlr genou=2 (zones : "
+                    + (", ".join(zones) or "aucune zone surveillée") + ")")
+            zone, value = zones[0], raw
+        zone, value = zone.strip(), value.strip()
+        if zone not in zones:
+            raise LedgerError(f"--dlr : zone inconnue « {zone} » (zones : "
+                              + (", ".join(zones) or "aucune zone surveillée") + ")")
+        if zone in readings:
+            raise LedgerError(f"--dlr : zone « {zone} » donnée deux fois")
+        readings[zone] = value
+    return readings
+
+
+def pain_facts(pains: dict[str, dict]) -> list[str]:
+    """« douleur genou=2 » pour chaque zone connue d'une observation."""
+    return [f"douleur {zone}={reading['value']}" for zone, reading in sorted(pains.items())
+            if reading.get("state") == "known"]
+
+
+def pending_pains(pains: dict[str, dict]) -> list[str]:
+    """Les zones encore attendues d'une observation, nommées comme ledger-complete."""
+    return [f"pain:{zone}" for zone, reading in sorted(pains.items())
+            if reading.get("state") == "pending"]
+
+
+def strength_pain_facts(pains: dict[str, dict]) -> list[str]:
+    """« genou 1->2/10 » : la douleur d'une séance de renfo, avant puis après."""
+    def shown(value: object) -> str:
+        return "?" if value is None else str(value)
+    return [f"{zone} {shown(moments.get('before'))}->{shown(moments.get('after'))}/10"
+            for zone, moments in sorted(pains.items())]
+
+
+def pain_reading(value: str) -> dict:
+    """Une valeur brute de douleur → la lecture typée (« ? » = demandée puis perdue)."""
+    if value == UNKNOWN:
+        return {"state": "unavailable"}
+    text = value.replace(",", ".")
+    try:
+        number = Decimal(text).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+    except InvalidOperation:
+        raise LedgerError(f"douleur illisible : {value!r} (0 à 10, au demi-point)") from None
+    if not re.fullmatch(PAIN_PATTERN, str(number)):
+        raise LedgerError(f"douleur hors échelle : {value!r} (0 à 10)")
+    return {"state": "known", "value": float(number)}
 
 
 # Les observations antérieures ont été écrites sous un contrat moins exigeant.
@@ -124,27 +207,29 @@ COMPLETENESS_FROM = dt.date(2026, 7, 30)
 COMPLETION_WINDOW = dt.timedelta(days=2)
 
 METRIC_COLUMNS = {
-    "rpe": "RPE", "pain": "Dlr", "enjoyment": "Plaisir",
+    "rpe": "RPE", "enjoyment": "Plaisir",
     "elevation_gain_m": "D+", "elevation_loss_m": "D-",
 }
 
 
 def missing_observation_fields(observation: dict) -> list[str]:
-    """Champs encore requis d'une observation typée."""
+    """Champs encore requis d'une observation typée ; la douleur, zone par zone."""
     kind = observation.get("kind", "")
     metrics = observation.get("measurements", {})
     required: list[str] = []
-    if kind in REST_TYPES:
-        required.append("pain")
-    else:
+    if kind not in REST_TYPES:
         if kind in EFFORT_TYPES:
-            required += ["rpe", "pain"]
+            required.append("rpe")
         if kind in ENJOYMENT_TYPES:
             required.append("enjoyment")
     missing = [
         METRIC_COLUMNS[metric] for metric in required
         if (metrics.get(metric) or {}).get("state") not in {"known", "unavailable"}
     ]
+    if requires_pain(kind):
+        missing += [pain_column(zone) for zone, reading in sorted(
+            (observation.get("pains") or {}).items())
+            if reading.get("state") not in {"known", "unavailable"}]
     if observation.get("strava_activity_id") is not None:
         missing += [
             METRIC_COLUMNS[metric]

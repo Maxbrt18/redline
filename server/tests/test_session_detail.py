@@ -161,6 +161,9 @@ def store():
         names = ", ".join(f"redline.{table.name}" for table in metadata.sorted_tables)
         connection.execute(sa.text(f"TRUNCATE TABLE {names} RESTART IDENTITY CASCADE"))
         connection.execute(sa.text("INSERT INTO redline.athletes(id) VALUES ('sam')"))
+        # La zone surveillée de l'instance fictive, comme le service la synchronise.
+        connection.execute(sa.text(
+            "INSERT INTO redline.pain_zones(athlete_id, slug, label) VALUES ('sam', 'injury', 'Injury')"))
     yield OperationalStore(database)
     database.dispose()
 

@@ -32,8 +32,11 @@ SESSION = {
 }
 
 
+ZONES = {"injury": "Injury"}
+
+
 def parsed(report: dict, session: dict = SESSION) -> dict:
-    return strength.parse_report(report, session["exercises"])
+    return strength.parse_report(report, session["exercises"], ZONES)
 
 
 # ----------------------------------------------------------------------- URL
@@ -103,9 +106,9 @@ def test_sidecar_absent_or_not_a_session(tmp_path):
 def test_parser_refuses_out_of_range_numbers_instead_of_forging_bounds():
     with pytest.raises(strength.ReportError):
         strength.parse_report({
-            "shin": 99, "minutes": -5, "note": "ok",
+            "pains": {"injury": {"after": 99}}, "minutes": -5, "note": "ok",
             "exercises": [{"i": 1, "score": 42, "reps": [12, -3, "x", 9999]}],
-        }, SESSION["exercises"])
+        }, SESSION["exercises"], ZONES)
 
 
 def test_parser_refuses_indexes_outside_the_session():
@@ -128,7 +131,8 @@ def test_parser_refuses_junk():
 
 def test_format_message_reads_like_the_athlete_wrote_it():
     message = strength.format_message(SESSION, parsed({
-        "shin": 1, "minutes": 32, "note": "Le soléaire a lâché avant le gastroc.",
+        "pains": {"injury": {"after": 1}}, "minutes": 32,
+        "note": "Le soléaire a lâché avant le gastroc.",
         "exercises": [
             {"i": 0, "score": 3},
             {"i": 1, "score": 7, "reps": [14, 12, 11, 10]},
@@ -233,20 +237,35 @@ def test_an_untouched_exercise_leaves_no_row():
     assert [row["slug"] for row in rows] == ["warmup-a"]
 
 
-# ----------------------------------------------------- les deux lectures du injury
+# ---------------------------------------------- les deux lectures de chaque zone
 
 @pytest.mark.parametrize("report,said", [
-    ({"shin_before": 1, "shin": 3}, "Injury : 1/10 avant, 3/10 après (monté)."),
-    ({"shin_before": 3, "shin": 1}, "Injury : 3/10 avant, 1/10 après (descendu)."),
-    ({"shin_before": 2, "shin": 2}, "Injury : 2/10 avant, 2/10 après (stable)."),
-    ({"shin_before": 2}, "Injury : 2/10 avant de commencer."),
-    ({"shin": 2}, "Injury : 2/10 après la séance (rien avant)."),
+    ({"before": 1, "after": 3}, "Injury : 1/10 avant, 3/10 après (monté)."),
+    ({"before": 3, "after": 1}, "Injury : 3/10 avant, 1/10 après (descendu)."),
+    ({"before": 2, "after": 2}, "Injury : 2/10 avant, 2/10 après (stable)."),
+    ({"before": 2}, "Injury : 2/10 avant de commencer."),
+    ({"after": 2}, "Injury : 2/10 après la séance (rien avant)."),
 ])
-def test_the_two_shin_readings_never_get_merged(report, said):
+def test_the_two_readings_never_get_merged(report, said):
     """Le registre en fait deux séries qui ne se mélangent pas (2026-07-29) : la
     lecture au repos et le pic à l'effort. Un seul chiffre ne répondait ni à l'une
     ni à l'autre — « 2/10 après » n'a pas de sens sans ce qu'il valait avant."""
-    assert said in strength.format_message(SESSION, parsed(report))
+    assert said in strength.format_message(SESSION, parsed({"pains": {"injury": report}}))
+
+
+def test_each_zone_is_reported_under_its_own_name():
+    zones = {"genou": "Genou", "cheville": "Cheville"}
+    clean = strength.parse_report({"pains": {"genou": {"before": 1, "after": 3},
+                                             "cheville": {"after": 0}}},
+                                  SESSION["exercises"], zones)
+    message = strength.format_message(SESSION, clean)
+    assert "Genou : 1/10 avant, 3/10 après (monté)." in message
+    assert "Cheville : 0/10 après la séance (rien avant)." in message
+
+
+def test_a_zone_the_instance_does_not_watch_is_refused():
+    with pytest.raises(strength.ReportError, match="non surveillée"):
+        strength.parse_report({"pains": {"hanche": {"after": 1}}}, SESSION["exercises"], ZONES)
 
 
 def test_a_gated_exercise_is_not_an_exercise_that_was_skipped():

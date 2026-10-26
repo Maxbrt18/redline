@@ -1866,7 +1866,7 @@ ne demande pas de confirmation artificielle."""
             self._complete_job(job)
             return
         missing = [column for column in current["missing"]
-                   if column in {"RPE", "Dlr", "Plaisir"} and not
+                   if ledger_model.column_base(column) in {"RPE", "Dlr", "Plaisir"} and not
                    self._state.proactive.marked(
                        "asked:" + ledger_model.cell_key(current, column))]
         if not missing:

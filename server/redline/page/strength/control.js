@@ -35,7 +35,7 @@ export function stepHead(index, exercise, live, done) {
       // « Retiré » n'est pas « pas fait » : l'un est une décision du coach que
       // la page applique, l'autre un choix de Sam. Les confondre ferait lire
       // au coach une inobservance là où sa propre règle a joué.
-      if (progress.gated) dose = 'retiré — injury';
+      if (progress.gated) dose = 'retiré — garde-fou';
       else if (progress.skipped) dose = 'pas fait';
       else if (!banked.length) { /* rien de compté : la dose reste */ }
       else if (exercise.dose.measure === 'contacts') {
@@ -160,7 +160,7 @@ export function control(index) {
   const progress = progressOf(index);
   if (progress.gated) {
     const box = el('div', null, 'p-ctrl');
-    box.appendChild(el('p', 'Retiré par le garde-fou injury', 'p-ctrl__label'));
+    box.appendChild(el('p', 'Retiré par le garde-fou de douleur', 'p-ctrl__label'));
     box.appendChild(el('p', session.gate.say, 'p-ctrl__value'));
     const cues = cuesFor(exercise);
     if (cues.length) box.appendChild(howBlock(cues));

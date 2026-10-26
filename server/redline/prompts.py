@@ -12,6 +12,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from scripts.model import agent_input, typography
+from scripts.model import ledger as ledger_model
 
 #: Les caractères qu'un clavier de téléphone ne porte pas, et que le coach ne tape donc
 #: jamais. La liste est une DONNÉE parce que `tests/test_prompts.py` s'en sert pour
@@ -261,7 +262,7 @@ LABELS = {
     # séance ; « la douleur (/10) » demandait au réveil une note qu'il n'a pas
     # (`coaching/protocols.md` § Le réveil n'est pas la même monnaie).
     "RPE": "l'effort ressenti sur la séance ENTIÈRE (RPE, un entier)",
-    "Dlr": "la douleur injury (/10 sur SA table, plafond 2)",
+    "Dlr": "la douleur au pic (/10 sur SA table, plafond 2)",
     "Plaisir": "le plaisir pris (/10)",
     "D+": "le D+",
     "D-": "le D-",
@@ -308,11 +309,17 @@ def _split_cells(entries: list) -> tuple[list, list]:
     return asked, fetched
 
 
+def _label(column: str) -> str:
+    """« Dlr:genou » → la douleur au pic… (genou) ; une zone se nomme toujours."""
+    zone = ledger_model.column_zone(column)
+    base = LABELS.get(ledger_model.column_base(column), column)
+    return f"{base} ({zone})" if zone else base
+
+
 def _listing(entries: list, *, labelled: bool) -> str:
     return " ; ".join(
         f"{entry['date']} ({entry['type']}) : "
-        + ", ".join((LABELS.get(column, column) if labelled else column)
-                    for column in entry["missing"])
+        + ", ".join((_label(column) if labelled else column) for column in entry["missing"])
         for entry in entries
     )
 

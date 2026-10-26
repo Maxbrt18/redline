@@ -23,7 +23,7 @@ from typing import Any
 
 from flask import Flask, jsonify, request
 
-from scripts.model import strength_log
+from scripts.model import paths, strength_log
 from scripts.storage.database import expected_schema_revision
 from scripts.storage.repository import OperationalStore
 
@@ -169,8 +169,8 @@ def _strength_payload(session: dict, report: dict, rows: list[dict], *,
         "session_key": str(session.get("sid") or "")[:64],
         "performed_on": performed_on,
         "workout": str(session.get("session") or "")[:20] or None,
-        "shin_before": report["shin_before"],
-        "shin_after": report["shin"],
+        "pains": {zone: {"before": reading["before"], "after": reading["after"]}
+                  for zone, reading in report["pains"].items()},
         "duration_minutes": report["minutes"],
         "note": report["note"],
         "prescription": session,
@@ -324,7 +324,7 @@ def create_app(config: Config, bot: CoachBot, state: Any,
 
     # ---- interactive strength session
 
-    session_html, session_etag = page.build(vault / "scripts" / "cards", cues)
+    session_html, session_etag = page.build(paths.ENGINE_ROOT / "scripts" / "cards", cues)
 
     @app.get(strength.PAGE_PATH)
     def session_page():
@@ -359,11 +359,15 @@ def create_app(config: Config, bot: CoachBot, state: Any,
             response = jsonify({"status": "forbidden"})
             response.status_code = 403
         else:
-            previous = None
+            previous, zones = None, []
             if operational_store is not None:
                 previous = operational_store.previous_strength_prescription(resolved["session"], clock.today())
+                # Les zones à demander avant et après : celles d'AUJOURD'HUI, pas celles
+                # figées dans le snapshot de la séance livrée.
+                zones = [{"zone": zone["slug"], "label": zone["label"]}
+                         for zone in operational_store.pain_zones() if zone["active"]]
             response = jsonify({"status": "ok", "session": resolved["session"],
-                                "previous_session": previous})
+                                "previous_session": previous, "zones": zones})
         response.headers["Cache-Control"] = "no-store"
         return response
 
@@ -409,7 +413,9 @@ def create_app(config: Config, bot: CoachBot, state: Any,
 
         report = body.get("report")
         try:
-            clean = strength.parse_report(report, session["exercises"])
+            zones = ({zone["slug"]: zone["label"] for zone in operational_store.pain_zones()
+                      if zone["active"]} if operational_store is not None else {})
+            clean = strength.parse_report(report, session["exercises"], zones)
             if not clean["performed_on"]:
                 raise strength.ReportError("performed_on absent")
             performed_on = date.fromisoformat(clean["performed_on"])
