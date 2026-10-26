@@ -47,7 +47,7 @@ def render(store: OperationalStore, root: Path, week: str, today: dt.date) -> st
     instruments = ledger.load_instruments(store)
     targets = programme.rpe_targets(root)
     lines = ["[DOSSIER DU BILAN, calculé par le service avant ce tour, invisible pour "
-             "Sam. Ces chiffres sont déjà calculés par les mêmes fonctions que les CLI : "
+             "l'athlète. Ces chiffres sont déjà calculés par les mêmes fonctions que les CLI : "
              "cite-les, ne les recalcule pas ; relance une CLI seulement pour vérifier un "
              "point précis.]", ""]
     lines.extend(ledger.week_report(store, rows, instruments, targets, week, today,
@@ -98,7 +98,7 @@ def render(store: OperationalStore, root: Path, week: str, today: dt.date) -> st
     overdue = [row for row in store.deadline_rows()
                if row.get("status") != "done" and _as_date(row["due_on"]) < today]
     lines += ["", f"Échéances échues ({len(overdue)}). Pour chacune qui dépend d'une action "
-                  "de Sam, donne-lui l'action prête à faire et une règle de repli datée :"]
+                  "de l'athlète, donne-lui l'action prête à faire et une règle de repli datée :"]
     lines.extend(f"- {row['deadline_key']} (due le {_as_date(row['due_on']):%d/%m}) : "
                  f"{row['item']}" + (f" ; bloque {row['blocks']}" if row.get("blocks") else "")
                  for row in overdue[:MAX_LISTED])

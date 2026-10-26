@@ -150,7 +150,7 @@ def ribbon(segments: list, *, width: int = CONTENT_W) -> str:
     gap to R1 inside, the label below; a recovery is a pale sliver on the floor
     with its duration. Under the ribbon, when the reps carry one, the heart rate
     as a line across the rep centres: what each acceleration cost.
-    (Sam, 2026-10-01: ribbon B + heart-rate band D.)
+    (l'athlète, 2026-10-01: ribbon B + heart-rate band D.)
     """
     if not segments:
         return ""

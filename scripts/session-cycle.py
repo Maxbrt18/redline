@@ -2,7 +2,7 @@
 """Pilote le cycle tolérant à l'oubli d'une séance.
 
 `start` est un raccourci facultatif. Une observation Strava datée reconstruit le
-départ et la fin même si Sam n'a rien déclaré avant de partir.
+départ et la fin même si l'athlète n'a rien déclaré avant de partir.
 """
 
 from __future__ import annotations

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Workout card -- every rep of a quality session as a ribbon in relief.
 
-Form (Sam, 2026-10-01, after a dot plot and a speed bar chart he found
+Form (l'athlète, 2026-10-01, after a dot plot and a speed bar chart he found
 unreadable): the session in the order it was run, each block as wide as it
 lasted. A rep rises with how much faster than R1 it went -- the shape of the
 session, flat or progressive -- and carries its pace on top and its gap to R1

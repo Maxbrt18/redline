@@ -4,7 +4,7 @@ Three requirements shape everything here:
 
   - **Every error, not the first one.** Fixing a note blind over six round trips is
     what makes a validator get abandoned.
-  - **Messages in French naming the field and the value.** Sam reads them in
+  - **Messages in French naming the field and the value.** The athlete reads them in
     `vault-check.py` output, Claude reads them when a script refuses its input. A
     message like « champ « dose.measure » : "rep" inconnu (attendus : amrap,
     contacts, reps, time) » fixes itself; "ValidationError" does not.

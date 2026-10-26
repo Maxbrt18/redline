@@ -739,7 +739,7 @@ deadlines = sa.Table(
     sa.Column("starts_on", sa.Date),
     sa.Column("ends_on", sa.Date),
     sa.Column("context", JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")),
-    # Présent = une action de Sam, montrée dans son carnet sous ce libellé court.
+    # Présent = une action de l'athlète, montrée dans son carnet sous ce libellé court.
     # Absent = une échéance de travail du coach, qui ne quitte jamais le vault.
     sa.Column("athlete_label", sa.Text),
     sa.CheckConstraint("status IN ('todo','scheduled','done')", name="ck_deadlines_status"),
@@ -824,7 +824,7 @@ coach_predictions = sa.Table(
 )
 
 # Permis EF (décision du 2026-09-27) : le choix du coach pour une EF déléguée, scellé
-# AVANT que Sam ne décide. Immuable : une deuxième écriture identique est idempotente,
+# AVANT que l'athlète ne décide. Immuable : une deuxième écriture identique est idempotente,
 # une écriture différente est refusée -- un choix qu'on corrige après coup ne prouve rien.
 permit_choices = sa.Table(
     "permit_choices", metadata,
@@ -1035,7 +1035,7 @@ outbound_deliveries = sa.Table(
     sa.Column("payload_digest", sa.Text, nullable=False),
     # L'enveloppe calculée elle-même : une reprise la RENVOIE au lieu de refaire le tour
     # modèle qui l'a produite. `prepared` = calculée, pas encore tentée (proactif retenu
-    # parce que Sam écrit, par exemple).
+    # parce que l'athlète écrit, par exemple).
     sa.Column("payload", JSONB),
     sa.Column("status", sa.Text, nullable=False),
     sa.Column("attempts", sa.Integer, nullable=False, server_default="1"),

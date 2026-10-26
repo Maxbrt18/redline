@@ -5,7 +5,7 @@
 .n-facts b { display: block; font: 700 26px/1 var(--display); }
 .n-facts small { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; }
 
-/* Aujourd'hui, le fil du jour (maquette A validée par Sam le 2026-10-09) : les étapes
+/* Aujourd'hui, le fil du jour (maquette A validée par l'athlète le 2026-10-09) : les étapes
  * du jour reliées par un filet, puis ce qui vient, puis les repères. Le point rouge est
  * l'étape en cours : un disque plein, sans halo ni pulsation (« ça fait très AI
  * generated »). Une étape faite se coche à l'encre ; le repos est un point éteint. */
@@ -144,7 +144,7 @@
 /* Une séance du fil porte la pastille de sa famille devant son titre. */
 .n-step h2 { display: flex; align-items: center; gap: 10px; }
 .n-step h2 > .n-pas { margin-top: -2px; }
-/* Les repères sur le sable (palette « Sable », Sam, 2026-10-26) : un même fond neutre et
+/* Les repères sur le sable (palette « Sable », l'athlète, 2026-10-26) : un même fond neutre et
  * chaud pour les trois, l'étiquette à l'encre ; seule la pastille dit la famille. Sans carte
  * teintée, le rouge garde son sens partout : la lettre du jour, le plafond franchi. */
 .n-tile.week { --h: var(--h-run); }

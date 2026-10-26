@@ -7,7 +7,7 @@ import {cellCount, specOf} from './today.js';
 import {ensure, loadToday} from '../data.js';
 
 // ------------------------------------------------------------ Détail d'une séance faite
-// Maquette v2 validée par Sam le 2026-10-26, en palette « Sable » : des cartes au lieu
+// Maquette v2 validée par l'athlète le 2026-10-26, en palette « Sable » : des cartes au lieu
 // des filets, une tête qui dit la séance en un grand chiffre et une barre, la couleur des
 // zones de FC partout où une FC s'affiche, le rouge pour les répétitions (l'intensité).
 // Tout est calculé par le service (/carnet-api/session/<id>) ; ici on met en forme.

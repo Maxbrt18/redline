@@ -73,7 +73,7 @@ SESSION_SCHEMA = Schema("séance", [
     field("type", str, choices=("seance-type",)),
     field("title", str, note="le titre imprimé en tête de card"),
     field("rule", str, minimum=10, maximum=200,
-          note="la règle imprimée en pied de card — ce que Sam lit PENDANT la séance"),
+          note="la règle imprimée en pied de card — ce que l'athlète lit PENDANT la séance"),
     field("exercises", list, minimum=1, item=field("exercice", object),
           note="les slugs, DANS L'ORDRE (il est non négociable)"),
     field("aliases", list, required=False, item=field("alias", str)),

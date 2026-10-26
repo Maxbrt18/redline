@@ -30,7 +30,7 @@ Environment=PATH=/home/ubuntu/.venvs/redline-current/bin:/home/ubuntu/.claude-ru
 Environment=DISABLE_AUTOUPDATER=1
 Environment=PYTHONPATH=/home/ubuntu/redline:/home/ubuntu/redline/server
 # Timezone: the schedule (debrief, morning note, usage-limit reset, commit stamps)
-# must be on Sam's local time, not UTC.
+# must be on the athlete's local time, not UTC.
 Environment=TZ=Europe/Paris
 
 ExecStartPre=/usr/bin/test -S /run/redline-postgres/.s.PGSQL.5432

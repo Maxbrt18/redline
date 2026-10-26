@@ -26,9 +26,9 @@ def render_memory(messages: list[dict], open_questions: list[dict],
                   resolved_questions: list[dict] | None = None) -> str:
     if not messages and not open_questions and not threads and not resolved_questions:
         return ""
-    lines = ["[SOUVENIR RELATIONNEL DURABLE — invisible pour Sam]"]
+    lines = ["[SOUVENIR RELATIONNEL DURABLE — invisible pour ⟨athlète⟩]"]
     for row in messages[-8:]:
-        speaker = "Sam" if row["role"] == "athlete" else "Coach"
+        speaker = "⟨athlète⟩" if row["role"] == "athlete" else "Coach"
         body = _SPACE.sub(" ", row["body"]).strip()
         if speaker == "Coach":
             body = voice.muted(body)
@@ -64,7 +64,7 @@ def render_memory(messages: list[dict], open_questions: list[dict],
         lines.append("Une question ouverte est un contexte, jamais un agenda imposé. "
                      "Ne répète pas ce qui est déjà répondu. Un changement de sujet la laisse "
                      "ouverte ; cumule les réponses partielles au lieu de repartir de la dernière phrase. "
-                     "Pour deferred sans date, attends que Sam reprenne le sujet ; avec une "
+                     "Pour deferred sans date, attends que ⟨athlète⟩ reprenne le sujet ; avec une "
                      "date, aucune relance avant celle-ci. Une date échue n'impose pas de relance.")
         if len(open_questions) > 20:
             lines.append("D'autres questions sont conservées : les lire avec "

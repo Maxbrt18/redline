@@ -7,7 +7,7 @@ import {swap} from '../nav.js';
 // Poussé depuis la tuile des repères (maquette validée le 2026-10-09) : un point par
 // séance notée et chaque réveil chiffré sur une même échelle graduée (2026-10-10 : les
 // réveils posés sous l'axe, sans valeur, ne se lisaient pas), le plafond en pointillé,
-// l'échelle de Sam en ses mots, puis le pic par semaine et les réveils sans note. Des
+// l'échelle de l'athlète en ses mots, puis le pic par semaine et les réveils sans note. Des
 // faits, aucun verdict.
 function painChart(data) {
   // `left` : la gouttière des graduations ; le tracé commence après elle.

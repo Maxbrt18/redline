@@ -33,7 +33,7 @@ export function stepHead(index, exercise, live, done) {
     if (done && progress) {
       const banked = progress.slots.filter((slot) => slot != null);
       // « Retiré » n'est pas « pas fait » : l'un est une décision du coach que
-      // la page applique, l'autre un choix de Sam. Les confondre ferait lire
+      // la page applique, l'autre un choix de l'athlète. Les confondre ferait lire
       // au coach une inobservance là où sa propre règle a joué.
       if (progress.gated) dose = 'retiré — garde-fou';
       else if (progress.skipped) dose = 'pas fait';

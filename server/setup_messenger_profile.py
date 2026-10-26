@@ -3,7 +3,7 @@
 
 Installs the persistent menu (the hamburger in the conversation) and the
 ice-breakers (suggestions shown on an empty conversation). Each button carries in
-its payload the SENTENCE injected verbatim into the conversation, as if Sam had
+its payload the SENTENCE injected verbatim into the conversation, as if the athlete had
 typed it: the webhook (redline/web.py) routes it to the coach with no lookup table.
 
 The button labels and payloads stay in French (the athlete reads them); the code

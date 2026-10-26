@@ -166,7 +166,7 @@ def _cue_script(cues) -> str:
     de donnée de santé, pas de nom, pas de dose, rien de personnel — « Genou
     fléchi à ~30°, amplitude maximale » est dans n'importe quel manuel. Mais la
     page n'est plus une coquille vide, et le dire vaut mieux que le découvrir.
-    (Arbitrage de Sam, 2026-07-31.)
+    (Arbitrage de l'athlète, 2026-07-31.)
 
     Corollaire : le document est assemblé au démarrage. Les consignes font donc
     partie du runtime et leur mise à jour passe par un déploiement du service.

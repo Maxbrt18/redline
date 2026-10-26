@@ -16,7 +16,7 @@ DAYS = ("lun", "mar", "mer", "jeu", "ven", "sam", "dim")
 #: DISPARAISSAIT de la liste au lieu de s'afficher vide. Le 25/08, le coach a annulé le
 #: renfo B du jeudi sans jamais créer le jogging annoncé dans son propre motif, et « la
 #: suite de la semaine » a rendu mercredi, vendredi, samedi, dimanche -- un trou que ni
-#: Sam ni le coach ne pouvaient voir, chacun lisant la même liste amputée. Deux
+#: L'athlète ni le coach ne pouvaient voir, chacun lisant la même liste amputée. Deux
 #: révisions successives ont reconduit l'oubli. Le rendu affirme « voilà ce qu'il te
 #: reste » : il doit donc parler de CHAQUE jour de la période qu'il annonce, y compris
 #: pour dire qu'il n'y a rien.
@@ -25,7 +25,7 @@ RIEN = "rien de prévu"
 
 class PlanStatus(enum.Enum):
     VALID = "valide"
-    AWAITING = "en attente d'une réponse de Sam"
+    AWAITING = "en attente d'une réponse de ⟨athlète⟩"
     STALE = "à réexaminer : une activité non rattachée est apparue depuis son calcul"
     INVALID = "invalide"
 
@@ -186,7 +186,7 @@ def prescription_state(raw: str, since: str, *,
 
 def render_plan_for_scope(raw: str, week: str, scope: str, *, today: str,
                           exclude_ids: frozenset[str] = frozenset()) -> str:
-    """Rend exactement ce que Sam demande, y compris s'il le redemande."""
+    """Rend exactement ce que l'athlète demande, y compris s'il le redemande."""
     if scope == "today":
         return render_plan_message(
             raw, week, today=today, exclude_ids=exclude_ids)
@@ -244,7 +244,7 @@ def render_plan_delta(before_raw: str, after_raw: str, week: str, *, today: str,
         changed.append(f"{_label(date.fromisoformat(session['date']))} : {session['title']} retiré")
     if not changed:
         return ""
-    # Ni numéro de révision ni semaine ISO : Sam lit un programme, pas un registre
+    # Ni numéro de révision ni semaine ISO : l'athlète lit un programme, pas un registre
     # (audit du 2026-10-15, « Programme 2026-W42 r1 enregistré »).
     if len(changed) == 1:
         return f"Changement au programme : {changed[0]}."

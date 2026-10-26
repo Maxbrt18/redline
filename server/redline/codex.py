@@ -11,6 +11,7 @@ import time
 from types import SimpleNamespace
 from typing import Any
 
+from . import persona
 from .agent import (
     HOLDING_MAX_CHARS,
     PLAN_SCOPES,
@@ -195,7 +196,8 @@ class CodexRunner:
             "cwd": self._config.vault_path,
             # Le style reste obligatoire pour une analyse de pièce jointe en lecture
             # seule. Le classifieur, lui, reçoit uniquement son schéma de triage.
-            "developer_instructions": instructions,
+            "developer_instructions": (None if instructions is None
+                                       else self._personal(instructions)),
             "model": model,
             # Redline est un service applicatif, pas un poste de développement :
             # son isolation est portée par l'utilisateur Unix, l'environnement
@@ -205,6 +207,10 @@ class CodexRunner:
             # n'est monté ; les approbations interactives restent refusées.
             "sandbox": self._sdk.Sandbox.full_access,
         }
+
+    def _personal(self, text: str) -> str:
+        """Le prénom de l'instance à la place du jeton : tout ce que le modèle lit."""
+        return persona.render(text, self._config.instance.athlete_name)
 
     def _open_thread(self, psid: str, model: str | None, mode: SessionMode,
                      turn_id: str | None, *, shell_enabled: bool = True) -> Any:
@@ -233,7 +239,7 @@ class CodexRunner:
             # de thread plus ancien de réintroduire bubblewrap.
             "sandbox": self._sdk.Sandbox.full_access,
         }
-        handle = thread.turn(message, **options)
+        handle = thread.turn(self._personal(message), **options)
         timed_out = threading.Event()
         active = self._runs.start(
             psid, AgentActivity(model, effort, time.monotonic(), timeout),
@@ -254,7 +260,7 @@ class CodexRunner:
                 result = handle.run()
             except Exception as exc:
                 if cancelled.is_set():
-                    raise _CancelledError("tour Codex annulé par Sam") from exc
+                    raise _CancelledError("tour Codex annulé par l'athlète") from exc
                 if timed_out.is_set():
                     raise _WatchdogError(
                         "tour Codex interrompu après le délai maximal") from exc
@@ -269,7 +275,7 @@ class CodexRunner:
             timer.cancel()
             self._runs.finish(psid, active)
         if cancelled.is_set():
-            raise _CancelledError("tour Codex annulé par Sam")
+            raise _CancelledError("tour Codex annulé par l'athlète")
         if timed_out.is_set():
             raise _WatchdogError("tour Codex interrompu après le délai maximal")
         return result

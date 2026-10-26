@@ -1076,7 +1076,7 @@ def test_messenger_reply_to_an_existing_inbound_is_backed_by_the_same_relation()
 
     context = state.reply_context(("mid-new",))
 
-    assert "message antérieur de Sam" in context
+    assert "message antérieur de ⟨athlète⟩" in context
     assert "Mon ancien constat." in context
 
 

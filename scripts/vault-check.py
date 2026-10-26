@@ -34,6 +34,7 @@ if str(ROOT) not in sys.path:
 from scripts.model import (  # noqa: E402
     claims,
     correction_replay,
+    instance,
     ledger,
 )
 from scripts.model import decisions as decision_log  # noqa: E402
@@ -95,7 +96,7 @@ CITES_EVIDENCE = {"coaching/decisions.md"}
 FORBIDDEN = [r"\bSECRET\b", r"diagnostic de [a-zé]+ite\b"]
 
 # Chiffres qui ont été ÉCRITS COMME DES FAITS sans avoir jamais été mesurés, retirés
-# après correction de Sam. Distinct de FORBIDDEN (fuites de vie privée) : ici le
+# après correction de l'athlète. Distinct de FORBIDDEN (fuites de vie privée) : ici le
 # risque n'est pas la divulgation, c'est la RÉAPPARITION — une valeur inventée qui a
 # essaimé dans cinq fichiers reviendra par copie si rien ne la retient.
 #   (no entry yet: add the regex of any number that was invented rather than measured)
@@ -263,7 +264,7 @@ def check_operational_privacy(vault: Vault, report: Report) -> None:
         text = vault.text(path) or ""
         for match in COMPANION.finditer(text):
             name = match.group(1)
-            if (name not in NOT_A_PERSON and name != "Sam"
+            if (name not in NOT_A_PERSON and name not in instance.own_names(vault.root)
                     and not re.fullmatch(r"W\d{2}", name) and len(name) > 1):
                 line = text[:match.start()].count("\n") + 1
                 hits.append(f"{path}:{line} — nom de tiers {name!r}")
@@ -715,7 +716,7 @@ def check_corrections_carriers(vault: Vault, report: Report) -> None:
 
     ⚠ CE QUE CE CONTRÔLE NE VÉRIFIE PAS, et qu'il ne faut pas lui prêter : il constate
     qu'un porteur est NOMMÉ, jamais qu'il porte. L'audit du 2026-08-19 l'a montré à ses
-    dépens : la règle du 2026-08-06 (« ne jamais attribuer à l'exécution de Sam un
+    dépens : la règle du 2026-08-06 (« ne jamais attribuer à l'exécution de l'athlète un
     effet dont la cause peut être une prescription du coach ») désignait `STYLE_PROMPT`,
     en avait disparu au ménage du 11/08, et cette ligne affichait OK depuis huit jours.
     Vérifier qu'un texte français vit toujours dans un prompt n'est pas greppable ; la

@@ -3,7 +3,7 @@
 Le sommeil et la charge de vie sont deux **multiplicateurs de la jauge** (×1,1 à ×1,2,
 `coaching/protocols.md`) et deux co-facteurs documentés des deux blessures. Ils ne
 vivaient que dans `athlete/instruments.csv`, **une ligne par semaine**, renseignée le
-dimanche : en semaine, le coach prescrivait sans savoir comment Sam avait dormi, et
+dimanche : en semaine, le coach prescrivait sans savoir comment l'athlète avait dormi, et
 le garde-fou n°4 (« 2-3 mauvaises nuits = semaine d'assimilation ») ne pouvait se
 déclencher qu'avec jusqu'à six jours de retard.
 

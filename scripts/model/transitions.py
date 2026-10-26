@@ -2,7 +2,7 @@
 
 Né le 2026-10-01 pour porter la règle de la séance-transition, qui n'avait aucun porteur.
 Le 2026-10-04, les fenêtres de fragilité +3/+4 sont retirées (decisions.md) : elles
-modélisaient un délai que la biographie de Sam ne démontre pas, et leur combinaison
+modélisaient un délai que la biographie de l'athlète ne démontre pas, et leur combinaison
 rendait la préparation infaisable. Ce qui reste :
 
 1. **une transition au plus par semaine** (`per_week_errors`, appelé par la validation
@@ -257,5 +257,5 @@ def render(verdict: Verdict) -> list[str]:
     for option in verdict.options:
         lines.extend(_option_lines(option, problem.weeks, "- "))
     lines.append("Le solveur ne tranche rien : le levier se choisit au bilan, avec "
-                 "Sam, et se logge dans decisions.md.")
+                 "l'athlète, et se logge dans decisions.md.")
     return lines

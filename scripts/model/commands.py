@@ -21,7 +21,7 @@ PROACTIVE_ANGLE = "proactive.angle"
 GEAR_UPSERT = "gear.upsert"
 PREDICTION_UPSERT = "prediction.upsert"
 CORRECTION_REGISTER = "correction.register"
-#: Permis EF : le choix du coach, scellé avant que Sam ne décide (2026-09-27).
+#: Permis EF : le choix du coach, scellé avant que l'athlète ne décide (2026-09-27).
 PERMIT_SEAL = "permit.seal"
 
 ACTIVE = (

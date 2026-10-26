@@ -162,7 +162,7 @@ class VaultRepo:
 
         `_push()` rejoue `sync()` avant de réessayer : sans cette garde, un dépôt qui
         attend un déploiement produisait DEUX fois le même texto dans le même tour
-        (reçu par Sam le 2026-08-21).
+        (reçu par l'athlète le 2026-08-21).
         """
         if any(alert.key == key for alert in self._alerts):
             return
@@ -344,7 +344,7 @@ class VaultRepo:
                       if status is PlanStatus.STALE)
         if awaiting:
             log.info("Semaine(s) %s enregistrée(s) mais non prescriptible(s) : "
-                     "un contrôle daté attend la réponse de Sam", ", ".join(awaiting))
+                     "un contrôle daté attend la réponse de ⟨athlète⟩", ", ".join(awaiting))
         if stale:
             log.info("Semaine(s) %s enregistrée(s) mais périmée(s) : une séance a bougé "
                      "depuis leur calcul, la prescription attend une révision",

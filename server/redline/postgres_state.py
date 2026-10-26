@@ -203,7 +203,7 @@ class PostgresStateStore(StateStore):
                         body=clean_body).on_conflict_do_nothing())
             if not created:
                 return
-            # Une livraison ne constitue jamais une preuve que Sam a répondu. Une
+            # Une livraison ne constitue jamais une preuve que l'athlète a répondu. Une
             # question ouverte naît d'une déclaration typée du tour (`fact-write.py
             # ask`) retrouvée dans le texte réellement livré, jamais d'un « ? » de
             # prose : une question rhétorique n'est pas un agenda à suivre. Un rendu
@@ -387,7 +387,7 @@ class PostgresStateStore(StateStore):
         for row in rows:
             if row["reply_body"]:
                 owner = ("du coach" if row["reply_role"] in {"coach", "proactive"}
-                         else "de Sam")
+                         else "de ⟨athlète⟩")
                 references.append(
                     f"Le message courant répond directement à ce message antérieur {owner} :\n"
                     f"« {row['reply_body']} »")

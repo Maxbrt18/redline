@@ -130,6 +130,19 @@ def parse(text: str) -> Instance:
     )
 
 
+def own_names(vault: Path) -> frozenset[str]:
+    """Les noms propres de l'instance qui ne désignent aucun tiers : prénom et lieu.
+
+    Sans `redline.toml` lisible, aucun : un contrôle de vie privée ne s'assouplit pas
+    sur une configuration qu'il ne peut pas lire.
+    """
+    try:
+        loaded = load(vault)
+    except InstanceError:
+        return frozenset()
+    return frozenset({loaded.athlete_name, loaded.place})
+
+
 def load(vault: Path) -> Instance:
     """L'instance du vault ; une erreur qui dit quoi faire, jamais un défaut silencieux."""
     path = vault / FILENAME

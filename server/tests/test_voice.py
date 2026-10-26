@@ -21,5 +21,5 @@ def test_memory_mutes_the_coach_and_never_alex():
         {"role": "athlete", "body": "Légère 🙂", "id": "a"},
         {"role": "coach", "body": "Salut Sam, noté. 🙂", "id": "b"},
     ], [])
-    assert "Sam [date inconnue; message_id=a]: Légère 🙂" in memory
+    assert "⟨athlète⟩ [date inconnue; message_id=a]: Légère 🙂" in memory
     assert "Coach [date inconnue; message_id=b]: Noté." in memory

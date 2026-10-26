@@ -188,7 +188,7 @@ def _correction(args, _) -> dict:
 
     Audit du 2026-10-09 : douze corrections n'existaient que dans PostgreSQL. Ni le
     contrôle des porteurs ni le registre de rejeu (`correction_replay.py`), qui lisent
-    le journal, ne les voyaient : l'erreur était annoncée à Sam, jamais apprise.
+    le journal, ne les voyaient : l'erreur était annoncée à l'athlète, jamais apprise.
     """
     from scripts.model import correction_replay
 
@@ -206,9 +206,9 @@ def _correction(args, _) -> dict:
 def _permit(args, _) -> dict:
     """Le choix du coach pour une EF du permis, scellé avec sa prédiction (2026-09-27)."""
     sunday = dt.date.fromisocalendar(int(args.week[:4]), int(args.week[-2:]), 7)
-    statement = (f"SCELLÉ, ne pas révéler à Sam avant le bilan {args.week}. Choix du coach "
+    statement = (f"SCELLÉ, ne pas révéler à l'athlète avant le bilan {args.week}. Choix du coach "
                  f"pour {args.session_key} du {args.date:%d/%m} : {args.minutes} min. "
-                 f"Prédiction : la durée courue par Sam tombe à ±10 min de ce choix.")
+                 f"Prédiction : la durée courue par l'athlète tombe à ±10 min de ce choix.")
     return {"iso_week": args.week, "session_key": args.session_key,
             "scheduled_on": args.date, "coach_minutes": args.minutes,
             "prediction_key": f"permis-ef-{args.session_key}", "statement": statement,
@@ -381,7 +381,7 @@ def parser() -> argparse.ArgumentParser:
                           help="objet JSON réservé aux détails du scénario")
     deadline.add_argument(
         "--athlete-label", default=UNSET,
-        help="libellé court (3-80 car.) : l'échéance est une action de Sam, montrée "
+        help="libellé court (3-80 car.) : l'échéance est une action de l'athlète, montrée "
              "dans son carnet ; une chaîne vide la rend au coach seul")
     deadline.add_argument("--patch", action="store_true", help=PATCH_HELP)
 
@@ -390,13 +390,13 @@ def parser() -> argparse.ArgumentParser:
     # le déclencheur du débrief exigeait « un angle que tu n'as pas déjà servi » — et
     # rien ne l'écrivait jamais : `vault.py` posait `angle: None` en dur. Le modèle
     # devait donc reconstituer les angles servis à partir des résumés bruts, et n'ayant
-    # aucun endroit où déposer ce raisonnement, il l'a déposé dans le message que Sam
+    # aucun endroit où déposer ce raisonnement, il l'a déposé dans le message que l'athlète
     # a reçu. Un garde-fou qui n'ouvre pas de chemin correct fabrique son contournement.
     angle = commands.add_parser(
         "angle", help="qualifie le message proactif de CE tour (n'a de sens qu'en tour)")
     angle.add_argument("angle", help="deux ou trois mots, ex. « titre Strava, récit libre »")
     permit = commands.add_parser(
-        "permit", help="scelle le choix du coach pour une EF du permis, AVANT que Sam décide")
+        "permit", help="scelle le choix du coach pour une EF du permis, AVANT que l'athlète décide")
     permit.add_argument("--week", type=week, required=True)
     permit.add_argument("--session-key", required=True)
     permit.add_argument("--date", type=day, required=True)

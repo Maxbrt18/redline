@@ -17,6 +17,7 @@ from unittest.mock import MagicMock
 import pytest
 from conftest import SERVER_DIR, VAULT_ROOT
 
+from redline import persona
 from redline.agent import RunResult
 from redline.claude import ClaudeCodeRunner
 from redline.prompts import STYLE_PROMPT
@@ -95,7 +96,7 @@ def test_every_claude_turn_names_its_file_in_the_system_prompt(make_config):
     runner = ClaudeCodeRunner(make_config(agent_provider="claude"), state=None)
     command = runner._command("bilan", None, turn_id=TURN)
     system = command[command.index("--append-system-prompt") + 1]
-    assert system.startswith(STYLE_PROMPT)
+    assert system.startswith(persona.render(STYLE_PROMPT, "Sam"))
     assert f"`--input {agent_input.turn_path(TURN)}`" in system
     assert command[command.index("-p") + 1] == "bilan"
 

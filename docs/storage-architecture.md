@@ -84,7 +84,7 @@ La persistance rend aussi le nombre de commandes réellement appliquées et leur
 Elle ne déclenche aucun second appel de modèle : la réponse livrée est celle du tour qui
 a travaillé, que des commandes aient été appliquées ou non. Une panne transitoire de
 PostgreSQL (connexion perdue) est retentée trois fois avant de refuser le lot ; un refus
-définitif nomme les types de commandes perdus, et la réponse l'annonce à Sam dans ses
+définitif nomme les types de commandes perdus, et la réponse l'annonce à l'athlète dans ses
 mots. Un fichier de code ou une projection modifiés pendant le tour sont restaurés
 fichier par fichier, sans abandonner les notes ni les commandes valides.
 

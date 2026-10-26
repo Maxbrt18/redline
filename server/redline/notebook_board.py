@@ -64,7 +64,7 @@ class AnswerError(ValueError):
     """Une réponse refusée : demande close, valeur hors échelle ou inconnue."""
 
 
-# L'échelle de Sam, en ses mots : propriétaire `coaching/protocols.md` (§ Comment lire
+# L'échelle de l'athlète, en ses mots : propriétaire `coaching/protocols.md` (§ Comment lire
 # la douleur). Le carnet la montre à côté des points pour qu'un chiffre se relise.
 PAIN_SCALE = [
     {"value": 1, "text": "La tension est là, pas gênante."},
@@ -127,7 +127,7 @@ def observation_fact(observation: dict, session: dict | None = None,
 
 
 def _scale(metric: str, value: Any) -> float:
-    """Les échelles de Sam : RPE et plaisir entiers, douleur au demi-point."""
+    """Les échelles de l'athlète : RPE et plaisir entiers, douleur au demi-point."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise AnswerError("Valeur numérique attendue.")
     number = float(value)
@@ -424,7 +424,7 @@ class Board:
 
     # ------------------------------------------------------------ demandes
     def asks(self) -> list[dict]:
-        """Les ressentis que le registre réclame et que Sam peut donner d'un geste."""
+        """Les ressentis que le registre réclame et que l'athlète peut donner d'un geste."""
         asks: list[dict] = []
         yesterday = self.today - dt.timedelta(days=1)
         # La trace se demande chaque matin, jour de repos compris : sans elle, rien ne
@@ -841,7 +841,7 @@ class Board:
                    and s["date"] >= self.today.isoformat()]
         # La sortie longue de la semaine en cours est celle du programme tant qu'elle
         # n'est pas courue : la plus longue des jours passés n'en est pas une, elle
-        # arrive souvent le week-end (Sam, 2026-10-10).
+        # arrive souvent le week-end (l'athlète, 2026-10-10).
         long_run = next((s for s in planned if s["workout"] == "SL"
                          and (s["targets"].get("distance_target_km")
                               or s["targets"].get("distance_cap_km"))), None)

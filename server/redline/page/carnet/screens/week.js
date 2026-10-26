@@ -167,7 +167,7 @@ function weekRow(item) {
     add(el('span'), 'Semaine ' + weekNumber(item.week), el('small', weekSpan(item.week))), figure, chevron());
 }
 // La semaine en barres, sous son chiffre (rapatriée d'Aujourd'hui le 2026-10-09, à la
-// demande de Sam) : plein = fait, pointillé = prévu, filet = repos.
+// demande de l'athlète) : plein = fait, pointillé = prévu, filet = repos.
 function weekChart(days) {
   const scale = Math.max(1, ...days.map(item => Math.max(item.done_km || 0, item.planned_km || 0)));
   const bars = el('div', null, 'n-strip'), letters = el('div', null, 'n-letters');

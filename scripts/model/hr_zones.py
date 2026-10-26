@@ -1,4 +1,4 @@
-"""Les zones de fréquence cardiaque de Sam, en bpm, pour les calculs.
+"""Les zones de fréquence cardiaque de l'athlète, en bpm, pour les calculs.
 
 Le raisonnement et l'usage de chaque zone vivent dans `athlete/athlete.md` (§ Zones) :
 méthode Karvonen, FC de repos 60, FC max ~199 **estimée** (jamais testée). Ce module en

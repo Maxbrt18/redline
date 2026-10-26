@@ -36,7 +36,7 @@ from dataclasses import dataclass
 #: une modélisation du délai que sa biographie ne démontre pas, et qui rendait la
 #: préparation infaisable.
 #:
-#: ⭐ AUCUN POURCENTAGE FIXE DE PROGRESSION (décision de Sam, 2026-09-27). La
+#: ⭐ AUCUN POURCENTAGE FIXE DE PROGRESSION (décision de l'athlète, 2026-09-27). La
 #: progression de la sortie longue se JUGE (tolérance observée, historique) ; le code
 #: montre l'écart aux 30 jours, il ne le tranche pas. Source de l'ancien critère :
 #: `episodes/src-frandsen-single-session.md`.
@@ -46,13 +46,13 @@ TRANSITION_LOOKBACK_DAYS = 30
 TRANSITIONS_PER_WEEK = 1
 #: La porte (2026-10-04) : une hausse facile s'ajoute si le pic d'effort hebdo reste à ce
 #: niveau ou en dessous, sans tendance à la hausse sur autant de semaines, réveils à la
-#: base. Remplace la checklist verte. La marche n'est jamais demandée (2026-10-11) : Sam
+#: base. Remplace la checklist verte. La marche n'est jamais demandée (2026-10-11) : l'athlète
 #: signale lui-même une gêne.
 GATE_EFFORT_PEAK = 1.5
 GATE_TREND_WEEKS = 2
 #: Les premières fois que la course exige avant l'affûtage (current-plan.md § Vue macro :
 #: reconnaissance du tracé ; plus de bloc descente dédié depuis le 2026-10-04,
-#: plus de nocturne prescrite depuis le 2026-10-11, Sam en fait une à son initiative ;
+#: plus de nocturne prescrite depuis le 2026-10-11, l'athlète en fait une à son initiative ;
 #: le D- monte dans les sorties longues). Une première fois faite se
 #: lit dans PostgreSQL : séance typée `transition` dont le cycle est terminé.
 RACE_FIRSTS = ("reconnaissance",)
@@ -137,7 +137,7 @@ RULES: tuple[Rule, ...] = (
          f"s'ajoute si le pic d'effort hebdo reste au plus {str(GATE_EFFORT_PEAK).replace('.', ',')}/10 "
          f"sans hausse sur {GATE_TREND_WEEKS} semaines, réveils à la base ; "
          "elles se cumulent. Case rouge : semaine suivante figée ; deux : un cran en arrière.",
-         "décision de Sam du 2026-10-04",
+         "décision de l'athlète du 2026-10-04",
          "coaching/current-plan.md § La porte ; coaching/decisions.md 2026-09-27 et 2026-10-04",
          "le coach ; écart aux 30 jours affiché par week-plan.py et ledger.py"),
     Rule("de", "Descente",
@@ -145,7 +145,7 @@ RULES: tuple[Rule, ...] = (
          "Les bouts W44-W45 : aucun drapeau rouge sur 7 jours (douleur focale, nocturne, "
          "antérieure, ou gênant la marche), effort au plus 1/10 sur 3 lignes ; J+1 à sa base. "
          "Drapeau rouge : suspension et avis médical.",
-         "décision de Sam du 2026-09-27 ; les symptômes n'excluent pas une lésion",
+         "décision de l'athlète du 2026-09-27 ; les symptômes n'excluent pas une lésion",
          "coaching/workouts/descente.md ; coaching/decisions.md 2026-09-27 et 2026-10-04", "le coach"),
     Rule("s9", "Arrivée à vide",
          f"plus longue sortie sans nouveau record sur {STALL_WEEKS} semaines closes : "

@@ -15,7 +15,7 @@
 
 Trois temps. Les podcasts YouTube passent tous par le même chemin, sans exception.
 
-1. Sam exporte la playlist via <https://export-youtube-playlist.vercel.app/tools/youtube-playlist-link-extractor/>
+1. L'athlète exporte la playlist via <https://export-youtube-playlist.vercel.app/tools/youtube-playlist-link-extractor/>
    et sauvegarde le fichier dans `sources/` (TXT, CSV ou Markdown — peu importe).
 2. `python3 scripts/playlist-to-csv.py sources/<export> -o sources/playlist.csv`
    → CSV canonique (`position,video_id,url,title`).

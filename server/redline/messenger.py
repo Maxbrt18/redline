@@ -14,6 +14,7 @@ from typing import ClassVar
 
 import requests
 
+from . import persona
 from .config import Config
 from .prompts import DEEP_PATIENCE_LINES, PATIENCE_LINES
 from .textutils import burst_parts, strip_links
@@ -54,6 +55,7 @@ class MessengerClient:
     def __init__(self, config: Config) -> None:
         self._url = f"https://graph.facebook.com/{config.graph_version}/me/messages"
         self._headers = {"Authorization": f"Bearer {config.page_token}"}
+        self._name = config.instance.athlete_name
 
     def action(self, psid: str, action: str) -> DeliveryResult:
         """Conversation indicator: "mark_seen" or "typing_on"."""
@@ -229,7 +231,24 @@ class MessengerClient:
                 time.sleep(max(2 * attempt, min(retry_after, 30.0)))
         return DeliveryResult.failure(f"{label} indisponible après {attempts} tentatives")
 
+    def _personal(self, payload: dict) -> dict:
+        """Le dernier passage avant le téléphone : aucun jeton n'y arrive tel quel."""
+        message = payload.get("message")
+        if not isinstance(message, dict):
+            return payload
+        message = dict(message)
+        if isinstance(message.get("text"), str):
+            message["text"] = persona.render(message["text"], self._name)
+        attachment = message.get("attachment")
+        inner = attachment.get("payload") if isinstance(attachment, dict) else None
+        if isinstance(attachment, dict) and isinstance(inner, dict) \
+                and isinstance(inner.get("text"), str):
+            message["attachment"] = {**attachment, "payload": {
+                **inner, "text": persona.render(inner["text"], self._name)}}
+        return {**payload, "message": message}
+
     def _post(self, payload: dict, attempts: int = 0) -> DeliveryResult:
+        payload = self._personal(payload)
         result = self._with_retry(
             lambda: requests.post(self._url, headers=self._headers,
                                   json=payload, timeout=self.TIMEOUT),

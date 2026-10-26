@@ -33,12 +33,12 @@ _Si cette lecture change une décision, elle va dans [[decisions]] ; sinon elle 
 _Tendance douleur : lire les 3-4 dernières lignes du registre, pas la mémoire de la semaine._
 
 - Capacités nourries cette semaine (six capacités PostgreSQL) :
-- TODO longue durée : mois médical ([[athlete]] §Suivi médical) fait ? **Sinon relancer Sam**
+- TODO longue durée : mois médical ([[athlete]] §Suivi médical) fait ? **Sinon relancer l'athlète**
 - Hygiène du vault : `python3 scripts/vault-check.py` → verdict, et corrections faites séance tenante
 
 ## Renfo de la semaine qui vient ([[strength]])
 
-_Le coach place les deux créneaux, Sam ne les négocie pas. Jamais la veille d'une SL ou d'une
+_Le coach place les deux créneaux, l'athlète ne les négocie pas. Jamais la veille d'une SL ou d'une
 qualité, jamais le même jour qu'une qualité, A et B espacées d'au moins 48 h._
 
 - Séance A (os & injury) : _jour_
@@ -46,7 +46,7 @@ qualité, jamais le même jour qu'une qualité, A et B espacées d'au moins 48 h
 - Séances réalisées la semaine écoulée : _n/2_ (traçable au registre)
 - Suivi mollet : tendance des comptes des séances A réellement faites ; aucun test dédié tant qu'il est en pause
 
-## Ressenti Sam
+## Ressenti de l'athlète
 
 ## Semaine suivante
 

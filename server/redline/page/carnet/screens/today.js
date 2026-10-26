@@ -11,11 +11,11 @@ import {loadToday} from '../data.js';
 import {launchSeance, openSeance} from '../seance.js';
 
 // ------------------------------------------------------------ Aujourd'hui
-// Le fil du jour (maquette A validée par Sam le 2026-10-09) : ce qui se fait
+// Le fil du jour (maquette A validée par l'athlète le 2026-10-09) : ce qui se fait
 // aujourd'hui, dans l'ordre, puis ce qui vient, puis les repères. Le détail décroît avec
 // la distance : l'étape en cours a tout, demain une ligne, la semaine une tuile. Un seul
 // point rouge, l'étape en cours ; il avance du réveil au soir. Un disque plein, sans halo
-// ni pulsation (Sam, 2026-10-09 : « ça fait très AI generated »).
+// ni pulsation (l'athlète, 2026-10-09 : « ça fait très AI generated »).
 function tiles(cells) {
   const grid = el('div', null, 'n-facts' + (cells.length === 3 ? ' three' : ''));
   cells.slice(0, 4).forEach(([value, label, over]) => grid.append(add(el('div'), el('b', value, over ? 'n-over' : null), el('small', label))));

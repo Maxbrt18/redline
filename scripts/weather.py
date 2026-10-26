@@ -288,7 +288,7 @@ def solar_parameters(lat, lon, when, solar):
 
     Le recalage du rayonnement (`solar = normsolar · toasolar`) n'existe que dans
     ce chemin, et c'est lui qui tient le régime « soleil rasant » — celui des
-    sorties du soir de Sam.
+    sorties du soir de l'athlète.
     """
     cza, soldist = sun_position(lat, lon, when)
     toasolar = SOLAR_CONST * max(0.0, cza) / (soldist * soldist)
