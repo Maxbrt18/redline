@@ -26,6 +26,7 @@ from typing import Any
 from scripts import ledger, signals
 from scripts.model import debrief, hr_zones, programme, session_cycle, transitions
 from scripts.model import ledger as ledger_model
+from scripts.model.instance import Instance, derived_label
 
 from . import session_detail
 from .plans import PlanStatus, blocked_session_ids
@@ -41,11 +42,6 @@ WORKOUT_ABBR = {
     "test-mollet": "test", "repos": "repos", "velo": "vélo", "rando": "rando",
 }
 #: Libellés d'affichage des capacités ; le slug reste l'identité.
-CAPABILITY_LABELS = {
-    "cap1-durabilite": "Durabilité", "cap2-descente": "Descente",
-    "cap3-digestion": "Digestion", "cap4-nuit": "Nuit", "cap5-injury": "Injury",
-    "cap6-mental": "Mental",
-}
 MOVING_TYPES = ledger.RUN_TYPES | {"rando", "vélo"}
 #: Le point du matin : l'état du jour, déclaratif, aux valeurs de `fact-write.py daily`.
 DAILY_FIELDS = {"sleep": ("bonne", "moyenne", "mauvaise"),
@@ -182,12 +178,19 @@ class Week:
 class Board:
     """Les trois écrans du carnet, calculés pour une date."""
 
-    def __init__(self, ops, repo, root: Path, today: dt.date, now: dt.datetime):
+    def __init__(self, ops, repo, root: Path, today: dt.date, now: dt.datetime,
+                 instance: Instance | None = None):
         self.ops, self.repo, self.root = ops, repo, root
+        self.instance = instance
         self.today, self.now = today, now
         self._observations: list[dict] | None = None
         self._rows: list[ledger.Row] | None = None
         self._strength: list[dict] | None = None
+
+    def _capability_label(self, slug: str) -> str:
+        if self.instance is None:
+            return derived_label(slug)
+        return self.instance.capability_label(slug)
 
     # ------------------------------------------------------------ lectures
     @property
@@ -795,7 +798,7 @@ class Board:
                                "start_time": race.get("start_time")})
         milestones.sort(key=lambda item: item["date"])
         capabilities = sorted(
-            ({"label": CAPABILITY_LABELS.get(row["slug"], row["slug"].split("-", 1)[-1].capitalize()),
+            ({"label": self._capability_label(row["slug"]),
               "score": row["score"], "scale": row["scale"], "number": row["capability_number"],
               "evaluated_on": row["evaluated_on"].isoformat()}
              for row in self.ops.latest_capabilities()),

@@ -88,7 +88,7 @@ def main() -> None:
     from scripts.storage.notebook import NotebookStore
     notebook = NotebookService(NotebookStore(database), repo, state,
                                Path(config.vault_path), config.coach_base_url,
-                               operational=operational_store)
+                               operational=operational_store, instance=config.instance)
     bot = CoachBot(client, repo, agent, state, config, Outbox(OUTBOX_DIR),
                    attachments=attachments, notebook=notebook)
     bot.start()

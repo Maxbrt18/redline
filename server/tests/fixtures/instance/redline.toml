@@ -1,0 +1,36 @@
+# L'instance fictive de la suite de tests. « Sam » n'est personne : c'est le seul
+# endroit où ce prénom est déclaré, et les tests le lisent d'ici.
+
+[athlete]
+name = "Sam"
+
+[notebook]
+place = "Paris"
+
+[[injuries]]
+slug = "injury"
+label = "Injury"
+
+[[capabilities]]
+slug = "cap1-durabilite"
+label = "Durabilité"
+
+[[capabilities]]
+slug = "cap2-descente"
+label = "Descente"
+
+[[capabilities]]
+slug = "cap3-digestion"
+label = "Digestion"
+
+[[capabilities]]
+slug = "cap4-nuit"
+label = "Nuit"
+
+[[capabilities]]
+slug = "cap5-injury"
+label = "Injury"
+
+[[capabilities]]
+slug = "cap6-mental"
+label = "Mental"

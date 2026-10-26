@@ -12,6 +12,9 @@ from dataclasses import dataclass
 from datetime import time as dtime
 from pathlib import Path
 
+from scripts.model import instance as instance_model
+from scripts.model.instance import Instance
+
 from .routing import RoutingConfig
 
 # Racine de server/ : seuls la configuration et l'outbox d'images éphémère restent
@@ -125,6 +128,14 @@ def _envtime(name: str, default: str) -> dtime | None:
         raise SystemExit(f"{name} invalid: {raw!r} (HH:MM format expected)") from None
 
 
+def _load_instance(vault_path: str) -> Instance:
+    """`redline.toml` du vault : sans lui, le service ne sait pas à qui il parle."""
+    try:
+        return instance_model.load(Path(vault_path))
+    except instance_model.InstanceError as exc:
+        raise SystemExit(str(exc)) from None
+
+
 @dataclass(frozen=True)
 class Config:
     page_token: str
@@ -165,8 +176,8 @@ class Config:
     attachment_dir: str
     attachment_max_bytes: int
     attachment_total_bytes: int
-    #: Le lieu de la météo des séances sans `location_label` (fiche de départ du carnet).
-    notebook_place: str = "Paris"
+    #: Ce qui distingue cette instance (`redline.toml` à la racine du vault).
+    instance: Instance
     #: Segment secret de l'URL de callback Strava : la seule authentification de la route.
     strava_webhook_secret: str = ""
 
@@ -185,6 +196,7 @@ class Config:
         agent_timeout_deep = _envint("AGENT_TIMEOUT_DEEP", 1800)
         agent_timeout_heavy = _envint("AGENT_TIMEOUT_HEAVY", 5400)
         triage_timeout = _envint("TRIAGE_TIMEOUT", 10)
+        vault_path = os.path.expanduser(os.environ.get("VAULT_PATH", "."))
         config = cls(
             page_token=os.environ["MESSENGER_PAGE_TOKEN"],
             verify_token=os.environ["MESSENGER_VERIFY_TOKEN"],
@@ -192,7 +204,7 @@ class Config:
             allowed_psid=os.environ.get("MESSENGER_ALLOWED_PSID", "").strip(),
             graph_version=os.environ.get("GRAPH_API_VERSION", "v21.0"),
             webhook_port=_envint("WEBHOOK_PORT", 8000),
-            vault_path=os.path.expanduser(os.environ.get("VAULT_PATH", ".")),
+            vault_path=vault_path,
             agent_provider=provider,
             claude_bin=os.environ.get("CLAUDE_BIN", "claude"),
             # None laisse le SDK utiliser son runtime épinglé : CODEX_BIN est un
@@ -235,7 +247,7 @@ class Config:
                 "ATTACHMENT_DIR", str(ATTACHMENT_DIR))),
             attachment_max_bytes=_envint("ATTACHMENT_MAX_BYTES", 12 * 1024 * 1024),
             attachment_total_bytes=_envint("ATTACHMENT_TOTAL_BYTES", 20 * 1024 * 1024),
-            notebook_place=os.environ.get("CARNET_PLACE", "Paris").strip() or "Paris",
+            instance=_load_instance(vault_path),
             strava_webhook_secret=os.environ.get("STRAVA_WEBHOOK_SECRET", "").strip(),
         )
         config._validate()
