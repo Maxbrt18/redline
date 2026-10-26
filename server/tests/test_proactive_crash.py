@@ -145,7 +145,7 @@ def test_card_rendered_while_a_message_arrives_is_kept_out_of_transport(make_bot
     job = ProactiveJob(psid='4242', kind='strength_card', prompt='', priority=True)
     target = tmp_path / 'card.png'
 
-    def render(*args):
+    def render(*args, **kwargs):
         store.mark_inbound('4242')
         return target
 

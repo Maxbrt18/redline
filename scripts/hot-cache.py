@@ -21,14 +21,17 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts import ledger  # noqa: E402
-from scripts.model import hot_cache  # noqa: E402
+from scripts.model import (  # noqa: E402
+    hot_cache,
+    paths,
+)
 from scripts.model.views import ViewDrift  # noqa: E402
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--root", default=ROOT, type=Path)
+    parser.add_argument("--root", default=paths.vault_root(), type=Path)
     parser.add_argument("--check", action="store_true",
                         help="signale une dérive sans rien écrire")
     args = parser.parse_args()

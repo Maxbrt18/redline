@@ -30,6 +30,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.cards import cli, render, strength_card  # noqa: E402
+from scripts.model import paths  # noqa: E402
 from scripts.model.notes import NoteError  # noqa: E402
 from scripts.model.schema import SchemaError  # noqa: E402
 
@@ -45,7 +46,7 @@ def write_link(out: Path, built: dict) -> None:
     if not strength.sidecar_enabled():
         return
     strength.write_sidecar(
-        out, strength_card.subtitle(built), strength_card.snapshot(built, root=ROOT))
+        out, strength_card.subtitle(built), strength_card.snapshot(built, root=paths.vault_root()))
 
 
 def main() -> None:
@@ -54,7 +55,7 @@ def main() -> None:
     out = Path(args.out)
     try:
         target, built = strength_card.render_card(
-            cli.read_input(args.input), out, root=ROOT, html_only=args.html)
+            cli.read_input(args.input), out, root=paths.vault_root(), html_only=args.html)
     except (NoteError, SchemaError) as exc:
         sys.exit(f"Séance non générée — {exc}")
     except render.CardOverflow as exc:

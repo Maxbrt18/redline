@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-ROOT = Path(__file__).resolve().parents[2]
+from scripts.model import paths
 
 #: Ignoré par Git (`.gitignore`) : le service fait `git add -A` en fin de tour.
 DIRECTORY = ".agent-tmp"
@@ -41,12 +41,13 @@ def turn_path(turn_id: str, suffix: str = "") -> str:
     return f"{DIRECTORY}/{turn_id}{'-' + suffix if suffix else ''}.json"
 
 
-def resolve(path: str, *, root: Path = ROOT, turn_id: str | None = None) -> Path:
+def resolve(path: str, *, root: Path | None = None, turn_id: str | None = None) -> Path:
     """Le fichier à lire, refusé s'il n'appartient pas au tour en cours.
 
     Hors tour (lancements opérateur, tests), tout chemin lisible convient :
     l'opérateur sait ce qu'il passe. Dans un tour, seul `.agent-tmp/<turn_id>[-<suffixe>].json`.
     """
+    root = root or paths.vault_root()
     candidate = Path(path)
     if not candidate.is_absolute():
         candidate = root / candidate
@@ -82,9 +83,9 @@ def read_json(path: str | None) -> Any:
     return json.loads(read_text(path))
 
 
-def clear(turn_id: str, *, root: Path = ROOT) -> None:
+def clear(turn_id: str, *, root: Path | None = None) -> None:
     """Supprime les fichiers d'un tour, quelle qu'en soit l'issue."""
-    directory = root / DIRECTORY
+    directory = (root or paths.vault_root()) / DIRECTORY
     if not turn_id or not directory.is_dir():
         return
     for path in directory.glob(f"{turn_id}*.json"):

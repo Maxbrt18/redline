@@ -35,6 +35,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts import ledger as gauge  # noqa: E402
+from scripts.model import paths  # noqa: E402
 
 # Une cadence à allure égale qui MONTE mérite un regard. Elle ne porte pas sa cause :
 # travail volontaire, terrain, allure, bruit de mesure et protection sont des hypothèses.
@@ -243,7 +244,7 @@ def render(rows: list, weeks: list, intentional_keys: frozenset[str],
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--root", default=gauge.ROOT, type=Path)
+    parser.add_argument("--root", default=paths.vault_root(), type=Path)
     parser.add_argument("--semaines", dest="weeks", type=int, default=4)
     args = parser.parse_args()
 

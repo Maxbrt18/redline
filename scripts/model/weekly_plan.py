@@ -9,10 +9,9 @@ import datetime as dt
 import json
 import re
 from itertools import pairwise
-from pathlib import Path
 
+from . import paths, rulebook, transitions, typography
 from . import programme as strength_programme
-from . import rulebook, transitions, typography
 from .programme import GATE_SCHEMA as STRENGTH_GATE_SCHEMA
 from .schema import Schema, SchemaError, field
 
@@ -452,8 +451,7 @@ def _strength_programme_errors(session: dict, where: str) -> list[str]:
         **(session.get("strength") or {}),
     }
     try:
-        root = Path(__file__).resolve().parents[2]
-        strength_programme.load(root).build(selection)
+        strength_programme.load(paths.vault_root()).build(selection)
     except Exception as exc:
         return [f"{where}.strength : prescription impossible — {exc}"]
     return []

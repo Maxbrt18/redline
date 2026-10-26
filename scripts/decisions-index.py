@@ -31,7 +31,10 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.model import views  # noqa: E402
+from scripts.model import (  # noqa: E402
+    paths,
+    views,
+)
 
 # Le parseur vit dans le modèle (vault-check.py le partage) ; ses noms restent
 # importables d'ici, c'est l'API des tests et des appelants historiques.
@@ -126,7 +129,7 @@ def find(decisions: list[Decision], query: str) -> list[Decision]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--root", default=ROOT, type=Path)
+    parser.add_argument("--root", default=paths.vault_root(), type=Path)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--due", action="store_true")
     mode.add_argument("--check", action="store_true")
