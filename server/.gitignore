@@ -1,0 +1,11 @@
+.env
+# Cache du jeton Strava : il porte le jeton de rafraîchissement, que Strava fait
+# tourner. Le bot fait `git add -A` — sans cette ligne, il le pousserait.
+.strava-token.json
+.strava-token.tmp
+state.json
+state.json.tmp
+__pycache__/
+.pytest_cache/
+outbox/
+attachments/

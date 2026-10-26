@@ -1,0 +1,175 @@
+/* Détail d'une séance faite (maquette v2 validée par Sam le 2026-10-26, palette Sable).
+ * Cet écran a ses cartes au lieu des filets du reste du carnet : « triste, pas lisible
+ * avec toutes ces lignes » sur la v1. Titres de groupe au-dessus des cartes, comme Réglages.
+ * La couleur a un sens : la teinte de la famille dans la pastille, la rampe des zones de
+ * FC (--z1 à --z5) partout où une FC s'affiche, le rouge pour les répétitions. */
+.n-dh { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 26px 4px 8px; }
+.n-dh h2 { font: 600 12px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.n-dh span { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.n-dcard, .n-dtile, .n-dlink { background: var(--card); box-shadow: 0 1px 2px rgb(40 30 25 / .06), 0 4px 14px rgb(40 30 25 / .04); }
+:root[data-theme="dark"] :is(.n-dcard, .n-dtile, .n-dlink) { box-shadow: inset 0 .5px 0 rgb(255 255 255 / .06); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) :is(.n-dcard, .n-dtile, .n-dlink) { box-shadow: inset 0 .5px 0 rgb(255 255 255 / .06); } }
+.n-dcard { border-radius: 18px; padding: 16px; }
+
+/* La tête : sur le sable, un grand chiffre, puis la séance en une barre. */
+.n-dhero { --h: var(--h-run); background: var(--sand); border-radius: 22px; padding: 16px 18px 18px; margin-top: 10px; }
+.n-dkind { display: flex; align-items: center; gap: 9px; margin: 0; font: 600 13.5px var(--sans); }
+.n-dhero .n-pas { background: color-mix(in oklab, var(--h) var(--tile-pas-mix), var(--sand)); }
+.n-dbig { display: flex; align-items: baseline; gap: 8px; margin: 14px 0 0; }
+.n-dbig b { font: 700 68px/.86 var(--display); letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.n-dbig span { font: 600 22px var(--display); color: var(--muted); }
+.n-dpair { display: flex; gap: 26px; margin-top: 12px; }
+.n-dpair b { display: block; font: 700 30px/1 var(--display); font-variant-numeric: tabular-nums; }
+.n-dpair b small { font: 600 16px var(--display); color: var(--muted); margin-left: 2px; }
+.n-dpair span { font-size: 12.5px; color: var(--muted); }
+.n-dstrip { display: flex; height: 14px; border-radius: 7px; overflow: hidden; gap: 2px; margin-top: 18px; }
+.n-dstrip i { display: block; height: 100%; }
+.n-dstrip .e { background: color-mix(in oklab, var(--h) 45%, var(--sand)); }
+.n-dstrip .r { background: color-mix(in oklab, var(--h) 22%, var(--sand)); }
+.n-dstrip .q { background: var(--red); }
+.n-dkstrip { display: grid; grid-template-columns: repeat(var(--n, 10), minmax(0, 1fr)); gap: 3px; margin-top: 18px; }
+.n-dkstrip i { height: 14px; border-radius: 3px; background: var(--zc); }
+.n-dkstrip i:first-child { border-radius: 7px 3px 3px 7px; }
+.n-dkstrip i:last-child { border-radius: 3px 7px 7px 3px; }
+.n-dslab { position: relative; height: 18px; margin-top: 6px; font-size: 12px; color: var(--muted); }
+.n-dslab > span { position: absolute; white-space: nowrap; }
+.n-dslab .l { left: 0; }
+.n-dslab .r { right: 0; }
+.n-dslab .q { transform: translateX(-50%); color: var(--red); font-weight: 600; }
+
+/* Tuiles : un chiffre chacune. */
+.n-dtiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+.n-dh + .n-dtiles { margin-top: 0; }
+.n-dtiles.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.n-dtile { border-radius: 16px; padding: 12px 12px 11px; min-width: 0; }
+.n-dtl { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+.n-dico { display: inline-grid; flex: none; }
+.n-dico svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.n-dtile > b { display: block; font: 700 26px/1 var(--display); margin-top: 8px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.n-dtile > b small { font: 600 14px var(--display); color: var(--muted); margin-left: 2px; }
+.n-dtile > small { display: block; font-size: 12px; color: var(--muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.n-dtiles.two .n-dtile > small { white-space: normal; line-height: 1.35; }
+.n-dtile.tib { --h: var(--h-tib); }
+.n-dtile.todo { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ghost); }
+.n-dtile.todo > b { color: var(--faint); }
+.n-zc { display: inline-block; padding: 1px 6px 2px; border-radius: 6px; font: 700 11px/1.3 var(--sans); color: var(--zc);
+  background: color-mix(in oklab, var(--zc) 16%, transparent); }
+.n-dseg { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; margin-top: 9px; }
+.n-dseg i { height: 6px; border-radius: 2px; background: color-mix(in oklab, var(--ink) 10%, transparent); }
+.n-dseg i.on { background: var(--h, var(--ink)); }
+.n-dseg i.half { opacity: .5; }
+.n-dfoot { font-size: 13px; color: var(--muted); margin: 10px 4px 0; }
+.n-dpend { color: var(--faint); border-bottom: 1.5px dashed var(--faint); }
+.n-dsec .n-check { background: var(--card); margin-top: 8px; }
+
+/* Prévu et fait. */
+.n-dcard .n-gauges { margin-top: 0; }
+.n-dsteps { display: grid; gap: 8px; margin-top: 16px; }
+.n-dstep { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px;
+  background: color-mix(in oklab, var(--ink) 4%, transparent); }
+.n-dstep > i { width: 10px; height: 10px; border-radius: 3px; background: color-mix(in oklab, var(--h-run) 45%, var(--card)); }
+.n-dstep.q > i { background: var(--red); }
+.n-dstep > span:nth-child(2) { font-size: 14.5px; font-weight: 600; min-width: 0; }
+.n-dstep > span:nth-child(2) small { display: block; font-size: 12.5px; font-weight: 400; color: var(--muted); margin-top: 1px; }
+.n-dstep > span:last-child { font: 600 16px var(--display); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.n-dstep > span:last-child small { display: block; font: 400 12px var(--sans); color: var(--muted); }
+.n-dnotefold { margin-top: 10px; }
+.n-dnotefold summary { min-height: 36px; font-size: 13.5px; color: var(--muted); }
+
+/* Les graphiques : la FC sur ses zones, l'altitude dessous, un même axe du temps. */
+.n-dchart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.n-dclab { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--muted); margin: 0 0 6px; }
+.n-dclab b { color: var(--ink); font-weight: 600; }
+.n-dclab + svg + .n-dclab { margin-top: 14px; }
+.n-dchart .zb { opacity: .14; }
+:root[data-theme="dark"] .n-dchart .zb { opacity: .2; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .n-dchart .zb { opacity: .2; } }
+.n-dchart .z1 { fill: var(--z1); } .n-dchart .z2 { fill: var(--z2); } .n-dchart .z3 { fill: var(--z3); }
+.n-dchart .z4 { fill: var(--z4); } .n-dchart .z5 { fill: var(--z5); }
+.n-dchart text { font: 500 10.5px var(--sans); fill: var(--muted); }
+.n-dchart text.zl { font: 700 10px var(--sans); text-anchor: end; opacity: 1; }
+.n-dchart .rb { fill: color-mix(in oklab, var(--ink) 6%, transparent); }
+.n-dchart .hr { fill: none; stroke: var(--ink); stroke-width: 1.7; stroke-linejoin: round; }
+.n-dchart .alt { fill: color-mix(in oklab, var(--h-run) 22%, transparent); stroke: var(--h-run); stroke-width: 1.4; stroke-linejoin: round; }
+.n-dchart text.rep { font: 700 12px var(--display); fill: var(--red); text-anchor: middle; }
+.n-dchart text.v { font: 600 11px var(--sans); fill: var(--ink); text-anchor: middle; }
+.n-dchart text.stop { text-anchor: middle; }
+.n-dchart text.ta-m { text-anchor: middle; }
+.n-dchart text.ta-e { text-anchor: end; }
+.n-daxis { position: relative; height: 14px; margin-top: 6px; font-size: 11px; color: var(--muted); }
+.n-daxis span { position: absolute; transform: translateX(-50%); }
+.n-daxis span:first-child { transform: none; }
+
+/* Les répétitions : un numéro rouge, la FC à la couleur de sa zone. */
+.n-dreps { margin-top: 18px; }
+.n-drh, .n-drr { display: grid; grid-template-columns: 30px repeat(5, minmax(0, 1fr)); align-items: center; gap: 4px; }
+.n-drh { font: 600 10.5px/1 var(--sans); letter-spacing: .05em; text-transform: uppercase; color: var(--muted); padding: 0 0 8px; }
+.n-drh span, .n-drr > span { text-align: right; }
+.n-drh span:first-child, .n-drr > span:first-child { text-align: left; }
+.n-drr { padding: 7px 0; font: 600 18px/1 var(--display); font-variant-numeric: tabular-nums; }
+.n-drr + .n-drr { border-top: 1px solid color-mix(in oklab, var(--ink) 7%, transparent); }
+.n-drn { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%;
+  background: color-mix(in oklab, var(--red) 14%, var(--card)); color: var(--red); font: 700 14px var(--display); }
+.n-drr small { font: 400 11px var(--sans); color: var(--muted); margin-left: 1px; }
+:is(.n-drr, .n-dkr) .fc { color: var(--zc); }
+:is(.n-drr, .n-dkr) .fc::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 5px; vertical-align: 2px; }
+.n-dnote { font-size: 13px; color: var(--muted); margin: 12px 0 0; line-height: 1.45; }
+.n-dnote b { color: var(--ink); font-weight: 600; }
+
+/* La lecture : un constat par ligne, en mots ; la réserve se donne d'un geste. */
+.n-dread { margin-top: 14px; display: grid; gap: 6px; }
+.n-dread-row { display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: start; padding: 10px 12px; border-radius: 12px;
+  font-size: 14px; line-height: 1.4; background: color-mix(in oklab, var(--ink) 4%, transparent); }
+.n-dread-row .n-dico svg { width: 20px; height: 20px; }
+.n-dread-row b { font-weight: 600; }
+.n-dread-row.pend { color: var(--faint); }
+.n-dread-row.ask { display: block; }
+.n-dask { display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: start; margin-bottom: 10px; }
+.n-dchoice button { background: var(--card); font-size: 14.5px; }
+
+/* Au kilomètre : l'allure en barre, la FC à la couleur de sa zone. */
+.n-dkm { margin-top: 16px; }
+.n-dkh, .n-dkr { display: grid; grid-template-columns: 30px 44px minmax(0, 1fr) 56px 40px; align-items: center; gap: 8px; }
+.n-dkh { font: 600 10.5px/1 var(--sans); letter-spacing: .05em; text-transform: uppercase; color: var(--muted); padding-bottom: 6px; }
+.n-dkh span:nth-child(3) { text-transform: none; letter-spacing: 0; font-weight: 500; }
+.n-dkh span:nth-child(n+4), .n-dkr span:nth-child(n+4) { text-align: right; }
+.n-dkr { padding: 5px 0; font: 600 16px/1 var(--display); font-variant-numeric: tabular-nums; }
+.n-dkr > span:first-child { font: 500 12.5px var(--sans); color: var(--muted); }
+.n-dkr .bar { height: 8px; border-radius: 4px; background: color-mix(in oklab, var(--h-run) 14%, transparent); position: relative; overflow: hidden; }
+.n-dkr .bar i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: var(--h-run); }
+.n-dkr .cad { color: var(--muted); font-weight: 500; }
+
+/* Temps par zone. */
+.n-dzones { display: grid; gap: 11px; }
+.n-dz { display: grid; grid-template-columns: 86px 1fr 70px; align-items: center; gap: 10px; font-size: 13px; }
+.n-dz .n-zc { margin-right: 6px; }
+.n-dz > span:first-child small { color: var(--muted); font-size: 11.5px; }
+.n-dzbar { height: 14px; border-radius: 4px; background: color-mix(in oklab, var(--zc) 12%, transparent); position: relative; overflow: hidden; }
+.n-dzbar i { position: absolute; inset: 0 auto 0 0; background: var(--zc); border-radius: 4px; }
+.n-dz > span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.n-dz > span:last-child b { font: 600 16px var(--display); }
+.n-dz > span:last-child small { color: var(--muted); margin-left: 4px; }
+
+/* Comparaison, semaine, liens. */
+.n-dcrow { display: grid; grid-template-columns: minmax(0, 1fr) 70px 70px; gap: 8px; padding: 8px 0; align-items: baseline; font-size: 14px; }
+.n-dcrow + .n-dcrow { border-top: 1px solid color-mix(in oklab, var(--ink) 7%, transparent); }
+.n-dcrow span:first-child { color: var(--muted); }
+.n-dcrow span + span { text-align: right; font: 600 17px var(--display); font-variant-numeric: tabular-nums; }
+.n-dcrow span:last-child { color: var(--faint); }
+.n-dcrow.head span { font: 600 11px/1 var(--sans); letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.n-dcrow.head span:nth-child(2) { color: var(--ink); }
+.n-dweek > b { font: 700 30px/1 var(--display); }
+.n-dweek > b small { font: 600 16px var(--display); color: var(--muted); margin-left: 4px; }
+.n-dmeter { height: 8px; border-radius: 4px; background: color-mix(in oklab, var(--h-run) 16%, transparent); margin-top: 10px; overflow: hidden; }
+.n-dmeter i { display: block; height: 100%; border-radius: 4px; background: var(--h-run); }
+.n-dweek .n-dnote { margin-top: 8px; }
+.n-dlink { display: flex; align-items: center; gap: 10px; margin-top: 8px; padding: 12px 14px; border-radius: 16px; color: var(--ink);
+  text-decoration: none; font-size: 15px; min-height: 48px; }
+.n-dlink > span:nth-child(2) { flex: 1; min-width: 0; }
+.n-dlink small { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.n-dlink .n-dico { color: var(--faint); }
+
+/* Le lien vers le détail, sous une séance faite d'Aujourd'hui. */
+.n-dopen { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 44px; margin-top: 8px; padding: 0;
+  border: 0; background: none; color: var(--ink); font-size: 14.5px; font-weight: 500; text-align: left; }
+.n-dlink:active, .n-dopen:active { opacity: .5; transition: none; }

@@ -1,0 +1,34 @@
+# Caddy — HTTPS automatique (Let's Encrypt) pour le webhook Messenger.
+# Le domaine coach.example.com doit résoudre vers l'IP du VPS via un
+# enregistrement A chez Cloudflare, en mode "DNS only" (nuage GRIS, pas orange) :
+# sinon Cloudflare intercepte le TLS et empêche Caddy d'obtenir son certificat.
+# Caddy obtient et renouvelle le cert tout seul, tant que les ports 80 et 443 sont
+# ouverts et que le domaine pointe bien ici.
+#
+#   sudo cp ~/redline/server/Caddyfile /etc/caddy/Caddyfile
+#   sudo systemctl restart caddy
+#   sudo systemctl status caddy
+
+coach.example.com {
+	# Email pour les avis d'expiration Let's Encrypt (optionnel mais conseillé).
+	tls admin@example.com
+
+	# Aucun corps légitime n'approche 1 Mo ; le service applique le même plafond.
+	request_body {
+		max_size 1MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+		-Via
+	}
+
+	# /ready interroge PostgreSQL à chaque appel : réservé au VPS (wait-ready.sh,
+	# verify-release.sh et le runtime updater passent par 127.0.0.1:8000).
+	# /health reste public : réponse en mémoire, sans base.
+	respond /ready 404
+
+	# Le service HTTP écoute en local ; Caddy fait le TLS et proxifie.
+	reverse_proxy 127.0.0.1:8000
+}

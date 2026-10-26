@@ -1,0 +1,223 @@
+/* Le carnet -- même peau que les cards et la page renfo (tokens.css).
+ *
+ * La structure est celle d'une app iOS (carte de navigation validée par Sam le
+ * 2026-10-08) : une barre du haut et un grand titre dans la police du système, des
+ * commandes en verre (liquid glass), une barre d'onglets flottante. Le contenu garde
+ * la charte : Barlow pour les chiffres et les titres de section, Inter pour le texte.
+ *
+ * Pas de mot REDLINE en tête (Sam, 2026-10-02) : la marque est l'icône de
+ * l'écran d'accueil et de l'onglet. Trois rubriques, une question chacune, en bas
+ * sous le pouce (maquette validée par Sam le 2026-10-08) : Aujourd'hui suit le
+ * moment de la journée, Semaine juge le passé et prescrit le reste, Course.
+ * Jamais de liseré coloré sur un bord : une alerte ressort par son texte et sa place.
+ *
+ * Les couleurs gardent leur sens (tokens.css) : --data le fait, un pointillé ce qui
+ * est prévu, --red aujourd'hui et la marque, --over un plafond franchi. Ni vert ni
+ * orange : un état qui n'est pas un franchissement se dit en mots. Deux exceptions, qui ne
+ * jugent rien : les pictos de la météo (Sam, 2026-10-08) et les pastilles teintées des
+ * familles (2026-10-22, en fin de fichier).
+ */
+:root { --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 13'%3E%3Cpath d='M1.5 1.5 6.5 6.5 1.5 11.5' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+  --sys: -apple-system, system-ui, "SF Pro Text", "Helvetica Neue", sans-serif; --bar: 52px;
+  --glass: color-mix(in oklab, var(--bg) 70%, transparent); --edge: color-mix(in oklab, var(--ink) 10%, transparent);
+  --tabbar: max(14px, calc(env(safe-area-inset-bottom) - 12px)); }
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; scrollbar-gutter: stable; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
+button, a { -webkit-tap-highlight-color: transparent; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:disabled { cursor: wait; opacity: .55; }
+a { color: inherit; }
+[hidden] { display: none !important; }
+.n-app { max-width: 620px; margin: auto;
+  padding: calc(var(--bar) + env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) calc(var(--tabbar) + 100px) max(20px, env(safe-area-inset-left)); }
+
+/* Le verre : un fond translucide flouté, un fil de lumière, une ombre douce. */
+.n-glass { border: .5px solid var(--edge); background: var(--glass); -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  backdrop-filter: blur(20px) saturate(1.6); box-shadow: 0 2px 12px rgb(0 0 0 / .08); color: var(--ink); }
+/* Les boutons ronds de la barre, comme ceux d'iOS : un disque plein légèrement teinté,
+ * un reflet fin sur le bord, aucune ombre portée. */
+.n-round { width: 40px; height: 40px; border-radius: 50%; padding: 0; display: grid; place-items: center; border: 0;
+  background: color-mix(in oklab, var(--ink) 7%, var(--bg)); box-shadow: inset 0 0 0 .5px color-mix(in oklab, var(--ink) 9%, transparent);
+  -webkit-backdrop-filter: none; backdrop-filter: none; }
+:root[data-theme="dark"] .n-round { background: color-mix(in oklab, #fff 12%, var(--bg)); box-shadow: inset 0 .5px 0 rgb(255 255 255 / .14); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .n-round { background: color-mix(in oklab, #fff 12%, var(--bg)); box-shadow: inset 0 .5px 0 rgb(255 255 255 / .14); } }
+.n-round svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+/* La barre du haut : le retour à gauche, les réglages à droite ; transparente en haut de
+ * page, pleine dès qu'on défile, avec le titre replié au centre. */
+/* Le fond plein est sur la barre elle-même, jamais sur un pseudo-élément : iOS 26 cherche
+ * une couleur unie sur l'élément fixé en haut de page, et à défaut pose son flou (« scroll
+ * edge effect ») qui déborde sous l'heure et brouille le bouton des réglages. */
+.n-topbar { position: fixed; z-index: 6; top: 0; left: 0; right: 0; padding-top: env(safe-area-inset-top); pointer-events: none;
+  background-color: var(--bg); transition: background-color .26s; }
+/* La bande d'état d'iOS 26+ prend la couleur de l'élément le plus haut posé sur le bord
+ * supérieur, et seulement s'il est opaque (mesuré dans la PWA, 2026-10-09) ; un élément
+ * transparent la fige, et `theme-color` n'y peut plus rien. La barre du haut reste donc
+ * seule sur ce bord : la feuille et la visionneuse commencent sous elle, et c'est elle qui
+ * prend leur couleur (voilée, noire). La bande suit sans délai ni astuce. */
+:root.n-veiled .n-topbar { background-color: color-mix(in srgb, #000 20%, var(--bg)); }
+:root.n-veiled .n-topbar-in { filter: brightness(.8); transition: filter .26s; }
+/* Fond plein, sans flou ni dégradé : la bande d'état d'iOS au-dessus est opaque, la
+ * barre la prolonge (Sam, 2026-10-08). Un filet la sépare du contenu qui défile. */
+.n-topbar::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; border-bottom: 1px solid var(--grid);
+  opacity: 0; transition: opacity .2s; }
+.n-topbar.scrolled::before { opacity: 1; }
+.n-topbar-in { position: relative; max-width: 620px; height: var(--bar); margin: auto; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+  padding: 0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left)); }
+.n-topbar .l, .n-topbar .r { display: flex; gap: 8px; pointer-events: auto; }
+.n-topbar .r { justify-self: end; }
+.n-topbar .c { max-width: 230px; font: 600 17px/1.2 var(--sys); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; transition: opacity .15s; }
+.n-topbar.titled .c { opacity: 1; }
+.n-topbar.instant .c, .n-topbar.instant::before { transition: none; }
+/* La barre de l'écran qu'on quitte, figée par-dessus la nouvelle pendant la transition. */
+.n-barcopy { position: absolute; left: 0; right: 0; bottom: 0; pointer-events: none; }
+.n-barcopy * { pointer-events: none !important; }
+/* Le grand titre : 34 pt, la police du système, comme Réglages ou Santé. */
+.n-lt { margin: 6px 0 4px; min-height: 64px; }
+.n-lt h1 { font: 700 34px/1.12 var(--sys); letter-spacing: .005em; margin: 0; text-wrap: balance; }
+.n-lt p { font: 400 15px/1.35 var(--sys); color: var(--muted); margin: 3px 0 0; min-height: 20px; }
+
+/* Trois rubriques dans une pilule de verre qui flotte au-dessus du contenu (iOS 26). */
+.n-nav { position: fixed; z-index: 5; left: max(20px, env(safe-area-inset-left)); right: max(20px, env(safe-area-inset-right)); bottom: var(--tabbar);
+  max-width: 440px; margin: 0 auto; border-radius: 999px; }
+.n-tabs { display: flex; padding: 5px; }
+.n-tabs button { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: none; border: 0;
+  min-height: 54px; padding: 4px 0; border-radius: 999px; color: var(--muted); font: 500 10.5px/1.2 var(--sys); }
+.n-tabs button[aria-current] { color: var(--ink); font-weight: 600; background: color-mix(in oklab, var(--ink) 8%, transparent); }
+.n-tabs svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.n-tabs button[aria-current] .dot { fill: var(--red); stroke: var(--red); }
+.n-tabs button[aria-current] .flag { fill: currentColor; }
+.n-quiet { background: none; border: 0; min-height: 44px; padding: 10px 0; color: var(--muted); font-size: 15px; }
+
+h1 { font: 700 32px/1.05 var(--display); margin: 2px 0 8px; text-wrap: balance; }
+h2 { font: 600 22px/1.15 var(--display); margin: 0; }
+p { margin: 8px 0; }
+.n-kicker { font: 600 12px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 16px 0 6px; }
+.n-meta { color: var(--muted); font-size: 13.5px; margin: 8px 0; }
+.n-notice { color: var(--muted); margin: 18px 0; overflow-wrap: anywhere; }
+.n-banner { background: var(--panel); border-radius: 12px; padding: 12px 14px; margin: 14px 0 0; font-size: 14px; }
+.n-over { color: var(--over); }
+.n-red { color: var(--red); }
+.n-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Sections : un filet, jamais une boîte. */
+/* Un seul titre de section (2026-10-10) : petites capitales sur un filet, comme les zones
+ * d'Aujourd'hui ; ce qui l'accompagne à droite reste à la même taille. */
+.n-sec { margin-top: 30px; }
+.n-sec > .n-row { padding-bottom: 9px; border-bottom: 1px solid var(--grid); }
+.n-sec > .n-row h2 { font: 600 12px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.n-sec > .n-row .n-meta { margin: 0; font-size: 12.5px; }
+/* Le chevron : le même trait dans les tuiles, les listes et les dépliants (le masque sert
+ * aux pseudo-éléments, qui ne peuvent pas porter de SVG en ligne). */
+.n-chevron { display: inline-block; flex: none; width: 7px; height: 12px; margin-left: 6px; vertical-align: -1px; overflow: visible;
+  fill: none; stroke: var(--faint); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.n-tlab .n-chevron { margin-left: 0; }
+.n-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+
+
+.n-action { display: inline-block; background: var(--ink); color: var(--bg); border: 0; border-radius: 10px; min-height: 44px; padding: 10px 16px; margin: 10px 0 0; font-weight: 600; font-size: 14.5px; text-decoration: none; }
+summary { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; cursor: pointer; list-style: none; color: var(--ink); font-weight: 500; font-size: 14.5px; }
+summary::-webkit-details-marker { display: none; }
+summary::after { content: ""; width: 7px; height: 12px; background: var(--faint); -webkit-mask: var(--chevron); mask: var(--chevron); transition: transform .15s; }
+details[open] > summary::after { transform: rotate(90deg); }
+.n-exercises { padding: 0; margin: 0; list-style: none; }
+.n-exercises li { padding: 10px 0; border-bottom: 1px solid var(--grid); overflow-wrap: anywhere; font-size: 15px; }
+.n-dose { color: var(--muted); display: block; margin-top: 3px; font-size: 13.5px; }
+
+
+
+/* À venir et Repères : un titre en petites capitales sur un filet, jamais une boîte. */
+.n-zone { margin-top: 30px; }
+.n-zh { font: 600 12px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; padding-bottom: 9px; border-bottom: 1px solid var(--grid); }
+.n-list { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; background: none; border: 0; border-bottom: 1px solid var(--grid); padding: 13px 0; text-align: left; font-size: 15px; }
+.n-list:last-child { border-bottom: 0; }
+.n-list small { color: var(--muted); white-space: nowrap; }
+
+.n-offline { color: var(--muted); font-size: 13px; margin: 2px 0 0; }
+
+/* Tirer pour actualiser : la page descend, un anneau tourne au-dessus. */
+.n-ptr { position: fixed; z-index: 4; left: 50%; top: calc(env(safe-area-inset-top) + var(--bar) + 4px); width: 26px; height: 26px; margin-left: -13px;
+  opacity: 0; pointer-events: none; transform: translateY(-40px); }
+.n-ptr i { display: block; width: 100%; height: 100%; border-radius: 50%; border: 2.4px solid var(--ghost); border-top-color: var(--muted); }
+.n-ptr.spin i { animation: n-spin .8s linear infinite; }
+@keyframes n-spin { to { transform: rotate(360deg); } }
+/* L'écran contient ses marges (`flow-root`) : sinon celle du grand titre le traverse,
+ * et sa copie figée pendant une transition, qui ne la laisse pas passer, s'affiche 6 px
+ * plus bas que lui ; le texte sautait à la fin de chaque transition (2026-10-09). */
+.n-page { display: flow-root; }
+.n-page.settle { transition: transform .25s cubic-bezier(.2, .8, .2, 1); }
+/* L'écran qui bouge pendant une transition : une copie figée sous les deux barres,
+ * avec l'ombre légère d'iOS sur son bord gauche ; celui d'en dessous n'en a pas. */
+.n-move { position: fixed; z-index: 4; inset: 0; overflow: hidden; background: var(--bg); pointer-events: none;
+  box-shadow: -2px 0 14px rgb(0 0 0 / .14); will-change: transform; }
+.n-move.under { z-index: 3; box-shadow: none; }
+
+/* Un retour immédiat sous le doigt (le reste du toucher d'app est dans shared/base.css). */
+button, .n-nav, .n-krow, summary { touch-action: manipulation; }
+.n-list:active, .n-krow:active, .n-tile:active, .n-toggle:active, .n-tabs button:active,
+.n-quiet:active, .n-action:active, .n-wrow:active, .n-cell:active, .n-round:active { opacity: .5; transition: none; }
+
+/* Les silhouettes d'une rubrique pas encore reçue, aux proportions de la vraie. */
+.n-skel { padding-top: 14px; }
+.n-sk { display: block; border-radius: 6px; background: var(--ghost); margin: 0 0 12px; }
+.n-sk.eyebrow { width: 55%; height: 14px; }
+.n-sk.title { width: 70%; height: 38px; margin-bottom: 18px; }
+.n-sk.tiles { height: 62px; margin-bottom: 22px; }
+.n-sk.line { width: 88%; height: 14px; }
+.n-sk.short { width: 46%; }
+.n-sk.block { height: 104px; margin: 22px 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .n-sk { animation: n-breathe 1.4s ease-in-out infinite; }
+  @keyframes n-breathe { 50% { opacity: .45; } }
+}
+.n-empty { padding: 28px 0; }
+
+/* Un message passager flotte au-dessus des onglets, il ne pousse jamais la page. */
+.n-toast { position: fixed; z-index: 6; left: 50%; bottom: calc(var(--tabbar) + 76px); transform: translateX(-50%);
+  width: max-content; max-width: min(520px, calc(100vw - 32px)); margin: 0; padding: 11px 16px; border-radius: 12px;
+  background: var(--ink); color: var(--bg); font-size: 14.5px; line-height: 1.35; box-shadow: 0 6px 24px rgb(0 0 0 / .18); overflow-wrap: anywhere; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .n-toast { animation: n-rise .2s ease-out; }
+  @keyframes n-rise { from { opacity: 0; transform: translate(-50%, 8px); } }
+}
+
+@media (max-width: 360px) { .n-app { padding-left: 16px; padding-right: 16px; } h1 { font-size: 28px; } .n-lt h1 { font-size: 30px; } }
+/* Sans flou (navigateur ancien), le verre reste lisible : un fond presque plein. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { :root { --glass: color-mix(in oklab, var(--bg) 96%, transparent); } }
+@media (prefers-reduced-motion: no-preference) { button { transition: opacity .15s, background .15s; } }
+@media (prefers-reduced-motion: reduce) { summary::after, .n-topbar, .n-page.settle { transition: none; } }
+
+/* Les pastilles teintées (maquette « Carnet en couleur » validée par Sam le 2026-10-22).
+ * La charte ne bouge pas : une pastille, comme celles de la météo, nomme la famille d'une
+ * séance (course, sortie longue, renfo, repos), d'un repère ou d'une capacité, et ne juge
+ * rien. Jamais sur un titre d'écran ni de section, ni sur un jalon.
+ * Palette « Sable » (Sam, 2026-10-26, elle remplace « Bleus ») : le papier et un sable
+ * chaud portent les surfaces, la couleur ne vit que dans les pastilles et les données. Un bleu
+ * étalé sur une grande carte se battait avec le papier chaud et le rouge du logo. Les teintes
+ * de famille sont très désaturées, à même clarté (OKLCH L 0,50 C ≈ 0,045 en clair, L 0,80 en
+ * sombre) ; aucune ne frôle le rouge ni l'orange. Une nouvelle famille prend une teinte de
+ * la même bande, à la même clarté.
+ * Les zones de FC montent vers le rouge, qui reste l'intensité : Z5 est --red. */
+:root { --h-run: #4c677b; --h-tib: #705a75; --h-race: #436b6f; --h-str: #7a5867; --h-rest: #69625a;
+  --sand: #f0eae3; --card: #fffdfb; --pas-mix: 20%; --tile-pas-mix: 18%;
+  --z1: #c7bbb7; --z2: #bc9392; --z3: #bb6c6f; --z4: #b54245; --z5: var(--red); }
+:root[data-theme="dark"] { --h-run: #a6c2d7; --h-tib: #ccb4d1; --h-race: #9ec6cb; --h-str: #d7b2c2; --h-rest: #c4bcb4;
+  --sand: #231e1b; --card: #1c1817; --pas-mix: 24%; --tile-pas-mix: 28%;
+  --z1: #7a6f6b; --z2: #a87877; --z3: #d37b7e; --z4: #f47a79; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --h-run: #a6c2d7; --h-tib: #ccb4d1; --h-race: #9ec6cb;
+  --h-str: #d7b2c2; --h-rest: #c4bcb4; --sand: #231e1b; --card: #1c1817; --pas-mix: 24%; --tile-pas-mix: 28%;
+  --z1: #7a6f6b; --z2: #a87877; --z3: #d37b7e; --z4: #f47a79; } }
+.n-pas { --h: var(--h-run); display: inline-grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 50%;
+  background: color-mix(in oklab, var(--h) var(--pas-mix), var(--bg)); color: var(--h); }
+.n-pas svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.n-pas.sm { width: 24px; height: 24px; }
+.n-pas.sm svg { width: 14px; height: 14px; }
+.n-pas.str { --h: var(--h-str); }
+.n-pas.rest, .n-pas.other { --h: var(--h-rest); }
+.n-pas.tib { --h: var(--h-tib); }
+.n-pas.race { --h: var(--h-race); }
+/* Deux séances le même jour : les pastilles se chevauchent, détourées par le papier. */
+.n-pasg { display: inline-flex; flex: none; }
+.n-pasg .n-pas + .n-pas { margin-left: -7px; box-shadow: 0 0 0 2px var(--bg); }

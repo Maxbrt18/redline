@@ -1,0 +1,12 @@
+// Redline : complète 50unattended-upgrades (les listes apt s'additionnent).
+// Caddy est exposé à Internet : ses correctifs passent sans attendre une intervention.
+// Docker redémarre le conteneur Postgres : acceptable dans la fenêtre de 03:40.
+Unattended-Upgrade::Origins-Pattern {
+	"origin=cloudsmith/caddy/stable";
+	"origin=Docker,label=Docker CE";
+};
+// Un noyau de sécurité n'est actif qu'après redémarrage. 04:00 est le creux d'activité
+// du VPS (collecteur Vélo'v compris) ; le service, Caddy et Docker repartent seuls.
+Unattended-Upgrade::Automatic-Reboot "true";
+Unattended-Upgrade::Automatic-Reboot-Time "04:00";
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";

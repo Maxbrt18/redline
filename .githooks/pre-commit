@@ -1,0 +1,72 @@
+#!/bin/sh
+# Regenerates the generated views before every commit, so a stale block can never
+# be committed in the first place -- vault-check.py only detects the drift after
+# the fact (weekly review), which is one CI-breaking commit too late (2026-07-29).
+#
+# The hook is a SECOND line of defence, not the guarantee: it only runs where
+# someone typed `git config core.hooksPath .githooks`, which a fresh clone (a
+# Claude Code session on the web, for instance) never has. The guarantee lives in
+# the writers themselves -- redline/vault.py regenerates before it commits.
+set -e
+cd "$(git rev-parse --show-toplevel)"
+
+# Le venv du dépôt est prioritaire sur le Python système du Mac. Sur le VPS, le
+# service place déjà son venv externe en tête du PATH. Le fallback garde les commits
+# de notes non bloquants, mais une modification de code exigera bien Python 3.12.
+if [ -x .venv/bin/python ]; then
+    RUNTIME_PYTHON=.venv/bin/python
+elif command -v python3.12 >/dev/null 2>&1; then
+    RUNTIME_PYTHON=python3.12
+else
+    RUNTIME_PYTHON=python3
+fi
+
+# ⚠ NON BLOQUANT, et c'est une politique, pas une négligence. `redline/vault.py`
+# (`regenerate_views`) dit noir sur blanc qu'un générateur en échec ne doit JAMAIS
+# empêcher un commit — « les notes d'une session perdues parce qu'un générateur a
+# calé sur une ligne de registre mal formée serait une panne bien pire qu'un bloc
+# périmé ». Ce hook faisait exactement l'inverse : deux règles contraires sur le même
+# événement. Le 2026-08-10 le hook a gagné, le débrief Strava du jour est parti à la
+# poubelle, et la ligne fautive — jamais committée — a cassé chaque exécution suivante
+# pendant une heure. Un bloc périmé se rattrape au commit suivant ; `vault-check.py`
+# le voit à la revue hebdo. Une écriture perdue ne se rattrape jamais.
+# Hors VPS, les vues PostgreSQL ne sont pas calculables : les lancer produisait un
+# faux incident à chaque commit alors que le mode statique porte exactement ce cas.
+# Empreinte de chaque fichier déjà modifié AVANT la régénération : seul ce que le
+# générateur a réellement touché est ajouté ensuite. `git add -u` (jusqu'au 2026-09-28)
+# embarquait toute modification non stagée du dépôt dans le commit en cours, ce qui
+# rendait impossibles les commits ciblés que le Mac et le VPS doivent faire.
+fingerprint() {
+    git diff --name-only -z | xargs -0 -I{} sh -c \
+        'printf "%s %s\n" "$(git hash-object -- "$1" 2>/dev/null || echo absent)" "$1"' _ {}
+}
+BEFORE=$(fingerprint)
+REGEN_OPTIONS=""
+if [ -z "${DATABASE_URL:-}" ]; then
+    REGEN_OPTIONS="--static-only"
+fi
+"$RUNTIME_PYTHON" scripts/regen-views.py $REGEN_OPTIONS >/dev/null || \
+    echo "pre-commit : régénération des vues en échec, commit maintenu (bloc périmé)."
+# La liste des fichiers produits reste lue sur le disque, jamais recopiée de
+# GENERATORS : une copie a déjà raté decisions.md (2026-07-29).
+fingerprint | while read -r hash path; do
+    printf '%s\n' "$BEFORE" | grep -qxF "$hash $path" || git add -- "$path"
+done
+
+# Code touched? Then run the gate the CI runs, here, where the fix is free rather
+# than a red build and a copy-pasted log. Each tool is skipped ALOUD when it is not
+# installed (the VPS has no dev deps): a silent skip reads like a passing gate, and
+# a hook that hard-fails on a missing linter is a hook someone disables.
+if git diff --cached --name-only | grep -qE '\.py$'; then
+    if ! "$RUNTIME_PYTHON" -c 'import sys; raise SystemExit(sys.version_info < (3, 12))'; then
+        echo "pre-commit : Python 3.12+ requis pour valider le code."
+        exit 1
+    fi
+    for tool in ruff mypy vulture pytest; do
+        if "$RUNTIME_PYTHON" -c "import $tool" 2>/dev/null; then
+            "$RUNTIME_PYTHON" -m "$tool" $([ "$tool" = ruff ] && echo "check .") $([ "$tool" = pytest ] && echo "-q -rs")
+        else
+            echo "pre-commit : $tool absent, non lancé."
+        fi
+    done
+fi

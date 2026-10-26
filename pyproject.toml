@@ -1,0 +1,86 @@
+# Tooling only: the service dependencies live in server/requirements.txt. Vault scripts
+# run as `python3 scripts/<name>.py`, and the service as `python3 -m redline`; neither
+# application package is installed into the venv.
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = []
+
+[tool.ruff.lint]
+# UP, PIE et FURB depuis le 2026-09-28 : une syntaxe, pas deux (`X | None` et non
+# `Optional[X]`), et les tournures que la bibliothèque standard fait déjà mieux.
+select = ["E", "W", "F", "I", "B", "SIM", "C4", "RUF", "UP", "PIE", "FURB"]
+ignore = [
+    # Long URLs and regexes in the middle of a rule are not worth a backslash.
+    "E501",
+    # RUF001-003 flag French typography (— « » ’ °) as "ambiguous unicode". Every
+    # string the athlete reads is French, so this fires ~44 times on correct code.
+    "RUF001", "RUF002", "RUF003",
+    # `class X(str, Enum)` -> StrEnum changerait str(x), donc le texte des incidents.
+    "UP042",
+    # Syntaxe PEP 695 (`type X = ...`, génériques) : aucun gain ici, et mypy la lit
+    # encore moins bien que TypeAlias/TypeVar.
+    "UP040", "UP047",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["evaluation", "redline", "scripts"]
+
+[tool.ruff.lint.per-file-ignores]
+# Test names are sentences on purpose (test_a_view_is_replaced_between_its_markers).
+"server/tests/*" = ["E741"]
+
+[tool.vulture]
+# Le code de production seul : les tests n'entrent pas dans l'analyse, donc une
+# fonction que seul son propre test appelle est signalée comme morte (2026-09-28 :
+# une quinzaine en vivaient ainsi). Un faux positif se déclare ici, nommé.
+paths = ["scripts", "server/redline", "server/evaluation", "server/codex-runtime-smoke.py",
+         "server/claude-runtime-smoke.py", "server/agent-runtime-update.py",
+         "server/evaluate-coaching.py",
+         "server/evaluate-conversation.py",
+         "server/setup_messenger_profile.py", "server/notebook-import.py"]
+exclude = ["*/tests/*"]
+min_confidence = 60
+# Routes Flask : appelées par le framework, jamais par le code.
+ignore_decorators = ["@app.get", "@app.post", "@app.before_request", "@app.after_request", "@app.errorhandler"]
+ignore_names = [
+    # Chargement paresseux du paquet `scripts.storage` (PEP 562).
+    "__getattr__",
+    # Déclaration des déclencheurs que la base doit porter, vérifiée contre elle.
+    "TRIGGERS",
+    # Porteur nommé de chaque règle du règlement compilé (CLAUDE.md, « une règle
+    # générale nomme son porteur ») : une donnée, pas un appel.
+    "enforced_by",
+    # Types d'effort sans fiche, déclarés plutôt qu'oubliés ; le test de couverture
+    # des fiches les exclut nommément.
+    "TYPES_WITHOUT_NOTE",
+    # Réglage Flask lu par Werkzeug.
+    "max_content_length",
+]
+
+[tool.mypy]
+# Added after a real outage: `_buffer_proactive_retry` was CALLED in bot.py without
+# existing for eleven days, and the Sunday review crashed instead of being deferred.
+# Neither ruff nor the tests see a missing method on `self`; mypy names it.
+python_version = "3.12"
+# Tout `scripts/` depuis le 2026-08-18, CLI à tiret comprises. Ce qui l'en empêchait
+# n'était pas leur nom mais la double racine d'import : chargées comme `scripts.*`,
+# elles faisaient voir à mypy les mêmes modules de modèle sous deux noms. La racine est
+# unique désormais (voir `tests/test_racine_import.py`), et ces ~2 500 lignes sont
+# précisément celles que le coach exécute à chaque tour.
+files = ["server/redline", "server/evaluation", "scripts"]
+warn_unused_ignores = true
+warn_redundant_casts = true
+
+[[tool.mypy.overrides]]
+# No stubs published, and the import is already guarded at the call site.
+module = ["waitress", "playwright.*", "youtube_transcript_api.*", "redline.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["server/tests"]
+# `.` porte `scripts.*`, `server` porte `redline.*`. UNE racine par arbre, et `scripts`
+# n'est PAS sur le chemin : un `from model.x import` y retrouverait le même module sous
+# un second nom, avec ses propres classes -- deux `SchemaError` qui ne se rattrapent pas.
+pythonpath = [".", "server"]

@@ -1,0 +1,3 @@
+# Plage de Claude Code que le metteur à jour nocturne peut promouvoir depuis le
+# canal npm `stable`. Changer de version majeure reste une décision humaine.
+@anthropic-ai/claude-code>=2.1.197,<3.0.0

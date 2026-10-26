@@ -1,0 +1,20 @@
+# CLI métier exposées au coach 24/7. Une ligne par fichier sous scripts/.
+# Refus par défaut : un nouveau script n'entre ici que s'il est réellement nécessaire
+# dans un tour Messenger. La CI vérifie existence, tri et références des prompts.
+chart-month.py
+chart-week.py
+decisions-index.py
+descent.py
+fact-read.py
+fact-write.py
+feasibility.py
+knowledge-search.py
+ledger-add.py
+ledger-complete.py
+ledger.py
+session-cycle.py
+signals.py
+strava.py
+vault-check.py
+weather.py
+week-plan.py

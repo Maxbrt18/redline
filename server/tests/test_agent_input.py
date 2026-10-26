@@ -1,0 +1,156 @@
+"""Un tour remet son JSON à une CLI par `--input`, dans un fichier à lui.
+
+11/10 : Claude Code 2.1.287 a refusé `week-plan.py revise … < /tmp/x.json` trois fois
+au bilan W41, et W42 n'a jamais été écrite. La forme nue `--input <chemin>` ne dépend
+plus de l'analyse des redirections ; le nom propre au tour empêche de relire le JSON
+d'un autre tour.
+"""
+
+from __future__ import annotations
+
+import importlib.util
+import json
+import subprocess
+import sys
+from unittest.mock import MagicMock
+
+import pytest
+from conftest import SERVER_DIR, VAULT_ROOT
+
+from redline.agent import RunResult
+from redline.claude import ClaudeCodeRunner
+from redline.prompts import STYLE_PROMPT
+from redline.routing import Route, RoutingConfig
+from redline.turns import TurnExecutor
+from scripts.model import agent_input
+
+TURN = "11111111-2222-3333-4444-555555555555"
+OTHER = "99999999-2222-3333-4444-555555555555"
+
+
+def _write(root, name: str, payload: object = None) -> str:
+    path = root / agent_input.DIRECTORY / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload if payload is not None else {"ok": 1}))
+    return f"{agent_input.DIRECTORY}/{name}"
+
+
+def test_a_turn_reads_its_own_file_and_its_suffixed_second(tmp_path):
+    for name in (f"{TURN}.json", f"{TURN}-carte.json"):
+        relative = _write(tmp_path, name)
+        assert agent_input.resolve(relative, root=tmp_path, turn_id=TURN) == (
+            tmp_path / relative).resolve()
+
+
+@pytest.mark.parametrize("path", [
+    f"{agent_input.DIRECTORY}/{OTHER}.json",   # le JSON d'un autre tour
+    "/tmp/x.json",                              # l'ancienne forme
+    f"{agent_input.DIRECTORY}/../{TURN}.json",  # hors du dossier
+    f"{agent_input.DIRECTORY}/{TURN}-.json",
+    f"{agent_input.DIRECTORY}/{TURN}.txt",
+])
+def test_a_turn_cannot_hand_over_any_other_file(tmp_path, path):
+    with pytest.raises(agent_input.AgentInputError, match="ce tour ne lit que"):
+        agent_input.resolve(path, root=tmp_path, turn_id=TURN)
+
+
+def test_outside_a_turn_the_operator_passes_any_path(tmp_path):
+    target = tmp_path / "revision.json"
+    assert agent_input.resolve(str(target), root=tmp_path, turn_id="") == target.resolve()
+
+
+def test_a_missing_file_says_to_write_it_first(monkeypatch):
+    monkeypatch.setenv("REDLINE_TURN_ID", TURN)
+    with pytest.raises(agent_input.AgentInputError, match="écris-le avec Write"):
+        agent_input.read_json(agent_input.turn_path(TURN))
+
+
+def test_clear_removes_only_the_files_of_that_turn(tmp_path):
+    _write(tmp_path, f"{TURN}.json")
+    _write(tmp_path, f"{TURN}-carte.json")
+    _write(tmp_path, f"{OTHER}.json")
+    agent_input.clear(TURN, root=tmp_path)
+    assert sorted(p.name for p in (tmp_path / agent_input.DIRECTORY).iterdir()) == [
+        f"{OTHER}.json"]
+
+
+def test_the_turn_directory_is_ignored_by_git():
+    """Le service fait `git add -A` : sans ça, chaque JSON partirait dans un commit."""
+    result = subprocess.run(
+        ["git", "check-ignore", "-q", f"{agent_input.DIRECTORY}/{TURN}.json"],
+        cwd=VAULT_ROOT, check=False)
+    assert result.returncode == 0
+
+
+def test_week_plan_reads_the_revision_from_input():
+    """`revise` et `preview` déclarent `--input` : le prompt le leur dicte."""
+    result = subprocess.run(
+        [sys.executable, "scripts/week-plan.py", "--help"], cwd=VAULT_ROOT,
+        capture_output=True, text=True, check=True)
+    assert "--input" in result.stdout
+
+
+def test_every_claude_turn_names_its_file_in_the_system_prompt(make_config):
+    """Système et pas message : le message s'ouvre sur la date et finit sur Sam."""
+    runner = ClaudeCodeRunner(make_config(agent_provider="claude"), state=None)
+    command = runner._command("bilan", None, turn_id=TURN)
+    system = command[command.index("--append-system-prompt") + 1]
+    assert system.startswith(STYLE_PROMPT)
+    assert f"`--input {agent_input.turn_path(TURN)}`" in system
+    assert command[command.index("-p") + 1] == "bilan"
+
+
+def test_every_turn_clears_its_files_whatever_the_outcome():
+    agent = MagicMock(provider="claude")
+    agent.run.return_value = RunResult(full_text="ok")
+    repo = MagicMock()
+    repo.head.return_value = "base"
+
+    outcome = TurnExecutor(agent, repo, MagicMock()).execute(
+        "4242", "bilan", plan=RoutingConfig.default("claude").plan(Route.HEAVY))
+
+    assert agent.run.call_args.args[1] == "bilan"
+    repo.clear_turn_inputs.assert_called_once_with(outcome.turn_id)
+
+
+def _smoke():
+    spec = importlib.util.spec_from_file_location(
+        "claude_runtime_smoke", SERVER_DIR / "claude-runtime-smoke.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _fake_claude(tmp_path, tool_result: str, denials: list | None = None) -> str:
+    """Un binaire qui rejoue le flux stream-json d'un appel de CLI."""
+    events = [
+        {"type": "assistant", "message": {"content": [{
+            "type": "tool_use", "id": "t1", "name": "Bash",
+            "input": {"command": "/usr/local/bin/redline-agent-cli week-plan.py preview "
+                                 "--week 2026-W01 --input .agent-tmp/x.json"}}]}},
+        {"type": "user", "message": {"content": [{
+            "type": "tool_result", "tool_use_id": "t1", "content": tool_result}]}},
+        {"type": "result", "permission_denials": denials or []},
+    ]
+    binary = tmp_path / "claude"
+    binary.write_text("#!/bin/sh\ncat <<'EOF'\n"
+                      + "\n".join(json.dumps(event) for event in events) + "\nEOF\n")
+    binary.chmod(0o755)
+    return str(binary)
+
+
+def test_the_runtime_smoke_accepts_a_cli_call_that_reached_the_launcher(tmp_path):
+    binary = _fake_claude(tmp_path, "Exit code 2\nagent-cli: aucun tour en cours")
+    _smoke()._cli_call_allowed(binary, "haiku", str(tmp_path))
+
+
+@pytest.mark.parametrize("result, denials", [
+    ("Permission to use Bash has been denied because Claude Code is running in "
+     "don't ask mode.", None),
+    ("agent-cli: aucun tour en cours", [{"tool_name": "Bash"}]),
+])
+def test_the_runtime_smoke_refuses_a_version_that_blocks_the_cli_call(
+        tmp_path, result, denials):
+    binary = _fake_claude(tmp_path, result, denials)
+    with pytest.raises(RuntimeError, match="appel de CLI"):
+        _smoke()._cli_call_allowed(binary, "haiku", str(tmp_path))

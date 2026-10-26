@@ -1,0 +1,117 @@
+# The conventions of pyproject.toml only hold while something runs them, and neither
+# the Mac nor the VPS bot -- both of which push here -- runs ruff on its own.
+#
+# Named for what it covers rather than when it runs, because the CODE half is the
+# whole point: scripts/vault-check.py is the other half, and it deliberately stays
+# out of here. It checks vault CONTENT, which the bot rewrites several times a day,
+# so code and content have separate verdicts. Vault content is verified separately,
+# by scripts/vault-check.py on a machine that holds the vault; this workflow owns
+# the code half only.
+#
+# That line got crossed twice (28 and 29/07) by content assertions smuggled into
+# pytest -- "the committed hot-cache block matches the ledger", "the real vault fits
+# the startup budget". Both went red on a ledger line the bot had just written. THE
+# RULE, now: a test that reads the real vault may only assert what code guarantees
+# (it parses, it conforms to its schema, frozen history is unchanged). Anything that
+# a normal day of coaching can invalidate belongs to vault-check.py.
+name: Code checks
+
+on:
+  push:
+    branches: [main]
+    # Messenger commits coaching facts several times a day.  Re-running an
+    # unchanged code gate on those commits made a calendar-dependent test look
+    # like three separate regressions on 04/08.  Code changes still run the full
+    # gate; pull requests remain unfiltered so a mixed change cannot hide it.
+    paths:
+      - ".github/workflows/code-checks.yml"
+      - ".python-version"
+      - ".githooks/**"
+      - "pyproject.toml"
+      - "alembic.ini"
+      - "migrations/**"
+      - "server/postgres/**"
+      - "server/**/*.py"
+      - "server/requirements*.txt"
+      - "server/redline/page/**"
+      # Scénarios et registre de rejeu : pytest en vérifie le schéma, et ci-gate.sh
+      # exige ce workflow pour tout SHA poussé.
+      - "server/tests/fixtures/**"
+      - "scripts/**/*.py"
+      - "scripts/**/*.sh"
+      - "scripts/cards/**"
+  pull_request:
+  workflow_dispatch:
+
+# Un seul run par branche : un push qui en suit un autre annule le précédent plutôt
+# que de faire la queue derrière un job Chromium.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    # Shows up as "Code checks / ruff · mypy · pytest" next to a commit: what the
+    # gate covers, without having to open it.
+    name: ruff · mypy · pytest
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: redline-test
+          POSTGRES_DB: redline_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://postgres:redline-test@localhost:5432/redline_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: ".python-version"
+
+      # Playwright is left out of THIS job on purpose: pulling ~350 MB of Chromium
+      # on every push to re-render four PNGs would make the gate slow enough to stop
+      # being run. It has its own job below, on the paths that can break it. Flask,
+      # on the other hand, is NOT optional here -- without it the webhook and
+      # /strength-report tests skip in silence, which is how they went unrun for a
+      # whole session.
+      - name: Install
+        run: |
+          CODEX_REQUIREMENT="$(sed -n '/^openai-codex/p' server/requirements.txt)"
+          test -n "$CODEX_REQUIREMENT"
+          python -m pip install --quiet pytest ruff mypy vulture pyyaml flask requests \
+                                        SQLAlchemy==2.0.46 alembic==1.18.4 \
+                                        'psycopg[binary,pool]==3.3.3' \
+                                        "$CODEX_REQUIREMENT" \
+                                        types-requests types-PyYAML
+
+      - name: Database schema
+        env:
+          DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
+        run: |
+          alembic upgrade head
+          alembic check
+
+      - name: Lint
+        run: python -m ruff check .
+
+      - name: Types
+        run: python -m mypy
+
+      # Code de production seul (config dans pyproject.toml) : une fonction que seul
+      # son propre test appelle est morte, et la build le dit.
+      - name: Dead code
+        run: python -m vulture
+
+      - name: Tests
+        # -rs prints WHY anything skipped: a module that skips itself for a missing
+        # dependency otherwise reads as a passing build.
+        run: python -m pytest -q -rs

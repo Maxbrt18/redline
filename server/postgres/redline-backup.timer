@@ -1,0 +1,10 @@
+[Unit]
+Description=Export chiffré PostgreSQL Redline toutes les heures
+
+[Timer]
+OnCalendar=*-*-* *:20:00 Europe/Paris
+Persistent=true
+RandomizedDelaySec=5m
+
+[Install]
+WantedBy=timers.target

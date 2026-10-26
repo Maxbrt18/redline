@@ -1,0 +1,108 @@
+# Redline — a self-hosted AI running coach
+
+[![Code checks](https://github.com/Maxbrt18/redline/actions/workflows/code-checks.yml/badge.svg)](https://github.com/Maxbrt18/redline/actions/workflows/code-checks.yml)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
+
+Redline is a running coach that lives in Facebook Messenger. It reads your Strava
+activities, keeps an append-only training ledger in PostgreSQL, maintains a revisioned
+weekly plan, debriefs every run, and answers through an LLM agent that is **forced to read
+the facts before it speaks**.
+
+> **This is the open-source edition.** It is the engine of a personal coach I built and use
+> daily, stripped of everything personal: no athlete data, no Strava data, no keys, no
+> private knowledge vault. What remains is the code, the schema, the templates and the
+> design ideas. It is published as-is: **no support, no roadmap, no guarantees.**
+>
+> The coach speaks **French**: prompts, messages and most comments are in French.
+> The code is organised so that it can be translated, but that work is not done.
+>
+> The athlete it coaches is called `Sam`: a stand-in name, not a real person.
+>
+> Redline is an AI, not a medical professional. It gives no diagnosis and no medication
+> advice, and says so.
+
+## Ideas worth stealing
+
+- **One owner per fact.** Sessions and pain readings live in an append-only ledger; the
+  weekly programme is a revisioned object; nothing is copied into prose.
+- **A reading ladder (N0–N3).** The agent reads more as the question gets more
+  consequential, and must escalate before asserting anything it has not read this session.
+- **Numbers are computed, never recalled.** Volume, climb and load come from a ledger CLI,
+  not from the model's memory.
+- **Falsifiable decisions.** Each coaching decision carries a prediction with a date and a
+  failure criterion; a monthly ritual argues against active decisions.
+- **A calibration rule.** When the athlete corrects the coach, the correction is logged
+  with what should have been read, and replayed as a regression scenario.
+
+## What is in the box
+
+| Path | What it is |
+|---|---|
+| `server/redline/` | The service: Messenger and Strava webhooks, proactive messages, agent runtime, mobile "notebook" web app (PWA) |
+| `scripts/` | The CLIs the agent calls (`ledger*.py`, `week-plan.py`, `strava.py`, `weather.py`, `fact-*.py`…) and the typed models behind them |
+| `scripts/storage/`, `migrations/` | PostgreSQL schema (Alembic) and repository layer |
+| `scripts/cards/` | HTML/PNG card renderer (week, month, workout, strength) |
+| `templates/` | Note templates for a vault (athlete onboarding, weekly review, debrief…) |
+| `CLAUDE.md` | A **template** of the agent's instruction file: reading ladder, calibration rule, fact-ownership table |
+| `docs/storage-architecture.md` | Why PostgreSQL owns operational facts and Git owns knowledge |
+| `server/tests/` | 1,921 tests (engine, storage, web app, prompts); 197 skip without PostgreSQL or a populated vault |
+
+## The cards
+
+Some answers are images instead of prose: the weekly recap, the month view, the workout
+debrief and the strength session arrive as cards typeset by the browser renderer in
+`scripts/cards/`, from the numbers the ledger already owns. The three below are rendered
+from the committed samples (`scripts/cards/samples/*.json`; the race name is a
+placeholder):
+
+```bash
+python3 scripts/chart-week.py -o /tmp/week.png < scripts/cards/samples/week.json
+```
+
+<p>
+  <img src="docs/cards/week.webp" alt="Weekly card" width="49%">
+  <img src="docs/cards/workout.webp" alt="Workout card" width="49%">
+</p>
+<p>
+  <img src="docs/cards/month.webp" alt="Monthly card" width="49%">
+</p>
+
+## What is NOT included
+
+The knowledge vault of the original deployment (athlete profile, journal, decisions,
+corrections, research notes, strength programme) is private and deliberately absent. Bring
+your own: the scripts expect a vault laid out as described in `CLAUDE.md`. The 43 tests
+that assert the *content* of a populated vault stay skipped until you bring one.
+
+## Running it
+
+See [`server/README.md`](server/README.md) (French) for the full deployment: PostgreSQL via
+Docker Compose, Alembic migrations, environment variables (`server/.env.example`), systemd
+units, Caddy. You need your own Strava API application, a Messenger app, and an LLM agent
+runtime.
+
+```bash
+python3.12 -m venv .venv && . .venv/bin/activate
+pip install -r server/requirements.txt -r server/requirements-dev.txt
+playwright install chromium   # the page and card tests drive a real browser
+PYTHONPATH=.:server pytest -q server/tests
+```
+
+Every skip carries its reason: 154 need PostgreSQL (`TEST_DATABASE_URL`), 43 need a
+populated vault, and the browser tests need `playwright install chromium`.
+
+To commit changes, run `git config core.hooksPath .githooks` first: it enables the
+pre-commit hook that regenerates the generated views before every commit.
+
+## En bref (FR)
+
+Redline est un coach de course à pied auto-hébergé : il lit Strava, tient un registre
+d'entraînement en PostgreSQL, révise un plan hebdomadaire et répond via un agent LLM obligé
+de lire les faits avant de parler. Cette version open source ne contient **aucune donnée
+personnelle** : seulement le moteur, le schéma, les gabarits et les idées de conception.
+Publié tel quel, sans support.
+
+## License
+
+GNU Affero General Public License v3.0 or later. If you run a modified version as a network
+service, you must offer its source to the people who use it.

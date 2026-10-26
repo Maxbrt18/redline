@@ -1,0 +1,362 @@
+/* Redline cards -- the design system.
+ *
+ * The palette and the faces live in tokens.css, shared with the interactive
+ * session page; this file owns the card GEOMETRY, which is not shared (a card is
+ * frozen at 1080 px). render.document() inlines both, in that order.
+ *
+ * CHARTE « LIGNE ROUGE » (2026-10-01):
+ *  - Nothing is boxed. Rows are separated by a hairline, figures by space; a
+ *    rounded panel with a border is the signature of a component library, and it
+ *    made every card read as generated.
+ *  - Data is ink (--data); the plan and the recoveries are its frame (--ghost).
+ *  - Red is the brand and intensity; a limit crossed is --over, the same red one
+ *    step darker. There is no status dot: a crossing turns the figure itself
+ *    --over, anything milder is said in words.
+ *  - No line in a plot but the gridlines: no reference line, no dash, no
+ *    underline. A threshold is the colour of the bar that crossed it.
+ *  - Labels in sentence case; no letter-spaced capitals.
+ *
+ * LAYOUT INVARIANT -- the reason this file exists:
+ *  every row is a flex container whose text cell carries `flex:1 1 auto` AND
+ *  `min-width:0`, and whose trailing cell is capped by a max-width. The browser
+ *  measures the text; a cell that runs out of room WRAPS and makes its row
+ *  taller. Nothing is ever positioned absolutely, so nothing can land on top of
+ *  anything else. Do not reintroduce fixed heights.
+ */
+
+:root { --pad: 64px; }   /* card gutter; the page has its own */
+
+/* -------------------------------------------------------------- foundation */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+}
+
+body {
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Tabular figures ONLY where numbers must line up in a column. Applying them to
+ * the whole card also widens the hyphen (Inter makes it digit-width), which turns
+ * "Step-up" and "demi-dose" into "Step - up" and "demi - dose" in running prose. */
+.row__value, .tile__value, .track__value, .countdown__value {
+  font-variant-numeric: tabular-nums;
+}
+
+/* No rule, no bar, no halo on the edges: the card is a surface, and the only
+ * brand element is the wordmark itself. */
+#card {
+  width: var(--card-width, 1080px);
+  padding: 52px var(--pad);
+  background: var(--bg);
+  color: var(--ink);
+}
+
+p, h1, h2, ol, ul { margin: 0; padding: 0; list-style: none; }
+
+/* ------------------------------------------------------------------ header */
+.head { padding-bottom: 8px; }
+
+.head__wordmark {
+  font-family: var(--display);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--brand);
+}
+
+.head__title {
+  margin-top: 14px;
+  font-family: var(--display);
+  font-size: 62px;
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: -.005em;
+  overflow-wrap: anywhere;   /* a long title wraps, it never leaves the card */
+}
+
+.head__meta {
+  margin-top: 14px;
+  font-size: 21px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+/* Air between the header and a block that follows it without a section label. */
+.stack { margin-top: 34px; }
+
+/* ---------------------------------------------------------------- sections */
+.section {
+  margin: 44px 0 16px;
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.section::first-letter { text-transform: uppercase; }
+
+/* ------------------------------------------------------- exercise rows */
+.rows { margin-top: 18px; display: flex; flex-direction: column; gap: 30px; }
+
+.day-group { display: flex; flex-direction: column; }
+
+.day-group__title {
+  padding-bottom: 6px;
+  font-family: var(--display);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.day-group__sessions { display: flex; flex-direction: column; }
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 22px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--grid);
+}
+
+.row__index {
+  flex: 0 0 52px;
+  font-family: var(--display);
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--faint);
+}
+
+/* flex:1 + min-width:0 is what makes an overlap unreachable */
+.row__main { flex: 1 1 auto; min-width: 0; }
+
+.row__name {
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.24;
+  overflow-wrap: anywhere;
+}
+
+.row__sub {
+  margin-top: 7px;
+  font-size: 18px;
+  line-height: 1.3;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* The trailing cell keeps its content but never eats more than its share.
+ * Sized so the longest dose the coach actually writes ("1-2 x jusqu'à fatigue
+ * technique") holds on one line; anything longer wraps here rather than pushing
+ * into the name. */
+.row__dose {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 46%;
+  text-align: right;
+}
+
+.row__value {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.26;
+  overflow-wrap: anywhere;
+}
+.row__dose .row__sub { color: var(--faint); }
+
+/* ------------------------------------------------------------------- tiles */
+/* A strip of figures between two hairlines, read left to right like a line of a
+ * training log. No boxes: a tile is a column, its neighbour is across a rule. */
+.tiles {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);   /* minmax(0,…) = tiles may shrink */
+  border-top: 1px solid var(--grid);
+  border-bottom: 1px solid var(--grid);
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 22px 22px 24px;
+  border-left: 1px solid var(--grid);
+}
+.tile:first-child { border-left: 0; padding-left: 0; }
+
+.tile__label {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.tile__value {
+  font-family: var(--display);
+  font-size: 46px;
+  font-weight: 700;
+  line-height: 1.04;
+  overflow-wrap: anywhere;   /* long tile values wrap -- no more text[:11]+'…' */
+}
+
+/* A textual instrument (the shin trend) is a sentence, not a figure. */
+.tile__value--text {
+  font-family: var(--sans);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.28;
+}
+
+/* The figure crossed its limit: the figure itself turns red. That is the whole
+ * status system -- nothing is drawn beside it. */
+.tile__value--over { color: var(--over); }
+
+.tile__sub {
+  font-size: 17px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* ----------------------------------------------------------------- verdict */
+/* The closing judgement is a line of prose under a rule, not a boxed alert. A
+ * verdict that reports a crossing is set in red; any other is plain ink. */
+.verdict {
+  margin-top: 34px;
+  padding-top: 26px;
+  border-top: 1px solid var(--grid);
+  font-size: 23px;
+  font-weight: 600;
+  line-height: 1.36;
+}
+.verdict--over { color: var(--over); }
+
+/* ------------------------------------------------------------------ legend */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 30px;
+  margin-top: 30px;
+  font-size: 17px;
+  color: var(--muted);
+}
+.legend__item { display: flex; align-items: center; gap: 10px; }
+.legend__swatch { flex: 0 0 auto; width: 18px; height: 18px; border-radius: 3px; }
+.legend__swatch--data  { background: var(--data); }
+.legend__swatch--ghost { background: var(--ghost); }
+.legend__swatch--effort { background: var(--red); }
+.legend__swatch--over  { background: var(--over); }
+
+/* ------------------------------------------------------------------- plots */
+.plot { display: block; width: 100%; margin-top: 22px; overflow: visible; }
+.plot__grid    { stroke: var(--grid); stroke-width: 1; }
+.plot__bar     { fill: var(--data); }
+.plot__bar--effort { fill: var(--red); }
+.plot__bar--over { fill: var(--over); }
+.plot__ghost   { fill: var(--ghost); }
+.plot__tick    { fill: var(--faint); font-size: 15px; }
+.plot__cat     { fill: var(--ink); font-size: 18px; font-weight: 500; }
+/* Knockout halo: a value label may cross a gridline. paint-order
+ * draws the background-coloured stroke first, so the label punches a hole in
+ * whatever runs behind it -- no opaque label boxes needed. */
+.plot__value {
+  fill: var(--ink);
+  font-size: 18px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 5px;
+  stroke-linejoin: round;
+}
+/* The quality-session ribbon (charts.ribbon). The pace is the headline figure of
+ * each rep; the gap to R1 sits inside its block, in the surface colour so it
+ * reads on either red; a recovery's duration is one rank down. */
+.ribbon__pace {
+  fill: var(--ink);
+  font-family: var(--display);
+  font-size: 38px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ribbon__pace--compact { font-size: 26px; }
+.ribbon__gap { fill: var(--bg); font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ribbon__gap--compact { font-size: 15px; }
+.ribbon__rest { fill: var(--muted); font-size: 16px; }
+.ribbon__hr { fill: none; stroke: var(--ink); stroke-width: 2.5; stroke-linejoin: round; }
+.ribbon__hr-point { fill: var(--ink); }
+.plot__note    { fill: var(--faint); font-size: 15px; }
+.plot__sub     { fill: var(--muted); font-size: 16px; }
+
+/* -------------------------------------------------- capability tracks */
+.tracks { display: flex; flex-direction: column; }
+
+.track {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--grid);
+}
+.track__name {
+  flex: 0 1 300px;
+  min-width: 0;
+  font-size: 21px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.track__rail {
+  flex: 1 1 auto;
+  min-width: 60px;
+  height: 8px;
+  background: var(--ghost);
+  border-radius: 99px;
+  overflow: hidden;
+}
+/* display:block is load-bearing -- an inline span ignores width and height, and
+ * the fill silently disappears. */
+.track__fill {
+  display: block;
+  height: 100%;
+  background: var(--data);
+  border-radius: 99px;
+}
+.track__value {
+  flex: 0 0 auto;
+  font-family: var(--display);
+  font-size: 26px;
+  font-weight: 700;
+}
+
+/* --------------------------------------------------------------- countdown */
+.countdown {
+  margin-top: 40px;
+  padding-top: 34px;
+  border-top: 1px solid var(--grid);
+  text-align: center;
+}
+.countdown__value {
+  font-family: var(--display);
+  font-size: 72px;
+  font-weight: 700;
+  line-height: 1;
+}
+.countdown__sub { margin-top: 12px; font-size: 20px; color: var(--muted); }
+
+/* ------------------------------------------------------------------ footer */
+.foot { margin-top: 30px; }
+.foot__note {
+  font-size: 20px;
+  line-height: 1.42;
+  overflow-wrap: anywhere;   /* the 25/07 bug: this used to run off the canvas */
+}
+.foot__rule {
+  margin-top: 12px;
+  font-size: 17px;
+  line-height: 1.4;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}

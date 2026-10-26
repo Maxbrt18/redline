@@ -1,0 +1,11 @@
+[Unit]
+Description=Contrôle nocturne et mise à jour protégée du runtime d'agent de Redline
+Wants=network-online.target
+After=network-online.target coach-messenger.service
+
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+TimeoutStartSec=45min
+ExecStart=/usr/bin/flock -n /run/lock/redline-agent-runtime-update.lock /usr/local/sbin/redline-agent-runtime-update

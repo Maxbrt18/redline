@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# Lanceur installé root:root hors du vault pour les CLI autorisées au coach 24/7.
+# Le code exécuté doit être exactement celui du commit déployé : un tour peut éditer
+# les notes, jamais réécrire une CLI puis l'exécuter avec les secrets du service.
+set -euo pipefail
+
+repo=${REDLINE_REPO:-/home/ubuntu/redline}
+script=${1:-}
+launcher_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if [ "$launcher_dir" = /usr/local/bin ]; then
+  policy=/usr/local/share/redline/agent-cli-tools.txt
+else
+  policy="$launcher_dir/agent-cli-tools.txt"
+fi
+
+[[ "$script" =~ ^[a-z0-9][a-z0-9-]*\.py$ ]] || {
+  echo "agent-cli: nom de commande invalide" >&2
+  exit 2
+}
+[ -r "$policy" ] || {
+  echo "agent-cli: politique root-owned absente" >&2
+  exit 1
+}
+grep -Fxq -- "$script" "$policy" || {
+  echo "agent-cli: commande absente de l'allowlist" >&2
+  exit 2
+}
+shift
+
+# Ce lanceur ne sert qu'aux tours du coach, et chaque tour outillé porte son identité :
+# sans elle, les CLI écriraient directement, hors de la transaction du tour qu'un
+# abandon efface. Vider la variable ne doit donc pas ouvrir un chemin d'écriture.
+# (Les commandes opérateur s'exécutent avec l'environnement du service, hors de ce lanceur.)
+uuid='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+[[ "${REDLINE_TURN_ID:-}" =~ $uuid ]] || {
+  echo "agent-cli: aucun tour en cours (REDLINE_TURN_ID absent ou invalide)" >&2
+  exit 2
+}
+
+cd "$repo"
+[ -f "scripts/$script" ] || {
+  echo "agent-cli: scripts/$script absent" >&2
+  exit 1
+}
+git ls-files --error-unmatch -- "scripts/$script" >/dev/null 2>&1 || {
+  echo "agent-cli: script non suivi par Git" >&2
+  exit 1
+}
+
+runtime_changes=$(git status --porcelain --untracked-files=all -- \
+  scripts server migrations alembic.ini pyproject.toml)
+[ -z "$runtime_changes" ] || {
+  echo "agent-cli: runtime différent du commit déployé, exécution refusée" >&2
+  exit 1
+}
+
+python_bin=$(command -v python) || {
+  echo "agent-cli: python absent" >&2
+  exit 1
+}
+case "$python_bin" in
+  */.venvs/*) ;;
+  *)
+    echo "agent-cli: python hors du venv du service" >&2
+    exit 1
+    ;;
+esac
+
+exec "$python_bin" "scripts/$script" "$@"

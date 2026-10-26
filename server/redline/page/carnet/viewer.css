@@ -1,0 +1,16 @@
+/* La visionneuse : la carte seule, sur fond noir, les commandes en verre sombre. */
+/* Elle commence sous la barre du haut, qui passe au noir : la bande d'état d'iOS suit la barre. */
+.n-viewer { position: fixed; inset: calc(env(safe-area-inset-top) + var(--bar)) 0 0; z-index: 20; background: #000; opacity: 0; transition: opacity .18s; }
+:root.n-viewing .n-topbar { background-color: #000; transition: background-color .18s; }
+/* Ses commandes prennent la place de celles de la barre, comme dans Photos : même
+ * hauteur que Retour et Réglages, donc rien de transparent sur le bord du haut. */
+.n-topbar .n-vw { display: none; }
+:root.n-viewing .n-topbar .n-vw { display: grid; background: rgb(255 255 255 / .16); color: #fff; box-shadow: none; }
+:root.n-viewing #back, :root.n-viewing #settings { display: none; }
+:root.n-viewing .n-topbar .c { opacity: 0; }
+:root.n-viewing .n-topbar::before { opacity: 0; }
+.n-viewer.open { opacity: 1; }
+.n-viewer-stage { position: absolute; inset: 0; display: grid; place-items: center; overflow: hidden; touch-action: none;
+  padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+.n-viewer-stage img { max-width: 100%; max-height: 100%; transform-origin: center; will-change: transform; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.n-viewer-stage.settle img { transition: transform .22s cubic-bezier(.2, .8, .2, 1); }
