@@ -27,7 +27,7 @@ import io
 import os
 import re
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from itertools import pairwise
 from pathlib import Path
 from typing import Protocol
@@ -97,13 +97,18 @@ class Row:
     dplus: int = 0
     dminus: int = 0
     rpe: float | None = None
-    pain: float | None = None
+    #: La douleur connue de chaque zone surveillée : {zone: /10}. Jamais fusionnées :
+    #: une série se lit zone par zone (`pain_at`).
+    pains: dict[str, float] = field(default_factory=dict)
     enjoyment: int | None = None
     note: str = ""
     wbgt: float | None = None
     #: FC moyenne déclarée douteuse : `sans_brassard` (mesure invalide) ou `contexte`
     #: (cause déclarée hors fatigue). None = FC valide.
     hr_doubt: str | None = None
+
+    def pain_at(self, zone: str) -> float | None:
+        return self.pains.get(zone)
 
     @property
     def hr_valid(self) -> int | None:
@@ -149,6 +154,25 @@ class LedgerStore(Protocol):
     def exposure_rows(self, *, confirmed_only: bool = False) -> list[dict]: ...
 
     def deadline_rows(self) -> list[dict]: ...
+
+    def pain_zones(self) -> list[dict]: ...
+
+
+@dataclass(frozen=True)
+class PainZone:
+    slug: str
+    label: str
+
+
+def pain_zones(store: LedgerStore) -> list[PainZone]:
+    """Les zones surveillées actives, dans leur ordre de déclaration."""
+    return [PainZone(zone["slug"], zone["label"]) for zone in store.pain_zones()
+            if zone["active"]]
+
+
+def zone_prefix(zone: PainZone, zones: list[PainZone]) -> str:
+    """« Genou · » devant une ligne de douleur, seulement s'il y a plusieurs zones."""
+    return f"{zone.label} · " if len(zones) > 1 else ""
 
 
 def open_store() -> LedgerStore:
@@ -212,7 +236,9 @@ def parse_ledger(store: LedgerStore) -> list[Row]:
             dplus=_known_int(observation, "elevation_gain_m") or 0,
             dminus=_known_int(observation, "elevation_loss_m") or 0,
             rpe=_known(observation, "rpe"),
-            pain=_known(observation, "pain"),
+            pains={zone: float(reading["value"])
+                   for zone, reading in (observation.get("pains") or {}).items()
+                   if reading.get("state") == "known" and reading.get("value") is not None},
             enjoyment=_known_int(observation, "enjoyment"),
             note=observation["note"] or "",
             wbgt=_known(observation, "wbgt_c"),
@@ -237,8 +263,9 @@ def parse_ledger(store: LedgerStore) -> list[Row]:
             date=session["performed_on"],
             type=kind,
             hours=duration / 60 if duration is not None else None,
-            pain=(float(session["shin_after"])
-                  if session.get("shin_after") is not None else None),
+            pains={zone: float(moments["after"])
+                   for zone, moments in (session.get("pains") or {}).items()
+                   if moments.get("after") is not None},
             note=session.get("note") or "",
         ))
         occupied.add(key)
@@ -500,8 +527,8 @@ def _series(values: list[float]) -> PainSeries:
     return PainSeries(peak=max(values), median=round(_median(values), 2), n=len(values))
 
 
-def pain_trend(rows: list[Row], weeks_back: int) -> list[PainWeek]:
-    """Weekly pain over the last `weeks_back` weeks, in TWO series.
+def pain_trend(rows: list[Row], weeks_back: int, zone: str) -> list[PainWeek]:
+    """Weekly pain of ONE zone over the last `weeks_back` weeks, in TWO series.
 
     Pain during effort and pain at rest answer different questions, and the rule that
     arbitrates -- Esculier, `coaching/protocols.md` -- needs both: « ≤2-3/10 qui
@@ -512,7 +539,7 @@ def pain_trend(rows: list[Row], weeks_back: int) -> list[PainWeek]:
     """
     per_week: dict[str, list[Row]] = {}
     for row in rows:
-        if row.pain is not None:
+        if row.pain_at(zone) is not None:
             per_week.setdefault(row.week, []).append(row)
     out = []
     for label in sorted(per_week)[-weeks_back:]:
@@ -523,12 +550,12 @@ def pain_trend(rows: list[Row], weeks_back: int) -> list[PainWeek]:
             # elle absorbait en silence tout type nouveau : une `palpation` (douleur
             # provoquée à la pression) aurait compté comme un pic d'effort, c'est-à-dire
             # dans la série qui juge le injury (2026-08-08).
-            effort=_series([r.pain for r in week
-                            if r.pain is not None and r.type in table.EFFORT_TYPES]),
-            rest=_series([r.pain for r in week
-                          if r.pain is not None and r.type in table.REST_TYPES]),
-            wake=_series([r.pain for r in week
-                          if r.pain is not None and r.type == "reveil"])))
+            effort=_series([value for r in week if (value := r.pain_at(zone)) is not None
+                            and r.type in table.EFFORT_TYPES]),
+            rest=_series([value for r in week if (value := r.pain_at(zone)) is not None
+                          and r.type in table.REST_TYPES]),
+            wake=_series([value for r in week if (value := r.pain_at(zone)) is not None
+                          and r.type == "reveil"])))
     return out
 
 
@@ -545,7 +572,7 @@ class EsculierFlag:
 REST_BASELINE_DAYS = 56  # huit semaines : assez pour couvrir un cycle de charge complet
 
 
-def rest_peak(rows: list[Row], before: dt.date) -> float | None:
+def rest_peak(rows: list[Row], before: dt.date, zone: str) -> float | None:
     """The peak of the rest series preceding `before`, or None without history.
 
     This is the reference the morning reading is judged against. It is
@@ -554,17 +581,17 @@ def rest_peak(rows: list[Row], before: dt.date) -> float | None:
     thing, hard to compare to it. Subtracting the two put two currencies on one ruler, one of which never
     existed.
     """
-    window = _rest_window(rows, before)
+    window = _rest_window(rows, before, zone)
     return max(window) if window else None
 
 
-def _rest_window(rows: list[Row], before: dt.date) -> list[float]:
-    return [row.pain for row in rows
-            if row.type in table.REST_TYPES and row.pain is not None
+def _rest_window(rows: list[Row], before: dt.date, zone: str) -> list[float]:
+    return [value for row in rows
+            if row.type in table.REST_TYPES and (value := row.pain_at(zone)) is not None
             and before - dt.timedelta(days=REST_BASELINE_DAYS) <= row.date < before]
 
 
-def rest_baseline(rows: list[Row], before: dt.date) -> str:
+def rest_baseline(rows: list[Row], before: dt.date, zone: str) -> str:
     """How a rest reading compares to the ones that came before it.
 
     Exists because a rest reading read as news (a change of category) can in fact equal
@@ -575,14 +602,15 @@ def rest_baseline(rows: list[Row], before: dt.date) -> str:
     the peak of the rest series that precede it. A number inside its own range cannot be
     reported as news.
     """
-    window = _rest_window(rows, before)
+    window = _rest_window(rows, before, zone)
     if not window:
         return "aucun historique de repos sur 8 sem"
     series = _series(window)
     return f"repos 8 sem : {series}"
 
 
-def esculier_check(rows: list[Row], history: list[Row] | None = None) -> list[EsculierFlag]:
+def esculier_check(rows: list[Row], zone: str,
+                   history: list[Row] | None = None) -> list[EsculierFlag]:
     """Where the Esculier rule is broken, or cannot be applied for want of a reading.
 
     « Pas pire le lendemain » looks at what a session leaves the NEXT MORNING at rest,
@@ -603,57 +631,51 @@ def esculier_check(rows: list[Row], history: list[Row] | None = None) -> list[Es
     The two others read a number that was always there, so they apply to the whole ledger.
 
     `history` is the full ledger when `rows` is a single week: without it the morning has
-    no series to be judged against. Defaults to `rows`.
+    no series to be judged against. Defaults to `rows`. The rule reads ONE zone: a knee
+    session is never judged by an ankle morning.
     """
     past = history if history is not None else rows
-    wake = {row.date: row.pain for row in rows
-            if row.type == "reveil" and row.pain is not None}
+    wake = {row.date: value for row in rows
+            if row.type == "reveil" and (value := row.pain_at(zone)) is not None}
     flags = []
     for row in sorted(rows, key=lambda r: r.date):
         # Positif, pas « not in REST_TYPES » : la règle Esculier parle de ce qu'une
         # SÉANCE laisse le lendemain. Une mesure ou une palpation n'est pas une séance,
         # et la négation les y faisait entrer dès qu'un type nouveau apparaissait.
-        if row.type not in table.EFFORT_TYPES or row.pain is None:
+        pain = row.pain_at(zone)
+        if row.type not in table.EFFORT_TYPES or pain is None:
             continue
-        if row.pain > ESCULIER_CAP:
+        if pain > ESCULIER_CAP:
             flags.append(EsculierFlag(row.date, "AU-DESSUS DU PLAFOND",
-                                      f"{row.type} à {row.pain}/10 > {ESCULIER_CAP} "
+                                      f"{row.type} à {pain}/10 > {ESCULIER_CAP} "
                                       f"→ réduction immédiate"))
         after = wake.get(row.date + dt.timedelta(days=1))
         if after is None:
-            if row.pain > 0 and row.date >= table.COMPLETENESS_FROM:
+            if pain > 0 and row.date >= table.COMPLETENESS_FROM:
                 flags.append(EsculierFlag(row.date, "non vérifié",
-                                          f"{row.type} à {row.pain}/10, aucune lecture "
+                                          f"{row.type} à {pain}/10, aucune lecture "
                                           f"« reveil » le lendemain"))
         else:
             morning = row.date + dt.timedelta(days=1)
             # Le référentiel est sa propre série de repos, jamais le pic d'effort de la
             # veille (2026-08-17). Sans historique, un réveil non nul se nomme une fois :
             # `rest_baseline` dit lui-même qu'il sort sans référentiel.
-            reference = rest_peak(past, morning)
+            reference = rest_peak(past, morning, zone)
             if after > (reference if reference is not None else 0.0):
                 flags.append(EsculierFlag(row.date, "TRACE AU RÉVEIL",
                                           f"{after}/10 au réveil après {row.type} "
-                                          f"à {row.pain}/10 — {rest_baseline(past, morning)}"))
+                                          f"à {pain}/10 — "
+                                          f"{rest_baseline(past, morning, zone)}"))
     return flags
 
 
-def gate(rows: list[Row], label: str, instr: Instruments) -> list[str]:
-    """La porte (règle `po` du règlement), calculée case par case depuis le registre.
-
-    Elle était jugée de tête au bilan : en W40, « réveils à la base » s'est lu dans la
-    prose alors que la série chiffrée de la semaine était vide (audit du 2026-10-09). Le
-    calcul ne remplace pas la lecture du comportement exigée par la règle : il dit ce que
-    le registre établit, et nomme ce qu'il ne peut pas établir (« ? »).
-    """
-    from scripts import signals  # signals importe ce module : import différé
-
+def _pain_gate_cases(rows: list[Row], label: str, previous: str,
+                     zone: str) -> list[tuple[str, str]]:
     def peak(week: str) -> float | None:
-        values = [row.pain for row in rows if row.week == week and row.type in RUN_TYPES
-                  and row.pain is not None]
+        values = [value for row in rows if row.week == week and row.type in RUN_TYPES
+                  and (value := row.pain_at(zone)) is not None]
         return max(values) if values else None
 
-    previous = _week_label(_week_start(label) - dt.timedelta(days=7))
     now, before = peak(label), peak(previous)
     cases = []
     if now is None:
@@ -668,8 +690,9 @@ def gate(rows: list[Row], label: str, instr: Instruments) -> list[str]:
         cases.append(("✓" if now <= before else "✗",
                       f"tendance : {before:g} → {now:g}"))
     wakes = [row for row in rows if row.week == label and row.type == "reveil"]
-    measured = [(row.date, row.pain) for row in wakes if row.pain is not None]
-    base = rest_peak(rows, _week_start(label))
+    measured = [(row.date, value) for row in wakes
+                if (value := row.pain_at(zone)) is not None]
+    base = rest_peak(rows, _week_start(label), zone)
     above = [(day, value) for day, value in measured
              if value > (base if base is not None else 0.0)]
     detail = (f"réveils : {len(measured)} chiffré(s) sur {len(wakes)}"
@@ -681,6 +704,27 @@ def gate(rows: list[Row], label: str, instr: Instruments) -> list[str]:
         cases.append(("?", detail))
     else:
         cases.append(("✓", detail))
+    return cases
+
+
+def gate(rows: list[Row], label: str, instr: Instruments,
+         zones: list[PainZone]) -> list[str]:
+    """La porte (règle `po` du règlement), calculée case par case depuis le registre.
+
+    Elle était jugée de tête au bilan : en W40, « réveils à la base » s'est lu dans la
+    prose alors que la série chiffrée de la semaine était vide (audit du 2026-10-09). Le
+    calcul ne remplace pas la lecture du comportement exigée par la règle : il dit ce que
+    le registre établit, et nomme ce qu'il ne peut pas établir (« ? »). Les cases de
+    douleur se jugent zone par zone : la porte ne s'ouvre que si chacune la passe.
+    Sans zone surveillée, elles n'existent pas.
+    """
+    from scripts import signals  # signals importe ce module : import différé
+
+    previous = _week_label(_week_start(label) - dt.timedelta(days=7))
+    cases: list[tuple[str, str]] = []
+    for zone in zones:
+        cases.extend((mark, zone_prefix(zone, zones) + text)
+                     for mark, text in _pain_gate_cases(rows, label, previous, zone.slug))
     drifts = [drift for drift in signals.hr_at_pace(rows)
               if _week_label(drift.date) in (previous, label)
               and drift.delta >= signals.HR_DRIFT_BPM]
@@ -1067,11 +1111,14 @@ def week_report(store: LedgerStore, rows: list[Row], instruments: dict, targets:
     if dminus:
         lines.append(f"D− de la semaine : {dminus} m — c'est LUI que compte la jauge "
                      f"(confrontation n°2, volet dénivelé, 2026-08-16)")
-    pain = pain_trend(week_rows, 1)
-    if pain:
-        lines.append(f"Douleur : {pain[0]}")
-    lines.extend(f"⚠ Esculier {flag}" for flag in esculier_check(week_rows, history=rows))
-    lines.extend(gate(rows, label, instr))
+    zones = pain_zones(store)
+    for zone in zones:
+        pain = pain_trend(week_rows, 1, zone.slug)
+        if pain:
+            lines.append(f"Douleur {zone.label} : {pain[0]}")
+        lines.extend(f"⚠ Esculier {zone_prefix(zone, zones)}{flag}"
+                     for flag in esculier_check(week_rows, zone.slug, history=rows))
+    lines.extend(gate(rows, label, instr, zones))
     lines.extend(f"⚠ au-dessus de la cible — {overshoot}"
                  for overshoot in over_target(week_rows, targets))
     lines.extend(f"⚠ ligne incomplète — {problem}"
@@ -1108,20 +1155,23 @@ def week_report(store: LedgerStore, rows: list[Row], instruments: dict, targets:
 
 # -------------------------------------------------------------------------------- CLI
 
-# The export's column names, unchanged: whatever reads this CSV reads these headers.
+# The export's column names. Pain has one column per zone, `dlr_<zone>`, between `rpe`
+# and `plaisir`: whatever reads this CSV finds every series under its own name.
 CSV_HEADERS = ["date", "semaine", "type", "km", "duree_h", "fc_moy", "cad",
-               "dplus", "dmoins", "rpe", "dlr", "plaisir", "note"]
+               "dplus", "dmoins", "rpe", "plaisir", "note"]
 
 
-def _export_csv(rows: list[Row]) -> str:
+def _export_csv(rows: list[Row], zones: list[PainZone]) -> str:
     buffer = io.StringIO()
     writer = csv.writer(buffer)
-    writer.writerow(CSV_HEADERS)
+    pain_headers = [f"dlr_{zone.slug}" for zone in zones]
+    writer.writerow([*CSV_HEADERS[:10], *pain_headers, *CSV_HEADERS[10:]])
     for row in rows:
         writer.writerow([row.date, row.week, row.type, row.km,
                          row.hours and round(row.hours, 3), row.hr_avg, row.cadence,
-                         row.dplus, row.dminus, row.rpe, row.pain, row.enjoyment,
-                         row.note])
+                         row.dplus, row.dminus, row.rpe,
+                         *(row.pain_at(zone.slug) for zone in zones),
+                         row.enjoyment, row.note])
     return buffer.getvalue()
 
 
@@ -1146,23 +1196,29 @@ def main() -> int:
     targets = programme.rpe_targets(args.root)
 
     if args.csv:
-        sys.stdout.write(_export_csv(rows))
+        sys.stdout.write(_export_csv(rows, pain_zones(store)))
         return 0
 
     if args.pain_weeks:
         print("Tendance douleur — le PIC fait foi (le déclaratif est biaisé bas).")
         print("Deux séries : douleur PENDANT l'effort, douleur AU REPOS. "
               "Le n compte : un max sur 7 lectures\nn'est pas comparable à un max sur 3.\n")
-        weeks = pain_trend(rows, args.pain_weeks)
-        for week in weeks:
-            print(f"  {week}")
-        recent = [row for row in rows if weeks and row.week >= weeks[0].week]
-        flags = esculier_check(recent, history=rows)
-        print("\n  Règle Esculier (≤2/10, pas pire le lendemain) :")
-        for flag in flags:
-            print(f"    {flag}")
-        if not flags:
-            print("    rien à signaler")
+        zones = pain_zones(store)
+        if not zones:
+            print("Aucune zone surveillée ([[injuries]] de redline.toml) : rien à suivre.")
+        for zone in zones:
+            print(f"{zone.label}")
+            weeks = pain_trend(rows, args.pain_weeks, zone.slug)
+            for week in weeks:
+                print(f"  {week}")
+            recent = [row for row in rows if weeks and row.week >= weeks[0].week]
+            flags = esculier_check(recent, zone.slug, history=rows)
+            print("\n  Règle Esculier (≤2/10, pas pire le lendemain) :")
+            for flag in flags:
+                print(f"    {flag}")
+            if not flags:
+                print("    rien à signaler")
+            print()
         return 0
 
     per_week = eq_hours_per_week(rows, instruments, targets)

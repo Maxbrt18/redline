@@ -88,7 +88,17 @@ def _known(observation: dict, metric: str) -> float | None:
     return float(measure["value"])
 
 
-def observation_fact(observation: dict, session: dict | None = None) -> dict:
+def known_pains(observation: dict, labels: dict[str, str]) -> list[dict]:
+    """La douleur connue de chaque zone, dans l'ordre des zones déclarées."""
+    pains = observation.get("pains") or {}
+    ordered = [zone for zone in labels if zone in pains] + sorted(set(pains) - set(labels))
+    return [{"zone": zone, "label": labels.get(zone, zone),
+             "value": float(pains[zone]["value"])} for zone in ordered
+            if pains[zone].get("state") == "known" and pains[zone].get("value") is not None]
+
+
+def observation_fact(observation: dict, session: dict | None = None,
+                     labels: dict[str, str] | None = None) -> dict:
     """Les mesures connues d'une observation, et les plafonds typés qu'elles franchissent."""
     duration = _known(observation, "duration_s")
     fact: dict[str, Any] = {
@@ -99,7 +109,8 @@ def observation_fact(observation: dict, session: dict | None = None) -> dict:
         # Sans brassard, la FC moyenne ne vaut rien : ni affichée, ni comparée (2026-10-20).
         "hr_avg": (None if observation.get("hr_doubt") == "sans_brassard"
                    else _known(observation, "hr_avg_bpm")),
-        "rpe": _known(observation, "rpe"), "pain": _known(observation, "pain"),
+        "rpe": _known(observation, "rpe"),
+        "pains": known_pains(observation, labels or {}),
         "enjoyment": _known(observation, "enjoyment"),
         "dplus": _known(observation, "elevation_gain_m"),
         "started_at": (observation["started_at"].astimezone(session_cycle.LOCAL_TIMEZONE)
@@ -182,10 +193,22 @@ class Board:
                  instance: Instance | None = None):
         self.ops, self.repo, self.root = ops, repo, root
         self.instance = instance
+        self._zones: list[ledger.PainZone] | None = None
         self.today, self.now = today, now
         self._observations: list[dict] | None = None
         self._rows: list[ledger.Row] | None = None
         self._strength: list[dict] | None = None
+
+    @property
+    def zones(self) -> list[ledger.PainZone]:
+        """Les zones surveillées actives ; aucune sans registre ni déclaration."""
+        if self._zones is None:
+            self._zones = ledger.pain_zones(self.ops) if self.ops is not None else []
+        return self._zones
+
+    @property
+    def zone_labels(self) -> dict[str, str]:
+        return {zone.slug: zone.label for zone in self.zones}
 
     def _capability_label(self, slug: str) -> str:
         if self.instance is None:
@@ -257,13 +280,17 @@ class Board:
             observation = next((row for row in week.observations
                                 if row["id"] == link["observation_id"]), None)
             if observation:
-                item["fact"] = observation_fact(observation, session)
+                item["fact"] = observation_fact(observation, session, self.zone_labels)
         if session["kind"] == "strength":
             report = next((row for row in week.strength
                            if row["performed_on"].isoformat() == session["date"]), None)
             if report:
                 item["fact"] = {"duration_min": report.get("duration_minutes"),
-                                "pain": report.get("shin_after"), "over": []}
+                                "pains": [{"zone": zone, "label": self.zone_labels.get(zone, zone),
+                                           "value": float(moments["after"])}
+                                          for zone, moments in (report.get("pains") or {}).items()
+                                          if moments.get("after") is not None],
+                                "over": []}
             item["entry_id"] = entries.get(session["date"])
         return item
 
@@ -279,7 +306,7 @@ class Board:
         """Ce qui a été couru ou marché sans séance du programme pour le porter."""
         linked = {link["observation_id"] for link in week.links.values()
                   if link.get("observation_id")}
-        return [{**observation_fact(row), "title": row["kind"]}
+        return [{**observation_fact(row, labels=self.zone_labels), "title": row["kind"]}
                 for row in week.observations
                 if row["kind"] in MOVING_TYPES and row["id"] not in linked]
 
@@ -325,40 +352,58 @@ class Board:
             "strength_done": sum(1 for s in strength if s["status"] == "done"),
             "strength_planned": len(strength),
             "load": level,
-            "pain_peak": max((row.pain for row in week.rows if row.pain is not None
-                              and row.type in ledger_model.EFFORT_TYPES), default=None),
+            "pain_peaks": [
+                {"zone": zone.slug, "label": zone.label,
+                 "peak": max((value for row in week.rows
+                              if (value := row.pain_at(zone.slug)) is not None
+                              and row.type in ledger_model.EFFORT_TYPES), default=None)}
+                for zone in self.zones],
         }
 
     def pain(self) -> dict:
-        weeks = ledger.pain_trend(self.rows, 4)
-        return {"cap": ledger.ESCULIER_CAP,
-                "weeks": [{"week": item.week, "peak": item.effort.peak} for item in weeks]}
+        return {"cap": ledger.ESCULIER_CAP, "zones": [
+            {"zone": zone.slug, "label": zone.label,
+             "weeks": [{"week": item.week, "peak": item.effort.peak}
+                       for item in ledger.pain_trend(self.rows, 4, zone.slug)]}
+            for zone in self.zones]}
 
-    def injury_view(self, weeks: int = 5) -> dict:
+    def injury_view(self, zone: str | None = None, weeks: int = 5) -> dict | None:
         """L'écran Injury du carnet (maquette validée le 2026-10-09) : chaque séance notée
         et chaque réveil sur les semaines calendaires récentes, le pic par semaine, et les
-        réveils décrits sans note. Des faits, jamais de verdict (biais de sous-déclaration)."""
+        réveils décrits sans note. Des faits, jamais de verdict (biais de sous-déclaration).
+
+        Une zone à la fois : `zone` absente, c'est la première déclarée. None quand
+        l'instance n'en surveille aucune, ou que la zone demandée n'existe pas."""
+        chosen = next((item for item in self.zones if zone in (None, item.slug)), None)
+        if chosen is None:
+            return None
+        slug = chosen.slug
         start = week_monday(week_label(self.today)) - dt.timedelta(weeks=weeks - 1)
-        rows = [row for row in self.rows if start <= row.date <= self.today and row.pain is not None]
+        rows = [row for row in self.rows
+                if start <= row.date <= self.today and row.pain_at(slug) is not None]
         efforts = [row for row in rows if row.type in ledger_model.EFFORT_TYPES]
         wakes = [row for row in rows if row.type == "reveil"]
         table = []
         for index in range(weeks):
             label = week_label(start + dt.timedelta(weeks=index))
-            effort = [row.pain for row in efforts if row.week == label and row.pain is not None]
-            wake = [row.pain for row in wakes if row.week == label and row.pain is not None]
+            effort = [row.pains[slug] for row in efforts if row.week == label]
+            wake = [row.pains[slug] for row in wakes if row.week == label]
             table.append({"week": label, "peak": max(effort, default=None), "n": len(effort),
                           "wake": max(wake, default=None)})
+        column = ledger_model.pain_column(slug)
         missing = sorted({obs["occurred_on"] for obs in self.observations
                           if obs["kind"] == "reveil" and obs["occurred_on"] <= self.today
                           and self.today - obs["occurred_on"] < dt.timedelta(days=14)
-                          and "Dlr" in ledger_model.missing_observation_fields(obs)}, reverse=True)
+                          and column in ledger_model.missing_observation_fields(obs)},
+                         reverse=True)
         return {
+            "zone": slug, "label": chosen.label,
+            "zones": [{"zone": item.slug, "label": item.label} for item in self.zones],
             "cap": ledger.ESCULIER_CAP, "start": start.isoformat(), "today": self.today.isoformat(),
             "week": week_label(self.today),
-            "points": [{"date": row.date.isoformat(), "pain": row.pain, "kind": row.type,
+            "points": [{"date": row.date.isoformat(), "pain": row.pains[slug], "kind": row.type,
                         "long": row.type == "SL"} for row in efforts],
-            "wakes": [{"date": row.date.isoformat(), "pain": row.pain} for row in wakes],
+            "wakes": [{"date": row.date.isoformat(), "pain": row.pains[slug]} for row in wakes],
             "weeks": table, "missing": [day.isoformat() for day in missing],
             "scale": PAIN_SCALE,
         }
@@ -386,6 +431,7 @@ class Board:
         # dit si le injury redescend entre deux séances (décision du 2026-10-15).
         effort_yesterday = any(row.date == yesterday and row.type in ledger_model.EFFORT_TYPES
                                for row in self.rows)
+        labels = self.zone_labels
         woke_today = False
         for row in self.observations:
             day = row["occurred_on"]
@@ -396,16 +442,22 @@ class Board:
                 continue
             missing = ledger_model.missing_observation_fields(row)
             if row["kind"] == "reveil":
-                if "Dlr" in missing and day == self.today and self._morning:
-                    asks.append({"id": f"wake-cell:{row['id']}", "type": "wake",
-                                 "date": day.isoformat(), "after_effort": effort_yesterday})
+                if day == self.today and self._morning:
+                    asks.extend({"id": f"wake-cell:{row['id']}:{zone}", "type": "wake",
+                                 "zone": zone, "label": labels.get(zone, zone),
+                                 "date": day.isoformat(), "after_effort": effort_yesterday}
+                                for zone in labels
+                                if ledger_model.pain_column(zone) in missing)
                 continue
-            fields = [metric for metric, column in (
-                ("pain", "Dlr"), ("rpe", "RPE"), ("enjoyment", "Plaisir")) if column in missing]
+            fields = [f"pain:{zone}" for zone in labels
+                      if ledger_model.pain_column(zone) in missing]
+            fields += [metric for metric, column in (
+                ("rpe", "RPE"), ("enjoyment", "Plaisir")) if column in missing]
             if fields:
                 asks.append({"id": f"cell:{row['id']}", "type": "cells",
                              "date": day.isoformat(), "kind": row["kind"],
-                             "km": _known(row, "distance_km"), "fields": fields})
+                             "km": _known(row, "distance_km"), "fields": fields,
+                             "labels": {f"pain:{zone}": label for zone, label in labels.items()}})
         daily = self.daily(self.today)
         missing = [field for field in DAILY_FIELDS if not daily.get(field)]
         if missing and self._morning:
@@ -413,8 +465,9 @@ class Board:
                          "date": self.today.isoformat(), "fields": missing})
         asks.extend(self.hr_asks())
         if not woke_today and self._morning:
-            asks.insert(0, {"id": f"wake:{self.today.isoformat()}", "type": "wake",
-                            "date": self.today.isoformat(), "after_effort": effort_yesterday})
+            asks[0:0] = [{"id": f"wake:{self.today.isoformat()}:{zone}", "type": "wake",
+                          "zone": zone, "label": label, "date": self.today.isoformat(),
+                          "after_effort": effort_yesterday} for zone, label in labels.items()]
         return asks
 
     def daily(self, day: dt.date) -> dict:
@@ -459,7 +512,7 @@ class Board:
         if ask_id.startswith("reserve:"):
             return self._answer_reserve(ask_id, value)
         ask = next((item for item in self.asks()
-                    if ask_id == item["id"] or ask_id.rsplit(":", 1)[0] == item["id"]), None)
+                    if ask_id == item["id"] or ask_id.startswith(item["id"] + ":")), None)
         if ask is None:
             raise AnswerError("Cette question est déjà close. Actualise le carnet.")
         if ask["type"] == "daily":
@@ -487,38 +540,45 @@ class Board:
             if value not in session_cycle.MORNING_TRACES:
                 raise AnswerError("Trace attendue : aucune, très légère, légère ou nette.")
             kind, _, key = ask["id"].partition(":")
+            trace = session_cycle.MORNING_TRACE_VALUES[value]
             if kind == "wake-cell":
-                self.ops.complete_measurement(uuid.UUID(key), "pain",
-                                              session_cycle.MORNING_TRACE_VALUES[value],
-                                              actor=ACTOR)
+                self.ops.complete_measurement(uuid.UUID(key.rsplit(":", 1)[0]), "pain", trace,
+                                              zone=ask["zone"], actor=ACTOR)
             else:
+                # La première zone répondue crée le réveil ; les autres y restent
+                # `pending` et se complètent ensuite, une zone par geste.
                 self.ops.add_observation({
                     "occurred_on": self.today, "kind": "reveil",
                     "idempotency_key": f"carnet:reveil:{self.today.isoformat()}",
                     "note": "trace au réveil déclarée dans le carnet", "source": ACTOR,
-                    "measurements": {"pain": {
-                        "state": "known",
-                        "value": session_cycle.MORNING_TRACE_VALUES[value]}},
+                    "measurements": {},
+                    "pains": {ask["zone"]: {"state": "known", "value": trace}},
                 }, actor=ACTOR)
             alert = None
             if value == "nette":
-                alert = (f"Carnet : trace nette au réveil ce matin ({self.today:%d/%m}). "
-                         "La condition écrite dans la séance du jour s'applique.")
+                where = f" ({ask['label']})" if len(self.zones) > 1 else ""
+                alert = (f"Carnet : trace nette au réveil ce matin{where} "
+                         f"({self.today:%d/%m}). La condition écrite dans la séance du jour "
+                         "s'applique.")
             return {"alert": alert}
-        metric = ask_id.rsplit(":", 1)[-1]
-        if metric not in ask["fields"]:
+        field = ask_id[len(ask["id"]) + 1:]
+        if field not in ask["fields"]:
             raise AnswerError("Cette mesure est déjà renseignée. Actualise le carnet.")
+        metric, _, zone = field.partition(":")
         number = _scale(metric, value)
         observation_id = uuid.UUID(ask["id"].split(":", 1)[1])
-        self.ops.complete_measurement(observation_id, metric, number, actor=ACTOR)
+        self.ops.complete_measurement(observation_id, metric, number, zone=zone or None,
+                                      actor=ACTOR)
         alert = None
         if metric == "pain" and number > ledger.ESCULIER_CAP:
             day = dt.date.fromisoformat(ask["date"])
-            alert = (f"Carnet : douleur {number:g}/10 au pic sur la séance {ask['kind']} "
-                     f"du {day:%d/%m}, au-dessus du plafond de {ledger.ESCULIER_CAP:g}.")
+            where = f" ({ask['labels'][field]})" if len(self.zones) > 1 else ""
+            alert = (f"Carnet : douleur {number:g}/10 au pic{where} sur la séance "
+                     f"{ask['kind']} du {day:%d/%m}, au-dessus du plafond de "
+                     f"{ledger.ESCULIER_CAP:g}.")
         # Les ressentis de la sortie sont complets : son débrief n'a plus à attendre.
         settled = (self.ops.strava_activity_for_observation(observation_id)
-                   if set(ask["fields"]) == {metric} else None)
+                   if set(ask["fields"]) == {field} else None)
         return {"alert": alert, "activity": settled}
 
     # ------------------------------------------------------------ détail d'une séance
@@ -563,7 +623,7 @@ class Board:
             "date": earlier["occurred_on"].isoformat(), "km": _known(earlier, "distance_km"),
             "hr_avg": None if earlier.get("hr_doubt") == "sans_brassard"
             else _known(earlier, "hr_avg_bpm"),
-            "rpe": _known(earlier, "rpe"), "pain": _known(earlier, "pain"),
+            "rpe": _known(earlier, "rpe"), "pains": known_pains(earlier, self.zone_labels),
             "enjoyment": _known(earlier, "enjoyment"), "rep_dplus": None, "rep_hr": None}
         intake = self.ops.strava_detail(earlier["id"])
         laps = ((intake or {}).get("distilled") or {}).get("laps") or []
@@ -583,14 +643,18 @@ class Board:
                 "retire_at_km": row.get("retire_at_km"), "status": row.get("status")}
 
     def _wake(self, day: dt.date) -> dict:
-        """La trace au réveil du jour (avant la séance) et du lendemain (après)."""
-        def pain_on(when: dt.date) -> float | None:
+        """La trace au réveil du jour (avant la séance) et du lendemain (après), par zone."""
+        def pains_on(when: dt.date) -> dict[str, float]:
             row = next((row for row in self.observations
                         if row["kind"] == "reveil" and row["occurred_on"] == when), None)
-            return _known(row, "pain") if row else None
+            return {item["zone"]: item["value"]
+                    for item in known_pains(row, self.zone_labels)} if row else {}
 
         after = day + dt.timedelta(days=1)
-        return {"before": pain_on(day), "after": pain_on(after),
+        before_pains, after_pains = pains_on(day), pains_on(after)
+        return {"zones": [{"zone": zone.slug, "label": zone.label,
+                           "before": before_pains.get(zone.slug),
+                           "after": after_pains.get(zone.slug)} for zone in self.zones],
                 "after_due": after > self.today}
 
     def _week_context(self, day: dt.date) -> dict:
@@ -622,7 +686,7 @@ class Board:
         s = None if not streams else {**streams, "hr": streams.get("hr") if hr_valid else None}
         quality = debrief.is_quality(session)
         reps = session_detail.quality(distilled.get("laps") or [], s) if quality else None
-        fact = observation_fact(observation, session)
+        fact = observation_fact(observation, session, self.zone_labels)
         dplus = fact["dplus"]
         series = None
         if s:
@@ -656,7 +720,8 @@ class Board:
                     "distance_target_km", "distance_cap_km", "duration_cap_min",
                     "rpe_min", "rpe_max", "hr_cap_bpm") if session.get(key) is not None},
                 "note": session.get("note")},
-            "ask": None if ask is None else {"id": ask["id"], "fields": ask["fields"]},
+            "ask": None if ask is None else {"id": ask["id"], "fields": ask["fields"],
+                                             "labels": ask["labels"]},
             "reserve_ask": self.reserve_ask(observation, session),
             "wake": self._wake(day),
             "phases": (reps or {}).get("phases"), "reps": (reps or {}).get("reps"),

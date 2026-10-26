@@ -44,7 +44,7 @@ def test_strength_publie_le_fait_canonique_sans_le_reconstruire():
         def strength_history(self):
             return [{
                 "performed_on": dt.date(2026, 8, 26), "workout": "a",
-                "duration_minutes": 60, "shin_before": 0, "shin_after": 1,
+                "duration_minutes": 60, "pains": {"injury": {"before": 0, "after": 1}},
                 "session_key": "w35-mer-ef-2026-08-26",
                 "note": "Une série de planche faite sur les deux pieds.",
                 "exercises": [{
@@ -58,7 +58,7 @@ def test_strength_publie_le_fait_canonique_sans_le_reconstruire():
 
     text = "\n".join(lines)
     assert "w35-mer-ef-2026-08-26" in text
-    assert "injury 0->1/10" in text
+    assert "douleur injury 0->1/10" in text
     assert "plank-toe · difficulté 8/10 · séries both=30" in text
     assert "Une série de planche faite sur les deux pieds" in text
 

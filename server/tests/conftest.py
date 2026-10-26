@@ -330,3 +330,13 @@ def _is_strength(item) -> bool:
         "test_no_link_without_configuration", "test_a_derogation_must_carry_a_typed_dose",
         "test_the_overflow_guard_actually_fires",
         "test_the_worst_payload_the_schema_allows_still_gets_a_sidecar"}
+
+
+# La zone surveillée de l'instance fictive (`[[injuries]]` de redline.toml) : les tests
+# de douleur lisent cette zone, jamais une douleur sans zone.
+ZONE = "injury"
+
+
+def zoned(value):
+    """`pains` d'une ligne du registre : la douleur de la zone fictive, ou rien."""
+    return {} if value is None else {ZONE: value}

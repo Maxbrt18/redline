@@ -22,9 +22,11 @@ from .notebook_board import AnswerError
 
 WEEK = re.compile(r"20\d{2}-W(?:0[1-9]|[1-4]\d|5[0-3])")
 UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
-ASK = re.compile(r"(?:cell:[0-9a-f-]{36}:(?:pain|rpe|enjoyment)|wake-cell:[0-9a-f-]{36}"
+ZONE = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")
+ASK = re.compile(r"(?:cell:[0-9a-f-]{36}:(?:pain:[a-z0-9][a-z0-9-]{0,39}|rpe|enjoyment)"
+                 r"|wake-cell:[0-9a-f-]{36}:[a-z0-9][a-z0-9-]{0,39}"
                  r"|reserve:[0-9a-f-]{36}"
-                 r"|wake:20\d{2}-\d{2}-\d{2}"
+                 r"|wake:20\d{2}-\d{2}-\d{2}:[a-z0-9][a-z0-9-]{0,39}"
                  r"|daily:20\d{2}-\d{2}-\d{2}:(?:sleep|life_load)|hr:20\d{2}-\d{2}-\d{2})")
 
 COOKIE = "__Host-redline-notebook"
@@ -188,7 +190,13 @@ def register(app: Flask, notebook: NotebookService, psid: str,
 
     @app.get("/carnet-api/injury")
     def notebook_injury():
-        return jsonify(notebook.injury())
+        zone = request.args.get("zone") or None
+        if zone is not None and not ZONE.fullmatch(zone):
+            return jsonify(error="Zone invalide."), 400
+        view = notebook.injury(zone)
+        if view is None:
+            return jsonify(error="Aucune zone surveillée."), 404
+        return jsonify(view)
 
     @app.get("/carnet-api/session/<observation_id>")
     def notebook_session(observation_id):

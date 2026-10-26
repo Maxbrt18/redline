@@ -63,8 +63,8 @@ def test_the_walk_share_uses_the_gauge_formula_not_a_copy_of_it():
 
 
 def test_a_quiet_week_carries_no_red_verdict():
-    rows = [Row(dt.date(2026, 3, 2), "EF", km=8.0, hours=0.8, pain=0.0),
-            Row(dt.date(2026, 3, 4), "EF", km=8.0, hours=0.8, pain=0.0)]
+    rows = [Row(dt.date(2026, 3, 2), "EF", km=8.0, hours=0.8, pains={"injury": 0.0}),
+            Row(dt.date(2026, 3, 4), "EF", km=8.0, hours=0.8, pains={"injury": 0.0})]
     block = hot_cache.render(ledger, rows, {"2026-W10": Instruments()}, RPE_TARGETS)
     assert "au rouge" not in block
     assert "% de marche" not in block   # zéro rando : la mention n'a pas lieu d'être
@@ -142,6 +142,9 @@ def test_refresh_fills_the_state_block_only_where_it_is_declared(tmp_path):
         def prediction_rows(self):
             return [{"status": "open", "due_on": dt.date(2026, 9, 1)}]
 
+        def pain_zones(self):
+            return [{"slug": "injury", "label": "Injury", "active": True}]
+
     rows = [Row(dt.date(2026, 9, 20), "SL", km=10.8, hours=1.3)]
     assert hot_cache.refresh(tmp_path, ledger, rows, {}, store=Store(),
                              today=dt.date(2026, 9, 27))
@@ -149,3 +152,16 @@ def test_refresh_fills_the_state_block_only_where_it_is_declared(tmp_path):
     assert "injury 3/5" in text and "1 typée(s)" in text
     assert not hot_cache.refresh(tmp_path, ledger, rows, {}, store=Store(),
                                  today=dt.date(2026, 9, 27), check=True)
+
+
+def test_each_watched_zone_has_its_own_trend_in_the_form_block():
+    rows = [Row(dt.date(2026, 3, 2), "EF", km=8.0, hours=0.8,
+                pains={"genou": 2.0, "cheville": 0.5})]
+    zones = [ledger.PainZone("genou", "Genou"), ledger.PainZone("cheville", "Cheville")]
+    block = hot_cache.render(ledger, rows, {}, RPE_TARGETS, zones=zones)
+    assert "Genou W10 2/—" in block and "Cheville W10 0,5/—" in block
+
+
+def test_without_a_watched_zone_the_form_block_says_so():
+    rows = [Row(dt.date(2026, 3, 2), "EF", km=8.0, hours=0.8)]
+    assert "aucune zone surveillée" in hot_cache.render(ledger, rows, {}, RPE_TARGETS)

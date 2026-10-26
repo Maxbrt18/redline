@@ -67,7 +67,9 @@ function factLines(fact, shown) {
   if (fact.km && fact.duration_min) parts.push(paceOf(fact.duration_min * 60 / fact.km) + '/km');
   if (fact.hr_avg != null && !skip.has('hr_avg')) parts.push('FC ' + fmt(fact.hr_avg, 0));
   if (fact.dplus >= 100) parts.push(fact.dplus + ' m D+');
-  const feel = [fact.pain != null ? 'douleur ' + fmt(fact.pain) : null, fact.enjoyment != null ? 'plaisir ' + fmt(fact.enjoyment, 0) : null].filter(Boolean);
+  const several = (fact.pains || []).length > 1;
+  const pains = (fact.pains || []).map(item => 'douleur ' + (several ? item.label.toLowerCase() + ' ' : '') + fmt(item.value));
+  const feel = [...pains, fact.enjoyment != null ? 'plaisir ' + fmt(fact.enjoyment, 0) : null].filter(Boolean);
   if (shown) return parts.length || feel.length ? [el('p', [...parts, ...feel].join(' · '))] : [];
   if (parts.length) lines.push(el('p', parts.join(' · ')));
   if (feel.length) lines.push(el('p', feel.join(' · ')));
@@ -206,7 +208,10 @@ export function renderWeek(data, root) {
   const rest = [];
   if (open && !upcoming && totals.km_target && totals.km_target > totals.km_done) rest.push('reste ~' + fmt(totals.km_target - totals.km_done, 0) + ' km');
   else if (totals.dplus) rest.push(totals.dplus + ' m D+');
-  if (totals.pain_peak != null) rest.push('douleur au pic ' + fmt(totals.pain_peak));
+  const peaks = totals.pain_peaks || [];
+  peaks.forEach(item => {
+    if (item.peak != null) rest.push('douleur au pic ' + (peaks.length > 1 ? item.label.toLowerCase() + ' ' : '') + fmt(item.peak));
+  });
   if (rest.length) sub.append(' · ' + rest.join(' · '));
   content.append(sub);
   if (data.strip) content.append(weekChart(data.strip));

@@ -54,10 +54,13 @@ def report(store: Any, today: dt.date, week: str | None = None) -> list[str]:
                        None if row.hours is None else row.hours * 60,
                        row.hr_valid, _strava_id(row.idempotency_key))
             for row in rows if row.date >= permit.START]
+    # Le permis se juge sur la PIRE trace du matin, toutes zones confondues : une zone qui
+    # proteste suffit à le refuser. C'est le seul endroit où les zones se rejoignent, et
+    # elles s'y rejoignent par le maximum, jamais par une moyenne.
     traces: dict[dt.date, float] = {}
     for row in rows:
-        if row.type == "reveil" and row.pain is not None and row.date >= permit.START:
-            traces[row.date] = max(traces.get(row.date, 0), row.pain)
+        if row.type == "reveil" and row.pains and row.date >= permit.START:
+            traces[row.date] = max(traces.get(row.date, 0), *row.pains.values())
     weeks = {choice["iso_week"] for choice in choices}
     groups = {run.strava_id: group for run in runs if run.type == "EF" and run.strava_id
               for group in [_group(store, run.strava_id)] if group is not None}

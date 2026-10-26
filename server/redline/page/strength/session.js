@@ -15,6 +15,7 @@ export const mmss = (seconds) => {
 
 export let session = null;      // resolved from the fragment capability
 export let previousSession = null;
+export let watchedZones = [];   // [{zone, label}] : les zones surveillées, à demander
 export let credentials = null;  // {token}
 export let state = null;        // progress, persisted
 export let timer = null;        // {kind:'work'|'rest', endsAt|startedAt, paused}
@@ -90,9 +91,11 @@ export function loadProgress() {
     // `opened` distingue « pas encore répondu » de « répondu 0 » : sans lui, un
     // injury parfaitement silencieux rouvrirait l'écran d'ouverture à chaque
     // retour sur l'onglet.
-    shinBefore: null, opened: false,
-    shin: null, note: '', minutes: null, sent: false, pending: false,
+    // `pains` : {zone: {before, after}}, une lecture avant et une après par zone.
+    pains: {}, opened: false,
+    note: '', minutes: null, sent: false, pending: false,
   };
+  if (!state.pains || typeof state.pains !== 'object') state.pains = {};
   state.current = clampInt(state.current, 0, session.exercises.length - 1, 0);
   timer = state.timer || null;
   if (timer && timer.index !== state.current) timer = null;
@@ -105,7 +108,14 @@ export function setTimer(value) { timer = value; }
 export function adopt(decoded) {
   session = decoded.session;
   previousSession = decoded.previous_session || null;
+  watchedZones = Array.isArray(decoded.zones) ? decoded.zones : [];
   credentials = { token: decoded.token };
+}
+
+// La lecture d'une zone à un moment (`before` | `after`), et son écriture.
+export const painOf = (slug, moment) => (state.pains[slug] || {})[moment] ?? null;
+export function setPain(slug, moment, value) {
+  state.pains[slug] = {...(state.pains[slug] || {}), [moment]: value};
 }
 
 // Ce qu'une séance commencée a déjà fait sur ce téléphone, lu dans sa sauvegarde :

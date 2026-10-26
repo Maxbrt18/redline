@@ -100,7 +100,7 @@ def open_session(browser, document):
         token = "A" * 32
         tab.route("**/strength-session", lambda route: route.fulfill(
             status=200, content_type="application/json",
-            body=json.dumps({"status": "ok", "session": data})))
+            body=json.dumps({"status": "ok", "session": data, "zones": ZONES})))
         tab.goto(f"{BASE}/s#t={token}")
         # L'un OU l'autre : une séance qui porte un garde-fou ouvre sur la lecture
         # injury, et n'a donc aucun exercice à l'écran tant qu'on n'a pas répondu.
@@ -470,7 +470,7 @@ def test_a_second_tap_on_the_button_reopens_the_session(browser, document):
     data = session(exercise("Mollet", measure="reps", sets=2, reps=15))
     tab.route("**/strength-session", lambda route: route.fulfill(
         status=200, content_type="application/json",
-        body=json.dumps({"status": "ok", "session": data})))
+        body=json.dumps({"status": "ok", "session": data, "zones": ZONES})))
     tab.evaluate("fragment => { location.hash = fragment; }", f"t={'F' * 32}")
     tab.wait_for_selector(".p-step--live", timeout=5000)
     assert tab.text_content(".p-step--live .p-step__name") == "Mollet"
@@ -487,7 +487,7 @@ def test_an_opaque_capability_resolves_then_posts_the_same_token(browser, docume
     tab.route("**/strength-session", lambda route: (
         resolved.append(json.loads(route.request.post_data)),
         route.fulfill(status=200, content_type="application/json",
-                      body=json.dumps({"status": "ok", "session": data}))))
+                      body=json.dumps({"status": "ok", "session": data, "zones": ZONES}))))
     tab.route("**/strength-report", lambda route: route.fulfill(status=200, body="ok"))
 
     tab.goto(f"{BASE}/s#t={token}")
@@ -514,7 +514,7 @@ def test_a_resolved_snapshot_reopens_offline_on_the_same_phone(browser, document
     def resolve(route):
         if online["value"]:
             route.fulfill(status=200, content_type="application/json",
-                          body=json.dumps({"status": "ok", "session": data}))
+                          body=json.dumps({"status": "ok", "session": data, "zones": ZONES}))
         else:
             route.abort()
 
@@ -555,7 +555,7 @@ def test_server_revocation_wins_over_a_cached_snapshot(browser, document):
                           body='{"status":"expired"}')
         else:
             route.fulfill(status=200, content_type="application/json",
-                          body=json.dumps({"status": "ok", "session": data}))
+                          body=json.dumps({"status": "ok", "session": data, "zones": ZONES}))
 
     tab.route("**/strength-session", resolve)
     tab.goto(f"{BASE}/s#t={token}")
@@ -736,7 +736,7 @@ def test_a_page_without_cues_still_runs(browser):
     data = session(step)
     tab.route("**/strength-session", lambda route: route.fulfill(
         status=200, content_type="application/json",
-        body=json.dumps({"status": "ok", "session": data})))
+        body=json.dumps({"status": "ok", "session": data, "zones": ZONES})))
     tab.goto(f"{BASE}/s#t={'G' * 32}")
     tab.wait_for_selector(".p-step--live")
     assert tab.evaluate("() => !!document.querySelector('.p-how__toggle')") is False
@@ -748,7 +748,9 @@ def test_a_page_without_cues_still_runs(browser):
 
 # ------------------------------------------------------- l'ouverture et le injury
 
-GATE = {"shin_max": 2, "drop": ["plyometrics"],
+# La zone surveillée que la page demande avant et après, comme le serveur la sert.
+ZONES = [{"zone": "injury", "label": "Injury"}]
+GATE = {"pain_max": 2, "drop": ["plyometrics"],
         "say": "Injury au-dessus de 2 : on saute la pliométrie et on garde le reste léger."}
 
 
@@ -787,7 +789,7 @@ def test_the_gate_drops_what_the_coach_named_and_says_his_sentence(open_session)
     assert tab.text_content("#gate") == GATE["say"]
     doses = tab.evaluate(
         "() => [...document.querySelectorAll('.p-step__dose')].map(n => n.textContent)")
-    assert "retiré — injury" in doses
+    assert "retiré — garde-fou" in doses
 
     # Et l'exercice retiré n'est pas à faire : la séance ouvre sur l'autre.
     assert tab.text_content(".p-step--live .p-step__name") == "Mollet"
@@ -799,7 +801,7 @@ def test_a_reading_under_the_threshold_changes_nothing(open_session):
     assert tab.evaluate("() => document.getElementById('gate').hidden") is True
     doses = tab.evaluate(
         "() => [...document.querySelectorAll('.p-step__dose')].map(n => n.textContent)")
-    assert "retiré — injury" not in doses
+    assert "retiré — garde-fou" not in doses
 
 
 def test_the_opening_can_be_skipped_and_then_nothing_is_gated(open_session):
@@ -838,8 +840,7 @@ def test_both_readings_reach_the_report(open_session):
     with tab.expect_request("**/strength-report") as caught:
         send(tab)
     body = json.loads(caught.value.post_data)
-    assert body["report"]["shin_before"] == 1
-    assert body["report"]["shin"] == 3
+    assert body["report"]["pains"] == {"injury": {"before": 1, "after": 3}}
 
 
 def test_the_gate_sentence_does_not_eat_the_session_note(open_session):
@@ -883,7 +884,7 @@ def test_the_beeps_actually_fire(browser, document):
                    exercise("Suite", measure="reps", sets=1, reps=8), sid="bip")
     tab.route("**/strength-session", lambda route: route.fulfill(
         status=200, content_type="application/json",
-        body=json.dumps({"status": "ok", "session": data})))
+        body=json.dumps({"status": "ok", "session": data, "zones": ZONES})))
     tab.goto(f"{BASE}/s#t={'H' * 32}")
     tab.wait_for_selector(".p-step--live")
     click(tab, "Démarrer")
@@ -931,7 +932,7 @@ def test_sound_and_screen_lock_survive_a_phone_sleep(browser, document):
     data = session(exercise("Iso", measure="time", seconds=30), sid="veille")
     tab.route("**/strength-session", lambda route: route.fulfill(
         status=200, content_type="application/json",
-        body=json.dumps({"status": "ok", "session": data})))
+        body=json.dumps({"status": "ok", "session": data, "zones": ZONES})))
     tab.goto(f"{BASE}/s#t={'V' * 32}")
     tab.wait_for_selector(".p-step--live")
     open_sound(tab)
@@ -964,7 +965,7 @@ def test_silencing_really_silences(browser, document):
     data = session(exercise("Iso", measure="time", seconds=2))
     tab.route("**/strength-session", lambda route: route.fulfill(
         status=200, content_type="application/json",
-        body=json.dumps({"status": "ok", "session": data})))
+        body=json.dumps({"status": "ok", "session": data, "zones": ZONES})))
     tab.goto(f"{BASE}/s#t={'I' * 32}")
     tab.wait_for_selector(".p-step--live")
     silence(tab)
@@ -978,7 +979,7 @@ def test_gated_exercise_is_consultable_but_has_no_execution_or_rating(open_sessi
     tab = open_session(gated_session())
     pick(tab, 4)
     tab.locator('.p-step__head').nth(1).click()
-    assert control(tab)['label'] == 'Retiré par le garde-fou injury'
+    assert control(tab)['label'] == 'Retiré par le garde-fou de douleur'
     assert 'Bloc 2' not in control(tab)['buttons']
     click(tab, 'Revenir à la séance')
     forward(tab)

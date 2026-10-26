@@ -65,10 +65,11 @@ def _missing_cells(detail: str) -> ClosedProactive | None:
         "Plaisir": "ton plaisir",
     }
     names = list(data.get("missing", ()))
-    selected = next((name for name in ("Dlr", "RPE", "Plaisir") if name in names), None)
+    selected = next((name for wanted in ("Dlr", "RPE", "Plaisir") for name in names
+                     if _base(name) == wanted), None)
     if selected is None:
         return ClosedProactive("Comment tu as vécu ta dernière séance ?")
-    requested = labels[selected]
+    requested = _requested(labels, selected)
     markers = list(data.get("markers", ()))
     index = names.index(selected)
     kind = str(data.get("type") or "séance")
@@ -77,6 +78,17 @@ def _missing_cells(detail: str) -> ClosedProactive | None:
     return ClosedProactive(
         text, (str(markers[index]),) if index < len(markers) and markers[index] else (),
         question=text)
+
+
+def _base(column: str) -> str:
+    """« Dlr:genou » → « Dlr » (même règle que `ledger.column_base`)."""
+    return column.split(":", 1)[0]
+
+
+def _requested(labels: dict[str, str], column: str) -> str:
+    """Le libellé demandé ; la douleur d'une zone nomme sa zone."""
+    _, _, zone = column.partition(":")
+    return labels[_base(column)] + (f" ({zone})" if zone else "")
 
 
 def missing_cells_in_notebook(detail: str) -> ClosedProactive | None:
@@ -90,10 +102,11 @@ def missing_cells_in_notebook(detail: str) -> ClosedProactive | None:
     if not data or data.get("type") == "reveil":
         return None
     labels = {"Dlr": "ton pic de douleur", "RPE": "ton RPE", "Plaisir": "ton plaisir"}
-    names = [name for name in ("Dlr", "RPE", "Plaisir") if name in data.get("missing", ())]
+    names = [name for wanted in ("Dlr", "RPE", "Plaisir")
+             for name in data.get("missing", ()) if _base(name) == wanted]
     if not names:
         return None
-    wanted = [labels[name] for name in names]
+    wanted = [_requested(labels, name) for name in names]
     listed = wanted[0] if len(wanted) == 1 else ", ".join(wanted[:-1]) + " et " + wanted[-1]
     session = " ".join(("Ta séance", str(data.get("type") or "").strip())).strip()
     try:

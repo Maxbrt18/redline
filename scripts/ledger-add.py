@@ -8,6 +8,9 @@ le contrat de `model/ledger.py`, puis écrit directement l'observation canonique
         --temps 0:41:56 --allure 6:08 --fcmoy 156.61 --fcmax 168 --cad 168.88 \\
         --dplus 64.7 --dmoins 64 --wbgt 20 --strava 90000000003 --note "…"
 
+La douleur se donne par zone surveillée : `--dlr genou=2 --dlr cheville=?`. Avec une
+seule zone, `--dlr 2` suffit.
+
 `--dry-run` affiche la charge validée sans écrire.
 """
 
@@ -50,7 +53,8 @@ def _number(name: str, value: str) -> float | int:
     return int(number) if number.is_integer() else number
 
 
-def morning_trace_errors(raw: dict[str, str]) -> list[str]:
+def morning_trace_errors(raw: dict[str, str], pains: dict[str, str],
+                         zones: list[str]) -> list[str]:
     """Une ligne `reveil` porte sa trace, ou elle ne s'écrit pas (audit du 2026-10-11).
 
     Sans `--dlr`, la mesure naissait `pending` sans bruit et la réponse de Sam ne
@@ -63,21 +67,27 @@ def morning_trace_errors(raw: dict[str, str]) -> list[str]:
     """
     if raw.get("Type") != "reveil":
         return []
-    given = raw.get("Dlr", "")
-    word = unicodedata.normalize("NFKD", given.lower()).encode("ascii", "ignore").decode()
-    word = "-".join(word.split())
-    if word in session_cycle.MORNING_TRACE_VALUES:
-        raw["Dlr"] = str(session_cycle.MORNING_TRACE_VALUES[word])
-        return []
-    if given and given != table.UNKNOWN:
-        return []
-    return ["réveil sans trace : passe --dlr aucune, « très légère », légère ou nette "
-            "(0, 0.5, 1 ou 2). Sa base habituelle est légère ; mieux que d'habitude ou très "
-            "légère = très légère. Si Sam n'a nommé aucune trace, n'écris pas de ligne "
-            "et demande-la."]
+    if not zones:
+        return ["réveil sans zone surveillée : il n'y a aucune trace à consigner"]
+    problems = []
+    for zone in zones:
+        given = pains.get(zone, "")
+        word = unicodedata.normalize("NFKD", given.lower()).encode("ascii", "ignore").decode()
+        word = "-".join(word.split())
+        if word in session_cycle.MORNING_TRACE_VALUES:
+            pains[zone] = str(session_cycle.MORNING_TRACE_VALUES[word])
+            continue
+        if given and given != table.UNKNOWN:
+            continue
+        problems.append(
+            f"réveil sans trace pour {zone} : passe --dlr {zone}=aucune, « très légère », "
+            "légère ou nette (0, 0.5, 1 ou 2). Sa base habituelle est légère ; mieux que "
+            "d'habitude ou très légère = très légère. Si l'athlète n'a nommé aucune trace, "
+            "n'écris pas de ligne et demande-la.")
+    return problems
 
 
-def _write_database(url: str, raw: dict[str, str], key: str, *,
+def _write_database(url: str, raw: dict[str, str], pains: dict[str, str], key: str, *,
                     depart_local: str = "", session_key: str = "") -> str:
     if not key:
         raise table.LedgerError(
@@ -102,6 +112,7 @@ def _write_database(url: str, raw: dict[str, str], key: str, *,
         "occurred_on": dt.date.fromisoformat(raw["Date"]), "kind": kind,
         "idempotency_key": key, "strava_activity_id": raw.get("Strava") or None,
         "note": raw.get("Note", ""), "source": "ledger-add", "measurements": measurements,
+        "pains": {zone: table.pain_reading(value) for zone, value in pains.items()},
     }
     if depart_local:
         from scripts.model import session_cycle
@@ -134,6 +145,13 @@ def _write_database(url: str, raw: dict[str, str], key: str, *,
     return str(oid)
 
 
+def _active_zones(url: str) -> list[str]:
+    from scripts.storage import Database, OperationalStore
+
+    store = OperationalStore(Database(url, application_name="ledger-add"))
+    return [zone["slug"] for zone in store.pain_zones() if zone["active"]]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__.splitlines()[0],
@@ -152,9 +170,11 @@ def main() -> int:
         parser.add_argument(f"--{option_of(item)}", default="",
                             help=f"champ « {item.name} »"
                                  + (f" ({item.note})" if item.note else ""))
+    parser.add_argument("--dlr", action="append", default=[], metavar="ZONE=VALEUR",
+                        help=f"douleur d'une zone surveillée ({table.PAIN_NOTE}) ; "
+                             "répétable, « ? » = demandée puis perdue")
     args = parser.parse_args()
 
-    database_url = (os.environ.get("DATABASE_URL") or "").strip()
     corrected, raw_values = [], {}
     for item in table.INPUTS:
         raw = str(getattr(args, option_of(item).replace("-", "_")) or "").strip()
@@ -165,8 +185,26 @@ def main() -> int:
             corrected.append(f"« {item.name} » : {raw} → {good} (arrondi)")
         raw_values[item.name] = good
 
-    problems = morning_trace_errors(raw_values)
+    database_url = (os.environ.get("DATABASE_URL") or "").strip()
+    zones: list[str] = []
+    if args.dlr or raw_values.get("Type") == "reveil":
+        if not database_url:
+            print("DATABASE_URL obligatoire : les zones surveillées vivent en base",
+                  file=sys.stderr)
+            return 2
+        zones = _active_zones(database_url)
+    try:
+        pains = table.parse_pains([value.strip() for value in args.dlr], zones)
+    except table.LedgerError as exc:
+        print(f"observation refusée : {exc}", file=sys.stderr)
+        return 1
+    problems = morning_trace_errors(raw_values, pains, zones)
     problems += table.INPUT_SCHEMA.errors(raw_values, raw_values.get("Date", "observation"))
+    for zone, value in pains.items():
+        try:
+            table.pain_reading(value)
+        except table.LedgerError as exc:
+            problems.append(f"{zone} : {exc}")
     if problems:
         print("\n  - ".join(["observation refusée :", *problems]), file=sys.stderr)
         return 1
@@ -174,7 +212,7 @@ def main() -> int:
     for change in corrected:
         print(change, file=sys.stderr)
     if args.dry_run:
-        print(raw_values)
+        print({**raw_values, **({"Dlr": pains} if pains else {})})
         return 0
 
     if not database_url:
@@ -184,7 +222,7 @@ def main() -> int:
     if raw_values.get("Strava"):
         key = f"strava:{raw_values['Strava']}"
     try:
-        oid = _write_database(database_url, raw_values, key,
+        oid = _write_database(database_url, raw_values, pains, key,
                               depart_local=args.depart_local.strip(),
                               session_key=args.session_key.strip())
     except (ValueError, table.LedgerError) as exc:

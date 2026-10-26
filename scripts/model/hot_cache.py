@@ -38,7 +38,7 @@ def _round(value: float) -> str:
 
 
 def render(ledger, rows: list, instruments: dict, targets: dict,
-           today: dt.date | None = None) -> str:
+           today: dt.date | None = None, zones: list | None = None) -> str:
     """Le paragraphe Forme pour la dernière semaine du registre.
 
     `ledger` est le module `scripts/ledger.py`, passé en argument plutôt qu'importé :
@@ -78,8 +78,12 @@ def render(ledger, rows: list, instruments: dict, targets: dict,
     def peak(series) -> str:
         return _round(series.peak) if series.n else "—"
 
-    trend = " → ".join(f"{w.week.split('-')[-1]} {peak(w.effort)}/{peak(w.rest)}"
-                       for w in ledger.pain_trend(rows, 3))
+    # Une tendance par zone surveillée, jamais une seule pour toutes.
+    trends = [(zone.label, " → ".join(
+        f"{w.week.split('-')[-1]} {peak(w.effort)}/{peak(w.rest)}"
+        for w in ledger.pain_trend(rows, 3, zone.slug))) for zone in zones or []]
+    trend = (" · ".join(f"{label} {text or '—'}" for label, text in trends) if len(trends) > 1
+             else (trends[0][1] or "—") if trends else "aucune zone surveillée")
 
     red = []
     if level > ledger.LEVEL_CAP:
@@ -196,8 +200,10 @@ def refresh(vault: Path, ledger, rows: list, instruments: dict,
     """
     day = today or dt.date.today()
     targets = programme.rpe_targets(vault)
+    zones = ledger.pain_zones(store) if store is not None else []
     drifted = apply(target(vault), BLOCK,
-                    render(ledger, rows, instruments, targets, today=day), check=check)
+                    render(ledger, rows, instruments, targets, today=day, zones=zones),
+                    check=check)
     path = target(vault)
     if store is not None and f"<!-- {STATE_BLOCK}_START -->" in path.read_text(
             encoding="utf-8"):

@@ -43,14 +43,19 @@ def test_unknown_or_broken_input_is_refused(text, expected):
 def test_an_athlete_without_injury_declares_none():
     text = (INSTANCE_DIR / instance.FILENAME).read_text(encoding="utf-8")
     text = text.replace('[[injuries]]\nslug = "injury"\nlabel = "Injury"\n', "")
-    loaded = instance.parse(text)
-    assert loaded.injuries == () and loaded.injury is None
+    assert instance.parse(text).injuries == ()
 
 
-def test_two_zones_are_refused_until_pain_is_stored_per_zone():
+def test_several_zones_are_kept_in_their_declared_order():
     text = (INSTANCE_DIR / instance.FILENAME).read_text(encoding="utf-8")
     text += '\n[[injuries]]\nslug = "genou"\nlabel = "Genou"\n'
-    with pytest.raises(instance.InstanceError, match="n'en suit qu'une"):
+    assert [zone.slug for zone in instance.parse(text).injuries] == ["injury", "genou"]
+
+
+def test_a_zone_declared_twice_is_refused():
+    text = (INSTANCE_DIR / instance.FILENAME).read_text(encoding="utf-8")
+    text += '\n[[injuries]]\nslug = "injury"\nlabel = "Encore"\n'
+    with pytest.raises(instance.InstanceError, match="double"):
         instance.parse(text)
 
 

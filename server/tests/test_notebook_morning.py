@@ -27,7 +27,8 @@ def ef(day: dt.date, hr: int) -> dict:
             "idempotency_key": f"strava:{day}", "started_at": None,
             "measurements": {"distance_km": known(8.0), "duration_s": known(48 * 60),
                              "hr_avg_bpm": known(hr), "elevation_gain_m": known(20),
-                             "rpe": known(2), "pain": known(0.5), "enjoyment": known(8)}}
+                             "rpe": known(2), "enjoyment": known(8)},
+            "pains": {"injury": known(0.5)}}
 
 
 class Ops:
@@ -48,6 +49,9 @@ class Ops:
 
     def strength_history(self):
         return []
+
+    def pain_zones(self):
+        return [{"slug": "injury", "label": "Injury", "active": True}]
 
     def session_cycle_status(self, week):
         return []

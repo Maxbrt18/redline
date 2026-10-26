@@ -37,6 +37,8 @@ from .schema import (
     messenger_message_refs,
     observation_metrics,
     observations,
+    pain_readings,
+    pain_zones,
     patience_notifications,
     permit_choices,
     plan_gates,
@@ -53,6 +55,7 @@ from .schema import (
     session_followups,
     session_predictions,
     strava_activity_intakes,
+    strength_pain_readings,
     strength_report_claims,
     strength_report_daily_quotas,
     strength_results,
@@ -115,11 +118,13 @@ def _request_projection(connection: Connection) -> None:
 CORRECTION_ANNOUNCE_WINDOW = dt.timedelta(days=7)
 
 #: Les observations qui tranchent une prédiction d'elles-mêmes (2026-10-10). Le réveil
-#: porte sa trace dans `pain` : 0 aucune, 0,5 très légère, 1 légère, 2 nette.
+#: porte sa trace, par zone, dans `pain_readings` : 0 aucune, 0,5 très légère, 1 légère,
+#: 2 nette.
 RESOLVING_KINDS = ("reveil",)
 #: Motifs d'une FC moyenne douteuse (schéma `ck_observation_metrics_hr_doubt`).
 HR_DOUBTS = ("sans_brassard", "contexte")
-RESOLUTION_COLUMNS = ("resolves_kind", "resolves_on", "success_op", "success_value")
+RESOLUTION_COLUMNS = ("resolves_kind", "resolves_on", "resolves_zone", "success_op",
+                      "success_value")
 _RULE_OPERATORS = {"<=": lambda a, b: a <= b, "<": lambda a, b: a < b,
                    ">=": lambda a, b: a >= b, ">": lambda a, b: a > b,
                    "=": lambda a, b: a == b}
@@ -150,8 +155,11 @@ def _resolution_rule(rule: dict | None, due_on: dt.date) -> dict:
     if threshold is None:
         raise StorageError(f"critère de réussite illisible : {rule.get('success_if')!r} "
                            "(forme attendue : <=1, <2, =0, >=1)")
-    return {"resolves_kind": kind, "resolves_on": day, "success_op": operator,
-            "success_value": threshold}
+    zone = rule.get("zone")
+    if zone is not None and not isinstance(zone, str):
+        raise StorageError("la zone d'une prédiction rattachée est un slug")
+    return {"resolves_kind": kind, "resolves_on": day, "resolves_zone": zone,
+            "success_op": operator, "success_value": threshold}
 
 
 def _rule_holds(operator: str, threshold: float, value: float) -> bool:
@@ -347,7 +355,8 @@ class OperationalStore:
             raise StorageError(f"observation inconnue : {payload['idempotency_key']}")
         self.complete_measurement_in(
             connection, observation_id, payload["metric"], payload.get("value"),
-            unavailable=bool(payload.get("unavailable")), actor=actor)
+            zone=payload.get("zone"), unavailable=bool(payload.get("unavailable")),
+            actor=actor)
 
     def _apply_hr_doubt(self, connection: Connection, payload: dict, actor: str) -> None:
         observation_id = connection.execute(sa.select(observations.c.id).where(
@@ -418,9 +427,9 @@ class OperationalStore:
         for key in cells:
             if not isinstance(key, str):
                 raise ValueError("clé de cellule textuelle attendue")
-            day, kind, column = key.split(":")
+            day, kind, column = key.split(":", 2)
             dt.date.fromisoformat(day)
-            if not kind or column not in {"RPE", "Dlr", "Plaisir"}:
+            if not kind or ledger.column_base(column) not in {"RPE", "Dlr", "Plaisir"}:
                 raise ValueError("cellule déclarative invalide")
 
     def _apply_question_review(self, connection: Connection, payload: dict, actor: str) -> None:
@@ -593,8 +602,15 @@ class OperationalStore:
             expected = self._metric_values(payload.get("measurements", {}))
             comparable = ("occurred_on", "started_at", "kind", "strava_activity_id", "gear_id",
                           "note", "supersedes_id")
+            stored_pains = self._pains_of_in(connection, existing["id"])
+            given_pains = {zone: reading for zone, reading in self._pain_values_in(
+                connection, values["kind"], payload.get("pains", {})).items()
+                if zone in payload.get("pains", {})}
             if any(existing[key] != values[key] for key in comparable) or any(
-                    _plain(stored_metrics[key]) != _plain(expected[key]) for key in expected):
+                    _plain(stored_metrics[key]) != _plain(expected[key]) for key in expected
+            ) or any(stored_pains.get(zone) != {"state": reading["state"],
+                                                 "value": _plain(reading["value"])}
+                     for zone, reading in given_pains.items()):
                 raise StorageError(
                     f"collision d'idempotence pour l'observation {values['idempotency_key']!r}")
             return existing["id"]
@@ -604,15 +620,20 @@ class OperationalStore:
             observation_id=observation_id,
             **self._metric_values(payload.get("measurements", {})),
         ))
+        pains = self._pain_values_in(connection, values["kind"], payload.get("pains", {}))
+        for zone, reading in pains.items():
+            connection.execute(pain_readings.insert().values(
+                observation_id=observation_id, zone=zone, athlete_id=values["athlete_id"],
+                **reading))
         event = {key: _plain(value) for key, value in values.items()}
         _audit(connection, actor, "observation.created", "observation", observation_id, event)
-        pain = payload.get("measurements", {}).get("pain", {})
-        if values["kind"] in RESOLVING_KINDS and pain.get("state", "known") in (
-                "known", "unavailable"):
-            self.settle_observed_predictions_in(
-                connection, values["kind"], values["occurred_on"],
-                float(pain["value"]) if pain.get("state", "known") == "known" else None,
-                actor=actor)
+        if values["kind"] in RESOLVING_KINDS:
+            for zone, reading in pains.items():
+                if reading["state"] in ("known", "unavailable"):
+                    self.settle_observed_predictions_in(
+                        connection, values["kind"], values["occurred_on"], zone,
+                        float(reading["value"]) if reading["state"] == "known" else None,
+                        actor=actor)
         if values["strava_activity_id"] and values["started_at"]:
             self._auto_match_observation_in(
                 connection, observation_id, payload.get("session_key"), actor=actor)
@@ -636,12 +657,77 @@ class OperationalStore:
             values[metric] = measurement.get("value") if state == "known" else None
         return values
 
+    # --------------------------------------------------------- zones de douleur
+    def sync_pain_zones(self, zones: list[tuple[str, str]], *,
+                        actor: str = "application") -> None:
+        """Aligne la référence sur `[[injuries]]` : une zone retirée passe inactive.
+
+        Jamais supprimée : ses lectures passées restent rattachées et lisibles.
+        """
+        with self.database.transaction() as connection:
+            declared = {slug for slug, _ in zones}
+            for slug, label in zones:
+                connection.execute(pg_insert(pain_zones).values(
+                    athlete_id=self.athlete_id, slug=slug, label=label, active=True,
+                ).on_conflict_do_update(
+                    index_elements=[pain_zones.c.athlete_id, pain_zones.c.slug],
+                    set_={"label": label, "active": True}))
+            connection.execute(pain_zones.update().where(
+                pain_zones.c.athlete_id == self.athlete_id,
+                pain_zones.c.slug.not_in(declared) if declared else sa.true(),
+            ).values(active=False))
+            _audit(connection, actor, "pain_zones.synced", "athlete",
+                   uuid.uuid5(uuid.NAMESPACE_URL, f"athlete:{self.athlete_id}"),
+                   {"zones": sorted(declared)})
+
+    def pain_zones(self) -> list[dict]:
+        """Les zones surveillées, actives d'abord, dans l'ordre de leur déclaration."""
+        with self.database.engine.connect() as connection:
+            return [dict(row) for row in connection.execute(sa.select(
+                pain_zones.c.slug, pain_zones.c.label, pain_zones.c.active,
+            ).where(pain_zones.c.athlete_id == self.athlete_id).order_by(
+                pain_zones.c.active.desc(), pain_zones.c.created_at,
+                pain_zones.c.slug)).mappings()]
+
+    def _active_zones_in(self, connection: Connection) -> list[str]:
+        return list(connection.execute(sa.select(pain_zones.c.slug).where(
+            pain_zones.c.athlete_id == self.athlete_id, pain_zones.c.active,
+        ).order_by(pain_zones.c.created_at, pain_zones.c.slug)).scalars())
+
+    def _pain_values_in(self, connection: Connection, kind: str,
+                        given: dict) -> dict[str, dict[str, Any]]:
+        """Une lecture par zone active : la valeur donnée, sinon `pending` si le type
+        d'observation exige la douleur, `not_applicable` sinon. Une zone inconnue ou
+        retirée est refusée plutôt que rangée dans une autre."""
+        active = self._active_zones_in(connection)
+        unknown = sorted(set(given) - set(active))
+        if unknown:
+            raise StorageError("zone de douleur inconnue ou inactive : " + ", ".join(unknown)
+                               + (f" (actives : {', '.join(active)})" if active
+                                  else " (aucune zone surveillée)"))
+        default = "pending" if ledger.requires_pain(kind) else "not_applicable"
+        readings = {}
+        for zone in active:
+            reading = given.get(zone, {"state": default})
+            state = reading.get("state", "known")
+            readings[zone] = {"state": state,
+                              "value": reading.get("value") if state == "known" else None}
+        return readings
+
+    @staticmethod
+    def _pains_of_in(connection: Connection, observation_id: uuid.UUID) -> dict[str, dict]:
+        return {row["zone"]: {"state": row["state"], "value": _plain(row["value"])}
+                for row in connection.execute(sa.select(
+                    pain_readings.c.zone, pain_readings.c.state, pain_readings.c.value,
+                ).where(pain_readings.c.observation_id == observation_id)).mappings()}
+
     def complete_measurement(self, observation_id: uuid.UUID, metric: str,
-                             value: float | None, *, unavailable: bool = False,
+                             value: float | None, *, zone: str | None = None,
+                             unavailable: bool = False,
                              actor: str = "application") -> None:
         with self.database.transaction() as connection:
             self.complete_measurement_in(connection, observation_id, metric, value,
-                                         unavailable=unavailable, actor=actor)
+                                         zone=zone, unavailable=unavailable, actor=actor)
 
     def doubt_hr(self, observation_id: uuid.UUID, reason: str, note: str,
                  *, actor: str = "application") -> None:
@@ -671,8 +757,15 @@ class OperationalStore:
         _request_projection(connection)
 
     def complete_measurement_in(self, connection: Connection, observation_id: uuid.UUID,
-                                metric: str, value: float | None, *, unavailable: bool = False,
+                                metric: str, value: float | None, *, zone: str | None = None,
+                                unavailable: bool = False,
                                 actor: str = "application") -> None:
+        if metric == "pain":
+            self._complete_pain_in(connection, observation_id, zone, value,
+                                   unavailable=unavailable, actor=actor)
+            return
+        if zone is not None:
+            raise StorageError(f"seule la douleur se mesure par zone, pas {metric}")
         if metric not in MEASUREMENT_DEFINITIONS:
             raise StorageError(f"mesure inconnue : {metric}")
         state = "unavailable" if unavailable else "known"
@@ -693,15 +786,37 @@ class OperationalStore:
             raise StorageError("mesure absente, déjà connue ou ambiguë")
         _audit(connection, actor, "measurement.completed", "observation", observation_id,
                {"metric": metric, "state": state, "value": value})
-        if metric == "pain":
-            kind, day = connection.execute(sa.select(
-                observations.c.kind, observations.c.occurred_on).where(
-                    observations.c.id == observation_id)).one()
-            if kind in RESOLVING_KINDS:
-                self.settle_observed_predictions_in(
-                    connection, kind, day, None if unavailable or value is None
-                    else float(value),
-                    actor=actor)
+        _request_projection(connection)
+
+    def _complete_pain_in(self, connection: Connection, observation_id: uuid.UUID,
+                          zone: str | None, value: float | None, *, unavailable: bool,
+                          actor: str) -> None:
+        """Comme toute mesure : seule une lecture `known` est immuable."""
+        zones = list(connection.execute(sa.select(pain_readings.c.zone).where(
+            pain_readings.c.observation_id == observation_id)).scalars())
+        if zone is None:
+            if len(zones) != 1:
+                raise StorageError("douleur : nomme la zone (" + (", ".join(sorted(zones))
+                                   or "aucune zone sur cette observation") + ")")
+            zone = zones[0]
+        state = "unavailable" if unavailable else "known"
+        result = connection.execute(pain_readings.update().where(
+            pain_readings.c.observation_id == observation_id,
+            pain_readings.c.zone == zone,
+            pain_readings.c.state.in_(("pending", "unavailable", "not_applicable")),
+        ).values(state=state, value=None if unavailable else value,
+                 recorded_at=sa.func.now()))
+        if result.rowcount != 1:
+            raise StorageError(f"douleur {zone} absente, déjà connue ou ambiguë")
+        _audit(connection, actor, "measurement.completed", "observation", observation_id,
+               {"metric": "pain", "zone": zone, "state": state, "value": value})
+        kind, day = connection.execute(sa.select(
+            observations.c.kind, observations.c.occurred_on).where(
+                observations.c.id == observation_id)).one()
+        if kind in RESOLVING_KINDS:
+            self.settle_observed_predictions_in(
+                connection, kind, day, zone,
+                None if unavailable or value is None else float(value), actor=actor)
         _request_projection(connection)
 
     def link_activity(self, idempotency_key: str, strava_activity_id: int, *,
@@ -775,8 +890,7 @@ class OperationalStore:
     def _strava_measurements(cls, distilled: dict,
                              intake: dict | None = None) -> dict[str, dict[str, Any]]:
         measurements: dict[str, dict[str, Any]] = {
-            "rpe": {"state": "pending"}, "pain": {"state": "pending"},
-            "enjoyment": {"state": "pending"},
+            "rpe": {"state": "pending"}, "enjoyment": {"state": "pending"},
             "elevation_loss_m": {"state": "pending"},
             "wbgt_c": ({"state": "pending"} if distilled.get("meteo")
                        else {"state": "unavailable"}),
@@ -1052,18 +1166,24 @@ class OperationalStore:
                    aggregate_id, {"kept": sorted(values)})
 
     def observation_feelings(self, observation_id: Any) -> dict:
-        """RPE, douleur et plaisir connus d'une observation, sans les mesures en attente."""
-        metrics = ("rpe", "pain", "enjoyment")
+        """RPE, plaisir et douleur par zone connus d'une observation, sans l'attente."""
+        metrics = ("rpe", "enjoyment")
         with self.database.engine.connect() as connection:
             row = connection.execute(sa.select(*(
                 column for metric in metrics for column in (
                     observation_metrics.c[metric], observation_metrics.c[f"{metric}_state"]))
             ).where(observation_metrics.c.observation_id == observation_id)
             ).mappings().one_or_none()
-        if row is None:
-            return {}
-        return {metric: float(row[metric]) for metric in metrics
-                if row[f"{metric}_state"] == "known"}
+            if row is None:
+                return {}
+            pains = {zone: float(reading["value"]) for zone, reading in
+                     self._pains_of_in(connection, _uuid(observation_id)).items()
+                     if reading["state"] == "known"}
+        feelings: dict[str, Any] = {metric: float(row[metric]) for metric in metrics
+                                    if row[f"{metric}_state"] == "known"}
+        if pains:
+            feelings["pains"] = pains
+        return feelings
 
     def strava_enrichment_state(self, activity_id: int) -> dict:
         intake = self.strava_intake(activity_id)
@@ -1373,7 +1493,18 @@ class OperationalStore:
                 for metric in MEASUREMENT_DEFINITIONS:
                     entry["measurements"][metric] = {
                         "state": row[f"{metric}_state"], "value": _plain(row[metric])}
+                entry["pains"] = {}
                 result.append(entry)
+            by_id = {entry["id"]: entry for entry in result}
+            for reading in connection.execute(sa.select(
+                    pain_readings.c.observation_id, pain_readings.c.zone,
+                    pain_readings.c.state, pain_readings.c.value,
+            ).where(pain_readings.c.athlete_id == self.athlete_id).order_by(
+                    pain_readings.c.zone)).mappings():
+                owner = by_id.get(reading["observation_id"])
+                if owner is not None:
+                    owner["pains"][reading["zone"]] = {
+                        "state": reading["state"], "value": _plain(reading["value"])}
             return result
 
     # -------------------------------------------------------------- expositions
@@ -1585,8 +1716,6 @@ class OperationalStore:
             session_key=payload["session_key"],
             performed_on=payload.get("performed_on", payload.get("day")),
             workout=payload.get("workout"),
-            shin_before=payload.get("shin_before"),
-            shin_after=payload.get("shin_after"),
             duration_minutes=payload.get("duration_minutes"),
             note=payload.get("note", ""),
             prescription=payload.get("prescription"),
@@ -1595,6 +1724,16 @@ class OperationalStore:
         ).scalar_one_or_none()
         if inserted is None:
             return False
+        active = self._active_zones_in(connection)
+        for zone, moments in (payload.get("pains") or {}).items():
+            if zone not in active:
+                raise StorageError(f"zone de douleur inconnue ou inactive : {zone}")
+            for moment in ("before", "after"):
+                if moments.get(moment) is not None:
+                    connection.execute(strength_pain_readings.insert().values(
+                        strength_session_id=session_id, zone=zone, moment=moment,
+                        athlete_id=payload.get("athlete_id", self.athlete_id),
+                        value=moments[moment]))
         for position, exercise in enumerate(payload.get("exercises", []), start=1):
             result_id = _uuid(exercise.get("id"))
             connection.execute(strength_results.insert().values(
@@ -1622,7 +1761,6 @@ class OperationalStore:
         query = sa.select(
             strength_sessions.c.id.label("session_id"), strength_sessions.c.session_key,
             strength_sessions.c.performed_on, strength_sessions.c.workout,
-            strength_sessions.c.shin_before, strength_sessions.c.shin_after,
             strength_sessions.c.duration_minutes, strength_sessions.c.note,
             strength_results.c.id.label("result_id"), strength_results.c.position,
             strength_results.c.exercise_slug,
@@ -1646,9 +1784,8 @@ class OperationalStore:
                 session = sessions.setdefault(row["session_id"], {
                     "id": row["session_id"], "session_key": row["session_key"],
                     "performed_on": row["performed_on"], "workout": row["workout"],
-                    "shin_before": row["shin_before"], "shin_after": row["shin_after"],
-                    "duration_minutes": row["duration_minutes"], "note": row["note"],
-                    "exercises": []})
+                    "pains": {}, "duration_minutes": row["duration_minutes"],
+                    "note": row["note"], "exercises": []})
                 if row["result_id"] is None:
                     continue
                 result = results.get(row["result_id"])
@@ -1665,6 +1802,12 @@ class OperationalStore:
                     result["sets"].append({"side": row["side"],
                                            "set_index": row["set_index"],
                                            "repetitions": row["repetitions"]})
+            for reading in connection.execute(sa.select(strength_pain_readings).where(
+                    strength_pain_readings.c.athlete_id == self.athlete_id)).mappings():
+                owner = sessions.get(reading["strength_session_id"])
+                if owner is not None:
+                    owner["pains"].setdefault(reading["zone"], {"before": None, "after": None})[
+                        reading["moment"]] = reading["value"]
             return list(sessions.values())
 
     def previous_strength_prescription(self, session: dict, today: dt.date) -> dict | None:
@@ -2196,14 +2339,20 @@ class OperationalStore:
                       "due_on": row["due_on"], "direction": row.get("direction", "neutral"),
                       **_resolution_rule(row.get("resolves_on"), row["due_on"])}
             if existing:
+                if values["resolves_kind"] is not None and values["resolves_zone"] is None:
+                    values["resolves_zone"] = existing["resolves_zone"]
                 comparable = ("domain", "statement", "probability", "due_on", "direction",
                               *RESOLUTION_COLUMNS)
                 if any(_plain(existing[key]) != _plain(values[key]) for key in comparable):
                     raise StorageError(
                         f"collision d'idempotence pour la prédiction {row['prediction_key']!r}")
                 return
+            if values["resolves_kind"] is not None:
+                values["resolves_zone"] = self._prediction_zone_in(
+                    connection, values["resolves_zone"])
             if values["resolves_kind"] is not None and self._observed_value_in(
-                    connection, values["resolves_kind"], values["resolves_on"]) is not None:
+                    connection, values["resolves_kind"], values["resolves_on"],
+                    values["resolves_zone"]) is not None:
                 raise StorageError(
                     f"l'observation {values['resolves_kind']} du {values['resolves_on']} "
                     "existe déjà : une prédiction s'écrit avant son issue")
@@ -2259,21 +2408,34 @@ class OperationalStore:
             raise StorageError(f"opération de prédiction inconnue : {operation}")
         _audit(connection, actor, action, "prediction", aggregate_id, _jsonable(row))
 
+    def _prediction_zone_in(self, connection: Connection, zone: str | None) -> str:
+        """La zone que la prédiction attend : nommée, ou la seule zone surveillée."""
+        active = self._active_zones_in(connection)
+        if zone is None:
+            if len(active) != 1:
+                raise StorageError(
+                    "une prédiction tranchée par le réveil nomme sa zone ("
+                    + (", ".join(active) or "aucune zone surveillée") + ")")
+            return active[0]
+        if zone not in active:
+            raise StorageError(f"zone de douleur inconnue ou inactive : {zone}")
+        return zone
+
     def _observed_value_in(self, connection: Connection, kind: str,
-                           day: dt.date) -> float | None:
-        """La dernière valeur connue de l'observation qui tranche, ou rien."""
-        value = connection.execute(sa.select(observation_metrics.c.pain).join(
-            observations, observations.c.id == observation_metrics.c.observation_id).where(
+                           day: dt.date, zone: str) -> float | None:
+        """La dernière valeur connue, dans cette zone, de l'observation qui tranche."""
+        value = connection.execute(sa.select(pain_readings.c.value).join(
+            observations, observations.c.id == pain_readings.c.observation_id).where(
                 observations.c.athlete_id == self.athlete_id,
                 observations.c.kind == kind, observations.c.occurred_on == day,
-                observation_metrics.c.pain_state == "known",
+                pain_readings.c.zone == zone, pain_readings.c.state == "known",
             ).order_by(observations.c.created_at.desc()).limit(1)).scalar_one_or_none()
         return None if value is None else float(value)
 
     def settle_observed_predictions_in(self, connection: Connection, kind: str,
-                                       day: dt.date, value: float | None,
+                                       day: dt.date, zone: str, value: float | None,
                                        *, actor: str = "application") -> int:
-        """Solde les prédictions ouvertes qui attendaient cette observation.
+        """Solde les prédictions ouvertes qui attendaient cette observation, dans sa zone.
 
         `value=None` : l'observation est déclarée indisponible ou n'est jamais venue ;
         la prédiction n'a pas été testée, elle passe en `void`, jamais en faux.
@@ -2283,9 +2445,10 @@ class OperationalStore:
             coach_predictions.c.status == "open",
             coach_predictions.c.resolves_kind == kind,
             coach_predictions.c.resolves_on == day,
+            coach_predictions.c.resolves_zone == zone,
         ).with_for_update()).mappings().all()
         for prediction in bound:
-            observed = {"kind": kind, "date": day.isoformat(), "value": value}
+            observed = {"kind": kind, "date": day.isoformat(), "zone": zone, "value": value}
             if value is None:
                 payload = {"void": True}
             else:
@@ -2305,6 +2468,7 @@ class OperationalStore:
         """
         pending = connection.execute(sa.select(
             coach_predictions.c.resolves_kind, coach_predictions.c.resolves_on,
+            coach_predictions.c.resolves_zone,
         ).where(
             coach_predictions.c.athlete_id == self.athlete_id,
             coach_predictions.c.status == "open",
@@ -2312,8 +2476,9 @@ class OperationalStore:
             coach_predictions.c.resolves_on < today,
         ).distinct()).all()
         return sum(self.settle_observed_predictions_in(
-            connection, kind, day, self._observed_value_in(connection, kind, day), actor=actor)
-            for kind, day in pending)
+            connection, kind, day, zone,
+            self._observed_value_in(connection, kind, day, zone), actor=actor)
+            for kind, day, zone in pending)
 
     def upsert_prediction(self, row: dict, *, actor: str = "application") -> None:
         with self.database.transaction() as connection:

@@ -272,7 +272,7 @@ class ProactiveScheduler:
                 if entry.get("type") == "reveil":
                     continue
                 missing = [column for column in entry["missing"]
-                           if column in {"RPE", "Dlr", "Plaisir"}]
+                           if ledger_model.column_base(column) in {"RPE", "Dlr", "Plaisir"}]
                 if missing:
                     claimable.append({**entry, "missing": missing})
             if claimable:

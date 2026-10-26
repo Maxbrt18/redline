@@ -17,6 +17,7 @@ import secrets
 import time
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 PAGE_PATH = "/s"
 SIDECAR_SUFFIX = ".link"
@@ -168,17 +169,18 @@ def _sides_of(exercise) -> list:
     return [str(slot.get("s") or "") for slot in slots if isinstance(slot, dict)]
 
 
-def parse_report(report: dict, exercises: list) -> dict:
+def parse_report(report: dict, exercises: list, zones: dict[str, str] | None = None) -> dict:
     """Valide puis normalise le contrat posté par la page.
 
     Une valeur hors bornes est une requête invalide, pas une valeur à corriger en
     silence : transformer 99 en douleur 10 ou ``"false"`` en vrai fabriquerait un
-    fait médical que l'athlète n'a pas saisi.
+    fait médical que l'athlète n'a pas saisi. La douleur arrive par zone surveillée
+    (`zones` : {slug: libellé}) ; une zone que l'instance ne surveille pas est refusée.
     """
     exercise_count = len(exercises)
     if not isinstance(report, dict):
         raise ReportError("report : objet JSON attendu")
-    allowed = {"performed_on", "shin_before", "shin", "minutes", "note", "exercises"}
+    allowed = {"performed_on", "pains", "minutes", "note", "exercises"}
     unknown = sorted(set(report) - allowed)
     if unknown:
         raise ReportError("champs inconnus : " + ", ".join(unknown))
@@ -266,8 +268,7 @@ def parse_report(report: dict, exercises: list) -> dict:
         # Deux lectures qui ne se mélangent pas, comme au registre depuis le
         # 2026-07-29 : celle d'avant est au repos, celle d'après porte l'effort.
         "performed_on": performed_on,
-        "shin_before": _optional_int(report.get("shin_before"), 0, 10, "shin_before"),
-        "shin": _optional_int(report.get("shin"), 0, 10, "shin"),
+        "pains": _parse_pains(report.get("pains"), zones or {}),
         "minutes": _optional_int(report.get("minutes"), 0, 300, "minutes"),
         "note": _clean_text(note),
     }
@@ -314,6 +315,29 @@ def log_entries(session: dict, clean: dict, day: str) -> list:
                 row["score"] = item["score"]
         entries.append(row)
     return entries
+
+
+def _parse_pains(raw: Any, zones: dict[str, str]) -> dict[str, dict]:
+    """{zone: {before, after}} : avant au repos, après l'effort, jamais mélangés."""
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise ReportError("pains : objet {zone: {before, after}} attendu")
+    unknown = sorted(set(raw) - set(zones))
+    if unknown:
+        raise ReportError("pains : zone non surveillée " + ", ".join(unknown))
+    pains = {}
+    for zone, label in zones.items():
+        moments = raw.get(zone)
+        if moments is None:
+            continue
+        if not isinstance(moments, dict) or set(moments) - {"before", "after"}:
+            raise ReportError(f"pains.{zone} : objet {{before, after}} attendu")
+        before = _optional_int(moments.get("before"), 0, 10, f"pains.{zone}.before")
+        after = _optional_int(moments.get("after"), 0, 10, f"pains.{zone}.after")
+        if before is not None or after is not None:
+            pains[zone] = {"label": label, "before": before, "after": after}
+    return pains
 
 
 def format_message(session: dict, clean: dict) -> str:
@@ -377,14 +401,15 @@ def format_message(session: dict, clean: dict) -> str:
     # le registre en fait deux séries qui ne se mélangent pas (2026-07-29), la
     # première au repos, la seconde après l'effort. Un seul chiffre ne répondait
     # ni à l'une ni à l'autre des deux questions.
-    before, after = clean["shin_before"], clean["shin"]
-    if before is not None and after is not None:
-        move = "stable" if before == after else ("monté" if after > before else "descendu")
-        tail.append(f"Injury : {before}/10 avant, {after}/10 après ({move}).")
-    elif after is not None:
-        tail.append(f"Injury : {after}/10 après la séance (rien avant).")
-    elif before is not None:
-        tail.append(f"Injury : {before}/10 avant de commencer.")
+    for reading in clean["pains"].values():
+        before, after, label = reading["before"], reading["after"], reading["label"]
+        if before is not None and after is not None:
+            move = "stable" if before == after else ("monté" if after > before else "descendu")
+            tail.append(f"{label} : {before}/10 avant, {after}/10 après ({move}).")
+        elif after is not None:
+            tail.append(f"{label} : {after}/10 après la séance (rien avant).")
+        elif before is not None:
+            tail.append(f"{label} : {before}/10 avant de commencer.")
     if clean["note"]:
         # Quoted, and named as such: the free-text field is the only thing here
         # that is not a bounded number.

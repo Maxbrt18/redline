@@ -19,6 +19,7 @@ if str(ROOT / "server") not in sys.path:
     sys.path.insert(0, str(ROOT / "server"))
 
 from redline.race_countdown import compile_deadline
+from scripts.model import ledger as table
 from scripts.model import predictions as prediction_model
 from scripts.model import voice
 
@@ -45,13 +46,14 @@ def observations(store: Any, limit: int) -> list[str]:
     for row in rows:
         facts = [row["occurred_on"].isoformat(), row["kind"]]
         for metric, suffix in (("distance_km", " km"), ("hr_avg_bpm", " bpm"),
-                               ("rpe", "/10 RPE"), ("pain", "/10 douleur"),
-                               ("enjoyment", "/10 plaisir")):
+                               ("rpe", "/10 RPE"), ("enjoyment", "/10 plaisir")):
             value = _known(row, metric, suffix)
             if value:
                 facts.append(value)
+        facts.extend(table.pain_facts(row.get("pains") or {}))
         pending = sorted(metric for metric, measure in row["measurements"].items()
                          if measure["state"] == "pending")
+        pending += table.pending_pains(row.get("pains") or {})
         if pending:
             facts.append("à compléter : " + ", ".join(pending))
         if row["note"]:
@@ -91,10 +93,8 @@ def strength(store: Any, limit: int) -> list[str]:
         facts = [row["performed_on"].isoformat(), f"renfo {row['workout']}"]
         if row.get("duration_minutes") is not None:
             facts.append(f"{row['duration_minutes']} min")
-        if row.get("shin_before") is not None or row.get("shin_after") is not None:
-            before = "?" if row.get("shin_before") is None else row["shin_before"]
-            after = "?" if row.get("shin_after") is None else row["shin_after"]
-            facts.append(f"injury {before}->{after}/10")
+        facts.extend("douleur " + fact
+                     for fact in table.strength_pain_facts(row.get("pains") or {}))
         facts.append(f"clé={row['session_key']}")
         lines.append(" · ".join(str(value) for value in facts))
         for exercise in row.get("exercises", []):
@@ -212,7 +212,8 @@ def predictions(store: Any, *, due: bool = False, today: dt.date | None = None) 
         challenge = " · contredite" if row["challenge"] else ""
         used = " · consommée" if row.get("used_at") else ""
         score = f" · Brier {float(row['brier_score']):.3f}" if row["brier_score"] is not None else ""
-        bound = (f" · se solde au {row['resolves_kind']} du {row['resolves_on']} "
+        zone = f" ({row['resolves_zone']})" if row.get("resolves_zone") else ""
+        bound = (f" · se solde au {row['resolves_kind']}{zone} du {row['resolves_on']} "
                  f"si {row['success_op']}{float(row['success_value']):g}"
                  if row.get("resolves_kind") else "")
         lines.append(f"{row['prediction_key']} · {row['domain']} · p={float(row['probability']):.0%} "

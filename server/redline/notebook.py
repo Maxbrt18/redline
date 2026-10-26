@@ -84,8 +84,8 @@ class NotebookService:
                    self.store.list_entries(psid, kind="weekly", limit=100) if entry.get("period")}
         return self.board().weeks_view(reviews)
 
-    def injury(self) -> dict:
-        return self.board().injury_view()
+    def injury(self, zone: str | None = None) -> dict | None:
+        return self.board().injury_view(zone)
 
     def session(self, observation_id: str) -> dict | None:
         """Le détail d'une séance faite ; ses flux et sa météo se relèvent au premier affichage."""

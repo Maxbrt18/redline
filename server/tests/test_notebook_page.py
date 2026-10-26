@@ -31,7 +31,8 @@ RENFO = {'id': 'w41-ven-renfo', 'date': '2026-10-09', 'title': 'Renfo, séance u
          'location': None, 'note': None, 'planned': [], 'fact': None, 'entry_id': None,
          'transition': None, 'targets': {}}
 DONE = ef('w41-mar-ef', '2026-10-06', 'done', {
-    'km': 8.35, 'duration_min': 48, 'hr_avg': 162, 'rpe': 3, 'pain': 0.5,
+    'km': 8.35, 'duration_min': 48, 'hr_avg': 162, 'rpe': 3,
+    'pains': [{'zone': 'injury', 'label': 'Injury', 'value': 0.5}],
     'enjoyment': 8, 'started_at': '2026-10-06T07:10:00+02:00', 'over': ['hr_avg']})
 TOTALS = {'km_done': 14.06, 'km_target': 41, 'runs_done': 2, 'runs_planned': 5, 'dplus': 27,
           'strength_done': 1, 'strength_planned': 2, 'load': 25}
@@ -46,8 +47,10 @@ TODAY = {
     'ahead': [],
     'strip': STRIP, 'totals': TOTALS,
     'asks': [{'id': 'cell:6b0f3c1e-1d1a-4a39-9e0d-5c1b0b5d2f10', 'type': 'cells',
-              'date': '2026-10-07', 'kind': 'EF', 'km': 5.71, 'fields': ['pain', 'rpe']}],
-    'pain': {'cap': 2.0, 'weeks': [{'week': '2026-W40', 'peak': 1.5}, {'week': '2026-W41', 'peak': 1.0}]},
+              'date': '2026-10-07', 'kind': 'EF', 'km': 5.71, 'fields': ['pain:injury', 'rpe'],
+              'labels': {'pain:injury': 'Injury'}}],
+    'pain': {'cap': 2.0, 'zones': [{'zone': 'injury', 'label': 'Injury', 'weeks': [
+        {'week': '2026-W40', 'peak': 1.5}, {'week': '2026-W41', 'peak': 1.0}]}]},
     'race': {'name': 'TargetRace', 'date': '2026-11-28', 'days': 50, 'start_time': '23:00',
              'distance_km': 45},
     'strength': {'status': 'ready', 'signature': 'old', 'date': '2026-10-09', 'session': {
@@ -57,7 +60,8 @@ WEEK = {'week': '2026-W41', 'monday': '2026-10-05', 'current': '2026-W41',
         'plan': {'status': 'valid', 'message': '', 'revision': 3},
         'sessions': [DONE, ef('w41-ven-ef', '2026-10-09'), RENFO], 'extra': [],
         'totals': TOTALS, 'strip': STRIP, 'review': None, 'cards': [ENTRY]}
-INJURY = {'cap': 2.0, 'start': '2026-09-28', 'today': '2026-10-09', 'week': '2026-W41',
+INJURY = {'zone': 'injury', 'label': 'Injury', 'zones': [{'zone': 'injury', 'label': 'Injury'}],
+          'cap': 2.0, 'start': '2026-09-28', 'today': '2026-10-09', 'week': '2026-W41',
           'points': [{'date': '2026-10-03', 'pain': 1.5, 'kind': 'SL', 'long': True},
                      {'date': '2026-10-06', 'pain': 0.5, 'kind': 'EF', 'long': False},
                      {'date': '2026-10-07', 'pain': 2.5, 'kind': 'EF', 'long': False}],
@@ -102,7 +106,7 @@ def serve(tab, answers=None):
             data = RACE
         elif path == 'weeks':
             data = WEEKS
-        elif path == 'injury':
+        elif path.startswith('injury'):
             data = INJURY
         elif path == 'entries':
             data = {'entries': [ENTRY], 'next_offset': None, 'latest': [ENTRY]}
@@ -184,7 +188,7 @@ def test_an_answer_is_one_tap_and_says_when_the_coach_takes_over(browser):
     tab.get_by_role('heading', name='EF de mercredi 7 · 5,7 km').wait_for()
     tab.locator('.n-check').first.get_by_role('button', name='2,5', exact=True).click()
     tab.get_by_text('Le coach te répond dans Messenger').wait_for()
-    assert answers == [{'ask': 'cell:6b0f3c1e-1d1a-4a39-9e0d-5c1b0b5d2f10:pain', 'value': 2.5}]
+    assert answers == [{'ask': 'cell:6b0f3c1e-1d1a-4a39-9e0d-5c1b0b5d2f10:pain:injury', 'value': 2.5}]
     tab.close()
 
 
@@ -346,7 +350,8 @@ def test_tabs_are_prepared_while_today_is_read_and_shown_without_waiting(browser
 def test_the_morning_comes_first_and_a_high_heart_rate_asks_why(browser):
     """Avant midi, le point du matin passe devant la séance ; une FC haute pose sa question."""
     morning = {**TODAY, 'asks': [
-        {'id': 'wake:2026-10-09', 'type': 'wake', 'date': '2026-10-09'},
+        {'id': 'wake:2026-10-09:injury', 'type': 'wake', 'zone': 'injury', 'label': 'Injury',
+         'date': '2026-10-09'},
         {'id': 'daily:2026-10-09', 'type': 'daily', 'date': '2026-10-09', 'fields': ['sleep', 'life_load']},
         {'id': 'hr:2026-10-07', 'type': 'hr', 'date': '2026-10-07', 'hr': 157, 'reference': 151,
          'n': 5, 'pace_s': 406}]}
@@ -722,7 +727,7 @@ def replying(data):
 
 def test_every_value_of_a_scale_is_visible_without_scrolling(browser):
     """Une question à la fois : la douleur sur une ligne, le RPE et le plaisir sur deux."""
-    for fields, shape in ((['pain', 'rpe'], [7, True, 1]), (['rpe'], [10, True, 2]), (['enjoyment'], [11, True, 2])):
+    for fields, shape in ((['pain:injury', 'rpe'], [7, True, 1]), (['rpe'], [10, True, 2]), (['enjoyment'], [11, True, 2])):
         tab = browser.new_page(viewport={'width': 320, 'height': 700})
         serve(tab)
         data = {**TODAY, 'asks': [{**TODAY['asks'][0], 'fields': fields}]}
@@ -860,11 +865,11 @@ def test_the_red_point_moves_from_the_run_to_the_strength_once_done(browser):
     ressentis viennent une question à la fois, le renfo prend le seul point rouge ; les
     repères mènent à leur onglet."""
     done = ef('w41-ven-ef', '2026-10-09', 'done', {
-        'km': 8.35, 'duration_min': 48, 'hr_avg': 162, 'rpe': None, 'pain': None, 'enjoyment': None,
+        'km': 8.35, 'duration_min': 48, 'hr_avg': 162, 'rpe': None, 'pains': [], 'enjoyment': None,
         'started_at': '2026-10-09T07:10:00+02:00', 'over': ['hr_avg'], 'observation_id': 'obs'})
     after = {**TODAY, 'sessions': [done, RENFO], 'asks': [
         {'id': 'cell:obs', 'type': 'cells', 'date': '2026-10-09', 'kind': 'EF', 'km': 8.35,
-         'fields': ['pain', 'rpe', 'enjoyment']}]}
+         'fields': ['pain:injury', 'rpe', 'enjoyment'], 'labels': {'pain:injury': 'Injury'}}]}
     tab = browser.new_page(viewport={'width': 393, 'height': 852})
     answers = []
     serve(tab, answers)
@@ -880,7 +885,7 @@ def test_the_red_point_moves_from_the_run_to_the_strength_once_done(browser):
     assert tab.locator('.n-step.done .n-chips button').count() == 7
     tab.locator('.n-step.done .n-chips').get_by_role('button', name='0,5', exact=True).click()
     tab.get_by_text('Noté').wait_for()
-    assert answers == [{'ask': 'cell:obs:pain', 'value': 0.5}]
+    assert answers == [{'ask': 'cell:obs:pain:injury', 'value': 0.5}]
     tab.locator('.n-tile', has_text='TargetRace').click()
     tab.get_by_role('heading', name='J-50').wait_for()
     tab.close()
@@ -917,4 +922,36 @@ def test_the_landmarks_open_more_detail(browser):
     tab.locator('.n-tile.wide').click()
     tab.get_by_role('heading', name='Semaine 41').wait_for()
     assert tab.locator('.n-strip .n-bar').count() == 7
+    tab.close()
+
+
+def test_two_watched_zones_get_two_tiles_and_two_morning_traces(browser):
+    """Deux zones surveillées : chacune sa tuile dans les repères, sa trace au réveil,
+    et l'écran de douleur passe de l'une à l'autre sans empiler la navigation."""
+    weeks = [{'week': '2026-W40', 'peak': 1.0}, {'week': '2026-W41', 'peak': 0.5}]
+    two = {**TODAY, 'pain': {'cap': 2.0, 'zones': [
+        {'zone': 'genou', 'label': 'Genou', 'weeks': weeks},
+        {'zone': 'cheville', 'label': 'Cheville', 'weeks': weeks}]},
+        'asks': [{'id': f'wake:2026-10-09:{zone}', 'type': 'wake', 'zone': zone,
+                  'label': label, 'date': '2026-10-09', 'after_effort': False}
+                 for zone, label in (('genou', 'Genou'), ('cheville', 'Cheville'))]}
+    zones = [{'zone': 'genou', 'label': 'Genou'}, {'zone': 'cheville', 'label': 'Cheville'}]
+    screens = {zone: {**INJURY, 'zone': zone, 'label': label, 'zones': zones}
+               for zone, label in (('genou', 'Genou'), ('cheville', 'Cheville'))}
+    tab = browser.new_page(viewport={'width': 390, 'height': 844})
+    answers = []
+    serve(tab, answers)
+    tab.route(BASE + '/carnet-api/today', replying(two))
+    tab.route(BASE + '/carnet-api/injury?zone=*', lambda route: route.fulfill(
+        content_type='application/json',
+        body=json.dumps(screens[route.request.url.rsplit('=', 1)[1]])))
+    tab.goto(BASE + '/carnet')
+    tab.get_by_text('Trace · Genou').wait_for()
+    assert tab.get_by_text('Trace · Cheville').is_visible()
+    assert tab.locator('.n-tile', has_text='Genou').count() == 1
+    assert tab.locator('.n-tile', has_text='Cheville').count() == 1
+    tab.locator('.n-tile', has_text='Cheville').click()
+    tab.wait_for_function("document.getElementById('lt-title').textContent === 'Cheville'")
+    tab.locator('#content').get_by_role('button', name='Genou', exact=True).click()
+    tab.wait_for_function("document.getElementById('lt-title').textContent === 'Genou'")
     tab.close()
