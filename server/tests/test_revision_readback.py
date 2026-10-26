@@ -88,7 +88,7 @@ def test_la_relecture_reclame_une_relecture():
     texte = weekly_plan.revision_readback("2026-W35", R4, {**R4, "revision": 5})
 
     assert "RELIS LA SEMAINE AVANT DE RÉPONDRE" in texte
-    assert "Chaque fait du message de Sam doit se retrouver ci-dessus" in texte
+    assert "Chaque fait du message de l'athlète doit se retrouver ci-dessus" in texte
 
 
 R2 = {

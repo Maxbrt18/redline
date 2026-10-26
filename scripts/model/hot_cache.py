@@ -98,7 +98,7 @@ def render(ledger, rows: list, instruments: dict, targets: dict,
     # ⭐ « Bouclée » seulement une fois la semaine CLOSE (2026-09-27). Le samedi 26/09,
     # ce bloc lu à chaque tour annonçait « W39 bouclée — 13 km, ratio 0,3 » : un
     # effondrement fabriqué par deux jours manquants, le piège exact que `ledger.py`
-    # avait déjà corrigé pour la trajectoire le 20/08 (objection de Sam).
+    # avait déjà corrigé pour la trajectoire le 20/08 (objection de l'athlète).
     day = today or dt.date.today()
     iso = day.isocalendar()
     if label == f"{iso.year}-W{iso.week:02d}":

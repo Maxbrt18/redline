@@ -25,7 +25,7 @@ function skyOf(hour) {
   if (code === 2) return {icon: light ? 'partly' : 'cloud', word: 'éclaircies', sky: night || 'partly'};
   return {icon: light ? 'sun' : 'moon', word: code === 1 ? 'peu nuageux' : light ? 'ensoleillé' : 'ciel clair', sky: night || 'clear'};
 }
-// Des pictogrammes en couleur (demande de Sam, 2026-10-08 : « plus sympa, moins
+// Des pictogrammes en couleur (demande de l'athlète, 2026-10-08 : « plus sympa, moins
 // triste ») : le soleil jaune, la pluie bleue, la lune indigo. La couleur reste dans
 // la météo ; ailleurs elle garde son sens (tokens.css).
 const CLOUD = d => '<path class="s-cloud" d="' + d + '"/>';

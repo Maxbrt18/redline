@@ -6,11 +6,11 @@ Il les relit comme des exemples et recopie leurs marqueurs : du 03/10 au 09/10, 
 de ses 47 messages ne portait 🙂 ; dès que l'un en a porté un, 12 des 15 suivants
 aussi, réprimande et consigne d'arrêt comprises, et le tic a traversé une session neuve
 et un prompt de style changé. Un emoji de sa part dans les huit derniers messages
-rendait le suivant 22 fois plus probable ; un emoji de Sam, 3 fois.
+rendait le suivant 22 fois plus probable ; un emoji de l'athlète, 3 fois.
 
 La relecture garde donc ce qui a été dit, et retire l'emoji et la formule d'ouverture,
 qui ne portent aucune information. Le texte stocké reste intact : seule la copie que le
-coach relit est épurée. Les messages de Sam ne passent jamais par ici.
+coach relit est épurée. Les messages de l'athlète ne passent jamais par ici.
 """
 
 from __future__ import annotations

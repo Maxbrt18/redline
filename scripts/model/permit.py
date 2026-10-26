@@ -1,6 +1,6 @@
-"""Permis EF (décision de Sam du 2026-09-27) : l'état du permis se CALCULE.
+"""Permis EF (décision de l'athlète du 2026-09-27) : l'état du permis se CALCULE.
 
-Rien n'est stocké hormis le choix scellé du coach (`permit_choices`) : ce que Sam a
+Rien n'est stocké hormis le choix scellé du coach (`permit_choices`) : ce que l'athlète a
 couru vient du registre, la trace du lendemain aussi, les déclarations de charge de vie
 de l'état du jour, le groupe de la capture Strava. Le statut (accompagné, permis,
 retrait, restriction) en dérive, comme tout état dérivé du vault.
@@ -84,7 +84,7 @@ def week_end(week: str) -> dt.date:
 def evaluate(choices: Iterable[dict], runs: Iterable[Run], traces: dict[dt.date, float],
              caps: dict[str, int | None], groups: dict[int, bool],
              today: dt.date) -> list[EfLine]:
-    """Une ligne par EF scellée : le choix du coach face à ce que Sam a couru."""
+    """Une ligne par EF scellée : le choix du coach face à ce que l'athlète a couru."""
     by_day: dict[dt.date, list[Run]] = {}
     for run in runs:
         if run.type == "EF":

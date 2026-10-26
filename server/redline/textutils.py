@@ -6,7 +6,7 @@ output: it is pure syntax, impossible in normal prose. Everything else -- tone,
 dashes, Markdown -- comes from the STYLE_PROMPT. If a tic reappears, tighten the
 prompt; never add a regex here.
 
-⭐ **A paragraph is a bubble** (Sam, 2026-08-11). The protocol used to cut on an
+⭐ **A paragraph is a bubble** (l'athlète, 2026-08-11). The protocol used to cut on an
 explicit `---` and nothing else, so a three-paragraph answer landed as one wall of
 text with blank lines inside it -- which nobody types on Messenger. A blank line now
 ends a bubble on its own, and `---` survives as the way to force a cut where no blank
@@ -89,7 +89,7 @@ def split_bubbles(text: str, *, partial: bool = False) -> tuple[list[str], str]:
 
 
 def burst_parts(text: str) -> list[str]:
-    """The whole reply as the texts Sam will receive, capped at BURST_MAX.
+    """The whole reply as the texts the athlete will receive, capped at BURST_MAX.
 
     Past the cap the tail is rejoined rather than dropped: a burst that is too long is
     a style problem for the prompt to fix, never a reason to lose a sentence.

@@ -68,7 +68,7 @@ def main() -> int:
                         help="la zone surveillée, pour --metric pain")
     parser.add_argument("--fc-douteuse", dest="hr_doubt", choices=("sans_brassard", "contexte"),
                         help="déclare douteuse la FC moyenne connue de l'observation")
-    parser.add_argument("--cause", default="", help="la cause déclarée par Sam, ses mots")
+    parser.add_argument("--cause", default="", help="la cause déclarée par l'athlète, ses mots")
     values = parser.add_mutually_exclusive_group()
     values.add_argument("--value", type=float)
     values.add_argument("--unavailable", action="store_true")
@@ -85,7 +85,7 @@ def main() -> int:
         if args.metric or args.value is not None or args.unavailable:
             parser.error("--fc-douteuse se passe seul, sans --metric ni valeur")
         if not args.cause.strip():
-            parser.error("--fc-douteuse exige --cause : la raison donnée par Sam")
+            parser.error("--fc-douteuse exige --cause : la raison donnée par l'athlète")
     elif not args.metric or (args.value is None and not args.unavailable):
         parser.error("--metric et (--value ou --unavailable) obligatoires")
     if args.zone is not None and args.metric != "pain":

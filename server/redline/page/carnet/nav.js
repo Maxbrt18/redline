@@ -13,7 +13,7 @@ import {ensure, refresh} from './data.js';
 
 // ------------------------------------------------------------ navigation
 // Trois racines toujours visibles ; tout le reste se pousse par-dessus et se referme
-// d'un cran vers l'endroit d'où l'on vient (carte validée par Sam le 2026-10-08).
+// d'un cran vers l'endroit d'où l'on vient (carte validée par l'athlète le 2026-10-08).
 // Chaque écran déjà vu s'affiche depuis la mémoire de la page puis se recalcule
 // derrière ; il n'est redessiné que si un chiffre a changé, et garde sa position.
 export const topRoute = () => app.stacks[app.active][app.stacks[app.active].length - 1] || null;
@@ -93,7 +93,7 @@ export function render(y) {
 // une copie figée : le vrai est déjà dans son état final, sous elle.
 // Les écrans poussés n'entrent pas dans l'historique du navigateur : son geste de
 // retour fait glisser une capture de toute la page, barre d'onglets comprise, ce
-// qu'aucune app iOS ne fait (Sam, 2026-10-09).
+// qu'aucune app iOS ne fait (l'athlète, 2026-10-09).
 const topBar = $('bar');
 export const pageNode = $('page');
 const barInner = topBar.querySelector('.n-topbar-in');

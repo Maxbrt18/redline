@@ -10,6 +10,7 @@ import json
 import re
 from itertools import pairwise
 
+from . import instance as instance_model
 from . import paths, rulebook, transitions, typography
 from . import programme as strength_programme
 from .programme import GATE_SCHEMA as STRENGTH_GATE_SCHEMA
@@ -52,9 +53,9 @@ THIRD_PARTY_TEXT = re.compile(
     r"\b(?:avec|chez|pour|et)\s+"
     r"(?P<name>[A-ZÉÈÀÂÎÔÛ][\wÉÈÊÀÂÎÔÛéèêàâîôûç-]{2,})\b"
 )
-PLAN_NAME_ALLOWLIST = frozenset({
-    "Sam", "Strava", "Paris", "TargetRace", "RDL", "EF", "FC", "SL",
-})
+#: Les mots capitalisés qui ne désignent jamais un tiers. Le prénom et le lieu de
+#: l'instance s'y ajoutent à la lecture (`instance.own_names`).
+PLAN_NAME_ALLOWLIST = frozenset({"Strava", "RDL", "EF", "FC", "SL"})
 
 STRENGTH_SPEC_SCHEMA = Schema("modulation de renforcement", [
     field("loads", list, required=False, maximum=20,
@@ -120,7 +121,7 @@ GATE_WHEN = ("avant", "apres")
 # cheville a-t-elle parlé ? », échéance le jour de cette séance A. Une observation, donc,
 # écrite dans le seul moule qui existait : celui d'une pré-condition. Le service a fait ce
 # qu'on lui demandait, il a retenu la prescription -- en attendant la réponse à une
-# question qui exigeait de faire la séance qu'il retenait. Sam a reçu un message qui
+# question qui exigeait de faire la séance qu'il retenait. L'athlète a reçu un message qui
 # nommait son renfo, posait la question, et ne livrait pas la carte.
 #
 # Un contrôle doit trancher, et « avant » se paie d'un `holds` qui NOMME les séances
@@ -135,7 +136,7 @@ GATE_SCHEMA = Schema("contrôle daté", [
     field("holds", list, required=False, item=field("séance", str),
           note="les identifiants de séance que ce contrôle retient — "
                "obligatoire si when=avant, interdit si when=apres"),
-    field("question", str, minimum=10, note="ce qu'il faut demander à Sam ce jour-là"),
+    field("question", str, minimum=10, note="ce qu'il faut demander à l'athlète ce jour-là"),
     field("on_fail", str, minimum=3, note="ce que devient le programme si la réponse est mauvaise"),
 ])
 
@@ -155,7 +156,7 @@ CHANGE_FIELDS = (
 #: rappels écrits partout en prose. Sept passaient par une révision (renfo A retiré le
 #: 11/08, EF retirée sur « intermittent » le 27/08, RDL et fréquence le 14/09…). Une
 #: `rule` en texte libre ne se vérifie pas ; un identifiant du règlement et un fait de
-#: `evidence`, si. `demande` couvre ce que Sam a lui-même demandé.
+#: `evidence`, si. `demande` couvre ce que l'athlète a lui-même demandé.
 MOTIF_RULES = (*(rule.id for rule in rulebook.RULES), "demande")
 #: Les préfixes d'un FAIT : ce que le registre, Strava, un avis ou un contrôle ont dit.
 #: Une règle du règlement ne s'applique qu'à un fait ; une demande vient d'un message.
@@ -241,7 +242,7 @@ def _week_dates(week: str) -> set[str]:
 
 
 # `title` et `note` sont les DEUX seuls champs de la révision qui partent tels quels
-# chez Sam -- texto du matin et carte du programme. `reason`, `evidence` et
+# chez l'athlète -- texto du matin et carte du programme. `reason`, `evidence` et
 # `constraints` sont l'archive, personne ne les lui envoie. Le 2026-08-11 la frontière
 # n'existait pas : un replan lui a expédié « Renfo A reporté : ... (trigger replan de
 # rev.1) ... (gate w33-renfoa-report) » et la moitié de la semaine désaccentuée. Un
@@ -256,13 +257,13 @@ _INTERNAL_RE = re.compile(r"\b(?:rev|r[ée]vision)\.?\s*\d", re.IGNORECASE)
 
 
 def _text_errors(text: str, where: str, label: str, gate_ids: list[str]) -> list[str]:
-    """`title`/`note` : ce que Sam lit, jugé comme tel."""
+    """`title`/`note` : ce que l'athlète lit, jugé comme tel."""
     problems = []
     for gate_id in gate_ids:
         if gate_id in text:
             problems.append(
                 f"{where} : {label} cite le contrôle daté « {gate_id} » — ce texte part "
-                "sur le téléphone de Sam et sur la carte, la machinerie interne "
+                "sur le téléphone de l'athlète et sur la carte, la machinerie interne "
                 "reste dans reason/evidence")
     match = _INTERNAL_RE.search(text)
     if match:
@@ -297,11 +298,11 @@ def written_text_errors(revision: dict, where: str = "revision") -> list[str]:
             if gate.get(label):
                 problems += typography.errors(
                     gate[label], f"{where}.gate[{gate.get('id', '?')}]", label)
-        # Décision de Sam du 2026-10-11 : la marche ne se demande jamais, il signale
+        # Décision de l'athlète du 2026-10-11 : la marche ne se demande jamais, il signale
         # lui-même une gêne. 29 questions en trois semaines, aucune réponse « modifiée ».
         # Décision du 2026-10-11 : une pré-condition ne retient plus de séance. 19
         # contrôles bloquants en deux mois, aucun échec sur son critère ; 23 changements
-        # de séance sur 25 venaient d'un message de Sam. La condition s'écrit dans la
+        # de séance sur 25 venaient d'un message de l'athlète. La condition s'écrit dans la
         # séance, et l'alerte « nette » du carnet la déclenche.
         if gate.get("when") == "avant":
             problems.append(
@@ -328,6 +329,7 @@ def intention_errors(revision: dict, where: str = "revision") -> list[str]:
     enrichies depuis les cycles. La frontière d'écriture est volontairement plus
     étroite : une révision dit ce qui est prévu ou annulé, jamais ce qui a eu lieu.
     """
+    allowed = PLAN_NAME_ALLOWLIST | instance_model.own_names(paths.vault_root())
     problems = [
         f"{where}.{session.get('id', '?')} : status=done appartient au cycle de "
         "séance. Garde status=planned ; le rendu ajoute 'fait' depuis PostgreSQL."
@@ -343,7 +345,7 @@ def intention_errors(revision: dict, where: str = "revision") -> list[str]:
                     "le plan. Garde seulement l'intention ; l'observation et le cycle "
                     "portent ce qui a eu lieu.")
             for match in THIRD_PARTY_TEXT.finditer(text):
-                if (match.group("name") not in PLAN_NAME_ALLOWLIST
+                if (match.group("name") not in allowed
                         and not re.fullmatch(r"W\d{2}", match.group("name"))):
                     problems.append(
                         f"{where}.{session.get('id', '?')}.{label} : nom de tiers "
@@ -351,7 +353,7 @@ def intention_errors(revision: dict, where: str = "revision") -> list[str]:
                         "sans identité personnelle.")
         strength_note = (session.get("strength") or {}).get("note") or ""
         for match in THIRD_PARTY_TEXT.finditer(strength_note):
-            if (match.group("name") not in PLAN_NAME_ALLOWLIST
+            if (match.group("name") not in allowed
                     and not re.fullmatch(r"W\d{2}", match.group("name"))):
                 problems.append(
                     f"{where}.{session.get('id', '?')}.strength.note : nom de tiers "
@@ -366,7 +368,7 @@ def intention_errors(revision: dict, where: str = "revision") -> list[str]:
                           ("constraints", revision.get("constraints") or [])):
         for index, text in enumerate(values):
             for match in THIRD_PARTY_TEXT.finditer(text):
-                if (match.group("name") not in PLAN_NAME_ALLOWLIST
+                if (match.group("name") not in allowed
                         and not re.fullmatch(r"W\d{2}", match.group("name"))):
                     problems.append(
                         f"{where}.{label}[{index}] : nom de tiers "
@@ -605,12 +607,12 @@ def remaining(sessions: list[dict], *, since: str = "") -> list[dict]:
     """Ce qu'il RESTE à faire, à partir de `since` : la vue PRESCRIPTIVE.
 
     ⭐ Une séance faite ou annulée n'engage plus rien, et cette phrase n'a le droit
-    d'exister qu'une fois. Le 2026-08-16, Sam finit sa SL vallonnée à 9 h, le coach
+    d'exister qu'une fois. Le 2026-08-16, l'athlète finit sa SL vallonnée à 9 h, le coach
     la débriefe correctement, et le bloc canonique posté juste après la lui redonne à
     faire : « la suite de la semaine — dim 16/08 : SL vallonnée, cible 10 km ». La
     donnée était juste (r11 l'avait passée à `done` à l'arrivée du fichier Strava), et
     les deux autres rendus du même objet lisaient bien `status` — la carte affichait
-    « · fait », le journal « (fait) ». Seul le rendu Messenger, le seul que Sam lise
+    « · fait », le journal « (fait) ». Seul le rendu Messenger, le seul que l'athlète lise
     vraiment et le seul à affirmer « la suite », filtrait sur la DATE et sur elle seule.
 
     Un objet, trois rendus, trois filtres réécrits à la main : c'est le rendu le plus
@@ -767,7 +769,7 @@ def render_journal(plan: dict) -> str:
     gates = revision.get("gates") or []
     # ⭐ Le journal disait de TOUS les contrôles qu'ils refusent le programme. Depuis le
     # 2026-08-18 c'est faux de la moitié d'entre eux : une observation (`apres`) se pose
-    # et ne retient rien. La projection que Sam lit affirmait donc le contraire du
+    # et ne retient rien. La projection que l'athlète lit affirmait donc le contraire du
     # code qui décide -- et c'est précisément la confusion qui a coûté le mot du matin
     # du 18/08. Une vue qui ment sur la règle est pire qu'une vue absente.
     for kind, titre in (
@@ -817,7 +819,7 @@ def journal_skeleton(week: str, today: dt.date) -> str:
         f"> `{week}` ; ce journal recevra la lecture de fin de semaine.", "",
         f"<!-- {BLOCK}_START -->", f"<!-- {BLOCK}_END -->", "",
         "## Intention d'ouverture", "",
-        "## Ressenti Sam", "",
+        "## Ressenti de l'athlète", "",
         "## Bilan de clôture", "",
         "## Lecture du coach", ""])
 
@@ -838,10 +840,10 @@ def render_hot_cache(plan: dict) -> str:
 #:
 #: Le coach compose le tableau des séances de tête, l'envoie sur stdin, et recevait pour
 #: toute réponse « révision N enregistrée et validée ». Il n'a jamais vu ce qu'il venait
-#: d'écrire : il enchaînait sur un message à Sam décrivant ce qu'il CROYAIT avoir
+#: d'écrire : il enchaînait sur un message à l'athlète décrivant ce qu'il CROYAIT avoir
 #: écrit. Le 25/08, r3 annonçait dans son propre motif un jogging le jeudi, un renfo B
 #: décalé et un repos le mardi ; l'objet ne portait qu'une annulation d'EF le mercredi.
-#: Les deux autres faits du message de Sam n'existaient nulle part, et r4 a reconduit
+#: Les deux autres faits du message de l'athlète n'existaient nulle part, et r4 a reconduit
 #: l'oubli du jogging.
 #:
 #: Le contrat rend donc la semaine telle qu'elle EST, jour par jour, jours vides et
@@ -938,7 +940,7 @@ def _motif_errors(session_id: str, entry: dict, cuts: list[str],
     if motif.get("regle") == "demande":
         if not _REQUEST_TRIGGER.match(fait):
             return [f"changes.{session_id}.motif : regle=demande exige un message de "
-                    "Sam (messenger:, request:, availability:)."]
+                    "l'athlète (messenger:, request:, availability:)."]
     elif not _FACT_TRIGGER.match(fait):
         return [f"changes.{session_id}.motif : regle={motif.get('regle')} s'applique à "
                 "un fait observé (observation:, strava:, medical:, gate:, exposure:, "
@@ -1054,7 +1056,7 @@ def revision_readback(week: str, previous: dict | None, current: dict) -> str:
     """Ce que la CLI rend au coach : le diff, puis la semaine telle qu'elle est."""
     depuis = f"r{previous['revision']}" if previous else "rien (première révision)"
     diff = revision_diff(previous, current) or [
-        "AUCUNE séance ajoutée, annulée, déplacée ni modifiée. Si le message de Sam "
+        "AUCUNE séance ajoutée, annulée, déplacée ni modifiée. Si le message de l'athlète "
         "demandait un changement, cette révision ne le porte pas."]
     bloc = [
         f"{week} révision {current['revision']} enregistrée et validée.",
@@ -1070,7 +1072,7 @@ def revision_readback(week: str, previous: dict | None, current: dict) -> str:
     orphelins = sessions_orphelines(previous, current)
     if orphelins:
         bloc += ["", "ATTENTION :", *(f"- {ligne}" for ligne in orphelins)]
-    bloc += ["", "Chaque fait du message de Sam doit se retrouver ci-dessus. Un jour "
+    bloc += ["", "Chaque fait du message de l'athlète doit se retrouver ci-dessus. Un jour "
                  "marqué AUCUNE SÉANCE est un oubli tant que tu n'as pas vérifié qu'il "
                  "est voulu."]
     return "\n".join(bloc)
@@ -1081,7 +1083,7 @@ def revision_readback(week: str, previous: dict | None, current: dict) -> str:
 #: consécutifs -- et jamais si la révision FAIT ce qu'elle DIT.
 #: La r3 du 25/08 annonçait dans son motif une sortie le jeudi et un renfo B décalé ;
 #: l'objet ne touchait que le mercredi. Elle est passée validée, et le coach a raconté
-#: son motif à Sam.
+#: son motif à l'athlète.
 #:
 #: Le contrôle porte sur les jours parce que c'est la seule affirmation d'un motif qu'un
 #: programme puisse contredire mécaniquement. Il ouvre les deux chemins corrects : soit

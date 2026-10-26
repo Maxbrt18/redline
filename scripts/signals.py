@@ -52,7 +52,7 @@ RUN_TYPES = EASY_TYPES | {"seuil", "côtes", "lignes", "cadence", "course"}
 # sorties avant que la douleur ne soit avouée » avait été écrit le 09/07 sans source, ne
 # s'est jamais vérifié dans le registre, et a produit six messages et une correction.
 # La plus longue sortie n'a PLUS de signal de saut : aucun pourcentage fixe ne juge sa
-# progression depuis le 2026-09-27 (décision de Sam, `scripts/model/rulebook.py`).
+# progression depuis le 2026-09-27 (décision de l'athlète, `scripts/model/rulebook.py`).
 # Elle reste affichée, et sa STAGNATION reste signalée (scénario 9).
 
 # ⭐ ALARME N°4, CALCULÉE (2026-09-27). « FC anormalement haute en footing » est le

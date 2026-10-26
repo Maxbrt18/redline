@@ -37,7 +37,7 @@ STAGES = (
           "Les inconnues critiques sont soit résolues, soit portées par une échéance typée."),
     # Ces deux jalons VÉRIFIENT une date, ils n'en imposent pas une (2026-09-27) : le
     # calendrier générique disait « répétition de course » à J-45 quand le plan de
-    # Sam la place en W45 (~J-25). Deux propriétaires du calendrier de course, c'est
+    # L'athlète la place en W45 (~J-25). Deux propriétaires du calendrier de course, c'est
     # un jalon qui pousse une séance que le plan interdit. Le plan décide la date.
     Stage("systemes", 60, "Systèmes en conditions réelles",
           "Vérifier que durée, terrain, nuit, nutrition, digestion et chaussures ont chacun une "
@@ -69,7 +69,7 @@ STAGES = (
           "La carte finale nomme départ, marche, nutrition, incident digestif et drapeaux d'arrêt."),
     Stage("jour-j", 0, "Jour J",
           "Restituer le plan déjà décidé ; aucune optimisation, aucun test, aucune nouvelle consigne.",
-          "Sam sait quoi faire dans la première heure et au premier imprévu."),
+          "⟨athlète⟩ sait quoi faire dans la première heure et au premier imprévu."),
 )
 
 

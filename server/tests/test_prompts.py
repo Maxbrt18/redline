@@ -48,7 +48,7 @@ def test_triage_separates_a_plan_that_moves_from_a_plan_that_is_asked_for():
     champs, sinon le parseur lit une colonne qui n'existe pas."""
     assert TRIAGE_PROMPT.splitlines()[1] == (
         "NIVEAU | E ou - | phrase d'attente | P ou - | D ou - | plan_scope")
-    assert "D (champ `plan_asked`) si Sam DEMANDE son programme" in TRIAGE_PROMPT
+    assert "D (champ `plan_asked`) si ⟨athlète⟩ DEMANDE son programme" in TRIAGE_PROMPT
     assert "jamais D, même quand c'est P" in TRIAGE_PROMPT
 
 
@@ -531,7 +531,7 @@ def test_a_stale_plan_asks_for_a_revision_before_the_turn_not_after():
     que détruire du travail déjà fait. La même information, servie en tête du tour,
     devient actionnable."""
     note = prompts.stale_plan_note("2026-W33")
-    assert "invisible pour Sam" in note
+    assert "invisible pour ⟨athlète⟩" in note
     assert "2026-W33" in note
     assert "tu réponds normalement" in note
     assert "AUCUNE prescription" in note
@@ -795,7 +795,7 @@ def test_the_weekly_commitment_is_gone():
     from scripts.model import weekly_plan
 
     weekly = " ".join(PROACTIVE_TRIGGERS["weekly"].split())
-    assert "Ne demande à Sam aucun engagement pour la semaine" in weekly
+    assert "Ne demande à ⟨athlète⟩ aucun engagement pour la semaine" in weekly
     assert "jamais une formule fixe ni un présupposé de défaut" in weekly
     journal = weekly_plan.journal_skeleton("2026-W41", datetime.date(2026, 10, 5))
     assert "Engagement" not in journal and "minimisé" not in journal

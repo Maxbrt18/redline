@@ -1,5 +1,5 @@
 """Les signes qu'un clavier de téléphone ne porte pas, et qui ne doivent donc entrer
-nulle part dans ce qui finit devant le coach ou devant Sam.
+nulle part dans ce qui finit devant le coach ou devant l'athlète.
 
 ⭐ LA RÈGLE A DEUX CANAUX, ET UN SEUL ÉTAIT GARDÉ (2026-08-19). Le 17/08, la consigne
 typographique a reçu son porteur : `BANNED_GLYPHS` plus un test qui scanne les textes
@@ -11,7 +11,7 @@ lui remet sous les yeux le lendemain.
 Au 19/08, le programme W34 en portait quatre : un tiret cadratin dans la `question` du
 contrôle du 23/08, que `prompts.gate_note()` interpole VERBATIM dans l'instruction
 invisible; un signe moins U+2212 dans la `note` du 22/08, qui part sur le téléphone de
-Sam et sur la carte; deux autres dans `constraints`. La consigne se faisait donc
+L'athlète et sur la carte; deux autres dans `constraints`. La consigne se faisait donc
 démentir par son propre contexte, exactement comme avant le 17/08, mais par le canal
 des données au lieu du canal de la prose. Et la boucle se referme sur elle-même : le
 coach écrit la révision suivante après avoir lu la précédente.
@@ -74,6 +74,6 @@ def errors(text: str, where: str, label: str) -> list[str]:
         problems.append(
             f"{where} : {label} contient « {glyph} », qu'un clavier de téléphone ne "
             f"porte pas (autour de « {around} »). Ce texte est réinjecté au coach à "
-            f"chaque tour, et title/note partent sur le téléphone de Sam. "
+            f"chaque tour, et title/note partent sur le téléphone de l'athlète. "
             f"À la place : {REPLACEMENTS.get(glyph, 'un signe du clavier')}.")
     return problems

@@ -80,7 +80,7 @@ def render_context_packet(store: OperationalStore, depth: str, today: dt.date) -
     if morning:
         lines.append("Réveils antérieurs : 8 dernières lectures au maximum sur 56 jours ; "
                      "repères historiques, jamais preuve de l'état actuel. "
-                     "Comparer les mesures comparables, sans exiger de Sam une certitude "
+                     "Comparer les mesures comparables, sans exiger de l'athlète une certitude "
                      "sur sa base ni convertir une note qualitative en chiffre.")
         lines.extend("- " + _observation(row) for row in morning)
     exposures = read(store.exposure_rows, "Expositions", confirmed_only=True)[:8]

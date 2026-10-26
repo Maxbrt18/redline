@@ -1,5 +1,5 @@
 // ------------------------------------------------------------ séance guidée
-// Le renfo s'ouvre en plein écran par-dessus le carnet (maquette validée par Sam le
+// Le renfo s'ouvre en plein écran par-dessus le carnet (maquette validée par l'athlète le
 // 2026-10-09) : la barre du carnet avec ✕ à gauche et le son à droite, le grand titre
 // des autres écrans, pas d'onglets. Pendant la séance, ni glissement retour ni tirer
 // pour actualiser : ✕ est la seule sortie, et une séance commencée demande confirmation,

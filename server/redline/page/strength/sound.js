@@ -86,7 +86,7 @@ export function announce(text) {
 }
 
 /* Le son se règle dans une feuille, ouverte par l'icône de la barre, comme les
- * réglages du carnet : un seul style pour toute l'app (Sam, 2026-10-09). */
+ * réglages du carnet : un seul style pour toute l'app (l'athlète, 2026-10-09). */
 function setMuted(value) {
   muted = value;
   if (muted) window.speechSynthesis?.cancel();

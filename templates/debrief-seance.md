@@ -33,6 +33,6 @@ d EF 7.5 6:12 rpe3 t0.5 p8 "un peu raide au départ, parti au ralenti"
 
 → `Type=EF · km=7.5 · Allure=6:12 · RPE=3 · Dlr=0.5 · Plaisir=8 · Note=…`
 
-> ⚠️ **À l'initiative de Sam, jamais réclamé par le coach.** Le coach continue de poser
+> ⚠️ **À l'initiative de l'athlète, jamais réclamé par le coach.** Le coach continue de poser
 > ses questions naturellement — un coach qui exige une syntaxe cesse d'être un coach. Le
 > format est un raccourci offert, pas un protocole imposé.

@@ -14,7 +14,7 @@ Usage:
 Lit les observations, métriques, déclarations quotidiennes et instruments directement
 dans PostgreSQL. Aucun registre Markdown n'est maintenu en parallèle.
 
-The French CLI flags and the CSV column names are a contract with Sam and with
+The French CLI flags and the CSV column names are a contract with the athlete and with
 whatever reads the export: they stay French while the code around them is English.
 """
 
@@ -576,7 +576,7 @@ def rest_peak(rows: list[Row], before: dt.date, zone: str) -> float | None:
     """The peak of the rest series preceding `before`, or None without history.
 
     This is the reference the morning reading is judged against. It is
-    NOT the peak of the previous day's session: Sam's /10 scale is written for effort
+    NOT the peak of the previous day's session: the athlete's /10 scale is written for effort
     (`coaching/protocols.md` § L'échelle d'effort), and the morning reading is a different
     thing, hard to compare to it. Subtracting the two put two currencies on one ruler, one of which never
     existed.
@@ -621,7 +621,7 @@ def esculier_check(rows: list[Row], zone: str,
     ⭐ 2026-08-17 -- what « worse » means changed, and this is a deliberate departure from
     the published rule, not a bug fix. The morning is compared to the peak of ITS OWN rest
     series (`rest_peak`), never to the previous day's effort peak: the literal subtraction
-    assumes a single ruler, and Sam has one scale, written for effort. Side effect that
+    assumes a single ruler, and the athlete has one scale, written for effort. Side effect that
     was the point: the qualification added on 2026-08-11 after the false stress-fracture
     signal moves from the MESSAGE into the TRIGGER -- a reading inside its own range no
     longer fires at all, instead of firing and then apologising. Hence the name:
@@ -745,7 +745,7 @@ def gate(rows: list[Row], label: str, instr: Instruments,
 
 # Les types du registre qui comptent comme « couru », par opposition à la marche et au
 # renfo. La distinction porte la lecture : une jauge rouge faite de rando ne dit pas la
-# même chose qu'une jauge rouge faite de course (objection Sam du 2026-07-21).
+# même chose qu'une jauge rouge faite de course (objection de l'athlète du 2026-07-21).
 RUN_TYPES = {"EF", "SL", "seuil", "côtes", "lignes", "cadence", "course"}
 WALK_TYPES = {"rando"}
 
@@ -834,7 +834,7 @@ def longest_recent(rows: list[Row], before: dt.date) -> float | None:
     """La plus longue sortie COURUE des 30 jours qui précèdent `before`.
 
     Un repère, pas un plafond : aucun pourcentage fixe ne borne la sortie suivante
-    (décision de Sam du 2026-09-27, `rulebook.py`). Il sert à dire de combien une
+    (décision de l'athlète du 2026-09-27, `rulebook.py`). Il sert à dire de combien une
     séance s'écarte du mois écoulé, pour que l'écart soit jugé et non découvert.
     """
     window = [row for row in _runs(rows)
@@ -856,7 +856,7 @@ def trajectory(rows: list[Row], today: dt.date,
 
     ⚠ La semaine en cours est INCOMPLÈTE par construction et se lit comme telle : un
     jeudi porte quatre jours, pas sept, et la comparer aux semaines closes fabrique un
-    effondrement qui n'existe pas (objection de Sam, 2026-08-20).
+    effondrement qui n'existe pas (objection de l'athlète, 2026-08-20).
     """
     current = _week_label(today)
     # N semaines CLOSES, plus la semaine en cours si elle existe. Compter la semaine
@@ -990,7 +990,7 @@ def race_projection(rows: list[Row], today: dt.date, race_on: dt.date,
     la semaine de course incluse, W46-W48 pour une course en W48). Aucune règle n'y est
     appliquée : l'instrument ne dit pas ce qui est permis, il dit ce qu'il FAUDRAIT,
     semaine d'assimilation ou nouveauté comprises, pour que l'écart à la cible soit
-    visible avant le jalon. La décision appartient à Sam et au coach.
+    visible avant le jalon. La décision appartient à l'athlète et au coach.
     """
     longest = longest_recent(rows, today)
     if longest is None or race_on <= today:
@@ -1093,7 +1093,7 @@ def week_report(store: LedgerStore, rows: list[Row], instruments: dict, targets:
     h_eq, level, trace = equivalent_hours(week_rows, instr, targets)
     ratio = acute_chronic_ratio(per_week, label)
     lines = [f"Semaine {label}", ""]
-    # Le volume avant la jauge : c'est le chiffre que Sam entend le plus souvent, et
+    # Le volume avant la jauge : c'est le chiffre que l'athlète entend le plus souvent, et
     # le seul qu'il puisse recompter lui-même. Il sort d'ici ou il ne sort pas.
     lines.append(f"Volume : {week_volume(week_rows)}")
     lines.append("(le registre, pas le plan — `Vol. cible` de current-plan.md est une "

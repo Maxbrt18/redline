@@ -1,4 +1,4 @@
-"""Comment chaque correction de Sam se rejoue, lu dans un registre typé.
+"""Comment chaque correction de l'athlète se rejoue, lu dans un registre typé.
 
 `coaching/corrections.md` raconte l'erreur et nomme son porteur ; `vault-check.py`
 (« règles de méta portées ») vérifie qu'un porteur est NOMMÉ, jamais qu'il porte. Pour une

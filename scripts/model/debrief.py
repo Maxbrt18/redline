@@ -1,4 +1,4 @@
-"""Les écarts calculés d'une sortie : ce que la montre ne dit pas à Sam.
+"""Les écarts calculés d'une sortie : ce que la montre ne dit pas à l'athlète.
 
 Audit du 2026-10-11. Les moments où Redline lui a appris quelque chose sont des
 comparaisons calculées : FC montée à allure comparable avant le rhume, renfo de 73 min
@@ -35,7 +35,7 @@ def planned_vs_done(row: Any, session: dict | None) -> list[str]:
                 out.append(f"distance {_fr(row.km)} km pour un {label} de "
                            f"{_fr(session[key])} ({_signed(row.km - session[key])})")
                 break
-    # Une durée plafond ne se compare que si c'est elle que Sam a lue : le rendu
+    # Une durée plafond ne se compare que si c'est elle que l'athlète a lue : le rendu
     # (`weekly_plan.distance_of`) la tait dès qu'une distance engage. Le 15/10, « 57 min
     # pour 55 » lui a été reproché sur un plafond qu'aucun message ne lui avait donné.
     shown_by_distance = (session.get("distance_cap_km") is not None

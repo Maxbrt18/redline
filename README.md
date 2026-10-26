@@ -16,7 +16,9 @@ the facts before it speaks**.
 > The coach speaks **French**: prompts, messages and most comments are in French.
 > The code is organised so that it can be translated, but that work is not done.
 >
-> The athlete it coaches is called `Sam`: a stand-in name, not a real person.
+> The engine never names the athlete: the name, the watched injuries and the tracked
+> capabilities come from `redline.toml` (see `redline.example.toml`). `Sam` is the
+> fictional athlete of the test suite only.
 >
 > Redline is an AI, not a medical professional. It gives no diagnosis and no medication
 > advice, and says so.

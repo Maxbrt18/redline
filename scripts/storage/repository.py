@@ -243,7 +243,7 @@ class OperationalStore:
         périmé — elle jetait la séance pour protéger le calcul, exactement à l'envers
         de la doctrine du vault (« une séance non consignée est perdue », « l'état
         dérivé se recalcule »). Ce jour-là, deux débriefs corrects ont été détruits et
-        Sam a reçu de la plomberie à la place de son coaching.
+        L'athlète a reçu de la plomberie à la place de son coaching.
 
         La péremption d'un plan n'est donc plus une erreur d'écriture : c'est un VERDICT
         DE PRESCRIPTIBILITÉ, rendu par `VaultRepo.validate_weekly_plan`, qui retient la
@@ -449,7 +449,7 @@ class OperationalStore:
         answer = connection.execute(sa.select(conversation_messages).where(
             conversation_messages.c.id == answer_id)).mappings().one_or_none()
         if not question or not answer or answer["role"] != "athlete":
-            raise ValueError("question ou message de Sam introuvable")
+            raise ValueError("question ou message de l'athlète introuvable")
         if answer["psid"] != question["psid"] or answer["created_at"] < question["asked_at"]:
             raise ValueError("la réponse ne peut pas appartenir à cette question")
         connection.execute(conversation_questions.update().where(
@@ -734,7 +734,7 @@ class OperationalStore:
         """Déclare douteuse une FC moyenne connue, une seule fois, avec son motif.
 
         La mesure reste immuable : seule l'annotation dit ce qu'elle vaut. Le motif
-        textuel (les mots de Sam) part dans le journal d'audit.
+        textuel (les mots de l'athlète) part dans le journal d'audit.
         """
         with self.database.transaction() as connection:
             self.doubt_hr_in(connection, observation_id, reason, note, actor=actor)

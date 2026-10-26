@@ -3,7 +3,7 @@ type: concept
 aliases: [<terme français principal, synonymes, ex. seuil, travail au seuil>]
 statut: en-accumulation      # en-accumulation → consolidé (après la passe transversale) → à-resynthétiser (si une nouvelle source contredit la Synthèse, cf. CLAUDE.md)
 preuve_couverture: non-évaluée        # non-évaluée | partielle | complète — uniquement après relecture des sources
-transposition_couverture: non-évaluée # non-évaluée | partielle | explicite — population de preuve vs Sam
+transposition_couverture: non-évaluée # non-évaluée | partielle | explicite — population de preuve vs l'athlète
 ---
 <!-- fichier : <nom-anglais-kebab>.md, ex. lactate-threshold.md -->
 

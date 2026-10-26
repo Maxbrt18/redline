@@ -174,7 +174,7 @@ Pour modifier un comportement :
   entrant direct échoué reste `pending` et est retenté après 30 s, 5 min puis toutes les
   30 min (ou à l'heure de retour annoncée par le fournisseur), 48 fois au plus, puis
   reste `pending` pour le démarrage suivant. Dès qu'une reprise doit attendre plus de
-  deux minutes, une seule phrase (au plus une toutes les deux heures) prévient Sam
+  deux minutes, une seule phrase (au plus une toutes les deux heures) prévient l'athlète
   que la réponse arrive ; une réponse tardive reçoit l'âge du message pour ne pas le
   traiter comme actuel.
 - Les messages proactifs sont journalisés par le service après livraison. L'agent ne
@@ -195,7 +195,7 @@ Pour modifier un comportement :
   retenu par le code. Les y avoir laissés faisait geler la synchronisation du vault sur
   une écriture parfaitement légitime.
 - **Les diagnostics internes restent dans les journaux d'exploitation.** Aucun texte
-  d'adaptateur (watchdog, tour, moteur) n'est montré à Sam : chaque classe d'échec a
+  d'adaptateur (watchdog, tour, moteur) n'est montré à l'athlète : chaque classe d'échec a
   une phrase à lui, définie une fois dans `bot.py`. Si la persistance d'un tour réactif
   est refusée, sa prose part avec une ligne qui nomme ce qui n'a pas été enregistré
   (« ta séance », « ton état du jour »…) ; aucun programme n'accompagne ce tour. Un échec
@@ -446,7 +446,7 @@ Codes de `check` et `show` :
 - `2` : valide, mais une précondition datée attend une réponse ;
 - `3` : périmé, à réviser avant de prescrire.
 
-Le bloc canonique est envoyé uniquement si ce qu'il reste à faire a changé, si Sam
+Le bloc canonique est envoyé uniquement si ce qu'il reste à faire a changé, si l'athlète
 le demande, ou si une dette de livraison existe. Le numéro de révision seul ne suffit
 pas : une révision peut ne consigner que du passé.
 
@@ -515,10 +515,10 @@ digestif en attente. `scripts/session-cycle.py` enregistre un départ déclaré
 facultatif et un appariement explicite.
 L'observation Strava porte l'heure réelle : elle remplace l'heure effective, conserve
 le départ déclaré comme trace et ferme rétroactivement la séance si « j'y vais » a été
-oublié. Une ambiguïté de date et de type reste non appariée jusqu'au choix de Sam.
+oublié. Une ambiguïté de date et de type reste non appariée jusqu'au choix de l'athlète.
 Le webhook réveille le scheduler, qui capture aussitôt le distillat et ses tours dans
 `strava_activity_intakes` : la sortie entre au registre et le carnet peut demander ses
-ressentis avant le débrief. Le débrief part au premier signal que Sam a fini : titre
+ressentis avant le débrief. Le débrief part au premier signal que l'athlète a fini : titre
 renommé dans Strava (événement `update`, titre et description s'enregistrent ensemble),
 ressentis complets dans le carnet, ou message Messenger, dont la réponse porte alors le
 débrief au lieu de le repousser de huit minutes. Sinon il part après
@@ -869,7 +869,7 @@ renfo et son bouton. Un jour de repos tient en une ligne et la fiche de demain s
 entier. Puis **À venir** (une ligne par jour, la météo pour demain seulement) et
 **Repères**, trois tuiles qui mènent au détail : la semaine en mini-barres (vers
 Semaine), le pic injury face au plafond (écran Injury, `GET /carnet-api/injury` : un point
-par séance notée et les réveils sur cinq semaines calendaires, l'échelle de Sam, le
+par séance notée et les réveils sur cinq semaines calendaires, l'échelle de l'athlète, le
 pic par semaine, les réveils sans note ; aucun verdict), le compte à rebours (vers Course). La météo dit le ciel et le ressenti au départ, puis la nuit par rapport à la
 séance (avant, pendant, après), avec un picto en couleur dans une pastille teintée du
 ciel du départ (code WMO, jour ou nuit). La bande d'état iOS (26+)

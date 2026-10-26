@@ -9,7 +9,7 @@ from redline.prompts import EMOTION_NOTE, STYLE_PROMPT
 from redline.textutils import burst_parts, strip_links
 
 EXPERIMENT = """Ajustement conversationnel expérimental
-Réponds d'abord à ce que Sam cherche dans ce tour : une réponse, une écoute,
+Réponds d'abord à ce que l'athlète cherche dans ce tour : une réponse, une écoute,
 un avis, une correction ou simplement une fin d'échange. Ne nomme pas cette analyse.
 La profondeur des vérifications ne dicte pas la longueur envoyée. Une réponse exacte
 peut tenir en une phrase même après une longue vérification. Développe si la demande

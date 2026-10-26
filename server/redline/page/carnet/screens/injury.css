@@ -1,5 +1,5 @@
 /* Injury : le pic de la semaine, un point par séance contre le plafond, l'échelle de
- * Sam, le pic par semaine, les réveils sans note. */
+ * L'athlète, le pic par semaine, les réveils sans note. */
 .n-tbig { display: flex; align-items: center; gap: 14px; margin: 18px 0 6px; }
 .n-tbig > b { font: 700 64px/.9 var(--display); }
 .n-tbig span { color: var(--muted); font-size: 14px; line-height: 1.35; }

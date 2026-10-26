@@ -41,7 +41,7 @@ export function chevron(cls) {
   shape('path', {d: 'M1.5 1.5 6.5 6.5 1.5 11.5'}, svg);
   return svg;
 }
-// Les pastilles teintées (maquette « Carnet en couleur » validée par Sam le
+// Les pastilles teintées (maquette « Carnet en couleur » validée par l'athlète le
 // 2026-10-22) : un disque léger et son icône nomment la famille d'une séance, d'un
 // repère ou d'une capacité, comme celles de la météo. Elles ne jugent rien.
 const PAS_ICONS = {

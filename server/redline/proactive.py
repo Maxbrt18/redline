@@ -137,7 +137,7 @@ class ProactiveScheduler:
                 log.exception("Proactive tick failed")
 
     def _ping_healthcheck(self) -> None:
-        """Outgoing heartbeat: healthchecks.io alerts Sam if the pings stop
+        """Outgoing heartbeat: healthchecks.io alerts the athlete if the pings stop
         (service dead, VPS down). Silent and harmless otherwise."""
         url = self._config.healthcheck_ping_url
         if not url:
@@ -261,7 +261,7 @@ class ProactiveScheduler:
 
         if now.hour >= self.CELLS_CLAIM_HOUR and self._bot is not None:
             # Le dernier recours Messenger ne réclame que ce qui vit dans la mémoire
-            # de Sam. D+/D- sont des calculs Strava : les laisser armer ce job
+            # de l'athlète. D+/D- sont des calculs Strava : les laisser armer ce job
             # produisait une question générique après que tous les ressentis avaient
             # déjà été donnés (2026-08-30).
             claimable = []
@@ -298,7 +298,7 @@ class ProactiveScheduler:
     def _sunday_settled(self, now: datetime) -> bool:
         """Le bilan part dès que le dimanche ne peut plus le changer (2026-10-18).
 
-        Attendre 19 h laissait Sam sans semaine suivante tout l'après-midi. Soldé
+        Attendre 19 h laissait l'athlète sans semaine suivante tout l'après-midi. Soldé
         veut dire : chaque séance du jour faite, manquée ou annulée, et aucun débrief
         Strava en attente, pour que le bilan lise la dernière sortie et passe après
         son débrief. L'heure fixe reste le repli quand une séance n'est pas soldée.

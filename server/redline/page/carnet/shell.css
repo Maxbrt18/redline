@@ -1,20 +1,20 @@
 /* Le carnet -- même peau que les cards et la page renfo (tokens.css).
  *
- * La structure est celle d'une app iOS (carte de navigation validée par Sam le
+ * La structure est celle d'une app iOS (carte de navigation validée par l'athlète le
  * 2026-10-08) : une barre du haut et un grand titre dans la police du système, des
  * commandes en verre (liquid glass), une barre d'onglets flottante. Le contenu garde
  * la charte : Barlow pour les chiffres et les titres de section, Inter pour le texte.
  *
- * Pas de mot REDLINE en tête (Sam, 2026-10-02) : la marque est l'icône de
+ * Pas de mot REDLINE en tête (l'athlète, 2026-10-02) : la marque est l'icône de
  * l'écran d'accueil et de l'onglet. Trois rubriques, une question chacune, en bas
- * sous le pouce (maquette validée par Sam le 2026-10-08) : Aujourd'hui suit le
+ * sous le pouce (maquette validée par l'athlète le 2026-10-08) : Aujourd'hui suit le
  * moment de la journée, Semaine juge le passé et prescrit le reste, Course.
  * Jamais de liseré coloré sur un bord : une alerte ressort par son texte et sa place.
  *
  * Les couleurs gardent leur sens (tokens.css) : --data le fait, un pointillé ce qui
  * est prévu, --red aujourd'hui et la marque, --over un plafond franchi. Ni vert ni
  * orange : un état qui n'est pas un franchissement se dit en mots. Deux exceptions, qui ne
- * jugent rien : les pictos de la météo (Sam, 2026-10-08) et les pastilles teintées des
+ * jugent rien : les pictos de la météo (l'athlète, 2026-10-08) et les pastilles teintées des
  * familles (2026-10-22, en fin de fichier).
  */
 :root { --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 13'%3E%3Cpath d='M1.5 1.5 6.5 6.5 1.5 11.5' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
@@ -59,7 +59,7 @@ a { color: inherit; }
 :root.n-veiled .n-topbar { background-color: color-mix(in srgb, #000 20%, var(--bg)); }
 :root.n-veiled .n-topbar-in { filter: brightness(.8); transition: filter .26s; }
 /* Fond plein, sans flou ni dégradé : la bande d'état d'iOS au-dessus est opaque, la
- * barre la prolonge (Sam, 2026-10-08). Un filet la sépare du contenu qui défile. */
+ * barre la prolonge (l'athlète, 2026-10-08). Un filet la sépare du contenu qui défile. */
 .n-topbar::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; border-bottom: 1px solid var(--grid);
   opacity: 0; transition: opacity .2s; }
 .n-topbar.scrolled::before { opacity: 1; }
@@ -189,11 +189,11 @@ button, .n-nav, .n-krow, summary { touch-action: manipulation; }
 @media (prefers-reduced-motion: no-preference) { button { transition: opacity .15s, background .15s; } }
 @media (prefers-reduced-motion: reduce) { summary::after, .n-topbar, .n-page.settle { transition: none; } }
 
-/* Les pastilles teintées (maquette « Carnet en couleur » validée par Sam le 2026-10-22).
+/* Les pastilles teintées (maquette « Carnet en couleur » validée par l'athlète le 2026-10-22).
  * La charte ne bouge pas : une pastille, comme celles de la météo, nomme la famille d'une
  * séance (course, sortie longue, renfo, repos), d'un repère ou d'une capacité, et ne juge
  * rien. Jamais sur un titre d'écran ni de section, ni sur un jalon.
- * Palette « Sable » (Sam, 2026-10-26, elle remplace « Bleus ») : le papier et un sable
+ * Palette « Sable » (l'athlète, 2026-10-26, elle remplace « Bleus ») : le papier et un sable
  * chaud portent les surfaces, la couleur ne vit que dans les pastilles et les données. Un bleu
  * étalé sur une grande carte se battait avec le papier chaud et le rouge du logo. Les teintes
  * de famille sont très désaturées, à même clarté (OKLCH L 0,50 C ≈ 0,045 en clair, L 0,80 en

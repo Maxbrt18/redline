@@ -64,7 +64,7 @@ class Triage:
 
     `plan_change` et `plan_asked` répondent à deux questions différentes, et les avoir
     confondues coûtait cher : le premier dit qu'il faut RELIRE le plan avant de
-    répondre, le second que Sam réclame son programme et qu'il doit donc partir.
+    répondre, le second que l'athlète réclame son programme et qu'il doit donc partir.
     """
 
     depth: str = DEFAULT_DEPTH
@@ -90,7 +90,7 @@ class Triage:
 class RunResult:
     """Résultat terminal, indépendant du fournisseur.
 
-    ``error`` est un détail TECHNIQUE destiné au journal, jamais un texte pour Sam :
+    ``error`` est un détail TECHNIQUE destiné au journal, jamais un texte pour l'athlète :
     seul ``bot.py`` décide de ce qui lui est dit, à partir de ``failure``.
     ``silent`` porte le choix typé d'une initiative de ne rien envoyer.
     """

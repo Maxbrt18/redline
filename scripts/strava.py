@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """L'accès Strava du coach, indépendant du moteur qui l'exécute.
 
-Pourquoi ce script existe — le 2026-08-14, Sam a uploadé sa sortie, le débrief
+Pourquoi ce script existe — le 2026-08-14, l'athlète a uploadé sa sortie, le débrief
 proactif s'est déclenché, et le coach a rendu SILENCE. Puis, sollicité à la main
 (« t'as vu ma sortie ? »), il a répondu qu'il n'avait pas ses données. La trace du
 run montre un coach qui a fait tout ce qu'il pouvait : il a cherché un outil Strava

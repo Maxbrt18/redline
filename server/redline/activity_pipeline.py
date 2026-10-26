@@ -68,7 +68,7 @@ class ActivityPipeline:
     def run(self, activity_id: int, *, fresh_words: bool = False) -> dict[str, Any]:
         """`fresh_words` relit titre et description pour le débrief qui part.
 
-        La capture se fait dès l'arrivée de la sortie, souvent avant que Sam ne la
+        La capture se fait dès l'arrivée de la sortie, souvent avant que l'athlète ne la
         renomme : sans relecture, le débrief lirait « Morning Run ». Une relecture
         ratée garde les mots capturés, jamais ne bloque le débrief.
         """

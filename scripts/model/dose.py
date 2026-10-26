@@ -42,7 +42,7 @@ def _required(value: _T | None, measure: str, name: str) -> _T:
         raise ValueError(f"dose « {measure} » : champ « {name} » absent")
     return value
 
-# The session vocabulary, in one place: this is what Sam reads on the card
+# The session vocabulary, in one place: this is what the athlete reads on the card
 # and on the page.
 FATIGUE = "jusqu'à échec technique"
 PER_SIDE = " / jambe"
@@ -201,7 +201,7 @@ class Dose:
         return self.sets.high is None and self.sets.low == 1
 
     def human(self) -> str:
-        """The dose as Sam reads it. Nobody ever reads it back."""
+        """The dose as the athlete reads it. Nobody ever reads it back."""
         side = PER_SIDE if self.per_side else ""
         if self.measure == "contacts":
             block = f", en blocs de {self.block}" if self.block else ""

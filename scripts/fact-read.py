@@ -35,7 +35,7 @@ def observations(store: Any, limit: int) -> list[str]:
     """Les observations récentes, AVEC leur clé et ce qui reste à compléter.
 
     La clé est affichée parce que `ledger-complete.py` l'exige : ne pas la montrer
-    revenait à demander un identifiant que rien ne publiait. Le 2026-08-14, Sam
+    revenait à demander un identifiant que rien ne publiait. Le 2026-08-14, l'athlète
     donne le RPE de son vélo de la veille ; le coach connaît son id Strava et tente
     donc `strava:90000000001`, alors que la ligne avait été consignée sans id, sous
     `messenger:2026-08-13:velo-remplace-renfob`. La mesure était impossible à écrire,
@@ -138,7 +138,7 @@ def deadlines(store: Any, include_done: bool) -> list[str]:
         if period:
             lines[-1] += period
         if row.get("athlete_label"):
-            lines[-1] += f" · carnet de Sam : « {row['athlete_label']} »"
+            lines[-1] += f" · carnet de l'athlète : « {row['athlete_label']} »"
     return lines
 
 

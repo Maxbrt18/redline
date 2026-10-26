@@ -27,7 +27,7 @@ from scripts.model import paths, strength_log
 from scripts.storage.database import expected_schema_revision
 from scripts.storage.repository import OperationalStore
 
-from . import clock, page, strength
+from . import clock, page, persona, strength
 from .attachments import encode_payload
 from .bot import CoachBot
 from .config import Config
@@ -88,7 +88,7 @@ def _iter_events(payload: dict):
 
     Stickers are distinguished from real attachments because a human does not reply
     "I can't read your attachment" to a thumbs-up. A postback carries in its payload
-    the sentence to inject as if Sam had typed it.
+    the sentence to inject as if the athlete had typed it.
     """
     if payload.get("object") != "page":
         return
@@ -211,7 +211,7 @@ def create_app(config: Config, bot: CoachBot, state: Any,
             nudge()
 
     def hasten_debrief(activity_id: int, why: str) -> None:
-        """Sam a fini avec sa sortie : son débrief part sans attendre le délai."""
+        """L'athlète a fini avec sa sortie : son débrief part sans attendre le délai."""
         if state.proactive.hasten_job(f"strava:{activity_id}", time.time()):
             log.info("Strava activity %s: debrief brought forward (%s)", activity_id, why)
             wake()
@@ -257,7 +257,7 @@ def create_app(config: Config, bot: CoachBot, state: Any,
 
         for psid, mid, kind, text, reply_to_mid in _iter_events(payload):
             if psid != config.allowed_psid:
-                continue  # lock: the coach only talks to Sam
+                continue  # lock: the coach only talks to the athlete
             if not mid or not state.claim_inbound(
                     mid, psid, kind, text, reply_to_message_id=reply_to_mid):
                 continue
@@ -308,7 +308,7 @@ def create_app(config: Config, bot: CoachBot, state: Any,
             return "ok", 200
         if aspect == "create":
             # Le délai n'est plus qu'un filet : la sortie est capturée tout de suite,
-            # et son débrief part dès que Sam montre qu'il a fini (titre renommé,
+            # et son débrief part dès que l'athlète montre qu'il a fini (titre renommé,
             # ressentis donnés dans le carnet, message au coach).
             due = time.time() + config.strava_debrief_delay
             state.proactive.record_activity(str(activity_id), due)
@@ -317,7 +317,7 @@ def create_app(config: Config, bot: CoachBot, state: Any,
             wake()
         elif isinstance(event.get("updates"), dict) and "title" in event["updates"]:
             # Titre et description s'enregistrent ensemble dans Strava : un titre
-            # renommé dit que Sam a écrit ce qu'il voulait dire de sa sortie. Sans
+            # renommé dit que l'athlète a écrit ce qu'il voulait dire de sa sortie. Sans
             # débrief en attente (vieille sortie retouchée), il ne se passe rien.
             hasten_debrief(activity_id, "titre renommé")
         return "ok", 200
@@ -428,7 +428,8 @@ def create_app(config: Config, bot: CoachBot, state: Any,
         if operational_store is None:
             return "temporary failure", 503
         rows = strength.log_entries(session, clean, performed_on.isoformat())
-        message = strength.format_message(session, clean)
+        message = persona.render(strength.format_message(session, clean),
+                                 config.instance.athlete_name)
         payload = _strength_payload(
             session, clean, rows, psid=config.allowed_psid, message=message)
         status = _accept_strength_report(

@@ -3,7 +3,7 @@
 
 Commande opérateur seulement (hors de `server/agent-cli-tools.txt`) : elle sert quand un
 bilan ou une réponse a été rédigé ailleurs, depuis le Mac par exemple, et doit arriver à
-Sam par la chaîne normale — silence de 8 min, trace en mémoire de conversation et en
+L'athlète par la chaîne normale — silence de 8 min, trace en mémoire de conversation et en
 messages proactifs — sans tour de modèle. La clé rend l'envoi idempotent : la même clé
 ne part qu'une fois.
 

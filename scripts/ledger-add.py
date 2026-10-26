@@ -57,7 +57,7 @@ def morning_trace_errors(raw: dict[str, str], pains: dict[str, str],
                          zones: list[str]) -> list[str]:
     """Une ligne `reveil` porte sa trace, ou elle ne s'écrit pas (audit du 2026-10-11).
 
-    Sans `--dlr`, la mesure naissait `pending` sans bruit et la réponse de Sam ne
+    Sans `--dlr`, la mesure naissait `pending` sans bruit et la réponse de l'athlète ne
     vivait que dans la note : 19 réveils sur 40 sans valeur, une porte « incomplète »
     alors qu'il avait répondu, et une relance du soir sur ce qu'il avait déjà dit. Le mot
     qu'il emploie s'accepte tel quel et se convertit ici (aucune 0, très légère 0,5,

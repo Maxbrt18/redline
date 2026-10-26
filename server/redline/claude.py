@@ -14,7 +14,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from . import clock
+from . import clock, persona
 from .agent import (
     HOLDING_MAX_CHARS,
     PROACTIVE_REPLY_SCHEMA,
@@ -256,7 +256,7 @@ class ClaudeCodeRunner:
         route = self._config.routing.plan(Route.TRIAGE)
         candidates = (spec or route.primary, *route.fallbacks)
         for attempt, candidate in enumerate(candidates, start=1):
-            command = [self._config.claude_bin, "-p", TRIAGE_PROMPT + message]
+            command = [self._config.claude_bin, "-p", self._personal(TRIAGE_PROMPT + message)]
             if candidate.model:
                 command += ["--model", candidate.model]
             if candidate.read_only:
@@ -299,10 +299,10 @@ class ClaudeCodeRunner:
         `output_schema`, rend la sortie structurée sérialisée en JSON. Lève en cas
         d'échec : le banc doit voir l'erreur, pas une réponse vide.
         """
-        command = [self._config.claude_bin, "-p", message, "--output-format", "json",
-                   "--permission-mode", "dontAsk", "--tools", ""]
+        command = [self._config.claude_bin, "-p", self._personal(message),
+                   "--output-format", "json", "--permission-mode", "dontAsk", "--tools", ""]
         if instructions:
-            command += ["--system-prompt", instructions]
+            command += ["--system-prompt", self._personal(instructions)]
         if output_schema is not None:
             command += ["--json-schema", json.dumps(output_schema)]
         if spec.model:
@@ -381,7 +381,7 @@ class ClaudeCodeRunner:
                     if btype == "tool_use":
                         # Text written BEFORE an action is work narration ("I'm
                         # updating the journal..."), not a message: only the text
-                        # after the LAST action goes to Sam. We drop only what
+                        # after the LAST action goes to the athlete. We drop only what
                         # precedes it because nothing is delivered before completion.
                         state.full = ""
                         separate = True
@@ -406,7 +406,7 @@ class ClaudeCodeRunner:
     def _classify_failure(detail: str) -> tuple[FailureKind | None, float | None]:
         """Classe une panne connue du CLI : (cause, instant de reprise lisible).
 
-        Aucun texte pour Sam ne sort d'ici : le bot décide seul de ce qu'il dit.
+        Aucun texte pour l'athlète ne sort d'ici : le bot décide seul de ce qu'il dit.
         Une panne inconnue rend (None, None) et suit la règle « travail commencé ou
         non ».
         """
@@ -421,14 +421,18 @@ class ClaudeCodeRunner:
             return FailureKind.PREFLIGHT, None
         return None, None
 
+    def _personal(self, text: str) -> str:
+        """Le prénom de l'instance à la place du jeton : tout ce que le modèle lit."""
+        return persona.render(text, self._config.instance.athlete_name)
+
     def _command(self, message: str, session_id: str | None,
                  model: str | None = None, effort: str | None = None,
                  *, turn_id: str | None = None, fork_session: bool = False,
                  read_only: bool = False, shell_enabled: bool = True,
                  structured: bool = False) -> list:
-        command = [self._config.claude_bin, "-p", message,
+        command = [self._config.claude_bin, "-p", self._personal(message),
                    "--output-format", "stream-json", "--verbose",
-                   "--append-system-prompt", style_prompt(turn_id)]
+                   "--append-system-prompt", self._personal(style_prompt(turn_id))]
         if structured:
             command += ["--json-schema", json.dumps(PROACTIVE_REPLY_SCHEMA)]
         if not shell_enabled:

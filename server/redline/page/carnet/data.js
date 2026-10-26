@@ -40,7 +40,7 @@ export function ensure() {
   if (view.root && app.active === 'week') load('weeks', 'weeks').catch(() => {});
 }
 // Les derniers chiffres restent sur l'appareil pour que le carnet s'ouvre sans réseau,
-// en montagne comme dans le métro (accord de Sam, 2026-10-08) : les trois racines
+// en montagne comme dans le métro (accord de l'athlète, 2026-10-08) : les trois racines
 // et la liste des semaines, jamais une carte. Effacés à la déconnexion ou quand
 // l'accès expire, ignorés au-delà de sept jours.
 const STORE = 'carnet-data', STALE = 7 * 24 * 3600 * 1000;

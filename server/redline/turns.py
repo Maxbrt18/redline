@@ -16,8 +16,8 @@ log = logging.getLogger("redline")
 #: Relance unique, dans la même session et la même transaction, quand un tour s'arrête
 #: sur un outil sans texte final. Rare, et moins coûteux qu'une phrase générique.
 EMPTY_REPLY_NOTE = (
-    "[NOTE SYSTÈME, invisible pour Sam : ton tour s'est terminé sans texte pour "
-    "Sam. Écris maintenant ta réponse finale, telle qu'elle doit partir. Ne relance "
+    "[NOTE SYSTÈME, invisible pour ⟨athlète⟩ : ton tour s'est terminé sans texte pour "
+    "⟨athlète⟩. Écris maintenant ta réponse finale, telle qu'elle doit partir. Ne relance "
     "aucune lecture ni écriture déjà faite.]"
 )
 

@@ -100,13 +100,13 @@ def _database_command(store, command: str, week: str, optional: bool,
         # ⭐ L'HORODATAGE APPARTIENT AU SERVICE, PLUS AU MODÈLE (2026-08-25). Le champ
         # n'était vérifié que sur sa FORME : les deux révisions du 25/08 portent minuit
         # et midi UTC, toutes deux écrites à 21h13. Un coach qui invente l'heure qu'il
-        # est invente aussi le jour dont Sam lui parle -- et `semantic_errors` compare
+        # est invente aussi le jour dont l'athlète lui parle -- et `semantic_errors` compare
         # l'échéance d'un contrôle daté à ce champ, donc une heure fausse désarme un
         # garde-fou. La seule horloge fiable de la chaîne est celle qui écrit.
         current["computed_at"] = now_stamp()
         # Le texte qui ENTRE est jugé avant le plan qui le contient : la révision est
         # réinjectée au coach à chaque tour prescriptif, et title/note partent sur le
-        # téléphone de Sam. Jugé ici et pas dans `validate` parce que l'historique
+        # téléphone de l'athlète. Jugé ici et pas dans `validate` parce que l'historique
         # est append-only : la même règle appliquée au plan entier refuserait la
         # révision du jour à cause du texte de la veille.
         previous = existing["revisions"][-1] if existing else None
@@ -167,7 +167,7 @@ def _database_command(store, command: str, week: str, optional: bool,
         print(f"{week} : révision {revision['revision']} valide, "
               f"{len(revision['sessions'])} entrée(s)")
     if gates:
-        print("\n  - ".join([f"{week} : en attente de la réponse de Sam :", *gates]),
+        print("\n  - ".join([f"{week} : en attente de la réponse de l'athlète :", *gates]),
               file=sys.stderr)
         return EXIT_AWAITING_GATE
     if stale:

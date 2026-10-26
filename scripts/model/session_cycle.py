@@ -17,7 +17,7 @@ TERMINAL_STATES = frozenset({"missed", "cancelled", "closed"})
 # intention parce que le programme est révisé ensuite.
 OBSERVED_STATES = frozenset({"started", "completed"})
 #: « Très légère » (0,5) depuis le 2026-10-11 : sa base habituelle est légère, et « mieux
-#: que d'habitude » ou « très légère » n'est ni légère ni nulle (Sam, audit du 11/10).
+#: que d'habitude » ou « très légère » n'est ni légère ni nulle (l'athlète, audit du 11/10).
 MORNING_TRACES = ("aucune", "tres-legere", "legere", "nette")
 MORNING_TRACE_VALUES = {"aucune": 0, "tres-legere": 0.5, "legere": 1, "nette": 2}
 LOCAL_TIMEZONE = ZoneInfo("Europe/Paris")

@@ -341,7 +341,7 @@ def _parse_pains(raw: Any, zones: dict[str, str]) -> dict[str, dict]:
 
 
 def format_message(session: dict, clean: dict) -> str:
-    """The parsed report, written out as the message Sam would have typed.
+    """The parsed report, written out as the message the athlete would have typed.
 
     It travels as a durable postback so the coach can react to the debrief. The
     structured facts are already stored in the same transaction; the model never
@@ -413,7 +413,7 @@ def format_message(session: dict, clean: dict) -> str:
     if clean["note"]:
         # Quoted, and named as such: the free-text field is the only thing here
         # that is not a bounded number.
-        tail.append(f"Ce que Sam ajoute : « {clean['note']} »")
+        tail.append(f"Ce que ⟨athlète⟩ ajoute : « {clean['note']} »")
     if tail:
         lines.append("")
         lines.extend(tail)

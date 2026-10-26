@@ -52,4 +52,4 @@ aliases: [anamnèse, onboarding athlète, athlete-onboarding]
 
 ## 9. 🔴 Logs personnels existants
 - Carnets, notes de téléphone, exports Strava/montre — **demander explicitement** (le log rétro de
-  Sam dormait dans son téléphone et a tout changé une fois retrouvé)
+  L'athlète dormait dans son téléphone et a tout changé une fois retrouvé)
