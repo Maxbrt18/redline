@@ -10,9 +10,11 @@ Chaque test travaille sur un environnement isolé : `monkeypatch.setenv` restaur
 l'état après coup, et `from_env` lit `os.environ`.
 """
 
+import shutil
 from datetime import time as dtime
 
 import pytest
+from conftest import INSTANCE_DIR
 
 from redline.config import Config, _load_dotenv
 from redline.routing import Route
@@ -36,6 +38,8 @@ def env(monkeypatch, tmp_path):
                                   "GRAPH", "STATE", "DATABASE", "ATTACHMENT", "HEALTH"):
             monkeypatch.delenv(name, raising=False)
     monkeypatch.chdir(tmp_path)
+    # Le vault par défaut est le dossier courant : il porte l'instance fictive.
+    shutil.copy(INSTANCE_DIR / "redline.toml", tmp_path / "redline.toml")
     for key, value in MINIMAL.items():
         monkeypatch.setenv(key, value)
     return monkeypatch
@@ -50,6 +54,22 @@ def test_the_minimal_environment_boots(env):
     assert config.routing.plan(Route.HEAVY).primary.effort == "high"
     assert config.agent_timeout == 600
     assert config.agent_timeout_deep == 1800
+
+
+def test_the_service_refuses_to_start_without_its_instance(env, tmp_path):
+    (tmp_path / "redline.toml").unlink()
+    with pytest.raises(SystemExit, match=r"redline\.example\.toml"):
+        Config.from_env()
+
+
+def test_the_instance_is_read_from_the_configured_vault(env, tmp_path):
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    (vault / "redline.toml").write_text(
+        (INSTANCE_DIR / "redline.toml").read_text(encoding="utf-8").replace(
+            'place = "Paris"', 'place = "Annecy"'), encoding="utf-8")
+    env.setenv("VAULT_PATH", str(vault))
+    assert Config.from_env().instance.place == "Annecy"
 
 
 def test_codex_has_provider_specific_model_defaults(env):

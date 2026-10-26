@@ -1,0 +1,151 @@
+"""Ce qui distingue une instance d'une autre : `redline.toml`, à la racine du vault.
+
+Le moteur ne connaît ni le prénom de l'athlète, ni la blessure qu'il surveille, ni
+les capacités qu'il suit. Tout ce qui changerait d'un athlète à l'autre se lit ici,
+une fois, et voyage typé jusqu'au code qui en a besoin. Un prompt, un écran ou une
+règle qui écrirait l'une de ces valeurs en dur réintroduirait le moteur à un seul
+athlète que ce fichier existe pour défaire.
+
+Fermé par défaut, comme le reste des schémas du dépôt : un champ inconnu est une
+erreur, et un `[…]` resté tel quel dans `redline.example.toml` aussi -- un gabarit à
+moitié rempli finirait mot pour mot dans un message à l'athlète.
+"""
+
+from __future__ import annotations
+
+import re
+import tomllib
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from .schema import Schema, SchemaError, field
+
+FILENAME = "redline.toml"
+EXAMPLE = "redline.example.toml"
+
+#: Un gabarit non rempli : `[Prénom]`, `[ville]`… Jamais une valeur légitime ici.
+PLACEHOLDER = re.compile(r"\[[^\]]*\]")
+SLUG = r"[a-z0-9][a-z0-9-]{0,39}"
+
+INSTANCE_SCHEMA = Schema("redline.toml", [
+    field("athlete", dict, schema=Schema("[athlete]", [
+        field("name", str, minimum=1, maximum=40,
+              note="le prénom que le coach emploie dans ses messages"),
+    ])),
+    field("notebook", dict, schema=Schema("[notebook]", [
+        field("place", str, minimum=1, maximum=80,
+              note="le lieu de la météo des séances sans lieu déclaré"),
+    ])),
+    # Zéro, une ou plusieurs zones : un athlète sans blessure n'a rien à déclarer.
+    field("injuries", list, required=False, item=field(
+        "zone", dict, schema=Schema("[[injuries]]", [
+            field("slug", str, pattern=SLUG),
+            field("label", str, minimum=1, maximum=40,
+                  note="le nom affiché de la zone surveillée, ex. « Genou »"),
+        ]))),
+    field("capabilities", list, minimum=1, maximum=9, item=field(
+        "capacité", dict, schema=Schema("[[capabilities]]", [
+            field("slug", str, pattern=SLUG),
+            field("label", str, minimum=1, maximum=30),
+        ]))),
+])
+
+
+class InstanceError(ValueError):
+    """`redline.toml` absent, illisible, non conforme ou encore à remplir."""
+
+
+@dataclass(frozen=True)
+class Capability:
+    slug: str
+    label: str
+
+
+@dataclass(frozen=True)
+class Injury:
+    slug: str
+    label: str
+
+
+#: Le registre ne porte qu'UNE série de douleur (effort + réveil), sans zone. Deux zones
+#: déclarées y verseraient leurs notes dans la même colonne, et une hausse au genou se
+#: lirait comme une hausse à la cheville. Refusé tant que la douleur n'est pas rangée
+#: par zone en base.
+MAX_TRACKED_INJURIES = 1
+
+
+@dataclass(frozen=True)
+class Instance:
+    athlete_name: str
+    place: str
+    injuries: tuple[Injury, ...]
+    capabilities: tuple[Capability, ...]
+
+    @property
+    def injury(self) -> Injury | None:
+        """La zone suivie, ou None : l'instance n'en surveille aucune."""
+        return self.injuries[0] if self.injuries else None
+
+    def capability_label(self, slug: str) -> str:
+        """Le libellé déclaré, sinon celui que porte le slug."""
+        for capability in self.capabilities:
+            if capability.slug == slug:
+                return capability.label
+        return derived_label(slug)
+
+
+def derived_label(slug: str) -> str:
+    """`cap2-descente` → « Descente » : lisible même sans déclaration."""
+    return slug.split("-", 1)[-1].capitalize()
+
+
+def placeholders(payload: Any, where: str = "") -> list[str]:
+    """Les valeurs encore au gabarit, nommées par leur chemin."""
+    if isinstance(payload, dict):
+        return [problem for key, value in payload.items()
+                for problem in placeholders(value, f"{where}.{key}" if where else key)]
+    if isinstance(payload, list):
+        return [problem for index, value in enumerate(payload)
+                for problem in placeholders(value, f"{where}[{index}]")]
+    if isinstance(payload, str) and PLACEHOLDER.search(payload):
+        return [f"champ « {where} » : {payload!r} est encore à remplir"]
+    return []
+
+
+def parse(text: str) -> Instance:
+    try:
+        payload = tomllib.loads(text)
+    except tomllib.TOMLDecodeError as exc:
+        raise InstanceError(f"{FILENAME} illisible : {exc}") from None
+    try:
+        INSTANCE_SCHEMA.validate(payload)
+    except SchemaError as exc:
+        raise InstanceError(str(exc)) from None
+    unfilled = placeholders(payload)
+    if unfilled:
+        raise InstanceError("\n  - ".join([f"{FILENAME} incomplet :", *unfilled]))
+    slugs = [entry["slug"] for entry in payload["capabilities"]]
+    if len(set(slugs)) != len(slugs):
+        raise InstanceError(f"{FILENAME} : slug de capacité en double ({', '.join(slugs)})")
+    injuries = payload.get("injuries", [])
+    if len(injuries) > MAX_TRACKED_INJURIES:
+        raise InstanceError(
+            f"{FILENAME} : {len(injuries)} zones déclarées, le moteur n'en suit qu'une "
+            "(le registre ne range pas encore la douleur par zone)")
+    return Instance(
+        athlete_name=payload["athlete"]["name"],
+        place=payload["notebook"]["place"],
+        injuries=tuple(Injury(entry["slug"], entry["label"]) for entry in injuries),
+        capabilities=tuple(Capability(entry["slug"], entry["label"])
+                           for entry in payload["capabilities"]),
+    )
+
+
+def load(vault: Path) -> Instance:
+    """L'instance du vault ; une erreur qui dit quoi faire, jamais un défaut silencieux."""
+    path = vault / FILENAME
+    if not path.is_file():
+        raise InstanceError(
+            f"{path} absent : copie {EXAMPLE} du moteur à la racine du vault, puis remplis-le")
+    return parse(path.read_text(encoding="utf-8"))

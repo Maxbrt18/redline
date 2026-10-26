@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from scripts.cards import archive, strength_card
+from scripts.model.instance import Instance
 from scripts.model.programme import load
 from scripts.storage.database import StorageError
 from scripts.storage.notebook import NotebookStore
@@ -54,15 +55,18 @@ def period_day(kind: str, period: str, fallback: dt.date) -> dt.date:
 
 class NotebookService:
     def __init__(self, store: NotebookStore, repo: VaultRepo, state: StateStore,
-                 root: Path, base_url: str, operational: OperationalStore | None = None):
+                 root: Path, base_url: str, operational: OperationalStore | None = None,
+                 instance: Instance | None = None):
         self.store, self.repo, self.state = store, repo, state
+        self.instance = instance
         self.root, self.base_url = root, base_url.rstrip("/")
         self.operational = operational
 
     def board(self) -> Board:
         if self.operational is None:
             raise StorageError("registre indisponible pour le carnet")
-        return Board(self.operational, self.repo, self.root, clock.today(), clock.now())
+        return Board(self.operational, self.repo, self.root, clock.today(), clock.now(),
+                     self.instance)
 
     def today(self) -> dict:
         view = self.board().today_view()

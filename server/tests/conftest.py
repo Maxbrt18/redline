@@ -23,10 +23,13 @@ from redline.agent import RunResult, RunSpec, Triage
 from redline.config import Config
 from redline.messenger import DeliveryResult
 from redline.routing import RoutingConfig
+from scripts.model import instance as instance_model
 
 # `SERVER_DIR.parent`, not `parent.parent.parent`: it survives moving `tests/`.
 SERVER_DIR = Path(__file__).resolve().parent.parent
 VAULT_ROOT = SERVER_DIR.parent
+# L'instance fictive des tests (redline.toml) : le seul endroit où son prénom est écrit.
+INSTANCE_DIR = SERVER_DIR / "tests" / "fixtures" / "instance"
 
 # Les cibles de RPE telles que `coaching/workouts/*.md` les déclare aujourd'hui.
 # LITTÉRALES ici, et déclarées une seule fois pour toute la suite : les tests de jauge
@@ -75,6 +78,7 @@ _DEFAULTS = {
     "attachment_dir": "server/attachments",
     "attachment_max_bytes": 12 * 1024 * 1024,
     "attachment_total_bytes": 20 * 1024 * 1024,
+    "instance": instance_model.load(INSTANCE_DIR),
 }
 
 

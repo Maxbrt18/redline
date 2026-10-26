@@ -905,7 +905,7 @@ compare le fait aux plafonds typés (`hr_cap_bpm`, `rpe_max`, `duration_cap_min`
 contraintes en prose, et d'un changement de révision il ne montre que ce qui a bougé et
 quand (le contexte est écrit pour le coach). La météo vient d'Open-Meteo par
 `GET /carnet-api/weather`, après l'affichage, pour le `location_label` de la séance ou
-`CARNET_PLACE` (défaut : Paris), avec le code WMO du ciel et le jour ou la nuit de
+`[notebook] place` de `redline.toml`, avec le code WMO du ciel et le jour ou la nuit de
 chaque heure ; une prévision indisponible n'affiche rien.
 Une échéance n'y apparaît que si elle porte `athlete_label`.
 

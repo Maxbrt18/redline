@@ -220,7 +220,7 @@ def create_app(config: Config, bot: CoachBot, state: Any,
         # le reçoit comme un message, exactement comme un compte rendu de renfo.
         register_notebook(app, notebook, config.allowed_psid, alert=lambda text, key: (
             bot.submit_event(config.allowed_psid, "postback", text, message_id=key)),
-            place=config.notebook_place, cues=cues,
+            place=config.instance.place, cues=cues,
             settled=lambda activity_id: hasten_debrief(activity_id, "ressentis du carnet"))
     try:
         schema_expected = expected_schema_revision(

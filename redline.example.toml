@@ -1,0 +1,27 @@
+# Configuration d'une instance Redline. À copier à la racine du vault sous le nom
+# `redline.toml`, puis à remplir : le service refuse de démarrer tant qu'une valeur
+# entre crochets reste telle quelle.
+
+[athlete]
+# Le prénom que le coach emploie dans ses messages.
+name = "[Prénom]"
+
+[notebook]
+# Le lieu de la météo des séances qui n'en déclarent pas (geocodage Open-Meteo).
+place = "[Ville]"
+
+# La zone que le coach surveille, s'il y en a une : sans bloc [[injuries]], aucune.
+# Une seule pour l'instant : le registre ne range pas encore la douleur par zone.
+# [[injuries]]
+# slug = "genou"
+# label = "Genou"
+
+# Les capacités que le cockpit suit, dans l'ordre d'affichage. Le slug est celui que
+# `fact-write.py capability` enregistre ; le libellé est ce que le carnet affiche.
+[[capabilities]]
+slug = "cap1-durabilite"
+label = "Durabilité"
+
+[[capabilities]]
+slug = "cap2-descente"
+label = "Descente"

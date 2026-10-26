@@ -6,7 +6,7 @@ autour du départ, et l'heure de la nuit. Rien n'est stocké : une prévision ch
 se redemande, au plus toutes les 30 minutes par lieu et par jour.
 
 Le lieu : le `location_label` de la séance s'il existe (« Vincennes »), sinon le lieu par
-défaut du carnet (`CARNET_PLACE`). Un nom introuvable ou un réseau absent ne casse rien :
+défaut du carnet (`[notebook] place` de `redline.toml`). Un nom introuvable ou un réseau absent ne casse rien :
 la fiche s'affiche sans météo.
 """
 
