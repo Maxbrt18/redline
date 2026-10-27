@@ -259,7 +259,7 @@ class Board:
             "start_time": session.get("start_time"), "location": session.get("location_label"),
             "note": session.get("note") or (session.get("strength") or {}).get("note"),
             "planned": _planned(session), "fact": None, "entry_id": None,
-            "transition": transitions.LABELS.get(session["transition"])
+            "transition": transitions.label(session["transition"])
             if session.get("transition") else None,
             "targets": {key: session.get(key) for key in (
                 "distance_target_km", "distance_cap_km", "duration_cap_min",

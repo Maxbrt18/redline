@@ -91,9 +91,9 @@ SESSION_SCHEMA = Schema("séance planifiée", [
                "annonce en texte ; obligatoire à l'écriture avec hr_zone"),
     field("cadence_target", int, required=False, minimum=120, maximum=220),
     field("demanding", bool),
-    field("transition", str, required=False, choices=transitions.KINDS,
-          note="nature qui sort des 30 derniers jours (garde-fou n°8) : une par "
-               "semaine, sans fenêtre ; absent pour une séance déjà connue"),
+    field("transition", str, required=False, pattern=rulebook.SLUG,
+          note="nature qui sort des 30 derniers jours (garde-fou n°8), l'une de celles "
+               "du règlement ; absent pour une séance déjà connue"),
     field("location_label", str, required=False),
     field("carbs_target_g_h", int, required=False, minimum=0, maximum=150,
           note="cible digestive expérimentale en grammes de glucides par heure"),
@@ -157,18 +157,33 @@ CHANGE_FIELDS = (
 #: 11/08, EF retirée sur « intermittent » le 27/08, RDL et fréquence le 14/09…). Une
 #: `rule` en texte libre ne se vérifie pas ; un identifiant du règlement et un fait de
 #: `evidence`, si. `demande` couvre ce que l'athlète a lui-même demandé.
-MOTIF_RULES = (*(rule.id for rule in rulebook.RULES), "demande")
+REQUEST_MOTIF = "demande"
+
+
+def motif_rules() -> tuple[str, ...]:
+    """Les motifs d'une restriction : les règles du règlement de l'instance, ou demande."""
+    return (*(rule.id for rule in rulebook.current().rules), REQUEST_MOTIF)
+
+
 #: Les préfixes d'un FAIT : ce que le registre, Strava, un avis ou un contrôle ont dit.
 #: Une règle du règlement ne s'applique qu'à un fait ; une demande vient d'un message.
 _FACT_TRIGGER = re.compile(r"^(?:observation|exposure|medical|gate|incident|strength|strava):")
 _REQUEST_TRIGGER = re.compile(r"^(?:messenger|request|availability):")
 
+def _known_rule(motif: dict) -> list[str]:
+    """La règle nommée existe dans le règlement de l'instance, lu à la validation."""
+    if motif["regle"] in motif_rules():
+        return []
+    return [f"champ « regle » : {motif['regle']!r} inconnu "
+            f"(attendus : {', '.join(motif_rules())})"]
+
+
 MOTIF_SCHEMA = Schema("motif d'une restriction", [
-    field("regle", str, choices=MOTIF_RULES,
+    field("regle", str, minimum=1,
           note="l'identifiant du règlement qui impose la restriction, ou demande"),
     field("fait", str, minimum=3,
           note="une entrée exacte de evidence : le fait qui déclenche la règle"),
-])
+], check=_known_rule)
 
 CHANGE_SCHEMA = Schema("preuve d'un changement de séance", [
     field("session_id", str, pattern=r"[a-z0-9][a-z0-9-]+"),
@@ -755,7 +770,7 @@ def _session_line(session: dict) -> str:
     suffix = " · ".join(details_of(session, cadence_unit=" pas/min"))
     status = "fait" if session["status"] == "done" else session["status"]
     if session.get("transition"):
-        status += ", transition " + transitions.LABELS[session["transition"]]
+        status += ", transition " + transitions.label(session["transition"])
     return f"- **{label} {day:%d/%m}** : {session['title']} ({status})" + (f" · {suffix}" if suffix else "")
 
 
@@ -937,13 +952,13 @@ def _motif_errors(session_id: str, entry: dict, cuts: list[str],
         return [
             f"changes.{session_id}.motif : restriction ({', '.join(cuts)}) sans motif "
             "typé. Nomme la règle du règlement qui l'impose (`regle` : "
-            f"{', '.join(MOTIF_RULES)}) et le fait qui la déclenche (`fait` : une entrée "
+            f"{', '.join(motif_rules())}) et le fait qui la déclenche (`fait` : une entrée "
             "exacte de evidence). Sans prémisse, la séance reste."]
     fait = motif.get("fait") or ""
     if fait not in evidence:
         return [f"changes.{session_id}.motif.fait doit recopier exactement une entrée "
                 "de evidence."]
-    if motif.get("regle") == "demande":
+    if motif.get("regle") == REQUEST_MOTIF:
         if not _REQUEST_TRIGGER.match(fait):
             return [f"changes.{session_id}.motif : regle=demande exige un message de "
                     "l'athlète (messenger:, request:, availability:)."]

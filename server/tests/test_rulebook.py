@@ -1,10 +1,78 @@
-"""Le règlement compilé : court, sans histoire, rattaché à des propriétaires réels."""
+"""Le règlement : celui de l'instance, ou le défaut du moteur ; court, sans histoire,
+et ce que le coach lit est ce que le code applique."""
 
+import os
 import re
+import tomllib
+from pathlib import Path
 
+import pytest
 from conftest import VAULT_ROOT
 
-from scripts.model import rulebook, typography
+from scripts.model import rulebook, transitions, typography
+
+DEFAULT_TEXT = rulebook.DEFAULT.read_text(encoding="utf-8")
+
+
+def _variant(tmp_path: Path, text: str) -> Path:
+    (tmp_path / rulebook.FILENAME).write_text(text, encoding="utf-8")
+    return tmp_path
+
+
+def test_without_its_own_rulebook_a_vault_gets_the_engine_default(tmp_path):
+    assert rulebook.load(tmp_path).source == rulebook.DEFAULT
+
+
+def test_an_instance_rulebook_replaces_the_default_entirely(tmp_path):
+    vault = _variant(tmp_path, DEFAULT_TEXT.replace("transitions_per_week = 1",
+                                                    "transitions_per_week = 2"))
+    book = rulebook.load(vault)
+    assert book.source == vault / rulebook.FILENAME
+    assert book.parameters.transitions_per_week == 2
+    assert "2 par semaine au plus" in next(r.text for r in book.rules if r.id == "n8")
+
+
+def test_the_current_rulebook_follows_vault_path(tmp_path, monkeypatch):
+    vault = _variant(tmp_path, DEFAULT_TEXT.replace('slug = "terrain"', 'slug = "piste"'))
+    monkeypatch.setenv("VAULT_PATH", str(vault))
+    assert "piste" in transitions.kinds() and "terrain" not in transitions.kinds()
+    assert transitions.label("piste") == "terrain neuf"
+
+
+def test_an_edited_rulebook_is_read_again_without_restart(tmp_path):
+    vault = _variant(tmp_path, DEFAULT_TEXT)
+    assert rulebook.load(vault).parameters.stall_weeks == 3
+    path = vault / rulebook.FILENAME
+    path.write_text(DEFAULT_TEXT.replace("stall_weeks = 3", "stall_weeks = 4"), encoding="utf-8")
+    stat = path.stat()
+    os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000))
+    assert rulebook.load(vault).parameters.stall_weeks == 4
+
+
+def test_a_cited_threshold_is_the_applied_value_said_in_french():
+    book = rulebook.parse(DEFAULT_TEXT, rulebook.DEFAULT)
+    gate = next(rule for rule in book.rules if rule.id == "po")
+    assert "1,5/10" in gate.text and "{" not in book.render()
+
+
+@pytest.mark.parametrize("change, message", [
+    (("pain_cap = 2", "pain_cap = 2\ncap_douleur = 3"), "inconnu"),
+    (("plafond {pain_cap}/10", "plafond {douleur_max}/10"), "seuil inconnu douleur_max"),
+    (('id = "n8"', 'id = "n9"'), "absente du règlement : n8"),
+    (('slug = "terrain"', 'slug = "descente"'), "transition en double : descente"),
+    (("assimilation_weeks = []", 'assimilation_weeks = ["W35"]'), "semaine ISO"),
+    (('slug = "terrain"', 'slug = "Terrain neuf"'), "slug"),
+])
+def test_a_malformed_rulebook_is_refused_with_its_reason(tmp_path, change, message):
+    old, new = change
+    assert old in DEFAULT_TEXT
+    with pytest.raises(rulebook.RulebookError, match=message):
+        rulebook.load(_variant(tmp_path, DEFAULT_TEXT.replace(old, new, 1)))
+
+
+def test_the_default_rulebook_declares_every_rule_the_engine_enforces():
+    ids = {entry["id"] for entry in tomllib.loads(DEFAULT_TEXT)["rules"]}
+    assert set(rulebook.ENFORCED) <= ids
 
 
 def test_the_rulebook_is_short_enough_to_travel_with_every_packet():
@@ -17,50 +85,24 @@ def test_the_rulebook_uses_only_phone_friendly_signs():
     assert [glyph for glyph in typography.BANNED_GLYPHS if glyph in rulebook.render()] == []
 
 
-def test_every_rule_names_an_owner_that_exists():
-    for rule in rulebook.RULES:
-        for owner in rule.owner.split(" ; "):
-            path = owner.split(" §")[0].split(" 20")[0].strip()
-            assert (VAULT_ROOT / path).exists(), f"{rule.id} : propriétaire absent {path}"
-
-
-def test_rule_ids_are_unique():
-    ids = [rule.id for rule in rulebook.RULES]
-    assert len(ids) == len(set(ids))
+def test_the_default_carries_no_history():
+    """La règle en vigueur, jamais son histoire : aucune date dans le défaut du moteur."""
+    assert not re.search(r"20\d\d-\d\d-\d\d|\bW\d\d\b", rulebook.render())
 
 
 def test_no_fixed_percentage_bounds_the_long_run():
-    """Décision de Sam du 2026-09-27 : la progression de la sortie longue se juge,
-    aucun pourcentage fixe ne la borne. Les seuls pourcentages restants sont ceux de
-    l'assimilation (n2) et de la réduction sur douleur (n3)."""
-    text = rulebook.render()
-    for rule in rulebook.RULES:
+    """La progression de la sortie longue se juge, aucun pourcentage fixe ne la borne.
+    Les seuls pourcentages restants sont ceux de l'assimilation (n2) et de la réduction
+    sur douleur (n3)."""
+    for rule in rulebook.current().rules:
         if rule.id in {"n2", "n3"}:
             continue
         assert not re.search(r"\d+\s?%", rule.text), rule.id
-    assert "sans pourcentage fixe" in text
+    assert "sans pourcentage fixe" in rulebook.render()
 
 
-def test_the_gate_replaces_calendar_windows():
-    """Décision de Sam du 2026-10-04 : hausses faciles cumulables sous une porte
-    observable ; plus de fenêtre +3/+4 ni de nouveauté unique."""
-    rules = {rule.id: rule for rule in rulebook.RULES}
-    assert "+3" not in rules["n8"].text and "nouveauté" not in rules["n1"].text
-    assert "1,5/10" in rules["po"].text and "cumulent" in rules["po"].text
-
-
-def test_descent_opens_on_an_observable_condition_not_a_medical_verdict():
-    """Décision de Sam du 2026-09-27 : dossier médical clos sans réponse."""
-    rule = next(rule for rule in rulebook.RULES if rule.id == "de")
-    assert "drapeau rouge" in rule.text and "avis médical" in rule.text
-    assert "J+1" in rule.text
-    assert "verdict" not in rule.text
-
-
-def test_volume_and_intensity_follow_the_signals():
-    """Décision de Sam du 2026-10-11 : l'alternance stricte volume/intensité est
-    remplacée par une règle conditionnelle aux signaux de la semaine précédente."""
-    rule = next(rule for rule in rulebook.RULES if rule.id == "n1")
-    assert "jamais volume ET intensité" not in rule.text
-    assert "porte ouverte" in rule.text and "introduction" in rule.text
-    assert "Une par semaine" in rule.text and "zéro VMA" in rule.text
+def test_every_rule_names_an_owner_that_exists():
+    for rule in rulebook.current().rules:
+        for owner in rule.owner.split(" ; "):
+            path = owner.split(" §")[0].split(" 20")[0].strip()
+            assert (VAULT_ROOT / path).exists(), f"{rule.id} : propriétaire absent {path}"

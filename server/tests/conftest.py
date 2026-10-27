@@ -296,7 +296,7 @@ def git_clone(tmp_path, git_repo):
 # content (`coaching/workouts/`, `coaching/exercises/`, `coaching/decisions.md`, ...).
 _VAULT_CONTENT_MODULES = {
     "test_programme.py", "test_carte_renfo.py", "test_charts.py", "test_weekly_plan.py",
-    "test_rulebook.py", "test_ledger.py", "test_decisions_index.py",
+    "test_ledger.py", "test_decisions_index.py",
     "test_coaching_scenarios.py", "test_capabilities.py",
 }
 _VAULT_CONTENT_TESTS = {

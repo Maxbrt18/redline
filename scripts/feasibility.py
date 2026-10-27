@@ -41,7 +41,7 @@ def novelties(sessions: list[dict], rows: list, as_of: dt.date) -> tuple[str, ..
         planned = session.get("distance_cap_km") or session.get("distance_target_km")
         day = transitions.day_of(session["date"])
         longest = ledger.longest_recent(rows, day)
-        if planned and longest and float(planned) > longest + rulebook.STALL_TOLERANCE_KM:
+        if planned and longest and float(planned) > longest + rulebook.current().parameters.stall_tolerance_km:
             found.append(transitions.LONG_RUN_STEP)
             break
     return tuple(found)
@@ -52,9 +52,10 @@ def build_problem(store: Any, rows: list, today: dt.date,
     race_on = ledger.next_race_date(store, today)
     if race_on is None:
         return None
+    book = rulebook.current()
     race_week = transitions.week_of(race_on)
     taper = tuple(transitions.shift(race_week, -offset)
-                  for offset in reversed(range(rulebook.TAPER_WEEKS)))
+                  for offset in reversed(range(book.parameters.taper_weeks)))
     weeks: list[str] = []
     week = transitions.week_of(today)
     while week < taper[0]:
@@ -69,9 +70,9 @@ def build_problem(store: Any, rows: list, today: dt.date,
              if plan_week in weeks and plan_week not in free}
     return transitions.Problem(
         race_on=race_on, weeks=tuple(weeks),
-        assimilation=frozenset(rulebook.ASSIMILATION_WEEKS), taper=taper, fixed=fixed,
-        required=tuple(kind for kind in rulebook.RACE_FIRSTS if kind not in done),
-        done=tuple(kind for kind in rulebook.RACE_FIRSTS if kind in done))
+        assimilation=frozenset(book.parameters.assimilation_weeks), taper=taper,
+        fixed=fixed, required=tuple(kind for kind in book.race_firsts if kind not in done),
+        done=tuple(kind for kind in book.race_firsts if kind in done))
 
 
 def report(store: Any, rows: list, today: dt.date,

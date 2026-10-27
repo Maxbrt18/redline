@@ -17,8 +17,10 @@ the facts before it speaks**.
 > The code is organised so that it can be translated, but that work is not done.
 >
 > The engine never names the athlete: the name, the watched injuries and the tracked
-> capabilities come from `redline.toml` (see `redline.example.toml`). `Sam` is the
-> fictional athlete of the test suite only.
+> capabilities come from `redline.toml` (see `redline.example.toml`). The coaching rules,
+> their thresholds and the kinds of transition session come from the vault's
+> `rulebook.toml`, or from the engine's `rulebook.default.toml` when the vault has none.
+> `Sam` is the fictional athlete of the test suite only.
 >
 > Redline is an AI, not a medical professional. It gives no diagnosis and no medication
 > advice, and says so.

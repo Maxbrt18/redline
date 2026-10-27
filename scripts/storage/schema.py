@@ -495,9 +495,10 @@ planned_sessions = sa.Table(
     sa.CheckConstraint(
         "(workout IN ('renfo-a','renfo-b')) = (strength_spec IS NOT NULL)",
         name="ck_planned_sessions_strength_owner"),
+    # Les natures possibles sont celles du règlement de l'instance (`rulebook.toml`),
+    # vérifiées à l'écriture du programme : la base n'en garde que la forme.
     sa.CheckConstraint(
-        "transition IS NULL OR transition IN "
-        "('qualite','descente','nocturne','terrain','reconnaissance','injury')",
+        "transition IS NULL OR transition ~ '^[a-z0-9][a-z0-9-]{0,39}$'",
         name="ck_planned_sessions_transition"),
 )
 
