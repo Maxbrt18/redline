@@ -60,9 +60,14 @@ def resolve(path: str, *, root: Path | None = None, turn_id: str | None = None) 
     suffix = stem[len(turn_id) + 1:] if stem.startswith(f"{turn_id}-") else None
     if (candidate.parent != (root / DIRECTORY).resolve()
             or not (stem == turn_id or (suffix and _SUFFIX.match(suffix)))):
+        # Le refus dit comment réussir : le 27/10, le coach a tenté `cp`, refusé en
+        # `dontAsk`, puis a abandonné une révision que l'athlète avait autorisée. `Write`
+        # est toujours permis ; c'est le seul geste à faire.
         raise AgentInputError(
             f"--input : ce tour ne lit que {turn_path(turn_id)} "
-            f"(ou {DIRECTORY}/{turn_id}-<nom>.json), reçu {path}")
+            f"(ou {DIRECTORY}/{turn_id}-<nom>.json), reçu {path}. Réécris le même JSON "
+            f"avec Write dans {turn_path(turn_id)}, puis relance la même commande avec "
+            f"--input {turn_path(turn_id)}")
     return candidate
 
 

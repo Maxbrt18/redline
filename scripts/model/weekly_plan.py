@@ -882,6 +882,12 @@ def _changed_session_fields(previous: dict | None, current: dict,
         if new is None:
             changed[session_id] = {"removed"}
             continue
+        # `done` n'est pas une intention : `load_plan` le pose depuis le cycle, et
+        # `intention_errors` impose `planned` à l'écriture. Le 27/10, une séance faite
+        # le matin même comptait donc comme « changée » et exigeait une justification
+        # impossible : aucune révision ne passait plus de la journée.
+        if old.get("status") == "done" and new.get("status") == "planned":
+            old = {**old, "status": "planned"}
         fields = {name for name in CHANGE_FIELDS if name not in {"added", "removed"}
                   and old.get(name) != new.get(name)}
         if fields:

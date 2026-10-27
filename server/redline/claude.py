@@ -29,7 +29,7 @@ from .agent import (
     structured_reply,
 )
 from .config import Config, sandbox_overrides
-from .prompts import DEFAULT_DEPTH, TRIAGE_PROMPT, instruction_digest, style_prompt
+from .prompts import DEFAULT_DEPTH, STYLE_PROMPT, TRIAGE_PROMPT, instruction_digest, with_turn_input
 from .routing import Route
 from .state import StateStore
 
@@ -430,9 +430,10 @@ class ClaudeCodeRunner:
                  *, turn_id: str | None = None, fork_session: bool = False,
                  read_only: bool = False, shell_enabled: bool = True,
                  structured: bool = False) -> list:
-        command = [self._config.claude_bin, "-p", self._personal(message),
+        command = [self._config.claude_bin, "-p",
+                   self._personal(with_turn_input(message, turn_id)),
                    "--output-format", "stream-json", "--verbose",
-                   "--append-system-prompt", self._personal(style_prompt(turn_id))]
+                   "--append-system-prompt", self._personal(STYLE_PROMPT)]
         if structured:
             command += ["--json-schema", json.dumps(PROACTIVE_REPLY_SCHEMA)]
         if not shell_enabled:

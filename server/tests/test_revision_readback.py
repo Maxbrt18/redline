@@ -177,6 +177,19 @@ def test_a_future_change_requires_exact_evidence_rule_and_fields():
     assert weekly_plan.change_evidence_errors(R2, current) == []
 
 
+def test_a_session_done_today_is_not_a_change_to_justify():
+    """27/10 : l'EF et le renfo du matin, rendus `done` par le cycle, rendaient
+    impossible toute révision du jour, `done` étant refusé à l'écriture."""
+    previous = {"revision": 3, "sessions": [
+        _session("w44-mar-ef", "2026-10-27", status="done"),
+        _session("w44-jeu-sl", "2026-10-29", workout="SL")]}
+    current = {"revision": 4, "computed_at": "2026-10-27T11:00:00+01:00",
+               "sessions": [_session("w44-mar-ef", "2026-10-27"),
+                            _session("w44-jeu-sl", "2026-10-29", workout="SL")]}
+
+    assert weekly_plan.change_evidence_errors(previous, current) == []
+
+
 def _cancel(evidence, motif=None):
     current = _r3("mercredi")
     entry = {"session_id": "w35-mer-ef", "fields": ["status"], "trigger": evidence[0],
