@@ -91,14 +91,31 @@ def test_week_plan_reads_the_revision_from_input():
     assert "--input" in result.stdout
 
 
-def test_every_claude_turn_names_its_file_in_the_system_prompt(make_config):
-    """Système et pas message : le message s'ouvre sur la date et finit sur Sam."""
+def test_a_resumed_claude_turn_names_its_own_file_in_its_message(make_config):
+    """27/10 : Claude Code fige le prompt système au premier tour de la session et le
+    rejoue à chaque `--resume`. Un chemin propre au tour posé là désignait encore le
+    premier tour, et `week-plan.py revise` refusait le fichier. Le chemin voyage donc
+    dans le message ; le prompt système ne dépend plus du tour."""
     runner = ClaudeCodeRunner(make_config(agent_provider="claude"), state=None)
-    command = runner._command("bilan", None, turn_id=TURN)
+    first = runner._command("bilan", "sess-42", turn_id=OTHER)
+    command = runner._command("Fais le changement", "sess-42", turn_id=TURN)
+    assert "--resume" in command
     system = command[command.index("--append-system-prompt") + 1]
-    assert system.startswith(persona.render(STYLE_PROMPT, "Sam"))
-    assert f"`--input {agent_input.turn_path(TURN)}`" in system
-    assert command[command.index("-p") + 1] == "bilan"
+    assert system == first[first.index("--append-system-prompt") + 1]
+    assert system == persona.render(STYLE_PROMPT, "Sam")
+    message = command[command.index("-p") + 1]
+    assert f"`--input {agent_input.turn_path(TURN)}`" in message
+    assert OTHER not in message
+    assert message.endswith("Fais le changement")
+
+
+def test_a_refused_path_says_how_to_succeed_with_write(tmp_path):
+    """27/10 : refus, `cp` interdit, révision autorisée abandonnée."""
+    with pytest.raises(agent_input.AgentInputError,
+                       match=f"Réécris le même JSON avec Write dans "
+                             f"{agent_input.DIRECTORY}/{TURN}.json"):
+        agent_input.resolve(f"{agent_input.DIRECTORY}/{OTHER}.json",
+                            root=tmp_path, turn_id=TURN)
 
 
 def test_every_turn_clears_its_files_whatever_the_outcome():

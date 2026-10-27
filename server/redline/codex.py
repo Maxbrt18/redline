@@ -31,7 +31,7 @@ from .prompts import (
     STYLE_PROMPT,
     TRIAGE_STRUCTURED_PROMPT,
     instruction_digest,
-    style_prompt,
+    with_turn_input,
 )
 from .routing import Route
 from .state import StateStore
@@ -216,7 +216,7 @@ class CodexRunner:
                      turn_id: str | None, *, shell_enabled: bool = True) -> Any:
         codex = self._codex(turn_id, shell_enabled=shell_enabled)
         source = None if mode is SessionMode.ISOLATED else live_session(self._state, self._config, self.provider, psid)
-        options = self._thread_options(model, instructions=style_prompt(turn_id))
+        options = self._thread_options(model)
         if mode is SessionMode.FORK and source:
             # A paginated persisted thread can only be forked ephemerally when the
             # response omits its historical turns. The SDK maps this to
@@ -291,8 +291,8 @@ class CodexRunner:
                     psid, spec.model, session_mode, turn_id,
                     shell_enabled=spec.shell_enabled)
                 result = self._turn(
-                    psid, thread, message, model=spec.model, effort=spec.effort,
-                    timeout=spec.timeout,
+                    psid, thread, with_turn_input(message, turn_id), model=spec.model,
+                    effort=spec.effort, timeout=spec.timeout,
                     output_schema=PROACTIVE_REPLY_SCHEMA if spec.structured_reply else None)
                 response = result.final_response or ""
                 silent = False

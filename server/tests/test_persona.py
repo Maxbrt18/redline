@@ -10,7 +10,7 @@ from redline import messenger, persona, prompts
 
 
 @pytest.mark.parametrize("name, expected", [
-    ("Maxime", "la réponse de Maxime, puis à Maxime, que Maxime lit"),
+    ("Marie", "la réponse de Marie, puis à Marie, que Marie lit"),
     ("Alex", "la réponse d'Alex, puis à Alex, qu'Alex lit"),
     ("Hugo", "la réponse d'Hugo, puis à Hugo, qu'Hugo lit"),
 ])
@@ -23,10 +23,10 @@ def test_the_name_replaces_the_token_and_french_elides(name, expected):
 def test_the_style_prompt_renders_exactly_the_text_it_was_written_for():
     """Le gabarit ne change rien d'autre que le prénom : rendu avec un prénom sans
     élision, il redonne le texte d'origine, caractère par caractère."""
-    rendered = persona.render(prompts.STYLE_PROMPT, "Maxime")
+    rendered = persona.render(prompts.STYLE_PROMPT, "Marie")
     assert persona.TOKEN not in rendered
-    assert rendered == prompts.STYLE_PROMPT.replace(persona.TOKEN, "Maxime")
-    assert rendered.startswith("Tu es Redline, coach course à pied de Maxime sur Messenger.")
+    assert rendered == prompts.STYLE_PROMPT.replace(persona.TOKEN, "Marie")
+    assert rendered.startswith("Tu es Redline, coach course à pied de Marie sur Messenger.")
 
 
 def test_both_adapters_hand_the_model_a_rendered_text(make_config):

@@ -56,13 +56,20 @@ def turn_input_note(turn_id: str) -> str:
             f"Un second JSON dans le même tour : `{second}`.]")
 
 
-def style_prompt(turn_id: str | None) -> str:
-    """Le prompt système d'un tour : le style, puis le fichier de ce tour.
+def with_turn_input(message: str, turn_id: str | None) -> str:
+    """Le message d'un tour, ouvert sur le fichier de CE tour.
 
-    Système et pas message : le message s'ouvre sur la date du jour et se termine sur
-    les mots de l'athlète, deux places que les tests tiennent.
+    ⭐ Une donnée propre au tour voyage dans le message, jamais dans le prompt système.
+    Le 27/10, la note vivait dans `--append-system-prompt` : Claude Code 2.1.308 fige
+    ce prompt à l'ouverture de la session (`prompt_snapshot`) et le rejoue à chaque
+    `--resume`. Les tours suivants ont donc lu le chemin du premier tour,
+    `week-plan.py revise` l'a refusé deux fois, et les plafonds de la sortie longue
+    que l'athlète avait autorisés n'ont jamais été écrits (même refus le 25/10).
+    Le prompt système est cuit au niveau de la session (`STYLE_DIGEST`) ; seul le
+    message est neuf à chaque tour. Placée en tête, la note laisse le message finir
+    sur les mots de l'athlète.
     """
-    return f"{STYLE_PROMPT}\n{turn_input_note(turn_id)}\n" if turn_id else STYLE_PROMPT
+    return f"{turn_input_note(turn_id)}\n\n{message}" if turn_id else message
 
 
 def strava_snapshot_note(snapshot: dict) -> str:

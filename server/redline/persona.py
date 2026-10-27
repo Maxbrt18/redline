@@ -8,7 +8,7 @@ ici montrerait le jeton tel quel, ce qui se voit ; un prénom écrit en dur, lui
 serait glissé en silence chez un autre athlète.
 
 Le français élide devant une voyelle : « de ⟨athlète⟩ » devient « d'Alex » mais reste
-« de Maxime ». Le rendu s'en charge, pour que les gabarits s'écrivent une seule fois.
+« de Marie ». Le rendu s'en charge, pour que les gabarits s'écrivent une seule fois.
 """
 
 from __future__ import annotations
