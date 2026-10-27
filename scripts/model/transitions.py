@@ -25,22 +25,21 @@ from itertools import combinations
 
 from . import rulebook
 
-#: La NATURE d'une séance qui sort des 30 derniers jours. `reconnaissance` est un terrain
-#: neuf particulier, le tracé de la course : il compte comme première fois exigée, un
-#: autre terrain neuf non. `injury` couvre une dose injury nouvelle hors course à pied
-#: (la séance B du 06/08 en était une, constatée après coup).
-KINDS = ("qualite", "descente", "nocturne", "terrain", "reconnaissance", "injury")
-
 #: Une nouveauté non typée, déduite : une sortie longue au-delà de la plus longue des
 #: 30 jours. Ce n'est pas une transition : c'est une hausse facile, qui passe par la porte
 #: observable et se cumule avec une transition (decisions.md 2026-10-04).
 LONG_RUN_STEP = "palier-sl"
 
-LABELS = {
-    "qualite": "1re qualité", "descente": "1er bloc descente", "nocturne": "1re nocturne",
-    "terrain": "terrain neuf", "reconnaissance": "reconnaissance du tracé",
-    "injury": "dose injury nouvelle", LONG_RUN_STEP: "palier de SL",
-}
+
+def kinds() -> tuple[str, ...]:
+    """Les natures qu'une transition peut porter : celles du règlement de l'instance."""
+    return rulebook.current().kinds
+
+
+def label(kind: str) -> str:
+    if kind == LONG_RUN_STEP:
+        return "palier de SL"
+    return rulebook.current().label(kind)
 
 
 # ------------------------------------------------------------------ semaines ISO
@@ -81,7 +80,7 @@ class Transition:
         return week_of(self.day)
 
     def __str__(self) -> str:
-        return f"{LABELS[self.kind]} du {self.day:%d/%m} ({self.session_id})"
+        return f"{label(self.kind)} du {self.day:%d/%m} ({self.session_id})"
 
 
 def opened(sessions: list[dict], as_of: dt.date) -> list[Transition]:
@@ -102,14 +101,21 @@ def opened(sessions: list[dict], as_of: dt.date) -> list[Transition]:
 
 
 def per_week_errors(sessions: list[dict], where: str) -> list[str]:
-    """Une transition au plus par semaine : contrôle interne à une révision."""
+    """Une nature connue du règlement, et pas plus de transitions par semaine que lui :
+    contrôle interne à une révision."""
+    book = rulebook.current()
+    problems = [f"{where} : séance {session['id']}, transition « {session['transition']} » "
+                f"inconnue du règlement (attendues : {', '.join(book.kinds)})"
+                for session in sessions
+                if session.get("transition") and session["transition"] not in book.kinds]
     typed = [session for session in sessions
              if session.get("transition") and session.get("status") != "cancelled"]
-    if len(typed) <= rulebook.TRANSITIONS_PER_WEEK:
-        return []
+    allowed = book.parameters.transitions_per_week
+    if len(typed) <= allowed:
+        return problems
     names = ", ".join(f"{s['id']} ({s['transition']})" for s in typed)
-    return [f"{where} : {len(typed)} transitions dans la semaine ({names}), "
-            f"garde-fou n°8 : {rulebook.TRANSITIONS_PER_WEEK} au plus"]
+    return [*problems, f"{where} : {len(typed)} transitions dans la semaine ({names}), "
+            f"garde-fou n°8 : {allowed} au plus"]
 
 
 # ------------------------------------------------------------------ solveur à rebours
@@ -129,7 +135,7 @@ class Problem:
 
 @dataclass(frozen=True)
 class Rules:
-    per_week: int = rulebook.TRANSITIONS_PER_WEEK   # garde-fou n°8
+    per_week: int | None = None   # garde-fou n°8 ; None : celui du règlement
     open_assimilation: bool = False
 
 
@@ -143,7 +149,7 @@ class Schedule:
 
     def line(self, weeks: tuple[str, ...]) -> str:
         return " ; ".join(
-            f"{short(week)} " + (" + ".join(LABELS[item] for item in self.novelties[week])
+            f"{short(week)} " + (" + ".join(label(item) for item in self.novelties[week])
                                  or "rien de neuf")
             for week in weeks)
 
@@ -156,6 +162,8 @@ def solve(problem: Problem, rules: Rules | None = None) -> Schedule | None:
     puis les transitions le plus tôt possible. Recherche exhaustive : l'espace est minuscule.
     """
     rules = rules or Rules()
+    per_week = (rules.per_week if rules.per_week is not None
+                else rulebook.current().parameters.transitions_per_week)
     best: tuple[tuple, Schedule] | None = None
 
     def options(week: str, remaining: tuple[str, ...]) -> list[tuple[str, ...]]:
@@ -164,7 +172,7 @@ def solve(problem: Problem, rules: Rules | None = None) -> Schedule | None:
         if week in problem.assimilation and not rules.open_assimilation:
             return [()]
         found: list[tuple[str, ...]] = []
-        for size in range(rules.per_week + 1):
+        for size in range(per_week + 1):
             for kinds in combinations(remaining, size):
                 found.extend([(LONG_RUN_STEP, *kinds), kinds])
         return found
@@ -206,15 +214,16 @@ class Verdict:
 
 def diagnose(problem: Problem) -> Verdict:
     """Le verdict sous les règles actuelles ; s'il n'y en a pas, chaque levier isolé."""
+    per_week = rulebook.current().parameters.transitions_per_week
     current = Option("règles actuelles", solve(problem))
     if current.schedule is not None:
         return Verdict(problem, True, (current,))
     levers: list[Option] = []
     for kind in problem.required:
         reduced = replace(problem, required=tuple(k for k in problem.required if k != kind))
-        levers.append(Option(f"sans {LABELS[kind]} avant la course", solve(reduced)))
-    levers.append(Option("deux transitions la même semaine (garde-fou n°8)",
-                         solve(problem, Rules(per_week=rulebook.TRANSITIONS_PER_WEEK + 1))))
+        levers.append(Option(f"sans {label(kind)} avant la course", solve(reduced)))
+    levers.append(Option("une transition de plus par semaine (garde-fou n°8)",
+                         solve(problem, Rules(per_week=per_week + 1))))
     if problem.assimilation & set(problem.weeks):
         levers.append(Option("une transition en semaine d'assimilation (garde-fou n°2)",
                              solve(problem, Rules(open_assimilation=True))))
@@ -241,14 +250,15 @@ def render(verdict: Verdict) -> list[str]:
         f"Semaines utiles {short(problem.weeks[0])}-{short(problem.weeks[-1])}"
         + (f", dont {', '.join(assimilation)} en assimilation" if assimilation else "")
         + ". Premières fois à placer : "
-        + (", ".join(LABELS[k] for k in problem.required) or "aucune")
-        + (" ; déjà faites : " + ", ".join(LABELS[k] for k in problem.done)
+        + (", ".join(label(k) for k in problem.required) or "aucune")
+        + (" ; déjà faites : " + ", ".join(label(k) for k in problem.done)
            if problem.done else "") + ".")
     if problem.fixed:
         lines.append("Déjà au programme : " + " ; ".join(
-            f"{short(w)} " + (" + ".join(LABELS[i] for i in items) or "rien de neuf")
+            f"{short(w)} " + (" + ".join(label(i) for i in items) or "rien de neuf")
             for w, items in sorted(problem.fixed.items())) + ".")
-    lines.append(f"Hypothèses : {rulebook.TRANSITIONS_PER_WEEK} transition par semaine (n8), "
+    lines.append(f"Hypothèses : {rulebook.current().parameters.transitions_per_week} "
+                 "transition(s) par semaine (n8), "
                  "rien en assimilation (n2) ni en affûtage ; un palier de SL n'est pas une "
                  "transition, il passe par la porte. Placement possible, pas prescription.")
     if verdict.feasible:

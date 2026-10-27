@@ -452,9 +452,12 @@ pas : une révision peut ne consigner que du passé.
 
 La relecture de `revise`, `preview` et d'un changement préparé affiche l'écart de chaque
 course à venir à la plus longue des 30 jours précédents. Elle est informative et ne bloque
-rien : aucun pourcentage fixe ne borne la sortie longue (décision du 2026-09-27). Les
-règles en vigueur, une ligne chacune, vivent dans `scripts/model/rulebook.py` ; le paquet
-de contexte les injecte à chaque tour N1+ et au bilan.
+rien : aucun pourcentage fixe ne borne la sortie longue. Les règles en vigueur, une
+ligne chacune, leurs seuils et les natures de transition vivent dans `rulebook.toml` à la
+racine du vault ; sans lui, le moteur applique `rulebook.default.toml`, qu'un vault
+remplace en entier, jamais en partie. `scripts/model/rulebook.py` le valide (le service
+refuse de démarrer sur un règlement non conforme) et le relit s'il change. Le paquet de
+contexte l'injecte à chaque tour N1+ et au bilan.
 
 Une prescription de renforcement active est résolue contre les vraies fiches de séance
 pendant la validation : variante, retraits et garde-fou inconnus bloquent la révision

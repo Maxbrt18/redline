@@ -52,6 +52,9 @@ ignore_names = [
     # Porteur nommé de chaque règle du règlement compilé (CLAUDE.md, « une règle
     # générale nomme son porteur ») : une donnée, pas un appel.
     "enforced_by",
+    # Seuils du règlement que seul le texte d'une règle cite (`{pain_cap}`), lus par
+    # `Parameters.spoken` : le code n'en applique pas, le coach si.
+    "gate_trend_weeks", "pain_cap",
     # Types d'effort sans fiche, déclarés plutôt qu'oubliés ; le test de couverture
     # des fiches les exclut nommément.
     "TYPES_WITHOUT_NOTE",

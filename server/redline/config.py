@@ -13,6 +13,7 @@ from datetime import time as dtime
 from pathlib import Path
 
 from scripts.model import instance as instance_model
+from scripts.model import rulebook as rulebook_model
 from scripts.model.instance import Instance
 
 from .routing import RoutingConfig
@@ -129,10 +130,15 @@ def _envtime(name: str, default: str) -> dtime | None:
 
 
 def _load_instance(vault_path: str) -> Instance:
-    """`redline.toml` du vault : sans lui, le service ne sait pas à qui il parle."""
+    """`redline.toml` du vault : sans lui, le service ne sait pas à qui il parle.
+
+    Le règlement se vérifie au même moment : un `rulebook.toml` non conforme arrêterait
+    sinon le premier tour qui le lit, devant l'athlète, au lieu du démarrage.
+    """
     try:
+        rulebook_model.load(Path(vault_path))
         return instance_model.load(Path(vault_path))
-    except instance_model.InstanceError as exc:
+    except (instance_model.InstanceError, rulebook_model.RulebookError) as exc:
         raise SystemExit(str(exc)) from None
 
 

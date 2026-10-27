@@ -1,0 +1,154 @@
+# Le règlement par défaut du moteur : les garde-fous EN VIGUEUR et les seuils que le
+# code applique. Une instance qui veut le sien copie ce fichier à la racine de son vault
+# sous le nom `rulebook.toml` : il remplace alors celui-ci en entier, jamais en partie.
+#
+# Le règlement compile ce qui a été décidé ; il ne décide rien. Changer le SENS d'une
+# règle est une décision de coaching : une entrée datée dans `coaching/decisions.md`,
+# puis le propriétaire de la règle, puis ce fichier, dans le même commit. L'histoire
+# d'une règle vit chez son propriétaire, jamais ici : une version ancienne qui remonte
+# est exactement ce que ce fichier existe pour empêcher.
+
+# ------------------------------------------------------------------ seuils appliqués
+
+[parameters]
+# Garde-fou n°8 : une transition est une séance dont la NATURE sort d'autant de jours.
+# C'est aussi la fenêtre de la plus longue sortie récente, le repère d'un palier de SL.
+transition_lookback_days = 30
+# Garde-fou n°8 : transitions au plus par semaine, contrôlé à l'écriture du programme.
+transitions_per_week = 1
+# La porte : une hausse facile s'ajoute si le pic d'effort hebdo de chaque zone reste
+# à ce niveau ou en dessous…
+gate_effort_peak = 1.5
+# … sans hausse sur autant de semaines.
+gate_trend_weeks = 2
+# Garde-fou n°3 : plafond de douleur à l'effort, sur sa table.
+pain_cap = 2
+# Garde-fou n°7 : une séance plus longue (en heures) est un jour exigeant.
+hard_min_hours = 1.25
+# L'affûtage couvre les N dernières semaines, semaine de course incluse.
+taper_weeks = 3
+# La plus longue sortie sans nouveau record sur autant de semaines CLOSES ouvre le
+# protocole d'instruction des baisses.
+stall_weeks = 3
+# En dessous de cet écart (km), deux sorties sont « la même » plus longue : bruit GPS.
+stall_tolerance_km = 0.1
+# Garde-fou n°2 : les semaines d'assimilation planifiées (« 2026-W35 »). Rien de neuf
+# ne s'y place.
+assimilation_weeks = []
+
+# ------------------------------------------------------------------ transitions
+
+# Les NATURES de séance qu'une transition peut porter. Le slug est ce que le programme
+# enregistre ; le libellé, ce que le carnet et le bilan affichent. `race_first` : une
+# première fois que la course exige avant l'affûtage (le solveur à rebours la place).
+# `quality` : la séance se débriefe comme une qualité, répétition par répétition.
+[[transitions]]
+slug = "qualite"
+label = "1re qualité"
+quality = true
+
+[[transitions]]
+slug = "descente"
+label = "1er bloc descente"
+
+[[transitions]]
+slug = "nocturne"
+label = "1re nocturne"
+
+[[transitions]]
+slug = "terrain"
+label = "terrain neuf"
+
+[[transitions]]
+slug = "reconnaissance"
+label = "reconnaissance du tracé"
+race_first = true
+
+# ------------------------------------------------------------------ règles
+
+# Une ligne par règle, injectée au coach à chaque tour : courte, sans histoire. `text`
+# peut citer un seuil entre accolades (`{pain_cap}`) : la valeur appliquée et la valeur
+# dite au coach sont ainsi la même. `owner` nomme le fichier du vault qui porte le
+# raisonnement ; `enforced_by`, ce qui l'applique.
+#
+# Les règles n2, n7, n8, po et s9 sont appliquées par le moteur : elles sont obligatoires.
+
+[[rules]]
+id = "n1"
+title = "Qualité"
+text = "une par semaine au plus, introduite seulement porte ouverte. Zéro VMA."
+grade = "règle de coaching"
+owner = "coaching/current-plan.md § garde-fou n°1"
+enforced_by = "le coach"
+
+[[rules]]
+id = "n2"
+title = "Assimilation"
+text = "-25 à -30 % toutes les 3-4 semaines, fréquence gardée ; on n'y ajoute rien."
+grade = "règle de coaching"
+owner = "coaching/current-plan.md § garde-fou n°2"
+enforced_by = "le coach ; feasibility.py (semaines d'assimilation)"
+
+[[rules]]
+id = "n3"
+title = "Douleur"
+text = "plafond {pain_cap}/10 à l'effort, zone par zone ; au-dessus ou foulée modifiée : arrêt. Persistante > 48 h : -30 %, puis paliers 50/70/85 % et 2 semaines sans qualité."
+grade = "règle de coaching"
+owner = "coaching/current-plan.md § garde-fou n°3"
+enforced_by = "le coach"
+
+[[rules]]
+id = "n4"
+title = "Sommeil et FC"
+text = "2-3 mauvaises nuits consécutives ou FC anormalement haute en footing : qualité supprimée, semaine traitée en assimilation."
+grade = "règle de coaching"
+owner = "coaching/current-plan.md § garde-fou n°4"
+enforced_by = "le coach ; FC à allure calculée par signals.py"
+
+[[rules]]
+id = "n5"
+title = "Pas de rattrapage"
+text = "une séance manquée ne se rattrape jamais."
+grade = "règle de coaching"
+owner = "coaching/philosophy.md"
+enforced_by = "le coach"
+
+[[rules]]
+id = "n6"
+title = "Dernier intervalle"
+text = "une qualité finit dans sa bande RPE, une répétition en réserve ; un all-in final la rate. Allures comparées au sein de la séance seulement."
+grade = "règle de coaching"
+owner = "coaching/current-plan.md § garde-fou n°6"
+enforced_by = "le coach"
+
+[[rules]]
+id = "n7"
+title = "Espacement"
+text = "jamais deux jours exigeants consécutifs (qualité, sortie longue, EF > {hard_min_hours} h). Une semaine à contrainte se réduit, elle ne se condense pas."
+grade = "règle de coaching"
+owner = "coaching/current-plan.md § garde-fou n°7"
+enforced_by = "week-plan.py revise (champ demanding)"
+
+[[rules]]
+id = "n8"
+title = "Transition"
+text = "séance dont la nature sort des {transition_lookback_days} derniers jours (1re qualité, 1er bloc descente, terrain neuf). {transitions_per_week} par semaine au plus, sous-dosée, plafond écrit avant."
+grade = "pari"
+owner = "coaching/current-plan.md § garde-fou n°8"
+enforced_by = "week-plan.py revise (champ transition) ; feasibility.py (à rebours)"
+
+[[rules]]
+id = "po"
+title = "Porte"
+text = "une hausse facile (palier de SL sans pourcentage fixe, EF allongée, sortie de plus) s'ajoute si le pic d'effort hebdo reste au plus {gate_effort_peak}/10 sans hausse sur {gate_trend_weeks} semaines, réveils à la base ; elles se cumulent. Case rouge : semaine suivante figée ; deux : un cran en arrière."
+grade = "règle de coaching"
+owner = "coaching/current-plan.md § La porte"
+enforced_by = "le coach ; écart aux 30 jours affiché par week-plan.py et ledger.py"
+
+[[rules]]
+id = "s9"
+title = "Arrivée à vide"
+text = "plus longue sortie sans nouveau record sur {stall_weeks} semaines closes : le protocole d'instruction des baisses s'ouvre, sans attendre le jalon daté."
+grade = "règle de coaching"
+owner = "athlete/goals.md"
+enforced_by = "ledger.py --semaine (bloc Trajectoire)"

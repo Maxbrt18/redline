@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from . import rulebook
+
 
 def _fr(value: float) -> str:
     return f"{value:.2f}".rstrip("0").rstrip(".").replace(".", ",")
@@ -71,8 +73,6 @@ def gaps(row: Any, session: dict | None, drift: Any | None) -> list[str]:
 #: Les séances dont le débrief porte la carte des répétitions. Une SL ou une course
 #: sont exigeantes sans être fractionnées : leurs tours sont des kilomètres, pas des reps.
 QUALITY_WORKOUTS = frozenset({"seuil", "cotes", "lignes"})
-#: Une séance typée « 1re qualité » en est une, quel que soit son workout.
-QUALITY_TRANSITION = "qualite"
 #: Écart minimal d'allure entre le plus lent des tours rapides et le plus rapide des
 #: tours lents. En dessous, les tours sont des tours automatiques d'une allure
 #: continue, pas une alternance effort/récup.
@@ -85,7 +85,9 @@ def is_quality(session: dict | None) -> bool:
     if not session:
         return False
     return (session.get("workout") in QUALITY_WORKOUTS
-            or session.get("transition") == QUALITY_TRANSITION)
+            # Une transition que le règlement marque `quality` en est une aussi,
+            # quel que soit son workout.
+            or session.get("transition") in rulebook.current().quality_kinds)
 
 
 def _seconds(text: Any) -> int | None:

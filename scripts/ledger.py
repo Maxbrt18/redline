@@ -49,7 +49,6 @@ LEVEL_CAP, RATIO_CAP = 85, 1.3
 
 QUALITY_TYPES = {"seuil", "côtes"}
 HALF_TYPES = {"rando", "vélo", "renfoA", "renfoB"}
-HARD_MIN_HOURS = rulebook.HARD_MIN_HOURS  # any session above this counts as a demanding day
 
 # ⭐ LE TERME DE DÉNIVELÉ LIT LE D−, PAS LE D+ (confrontation n°2, volet dénivelé,
 # 2026-08-16 — `decisions.md`). Ce que les heures ne captent pas, c'est la descente :
@@ -122,7 +121,8 @@ class Row:
 
     @property
     def hard(self) -> bool:
-        return self.type in QUALITY_TYPES or (self.hours or 0) > HARD_MIN_HOURS
+        return (self.type in QUALITY_TYPES
+                or (self.hours or 0) > rulebook.current().parameters.hard_min_hours)
 
 
 @dataclass
@@ -681,8 +681,9 @@ def _pain_gate_cases(rows: list[Row], label: str, previous: str,
     if now is None:
         cases.append(("?", "pic d'effort : aucune course chiffrée"))
     else:
-        cases.append(("✓" if now <= rulebook.GATE_EFFORT_PEAK else "✗",
-                      f"pic d'effort {now:g}/10 (au plus {rulebook.GATE_EFFORT_PEAK:g})"))
+        ceiling = rulebook.current().parameters.gate_effort_peak
+        cases.append(("✓" if now <= ceiling else "✗",
+                      f"pic d'effort {now:g}/10 (au plus {ceiling:g})"))
     if now is None or before is None:
         cases.append(("?", f"tendance : {previous} {before if before is not None else '—'} "
                            f"→ {label} {now if now is not None else '—'}"))
@@ -834,11 +835,11 @@ def longest_recent(rows: list[Row], before: dt.date) -> float | None:
     """La plus longue sortie COURUE des 30 jours qui précèdent `before`.
 
     Un repère, pas un plafond : aucun pourcentage fixe ne borne la sortie suivante
-    (décision de l'athlète du 2026-09-27, `rulebook.py`). Il sert à dire de combien une
+    (le règlement, `rulebook.py`). Il sert à dire de combien une
     séance s'écarte du mois écoulé, pour que l'écart soit jugé et non découvert.
     """
-    window = [row for row in _runs(rows)
-              if 0 <= (before - row.date).days < rulebook.TRANSITION_LOOKBACK_DAYS]
+    days = rulebook.current().parameters.transition_lookback_days
+    window = [row for row in _runs(rows) if 0 <= (before - row.date).days < days]
     if not window:
         return None
     return max(row.km or 0 for row in window)
@@ -911,7 +912,7 @@ class Stall:
 
     @property
     def triggered(self) -> bool:
-        return self.weeks >= rulebook.STALL_WEEKS
+        return self.weeks >= rulebook.current().parameters.stall_weeks
 
     def __str__(self) -> str:
         if not self.weeks:
@@ -950,9 +951,10 @@ def long_run_stall(rows: list[Row], today: dt.date) -> Stall | None:
         week += dt.timedelta(weeks=1)
     longest = {label: max((row.km or 0 for row in _runs(rows) if row.week == label),
                           default=0.0) for label in labels}
+    tolerance = rulebook.current().parameters.stall_tolerance_km
     record, record_week, stalled = 0.0, labels[0], 0
     for label in labels:
-        if longest[label] > record + rulebook.STALL_TOLERANCE_KM:
+        if longest[label] > record + tolerance:
             record, record_week, stalled = longest[label], label, 0
         else:
             stalled += 1
@@ -982,7 +984,7 @@ class Projection:
 
 
 def race_projection(rows: list[Row], today: dt.date, race_on: dt.date,
-                    taper_weeks: int = rulebook.TAPER_WEEKS) -> Projection | None:
+                    taper_weeks: int | None = None) -> Projection | None:
     """Planificateur à rebours : le rythme qu'exige une cible de sortie longue.
 
     Point de départ : la plus longue des 30 derniers jours. Les semaines utiles vont de
@@ -996,6 +998,8 @@ def race_projection(rows: list[Row], today: dt.date, race_on: dt.date,
     if longest is None or race_on <= today:
         return None
     race_week = _week_start(_week_label(race_on))
+    if taper_weeks is None:
+        taper_weeks = rulebook.current().parameters.taper_weeks
     taper_start = race_week - dt.timedelta(weeks=taper_weeks - 1)
     # La semaine en cours a peut-être déjà eu sa sortie longue : on part de la
     # suivante, lecture prudente d'un jour de bilan.
