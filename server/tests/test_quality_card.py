@@ -1,16 +1,18 @@
-"""La carte des répétitions, construite par le service depuis les tours Strava.
-
-15/10 : le premier fractionné avec Redline est parti sans carte, laissée au choix d'un
-débrief à effort bas. Elle ne dépend plus du modèle.
-"""
+"""The repetitions card, built by the service from the Strava laps."""
 
 from scripts.model import debrief
+from scripts.model.activity import Lap
 
 SEUIL = {"workout": "threshold", "title": "Seuil doux en côte, calibration"}
 
 
 def _laps(*rows):
-    return [{"temps": t, "distance_km": d, "fc_moy": h} for t, d, h in rows]
+    """Laps from (`m:ss`, km, average HR), as a watch screen shows them."""
+    def seconds(text):
+        minutes, secs = text.split(":")
+        return int(minutes) * 60 + int(secs)
+    return [Lap(moving_s=seconds(t), distance_m=round(d * 1000, 1), hr_avg_bpm=h)
+            for t, d, h in rows]
 
 
 # Les tours réels de l'activité 90000000005 (15/10) : échauffement, 4 x 3 min en
@@ -101,7 +103,7 @@ def _bot(make_bot, tmp_path):
 def test_the_job_carries_the_card_and_the_quality_flag_from_the_snapshot():
     job = ProactiveScheduler._job("4242", {
         "id": "strava:1", "kind": "strava_debrief", "detail": "1",
-        "snapshot": {"activity": {"id": 1}, "qualite": True, "repetitions": CARD}})
+        "snapshot": {"activity": {"id": 1}, "quality": True, "quality_card": CARD}})
     assert job.quality and job.workout_card == CARD
 
 

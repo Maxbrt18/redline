@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from scripts import descent, strava
+from scripts.model import activity as activity_model
+from scripts.model.activity import Activity, Lap
 from scripts.storage import StorageError
 from scripts.storage.repository import OperationalStore
 
@@ -19,13 +21,6 @@ WeatherFetch = Callable[[dict], float | None]
 GearFetch = Callable[[str], dict]
 
 log = logging.getLogger("redline")
-
-SNAPSHOT_ACTIVITY_FIELDS = (
-    "id", "nom", "description", "sport", "depart_local", "distance_km",
-    "temps_mouvement", "temps_total", "dplus_m", "fc_moy", "fc_max",
-    "effort_relatif", "calories", "materiel_id", "nb_laps", "allure_min_km",
-    "vitesse_kmh", "cadence_pas_min", "cadence_tr_min",
-)
 
 
 def _activity(activity_id: int) -> dict:
@@ -43,8 +38,8 @@ def _altitude(activity_id: int) -> list:
     return values
 
 
-def _wbgt(meteo: dict) -> float | None:
-    return weather_at(meteo).get("wbgt")
+def _wbgt(query: dict) -> float | None:
+    return weather_at(query).get("wbgt")
 
 
 def _gear(gear_id: str) -> dict:
@@ -76,9 +71,9 @@ class ActivityPipeline:
         intake = self._captured_intake(activity_id)
         replayed = intake is not None
         if intake is not None:
-            distilled = dict(intake["distilled"])
+            activity = Activity.from_json(intake["distilled"])
             if fresh_words:
-                distilled.update(self._words(activity_id))
+                activity = self._reread_words(activity)
             captured = {
                 "activity_id": activity_id,
                 "status": intake["status"],
@@ -86,16 +81,10 @@ class ActivityPipeline:
                 "observation_id": intake.get("observation_id"),
             }
         else:
-            raw = self.activity_fetch(activity_id)
-            distilled = strava.distill_activity(raw)
-            sport = str(distilled.get("sport") or "")
-            distilled["laps"] = [
-                strava.distill_lap(lap, sport, index)
-                for index, lap in enumerate(raw.get("laps") or [], start=1)
-            ]
-            captured = self.store.ingest_strava_activity(distilled)
+            activity = strava.parse_activity(self.activity_fetch(activity_id))
+            captured = self.store.ingest_strava_activity(activity)
         gear_state = "not_applicable"
-        gear_id = str(distilled.get("materiel_id") or "").strip()
+        gear_id = (activity.gear_id or "").strip()
         if gear_id and not replayed:
             try:
                 self.store.sync_strava_gear(self.gear_fetch(gear_id))
@@ -109,26 +98,26 @@ class ActivityPipeline:
         intake = self.store.strava_intake(activity_id)
 
         if intake["elevation_loss_state"] in {"pending", "failed"}:
-            self._elevation_loss(activity_id, distilled)
+            self._elevation_loss(activity)
         if intake["wbgt_state"] in {"pending", "failed"}:
-            self._weather(activity_id, distilled)
+            self._weather(activity)
 
         enrichments = self.store.strava_enrichment_state(activity_id)
-        snapshot = self._snapshot(distilled, captured, enrichments)
+        snapshot = self._snapshot(activity, captured, enrichments)
         feelings = self._feelings(captured.get("observation_id"))
         if feelings:
-            snapshot["ressentis"] = feelings
+            snapshot["feelings"] = feelings
         gaps, session, day = self._gaps(activity_id, captured.get("observation_id"))
         if gaps:
-            snapshot["ecarts"] = gaps
+            snapshot["gaps"] = gaps
         from scripts.model import debrief
 
         if debrief.is_quality(session):
             # Lu par le service : un débrief de qualité engage un jugement (N2).
-            snapshot["qualite"] = True
-            card = self._quality_card(activity_id, snapshot["laps"], session, day)
+            snapshot["quality"] = True
+            card = self._quality_card(activity_id, activity.laps, session, day)
             if card:
-                snapshot["repetitions"] = card
+                snapshot["quality_card"] = card
         return {
             **captured,
             "enrichments": enrichments,
@@ -136,14 +125,14 @@ class ActivityPipeline:
             "snapshot": snapshot,
         }
 
-    def _words(self, activity_id: int) -> dict:
+    def _reread_words(self, activity: Activity) -> Activity:
         try:
-            fresh = strava.distill_activity(self.activity_fetch(activity_id))
+            fresh = strava.parse_activity(self.activity_fetch(activity.id))
         except Exception as exc:
             log.warning("Titre Strava de %s non relu, mots capturés gardés : %s",
-                        activity_id, exc)
-            return {}
-        return {"nom": fresh.get("nom"), "description": fresh.get("description")}
+                        activity.id, exc)
+            return activity
+        return replace(activity, name=fresh.name, description=fresh.description)
 
     def _feelings(self, observation_id: Any) -> dict:
         """RPE, douleur et plaisir déjà donnés (carnet) : le débrief part souvent après."""
@@ -190,7 +179,7 @@ class ActivityPipeline:
             return [], None, None
 
     @staticmethod
-    def _quality_card(activity_id: int, laps: list, session: dict | None,
+    def _quality_card(activity_id: int, laps: tuple[Lap, ...], session: dict | None,
                       day: Any) -> dict | None:
         """Les répétitions d'une séance de qualité, prêtes pour la carte.
 
@@ -227,20 +216,12 @@ class ActivityPipeline:
         return intake
 
     @staticmethod
-    def _snapshot(distilled: dict, captured: dict, enrichments: dict) -> dict:
+    def _snapshot(activity: Activity, captured: dict, enrichments: dict) -> dict:
         """Paquet borné donné au coach, sans polyline ni second appel fournisseur."""
-        activity = {
-            key: distilled[key]
-            for key in SNAPSHOT_ACTIVITY_FIELDS
-            if distilled.get(key) not in (None, "")
-        }
-        laps = distilled.get("laps")
-        if not isinstance(laps, list):
-            laps = []
         return {
-            "source": "capture_strava_persistante",
-            "activity": activity,
-            "laps": laps,
+            "source": "strava_capture",
+            "activity": activity_model.summary(activity),
+            "laps": activity_model.lap_summaries(activity),
             "matching": {
                 "status": captured.get("status"),
                 "candidate_session_keys": captured.get("candidate_session_keys") or [],
@@ -249,8 +230,8 @@ class ActivityPipeline:
             "enrichments": enrichments,
         }
 
-    def _elevation_loss(self, activity_id: int, distilled: dict) -> None:
-        gain = distilled.get("dplus_m")
+    def _elevation_loss(self, activity: Activity) -> None:
+        activity_id, gain = activity.id, activity.elevation_gain_m
         if gain is None:
             self.store.finish_strava_enrichment(
                 activity_id, "elevation_loss", unavailable=True)
@@ -264,13 +245,13 @@ class ActivityPipeline:
         self.store.finish_strava_enrichment(
             activity_id, "elevation_loss", value=value)
 
-    def _weather(self, activity_id: int, distilled: dict) -> None:
-        meteo = distilled.get("meteo")
-        if not meteo:
+    def _weather(self, activity: Activity) -> None:
+        activity_id, query = activity.id, activity.weather_query
+        if query is None:
             self.store.finish_strava_enrichment(activity_id, "wbgt", unavailable=True)
             return
         try:
-            value = self.weather_fetch(meteo)
+            value = self.weather_fetch(query)
         except Exception as exc:
             self.store.finish_strava_enrichment(
                 activity_id, "wbgt", error=str(exc))

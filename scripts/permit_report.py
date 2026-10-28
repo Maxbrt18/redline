@@ -22,6 +22,7 @@ from scripts.model import (  # noqa: E402
     permit,
     session_kinds,
 )
+from scripts.model.activity import Activity  # noqa: E402
 
 
 def _strava_id(key: str) -> int | None:
@@ -44,7 +45,7 @@ def _caps(store: Any, weeks: set[str]) -> dict[str, int | None]:
 
 def _group(store: Any, activity_id: int) -> bool | None:
     try:
-        count = (store.strava_intake(activity_id).get("distilled") or {}).get("nb_athletes")
+        count = Activity.from_json(store.strava_intake(activity_id)["distilled"]).athlete_count
     except Exception:  # capture absente : le groupe reste inconnu, jamais supposé
         return None
     return None if count is None else int(count) > 1

@@ -284,8 +284,8 @@ class FakeStateStore:
             "activity_id": activity_id,
             "status": "matched",
             "snapshot": {
-                "source": "capture_strava_persistante",
-                "activity": {"id": activity_id, "nom": "easy", "sport": "Run"},
+                "source": "strava_capture",
+                "activity": {"id": activity_id, "name": "easy", "sport": "Run"},
                 "laps": [],
                 "matching": {"status": "matched"},
                 "enrichments": {},

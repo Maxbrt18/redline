@@ -33,6 +33,7 @@ from scripts.model import (
     transitions,
 )
 from scripts.model import ledger as ledger_model
+from scripts.model.activity import Activity
 from scripts.model.errors import InputError
 from scripts.model.instance import Instance, derived_label
 
@@ -89,6 +90,12 @@ def _known(observation: dict, metric: str) -> float | None:
     if measure.get("state") != "known" or measure.get("value") is None:
         return None
     return float(measure["value"])
+
+
+def _activity(intake: dict | None) -> Activity | None:
+    """The activity a Strava capture holds; None without a capture or after a failed one."""
+    stored = (intake or {}).get("distilled")
+    return Activity.from_json(stored) if stored else None
 
 
 def known_pains(observation: dict, labels: dict[str, str]) -> list[dict]:
@@ -628,8 +635,8 @@ class Board:
             else _known(earlier, "hr_avg_bpm"),
             "rpe": _known(earlier, "rpe"), "pains": known_pains(earlier, self.zone_labels),
             "enjoyment": _known(earlier, "enjoyment"), "rep_dplus": None, "rep_hr": None}
-        intake = self.ops.strava_detail(earlier["id"])
-        laps = ((intake or {}).get("distilled") or {}).get("laps") or []
+        activity = _activity(self.ops.strava_detail(earlier["id"]))
+        laps = activity.laps if activity else ()
         reps = (session_detail.quality(laps, None) or {}).get("reps") or []
         if reps:
             out["rep_dplus"] = round(sum(rep["dplus"] for rep in reps) / len(reps))
@@ -683,12 +690,13 @@ class Board:
             return None
         session = self._linked_session(observation)
         day = observation["occurred_on"]
-        distilled = (intake or {}).get("distilled") or {}
+        activity = _activity(intake)
         streams = (intake or {}).get("streams")
         hr_valid = observation.get("hr_doubt") != "sans_brassard"
         s = None if not streams else {**streams, "hr": streams.get("hr") if hr_valid else None}
         quality = debrief.is_quality(session)
-        reps = session_detail.quality(distilled.get("laps") or [], s) if quality else None
+        reps = (session_detail.quality(activity.laps if activity else (), s)
+                if quality else None)
         fact = observation_fact(observation, session, self.zone_labels)
         dplus = fact["dplus"]
         series = None
@@ -707,7 +715,7 @@ class Board:
         wbgt = (intake or {}).get("wbgt_value")
         if weather is None and wbgt is not None:
             weather = {"wbgt": float(wbgt)}
-        gear_id = observation.get("gear_id") or distilled.get("materiel_id")
+        gear_id = observation.get("gear_id") or (activity.gear_id if activity else None)
         ask = next((item for item in self.asks() if item["id"] == f"cell:{observation['id']}"),
                    None)
         return {

@@ -19,6 +19,7 @@ from test_weekly_plan import revision, session
 from redline.notebook_board import AnswerError, Board
 from redline.plans import PlanStatus
 from scripts.model import weekly_plan
+from scripts.model.activity import Activity
 from scripts.storage import Database, OperationalStore
 from scripts.storage.schema import metadata
 
@@ -338,9 +339,9 @@ def test_the_last_feeling_of_a_strava_run_brings_its_debrief_forward(
     from scripts.storage.notebook import NotebookStore
 
     seed_week(store)
-    store.ingest_strava_activity({
-        "id": 90000000019, "sport": "Run", "nom": "Morning Run",
-        "depart_local": "2026-10-07T18:40:00", "distance_km": 5.71})
+    store.ingest_strava_activity(Activity(
+        id=90000000019, sport="Run", name="Morning Run",
+        start_local="2026-10-07T18:40:00", distance_m=5710.0))
     evening = dt.datetime(2026, 10, 7, 20, 0, tzinfo=PARIS)
     monkeypatch.setattr(clock, "now", lambda: evening)
     monkeypatch.setattr(clock, "today", lambda: evening.date())

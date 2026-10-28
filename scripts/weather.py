@@ -8,7 +8,7 @@ registre. Stdlib uniquement, y compris le WBGT — rien à installer sur le VPS.
 
 Le coach 24/7 récupère le polyline encodé et l'heure de départ avec
 `python3 scripts/strava.py activity <id>`, qui les rend prêts à l'emploi dans son
-bloc `meteo`.
+bloc `weather_query`.
 
 ⚠ **Strava ne donne qu'une heure murale locale, SANS fuseau.** C'est le seul appel
 à connaître :
@@ -379,7 +379,7 @@ def parse_time(value, local=False):
     Deux chemins, et un seul est correct pour chaque source :
 
     - `local=True` : la valeur est une heure **murale au lieu de départ**, sans
-      fuseau — c'est exactement ce que rend le champ `depart_local` de
+      fuseau — c'est exactement ce que rend le champ `start_local` de
       `scripts/strava.py activity`. Le
       décalage est résolu plus tard, depuis les coordonnées (`resolve_offset`),
       parce que lui seul connaît le fuseau du lieu et l'heure d'été à cette date.
@@ -406,7 +406,7 @@ def parse_time(value, local=False):
     if dt.tzinfo is None:
         raise ValueError(
             f"heure sans fuseau : {value!r}. Strava ne rend qu'une heure "
-            "murale (`depart_local`) : passe-la telle quelle avec "
+            "murale (`start_local`) : passe-la telle quelle avec "
             "--local, le script résout le décalage depuis les coordonnées. "
             "N'ajoute JAMAIS un `Z` toi-même — ça la déclare UTC et décale la "
             "lecture de 2 h l'été à Paris (bug du 2026-08-05)."
@@ -573,7 +573,7 @@ def main():
                          "`start_local` de Strava tel quel, sans fuseau.")
     ap.add_argument("--local", action="store_true",
                     help="--time est l'heure murale au lieu de départ "
-                         "(= `depart_local` de scripts/strava.py). Le décalage est "
+                         "(= `start_local` de scripts/strava.py). Le décalage est "
                          "résolu depuis les coordonnées. N'ajoute jamais un `Z` "
                          "à la place.")
     ap.add_argument("--json", action="store_true", help="Sortie JSON brute.")

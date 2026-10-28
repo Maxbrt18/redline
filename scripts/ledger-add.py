@@ -93,7 +93,7 @@ def morning_trace_errors(raw: dict[str, str], pains: dict[str, str],
 
 
 def _write_database(url: str, raw: dict[str, str], pains: dict[str, str], key: str, *,
-                    depart_local: str = "", session_key: str = "") -> str:
+                    start_local: str = "", session_key: str = "") -> str:
     if not key:
         raise table.LedgerError(
             "--idempotency-key obligatoire sans id Strava (identité stable du fait)")
@@ -120,14 +120,14 @@ def _write_database(url: str, raw: dict[str, str], pains: dict[str, str], key: s
         "note": raw.get("Note", ""), "source": "ledger-add", "measurements": measurements,
         "pains": {zone: table.pain_reading(value) for zone, value in pains.items()},
     }
-    if depart_local:
+    if start_local:
         from scripts.model import session_cycle
-        started_at = session_cycle.local_wall_clock(depart_local)
+        started_at = session_cycle.local_wall_clock(start_local)
         if started_at.date() != payload["occurred_on"]:
-            raise table.LedgerError("--depart-local ne tombe pas le jour de --date")
+            raise table.LedgerError("--start-local ne tombe pas le jour de --date")
         payload["started_at"] = started_at
     elif session_key:
-        raise table.LedgerError("--session-key exige --depart-local")
+        raise table.LedgerError("--session-key exige --start-local")
     if session_key:
         payload["session_key"] = session_key
     turn_id = (os.environ.get("REDLINE_TURN_ID") or "").strip()
@@ -168,8 +168,8 @@ def main() -> int:
                         help="affiche la ligne validée, n'écrit rien")
     parser.add_argument("--idempotency-key", default="",
                         help="clé stable obligatoire sans Strava, ex. messenger:<mid>:lecture")
-    parser.add_argument("--depart-local", default="",
-                        help="heure locale ISO rendue par strava.py (`depart_local`)")
+    parser.add_argument("--start-local", default="",
+                        help="heure locale ISO rendue par strava.py (`start_local`)")
     parser.add_argument("--session-key", default="",
                         help="appariement explicite, ex. 2026-W34:w34-ven-ef")
     for item in table.INPUTS:
@@ -231,7 +231,7 @@ def main() -> int:
         key = f"strava:{raw_values['Strava']}"
     try:
         oid = _write_database(database_url, raw_values, pains, key,
-                              depart_local=args.depart_local.strip(),
+                              start_local=args.start_local.strip(),
                               session_key=args.session_key.strip())
     except (ValueError, table.LedgerError) as exc:
         print(f"observation non écrite : {exc}", file=sys.stderr)

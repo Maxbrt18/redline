@@ -14,11 +14,13 @@ un échantillon sous `MOVING_MPS` ne compte pas dans le temps en mouvement.
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
 from scripts import strava, weather
 from scripts.model import debrief, hr_zones
+from scripts.model.activity import Activity, Lap
 
 log = logging.getLogger("redline")
 
@@ -94,13 +96,13 @@ def fetch_streams(activity_id: int) -> dict:
     return compact(raw, laps if isinstance(laps, list) else [])
 
 
-def weather_at(meteo: dict) -> dict:
+def weather_at(query: dict) -> dict:
     """La météo horaire au point et à l'heure de départ (WBGT compris s'il converge)."""
-    points = weather.decode_polyline(meteo["polyline"])
+    points = weather.decode_polyline(query["polyline"])
     if not points:
         raise ValueError("polyline vide")
     lat, lon = points[0]
-    local = weather.parse_time(meteo["time"], local=True)
+    local = weather.parse_time(query["time"], local=True)
     moment, _ = weather.resolve_offset(lat, lon, local)
     return weather.get_weather(lat, lon, moment)
 
@@ -120,10 +122,11 @@ def ensure(store: Any, intake: dict) -> dict:
             streams = fresh["streams"] = fetch_streams(activity_id)
         except Exception as exc:
             log.warning("Flux Strava de %s non relevés : %s", activity_id, exc)
-    meteo = (intake.get("distilled") or {}).get("meteo") or {}
-    if conditions is None and meteo.get("polyline") and meteo.get("time"):
+    stored = intake.get("distilled")
+    query = Activity.from_json(stored).weather_query if stored else None
+    if conditions is None and query is not None:
         try:
-            conditions = fresh["weather"] = weather_at(meteo)
+            conditions = fresh["weather"] = weather_at(query)
         except Exception as exc:
             log.warning("Météo de %s non relevée : %s", activity_id, exc)
     if fresh:
@@ -258,19 +261,19 @@ def _at(s: dict, second: float) -> int | None:
 
 
 # ------------------------------------------------------------ séance de qualité
-def _lap_bounds(laps: list, s: dict | None) -> list[list[float]]:
+def _lap_bounds(laps: Sequence[Lap], s: dict | None) -> list[list[float]]:
     """Les bornes [début, fin] de chaque tour : horodatées, sinon les durées cumulées."""
     if s and len(s.get("lap_times") or []) == len(laps):
         return s["lap_times"]
     out, clock = [], 0.0
     for lap in laps:
-        seconds = debrief._seconds(lap.get("temps")) or 0
+        seconds = lap.moving_s
         out.append([clock, clock + seconds])
         clock += seconds
     return out
 
 
-def quality(laps: list, s: dict | None) -> dict | None:
+def quality(laps: Sequence[Lap], s: dict | None) -> dict | None:
     """Les phases d'une séance de qualité et le détail de chaque répétition.
 
     Les blocs viennent de la même lecture des tours que la carte des répétitions
@@ -292,17 +295,18 @@ def quality(laps: list, s: dict | None) -> dict | None:
         metres = sum(phase["dist_m"] for phase in block)
 
         def weighted(key: str) -> float | None:
-            pairs = [(item.get(key), phase["time_s"]) for item, phase in zip(items, block, strict=True)]
+            pairs = [(getattr(item, key), phase["time_s"])
+                     for item, phase in zip(items, block, strict=True)]
             if not seconds or any(value is None for value, _ in pairs):
                 return None
             return sum(value * weight for value, weight in pairs) / seconds
 
-        beat, step = weighted("fc_moy"), weighted("cadence_pas_min")
+        beat, step = weighted("hr_avg_bpm"), weighted("cadence_spm")
         return {"time_s": seconds, "dist_m": round(metres),
                 "pace_s": round(seconds * 1000 / metres) if metres else None,
                 "hr": None if beat is None else round(beat),
                 "cadence": None if step is None else round(step),
-                "dplus": round(sum(item.get("dplus_m") or 0 for item in items))}
+                "dplus": round(sum(item.elevation_gain_m or 0 for item in items))}
 
     phases: list[dict] = []
     reps: list[dict] = []

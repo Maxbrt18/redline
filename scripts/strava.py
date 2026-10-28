@@ -1,25 +1,7 @@
 #!/usr/bin/env python3
-"""L'accès Strava du coach, indépendant du moteur qui l'exécute.
+"""Strava access for the coach, whatever agent runs it.
 
-Pourquoi ce script existe — le 2026-08-14, l'athlète a uploadé sa sortie, le débrief
-proactif s'est déclenché, et le coach a rendu SILENCE. Puis, sollicité à la main
-(« t'as vu ma sortie ? »), il a répondu qu'il n'avait pas ses données. La trace du
-run montre un coach qui a fait tout ce qu'il pouvait : il a cherché un outil Strava
-dans sa liste, greffé le dépôt à la recherche d'un script, tenté d'ouvrir la page
-de l'activité, testé `STRAVA_ACCESS_TOKEN`, essayé un curl. Cinq tentatives, zéro
-accès.
-
-La cause n'était pas le coach : Strava n'existait que comme serveur MCP déclaré dans
-`~/.claude.json`, donc pour le moteur Claude uniquement. Le service tournait sur
-Codex (`AGENT_PROVIDER=codex`) depuis le 2026-08-12, et `~/.codex/config.toml` ne
-déclare aucun MCP. **Une capacité rangée dans un fichier de configuration par moteur
-disparaît au premier changement de moteur**, sans que rien ne le signale — c'est la
-même leçon que le lien de renfo du 2026-08-11, à l'échelle d'une source de données.
-
-Donc : la capacité vit dans le dépôt, en stdlib, nommée dans `CLAUDE.md` que tous les
-moteurs lisent. Elle se déploie avec `git pull` et se teste comme le reste.
-
-Usage :
+Usage:
     python3 scripts/strava.py check
     python3 scripts/strava.py activity 90000000002
     python3 scripts/strava.py laps 90000000002
@@ -27,40 +9,22 @@ Usage :
     python3 scripts/strava.py streams 90000000002 --keys altitude | \
         python3 scripts/descent.py --dplus 64.6
 
-Sortie : un bloc `clé: valeur` en français, ou `--json` pour la forme machine.
-`streams` rend toujours du JSON à plat (`{"altitude": [...]}`) : c'est exactement ce
-que `scripts/descent.py` mange, sans réemballage.
+Output is a readable `key : value` block, or JSON with `--json`. `streams` always
+prints flat JSON (`{"altitude": [...]}`), the shape `scripts/descent.py` reads.
+Activities are parsed into `scripts.model.activity.Activity`: cadence is in steps per
+minute on foot (Strava counts one foot) and in revolutions otherwise, and values are
+not rounded beyond the provider's precision.
 
-⚠ **La cadence.** Strava compte les pas d'UNE jambe en course à pied : le chiffre
-utile au registre est le double (168, pas 84). Mais à vélo, `average_cadence` est
-déjà un régime de pédalier en tr/min, et le doubler écrirait 160 tr/min pour un
-père tranquille. Ce script double pour les sports à pied UNIQUEMENT, et nomme dans
-sa sortie ce qu'il a fait (`cadence_pas_min` contre `cadence_tr_min`). La règle
-« multiplier par 2 » de CLAUDE.md ne portait pas cette nuance : une règle qui vit
-dans du code peut la porter, une ligne de prompt non.
-
-⚠ **Les valeurs sont BRUTES**, non arrondies : `scripts/ledger-add.py` est le seul
-qui arrondit, et deux arrondis en série ne rendent pas le même chiffre qu'un seul.
-
-Authentification — **deux faits, deux propriétaires, aucun recouvrement** :
-
-- l'environnement du service porte **l'identité de l'application** : `STRAVA_CLIENT_ID` et
-  `STRAVA_CLIENT_SECRET`, et rien d'autre. systemd charge ce fichier, donc le sandbox
-  les voit — c'est le même chemin que `DATABASE_URL`.
-- `server/.strava-token.json` (0600, hors Git) porte **les jetons**, qui tournent :
-  l'accès expire toutes les 6 h et se renouvelle tout seul, et Strava peut remplacer
-  le jeton de rafraîchissement à cette occasion. Le cache réécrit les deux.
-
-Il n'y a **aucune amorce de jeton dans `.env`**. Elle y a vécu jusqu'au 2026-08-14 et
-c'était un second propriétaire : dès la première rotation la copie de `.env` devenait
-fausse sans que rien ne le signale, et on diagnostiquait un accès vivant en lisant une
-valeur morte. L'amorçage est donc un geste explicite et unique :
+Authentication has two owners. The service environment holds the application identity
+(`STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`) and nothing else. `server/.strava-token.json`
+(0600, outside Git) holds the tokens, which rotate: access expires every 6 h and is
+refreshed here, and Strava may replace the refresh token at that moment. The first
+tokens are written once, on the machine that runs the coach, by
 
     python3 scripts/strava.py login
 
-à lancer **sur la machine qui fait tourner le coach** (le cache y est écrit), dans un
-terminal interactif : la commande lit le code d'autorisation sur l'entrée standard et
-jamais en argument, parce qu'un secret passé en argument finit dans `~/.bash_history`.
+which reads the authorisation code from standard input, never from an argument, so
+that it does not land in the shell history.
 """
 
 from __future__ import annotations
@@ -80,15 +44,17 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.model import entrypoint  # noqa: E402
+from scripts.model import entrypoint, session_kinds  # noqa: E402
+from scripts.model.activity import Activity, Lap, lap_summaries, summary  # noqa: E402
 from scripts.model.errors import ExternalError  # noqa: E402
 
 API = "https://www.strava.com/api/v3"
 TOKEN_URL = "https://www.strava.com/oauth/token"
 TIMEOUT = 30
 
-# Les sports où Strava ne compte qu'un pied. Le vélo n'y est pas, et c'est le sujet.
-FOOT_SPORTS = {"Run", "TrailRun", "VirtualRun", "Walk", "Hike"}
+#: What `activities` shows of each activity: enough to pick one.
+LIST_KEYS = ("id", "name", "sport", "start_local", "distance_km", "moving_time",
+             "elevation_gain_m")
 
 # Marge avant expiration : un jeton valide 40 s ne survit pas à l'appel qu'on
 # s'apprête à faire.
@@ -236,97 +202,62 @@ def call(endpoint: str, params: dict | None = None) -> Any:
     raise StravaError("Strava a refusé le jeton deux fois de suite")
 
 
-# ------------------------------------------------------------------ distillat
-
-def _pace(distance_m: float, moving_time_s: float) -> str | None:
-    """L'allure en min/km, telle qu'elle s'écrit au registre.
-
-    L'arrondi porte sur le TOTAL avant d'être découpé : arrondir les secondes seules
-    laisse passer « 6:60 » dès que la valeur exacte dépasse 6:59,5.
-    """
-    if not distance_m or not moving_time_s:
-        return None
-    minutes, seconds = divmod(round(moving_time_s / (distance_m / 1000)), 60)
-    return f"{minutes}:{seconds:02d}"
-
+# ------------------------------------------------------------------ lecture
 
 def _wall_clock(value: str | None) -> str | None:
-    """L'heure de départ locale, débarrassée du `Z` que Strava colle dessus.
-
-    ⚠ Piège de l'API, et c'est le plus coûteux du lot : `start_date_local` est une
-    heure MURALE au lieu de départ, mais Strava la sérialise quand même avec un `Z`
-    final — « 2026-08-14T07:32:50Z » pour un départ à 7h32 à Paris. Prise au mot, elle
-    se lit UTC et décale la météo de 2 h l'été, ce qui fausse la température de 2 à
-    4 °C : c'est exactement le bug du 2026-08-05 (`coaching/corrections.md`).
-
-    `weather.py --local` REFUSE une heure qui porte un fuseau. Lui passer la valeur
-    telle quelle le mettrait donc en échec à chaque sortie extérieure — et un garde-fou
-    qui bloque sans ouvrir de chemin correct fabrique son contournement, ce que la règle
-    de méta du 2026-08-06 nomme précisément. Le chemin correct s'ouvre ici, une fois,
-    plutôt que dans la tête du coach à chaque débrief.
-    """
+    """`start_date_local` is a wall-clock time, but Strava serialises it with a `Z`."""
     if not value:
         return None
     return value.removesuffix("Z")
 
 
-def _duration(seconds: float | None) -> str | None:
-    if not seconds:
-        return None
-    seconds = int(seconds)
-    hours, rest = divmod(seconds, 3600)
-    minutes, secs = divmod(rest, 60)
-    return f"{hours}:{minutes:02d}:{secs:02d}" if hours else f"{minutes}:{secs:02d}"
-
-
-def _cadence(raw: float | None, sport: str) -> tuple[str, float] | None:
-    """La cadence, nommée par son unité — le ×2 ne vaut que pour les sports à pied."""
+def _cadence(raw: float | None, on_foot: bool) -> dict[str, float]:
+    """Strava counts one foot's steps on foot and crank turns otherwise."""
     if raw is None:
-        return None
-    if sport in FOOT_SPORTS:
-        return ("cadence_pas_min", round(raw * 2, 1))
-    return ("cadence_tr_min", round(raw, 1))
+        return {}
+    if on_foot:
+        return {"cadence_spm": round(raw * 2, 1)}
+    return {"cadence_rpm": round(raw, 1)}
 
 
-def distill_activity(raw: dict) -> dict:
-    """Ce dont le coach a besoin, et rien de plus : le brut fait 100 champs."""
+def parse_lap(raw: dict, on_foot: bool) -> Lap:
+    return Lap(
+        name=raw.get("name"),
+        distance_m=raw.get("distance") or 0.0,
+        moving_s=raw.get("moving_time") or 0,
+        hr_avg_bpm=raw.get("average_heartrate"),
+        hr_max_bpm=raw.get("max_heartrate"),
+        elevation_gain_m=raw.get("total_elevation_gain"),
+        **_cadence(raw.get("average_cadence"), on_foot),
+    )
+
+
+def parse_activity(raw: dict) -> Activity:
+    """An activity from `/activities/{id}` (with its laps) or a summary row of a list."""
     sport = raw.get("sport_type") or raw.get("type") or ""
-    distance = raw.get("distance") or 0.0
-    moving = raw.get("moving_time") or 0
-    out: dict[str, Any] = {
-        "id": raw.get("id"),
-        "nom": raw.get("name"),
-        "description": raw.get("description") or "",
-        "sport": sport,
-        "depart_local": _wall_clock(raw.get("start_date_local")),
-        "distance_km": round(distance / 1000, 3),
-        "temps_mouvement": _duration(moving),
-        "temps_total": _duration(raw.get("elapsed_time")),
-        "dplus_m": raw.get("total_elevation_gain"),
-        "fc_moy": raw.get("average_heartrate"),
-        "fc_max": raw.get("max_heartrate"),
-        "effort_relatif": raw.get("suffer_score"),
-        "calories": raw.get("calories"),
-        "materiel_id": raw.get("gear_id"),
-        "nb_laps": len(raw.get("laps") or []),
-        # Sortie de groupe : restriction du permis EF (2026-09-27).
-        "nb_athletes": raw.get("athlete_count"),
-    }
-    if sport in FOOT_SPORTS:
-        out["allure_min_km"] = _pace(distance, moving)
-    elif distance and moving:
-        out["vitesse_kmh"] = round(distance / moving * 3.6, 1)
-
-    cadence = _cadence(raw.get("average_cadence"), sport)
-    if cadence:
-        out[cadence[0]] = cadence[1]
-
-    polyline = (raw.get("map") or {}).get("summary_polyline") or ""
-    if polyline and not raw.get("trainer"):
-        # Tout ce dont weather.py a besoin, dans l'ordre où il le demande.
-        out["meteo"] = {"polyline": polyline,
-                        "time": _wall_clock(raw.get("start_date_local"))}
-    return out
+    on_foot = sport in session_kinds.FOOT_SPORTS
+    outdoor = not raw.get("trainer")
+    return Activity(
+        id=raw["id"],
+        sport=sport,
+        name=raw.get("name"),
+        description=raw.get("description") or "",
+        start_local=_wall_clock(raw.get("start_date_local")),
+        distance_m=raw.get("distance") or 0.0,
+        moving_s=raw.get("moving_time") or 0,
+        elapsed_s=raw.get("elapsed_time"),
+        elevation_gain_m=raw.get("total_elevation_gain"),
+        hr_avg_bpm=raw.get("average_heartrate"),
+        hr_max_bpm=raw.get("max_heartrate"),
+        relative_effort=raw.get("suffer_score"),
+        calories=raw.get("calories"),
+        gear_id=raw.get("gear_id"),
+        athlete_count=raw.get("athlete_count"),
+        route_polyline=((raw.get("map") or {}).get("summary_polyline") or None
+                        if outdoor else None),
+        laps=tuple(parse_lap(lap, on_foot) for lap in raw.get("laps") or ()),
+        **_cadence(raw.get("average_cadence"), on_foot),
+    )
 
 
 def distill_gear(raw: dict) -> dict:
@@ -344,26 +275,6 @@ def distill_gear(raw: dict) -> dict:
         "model": raw.get("model_name"),
         "description": raw.get("description"),
     }
-
-
-def distill_lap(lap: dict, sport: str, index: int) -> dict:
-    distance = lap.get("distance") or 0.0
-    moving = lap.get("moving_time") or 0
-    out: dict[str, Any] = {
-        "rep": index,
-        "nom": lap.get("name"),
-        "distance_km": round(distance / 1000, 3),
-        "temps": _duration(moving),
-        "fc_moy": lap.get("average_heartrate"),
-        "fc_max": lap.get("max_heartrate"),
-        "dplus_m": lap.get("total_elevation_gain"),
-    }
-    if sport in FOOT_SPORTS:
-        out["allure_min_km"] = _pace(distance, moving)
-    cadence = _cadence(lap.get("average_cadence"), sport)
-    if cadence:
-        out[cadence[0]] = cadence[1]
-    return out
 
 
 # ------------------------------------------------------------------ rendu
@@ -400,39 +311,31 @@ def emit(data: Any, as_json: bool) -> None:
 # ------------------------------------------------------------------ commandes
 
 def cmd_activity(args) -> Any:
-    return distill_activity(call(f"/activities/{args.id}"))
+    """The summary, plus what `weather.py` needs for an outdoor activity."""
+    activity = parse_activity(call(f"/activities/{args.id}"))
+    out = summary(activity)
+    if activity.weather_query:
+        out["weather_query"] = activity.weather_query
+    return out
 
 
 def cmd_laps(args) -> Any:
-    activity = call(f"/activities/{args.id}")
-    sport = activity.get("sport_type") or activity.get("type") or ""
-    # `is None` et pas un test de vérité : une activité sans tour rendrait une liste
-    # vide, et retomber sur l'endpoint dédié pour se faire répondre la même chose
-    # brûlerait un appel du quota à chaque fois.
-    laps = activity.get("laps")
-    if laps is None:
-        laps = call(f"/activities/{args.id}/laps")
-    return {
-        "activite": activity.get("name"),
-        "sport": sport,
-        "laps": [distill_lap(lap, sport, i) for i, lap in enumerate(laps, start=1)],
-    }
+    raw = call(f"/activities/{args.id}")
+    if raw.get("laps") is None:
+        # Only an absent field calls the endpoint: an empty list is an answer.
+        raw = {**raw, "laps": call(f"/activities/{args.id}/laps")}
+    activity = parse_activity(raw)
+    return {"name": activity.name, "sport": activity.sport,
+            "laps": lap_summaries(activity)}
 
 
 def cmd_activities(args) -> Any:
     params: dict[str, Any] = {"per_page": args.limit}
     if args.after:
         params["after"] = int(time.mktime(time.strptime(args.after, "%Y-%m-%d")))
-    rows = call("/athlete/activities", params)
-    return [{
-        "id": row.get("id"),
-        "nom": row.get("name"),
-        "sport": row.get("sport_type") or row.get("type"),
-        "depart_local": _wall_clock(row.get("start_date_local")),
-        "distance_km": round((row.get("distance") or 0) / 1000, 2),
-        "temps_mouvement": _duration(row.get("moving_time")),
-        "dplus_m": row.get("total_elevation_gain"),
-    } for row in rows]
+    return [{key: row[key] for key in LIST_KEYS if key in row}
+            for row in (summary(parse_activity(raw)) for raw in call(
+                "/athlete/activities", params))]
 
 
 def cmd_streams(args) -> Any:

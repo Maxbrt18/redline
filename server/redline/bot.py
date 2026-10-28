@@ -732,8 +732,8 @@ ne demande pas de confirmation artificielle."""
                 pro.release_job(record["id"], delay=0)
                 return ""
             absorbed["job"] = record
-            absorbed["workout_card"] = snapshot.get("repetitions")
-            absorbed["quality"] = bool(snapshot.get("qualite"))
+            absorbed["workout_card"] = snapshot.get("quality_card")
+            absorbed["quality"] = bool(snapshot.get("quality"))
             log.info("Strava activity %s: debrief folded into the reply", record["detail"])
             return (strava_snapshot_note(snapshot) + "\n\n" + debrief_in_reply(
                 record["detail"], carnet=self._notebook_connected(psid)))

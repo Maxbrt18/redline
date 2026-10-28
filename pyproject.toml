@@ -57,6 +57,8 @@ ignore_names = [
     "gate_trend_weeks", "pain_cap",
     # Réglage Flask lu par Werkzeug.
     "max_content_length",
+    # Champs d'`Activity` que seul `summary()` lit, par `dataclasses.fields`.
+    "relative_effort", "calories",
 ]
 
 [tool.mypy]

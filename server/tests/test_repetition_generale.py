@@ -106,7 +106,7 @@ def test_un_debrief_complet_passe_la_frontiere_du_tour(store):
     reussit(coach("scripts/ledger-add.py", "--date", "2026-08-14", "--type", "easy",
                   "--km", "6.969", "--temps", "43:05", "--allure", "6:11",
                   "--fcmoy", "151.3", "--cad", "165", "--dplus", "64.6",
-                  "--strava", "90000000002", "--depart-local", "2026-08-14T07:15:00",
+                  "--strava", "90000000002", "--start-local", "2026-08-14T07:15:00",
                   "--session-key", "2026-W33:w33-ven-ef", turn=tour), "ledger-add")
 
     assert store.apply_turn_with_receipts(tour)[0] == 1
@@ -281,7 +281,7 @@ def test_le_debrief_strava_joue_toute_sa_sequence(store):
                   "--km", "6.969", "--temps", "43:05", "--allure", "6:11",
                   "--fcmoy", "151.3", "--cad", "165", "--dplus", "64.6",
                   "--dmoins", "65", "--wbgt", "23", "--strava", "90000000002",
-                  "--depart-local", "2026-08-14T07:15:00",
+                  "--start-local", "2026-08-14T07:15:00",
                   "--session-key", "2026-W33:w33-ven-ef",
                   turn=tour), "ledger-add")
     assert store.apply_turn_with_receipts(tour)[0] == 1
