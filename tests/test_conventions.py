@@ -13,8 +13,10 @@ from pathlib import Path
 
 from conftest import ENGINE_ROOT
 
-ROOTS = ("src", "deploy", "migrations", "tests", ".github", "pyproject.toml")
-HASH_COMMENTED = {".sh", ".toml", ".yml", ".yaml", ".ini", ".txt", ".example", ".cfg"}
+ROOTS = ("src", "deploy", "migrations", "tests", ".github", ".githooks", "pyproject.toml")
+HASH_COMMENTED = {".sh", ".toml", ".yml", ".yaml", ".ini", ".txt", ".example", ".cfg",
+                  ".service", ".timer", ".conf"}
+HASH_COMMENTED_NAMES = {"Caddyfile", "Dockerfile"}
 SLASH_COMMENTED = {".js", ".css", ".html"}
 SKIPPED = ("tests/fixtures/",)
 
@@ -52,7 +54,8 @@ def _comments(path: Path):
         source = path.read_text(encoding="utf-8")
         for match in SLASH_COMMENT.finditer(source):
             yield source.count("\n", 0, match.start()) + 1, match.group()
-    elif path.suffix in HASH_COMMENTED or path.name == "Caddyfile":
+    elif (path.suffix in HASH_COMMENTED or path.name in HASH_COMMENTED_NAMES
+          or (not path.suffix and path.read_bytes().startswith(b"#!"))):
         lines = path.read_text(encoding="utf-8").splitlines()
         for number, line in enumerate(lines, start=1):
             if line.lstrip().startswith("#"):

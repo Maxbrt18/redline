@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Lanceur installé root:root hors du vault pour les CLI autorisées au coach 24/7.
-# Le code exécuté doit être exactement celui du commit déployé : un tour peut éditer
-# les notes, jamais réécrire une CLI puis l'exécuter avec les secrets du service.
+# Launcher installed root:root outside the vault for the CLIs allowed to the 24/7 coach.
+# The executed code must be exactly that of the deployed commit: a turn may edit the
+# notes, never rewrite a CLI and then run it with the service secrets.
 set -euo pipefail
 
 repo=${REDLINE_REPO:-/home/ubuntu/redline}
@@ -27,18 +27,18 @@ grep -Fxq -- "$script" "$policy" || {
 }
 shift
 
-# Ce lanceur ne sert qu'aux tours du coach, et chaque tour outillé porte son identité :
-# sans elle, les CLI écriraient directement, hors de la transaction du tour qu'un
-# abandon efface. Vider la variable ne doit donc pas ouvrir un chemin d'écriture.
-# (Les commandes opérateur s'exécutent avec l'environnement du service, hors de ce lanceur.)
+# This launcher only serves coach turns, and every tooled turn carries its identity:
+# without it the CLIs would write directly, outside the turn transaction that an
+# abort discards. Clearing the variable must therefore not open a write path.
+# (Operator commands run with the service environment, outside this launcher.)
 uuid='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
 [[ "${REDLINE_TURN_ID:-}" =~ $uuid ]] || {
   echo "agent-cli: aucun tour en cours (REDLINE_TURN_ID absent ou invalide)" >&2
   exit 2
 }
 
-# `week-plan.py` est la commande que nomment les consignes ; `redline.cli.week_plan`
-# est le module qui la porte.
+# `week-plan.py` is the command named by the instructions; `redline.cli.week_plan`
+# is the module that implements it.
 name=${script%.py}
 module="redline.cli.${name//-/_}"
 source_file="src/redline/cli/${name//-/_}.py"

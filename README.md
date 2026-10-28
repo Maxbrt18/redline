@@ -83,7 +83,7 @@ temporary copy of it through `VAULT_PATH`, exactly as the service runs on yours.
 
 ## Running it
 
-See [`docs/deployment.md`](docs/deployment.md) (French) for the full deployment: PostgreSQL via
+See [`docs/deployment.md`](docs/deployment.md) for the full deployment: PostgreSQL via
 Docker Compose, Alembic migrations, environment variables (`deploy/coach-messenger.env.example`), systemd
 units, Caddy. You need your own Strava API application, a Messenger app, and an LLM agent
 runtime.
