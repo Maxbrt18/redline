@@ -8,14 +8,40 @@ failing loudly. These tests hold the boundary through a real launch.
 import os
 import subprocess
 
+import pytest
 from conftest import ENGINE_ROOT, cli_command
 
 from redline.model import paths
+from redline.model.errors import ConfigError
 
 
-def test_without_configuration_the_vault_is_the_engine_itself(monkeypatch):
+def test_without_configuration_there_is_no_vault(monkeypatch):
     monkeypatch.delenv("VAULT_PATH", raising=False)
-    assert paths.vault_root() == paths.ENGINE_ROOT == ENGINE_ROOT
+    with pytest.raises(ConfigError, match="VAULT_PATH is not set"):
+        paths.vault_root()
+
+
+def test_the_engine_checkout_is_never_a_vault(monkeypatch):
+    """Its CLAUDE.md and AGENTS.md are for developers, not the coach."""
+    monkeypatch.setenv("VAULT_PATH", str(ENGINE_ROOT))
+    with pytest.raises(ConfigError, match="engine checkout"):
+        paths.vault_root()
+
+
+def test_the_service_refuses_to_start_without_a_vault(monkeypatch):
+    from redline.service.config import Config
+    for key in ("MESSENGER_PAGE_TOKEN", "MESSENGER_VERIFY_TOKEN", "MESSENGER_APP_SECRET",
+                "MESSENGER_ALLOWED_PSID"):
+        monkeypatch.setenv(key, "x")
+    monkeypatch.delenv("VAULT_PATH", raising=False)
+    with pytest.raises(SystemExit, match="VAULT_PATH"):
+        Config.from_env()
+
+
+def test_the_agent_wrapper_refuses_to_run_without_a_vault():
+    wrapper = (ENGINE_ROOT / "deploy" / "redline-agent-cli").read_text(encoding="utf-8")
+    assert "vault=${VAULT_PATH:-}" in wrapper
+    assert "VAULT_PATH absent" in wrapper
 
 
 def test_vault_path_moves_the_vault_and_nothing_else(monkeypatch, tmp_path):
