@@ -15,6 +15,7 @@ Depuis le 2026-09-25, la frontière est coupée en deux : `persist_turn` (Postgr
 commit local, sans réseau) précède la livraison ; `publish` (vues, commit, push) la suit.
 """
 
+import os
 import subprocess
 import sys
 from unittest.mock import MagicMock
@@ -71,7 +72,7 @@ class TestNothingFailsSilently:
             self, git_repo):
         """RWF-003 : l'effet dangereux est le fichier de code, pas les notes du tour."""
         base = _head(git_repo)
-        path = git_repo / "server" / "redline" / "surprise.py"
+        path = git_repo / "src" / "redline" / "service" / "surprise.py"
         path.parent.mkdir(parents=True)
         path.write_text("BROKEN = True\n", encoding="utf-8")
         (git_repo / "notes.md").write_text("une note du coach", encoding="utf-8")
@@ -125,29 +126,30 @@ class TestTheHookAgreesWithTheCode:
     `regenerate_views` a explicitement décidé de laisser passer. Aucun test ne
     l'exerçait, parce que les dépôts de test n'ont pas de `core.hooksPath`."""
 
-    def test_the_real_hook_does_not_abort_a_commit_on_a_failing_generator(self, git_repo):
-        scripts = git_repo / "scripts"
-        scripts.mkdir(exist_ok=True)
-        (scripts / "regen-views.py").write_text(
+    def test_the_real_hook_does_not_abort_a_commit_on_a_failing_generator(
+            self, git_repo, tmp_path):
+        generator = tmp_path / "fake" / "redline" / "cli"
+        generator.mkdir(parents=True)
+        (generator.parent / "__init__.py").write_text("", encoding="utf-8")
+        (generator / "__init__.py").write_text("", encoding="utf-8")
+        (generator / "regen_views.py").write_text(
             "import sys; sys.exit('registre illisible')\n", encoding="utf-8")
-        # Le générateur entre AVANT que le hook ne soit branché : le commit à tester ne
-        # doit stager aucun `.py`, sans quoi c'est la porte ruff/mypy/pytest du hook
-        # qu'on mesurerait, et pas la ligne de régénération.
-        git(git_repo, "add", "-A")
-        git(git_repo, "commit", "--no-verify", "-m", "générateur cassé")
         git(git_repo, "config", "core.hooksPath", str(ENGINE_ROOT / ".githooks"))
         (git_repo / "notes.md").write_text("le travail d'une session")
         git(git_repo, "add", "-A")
         done = subprocess.run(["git", "commit", "-m", "session"], cwd=git_repo,
-                              capture_output=True, text=True)
+                              capture_output=True, text=True,
+                              env={**os.environ, "PYTHONPATH": str(tmp_path / "fake")})
         assert done.returncode == 0, done.stderr
         assert "notes.md" in _committed(git_repo)
 
-    def test_the_hook_stages_what_it_regenerates_and_nothing_else(self, git_repo):
+    def test_the_hook_stages_what_it_regenerates_and_nothing_else(self, git_repo, tmp_path):
         """`git add -u` embarquait toute édition non stagée : aucun commit ciblé."""
-        scripts = git_repo / "scripts"
-        scripts.mkdir(exist_ok=True)
-        (scripts / "regen-views.py").write_text(
+        generator = tmp_path / "fake" / "redline" / "cli"
+        generator.mkdir(parents=True)
+        (generator.parent / "__init__.py").write_text("", encoding="utf-8")
+        (generator / "__init__.py").write_text("", encoding="utf-8")
+        (generator / "regen_views.py").write_text(
             "from pathlib import Path\nPath('vue.md').write_text('régénérée')\n",
             encoding="utf-8")
         for name in ("vue.md", "brouillon.md", "notes.md"):
@@ -159,7 +161,8 @@ class TestTheHookAgreesWithTheCode:
         (git_repo / "notes.md").write_text("le travail d'une session")
         git(git_repo, "add", "notes.md")
         done = subprocess.run(["git", "commit", "-m", "session"], cwd=git_repo,
-                              capture_output=True, text=True)
+                              capture_output=True, text=True,
+                              env={**os.environ, "PYTHONPATH": str(tmp_path / "fake")})
         assert done.returncode == 0, done.stderr
         committed = _committed(git_repo)
         assert "notes.md" in committed and "vue.md" in committed

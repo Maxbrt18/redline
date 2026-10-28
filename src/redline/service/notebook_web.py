@@ -12,6 +12,7 @@ from urllib.parse import urlsplit
 from flask import Flask, jsonify, request
 from sqlalchemy.exc import SQLAlchemyError
 
+from redline.cards import render
 from redline.coach.fr import session_labels
 from redline.storage.database import StorageError
 from redline.storage.notebook import DEVICE_SECONDS
@@ -48,7 +49,7 @@ def register(app: Flask, notebook: NotebookService, psid: str,
     """`alert(texte, clé)` réveille le coach quand une réponse franchit un plafond ;
     `cues` porte les consignes d'exécution des exercices, pour la séance guidée ;
     `settled(activité)` avance le débrief d'une sortie dont les ressentis sont complets."""
-    document = page.notebook_document(notebook.root / "scripts" / "cards", cues,
+    document = page.notebook_document(render.CARDS_DIR, cues,
                                       session_labels.for_page()).encode("utf-8")
     # La coquille ne porte aucune donnée : elle se revalide (304) et voyage compressée.
     # Mesure du 2026-10-08 : 162 Ko re-téléchargés à chaque ouverture, en `no-store`.

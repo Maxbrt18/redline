@@ -25,6 +25,7 @@ from redline.storage.database import StorageError
 from redline.storage.repository import OperationalStore
 
 from . import clock
+from .config import OUTBOX_DIR
 from .plans import PlanStatus, render_plan_message
 
 log = logging.getLogger("redline")
@@ -574,11 +575,9 @@ class VaultRepo:
             revision = json.loads(context)["revision"]
         except (json.JSONDecodeError, KeyError):
             return False
-        script = os.path.join(self._path, "scripts", "chart-plan.py")
-        outbox = os.path.join(self._path, "server", "outbox")
-        os.makedirs(outbox, exist_ok=True)
-        target = os.path.join(outbox, f"plan-{week.lower()}-r{revision}.png")
-        command = [sys.executable, script, "--week", week, "-o", target]
+        OUTBOX_DIR.mkdir(parents=True, exist_ok=True)
+        target = str(OUTBOX_DIR / f"plan-{week.lower()}-r{revision}.png")
+        command = [sys.executable, "-m", "redline.cli.chart_plan", "--week", week, "-o", target]
         if today:
             command += ["--today", today]
         try:
@@ -596,13 +595,12 @@ class VaultRepo:
 
     def render_workout_card(self, card: dict, activity_id: str) -> bool:
         """Rend la carte des répétitions d'une séance de qualité dans l'outbox."""
-        script = os.path.join(self._path, "scripts", "chart-workout.py")
-        outbox = os.path.join(self._path, "server", "outbox")
-        os.makedirs(outbox, exist_ok=True)
-        target = os.path.join(outbox, f"workout-{activity_id}.png")
+        OUTBOX_DIR.mkdir(parents=True, exist_ok=True)
+        target = str(OUTBOX_DIR / f"workout-{activity_id}.png")
         try:
             process = subprocess.run(
-                [sys.executable, script, "-o", target], cwd=self._path,
+                [sys.executable, "-m", "redline.cli.chart_workout", "-o", target],
+                cwd=self._path,
                 input=json.dumps(card, ensure_ascii=False), capture_output=True,
                 text=True, timeout=PROCESS_TIMEOUT)
         except subprocess.TimeoutExpired:
