@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Configuration de l'hôte : mises à jour automatiques et SSH. Idempotent.
 #
-#   sudo server/host/install.sh
+#   sudo deploy/host/install.sh
 #
 # Le pare-feu de l'hôte est firewalld (zone public : ssh, http, https, dhcpv6-client),
 # seconde couche derrière la Security List Oracle. Ce script ne le modifie pas.

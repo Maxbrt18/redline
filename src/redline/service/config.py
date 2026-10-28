@@ -19,14 +19,6 @@ from redline.model.instance import Instance
 
 from .routing import RoutingConfig
 
-# Racine de server/ : seuls la configuration et l'outbox d'images éphémère restent
-# sur disque. Toutes les données durables vivent dans PostgreSQL.
-SERVER_DIR = paths.ENGINE_ROOT / "server"
-
-# Image outbox: any PNG dropped here during an agent turn goes out as a Messenger
-# attachment after the last text (see outbox.py). Gitignored.
-OUTBOX_DIR = SERVER_DIR / "outbox"
-ATTACHMENT_DIR = SERVER_DIR / "attachments"
 # `secrets.token_urlsafe(32)` en donne 43 ; aucune valeur d'exemple n'atteint 32.
 SHARED_SECRET_MIN_LENGTH = 32
 
@@ -251,7 +243,7 @@ class Config:
             coach_base_url=os.environ.get("COACH_BASE_URL", "").strip().rstrip("/"),
             strength_reports_per_day=_envint("STRENGTH_REPORTS_PER_DAY", 8),
             attachment_dir=os.path.expanduser(os.environ.get(
-                "ATTACHMENT_DIR", str(ATTACHMENT_DIR))),
+                "ATTACHMENT_DIR", str(paths.state_dir() / "attachments"))),
             attachment_max_bytes=_envint("ATTACHMENT_MAX_BYTES", 12 * 1024 * 1024),
             attachment_total_bytes=_envint("ATTACHMENT_TOTAL_BYTES", 20 * 1024 * 1024),
             instance=_load_instance(vault_path),

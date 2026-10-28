@@ -5,9 +5,9 @@ import sys
 from pathlib import Path
 
 import pytest
-from conftest import SERVER_DIR
+from conftest import DEPLOY_DIR, ENGINE_ROOT
 
-SERVER = SERVER_DIR
+SERVER = DEPLOY_DIR
 SCRIPT = SERVER / "agent-runtime-update.py"
 SPEC = importlib.util.spec_from_file_location("agent_runtime_update", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
@@ -39,7 +39,7 @@ def test_requirement_bounds_fail_closed_for_unknown_policies(requirements):
 
 def test_both_tracked_manifests_hold_a_single_valid_range():
     """Les deux runtimes lisent leur borne dans le dépôt, avec la même règle."""
-    requirements = (SERVER / "requirements.txt").read_text(encoding="utf-8")
+    requirements = (ENGINE_ROOT / "requirements.txt").read_text(encoding="utf-8")
     claude = (SERVER / "claude-runtime.txt").read_text(encoding="utf-8")
     assert updater._manifest_bounds(requirements, "openai-codex")
     assert updater._manifest_bounds(claude, updater.CLAUDE_PACKAGE)
@@ -76,6 +76,11 @@ def test_codex_candidate_installs_runtime_and_validation_dependencies():
     ]
 
 
+def test_codex_candidate_installs_the_engine_from_the_checkout():
+    command = updater.CodexRuntime.package_install_command("/tmp/candidate/bin/python")
+    assert command[-3:] == ["--no-deps", "-e", str(updater.REPO)]
+
+
 def test_unexpected_pip_index_output_is_refused():
     with pytest.raises(ValueError):
         updater._available_versions("ERROR: connection unavailable\n")
@@ -107,7 +112,7 @@ def test_claude_candidate_installs_the_exact_version_in_its_own_prefix():
 
 def test_the_service_path_serves_the_managed_claude_before_the_global_one():
     """Le lien géré précède /usr/bin : sans lui, le Claude global reste le recours."""
-    unit = (SERVER / "coach-messenger.service").read_text(encoding="utf-8")
+    unit = (SERVER / "systemd" / "coach-messenger.service").read_text(encoding="utf-8")
     path = next(line.split("=", 2)[2] for line in unit.splitlines()
                 if line.startswith("Environment=PATH="))
     entries = path.split(":")

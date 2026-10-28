@@ -47,6 +47,7 @@ the facts before it speaks**.
 | `src/redline/model/`, `analysis/`, `integrations/`, `coach/` | The typed domain, the ledger and its reports, Strava and the weather, the coach's words |
 | `src/redline/storage/`, `migrations/` | PostgreSQL schema (Alembic) and repository layer |
 | `src/redline/cards/` | HTML/PNG card renderer (week, month, workout, strength) |
+| `deploy/` | systemd units, Caddy, PostgreSQL (Compose, backups), the agent's command launcher and its allowlist, the runtime updater |
 | `templates/` | Note templates for a vault (athlete onboarding, weekly review, debrief…) |
 | `CLAUDE.md` | A **template** of the agent's instruction file: reading ladder, calibration rule, fact-ownership table |
 | `docs/storage-architecture.md` | Why PostgreSQL owns operational facts and Git owns knowledge |
@@ -82,14 +83,14 @@ temporary copy of it through `VAULT_PATH`, exactly as the service runs on yours.
 
 ## Running it
 
-See [`server/README.md`](server/README.md) (French) for the full deployment: PostgreSQL via
-Docker Compose, Alembic migrations, environment variables (`server/.env.example`), systemd
+See [`docs/deployment.md`](docs/deployment.md) (French) for the full deployment: PostgreSQL via
+Docker Compose, Alembic migrations, environment variables (`deploy/coach-messenger.env.example`), systemd
 units, Caddy. You need your own Strava API application, a Messenger app, and an LLM agent
 runtime.
 
 ```bash
 python3.12 -m venv .venv && . .venv/bin/activate
-pip install -r server/requirements.txt -r server/requirements-dev.txt
+pip install -r requirements.txt -r requirements-dev.txt
 pip install --no-deps -e .   # the engine, as the `redline` package
 playwright install chromium   # the page and card tests drive a real browser
 pytest -q

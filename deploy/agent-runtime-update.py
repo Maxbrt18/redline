@@ -30,7 +30,7 @@ from pathlib import Path
 
 REPO = Path("/home/ubuntu/redline")
 SERVICE = "coach-messenger"
-SERVICE_UNIT = REPO / "server/coach-messenger.service"
+SERVICE_UNIT = REPO / "deploy/systemd/coach-messenger.service"
 SYSTEM_PYTHON = "/usr/bin/python3.12"
 VERSION_PATTERN = re.compile(r"^[0-9]+(?:\.[0-9]+){1,3}$")
 MARKER = ".redline-runtime-ready"
@@ -40,8 +40,8 @@ STARTUP_TIMEOUT = 90
 # les deux fournisseurs ; seul Codex y vit en tant que runtime.
 VENVS = Path("/home/ubuntu/.venvs")
 SERVICE_VENV = VENVS / "redline-current"
-REQUIREMENTS = REPO / "server/requirements.txt"
-DEV_REQUIREMENTS = REPO / "server/requirements-dev.txt"
+REQUIREMENTS = REPO / "requirements.txt"
+DEV_REQUIREMENTS = REPO / "requirements-dev.txt"
 CODEX_SMOKE = "/usr/local/libexec/redline-codex-runtime-smoke.py"
 CODEX_CANDIDATE = re.compile(r"^redline-codex-[0-9]+(?:\.[0-9]+){1,3}-[a-f0-9]{10}$")
 
@@ -49,7 +49,7 @@ CODEX_CANDIDATE = re.compile(r"^redline-codex-[0-9]+(?:\.[0-9]+){1,3}-[a-f0-9]{1
 CLAUDE_RUNTIMES = Path("/home/ubuntu/.claude-runtimes")
 CLAUDE_LINK = CLAUDE_RUNTIMES / "current"
 CLAUDE_PACKAGE = "@anthropic-ai/claude-code"
-CLAUDE_MANIFEST = REPO / "server/claude-runtime.txt"
+CLAUDE_MANIFEST = REPO / "deploy/claude-runtime.txt"
 CLAUDE_CHANNEL = "stable"
 CLAUDE_SMOKE = "/usr/local/libexec/redline-claude-runtime-smoke.py"
 CLAUDE_CANDIDATE = re.compile(r"^claude-code-[0-9]+(?:\.[0-9]+){1,3}$")
@@ -414,6 +414,12 @@ class CodexRuntime:
             "-r", str(REQUIREMENTS), "-r", str(DEV_REQUIREMENTS),
         ]
 
+    @staticmethod
+    def package_install_command(python_bin: str) -> list[str]:
+        """The engine itself, editable: the checkout stays the code the service runs."""
+        return [python_bin, "-m", "pip", "install", "--disable-pip-version-check",
+                "--no-deps", "-e", str(REPO)]
+
     def build(self, version: str) -> Path:
         req_digest = self._requirements_digest()
         candidate = self.root / f"redline-codex-{version}-{req_digest[:10]}"
@@ -422,6 +428,7 @@ class CodexRuntime:
         def build() -> None:
             _run_as_ubuntu([SYSTEM_PYTHON, "-m", "venv", str(candidate)], timeout=120)
             _run_as_ubuntu(self.pip_install_command(python_bin), timeout=900)
+            _run_as_ubuntu(self.package_install_command(python_bin), timeout=300)
 
         return _build_candidate(candidate, version, f"{version}\n{req_digest}\n", build,
                                 lambda: self._installed_version(python_bin))

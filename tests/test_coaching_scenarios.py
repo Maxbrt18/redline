@@ -1,6 +1,6 @@
 """Les scénarios d'évaluation : forme vérifiée, et chaque correction réelle y laisse une trace.
 
-Le banc `server/evaluate-coaching.py` est payant et hors CI ; ses fixtures, elles, se
+Le banc `redline.cli.evaluate_coaching` est payant et hors CI ; ses fixtures, elles, se
 vérifient gratuitement. Depuis le 2026-09-27, une erreur corrigée par Sam peut devenir
 un scénario rejouable : le champ `origin` nomme la correction ou la décision d'où il vient.
 """

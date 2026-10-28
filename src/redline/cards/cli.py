@@ -8,15 +8,26 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 
-from redline.model import agent_input
+from redline.model import agent_input, paths
 from redline.model.errors import InputError
 from redline.model.schema import Schema, SchemaError
 
 
+def output_path(raw: str) -> str:
+    """`week-29.png` lands in the service's outbox, so the coach never spells where it
+    lives; a path with a directory is taken as is."""
+    if os.sep in raw:
+        return raw
+    paths.outbox_dir().mkdir(parents=True, exist_ok=True)
+    return str(paths.outbox_dir() / raw)
+
+
 def parse_args(description: str) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=description)
-    parser.add_argument("-o", "--out", required=True, help="chemin du PNG à produire")
+    parser.add_argument("-o", "--out", required=True, type=output_path,
+                        help="le PNG à produire ; un nom seul le range dans l'outbox")
     parser.add_argument("--html", action="store_true",
                         help="écrit le HTML autonome au lieu de rendre (boucle de design)")
     parser.add_argument("--input", help="JSON de la card (défaut : stdin hors tour)")

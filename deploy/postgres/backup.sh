@@ -6,7 +6,7 @@ if [[ "$(id -u)" -eq 0 ]]; then
   exit 2
 fi
 
-compose_file="${REDLINE_POSTGRES_COMPOSE:-/home/ubuntu/redline/server/postgres/compose.yml}"
+compose_file="${REDLINE_POSTGRES_COMPOSE:-/home/ubuntu/redline/deploy/postgres/compose.yml}"
 env_file="${REDLINE_POSTGRES_ENV:-/etc/redline/postgres.env}"
 backup_dir="${REDLINE_BACKUP_DIR:-/var/lib/redline-backups}"
 recipient_file="${REDLINE_AGE_RECIPIENT_FILE:-/etc/redline/secrets/backup-age-recipient.txt}"

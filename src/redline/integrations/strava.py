@@ -16,7 +16,7 @@ minute on foot (Strava counts one foot) and in revolutions otherwise, and values
 not rounded beyond the provider's precision.
 
 Authentication has two owners. The service environment holds the application identity
-(`STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`) and nothing else. `server/.strava-token.json`
+(`STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`) and nothing else. `$REDLINE_STATE_DIR/strava-token.json`
 (0600, outside Git) holds the tokens, which rotate: access expires every 6 h and is
 refreshed here, and Strava may replace the refresh token at that moment. The first
 tokens are written once, on the machine that runs the coach, by
@@ -69,7 +69,7 @@ class StravaNotFound(StravaError):
 
 def _cache_path() -> Path:
     override = (os.environ.get("STRAVA_TOKEN_CACHE") or "").strip()
-    return Path(override) if override else paths.ENGINE_ROOT / "server" / ".strava-token.json"
+    return Path(override) if override else paths.state_dir() / "strava-token.json"
 
 
 def _read_cache(path: Path) -> dict:
@@ -119,7 +119,7 @@ def _app_identity() -> tuple[str, str]:
     if not client_id or not client_secret:
         raise StravaError(
             "STRAVA_CLIENT_ID et STRAVA_CLIENT_SECRET sont absents de l'environnement : "
-            "ils se renseignent dans l'environnement (cf. server/.env.example)."
+            "ils se renseignent dans l'environnement (cf. deploy/coach-messenger.env.example)."
         )
     return client_id, client_secret
 

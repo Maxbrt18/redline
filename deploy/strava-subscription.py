@@ -9,8 +9,8 @@ déjà tourner avec ce secret. Sans changement à faire, `renew` ne touche à ri
 
 Usage (sur le VPS, environnement du service chargé) :
   set -a; . /etc/redline/runtime/coach-messenger.env; set +a
-  python3 server/strava-subscription.py status   # code 0 si l'abonnement est le bon
-  python3 server/strava-subscription.py renew
+  python3 deploy/strava-subscription.py status   # code 0 si l'abonnement est le bon
+  python3 deploy/strava-subscription.py renew
 """
 
 from __future__ import annotations

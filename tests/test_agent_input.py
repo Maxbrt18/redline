@@ -14,7 +14,7 @@ import subprocess
 from unittest.mock import MagicMock
 
 import pytest
-from conftest import ENGINE_ROOT, SERVER_DIR, cli_command
+from conftest import DEPLOY_DIR, ENGINE_ROOT, cli_command
 
 from redline.model import agent_input
 from redline.service import persona
@@ -132,7 +132,7 @@ def test_every_turn_clears_its_files_whatever_the_outcome():
 
 def _smoke():
     spec = importlib.util.spec_from_file_location(
-        "claude_runtime_smoke", SERVER_DIR / "claude-runtime-smoke.py")
+        "claude_runtime_smoke", DEPLOY_DIR / "claude-runtime-smoke.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module

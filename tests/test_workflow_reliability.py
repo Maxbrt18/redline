@@ -500,19 +500,19 @@ def test_rwf016_a_turn_is_traceable_by_structured_events_without_text(make_bot, 
 def test_rwf016_the_release_check_and_the_service_fingerprint_the_same_code(git_repo):
     """`verify-release.sh` et `/health` doivent calculer la même empreinte, et un commit
     de notes du coach ne doit pas la faire bouger."""
-    for tree in ("server", "src", "migrations"):
+    for tree in ("deploy", "src", "migrations"):
         (git_repo / tree).mkdir()
         (git_repo / tree / "code.py").write_text(f"# {tree}\n", encoding="utf-8")
     git(git_repo, "add", "-A")
     git(git_repo, "commit", "-m", "code")
-    script = (ENGINE_ROOT / "server" / "verify-release.sh").read_text(encoding="utf-8")
+    script = (ENGINE_ROOT / "deploy" / "verify-release.sh").read_text(encoding="utf-8")
     pipeline = re.search(r"^trees=.*?^expected_tree=[^\n]*", script, re.DOTALL | re.MULTILINE)
     assert pipeline is not None
     shell = subprocess.run(
         ["bash", "-c", f'{pipeline.group(0)}\nprintf %s "$expected_tree"'],
         env={"PATH": "/usr/bin:/bin", "repo_root": str(git_repo), "expected": "HEAD"},
         capture_output=True, text=True, check=True)
-    repo = VaultRepo(str(git_repo), "origin", "main")
+    repo = VaultRepo(str(git_repo), "origin", "main", engine_root=git_repo)
     before = repo.runtime_tree()
 
     (git_repo / "note.md").write_text("une note du coach", encoding="utf-8")
@@ -672,7 +672,7 @@ def test_rwf017_the_documentation_names_no_removed_mechanism():
                "silence_verdict", "response_review", "règles locales",
                "contrôle de cohérence", "rédaction en branche éphémère")
     documents = [*sorted((ENGINE_ROOT / "docs").glob("*.md")),
-                 ENGINE_ROOT / "server" / "README.md", ENGINE_ROOT / "server" / ".env.example"]
+                 ENGINE_ROOT / "deploy" / "coach-messenger.env.example"]
     stale = [(path.name, name) for path in documents
              for name in removed if name in path.read_text(encoding="utf-8")]
     assert stale == []

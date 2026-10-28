@@ -70,7 +70,7 @@ un worktree ou une livraison.
 
 Une photo ou un document suit une frontière différente : le webhook ne conserve que
 l'URL Meta le temps de la reprise, le worker télécharge un JPEG/PNG/WebP/PDF/TXT/CSV
-borné dans `server/attachments/` (0600), puis lance un tour agent en lecture seule.
+borné dans `var/attachments/` (0600), puis lance un tour agent en lecture seule.
 Le brut est supprimé dans un `finally` et l'URL est vidée de PostgreSQL. Le coach rend
 des observations et d'éventuels faits candidats ; seule la confirmation suivante,
 dans un tour normal, peut les écrire. Vidéo et audio sont refusés sans analyse.
@@ -187,7 +187,7 @@ Pour modifier un comportement :
   runtime et retour Git en lecture seule. `SANDBOX_NEEDS` contient les seules valeurs
   d'environnement nécessaires aux CLI métier.
 - Le runtime n'est jamais mis à jour depuis un tour. `VaultRepo.sync()` refuse tout
-  commit entrant touchant `server/`, `scripts/`, `migrations/`, les hooks, la CI, les
+  commit entrant touchant `deploy/`, `src/`, `migrations/`, les hooks, la CI, les
   dépendances ou les assets lus au démarrage.
 - **« Runtime » = le service tourne différemment après ce commit** (choix de design,
   2026-08-21). Ni `coaching/exercises/*.md` — des données relues à chaque appel de
@@ -211,15 +211,16 @@ Python 3.12 est requis.
 
 ```bash
 python3.12 -m venv .venv
-.venv/bin/pip install -r server/requirements.txt -r server/requirements-dev.txt
-cp server/.env.example server/.env
+.venv/bin/pip install -r requirements.txt -r requirements-dev.txt
+.venv/bin/pip install --no-deps -e .
+cp deploy/coach-messenger.env.example .env
 ```
 
 Créer ou migrer PostgreSQL avec le rôle de migration, puis lancer depuis la racine :
 
 ```bash
 DATABASE_URL='postgresql+psycopg://…' alembic upgrade head
-PYTHONPATH="$PWD:$PWD/server" .venv/bin/python -m redline
+.venv/bin/python -m redline
 ```
 
 Le démarrage refuse :
@@ -230,7 +231,7 @@ Le démarrage refuse :
 - valeur numérique, booléenne, horaire, effort ou route invalide (notamment Sol Max) ;
 - PostgreSQL indisponible.
 
-`server/.env.example` est la référence exhaustive. En local, `server/.env` est toléré ;
+`deploy/coach-messenger.env.example` est la référence exhaustive. En local, `.env` à la racine est toléré ;
 en production, le fichier réel vit hors du checkout dans
 `/etc/redline/runtime/coach-messenger.env`, lisible par le seul utilisateur du service.
 Les variables `AGENT_*` sont les
@@ -267,7 +268,7 @@ redémarrage du service, car Strava valide l'URL immédiatement :
 
 ```bash
 set -a; . /etc/redline/runtime/coach-messenger.env; set +a
-/home/ubuntu/.venvs/redline-current/bin/python server/strava-subscription.py renew
+/home/ubuntu/.venvs/redline-current/bin/python deploy/strava-subscription.py renew
 ```
 
 `status` rend 0 si l'unique abonnement pointe vers l'URL attendue. Aucun des deux
@@ -343,7 +344,7 @@ tests douloureux, scores inférés et identité) appartiennent aux instructions 
 aux scénarios d'évaluation. Les protections sur les écritures et le programme restent du
 code déterministe.
 
-`server/evaluate-coaching.py --output /tmp/coaching-evaluation.json` produit des réponses
+`python -m redline.cli.evaluate_coaching --output /tmp/coaching-evaluation.json` produit des réponses
 fictives avec les profils du fournisseur de `AGENT_PROVIDER` (Claude en production : la
 route du scénario, juge sur le profil N2), sans outil, mémoire persistante ni envoi.
 `ClaudeCodeRunner.one_shot` lance `claude -p` dans un dossier vide, donc sans `CLAUDE.md`,
@@ -364,7 +365,7 @@ Le banc échoue aussi sur une réponse vide, un dépassement des budgets de form
 un refus du juge sur une réponse générée. Le drapeau `emotional` des fixtures commande
 l'injection émotionnelle ; les bulles suivent le découpage partagé du transport.
 
-`server/evaluate-conversation.py` complète ce banc avec douze situations et vingt et un
+`python -m redline.cli.evaluate_conversation` complète ce banc avec douze situations et vingt et un
 tours. Il réinjecte les réponses produites au tour suivant, propose une variante
 `contextual` limitée à l'évaluation, et compare deux fichiers de résultats hors ligne
 avec une grille de lecture à l'aveugle. `--dry-run` exporte le contenu sans appel de
@@ -435,9 +436,9 @@ soit le niveau ; elle est mémorisée dans la conversation comme un vrai message
 Le programme appartient à PostgreSQL et ses révisions sont append-only.
 
 ```bash
-python3 scripts/week-plan.py show --week 2026-W33
-python3 scripts/week-plan.py check --week 2026-W33
-python3 scripts/week-plan.py revise --week 2026-W33 < revision.json
+python -m redline.cli.week_plan show --week 2026-W33
+python -m redline.cli.week_plan check --week 2026-W33
+python -m redline.cli.week_plan revise --week 2026-W33 < revision.json
 ```
 
 Codes de `check` et `show` :
@@ -478,7 +479,7 @@ heure n'est inventée. Le jeu de calibration (prédiction de la veille, J+1 en r
 rapides) est arrêté depuis le 2026-10-09 ; ses tables restent lisibles.
 
 Avant le tour du bilan hebdomadaire, le service calcule un dossier
-(`scripts/weekly_dossier.py`) avec les mêmes fonctions que les CLI : semaine close,
+(`redline.analysis.weekly_dossier`) avec les mêmes fonctions que les CLI : semaine close,
 trajectoire de la sortie longue et stagnation, signaux, prédictions échues,
 échéances échues, capacités. Il l'injecte avec le paquet N2 ; un calcul en
 échec le remplace par une ligne qui renvoie aux CLI, sans retenir le bilan. Le projecteur
@@ -495,8 +496,8 @@ valide. Après une réparation opérateur, un job terminé ou en échec se rouvr
 ad hoc, et cette commande reste volontairement hors du sandbox du coach :
 
 ```bash
-scripts/proactive-job.py status --job-key weekly:2026-W34
-scripts/proactive-job.py reopen --job-key weekly:2026-W34
+python -m redline.cli.proactive_job status --job-key weekly:2026-W34
+python -m redline.cli.proactive_job reopen --job-key weekly:2026-W34
 ```
 
 Les commandes opérateur s'exécutent depuis la racine, avec l'environnement du service
@@ -509,13 +510,13 @@ prioritaire, périmé après 6 h, idempotent par sa clé, tracé en mémoire de 
 Commande opérateur, hors du sandbox du coach :
 
 ```bash
-scripts/operator-message.py --key bilan-w39 --text "…"
+python -m redline.cli.operator_message --key bilan-w39 --text "…"
 ```
 
 `session_cycles` donne à chaque `plan_id + logical_key` une identité stable à travers les
 révisions append-only. Une nouvelle révision resynchronise le cycle et conserve l'état
 si les champs utiles n'ont pas changé ; une séance annulée ou retirée perd son retour
-digestif en attente. `scripts/session-cycle.py` enregistre un départ déclaré
+digestif en attente. `session-cycle.py` enregistre un départ déclaré
 facultatif et un appariement explicite.
 L'observation Strava porte l'heure réelle : elle remplace l'heure effective, conserve
 le départ déclaré comme trace et ferme rétroactivement la séance si « j'y vais » a été
@@ -614,10 +615,10 @@ consommée par une seule révision. Le refus est donc transactionnel, pas une co
 le modèle peut oublier.
 
 ```bash
-python3 scripts/session-cycle.py pending --week 2026-W34
-python3 scripts/session-cycle.py reconcile-strava --days 30
-python3 scripts/fact-read.py predictions
-python3 scripts/fact-read.py gear
+python -m redline.cli.session_cycle pending --week 2026-W34
+python -m redline.cli.session_cycle reconcile-strava --days 30
+python -m redline.cli.fact_read predictions
+python -m redline.cli.fact_read gear
 ```
 
 Cycle normal : `pending` -> `running` -> `done`. Une erreur avant livraison remet le
@@ -650,24 +651,24 @@ du commit **effectivement démarré**, puis sauvegarde post-déploiement. La pr�
 HTTP 200 seule ne prouve pas que le nouveau code tourne.
 
 `Type=simple` confirme seulement que le processus Python a été lancé : Waitress peut
-encore être en train d'ouvrir le port. L'unité exécute donc `server/wait-ready.sh` dans
+encore être en train d'ouvrir le port. L'unité exécute donc `deploy/wait-ready.sh` dans
 `ExecStartPost` et ne termine le démarrage systemd qu'après un `/ready` HTTP 200. Le
 vérificateur de release réutilise le même délai borné de 90 s avant de contrôler le
 commit, le stockage, le schéma et le worker. Il exige aussi que le commit attendu soit
 un ancêtre du checkout sans différence runtime, et compare l'empreinte des arbres
-`server/`, `scripts/` et `migrations/` à `runtime_tree` de `/health` : un commit du vault
+`deploy/`, `src/` et `migrations/` du moteur à `runtime_tree` de `/health` : un commit du vault
 posé par-dessus ne fait plus échouer la vérification, un code différent si. Un démarrage lent attend ; une readiness
 qui ne revient vraiment pas fait échouer le démarrage avec le dernier code HTTP visible.
 
 Le service Python utilise `/home/ubuntu/.venvs/redline-current`, un lien vers le venv
 actif. Le timer `redline-agent-runtime-update.timer` met à jour chaque nuit à 03 h, heure
 de Paris, le runtime du seul fournisseur que lit le service (`AGENT_PROVIDER`, lu comme
-systemd : unité puis fichier d'environnement). `server/agent-runtime-update.py` porte une
+systemd : unité puis fichier d'environnement). `deploy/agent-runtime-update.py` porte une
 transaction unique et deux adaptateurs :
 
 | | Codex | Claude |
 |---|---|---|
-| Version cible | dernière stable d'`openai-codex` dans `server/requirements.txt` | canal npm `stable` d'Anthropic, borné par `server/claude-runtime.txt` |
+| Version cible | dernière stable d'`openai-codex` dans `requirements.txt` | canal npm `stable` d'Anthropic, borné par `deploy/claude-runtime.txt` |
 | Candidat | venv `~/.venvs/redline-codex-<version>-<empreinte>` | préfixe npm `~/.claude-runtimes/claude-code-<version>` |
 | Lien basculé | `~/.venvs/redline-current` | `~/.claude-runtimes/current`, en tête du `PATH` du service |
 | Prévol | `codex-runtime-smoke.py` | `claude-runtime-smoke.py`, avec l'identité et l'environnement exacts du service (`systemd-run`) |
@@ -705,17 +706,13 @@ RELEASE_SHA=$(git rev-parse HEAD)
 sudo systemctl start redline-backup.service
 sudo systemctl is-failed --quiet redline-backup.service && exit 1
 sudo install -d -o root -g ubuntu -m 0750 /etc/redline/runtime
-# Migration unique depuis l'ancien emplacement ; vérifier le fichier avant de supprimer l'original.
-if [ ! -r /etc/redline/runtime/coach-messenger.env ]; then
-  sudo install -o root -g ubuntu -m 0640 server/.env \
-    /etc/redline/runtime/coach-messenger.env
-fi
-sudo install -o root -g root -m 0755 server/redline-agent-cli \
+test -r /etc/redline/runtime/coach-messenger.env
+sudo install -o root -g root -m 0755 deploy/redline-agent-cli \
   /usr/local/bin/redline-agent-cli
 sudo install -d -o root -g root -m 0755 /usr/local/share/redline
-sudo install -o root -g root -m 0644 server/agent-cli-tools.txt \
+sudo install -o root -g root -m 0644 deploy/agent-cli-tools.txt \
   /usr/local/share/redline/agent-cli-tools.txt
-sudo install -o root -g root -m 0755 server/postgres/export-latest-backup.sh \
+sudo install -o root -g root -m 0755 deploy/postgres/export-latest-backup.sh \
   /usr/local/bin/redline-backup-export
 if [ ! -e /home/ubuntu/.venvs/redline-current ] && \
    [ ! -L /home/ubuntu/.venvs/redline-current ]; then
@@ -724,21 +721,22 @@ if [ ! -e /home/ubuntu/.venvs/redline-current ] && \
 fi
 test -L /home/ubuntu/.venvs/redline-current
 test -x /home/ubuntu/.venvs/redline-current/bin/python
-sudo install -o root -g root -m 0755 server/agent-runtime-update.py \
+sudo install -o root -g root -m 0755 deploy/agent-runtime-update.py \
   /usr/local/sbin/redline-agent-runtime-update
-sudo install -o root -g root -m 0755 server/codex-runtime-smoke.py \
+sudo install -o root -g root -m 0755 deploy/codex-runtime-smoke.py \
   /usr/local/libexec/redline-codex-runtime-smoke.py
-sudo install -o root -g root -m 0755 server/claude-runtime-smoke.py \
+sudo install -o root -g root -m 0755 deploy/claude-runtime-smoke.py \
   /usr/local/libexec/redline-claude-runtime-smoke.py
-sudo install -o root -g root -m 0644 server/redline-agent-runtime-update.service \
+sudo install -o root -g root -m 0644 deploy/systemd/redline-agent-runtime-update.service \
   /etc/systemd/system/redline-agent-runtime-update.service
-sudo install -o root -g root -m 0644 server/redline-agent-runtime-update.timer \
+sudo install -o root -g root -m 0644 deploy/systemd/redline-agent-runtime-update.timer \
   /etc/systemd/system/redline-agent-runtime-update.timer
-sudo install -o root -g root -m 0644 server/coach-messenger.service \
+sudo install -o root -g root -m 0644 deploy/systemd/coach-messenger.service \
   /etc/systemd/system/coach-messenger.service
 sudo systemctl daemon-reload
 /home/ubuntu/.venvs/redline-current/bin/python -m pip install \
-  -r server/requirements.txt
+  -r requirements.txt
+/home/ubuntu/.venvs/redline-current/bin/python -m pip install --no-deps -e .
 MIGRATOR_DATABASE_URL='postgresql+psycopg://redline_migrator:…@/redline?host=/run/redline-postgres'
 DATABASE_URL="$MIGRATOR_DATABASE_URL" \
   /home/ubuntu/.venvs/redline-current/bin/alembic upgrade head
@@ -747,7 +745,7 @@ DATABASE_URL="$MIGRATOR_DATABASE_URL" \
 /home/ubuntu/.venvs/redline-current/bin/python -m pytest -q
 sudo systemctl restart coach-messenger
 REDLINE_PYTHON=/home/ubuntu/.venvs/redline-current/bin/python \
-  server/verify-release.sh "$RELEASE_SHA"
+  deploy/verify-release.sh "$RELEASE_SHA"
 /home/ubuntu/.venvs/redline-current/bin/python -c \
   'from importlib.metadata import version; print("openai-codex", version("openai-codex"))'
 sudo systemctl enable --now redline-agent-runtime-update.timer
@@ -766,17 +764,12 @@ restaure la dernière archive pour de vrai. Adapter le checkout au mécanisme de
 déploiement réel. Ne jamais faire porter ces étapes à un message utilisateur ou à un
 processus agent.
 
-Après la première vérification réussie avec l'unité externe, supprimer la copie
-`server/.env` du checkout : conserver les deux emplacements recréerait un second
-propriétaire silencieusement périssable. Les déploiements suivants ne recopient
-évidemment plus cette étape de migration.
-
 ### Ajouter une CLI utilisable par le coach
 
-Un nouveau fichier sous `scripts/` est **refusé par défaut** : rendre automatiquement
-exécutable tout futur script transformerait le répertoire entier en capacité implicite.
+Un nouveau module sous `src/redline/cli/` est **refusé par défaut** : rendre automatiquement
+exécutable toute future commande transformerait le répertoire entier en capacité implicite.
 S'il est nécessaire dans un tour Messenger, ajouter son nom à
-`server/agent-cli-tools.txt` et le référencer dans le prompt concerné. Les tests refusent
+`deploy/agent-cli-tools.txt` et le référencer dans le prompt concerné. Les tests refusent
 une entrée absente, non triée, inexistante ou une CLI citée par les prompts mais oubliée
 du manifeste. Le déploiement installe ce manifeste hors du vault en `root:root` ; le
 coach ne peut donc pas élargir lui-même ses permissions.
@@ -788,7 +781,7 @@ coach ne peut donc pas élargir lui-même ses permissions.
 .venv/bin/python -m mypy
 .venv/bin/python -m vulture
 .venv/bin/python -m pytest -q -rs
-python3 scripts/vault-check.py
+python -m redline.cli.vault_check
 ```
 
 `vulture` lit le code de production sans les tests (configuration dans
@@ -800,8 +793,8 @@ test migrée avec un rôle d'administration ; sinon ils sont signalés comme ign
 
 ## Hôte : pare-feu, mises à jour, SSH
 
-`server/host/` porte la configuration de la machine (firewalld, mises à jour
-automatiques, SSH). `sudo server/host/install.sh` la valide puis l'installe,
+`deploy/host/` porte la configuration de la machine (firewalld, mises à jour
+automatiques, SSH). `sudo deploy/host/install.sh` la valide puis l'installe,
 sans redémarrer aucun service applicatif.
 
 - **Pare-feu** : firewalld, zone `public` (ssh, http, https, dhcpv6-client), seconde
@@ -834,8 +827,8 @@ Ordre de vérification :
    prose, parties et caractères ajoutés par le service, points d'interrogation), sans
    aucun texte ; les jobs proactifs portent `job_id`, `kind` et `outcome` ;
 3. lignes `Incident interne`, échecs de projection ou de push ;
-4. `scripts/week-plan.py check` pour les semaines citées ;
-5. `scripts/vault-check.py` ;
+4. `week-plan.py check` pour les semaines citées ;
+5. `vault-check.py` ;
 6. `inbound_messages`, `proactive_jobs` (`failed` + `last_error`) et `projection_states`
    en lecture seule ;
 7. timer et âge de la dernière sauvegarde PostgreSQL chiffrée.
@@ -902,7 +895,7 @@ qualité, la réserve (garde-fou n°6) se déclare d'un geste tant que la séanc
 fenêtre de complétude : `reserve:<observation>` écrit la mesure `reps_in_reserve`.
 **Course** : J-N, plus longue sortie, jalons, capacités, archives.
 `redline/notebook_board.py` calcule tout à la lecture : la révision active porte
-l'intention, le registre le fait, `scripts/ledger.py` et `scripts/signals.py` les comptes.
+l'intention, le registre le fait, `ledger.py` et `signals.py` les comptes.
 Aucun chiffre n'est stocké pour le carnet ; un programme absent ne prescrit rien, un
 contrôle daté échu retient ses séances, une révision à réarbitrer le dit. Le carnet
 compare le fait aux plafonds typés (`hr_cap_bpm`, `rpe_max`, `duration_cap_min`,
@@ -974,10 +967,10 @@ un ancien programme. Une carte s'agrandit et se télécharge depuis sa page priv
 La reprise historique est une commande opérateur, hors sandbox du coach :
 
 ```bash
-PYTHONPATH=.:server /home/ubuntu/.venvs/redline-current/bin/python \
-  server/notebook-import.py --year 2026             # inventaire sans écriture
-PYTHONPATH=.:server /home/ubuntu/.venvs/redline-current/bin/python \
-  server/notebook-import.py --year 2026 --apply     # import idempotent
+/home/ubuntu/.venvs/redline-current/bin/python \
+  -m redline.cli.notebook_import --year 2026             # inventaire sans écriture
+/home/ubuntu/.venvs/redline-current/bin/python \
+  -m redline.cli.notebook_import --year 2026 --apply     # import idempotent
 ```
 
 Elle reprend les bilans textuels effectivement livrés et les images encore présentes

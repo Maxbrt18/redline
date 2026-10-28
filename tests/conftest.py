@@ -32,8 +32,8 @@ from redline.service.routing import RoutingConfig
 
 TESTS_DIR = Path(__file__).resolve().parent
 ENGINE_ROOT = TESTS_DIR.parent
-#: Deployment files and the service's runtime directories.
-SERVER_DIR = ENGINE_ROOT / "server"
+#: Units, launcher, allowlist and scripts of a deployment.
+DEPLOY_DIR = ENGINE_ROOT / "deploy"
 # Le vault fictif des tests : `redline.toml` (le seul endroit où le prénom de l'athlète
 # fictif est écrit), le programme de renfo, les fiches de séance, les capacités et le
 # journal des décisions. Personne de réel : il existe pour que les tests qui lisent du
@@ -93,7 +93,7 @@ _DEFAULTS = {
     "healthcheck_ping_url": "",
     "coach_base_url": "https://coach.test",
     "strength_reports_per_day": 8,
-    "attachment_dir": "server/attachments",
+    "attachment_dir": "var/attachments",
     "attachment_max_bytes": 12 * 1024 * 1024,
     "attachment_total_bytes": 20 * 1024 * 1024,
     "instance": instance_model.load(TEST_VAULT),

@@ -56,7 +56,7 @@ sys.exit('appel gh inattendu')
         env = {**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}",
                "FAKE_GH_ROOT": str(tmp_path), "EXPECTED_SHA": sha, "REAL_JQ": jq,
                "REDLINE_CI_WAIT_SECONDS": wait}
-        return subprocess.run(["bash", "scripts/ci-gate.sh", sha, *required],
+        return subprocess.run(["bash", "deploy/ci-gate.sh", sha, *required],
                               cwd=ROOT, env=env, text=True, capture_output=True, timeout=10)
 
     return invoke, tmp_path

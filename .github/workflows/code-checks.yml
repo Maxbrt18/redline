@@ -30,10 +30,10 @@ on:
       - "pyproject.toml"
       - "alembic.ini"
       - "migrations/**"
-      - "server/**"
+      - "deploy/**"
+      - "requirements*.txt"
       - "src/**"
       - "tests/**"
-      - "scripts/**/*.sh"
   pull_request:
   workflow_dispatch:
 
@@ -79,7 +79,7 @@ jobs:
       # whole session.
       - name: Install
         run: |
-          CODEX_REQUIREMENT="$(sed -n '/^openai-codex/p' server/requirements.txt)"
+          CODEX_REQUIREMENT="$(sed -n '/^openai-codex/p' requirements.txt)"
           test -n "$CODEX_REQUIREMENT"
           python -m pip install --quiet pytest ruff mypy vulture pyyaml flask requests \
                                         SQLAlchemy==2.0.46 alembic==1.18.4 \

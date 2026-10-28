@@ -19,7 +19,7 @@ Two outputs from that one selection: the PNG, and a `.link` sidecar holding the 
 interactive snapshot. After the image is delivered, the service stores that snapshot
 and turns its opaque capability into a button. Both views therefore cannot disagree.
 
-Usage:  python3 scripts/chart-strength.py -o server/outbox/strength-2026-07-25.png < selection.json
+Usage:  python3 scripts/chart-strength.py -o strength-2026-07-25.png < selection.json
 """
 
 from pathlib import Path
@@ -36,7 +36,7 @@ from redline.model.schema import SchemaError
 # The only cross-tree import in the repo: the card mints the signed link with the
 # very code the server verifies it with, so the two can never disagree.
 # `redline.service.strength` is a declared leaf (standard library only, imports nothing
-# from its own package), which is what makes reaching into server/ safe here.
+# from its own package), which is what makes reaching into the service safe here.
 from redline.service import strength
 
 

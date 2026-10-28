@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 # The engine installs as the `redline` package, editable (`pip install --no-deps -e .`):
 # the checkout stays the code that runs. Its pinned dependencies live in
-# server/requirements.txt, which the runtime updater installs into the service venv.
+# requirements.txt, which the runtime updater installs into the service venv.
 [project]
 name = "redline"
 version = "0.1.0"
@@ -50,8 +50,8 @@ known-first-party = ["redline"]
 # Le code de production seul : les tests n'entrent pas dans l'analyse, donc une
 # fonction que seul son propre test appelle est signalée comme morte (2026-09-28 :
 # une quinzaine en vivaient ainsi). Un faux positif se déclare ici, nommé.
-paths = ["src", "server/codex-runtime-smoke.py", "server/claude-runtime-smoke.py",
-         "server/agent-runtime-update.py"]
+paths = ["src", "deploy/codex-runtime-smoke.py", "deploy/claude-runtime-smoke.py",
+         "deploy/agent-runtime-update.py"]
 exclude = ["*/tests/*"]
 min_confidence = 60
 # Routes Flask : appelées par le framework, jamais par le code.

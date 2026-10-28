@@ -1,4 +1,4 @@
-# CLI métier exposées au coach 24/7. Une ligne par fichier sous scripts/.
+# CLI métier exposées au coach 24/7. Une ligne par commande, portée par un module de src/redline/cli/.
 # Refus par défaut : un nouveau script n'entre ici que s'il est réellement nécessaire
 # dans un tour Messenger. La CI vérifie existence, tri et références des prompts.
 chart-month.py

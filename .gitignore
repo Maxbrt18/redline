@@ -27,7 +27,10 @@ __pycache__/
 /episodes/
 /concepts/
 /sources/
-server/attachments/
 
 # Metadata written by `pip install -e .`
 *.egg-info/
+
+# Runtime state of a running service (`REDLINE_STATE_DIR`, by default here): outbox,
+# attachments, the Strava token cache. Never committed.
+/var/

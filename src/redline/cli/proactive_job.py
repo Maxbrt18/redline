@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Inspecte ou rouvre un bilan périodique exact après un incident d'exploitation.
 
-Commande opérateur seulement : elle reste hors de `server/agent-cli-tools.txt`, donc
+Commande opérateur seulement : elle reste hors de `deploy/agent-cli-tools.txt`, donc
 le coach en sandbox ne peut pas rejouer lui-même une initiative déjà acquittée.
 """
 
