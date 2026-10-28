@@ -1,36 +1,27 @@
 .DS_Store
-# État d'UI Obsidian par appareil (panneaux ouverts, zoom du graphe) : pur bruit.
-# La vraie config (app/appearance/core-plugins) reste suivie.
-.obsidian/workspace.json
-.obsidian/workspace-mobile.json
-.obsidian/graph.json
 
-# Fichiers d'échange / temporaires d'éditeur — un .env.swp contient le .env en
-# clair (tokens). Le bot fait `git add -A` : sans ça il pousserait le swap.
+# Editor swap files: a swapped .env holds its secrets in clear text.
 *.sw[a-p]
 .*.sw[a-p]
 *~
 .*.swp
 *.swo
+
 .env
 .env.*
 !.env.example
 
-# Python bytecode (le bot VPS fait git add -A : sans ça il pousse les .pyc)
 __pycache__/
 *.py[cod]
 .venv/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-
-# Instructions locales injectées par Codex Desktop ; le serveur suit CLAUDE.md.
-AGENTS.md
-
-# JSON qu'un tour du coach remet à une CLI (`--input`), un fichier par tour, supprimé
-# en fin de tour : scripts/model/agent_input.py. Le service fait `git add -A`.
+# Per-turn JSON handed to a CLI (`--input`), deleted at the end of the turn.
 .agent-tmp/
 
-# Your own coaching data lives in a PRIVATE vault, never in this repository.
+# Coaching data belongs to a private vault, never to the engine repository.
 /athlete/
 /inbox/
 /episodes/
