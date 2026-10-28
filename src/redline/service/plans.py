@@ -1,0 +1,285 @@
+"""Pure reading and rendering of the canonical weekly plan."""
+
+from __future__ import annotations
+
+import enum
+import json
+from collections.abc import Iterable
+from datetime import date, datetime, timedelta
+
+from redline.model import weekly_plan as weekly_plan_model
+
+DAYS = ("lun", "mar", "mer", "jeu", "ven", "sam", "dim")
+
+#: ⭐ UN JOUR QUI SE VIDE SE NOMME (2026-08-25). Le rendu prescriptif filtrait sur
+#: `remaining()`, qui écarte l'annulé : un jour dont on retirait la seule séance
+#: DISPARAISSAIT de la liste au lieu de s'afficher vide. Le 25/08, le coach a annulé le
+#: renfo B du jeudi sans jamais créer le jogging annoncé dans son propre motif, et « la
+#: suite de la semaine » a rendu mercredi, vendredi, samedi, dimanche -- un trou que ni
+#: L'athlète ni le coach ne pouvaient voir, chacun lisant la même liste amputée. Deux
+#: révisions successives ont reconduit l'oubli. Le rendu affirme « voilà ce qu'il te
+#: reste » : il doit donc parler de CHAQUE jour de la période qu'il annonce, y compris
+#: pour dire qu'il n'y a rien.
+RIEN = "rien de prévu"
+
+
+class PlanStatus(enum.Enum):
+    VALID = "valide"
+    AWAITING = "en attente d'une réponse de ⟨athlète⟩"
+    STALE = "à réexaminer : une activité non rattachée est apparue depuis son calcul"
+    INVALID = "invalide"
+
+
+def _monday(week: str) -> date:
+    year, _, number = week.partition("-W")
+    return date.fromisocalendar(int(year), int(number), 1)
+
+
+def _sunday(day: date) -> date:
+    return day + timedelta(days=6 - day.weekday())
+
+
+def _revision(raw: str) -> dict | None:
+    if not raw:
+        return None
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def due_gates_by_kind(context: str, today: str) -> tuple[list, list]:
+    """Return due blocking gates and due observation gates from loaded context."""
+    revision = _revision(context)
+    if revision is None:
+        return [], []
+    as_of = date.fromisoformat(today)
+    return weekly_plan_model.split_by_when(
+        weekly_plan_model.due_gates_of(revision, as_of))
+
+
+def blocked_session_ids(context: str, today: str) -> frozenset[str]:
+    """Return the session identifiers explicitly held by due preconditions."""
+    blocking, _ = due_gates_by_kind(context, today)
+    return frozenset(session_id for gate in blocking for session_id in gate["holds"])
+
+
+def strength_due(context: str, today: str) -> dict | None:
+    """Return today's unsettled strength session, if any."""
+    revision = _revision(context)
+    if revision is None:
+        return None
+    for session in revision.get("sessions") or []:
+        if (isinstance(session, dict)
+                and session.get("kind") == "strength"
+                and session.get("date") == today
+                and session.get("status") not in weekly_plan_model.SETTLED_STATUSES):
+            return session
+    return None
+
+
+def _done(session: dict) -> str:
+    return " (fait)" if session.get("status") == "done" else ""
+
+
+def _short(session: dict) -> str:
+    distance = weekly_plan_model.distance_of(session)
+    timing = f" à {session['start_time']}" if session.get("start_time") else ""
+    head = session["title"] + timing
+    head = f"{head}, {distance}" if distance else head
+    return head + _done(session)
+
+
+def _full(session: dict) -> str:
+    head = session["title"] + _done(session)
+    if session.get("start_time"):
+        head += f" à {session['start_time']}"
+    details = weekly_plan_model.details_of(session)
+    if session.get("location_label"):
+        details.append("lieu " + session["location_label"])
+    return ", ".join([head, *details])
+
+
+def _label(day: date) -> str:
+    return f"{DAYS[day.weekday()]} {day:%d/%m}"
+
+
+def _day_lines(sessions: list) -> list[str]:
+    lines = []
+    for date_text in sorted({session["date"] for session in sessions}):
+        day = datetime.fromisoformat(date_text)
+        same_day = [session for session in sessions if session["date"] == date_text]
+        lines.append(f"{_label(day)} : "
+                     + " + ".join(_short(session) for session in same_day))
+    return lines
+
+
+def _span(first: date, last: date) -> Iterable[date]:
+    while first <= last:
+        yield first
+        first += timedelta(days=1)
+
+
+def _covered_lines(shown: list, every: list, span: Iterable[date],
+                   excluded: frozenset[str]) -> list[str]:
+    """Une ligne par jour de la période annoncée, `RIEN` compris.
+
+    Deux jours restent muets, et pour la même raison : le message ne les couvre pas.
+    Celui qu'un contrôle daté RETIENT, parce que la question du contrôle part dans le
+    même tour et dit déjà ce qu'on attend. Celui dont la séance est FAITE, parce qu'un
+    jour derrière nous n'a plus rien à prescrire. Le jour annulé, lui, se nomme : c'est
+    exactement le trou qu'on cherche à rendre visible.
+    """
+    par_jour: dict[str, list] = {}
+    for session in shown:
+        par_jour.setdefault(session["date"], []).append(session)
+    retenus = {session["date"] for session in every if session.get("id") in excluded}
+    faits = {session["date"] for session in every if session.get("status") == "done"}
+    lines = []
+    for day in span:
+        stamp = day.isoformat()
+        if stamp in par_jour:
+            lines.append(f"{_label(day)} : "
+                         + " + ".join(_short(s) for s in par_jour[stamp]))
+        elif stamp not in retenus and stamp not in faits:
+            lines.append(f"{_label(day)} : {RIEN}")
+    return lines
+
+
+def prescription_lines(raw: str, since: str, *,
+                       exclude_ids: frozenset[str] = frozenset()) -> list[str]:
+    """Render the remaining prescription without its revision header."""
+    revision = _revision(raw)
+    if revision is None:
+        return []
+    sessions = weekly_plan_model.remaining(
+        weekly_plan_model.scheduled(revision.get("sessions", [])), since=since)
+    return _day_lines([session for session in sessions
+                       if session.get("id") not in exclude_ids])
+
+
+_PRESCRIPTION_FIELDS = (
+    "title", "date", "start_time", "workout", "status", "distance_target_km", "distance_cap_km",
+    "duration_cap_min", "rpe_min", "rpe_max", "hr_zone", "cadence_target",
+    "demanding", "carbs_target_g_h", "location_label", "strength", "note",
+)
+
+
+def _signature(session: dict) -> tuple:
+    return tuple(json.dumps(session.get(field), sort_keys=True, ensure_ascii=False)
+                 for field in _PRESCRIPTION_FIELDS)
+
+
+def prescription_state(raw: str, since: str, *,
+                       exclude_ids: frozenset[str] = frozenset()) -> list[tuple]:
+    """État prescriptif complet, distinct du rendu court envoyé sur Messenger."""
+    revision = _revision(raw)
+    if revision is None:
+        return []
+    sessions = weekly_plan_model.remaining(
+        revision.get("sessions", []), since=since)
+    return sorted(
+        (session["id"], _signature(session))
+        for session in sessions if session.get("id") not in exclude_ids)
+
+
+def render_plan_for_scope(raw: str, week: str, scope: str, *, today: str,
+                          exclude_ids: frozenset[str] = frozenset()) -> str:
+    """Rend exactement ce que l'athlète demande, y compris s'il le redemande."""
+    if scope == "today":
+        return render_plan_message(
+            raw, week, today=today, exclude_ids=exclude_ids)
+    if scope == "full":
+        return render_plan_message(raw, week, exclude_ids=exclude_ids)
+    if scope == "next":
+        revision = _revision(raw)
+        if revision is None:
+            return ""
+        candidates = weekly_plan_model.remaining(
+            revision.get("sessions", []), since=today)
+        candidates = [session for session in candidates
+                      if session.get("id") not in exclude_ids]
+        if not candidates:
+            return "Rien de prévu d'ici dimanche."
+        first = min(session["date"] for session in candidates)
+        same_day = [session for session in candidates if session["date"] == first]
+        day = date.fromisoformat(first)
+        return (f"Prochaine séance, {_label(day)} : "
+                + " ; ".join(_full(session) for session in same_day) + ".")
+    # `remaining` est aussi le repli sûr des anciens clients qui ne portaient qu'un D.
+    return render_plan_message(
+        raw, week, since=today, exclude_ids=exclude_ids)
+
+
+def render_plan_delta(before_raw: str, after_raw: str, week: str, *, today: str,
+                      exclude_ids: frozenset[str] = frozenset()) -> str:
+    """Une révision réactive annonce ses changements, jamais toute la semaine."""
+    before, after = _revision(before_raw), _revision(after_raw)
+    if after is None:
+        return ""
+    old = {session["id"]: session for session in (before or {}).get("sessions", [])}
+    new = {session["id"]: session for session in after.get("sessions", [])}
+    changed: list[str] = []
+    for session_id, session in new.items():
+        previous = old.get(session_id)
+        relevant_date = max(session.get("date", ""), (previous or {}).get("date", ""))
+        if relevant_date < today or session_id in exclude_ids:
+            continue
+        if previous is not None and _signature(previous) == _signature(session):
+            continue
+        day = date.fromisoformat(session["date"])
+        if session.get("status") == "cancelled":
+            changed.append(f"{_label(day)} : {session['title']} annulé")
+        elif previous is not None and previous.get("date") != session.get("date"):
+            old_day = date.fromisoformat(previous["date"])
+            changed.append(
+                f"{session['title']} déplacé de {_label(old_day)} à {_label(day)} : "
+                + ", ".join(weekly_plan_model.details_of(session)))
+        else:
+            changed.append(f"{_label(day)} : {_full(session)}")
+    for session_id, session in old.items():
+        if session_id in new or session.get("date", "") < today or session_id in exclude_ids:
+            continue
+        changed.append(f"{_label(date.fromisoformat(session['date']))} : {session['title']} retiré")
+    if not changed:
+        return ""
+    # Ni numéro de révision ni semaine ISO : l'athlète lit un programme, pas un registre
+    # (audit du 2026-10-15, « Programme 2026-W42 r1 enregistré »).
+    if len(changed) == 1:
+        return f"Changement au programme : {changed[0]}."
+    return "\n".join(["Changements au programme :", *(f"{line}." for line in changed)])
+
+
+def render_plan_message(raw: str, week: str, *, today: str = "", since: str = "",
+                        exclude_ids: frozenset[str] = frozenset()) -> str:
+    """Render one validated revision for Messenger."""
+    revision = _revision(raw)
+    if revision is None:
+        return ""
+    all_sessions = weekly_plan_model.scheduled(revision.get("sessions", []))
+    held_sessions = [session for session in all_sessions
+                     if session.get("id") in exclude_ids]
+    sessions = all_sessions
+    sessions = [session for session in sessions if session.get("id") not in exclude_ids]
+    if today:
+        sessions = [session for session in sessions if session.get("date") == today]
+        held_today = [session for session in held_sessions
+                      if session.get("date") == today]
+    elif since:
+        sessions = weekly_plan_model.remaining(sessions, since=since)
+    if not sessions:
+        if today and held_today:
+            titles = " + ".join(dict.fromkeys(session["title"] for session in held_today))
+            return f"Aujourd'hui : {titles}, en attente de ta réponse."
+        return "Rien de prévu d'ici dimanche." if since else "Rien de prévu aujourd'hui."
+    if today:
+        text = "Aujourd'hui : " + " ; ".join(_full(session) for session in sessions)
+        return text if text.endswith((".", "!", "?")) else text + "."
+    every = revision.get("sessions", [])
+    first = date.fromisoformat(since) if since else _monday(week)
+    header = ("La suite de la semaine :" if since
+              else f"Programme du {first:%d/%m} au {_sunday(first):%d/%m} :")
+    return "\n".join([header,
+                       *_covered_lines(sessions, every,
+                                       _span(first, _sunday(first)), exclude_ids)])

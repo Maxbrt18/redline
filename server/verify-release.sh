@@ -16,7 +16,7 @@ esac
 }
 
 repo_root=$(git rev-parse --show-toplevel)
-runtime_paths=(server scripts migrations alembic.ini pyproject.toml)
+runtime_paths=(server src migrations alembic.ini pyproject.toml)
 # Le coach committe ses notes dès qu'un tour les touche, y compris un message rejoué au
 # démarrage : HEAD peut donc légitimement dépasser le SHA déployé. Ce qui doit être
 # identique, c'est le CODE.
@@ -34,7 +34,7 @@ git -C "$repo_root" diff --quiet -- "${runtime_paths[@]}"
 git -C "$repo_root" diff --cached --quiet -- "${runtime_paths[@]}"
 # Même empreinte que `VaultRepo.runtime_tree` : sha256 des trois arbres, séparés par
 # une espace, sans fin de ligne.
-trees=$(git -C "$repo_root" rev-parse "$expected:server" "$expected:scripts" \
+trees=$(git -C "$repo_root" rev-parse "$expected:server" "$expected:src" \
   "$expected:migrations" | paste -sd ' ' -)
 expected_tree=$(printf '%s' "$trees" | { command -v sha256sum >/dev/null 2>&1 && sha256sum || shasum -a 256; } | cut -c1-12)
 

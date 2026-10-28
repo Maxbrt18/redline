@@ -45,7 +45,7 @@ REGEN_OPTIONS=""
 if [ -z "${DATABASE_URL:-}" ]; then
     REGEN_OPTIONS="--static-only"
 fi
-"$RUNTIME_PYTHON" scripts/regen-views.py $REGEN_OPTIONS >/dev/null || \
+"$RUNTIME_PYTHON" -m redline.cli.regen_views $REGEN_OPTIONS >/dev/null || \
     echo "pre-commit : régénération des vues en échec, commit maintenu (bloc périmé)."
 # La liste des fichiers produits reste lue sur le disque, jamais recopiée de
 # GENERATORS : une copie a déjà raté decisions.md (2026-07-29).

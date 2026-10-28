@@ -28,7 +28,7 @@ Environment=PATH=/home/ubuntu/.venvs/redline-current/bin:/home/ubuntu/.claude-ru
 # Claude Code must not update itself: only the nightly updater promotes a version,
 # after a real preflight. Its own updater failed silently from 2.1.197 onwards.
 Environment=DISABLE_AUTOUPDATER=1
-Environment=PYTHONPATH=/home/ubuntu/redline:/home/ubuntu/redline/server
+Environment=PYTHONPATH=/home/ubuntu/redline/src
 # Timezone: the schedule (debrief, morning note, usage-limit reset, commit stamps)
 # must be on the athlete's local time, not UTC.
 Environment=TZ=Europe/Paris

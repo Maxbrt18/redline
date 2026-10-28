@@ -28,3 +28,6 @@ __pycache__/
 /concepts/
 /sources/
 server/attachments/
+
+# Metadata written by `pip install -e .`
+*.egg-info/

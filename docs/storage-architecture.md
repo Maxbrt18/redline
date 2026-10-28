@@ -59,7 +59,7 @@ Les garanties principales sont portées par PostgreSQL :
 - une même clé d'idempotence avec un contenu différent est une erreur, pas un succès
   silencieux.
 
-Le schéma courant est dans `scripts/storage/schema.py`. Alembic est l'autorité de
+Le schéma courant est dans `src/redline/storage/schema.py`. Alembic est l'autorité de
 version : une révision unique crée le stockage au complet, et toute évolution
 ultérieure crée une nouvelle révision.
 
@@ -94,7 +94,7 @@ sont contrôlées même si le triage ne les avait pas identifiées. Une panne de
 après commit conserve ces reçus et le statut enregistré.
 
 Le contrôle sémantique probabiliste ne participe plus au transport Messenger. Il vit dans
-le paquet `server/evaluation/`, hors du paquet `redline` et du protocole des
+le paquet `src/redline/evaluation/`, hors du paquet `redline` et du protocole des
 adaptateurs, comme banc d'évaluation explicite. Les réponses réactives et proactives
 partent après les seules portes déterministes : résultat de persistance, validité et
 fraîcheur du programme, contrôles datés et rendu canonique. Une panne d'un second modèle
@@ -258,7 +258,7 @@ simple présence dans `scripts/`.
 Cette frontière limite les dégâts d'une instruction malveillante. Elle ne constitue
 pas encore un broker de capacités : les secrets PostgreSQL et Strava nécessaires au
 service restent présents dans l'environnement du processus et font l'objet d'une dette
-résiduelle explicite dans `server/redline/config.py`. Le PSID unique, les signatures
+résiduelle explicite dans `src/redline/service/config.py`. Le PSID unique, les signatures
 webhook, l'utilisateur PostgreSQL applicatif, le sandbox du moteur et systemd restent
 les autres frontières de sécurité.
 
