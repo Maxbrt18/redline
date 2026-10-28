@@ -23,10 +23,18 @@ What the engine is built to guarantee:
   with `MESSENGER_APP_SECRET`; the service refuses to start without the Messenger
   secrets. The Strava callback is authenticated by a secret URL segment
   (`STRAVA_WEBHOOK_SECRET`); without it, the Strava webhook stays disabled.
-- **The agent cannot run arbitrary code.** The coach runs commands only through
-  `deploy/redline-agent-cli`, which executes the deployed commit of the engine (never a
-  file a turn could have edited) and only the commands listed in
-  `deploy/agent-cli-tools.txt`.
+- **The agent is confined to the vault and its commands.** A turn may edit notes in
+  the vault and run the commands listed in `deploy/agent-cli-tools.txt`, through
+  `deploy/redline-agent-cli`, which executes the deployed commit of the engine and
+  refuses to run if the service account can write the engine's code or its venv.
+  - Claude Code runs every call with `--restricted --strict-mcp-config`: no user,
+    project or vault settings file, hook or MCP server is loaded, the file tools stay
+    in the vault, and writes to settings, Git and tool configuration are refused. A
+    turn cannot plant something the next call would execute.
+  - Codex runs its commands in its workspace sandbox (bubblewrap on Linux): writes are
+    limited to the vault and `REDLINE_STATE_DIR`; `.git` and `.codex` stay read-only.
+  - The reference unit runs the service as a dedicated account without sudo, with a
+    read-only file system outside its state directory.
 - **Received content is data.** Messages and attachments are never treated as
   instructions to the service. Attachments are downloaded by the worker into a private,
   size-bounded, temporary file that is deleted after the turn.
@@ -39,8 +47,11 @@ What the engine is built to guarantee:
   `REDLINE_STATE_DIR` (`var/`, ignored).
 
 What it does not protect against: a compromised host or LLM provider account, a vault
-repository made public by its owner, or a model that writes something wrong in the
-athlete's own notes. See [`docs/llm-data.md`](docs/llm-data.md) for what reaches the
+repository made public by its owner, a model that writes something wrong in the
+athlete's own notes, or a deployment that runs the service as the account owning the
+engine (the confinement then rests on the agent runtime alone). The agent can read
+what the service account can read: keep the environment file and other secrets out of
+its reach. See [`docs/llm-data.md`](docs/llm-data.md) for what reaches the
 model provider.
 
 ## Out of scope

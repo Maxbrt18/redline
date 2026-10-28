@@ -11,6 +11,8 @@ import time
 from types import SimpleNamespace
 from typing import Any
 
+from redline.model import paths
+
 from . import persona
 from .agent import (
     HOLDING_MAX_CHARS,
@@ -47,6 +49,14 @@ TRIAGE_NO_SHELL_OVERRIDE = "features.shell_tool=false"
 CONSTITUTION_OVERRIDE = 'project_doc_fallback_filenames=["CLAUDE.md"]'
 # A one-off turn (triage, evaluation bench) does not pay for the whole constitution.
 NO_PROJECT_DOC_OVERRIDE = "project_doc_max_bytes=0"
+# The coach's commands reach Strava and PostgreSQL, and write their cards to the state
+# directory: the sandbox keeps the network open and adds that one writable root to the
+# vault. Everything else, `.git` and `.codex` included, stays read-only.
+NETWORK_OVERRIDE = "sandbox_workspace_write.network_access=true"
+
+
+def _writable_roots_override() -> str:
+    return f"sandbox_workspace_write.writable_roots={json.dumps([str(paths.state_dir())])}"
 
 TRIAGE_SCHEMA = {
     "type": "object",
@@ -137,7 +147,7 @@ class CodexRunner:
                 and self._client_shell_enabled == shell_enabled):
             return self._client
         self._close_turn_client()
-        overrides = (CONSTITUTION_OVERRIDE,) + (
+        overrides = (CONSTITUTION_OVERRIDE, NETWORK_OVERRIDE, _writable_roots_override()) + (
             () if shell_enabled else (TRIAGE_NO_SHELL_OVERRIDE,))
         self._client = self._start(overrides, turn_id)
         self._client_turn_id = turn_id
@@ -199,13 +209,9 @@ class CodexRunner:
             "developer_instructions": (None if instructions is None
                                        else self._personal(instructions)),
             "model": model,
-            # Redline is an application service, not a developer workstation: its
-            # isolation comes from the Unix user, the scrubbed environment, the
-            # root-owned CLI and the turn transaction. The Codex/bubblewrap Linux
-            # sandbox added a host dependency that kept every command from starting.
-            # ``full_access`` means no Codex sandbox is mounted; interactive approvals
-            # stay denied.
-            "sandbox": self._sdk.Sandbox.full_access,
+            # Commands run in the Codex sandbox (bubblewrap on Linux): they may write
+            # the vault and the state directory only. Interactive approvals stay denied.
+            "sandbox": self._sdk.Sandbox.workspace_write,
         }
 
     def _personal(self, text: str) -> str:
@@ -236,8 +242,8 @@ class CodexRunner:
             "effort": self._sdk.ReasoningEffort(effort) if effort else None,
             "output_schema": output_schema,
             # Repeating the policy at turn level keeps a preset or a resumed older
-            # thread from reintroducing bubblewrap.
-            "sandbox": self._sdk.Sandbox.full_access,
+            # thread from widening it.
+            "sandbox": self._sdk.Sandbox.workspace_write,
         }
         handle = thread.turn(self._personal(message), **options)
         timed_out = threading.Event()

@@ -210,6 +210,7 @@ def test_root_owned_launcher_refuses_a_cli_modified_during_the_turn(tmp_path):
     fake_python.write_text("#!/bin/sh\nprintf '%s\\n' \"$@\" \"cwd=$(pwd -P)\"\n",
                            encoding="utf-8")
     fake_python.chmod(0o755)
+    (fake_bin.parent / "lib" / "python3.12" / "site-packages").mkdir(parents=True)
     environment = {
         **{name: value for name, value in os.environ.items() if name != "VAULT_PATH"},
         "PATH": f"{fake_bin}:/usr/bin:/bin",
@@ -228,6 +229,29 @@ def test_root_owned_launcher_refuses_a_cli_modified_during_the_turn(tmp_path):
         assert outside.returncode == 2
         assert "aucun tour en cours" in outside.stderr
 
+    # Code or a venv the service user can write is refused before anything runs.
+    def read_only(*folders, mode=0o555):
+        for folder in folders:
+            folder.chmod(mode)
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    writable = subprocess.run(
+        [launcher, "ledger.py", "--semaine", "2030-W35"],
+        env={**environment, "VAULT_PATH": str(vault)},
+        text=True, capture_output=True, check=False)
+    assert writable.returncode == 1
+    assert "code du moteur modifiable" in writable.stderr
+    read_only(script_dir, script_dir.parent, repo / "src")
+    venv_open = subprocess.run(
+        [launcher, "ledger.py", "--semaine", "2030-W35"],
+        env={**environment, "VAULT_PATH": str(vault)},
+        text=True, capture_output=True, check=False)
+    assert venv_open.returncode == 1
+    assert "venv modifiable" in venv_open.stderr
+    site = fake_bin.parent / "lib" / "python3.12" / "site-packages"
+    read_only(fake_bin, site, fake_bin.parent)
+
     # Without a vault the launcher refuses: the engine checkout is never one.
     no_vault = subprocess.run(
         [launcher, "ledger.py", "--semaine", "2026-W35"],
@@ -237,8 +261,6 @@ def test_root_owned_launcher_refuses_a_cli_modified_during_the_turn(tmp_path):
 
     # The script stays the verified engine's, and runs in the vault, where the turn put
     # its files.
-    vault = tmp_path / "vault"
-    vault.mkdir()
     environment["VAULT_PATH"] = str(vault)
     split = subprocess.run(
         [launcher, "ledger.py", "--semaine", "2026-W35"],
@@ -247,9 +269,14 @@ def test_root_owned_launcher_refuses_a_cli_modified_during_the_turn(tmp_path):
     assert "-m\nredline.cli.ledger" in split.stdout
     assert f"cwd={vault.resolve()}" in split.stdout
 
+    read_only(script_dir, mode=0o755)
     target.write_text("print('code injecté')\n", encoding="utf-8")
+    read_only(script_dir)
     dirty = subprocess.run(
         [launcher, "ledger.py", "--semaine", "2026-W35"],
         env=environment, text=True, capture_output=True, check=False)
+    for folder in (script_dir, script_dir.parent, repo / "src", fake_bin, site,
+                   fake_bin.parent):
+        folder.chmod(0o755)
     assert dirty.returncode == 1
     assert "runtime différent du commit déployé" in dirty.stderr

@@ -25,8 +25,11 @@ TIMEOUT = 180
 
 
 def _ask(binary: str, prompt: str, model: str, cwd: str, *, resume: str | None = None) -> dict:
+    from redline.service.claude import CONFINEMENT
+
     command = [binary, "-p", prompt, "--model", model, "--effort", "low",
-               "--output-format", "json", "--permission-mode", "dontAsk", "--tools", ""]
+               "--output-format", "json", *CONFINEMENT,
+               "--permission-mode", "dontAsk", "--tools", ""]
     if resume:
         command += ["--resume", resume]
     result = subprocess.run(command, cwd=cwd, text=True, capture_output=True,

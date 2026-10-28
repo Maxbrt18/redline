@@ -11,10 +11,21 @@ StartLimitIntervalSec=120
 Type=simple
 # `systemctl restart` must not report success before the HTTP readiness contract is true.
 TimeoutStartSec=150s
-# --- Adapt these 4 lines to your VPS ---
-User=ubuntu
+# --- Adapt these lines to your VPS ---
+# The service runs as `redline`, a system account without sudo that owns nothing but
+# its state (/var/lib/redline: the vault, the outbox, the Claude sessions). The engine
+# checkout, its venv and the agent runtime belong to the deploy account (`ubuntu` here):
+# the service reads them, a turn can never rewrite them.
+User=redline
+Group=redline
 WorkingDirectory=/home/ubuntu/redline
 EnvironmentFile=/etc/redline/runtime/coach-messenger.env
+StateDirectory=redline
+StateDirectoryMode=0700
+Environment=HOME=/var/lib/redline
+Environment=REDLINE_STATE_DIR=/var/lib/redline/state
+# VAULT_PATH (environment file) points inside the state directory, for instance
+# /var/lib/redline/vault: the only tree outside it that the service may write is none.
 # PATH must contain `node` and, when selected, `claude`. The nightly updater
 # (agent-runtime-update.py) owns both runtimes: the Codex SDK ships its runtime
 # from the active venv, and `claude` comes from ~/.claude-runtimes/current, ahead
@@ -27,9 +38,27 @@ Environment=PATH=/home/ubuntu/.venvs/redline-current/bin:/home/ubuntu/.claude-ru
 # Claude Code must not update itself: only the nightly updater promotes a version,
 # after a real preflight. Its own updater failed silently from 2.1.197 onwards.
 Environment=DISABLE_AUTOUPDATER=1
-# The service sets its own time zone from the vault's redline.toml, and its runtime
-# state (outbox, attachments, Strava token) lives in REDLINE_STATE_DIR, by default
-# var/ in this checkout.
+# The service sets its own time zone from the vault's redline.toml.
+
+# Sandbox: the whole file system is read-only except the state directory. No new
+# privilege, no device, no kernel tunable. The agent runtimes need nothing more:
+# Node's JIT rules out MemoryDenyWriteExecute, and the Codex sandbox (bubblewrap) needs
+# user namespaces, which rules out RestrictNamespaces.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+UMask=0077
 
 ExecStartPre=/usr/bin/test -S /run/redline-postgres/.s.PGSQL.5432
 ExecStartPre=/usr/bin/test -x /usr/local/bin/redline-agent-cli
