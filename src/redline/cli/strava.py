@@ -1,4 +1,4 @@
-"""The `strava.py` command: see `redline.integrations.strava`."""
+"""The `redline strava` command: see `redline.integrations.strava`."""
 
 from redline.integrations.strava import main
 from redline.model import entrypoint

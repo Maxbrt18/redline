@@ -2,10 +2,10 @@
 """Find decisions in `decisions.md` without reading the whole journal.
 
 A decision is a `## ` section of the file; its predictions live in PostgreSQL
-(`fact-write.py prediction`), not in its prose.
+(`redline fact-write prediction`), not in its prose.
 
 Usage:
-    python3 scripts/decisions-index.py --find douleur
+    redline decisions-index --find douleur
 """
 
 from __future__ import annotations

@@ -1,5 +1,5 @@
 """Reading a note: PyYAML for the syntax, schema.py for the meaning, and a hard
-refusal in between. A note that does not conform stops `vault-check.py`; it does not
+refusal in between. A note that does not conform stops `redline vault-check`; it does not
 reach Saturday morning.
 
 THE BODY IS NEVER READ. The frontmatter holds the fact, the body holds the why.

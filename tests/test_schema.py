@@ -1,7 +1,7 @@
 """The validator: every rule, and the exact wording of what it refuses.
 
 The messages are asserted, not just the failure. They are read by Sam in
-`vault-check.py` output and by Claude when a script refuses its input: a message
+`vault-check` output and by Claude when a script refuses its input: a message
 that does not name the field and the value sends the reader back to the source,
 which is how a validator gets abandoned.
 """

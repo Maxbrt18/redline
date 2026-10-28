@@ -56,7 +56,7 @@ def current(text: str, name: str) -> str:
 def apply(path: Path, name: str, content: str, check: bool = False) -> bool:
     """Write the block (or, with `check`, only report). True if it had drifted.
 
-    `check` is what `vault-check.py` calls: it never writes, so a control can
+    `check` is what `redline vault-check` calls: it never writes, so a control can
     never silently repair what it was supposed to flag.
     """
     text = path.read_text(encoding="utf-8")

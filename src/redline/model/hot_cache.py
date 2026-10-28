@@ -37,7 +37,7 @@ def render(ledger, rows: list, instruments: dict, targets: dict,
            today: dt.date | None = None, zones: list | None = None) -> str:
     """The Forme paragraph for the latest week of the ledger.
 
-    `ledger` is the `scripts/ledger.py` module, passed in rather than imported:
+    `ledger` is the `redline ledger` module, passed in rather than imported:
     `model/` depends on nothing above it, which keeps this layer importable on a machine
     without dependencies.
     """
@@ -55,7 +55,7 @@ def render(ledger, rows: list, instruments: dict, targets: dict,
     h_eq, level, _ = ledger.equivalent_hours(week, instr, targets)
     ratio = ledger.acute_chronic_ratio(per_week, label)
 
-    # Volume comes from `ledger.week_volume` only: this line and `ledger.py --week`
+    # Volume comes from `ledger.week_volume` only: this line and `redline ledger --week`
     # must report the same mileage by construction, not by coincidence of two sums.
     volume = ledger.week_volume(week)
     run_km, walk_km, runs = volume.km_run, volume.km_walk, volume.runs
@@ -105,10 +105,10 @@ def render(ledger, rows: list, instruments: dict, targets: dict,
         + f". **Tendance douleur, au PIC hebdo** (jamais la médiane), "
         f"**effort/repos** : {trend}. "
         f"**Jauge : elle se CALCULE, ne la réécris jamais de tête** — "
-        f"`python3 scripts/ledger.py --week <W>`. {short} = "
+        f"`redline ledger --week <W>`. {short} = "
         f"**{_round(h_eq)} h-éq · {level}/100 · ratio "
         f"{_round(ratio) if ratio is not None else '—'}**{verdict}{walk_note}. "
-        f"Faits : PostgreSQL. Bloc **généré** par `scripts/hot-cache.py`."
+        f"Faits : PostgreSQL. Bloc **généré** par `redline hot-cache`."
     )
 
 
@@ -128,7 +128,7 @@ def render_state(ledger, rows: list, *, deadlines: list[dict], capabilities: lis
     """The ÉTAT block: the computed state that drives the coming weeks."""
     # No current date in the output: it changes only with the facts or the week.
     lines = ["- **État calculé** depuis PostgreSQL et decisions.md par "
-             "`scripts/hot-cache.py`, ne pas l'éditer."]
+             "`redline hot-cache`, ne pas l'éditer."]
     trajectory = []
     longest = ledger.longest_recent(rows, today)
     if longest is not None:
@@ -156,7 +156,7 @@ def render_state(ledger, rows: list, *, deadlines: list[dict], capabilities: lis
             f"{row['slug']} {row['score']}/{row['scale']}" for row in capabilities) + ".")
     if typed_due:
         lines.append(f"- **Prédictions à solder** : {typed_due} "
-                     "(`fact-read.py predictions --due`).")
+                     "(`redline fact-read predictions --due`).")
     return "\n".join(lines)
 
 
@@ -180,7 +180,7 @@ def refresh(vault: Path, ledger, rows: list, instruments: dict,
     """True if a block had drifted. With `check`, nothing is written.
 
     RPE targets are resolved HERE, from the vault: the Forme block must render exactly the
-    same gauge as `ledger.py --week`, and a second source of targets would let them
+    same gauge as `redline ledger --week`, and a second source of targets would let them
     diverge silently. The ÉTAT block is rendered only if the file carries its markers and
     a store is provided.
     """

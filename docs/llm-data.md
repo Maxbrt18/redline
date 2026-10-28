@@ -24,9 +24,9 @@ During a turn the agent works in a checkout of the vault with `Read`, `Glob`, `G
 opens is sent to the provider:
 
 - any note of the vault (athlete profile, injury history, goals, decisions, journal);
-- PostgreSQL facts returned by the CLIs (`ledger.py`, `fact-read.py`, `week-plan.py`…);
-- Strava activities, laps and streams fetched by `strava.py`;
-- weather at the start of a run (`weather.py`, which sends the route's coordinates and
+- PostgreSQL facts returned by the CLIs (`redline ledger`, `redline fact-read`, `redline week-plan`…);
+- Strava activities, laps and streams fetched by `redline strava`;
+- weather at the start of a run (`redline weather`, which sends the route's coordinates and
   time to Open-Meteo).
 
 ## Smaller calls

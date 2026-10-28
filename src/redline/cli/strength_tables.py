@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Regenerate the exercise tables of coaching/strength.md from the notes.
 
-`--check` reports a drift and writes nothing, which is what `vault-check.py` calls.
+`--check` reports a drift and writes nothing, which is what `redline vault-check` calls.
 
-Usage:  python3 scripts/strength-tables.py [--check]
+Usage:  redline strength-tables [--check]
 """
 
 import argparse
@@ -35,7 +35,7 @@ def main() -> None:
         return
     if args.check:
         raise InputError(f"Tables périmées dans {target(paths.vault_root()).name} : {', '.join(drifted)}\n"
-                 f"Régénère avec : python3 scripts/strength-tables.py")
+                 f"Régénère avec : redline strength-tables")
     print(f"Tables régénérées : {', '.join(drifted)}")
 
 

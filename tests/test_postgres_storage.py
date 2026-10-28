@@ -1092,7 +1092,7 @@ def test_messenger_reply_to_an_existing_inbound_is_backed_by_the_same_relation()
 
 
 def _ask(store, state, questions, source_key, *, body=None, platform_messages=()):
-    """A turn that DECLARES its questions (`fact-write.py ask`), then the delivery."""
+    """A turn that DECLARES its questions (`fact-write ask`), then the delivery."""
     from redline.model import commands
     questions = (questions,) if isinstance(questions, str) else tuple(questions)
     turn_id = str(uuid.uuid4())

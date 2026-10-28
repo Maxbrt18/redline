@@ -210,7 +210,7 @@ def now_stamp() -> str:
     """The real instant of the write, in local time with its offset.
 
     A single function, patchable in tests and called from one place only:
-    `week-plan.py revise`. The `computed_at` field used to be filled by the model, which
+    `redline week-plan revise`. The `computed_at` field used to be filled by the model, which
     has no clock -- see the comment in `revise`.
     """
     return dt.datetime.now().astimezone().replace(microsecond=0).isoformat()
@@ -264,7 +264,7 @@ def _text_errors(text: str, where: str, label: str, gate_ids: list[str]) -> list
 def written_text_errors(revision: dict, where: str = "revision") -> list[str]:
     """The forbidden marks in the text of ONE revision about to be written.
 
-    Called by `week-plan.py revise` on the NEW revision, never by `validate()`. History is
+    Called by `redline week-plan revise` on the NEW revision, never by `validate()`. History is
     append-only and `revise` validates the whole plan: the same rule in `semantic_errors`
     would reject today's revision because of an older text, blocking the coach on an
     uncorrectable fault. Here only what comes in is judged, and the program cleans up as
@@ -501,7 +501,7 @@ def semantic_errors(plan: dict, where: str = "weekly_plan",
                 problems.append(
                     f"{where_gate} : échéance {gate['due']} hors de {week} — "
                     "une condition au-delà du dimanche va dans PostgreSQL via "
-                    "scripts/fact-write.py deadline")
+                    "redline fact-write deadline")
             if gate["due"] < written_on:
                 problems.append(
                     f"{where_gate} : échéance {gate['due']} antérieure au calcul "

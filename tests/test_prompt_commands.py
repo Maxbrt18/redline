@@ -1,9 +1,9 @@
 """Every command named in a prompt must exist and accept what it is told.
 
 A prompt that cites a wrong command does not break at deployment: it breaks later,
-mid-conversation. A debrief trigger that pipes into `scripts/descent.py` is outside the
+mid-conversation. A debrief trigger that pipes into `redline descent` is outside the
 single authorised launcher, so it is refused and disguised as an access outage. A test
-scenario calling `fact-write.py daily --day` when the option is `--date` is the same
+scenario calling `fact-write daily --day` when the option is `--date` is the same
 kind of fault.
 
 Both are invisible to unit tests: prompts are strings, nobody executes them. Here they
@@ -26,7 +26,7 @@ from redline.service import prompts
 # itself presents as a command is read.
 SPAN = re.compile(r"`([^`]+)`")
 SCRIPT = re.compile(
-    r"/usr/local/bin/redline-agent-cli\s+([a-z-]+\.py)((?:\s+[a-z][a-z-]*)*)")
+    r"/usr/local/bin/redline-agent-cli\s+([a-z][a-z-]*)((?:\s+[a-z][a-z-]*)*)")
 
 
 def _prompts() -> dict[str, str]:
@@ -54,8 +54,8 @@ def _prompts() -> dict[str, str]:
 def _commandes() -> list[tuple[str, str, str, tuple[str, ...]]]:
     """(origin, script, subcommands, options) for each cited command.
 
-    Splitting on pipes matters: without it, the `--dplus` of `descent.py` would be
-    attributed to `strava.py` in a debrief pipe, and the test would blame the wrong
+    Splitting on pipes matters: without it, the `--dplus` of `descent` would be
+    attributed to `strava` in a debrief pipe, and the test would blame the wrong
     script for ignoring an option it never had.
     """
     trouvees = []
@@ -66,7 +66,7 @@ def _commandes() -> list[tuple[str, str, str, tuple[str, ...]]]:
                 correspondance = SCRIPT.search(segment)
                 if not correspondance:
                     continue
-                script = "scripts/" + correspondance.group(1)
+                script = correspondance.group(1)
                 suite = correspondance.group(2)
                 options = tuple(sorted(set(re.findall(r"(--[a-z][a-z-]+)", segment))))
                 trouvees.append((origine, script, suite.strip(), options))
@@ -81,8 +81,8 @@ def test_les_prompts_citent_bien_des_commandes():
     while checking nothing."""
     assert len(COMMANDES) >= 10
     scripts = {script for _, script, _, _ in COMMANDES}
-    assert "scripts/strava.py" in scripts
-    assert "scripts/week-plan.py" in scripts
+    assert "strava" in scripts
+    assert "week-plan" in scripts
 
 
 @pytest.mark.parametrize("origine,script,suite,options", COMMANDES,
@@ -115,7 +115,7 @@ def test_chaque_commande_citee_est_executable(origine, script, suite, options):
 def test_toute_commande_passe_par_le_lanceur_autorise():
     """The prompt and ``dontAsk`` must describe exactly the same path.
 
-    If the doctrine says ``scripts/ledger-add.py`` while Bash only allows
+    If the doctrine says ``redline ledger-add`` while Bash only allows
     ``redline-agent-cli``, the refusal gets reported as a save outage. Every mention of a
     business CLI is therefore normalised, not only the examples that carry options.
     """
@@ -124,10 +124,9 @@ def test_toute_commande_passe_par_le_lanceur_autorise():
         plat = " ".join(texte.split())
         for span in SPAN.findall(plat):
             for segment in span.split("|"):
-                if ".py" not in segment or "coaching/" in segment:
-                    continue
-                if ("scripts/" in segment or re.search(r"\b[a-z-]+\.py\b", segment)) \
-                        and prompts.AGENT_CLI not in segment:
+                if re.match(r"(?:python3? )?redline [a-z]", segment.strip()) \
+                        or (re.search(r"\bscripts/|\b[a-z-]+\.py\b", segment) \
+                        and "coaching/" not in segment):
                     fautes.append(f"{origine} : `{span[:90]}`")
     assert not fautes, "commandes hors lanceur :\n  " + "\n  ".join(fautes)
 

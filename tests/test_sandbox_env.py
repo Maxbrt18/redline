@@ -164,8 +164,8 @@ def test_agent_cli_policy_is_sorted_unique_and_points_to_tracked_scripts():
     tools = _agent_tool_policy()
     assert tools == sorted(set(tools))
     for tool in tools:
-        assert re.fullmatch(r"[a-z0-9][a-z0-9-]*\.py", tool)
-        source = f"src/redline/cli/{tool.removesuffix('.py').replace('-', '_')}.py"
+        assert re.fullmatch(r"[a-z0-9][a-z0-9-]*", tool)
+        source = f"src/redline/cli/{tool.replace('-', '_')}.py"
         assert (ROOT / source).is_file(), tool
         tracked = subprocess.run(
             ["git", "ls-files", "--error-unmatch", source],
@@ -179,8 +179,9 @@ def test_every_cli_named_to_the_live_agent_is_in_the_root_owned_policy():
                    if path.suffix in {".md", ".py"})
     assert texts
     for path in (ROOT / "CLAUDE.md", *texts):
-        references.update(re.findall(r"scripts/([a-z0-9-]+\.py)", path.read_text(
+        references.update(re.findall(r"`(?:python3? )?redline ([a-z0-9][a-z0-9-]*)", path.read_text(
             encoding="utf-8")))
+    assert {"week-plan", "fact-write", "ledger"} <= references
     assert references <= set(_agent_tool_policy())
 
 
@@ -223,7 +224,7 @@ def test_root_owned_launcher_refuses_a_cli_modified_during_the_turn(tmp_path):
     # Blanking the variable is not enough to leave the transaction.
     for turn_id in ("", "pas-un-uuid"):
         outside = subprocess.run(
-            [launcher, "fact-write.py", "daily"],
+            [launcher, "fact-write", "daily"],
             env={**environment, "REDLINE_TURN_ID": turn_id},
             text=True, capture_output=True, check=False)
         assert outside.returncode == 2
@@ -237,14 +238,14 @@ def test_root_owned_launcher_refuses_a_cli_modified_during_the_turn(tmp_path):
     vault = tmp_path / "vault"
     vault.mkdir()
     writable = subprocess.run(
-        [launcher, "ledger.py", "--week", "2030-W35"],
+        [launcher, "ledger", "--week", "2030-W35"],
         env={**environment, "VAULT_PATH": str(vault)},
         text=True, capture_output=True, check=False)
     assert writable.returncode == 1
     assert "code du moteur modifiable" in writable.stderr
     read_only(script_dir, script_dir.parent, repo / "src")
     venv_open = subprocess.run(
-        [launcher, "ledger.py", "--week", "2030-W35"],
+        [launcher, "ledger", "--week", "2030-W35"],
         env={**environment, "VAULT_PATH": str(vault)},
         text=True, capture_output=True, check=False)
     assert venv_open.returncode == 1
@@ -254,7 +255,7 @@ def test_root_owned_launcher_refuses_a_cli_modified_during_the_turn(tmp_path):
 
     # Without a vault the launcher refuses: the engine checkout is never one.
     no_vault = subprocess.run(
-        [launcher, "ledger.py", "--week", "2026-W35"],
+        [launcher, "ledger", "--week", "2026-W35"],
         env=environment, text=True, capture_output=True, check=False)
     assert no_vault.returncode == 1
     assert "VAULT_PATH absent" in no_vault.stderr
@@ -263,7 +264,7 @@ def test_root_owned_launcher_refuses_a_cli_modified_during_the_turn(tmp_path):
     # its files.
     environment["VAULT_PATH"] = str(vault)
     split = subprocess.run(
-        [launcher, "ledger.py", "--week", "2026-W35"],
+        [launcher, "ledger", "--week", "2026-W35"],
         env=environment, text=True, capture_output=True, check=False)
     assert split.returncode == 0
     assert "-m\nredline.cli.ledger" in split.stdout
@@ -273,7 +274,7 @@ def test_root_owned_launcher_refuses_a_cli_modified_during_the_turn(tmp_path):
     target.write_text("print('code injecté')\n", encoding="utf-8")
     read_only(script_dir)
     dirty = subprocess.run(
-        [launcher, "ledger.py", "--week", "2026-W35"],
+        [launcher, "ledger", "--week", "2026-W35"],
         env=environment, text=True, capture_output=True, check=False)
     for folder in (script_dir, script_dir.parent, repo / "src", fake_bin, site,
                    fake_bin.parent):

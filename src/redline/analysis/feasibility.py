@@ -2,11 +2,11 @@
 """Backward feasibility of the plan, read from PostgreSQL: same code for the review and the CLI.
 
 The computation lives in `src/redline/model/transitions.py`; this module gathers the facts:
-the typed race (`fact-write.py deadline --kind race`), the active revisions, the transitions
+the typed race (`redline fact-write deadline --kind race`), the active revisions, the transitions
 done, the longest run of the last 30 days. Nothing is written.
 
-    python3 scripts/feasibility.py                  # from today
-    python3 scripts/feasibility.py --unwritten 2030-W41  # treat W41 as still to be written
+    redline feasibility                  # from today
+    redline feasibility --unwritten 2030-W41  # treat W41 as still to be written
 
 `--unwritten` explores an already scheduled week: without it, a week that has an active
 revision is frozen on its novelties (typed transition, deduced long-run step).
@@ -79,7 +79,7 @@ def report(store: Any, rows: list, today: dt.date,
     problem = build_problem(store, rows, today, free)
     if problem is None:
         return ["Faisabilité à rebours : aucune course typée à venir "
-                "(`fact-write.py deadline --kind race`)."]
+                "(`redline fact-write deadline --kind race`)."]
     return transitions.render(transitions.diagnose(problem))
 
 

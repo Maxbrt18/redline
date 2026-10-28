@@ -5,7 +5,7 @@
 set -euo pipefail
 
 repo=${REDLINE_REPO:-/home/ubuntu/redline}
-script=${1:-}
+name=${1:-}
 launcher_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 if [ "$launcher_dir" = /usr/local/bin ]; then
   policy=/usr/local/share/redline/agent-cli-tools.txt
@@ -13,7 +13,7 @@ else
   policy="$launcher_dir/agent-cli-tools.txt"
 fi
 
-[[ "$script" =~ ^[a-z0-9][a-z0-9-]*\.py$ ]] || {
+[[ "$name" =~ ^[a-z0-9][a-z0-9-]*$ ]] || {
   echo "agent-cli: nom de commande invalide" >&2
   exit 2
 }
@@ -21,7 +21,7 @@ fi
   echo "agent-cli: politique root-owned absente" >&2
   exit 1
 }
-grep -Fxq -- "$script" "$policy" || {
+grep -Fxq -- "$name" "$policy" || {
   echo "agent-cli: commande absente de l'allowlist" >&2
   exit 2
 }
@@ -37,9 +37,8 @@ uuid='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
   exit 2
 }
 
-# `week-plan.py` is the command named by the instructions; `redline.cli.week_plan`
-# is the module that implements it.
-name=${script%.py}
+# `week-plan` is the command named by the instructions; `redline.cli.week_plan` is the
+# module that implements it.
 module="redline.cli.${name//-/_}"
 source_file="src/redline/cli/${name//-/_}.py"
 

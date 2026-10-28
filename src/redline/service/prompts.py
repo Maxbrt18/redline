@@ -12,6 +12,7 @@ import re
 from collections.abc import Sequence
 from pathlib import Path
 
+from redline import cli
 from redline.coach.fr import fill, messages, note, prompt
 from redline.model import agent_input, session_kinds, typography
 from redline.model import ledger as ledger_model
@@ -21,17 +22,16 @@ from redline.model import ledger as ledger_model
 BANNED_GLYPHS = typography.BANNED_GLYPHS
 
 AGENT_CLI = "/usr/local/bin/redline-agent-cli"
-_DIRECT_SCRIPT = re.compile(
-    r"(?:(?:python3\s+)?scripts/|(?<=`))([a-z0-9-]+\.py)")
+_COMMAND = re.compile(r"\bredline (?=(?:" + "|".join(map(re.escape, cli.COMMANDS)) + r")\b)")
 
 
 def agent_cli(text: str) -> str:
     """Rewrite every command an injected text names to the only path the agent may run.
 
-    A prompt that forbids `python3 scripts/…` and then shows that form gets the form
-    copied, and the copy is refused.
+    The texts spell commands as an operator types them (`redline week-plan`); the agent
+    may only run them through its launcher, and a form it is shown is the form it copies.
     """
-    return _DIRECT_SCRIPT.sub(lambda match: f"{AGENT_CLI} {match.group(1)}", text)
+    return _COMMAND.sub(f"{AGENT_CLI} ", text)
 
 
 def turn_input_note(turn_id: str) -> str:

@@ -38,7 +38,7 @@ def render_memory(messages: list[dict], open_questions: list[dict],
                      f"message_id={row.get('id', '?')}]: {body}")
     if open_questions:
         lines.append(
-            "Pour examiner une réponse, utilise /usr/local/bin/redline-agent-cli fact-write.py "
+            "Pour examiner une réponse, utilise /usr/local/bin/redline-agent-cli fact-write "
             "question --question-id <UUID> --answer-id <UUID> --status <état> --note "
             "'Ce qui est compris et ce qui manque'. Les UUID sont ceux de ce souvenir. "
             "answered exige une réponse suffisante à toute la question ; open conserve "
@@ -68,7 +68,7 @@ def render_memory(messages: list[dict], open_questions: list[dict],
                      "date, aucune relance avant celle-ci. Une date échue n'impose pas de relance.")
         if len(open_questions) > 20:
             lines.append("D'autres questions sont conservées : les lire avec "
-                         "/usr/local/bin/redline-agent-cli fact-read.py questions --limit 1000.")
+                         "/usr/local/bin/redline-agent-cli fact-read questions --limit 1000.")
     if threads:
         lines.append("Sujets conservés (leur présence ne demande aucune relance) :")
         for row in threads[:15]:

@@ -19,11 +19,11 @@ the flats. The identity above does not have that flaw. On a descent where Strava
 reported D-, it gives 1101 for 1096 recorded (0.5 % off).
 
 Usage:
-    python3 scripts/descent.py --dplus 175.3 --altitude '[262.9, ..., 262.6]'
-    python3 scripts/strava.py streams <id> --keys altitude \
-        | python3 scripts/descent.py --dplus 175.3
+    redline descent --dplus 175.3 --altitude '[262.9, ..., 262.6]'
+    redline strava streams <id> --keys altitude \
+        | redline descent --dplus 175.3
 
-The stream is passed as is: either the JSON returned by `strava.py streams`
+The stream is passed as is: either the JSON returned by `redline strava streams`
 ({"altitude": [...]}), or the bare list.
 """
 
@@ -51,7 +51,7 @@ def _altitude(payload: str) -> list:
         data = data.get("altitude")
     if not isinstance(data, list):
         raise ValueError("flux d'altitude introuvable : attendu une liste, ou un objet "
-                         "{\"altitude\": [...]} tel que renvoyé par `strava.py streams`")
+                         "{\"altitude\": [...]} tel que renvoyé par `redline strava streams`")
     return data
 
 

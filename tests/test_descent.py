@@ -1,4 +1,4 @@
-"""scripts/descent.py -- the elevation loss that the Strava API does not return.
+"""redline descent -- the elevation loss that the Strava API does not return.
 
 The check that matters is the last one: on the only ledger activity whose loss was
 known otherwise, the method falls back within 0.5 %. Without it, these tests would

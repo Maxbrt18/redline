@@ -1,6 +1,6 @@
 #!/bin/sh
 # Regenerates the generated views before every commit, so a stale block is never
-# committed in the first place -- vault-check.py only detects the drift afterwards.
+# committed in the first place -- redline vault-check only detects the drift afterwards.
 #
 # The hook is a SECOND line of defence, not the guarantee: it only runs where
 # someone typed `git config core.hooksPath .githooks`, which a fresh clone (a
@@ -23,7 +23,7 @@ fi
 # NON-BLOCKING, by policy. `redline/vault.py` (`regenerate_views`) states that a
 # failing generator must NEVER prevent a commit: lost session notes are a far worse
 # outage than a stale block. A stale block is repaired by the next commit, and
-# `vault-check.py` reports it in the weekly review; a lost write is never recovered.
+# `redline vault-check` reports it in the weekly review; a lost write is never recovered.
 # Off the VPS the PostgreSQL views cannot be computed: running them would raise a
 # false incident on every commit, while static mode covers exactly that case.
 # Fingerprint of every file already modified BEFORE regeneration: only what the

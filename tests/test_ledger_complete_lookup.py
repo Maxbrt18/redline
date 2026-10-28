@@ -3,7 +3,7 @@
 The athlete gives the RPE and pain of a bike ride from the day before. The coach knows
 the Strava id of the activity and tries `strava:90000000001`. But the row had been
 recorded without an id, under a `messenger:` key, and that key appeared nowhere: not
-in `fact-read.py observations`, nor elsewhere. It had only lived in the memory of the
+in `fact-read observations`, nor elsewhere. It had only lived in the memory of the
 session, long gone. Result: "unknown observation", turn refused, technical incident.
 A check demanded a correct path that nothing made reachable.
 
@@ -78,12 +78,12 @@ def test_a_type_disambiguates_without_needing_the_key():
 
 def test_a_date_without_any_observation_names_where_to_look():
     cli = _cli()
-    with pytest.raises(InputError, match=r"fact-read\.py observations"):
+    with pytest.raises(InputError, match=r"fact-read observations"):
         cli.resolve_key(_Store([VELO]), "", "2026-08-01", "")
 
 
 def test_the_key_is_published_by_the_reader_that_the_coach_runs():
-    """The root remedy: `ledger-complete.py` requires a key, so the reader must publish
+    """The root remedy: `ledger-complete` requires a key, so the reader must publish
         it. Not displaying it amounted to asking for a secret identifier."""
     from redline.cli import fact_read
 

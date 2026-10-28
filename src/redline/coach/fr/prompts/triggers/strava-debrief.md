@@ -6,19 +6,19 @@
    Sortie vallonnée : FC des montées dans `streams`. Des montées hors
    zone font une qualité ; première depuis 30 jours, la séance porte `transition: qualite`.
 2. Le service a DÉJÀ capturé ET ENRICHI les métriques objectives, D- et WBGT compris :
-   ne relance ni weather.py, ni descent.py, ni ledger-complete.py pour elles.
-   Statut : `python3 scripts/session-cycle.py pending`. `matched` = observation et cycle
+   ne relance ni `weather`, ni `descent`, ni `ledger-complete` pour elles.
+   Statut : `redline session-cycle pending`. `matched` = observation et cycle
    existent ; `ambiguous` ou `unmatched` = distillat durable : demande l'appariement,
-   n'invente aucun type, ne relance pas `ledger-add.py` sur la même identité.
+   n'invente aucun type, ne relance pas `redline ledger-add` sur la même identité.
    `start_local` a déjà reconstruit le départ. Une seule séance du jour et du même
    type : rattachement automatique ; plusieurs : demande laquelle puis
-   `session-cycle.py match`, jamais en silence. La cadence est déjà dans la bonne
+   `redline session-cycle match`, jamais en silence. La cadence est déjà dans la bonne
    unité, ne la multiplie pas une deuxième fois. Laisse vides RPE, douleur et plaisir
    non donnés. Le cycle porte la séance terminée : NE RÉVISE PAS le plan pour recopier
    son statut ; une révision n'existe que si la prescription future change.
 3. AVANT D'ÉCRIRE : lis la Batterie de `coaching/protocols.md` et les derniers angles
-   avec `scripts/fact-read.py proactive`. Si un angle est utile, choisis-en un non servi, puis DÉPOSE-LE :
-   `python3 scripts/fact-write.py angle "<deux ou trois mots>"`. C'est son seul endroit.
+   avec `redline fact-read proactive`. Si un angle est utile, choisis-en un non servi, puis DÉPOSE-LE :
+   `redline fact-write angle "<deux ou trois mots>"`. C'est son seul endroit.
    DANS LE MESSAGE : il n'en reste rien à dire. Ta première phrase porte l'écart de
    `ecarts` qui compte (plafond franchi, FC qui monte), sinon l'angle, sans le nommer.
    Jamais la douleur /10, jamais trois chiffres de la montre à la suite.

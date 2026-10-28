@@ -62,7 +62,7 @@ MONTH_SCHEMA = Schema("mois", [
     # Free-form keys: they are the capability LABELS the cockpit prints, and they
     # change with the cockpit, not with the code.
     field("capabilities", dict, required=False,
-          note="nom de capacité -> score, cf. scripts/fact-read.py capabilities"),
+          note="nom de capacité -> score, cf. redline fact-read capabilities"),
     field("cap_scale", float, required=False, minimum=1, default=5),
     field("race_name", str, required=False),
     field("race_date", str, required=False, pattern=DATE),

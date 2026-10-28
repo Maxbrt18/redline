@@ -45,7 +45,7 @@ SETTLED_CYCLE_STATES = session_cycle.TERMINAL_STATES | {"completed"}
 #
 # "Runtime" means: the service behaves differently after this commit. A file that
 # nothing executes or loads is not runtime, even under `deploy/`. For example
-# `coaching/exercises/*.md` is DATA, reread by a subprocess on each `chart-strength.py`
+# `coaching/exercises/*.md` is DATA, reread by a subprocess on each `redline chart-strength`
 # call, never loaded at startup, and edited by the coach itself. Classing it as runtime
 # would freeze vault synchronization on a write the coach is allowed to make.
 RUNTIME_PATHS = (
@@ -558,7 +558,7 @@ class VaultRepo:
         except Exception:  # the dossier is an aid, never a gate
             log.exception("Dossier du bilan %s non calculé", week)
             return ("[DOSSIER DU BILAN indisponible : calcul en échec, voir les journaux. "
-                    "Relance toi-même ledger.py, signals.py et fact-read.py predictions --due.]")
+                    "Relance toi-même redline ledger, redline signals et redline fact-read predictions --due.]")
 
     def weekly_plan_message(self, week: str, today: str = "", since: str = "",
                             exclude_ids=frozenset()) -> str:

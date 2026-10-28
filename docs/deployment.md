@@ -190,7 +190,7 @@ To change a behavior:
   dependencies or the assets read at startup.
 - **"Runtime" = the service behaves differently after this commit.** Neither
   `coaching/exercises/*.md` — data re-read at each call of
-  `chart-strength.py`, and which the coach edits itself — nor `tests/` are runtime:
+  `redline chart-strength`, and which the coach edits itself — nor `tests/` are runtime:
   neither requires a restart, and a test pushed with code is held back by the code anyway.
   Leaving them in would freeze vault synchronization on a perfectly legitimate
   write.
@@ -336,14 +336,14 @@ lacked evidence or when it timed out, add latency and break the continuity
 of the conversation without being able to guarantee medical accuracy.
 
 Probabilistic semantic judgment lives in the `evaluation/` package, outside `redline/`,
-and is called only by `evaluate-coaching.py`, an explicit evaluation bench. It is used to confront red cases and to
+and is called only by `redline evaluate-coaching`, an explicit evaluation bench. It is used to confront red cases and to
 improve the coach's instructions; its unavailability or its verdict can never
 hold back a Messenger conversation. The coaching limits (diagnosis, medication,
 painful tests, inferred scores and identity) belong to the coach's instructions and
 to the evaluation scenarios. The protections on writes and on the program remain
 deterministic code.
 
-`python -m redline.cli.evaluate_coaching --output /tmp/coaching-evaluation.json` produces fictitious
+`redline evaluate-coaching --output /tmp/coaching-evaluation.json` produces fictitious
 answers with the profiles of the provider in `AGENT_PROVIDER` (Claude in production: the
 scenario's route, judge on the N2 profile), with no tool, persistent memory or sending.
 `ClaudeCodeRunner.one_shot` launches `claude -p` in an empty folder, hence without `CLAUDE.md`,
@@ -351,7 +351,7 @@ like the Codex bench; `evaluation/runner.py` bounds the billable models.
 The fixtures `tests/fixtures/coaching-scenarios.json` carry 36 scenarios, their
 context, posture, illustrative answer and acceptance criteria; those that originate from a
 real correction name their origin (`origin`), checked by `test_coaching_scenarios.py`. The vault's `coaching/corrections-replay.json` registry gives each entry of
-`coaching/corrections.md` its replay mode; `vault-check.py` flags those still waiting
+`coaching/corrections.md` its replay mode; `redline vault-check` flags those still waiting
 for a scenario (`a-rejouer`). The routes are imposed
 by the fixtures and the reads replaced by fictitious facts: this bench evaluates
 the wording, not the real routing nor the effects of the tools. Human review remains necessary;
@@ -364,7 +364,7 @@ The bench also fails on an empty answer, an overrun of the form budgets or
 a judge refusal on a generated answer. The `emotional` flag of the fixtures controls
 emotional injection; the bubbles follow the transport's shared splitting.
 
-`python -m redline.cli.evaluate_conversation` complements this bench with twelve situations and twenty-one
+`redline evaluate-conversation` complements this bench with twelve situations and twenty-one
 turns. It feeds the produced answers back into the next turn, offers a
 `contextual` variant limited to evaluation, and compares two result files offline
 with a blind reading grid. `--dry-run` exports the content without a model
@@ -435,9 +435,9 @@ level; it is stored in the conversation like a real message. After
 The program belongs to PostgreSQL and its revisions are append-only.
 
 ```bash
-python -m redline.cli.week_plan show --week 2030-W33
-python -m redline.cli.week_plan check --week 2030-W33
-python -m redline.cli.week_plan revise --week 2030-W33 < revision.json
+redline week-plan show --week 2030-W33
+redline week-plan check --week 2030-W33
+redline week-plan revise --week 2030-W33 < revision.json
 ```
 
 Codes of `check` and `show`:
@@ -495,8 +495,8 @@ revision. After an operator repair, a finished or failed job reopens without ad 
 SQL, and this command is deliberately kept outside the coach's sandbox:
 
 ```bash
-python -m redline.cli.proactive_job status --job-key weekly:2030-W34
-python -m redline.cli.proactive_job reopen --job-key weekly:2030-W34
+redline proactive-job status --job-key weekly:2030-W34
+redline proactive-job reopen --job-key weekly:2030-W34
 ```
 
 Operator commands run from the root, with the service's environment
@@ -504,18 +504,18 @@ Operator commands run from the root, with the service's environment
 on the local workstation carries them; this edition ships the CLIs, not the wrapper.
 
 A text written outside the service (a review done from the Mac) goes through the same chain,
-without a model turn, with `operator-message.py`: closed `operator_message` job,
+without a model turn, with `redline operator-message`: closed `operator_message` job,
 high priority, stale after 6 h, idempotent by its key, traced in conversation memory.
 Operator command, outside the coach's sandbox:
 
 ```bash
-python -m redline.cli.operator_message --key bilan-w39 --text "…"
+redline operator-message --key bilan-w39 --text "…"
 ```
 
 `session_cycles` gives each `plan_id + logical_key` a stable identity across the
 append-only revisions. A new revision resynchronizes the cycle and keeps its state
 if the relevant fields have not changed; a cancelled or removed session loses its pending
-digestive follow-up. `session-cycle.py` records an optional declared
+digestive follow-up. `redline session-cycle` records an optional declared
 departure and an explicit match.
 The Strava observation carries the real time: it replaces the effective time, keeps
 the declared departure as a trace and retroactively closes the session if "I'm going"
@@ -535,8 +535,8 @@ The same materialization turns the other typed facts into idempotent initiatives
 missed session, daily signal, race pre-mortem, digestive follow-up, gear
 wear, spontaneous correction and contradiction of a load increase. A correction
 is announced within 7 days of being recorded, or never: the announcement expires
-and `fact-read.py corrections` says so, with the number of recurrences drawn from the audit log.
-`fact-write.py correction` requires `--entry`, the title of an entry already written in
+and `redline fact-read corrections` says so, with the number of recurrences drawn from the audit log.
+`redline fact-write correction` requires `--entry`, the title of an entry already written in
 `coaching/corrections.md`. Only
 `race` deadlines trigger a scenario; an `availability` mechanically forbids a
 demanding session in its range. Pre-session reminder, timed mental cue, weather alert and
@@ -552,14 +552,14 @@ the retained topics. Service lines (waiting, outage, limit) stay in the database
 but do not count among the eight. At N2 and N3, the business packet already carries the open
 threads: the memory does not render them a second time. The last twelve closed questions stay visible with their
 answer or their limit, to avoid asking them again. Long texts flag their
-shortening and keep their end. `fact-read.py conversation --query <sujet>` searches
+shortening and keep their end. `redline fact-read conversation --query <sujet>` searches
 past exchanges in French and gives the dated message with its neighbors. The service
 binds the turn to its PSID in `turn_scopes`; the CLI refuses a missing or expired turn, without
-exposing the Messenger identifier to the shell. `knowledge-search.py --query <sujet>` locates the
+exposing the Messenger identifier to the shell. `redline knowledge-search --query <sujet>` locates the
 theory sheets; its result is an index to open, not proof already read.
-`fact-read.py questions --limit 1000` makes it possible to find older questions.
+`redline fact-read questions --limit 1000` makes it possible to find older questions.
 A common word, a number, a yes or a Messenger reply closes no question.
-The coach explicitly reviews the answer with `fact-write.py question`, which carries the
+The coach explicitly reviews the answer with `redline fact-write question`, which carries the
 question and message identifiers, a note and a state: `open` for a partial
 answer, `answered` for a sufficient answer, `deferred` for a later resumption
 and `expired` for a closed topic. A resumption date is recorded only if agreed.
@@ -569,7 +569,7 @@ a later message from the same person. A recorded correction
 is matched to the inbound text by lexical overlap and is spontaneously pushed
 only once.
 
-The model's questions are declared by `fact-write.py ask --text ...`, with only the
+The model's questions are declared by `redline fact-write ask --text ...`, with only the
 `--cell` keys requested. Their exact text must have been delivered before creating
 the question and its markers; a simple answer no longer marks all feelings
 as asked. Follow-up is reserved for an expected piece of information: a social
@@ -614,10 +614,10 @@ consumed by a single revision. The refusal is therefore transactional, not an in
 the model can forget.
 
 ```bash
-python -m redline.cli.session_cycle pending --week 2030-W34
-python -m redline.cli.session_cycle reconcile-strava --days 30
-python -m redline.cli.fact_read predictions
-python -m redline.cli.fact_read gear
+redline session-cycle pending --week 2030-W34
+redline session-cycle reconcile-strava --days 30
+redline fact-read predictions
+redline fact-read gear
 ```
 
 Normal cycle: `pending` -> `running` -> `done`. An error before delivery puts the
@@ -703,7 +703,7 @@ transaction and two adapters:
 Candidates are built as `ubuntu`, never as root. Both preflights read the
 models from `redline.routing.default_models`, the repository's only list; the Claude preflight
 displays the identifier each alias resolves to, resumes with the candidate a session
-written by the active one, then requires a coach CLI call (`week-plan.py preview
+written by the active one, then requires a coach CLI call (`redline week-plan preview
 --input <turn file>`) to pass the exact permissions of an autonomous turn
 (`redline.claude.AUTONOMOUS_PERMISSIONS`). Any failure after the switch restores the previous link. A refused
 update stays visible in `journalctl -u redline-agent-runtime-update.service`; the
@@ -807,7 +807,7 @@ coach therefore cannot widen its own permissions.
 .venv/bin/python -m mypy
 .venv/bin/python -m vulture
 .venv/bin/python -m pytest -q -rs
-python -m redline.cli.vault_check
+redline vault-check
 ```
 
 `vulture` reads the production code without the tests (configuration in
@@ -853,8 +853,8 @@ Order of verification:
    prose, parts and characters added by the service, question marks), with
    no text at all; proactive jobs carry `job_id`, `kind` and `outcome`;
 3. `Incident interne` lines, projection or push failures;
-4. `week-plan.py check` for the weeks cited;
-5. `vault-check.py`;
+4. `redline week-plan check` for the weeks cited;
+5. `redline vault-check`;
 6. `inbound_messages`, `proactive_jobs` (`failed` + `last_error`) and `projection_states`
    read-only;
 7. timer and age of the latest encrypted PostgreSQL backup.
@@ -921,7 +921,7 @@ quality session, the reserve (guard rail no. 6) is declared in one gesture while
 completeness window: `reserve:<observation>` writes the `reps_in_reserve` measurement.
 **Course**: D-N, longest outing, milestones, capabilities, archives.
 `redline/notebook_board.py` computes everything at read time: the active revision carries
-the intention, the ledger the fact, `ledger.py` and `signals.py` the counts.
+the intention, the ledger the fact, `redline ledger` and `redline signals` the counts.
 No figure is stored for the notebook; an absent program prescribes nothing, an overdue dated
 check holds back its sessions, a revision to re-arbitrate says so. The notebook
 compares the fact to the typed caps (`hr_cap_bpm`, `rpe_max`, `duration_cap_min`,

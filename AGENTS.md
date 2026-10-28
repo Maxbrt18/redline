@@ -15,7 +15,7 @@ instructions are not here: they live in each instance's vault (template:
 | `src/redline/service/` | the Messenger service, agent runners, the notebook PWA (`page/`) |
 | `src/redline/coach/fr/` | every athlete-facing text: prompts, messages, labels, scales |
 | `src/redline/cards/` | PNG cards and charts |
-| `src/redline/cli/` | one thin module per command (`week-plan.py` → `redline.cli.week_plan`) |
+| `src/redline/cli/` | one thin module per command (`redline week-plan` → `redline.cli.week_plan`) |
 | `src/redline/evaluation/` | offline coaching and conversation benches |
 | `migrations/` | Alembic revisions, frozen once merged |
 | `deploy/` | systemd units, Caddy, host scripts, the agent CLI wrapper and its allowlist |

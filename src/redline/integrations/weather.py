@@ -7,13 +7,13 @@ and the **WBGT**, the real heat load, which is what goes into the ledger. Standa
 library only, WBGT included, so nothing has to be installed on the server.
 
 The coach gets the encoded polyline and the start time from
-`python3 scripts/strava.py activity <id>`, which returns them ready to use in its
+`redline strava activity <id>`, which returns them ready to use in its
 `weather_query` block.
 
 Strava only gives a local wall-clock time, WITHOUT a timezone. This is the one call
 to know:
 
-  python3 scripts/weather.py --polyline 'ki{eFvqfiVsBc@...' \
+  redline weather --polyline 'ki{eFvqfiVsBc@...' \
       --time '2030-06-15T19:01:46' --local
 
 `--local` means "this time is the local time of the start place"; the script resolves
@@ -359,7 +359,7 @@ def parse_time(value, local=False):
     Two paths, and only one is correct for each source:
 
     - `local=True`: the value is a **wall-clock time at the start place**, without a
-      timezone, which is what the `start_local` field of `scripts/strava.py activity`
+      timezone, which is what the `start_local` field of `redline strava activity`
       returns. The offset is resolved later from the coordinates (`resolve_offset`),
       because only that step knows the place's timezone and daylight saving at that
       date.
@@ -550,7 +550,7 @@ def main():
                          "`start_local` de Strava tel quel, sans fuseau.")
     ap.add_argument("--local", action="store_true",
                     help="--time est l'heure murale au lieu de départ "
-                         "(= `start_local` de scripts/strava.py). Le décalage est "
+                         "(= `start_local` de redline strava). Le décalage est "
                          "résolu depuis les coordonnées. N'ajoute jamais un `Z` "
                          "à la place.")
     ap.add_argument("--json", action="store_true", help="Sortie JSON brute.")

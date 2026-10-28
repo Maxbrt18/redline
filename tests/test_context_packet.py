@@ -101,7 +101,7 @@ def test_a_strength_report_is_forced_to_n2_and_named_as_already_persisted(make_b
     message = agent.calls[-1]["message"]
     assert "NIVEAU N2" in message
     assert "RAPPORT RENFO DEJA ENREGISTRE" in message
-    assert "fact-read.py strength --limit 3" in message
+    assert "fact-read strength --limit 3" in message
     assert "ne dis jamais que la sauvegarde a echoue" in message
     agent.classify.assert_not_called()
 

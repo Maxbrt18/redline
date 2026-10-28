@@ -1,4 +1,4 @@
-"""The `weather.py` command: see `redline.integrations.weather`."""
+"""The `redline weather` command: see `redline.integrations.weather`."""
 
 from redline.integrations.weather import main
 from redline.model import entrypoint

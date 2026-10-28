@@ -2,7 +2,7 @@
 """Multi-turn conversation bench, isolated from PostgreSQL and Messenger.
 
 --dry-run loads neither configuration nor SDK. --compare works offline.
-Generation uses the same one_shot adapter as evaluate-coaching.py; it does not
+Generation uses the same one_shot adapter as redline evaluate-coaching; it does not
 evaluate writes, triage, or the service's real session resumption.
 """
 from __future__ import annotations

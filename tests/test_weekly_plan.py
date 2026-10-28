@@ -294,7 +294,7 @@ def test_a_gate_is_lifted_only_by_a_new_revision_without_it():
 def test_a_gate_beyond_sunday_belongs_to_the_echeancier():
     broken = plan()
     broken["revisions"][0]["gates"] = [gate(due="2026-08-11")]
-    with pytest.raises(SchemaError, match=r"fact-write\.py deadline"):
+    with pytest.raises(SchemaError, match=r"fact-write deadline"):
         weekly_plan.validate(broken)
 
 

@@ -1,4 +1,4 @@
-"""weather.py: the outdoor WBGT, a port of Liljegren et al. (2008).
+"""weather: the outdoor WBGT, a port of Liljegren et al. (2008).
 
 These tests protect a **port**. The risk specific to a port is not that it crashes -- it is
 that it gets a coefficient wrong and still outputs a plausible number. Three families of

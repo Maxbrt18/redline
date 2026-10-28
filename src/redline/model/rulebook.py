@@ -11,8 +11,8 @@ engine applies `rulebook.default.toml`, its default. One replaces the other enti
 partial merge would let two versions of the same rule coexist, the very fault this module
 exists to prevent.
 
-It is the SINGLE SOURCE of the thresholds the code applies (`scripts/ledger.py`,
-`scripts/feasibility.py`, `transitions.py`) and of the transition kinds a programme may
+It is the SINGLE SOURCE of the thresholds the code applies (`redline ledger`,
+`redline feasibility`, `transitions.py`) and of the transition kinds a programme may
 carry. A threshold cited in a rule's text (`{pain_cap}`) is rendered from the same value:
 what the coach reads is what the code applies.
 """

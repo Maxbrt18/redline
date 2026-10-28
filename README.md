@@ -43,7 +43,7 @@ the facts before it speaks**.
 | Path | What it is |
 |---|---|
 | `src/redline/service/` | The service: Messenger and Strava webhooks, proactive messages, agent runtime, mobile "notebook" web app (PWA) |
-| `src/redline/cli/` | The commands the agent calls (`ledger.py`, `week-plan.py`, `strava.py`, `fact-write.py`…), one module each |
+| `src/redline/cli/` | The commands the agent calls (`redline ledger`, `redline week-plan`, `redline strava`, `redline fact-write`…), one module each |
 | `src/redline/model/`, `analysis/`, `integrations/`, `coach/` | The typed domain, the ledger and its reports, Strava and the weather, the coach's words |
 | `src/redline/storage/`, `migrations/` | PostgreSQL schema (Alembic) and repository layer |
 | `src/redline/cards/` | HTML/PNG card renderer (week, month, workout, strength) |
@@ -62,7 +62,7 @@ from the committed samples (`src/redline/cards/samples/*.json`; the race name is
 placeholder):
 
 ```bash
-python -m redline.cli.chart_week -o /tmp/week.png < src/redline/cards/samples/week.json
+redline chart-week -o /tmp/week.png < src/redline/cards/samples/week.json
 ```
 
 <p>

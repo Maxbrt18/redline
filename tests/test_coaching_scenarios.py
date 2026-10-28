@@ -15,7 +15,7 @@ SCENARIOS = ENGINE_ROOT / correction_replay.SCENARIOS
 REQUIRED = {"id", "route", "message", "context", "understanding", "ask", "avoid",
             "posture", "ideal", "acceptance", "max_questions", "max_messages"}
 ROUTES = {"N0", "N1", "N2", "N3"}
-# A review case judges an already written answer (`evaluate-coaching.py`, branch
+# A review case judges an already written answer (`evaluate-coaching`, branch
 # `candidate`): it has neither route nor ideal.
 REVIEW_REQUIRED = {"id", "message", "candidate", "expected_approved"}
 

@@ -54,8 +54,8 @@ STRENGTH = {
     "note": "Douleur à 0/10 : version complète.",
 }
 
-CARDS = [("chart-workout.py", WORKOUT), ("chart-week.py", WEEK),
-         ("chart-month.py", MONTH), ("chart-strength.py", STRENGTH)]
+CARDS = [("chart-workout", WORKOUT), ("chart-week", WEEK),
+         ("chart-month", MONTH), ("chart-strength", STRENGTH)]
 
 
 def run_script(name: str, payload: dict, out: Path, env: dict | None = None) -> subprocess.CompletedProcess:
@@ -126,14 +126,14 @@ LONG_NOTE = ("1ère séance depuis avril : demi-dose (une série en moins partou
 
 STRESS = [
     pytest.param(
-        "chart-strength.py",
+        "chart-strength",
         {"session": "a", "add": [{"name": LONG_NAME, "target": LONG_TARGET,
                                   "dose": {"measure": "amrap", "sets": [2, 3],
                                            "side": "each", "rest_s": 90}}],
          "note": LONG_NOTE},
         id="strength-long-strings"),
     pytest.param(
-        "chart-strength.py",
+        "chart-strength",
         # FIFTEEN, not «thirteen + six»: the tested number is the total, and session
         # A gained 4 motor-control exercises (9 -> 13).
         # The addition thus follows the session instead of being a frozen 6, otherwise this case
@@ -143,36 +143,36 @@ STRESS = [
                                  for i in range(15 - 13)]},
         id="strength-fifteen-exercises"),
     pytest.param(
-        "chart-strength.py", {"session": "assimilation"},
+        "chart-strength", {"session": "assimilation"},
         id="strength-every-optional-missing"),
     pytest.param(
-        "chart-week.py",
+        "chart-week",
         dict(WEEK, pain="très irritable depuis mardi, réveil douloureux",
              pain_flag="bad", cmj_cm=31.5,
              dates="du lundi 13 au dimanche 19 juillet 2026"),
         id="week-long-tile-text"),
     pytest.param(
-        "chart-week.py",
+        "chart-week",
         {"days": [{"day": "lun", "done_km": 0}], "week": "W1"},
         id="week-single-empty-day"),
     pytest.param(
-        "chart-month.py",
+        "chart-month",
         dict(MONTH, capabilities={"Durabilité sur sentier technique en descente": 4,
                                   "Gestion digestive à l'effort prolongé": 1},
              km=1234.5, dplus=45678),
         id="month-long-capability-names"),
     pytest.param(
-        "chart-month.py", {"month": "Un mois au titre particulièrement long 2026"},
+        "chart-month", {"month": "Un mois au titre particulièrement long 2026"},
         id="month-title-only"),
     pytest.param(
-        "chart-workout.py",
+        "chart-workout",
         dict(WORKOUT, title="12 x 400 m en côte à 8 % avec récupération descendante",
              note="cible SV2, récupération 1'30 en trottinant",
              reps=[{"label": f"Rep {i + 1}", "time_s": 90 - i, "dist_m": 400,
                     "hr": 165 + i} for i in range(12)]),
         id="workout-twelve-reps-long-labels"),
     pytest.param(
-        "chart-workout.py",
+        "chart-workout",
         {"reps": [{"time_s": 88, "dist_m": 400}, {"time_s": 88, "dist_m": 400}]},
         id="workout-no-target-no-hr"),
 ]
@@ -191,7 +191,7 @@ def test_the_overflow_guard_actually_fires(tmp_path):
     payload = dict(STRENGTH, add=[
         {"name": f"Exercice {i}", "dose": {"measure": "reps", "sets": 3, "reps": 10}}
         for i in range(40)])
-    process = run_script("chart-strength.py", payload, tmp_path / "chart.png")
+    process = run_script("chart-strength", payload, tmp_path / "chart.png")
     assert process.returncode != 0
     assert "Card non générée" in process.stderr
     assert "card trop haute" in process.stderr
@@ -214,13 +214,13 @@ def test_invalid_json_fails_cleanly(tmp_path):
 @pytest.mark.parametrize("script,payload,expected", [
     # A key nobody validated is a card the athlete reads as true. Every refusal
     # names the field -- these assertions are on the MESSAGE, not just the exit code.
-    ("chart-week.py", dict(WEEK, gauge_lvl=72), "gauge_lvl"),
-    ("chart-week.py", dict(WEEK, pain_flag="rouge"), "pain_flag"),
-    ("chart-week.py", dict(WEEK, plaisir=42), "plaisir"),
-    ("chart-week.py", {"dates": "sans semaine"}, "week"),
-    ("chart-month.py", dict(MONTH, race_date="28/11/2026"), "race_date"),
-    ("chart-workout.py", dict(WORKOUT, reps=WORKOUT["reps"][:1]), "reps"),
-    ("chart-workout.py",
+    ("chart-week", dict(WEEK, gauge_lvl=72), "gauge_lvl"),
+    ("chart-week", dict(WEEK, pain_flag="rouge"), "pain_flag"),
+    ("chart-week", dict(WEEK, plaisir=42), "plaisir"),
+    ("chart-week", {"dates": "sans semaine"}, "week"),
+    ("chart-month", dict(MONTH, race_date="28/11/2026"), "race_date"),
+    ("chart-workout", dict(WORKOUT, reps=WORKOUT["reps"][:1]), "reps"),
+    ("chart-workout",
      dict(WORKOUT, reps=[{"time_s": 90, "dist_m": 0}, {"time_s": 90, "dist_m": 400}]),
      "dist_m"),
 ])
@@ -235,20 +235,20 @@ def test_a_malformed_payload_is_refused_by_name(tmp_path, script, payload, expec
 @pytest.mark.parametrize("kind", ["a", "b", "assimilation"])
 def test_strength_card_renders_every_session_type(tmp_path, kind):
     out = tmp_path / f"strength-{kind}.png"
-    process = run_script("chart-strength.py", {"session": kind}, out)
+    process = run_script("chart-strength", {"session": kind}, out)
     assert process.returncode == 0, process.stderr
     assert out.is_file()
 
 
 def test_strength_card_rejects_an_unknown_session(tmp_path):
-    process = run_script("chart-strength.py", {"session": "c"}, tmp_path / "x.png")
+    process = run_script("chart-strength", {"session": "c"}, tmp_path / "x.png")
     assert process.returncode != 0
     assert "connues : a, assimilation, b" in process.stderr
 
 
 def test_strength_card_refusal_names_the_field(tmp_path):
     """A refusal Claude can act on without opening the source."""
-    process = run_script("chart-strength.py", {"session": "a", "half_dose": "oui"},
+    process = run_script("chart-strength", {"session": "a", "half_dose": "oui"},
                          tmp_path / "x.png")
     assert process.returncode != 0
     assert "champ « half_dose » : booléen attendu" in process.stderr
@@ -257,7 +257,7 @@ def test_strength_card_refusal_names_the_field(tmp_path):
 
 def test_a_derogation_must_carry_a_typed_dose(tmp_path):
     """Off-programme is allowed; a free-form dose string is not."""
-    process = run_script("chart-strength.py",
+    process = run_script("chart-strength",
                          {"session": "a", "add": [{"name": "Gainage", "dose": "3 x 30 s"}]},
                          tmp_path / "x.png")
     assert process.returncode != 0
@@ -293,7 +293,7 @@ def test_strength_card_writes_its_exact_session_snapshot(tmp_path):
     from redline.service import strength
 
     out = tmp_path / "strength-2026-07-22.png"
-    assert run_script("chart-strength.py", STRENGTH, out, env=LINK_ENV).returncode == 0
+    assert run_script("chart-strength", STRENGTH, out, env=LINK_ENV).returncode == 0
 
     text, session = strength.read_sidecar(out)
     assert text == "Renfo, séance unique, mardi 22 juillet"
@@ -328,7 +328,7 @@ def test_the_worst_payload_the_schema_allows_still_gets_a_sidecar(tmp_path):
                  "say": "S" * 200},           # GATE_SCHEMA: maximum=200
     }
     out = tmp_path / "worst.png"
-    process = run_script("chart-strength.py", worst, out, env=LINK_ENV)
+    process = run_script("chart-strength", worst, out, env=LINK_ENV)
     assert process.returncode == 0, process.stderr
 
     _, session = strength.read_sidecar(out)
@@ -340,21 +340,21 @@ def test_no_link_without_configuration(tmp_path):
     """On the Mac the variables are usually unset: the card is the deliverable,
     the link is what rides along."""
     out = tmp_path / "strength.png"
-    assert run_script("chart-strength.py", STRENGTH, out).returncode == 0
+    assert run_script("chart-strength", STRENGTH, out).returncode == 0
     assert out.exists()
     assert not list(tmp_path.glob("*.link"))
 
 
 def test_the_strength_sidecar_needs_only_the_public_base_url(tmp_path):
     out = tmp_path / "strength.png"
-    done = run_script("chart-strength.py", STRENGTH, out, env=LINK_ENV)
+    done = run_script("chart-strength", STRENGTH, out, env=LINK_ENV)
     assert done.returncode == 0, done.stderr
     assert out.exists() and strength_sidecar(out).exists()
 
 
 def test_other_cards_never_get_a_link(tmp_path):
     out = tmp_path / "week.png"
-    assert run_script("chart-week.py", WEEK, out, env=LINK_ENV).returncode == 0
+    assert run_script("chart-week", WEEK, out, env=LINK_ENV).returncode == 0
     assert not list(tmp_path.glob("*.link"))
 
 

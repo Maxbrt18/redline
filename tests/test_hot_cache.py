@@ -5,7 +5,7 @@ Values typed by hand go stale as soon as a ledger line is added, until someone r
 the script AND remembers to re-edit the cache.
 
 What these tests deliberately do NOT protect: that the VERSIONED block is up to date.
-That is vault content, not code, and it is checked by `vault-check.py`
+That is vault content, not code, and it is checked by `vault-check`
 (`check_generated_views`), as stated in the header of `code-checks.yml`. A gate that
 cries wolf on a note that moves ends up ignored. Drift is prevented upstream:
 `redline/vault.py` regenerates before committing, `.githooks/pre-commit` covers

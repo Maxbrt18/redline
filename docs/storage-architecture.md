@@ -4,7 +4,7 @@
 
 PostgreSQL 17 est l'unique propriétaire des faits opérationnels et de l'état durable
 du service. Git reste le journal du code et du savoir humain ; les faits se lisent
-directement avec `scripts/fact-read.py`, `scripts/ledger.py` et `week-plan.py`.
+directement avec `redline fact-read`, `redline ledger` et `redline week-plan`.
 Obsidian ne conserve que le raisonnement humain et quelques vues réellement utiles
 (`hot-cache`, plans hebdomadaires, tables de renforcement et CSV d'export).
 
@@ -71,7 +71,7 @@ et état de projection, puis commit en **une transaction PostgreSQL**. Une comma
 invalide annule tout ce lot. La frontière du service relit ensuite les semaines dont
 la réponse dépend avant toute livraison.
 
-La CLI `week-plan.py preview --week …` accepte le même JSON que `revise`. Dans un
+La CLI `redline week-plan preview --week …` accepte le même JSON que `revise`. Dans un
 tour du coach, ce JSON arrive par `--input .agent-tmp/<turn_id>.json`, jamais par
 une redirection ; stdin reste la voie des lancements opérateur, hors du tour.
 Elle appelle le même moteur transactionnel avec les commandes déjà préparées dans
@@ -127,8 +127,8 @@ génération ou leur push échoue, le fait canonique reste enregistré et `proje
 pour reprise. Le service ne prétend donc jamais avoir annulé une transaction déjà
 commitée.
 
-Les écritures passent uniquement par `ledger-add.py`, `ledger-complete.py`,
-`week-plan.py revise`, `fact-write.py` et la route renfo signée. Le projecteur est
+Les écritures passent uniquement par `redline ledger-add`, `redline ledger-complete`,
+`redline week-plan revise`, `redline fact-write` et la route renfo signée. Le projecteur est
 sérialisé par un verrou consultatif PostgreSQL et n'acquitte l'état sale qu'après le
 succès de tous les générateurs.
 

@@ -8,7 +8,7 @@ changement préparé et validé quand une modification est décidée, (2) UNE qu
 fait qui te manque peut renverser la décision, (3) une réponse ordinaire, y compris si
 une information réelle ne justifie aucun changement du programme. Le triage ne vaut
 jamais autorisation de modifier. Une exploration demandée peut utiliser
-`scripts/week-plan.py preview` : même validation que revise, sans préparer ni
+`redline week-plan preview` : même validation que revise, sans préparer ni
 enregistrer de changement. Dans ce troisième cas, ne récite pas la semaine et ne plaque
 pas un automatique "rien ne bouge". ⟨athlète⟩ n'a pas à te demander de consigner : la
 trace est ton travail, pas le sien, et il ne devrait jamais avoir à l'expliquer deux

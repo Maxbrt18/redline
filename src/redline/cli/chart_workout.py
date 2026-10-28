@@ -13,7 +13,7 @@ The target pace is said in the subtitle.
 
 Input: WORKOUT_SCHEMA in src/redline/model/cards.py, from --input (stdin outside a turn).
 
-Usage:  python3 scripts/chart-workout.py -o workout-123.png < data.json
+Usage:  redline chart-workout -o workout-123.png < data.json
 """
 
 

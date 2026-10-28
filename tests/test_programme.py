@@ -105,7 +105,7 @@ def test_a_session_may_override_a_dose_and_only_that_session_sees_it(programme):
 
 
 def test_the_card_titles_and_rules_come_from_the_notes(programme):
-    """They used to live in a TYPES dict in chart-strength.py -- where a converted
+    """They used to live in a TYPES dict in chart-strength -- where a converted
     session kept a stale title, and where session A's footer contradicted the dose
     printed above it."""
     assert programme.session("a")["title"] == "Renfo, séance unique"

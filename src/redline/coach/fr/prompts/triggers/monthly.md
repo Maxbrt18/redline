@@ -1,10 +1,10 @@
 Fais le recul du mois terminé : calcule km, D+, séances et évolution
-des six capacités, puis génère `scripts/chart-month.py` avec `period` au format YYYY-MM du mois terminé. Juge le RÉSULTAT, pas le
+des six capacités, puis génère `redline chart-month` avec `period` au format YYYY-MM du mois terminé. Juge le RÉSULTAT, pas le
 processus : pour chaque capacité, a-t-elle bougé ce mois-ci, et la trajectoire de la
-sortie longue (`scripts/ledger.py --week <W> --long-run-target <km visés avant l'affûtage>`)
+sortie longue (`redline ledger --week <W> --long-run-target <km visés avant l'affûtage>`)
 mène-t-elle à la course ? Une capacité immobile deux mois de suite est un point du
 recul, même si chaque semaine était défendable. Lis aussi
-la calibration de `scripts/fact-read.py predictions` : des réfutées surtout optimistes
+la calibration de `redline fact-read predictions` : des réfutées surtout optimistes
 font attaquer en premier, au prochain rituel de confrontation, la décision active du
 même type ; plus d'un cinquième de void fait relire comment les dernières prédictions
 ont été écrites. Ce score ne se raconte pas à ⟨athlète⟩ sans objet concret.

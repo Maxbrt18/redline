@@ -206,7 +206,7 @@ class PostgresStateStore(StateStore):
             if not created:
                 return
             # A delivery is never proof that the athlete answered. An open question
-            # comes from a typed declaration of the turn (`fact-write.py ask`) found in
+            # comes from a typed declaration of the turn (`redline fact-write ask`) found in
             # the text actually delivered, never from a "?" in prose: a rhetorical
             # question is not an agenda to follow. A closed rendering has no turn: the
             # service names the information it awaits itself (`questions`), subject to

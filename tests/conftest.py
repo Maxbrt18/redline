@@ -264,8 +264,8 @@ def load_script(name: str):
 
 
 def cli_command(name: str) -> list[str]:
-    """How a test runs the command `name` in a subprocess."""
-    return [sys.executable, "-m", cli.module(name)]
+    """How a test runs the command `name` (`week-plan` or `redline week-plan`)."""
+    return [sys.executable, "-m", cli.module(name.removeprefix("redline "))]
 
 
 def git(cwd, *args):

@@ -7,7 +7,7 @@ the athlete through the normal chain -- 8 min of silence, a trace in conversatio
 and in proactive messages -- without a model turn. The key makes the send idempotent:
 the same key goes out only once.
 
-    scripts/operator-message.py --key bilan-w39 --text "…"
+    redline operator-message --key bilan-w39 --text "…"
 """
 
 from __future__ import annotations

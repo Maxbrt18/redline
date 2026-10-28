@@ -2,15 +2,15 @@
 """Strava access for the coach, whatever agent runs it.
 
 Usage:
-    python3 scripts/strava.py check
-    python3 scripts/strava.py activity 90000000002
-    python3 scripts/strava.py laps 90000000002
-    python3 scripts/strava.py activities --limit 5
-    python3 scripts/strava.py streams 90000000002 --keys altitude | \
-        python3 scripts/descent.py --dplus 64.6
+    redline strava check
+    redline strava activity 90000000002
+    redline strava laps 90000000002
+    redline strava activities --limit 5
+    redline strava streams 90000000002 --keys altitude | \
+        redline descent --dplus 64.6
 
 Output is a readable `key : value` block, or JSON with `--json`. `streams` always
-prints flat JSON (`{"altitude": [...]}`), the shape `scripts/descent.py` reads.
+prints flat JSON (`{"altitude": [...]}`), the shape `redline descent` reads.
 Activities are parsed into `redline.model.activity.Activity`: cadence is in steps per
 minute on foot (Strava counts one foot) and in revolutions otherwise, and values are
 not rounded beyond the provider's precision.
@@ -21,7 +21,7 @@ Authentication has two owners. The service environment holds the application ide
 refreshed here, and Strava may replace the refresh token at that moment. The first
 tokens are written once, on the machine that runs the coach, by
 
-    python3 scripts/strava.py login
+    redline strava login
 
 which reads the authorisation code from standard input, never from an argument, so
 that it does not land in the shell history.
@@ -133,7 +133,7 @@ def access_token(*, force_refresh: bool = False) -> str:
     a stale copy after the first rotation, so it lives in the cache only.
 
     Without a cache there is no fallback: bootstrapping is the explicit
-    `strava.py login` step, and the error message names it.
+    `redline strava login` step, and the error message names it.
     """
     client_id, client_secret = _app_identity()
 
@@ -149,7 +149,7 @@ def access_token(*, force_refresh: bool = False) -> str:
     if not refresh_token:
         raise StravaError(
             f"aucun jeton dans {path} : l'autorisation n'a jamais été faite sur cette "
-            "machine, ou le cache a été effacé. Lance `python3 scripts/strava.py login` "
+            "machine, ou le cache a été effacé. Lance `redline strava login` "
             "SUR LA MACHINE QUI FAIT TOURNER LE COACH, et suis les deux étapes."
         )
 
@@ -303,7 +303,7 @@ def emit(data: Any, as_json: bool) -> None:
 # ------------------------------------------------------------------ commands
 
 def cmd_activity(args) -> Any:
-    """The summary, plus what `weather.py` needs for an outdoor activity."""
+    """The summary, plus what `redline weather` needs for an outdoor activity."""
     activity = parse_activity(call(f"/activities/{args.id}"))
     out = summary(activity)
     if activity.weather_query:
@@ -331,7 +331,7 @@ def cmd_activities(args) -> Any:
 
 
 def cmd_streams(args) -> Any:
-    """The streams, flattened to the shape `descent.py` already accepts as is."""
+    """The streams, flattened to the shape `redline descent` already accepts as is."""
     keys = args.keys
     raw = call(f"/activities/{args.id}/streams", {"keys": keys, "key_by_type": "true"})
     return {name: stream.get("data") for name, stream in raw.items()
@@ -450,12 +450,12 @@ COMMANDS = {
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=__doc__.splitlines()[0],
-        epilog="Valeurs BRUTES : c'est ledger-add.py qui arrondit, et lui seul.",
+        epilog="Valeurs BRUTES : c'est redline ledger-add qui arrondit, et lui seul.",
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--json", action="store_true", help="sortie machine")
 
     # `--json` is accepted both BEFORE and AFTER the subcommand. A caller naturally
-    # writes `strava.py activity 42 --json`, which argparse only accepts up front
+    # writes `redline strava activity 42 --json`, which argparse only accepts up front
     # without this parent, and its error does not say where the flag belongs.
     # SUPPRESS makes both orders compatible: without it, the subcommand's default
     # would overwrite a `--json` already set up front.
@@ -479,7 +479,7 @@ def build_parser() -> argparse.ArgumentParser:
     activities.add_argument("--after", help="AAAA-MM-JJ")
 
     streams = subparsers.add_parser("streams", parents=[commun],
-                                    help="les flux, prêts pour descent.py")
+                                    help="les flux, prêts pour redline descent")
     streams.add_argument("id")
     streams.add_argument("--keys", default="altitude",
                          help="altitude, heartrate, cadence, velocity_smooth, distance, time")

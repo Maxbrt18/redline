@@ -6,7 +6,7 @@ ledger unreadable, and everything downstream with it.
 
 The Markdown ledger no longer exists: PostgreSQL constrains each measure per column, and an
 out-of-type value is refused by the database, not by a re-read. What remains, and what these
-tests freeze, is the INPUT BOUNDARY: `ledger-add.py` rounds what the source returns as a
+tests freeze, is the INPUT BOUNDARY: `ledger-add` rounds what the source returns as a
 float, refuses by naming the column what no rounding can fix, and never touches a cell that
 is already conforming.
 """
@@ -70,7 +70,7 @@ def test_lecrivain_type_arrondit_ce_que_strava_rend(monkeypatch, capsys):
     """The clean path: RAW values go in, a conforming row comes out."""
     add = _load_writer()
     monkeypatch.setattr(sys, "argv", [
-        "ledger-add.py", "--dry-run",
+        "ledger-add", "--dry-run",
         "--date", "2026-08-10", "--type", "easy",
         "--km", "6.8396", "--temps", "0:41:56", "--allure", "6:08", "--fcmoy", "156.61",
         "--fcmax", "168", "--cad", "168.884", "--dplus", "64.7", "--dmoins", "64",
@@ -85,7 +85,7 @@ def test_lecrivain_type_refuse_en_nommant_la_colonne(monkeypatch, capsys):
     """What no rounding can fix is refused BEFORE any write."""
     add = _load_writer()
     monkeypatch.setattr(sys, "argv", [
-        "ledger-add.py", "--date", "2026-08-10", "--type", "footing", "--km", "6.84"])
+        "ledger-add", "--date", "2026-08-10", "--type", "footing", "--km", "6.84"])
     assert add.main() == 1
     assert "Type" in capsys.readouterr().err
 
@@ -102,7 +102,7 @@ def test_un_reveil_sans_trace_ne_sécrit_pas(monkeypatch, capsys, trace):
     answer lived only in the note. The gate never read it."""
     add = _load_writer()
     _zones(monkeypatch, add)
-    argv = ["ledger-add.py", "--dry-run", "--date", "2026-10-11", "--type", "wake-trace",
+    argv = ["ledger-add", "--dry-run", "--date", "2026-10-11", "--type", "wake-trace",
             "--note", "Trace légère déclarée par Sam"]
     monkeypatch.setattr(sys, "argv", argv + (["--pain", trace] if trace else []))
     assert add.main() == 1
@@ -115,7 +115,7 @@ def test_le_mot_de_alex_devient_la_valeur(monkeypatch, capsys, word, value):
     add = _load_writer()
     _zones(monkeypatch, add)
     monkeypatch.setattr(sys, "argv", [
-        "ledger-add.py", "--dry-run", "--date", "2026-10-11", "--type", "wake-trace",
+        "ledger-add", "--dry-run", "--date", "2026-10-11", "--type", "wake-trace",
         "--pain", word])
     assert add.main() == 0
     assert f"'Dlr': {{'genou': '{value}'}}" in capsys.readouterr().out
@@ -125,7 +125,7 @@ def test_avec_plusieurs_zones_chaque_douleur_nomme_la_sienne(monkeypatch, capsys
     add = _load_writer()
     _zones(monkeypatch, add, ("talon", "cheville"))
     monkeypatch.setattr(sys, "argv", [
-        "ledger-add.py", "--dry-run", "--date", "2026-10-11", "--type", "easy",
+        "ledger-add", "--dry-run", "--date", "2026-10-11", "--type", "easy",
         "--pain", "talon=2", "--pain", "cheville=?"])
     assert add.main() == 0
     assert "'Dlr': {'talon': '2', 'cheville': '?'}" in capsys.readouterr().out
@@ -137,7 +137,7 @@ def test_avec_plusieurs_zones_chaque_douleur_nomme_la_sienne(monkeypatch, capsys
 def test_une_douleur_sans_zone_claire_est_refusee(monkeypatch, capsys, given, refused):
     add = _load_writer()
     _zones(monkeypatch, add, ("talon", "cheville"))
-    argv = ["ledger-add.py", "--dry-run", "--date", "2026-10-11", "--type", "easy"]
+    argv = ["ledger-add", "--dry-run", "--date", "2026-10-11", "--type", "easy"]
     for value in given:
         argv += ["--pain", value]
     monkeypatch.setattr(sys, "argv", argv)
@@ -149,7 +149,7 @@ def test_un_reveil_exige_une_trace_par_zone(monkeypatch, capsys):
     add = _load_writer()
     _zones(monkeypatch, add, ("talon", "cheville"))
     monkeypatch.setattr(sys, "argv", [
-        "ledger-add.py", "--dry-run", "--date", "2026-10-11", "--type", "wake-trace",
+        "ledger-add", "--dry-run", "--date", "2026-10-11", "--type", "wake-trace",
         "--pain", "talon=aucune"])
     assert add.main() == 1
     assert "réveil sans trace pour cheville" in capsys.readouterr().err
@@ -171,7 +171,7 @@ def test_existing_observation_is_rejected_before_staging(monkeypatch):
     monkeypatch.setenv("REDLINE_TURN_ID", "active-turn")
     monkeypatch.setattr(redline.storage, "Database", MagicMock())
     monkeypatch.setattr(redline.storage, "OperationalStore", lambda *args: store)
-    with pytest.raises(writer.table.LedgerError, match=r"ledger-complete\.py"):
+    with pytest.raises(writer.table.LedgerError, match=r"ledger-complete"):
         writer._write_database("test", {"Date": "2026-09-11", "Type": "easy"}, {},
                                "strava:90000000004")
     store.stage_command.assert_not_called()

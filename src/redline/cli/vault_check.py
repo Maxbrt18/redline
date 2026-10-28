@@ -6,8 +6,8 @@ links, file names, PostgreSQL state, generated views), never prose. What a vault
 its notes to (note types, reading budget) is declared in `redline.toml` under
 `[vault]`; a vault's own editorial conventions belong in a script of its own.
 
-Usage:  python3 scripts/vault-check.py            # from the vault root
-        python3 scripts/vault-check.py --quiet    # only failures
+Usage:  redline vault-check            # from the vault root
+        redline vault-check --quiet    # only failures
 Exit code 0 if everything passes, 1 otherwise.
 """
 
@@ -443,7 +443,7 @@ def check_prediction_debt(vault: Vault, report: Report) -> None:
         report.fail("prédictions soldées",
                     [f"{len(late)} prédiction(s) échue(s) depuis plus de "
                      f"{PREDICTION_GRACE_DAYS} j ; ferme chacune avec "
-                     "`fact-write.py prediction --key <clé> --outcome true|false|void`", *late])
+                     "`redline fact-write prediction --key <clé> --outcome true|false|void`", *late])
     elif due:
         report.warn("prédictions soldées",
                     f"{len(due)} à fermer au prochain bilan : " + " · ".join(lines[:3]))
@@ -640,7 +640,7 @@ def check_generated_views(vault: Vault, report: Report) -> None:
     problems = []
     try:
         problems += [f"{name} a dérivé — régénère avec "
-                     f"`python3 scripts/strength-tables.py`"
+                     f"`redline strength-tables`"
                      for name in refresh(vault.root, load_programme(vault.root),
                                          check=True)]
         store = ledger_gauge.open_store()
@@ -649,7 +649,7 @@ def check_generated_views(vault: Vault, report: Report) -> None:
         if hot_cache.refresh(vault.root, ledger_gauge, rows, instruments,
                              store=store, check=True):
             problems.append("blocs Forme/État du hot-cache ont dérivé — régénère avec "
-                            "`python3 scripts/hot-cache.py`")
+                            "`redline hot-cache`")
         drifted, seen = _plan_view_drift(vault)
         problems += drifted
     except (NoteError, ViewDrift, ledger.LedgerError) as exc:
@@ -682,7 +682,7 @@ def _plan_view_drift(vault: Vault) -> tuple:
     finally:
         database.dispose()
     return ([f"{name} : le programme a dérivé de PostgreSQL — régénère avec "
-             f"`python3 scripts/storage-project.py`" for name in drifted], seen)
+             f"`redline storage-project`" for name in drifted], seen)
 
 
 # The order IS the reading order of the report. Adding a check means adding it here

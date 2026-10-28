@@ -89,7 +89,7 @@ def test_historical_bench_fails_on_shape_or_review_failure(
     monkeypatch.setattr(main.__globals__['Config'], 'from_env', lambda: make_config())
     monkeypatch.setitem(main.__globals__, 'bench_runner', lambda *args: runner)
     monkeypatch.setitem(main.__globals__, 'judge', lambda *args, **kwargs: approved)
-    monkeypatch.setattr(sys, 'argv', ['evaluate-coaching.py', '--fixtures', str(fixtures),
+    monkeypatch.setattr(sys, 'argv', ['evaluate-coaching', '--fixtures', str(fixtures),
                                     '--output', str(tmp_path / 'result.json')])
     assert main() == expected
     assert '[ÉTAT D\'ESPRIT' not in runner.one_shot.call_args.kwargs['instructions']
