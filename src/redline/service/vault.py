@@ -63,12 +63,12 @@ RUNTIME_TREES = ("deploy", "src", "migrations")
 
 # Technical alert causes. The key avoids duplicating a cause within a single
 # synchronization or persistence pass.
-ALERT_DEPLOY = "deploiement"
-ALERT_HISTORY = "historique"
+ALERT_DEPLOY = "deployment"
+ALERT_HISTORY = "history"
 ALERT_PUSH = "push"
 ALERT_COMMIT = "commit"
 ALERT_PROJECTION = "projection"
-ALERT_WRITE = "ecriture"
+ALERT_WRITE = "write"
 
 
 def needs_deployment(path: str) -> bool:

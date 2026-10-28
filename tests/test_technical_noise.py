@@ -33,7 +33,7 @@ def test_an_internal_incident_is_logged_without_text(make_bot, caplog):
     bot._log_vault_alerts()
 
     assert _alerts_sent(client) == []
-    assert caplog.text.count("Incident interne « vault:deploiement »") == 1
+    assert caplog.text.count("Incident interne « vault:deployment »") == 1
 
 
 def test_two_distinct_internal_causes_are_logged_without_text(make_bot, caplog):
@@ -50,5 +50,5 @@ def test_two_distinct_internal_causes_are_logged_without_text(make_bot, caplog):
     bot._log_vault_alerts()
 
     assert _alerts_sent(client) == []
-    assert "vault:deploiement" in caplog.text
+    assert "vault:deployment" in caplog.text
     assert "vault:projection" in caplog.text

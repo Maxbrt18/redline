@@ -697,7 +697,7 @@ class Board:
         seconds = session_detail.zone_seconds(s, limits) if s and limits else None
         conditions = (intake or {}).get("weather") or {}
         weather = {key: conditions.get(key) for key in (
-            "temp", "ressenti", "humidite", "vent", "conditions", "wbgt")} if conditions else None
+            "temp", "feels_like", "humidity", "wind", "conditions", "wbgt")} if conditions else None
         wbgt = (intake or {}).get("wbgt_value")
         if weather is None and wbgt is not None:
             weather = {"wbgt": float(wbgt)}

@@ -131,14 +131,14 @@ CHANGE_FIELDS = (
 
 #: A restriction names its premise as a type. A restriction without a premise is the most
 #: frequent prescription error, and free-text reminders did not prevent it. A free-text
-#: `rule` cannot be verified; a rulebook identifier and an `evidence` fact can. `demande`
+#: `rule` cannot be verified; a rulebook identifier and an `evidence` fact can. `request`
 #: covers what the athlete asked for directly.
-REQUEST_MOTIF = "demande"
+REQUEST_RULE = "request"
 
 
-def motif_rules() -> tuple[str, ...]:
-    """The motives of a restriction: the instance rulebook's rules, or a request."""
-    return (*(rule.id for rule in rulebook.current().rules), REQUEST_MOTIF)
+def restriction_rules() -> tuple[str, ...]:
+    """The premises of a restriction: the instance rulebook's rules, or a request."""
+    return (*(rule.id for rule in rulebook.current().rules), REQUEST_RULE)
 
 
 #: Prefixes of a FACT: what the ledger, Strava, an opinion or a gate said.
@@ -146,18 +146,18 @@ def motif_rules() -> tuple[str, ...]:
 _FACT_TRIGGER = re.compile(r"^(?:observation|exposure|medical|gate|incident|strength|strava):")
 _REQUEST_TRIGGER = re.compile(r"^(?:messenger|request|availability):")
 
-def _known_rule(motif: dict) -> list[str]:
+def _known_rule(restriction: dict) -> list[str]:
     """The named rule exists in the instance rulebook, read at validation time."""
-    if motif["regle"] in motif_rules():
+    if restriction["rule"] in restriction_rules():
         return []
-    return [f"champ « regle » : {motif['regle']!r} inconnu "
-            f"(attendus : {', '.join(motif_rules())})"]
+    return [f"champ « rule » : {restriction['rule']!r} inconnu "
+            f"(attendus : {', '.join(restriction_rules())})"]
 
 
-MOTIF_SCHEMA = Schema("motif d'une restriction", [
-    field("regle", str, minimum=1,
-          note="l'identifiant du règlement qui impose la restriction, ou demande"),
-    field("fait", str, minimum=3,
+RESTRICTION_SCHEMA = Schema("prémisse d'une restriction", [
+    field("rule", str, minimum=1,
+          note="l'identifiant du règlement qui impose la restriction, ou request"),
+    field("fact", str, minimum=3,
           note="une entrée exacte de evidence : le fait qui déclenche la règle"),
 ], check=_known_rule)
 
@@ -173,7 +173,7 @@ CHANGE_SCHEMA = Schema("preuve d'un changement de séance", [
           note="la règle de coaching appliquée à cette preuve"),
     # Optional on read: older revisions do not carry it.
     # Required on write for any restriction (`change_evidence_errors`).
-    field("motif", dict, required=False, schema=MOTIF_SCHEMA,
+    field("restriction", dict, required=False, schema=RESTRICTION_SCHEMA,
           note="obligatoire si la séance est retirée, annulée ou réduite"),
 ])
 
@@ -630,7 +630,7 @@ def gate_reasons(plan: dict, today: dt.date | None = None) -> list[str]:
     """The text of the due gates, as served to the coach."""
     return [f"contrôle daté du {gate['due']} non levé — DEMANDE À L'ATHLÈTE AVANT "
             f"TOUTE PRESCRIPTION : {gate['question']} ; à défaut : {gate['on_fail']}. "
-            "Le contrôle ne se lève qu'en enregistrant une révision dont le motif "
+            "Le contrôle ne se lève qu'en enregistrant une révision dont la raison "
             "porte SA réponse, jamais en le retirant du programme."
             for gate in blocking_gates(plan, today)]
 
@@ -854,25 +854,25 @@ def restrictions(old: dict, new: dict | None) -> list[str]:
     return found
 
 
-def _motif_errors(session_id: str, entry: dict, cuts: list[str],
-                  evidence: list[str]) -> list[str]:
-    motif = entry.get("motif")
-    if not motif:
+def _restriction_errors(session_id: str, entry: dict, cuts: list[str],
+                        evidence: list[str]) -> list[str]:
+    restriction = entry.get("restriction")
+    if not restriction:
         return [
-            f"changes.{session_id}.motif : restriction ({', '.join(cuts)}) sans motif "
-            "typé. Nomme la règle du règlement qui l'impose (`regle` : "
-            f"{', '.join(motif_rules())}) et le fait qui la déclenche (`fait` : une entrée "
-            "exacte de evidence). Sans prémisse, la séance reste."]
-    fait = motif.get("fait") or ""
-    if fait not in evidence:
-        return [f"changes.{session_id}.motif.fait doit recopier exactement une entrée "
-                "de evidence."]
-    if motif.get("regle") == REQUEST_MOTIF:
-        if not _REQUEST_TRIGGER.match(fait):
-            return [f"changes.{session_id}.motif : regle=demande exige un message de "
+            f"changes.{session_id}.restriction : restriction ({', '.join(cuts)}) sans "
+            "prémisse typée. Nomme la règle du règlement qui l'impose (`rule` : "
+            f"{', '.join(restriction_rules())}) et le fait qui la déclenche (`fact` : une "
+            "entrée exacte de evidence). Sans prémisse, la séance reste."]
+    fact = restriction.get("fact") or ""
+    if fact not in evidence:
+        return [f"changes.{session_id}.restriction.fact doit recopier exactement une "
+                "entrée de evidence."]
+    if restriction.get("rule") == REQUEST_RULE:
+        if not _REQUEST_TRIGGER.match(fact):
+            return [f"changes.{session_id}.restriction : rule=request exige un message de "
                     "l'athlète (messenger:, request:, availability:)."]
-    elif not _FACT_TRIGGER.match(fait):
-        return [f"changes.{session_id}.motif : regle={motif.get('regle')} s'applique à "
+    elif not _FACT_TRIGGER.match(fact):
+        return [f"changes.{session_id}.restriction : rule={restriction.get('rule')} s'applique à "
                 "un fait observé (observation:, strava:, medical:, gate:, exposure:, "
                 "incident:, strength:), pas à une intention."]
     return []
@@ -885,7 +885,7 @@ _AUTHORITATIVE_TRIGGER = re.compile(
 
 def change_evidence_errors(previous: dict | None, current: dict) -> list[str]:
     """Each future change names its evidence and the rule that turns it into a decision;
-    a restriction adds its typed `motif`."""
+    a restriction adds its typed `restriction`."""
     if previous is None:
         return []
     as_of = str(current.get("computed_at") or now_stamp())[:10]
@@ -930,7 +930,7 @@ def change_evidence_errors(previous: dict | None, current: dict) -> list[str]:
         cuts = restrictions(before[session_id], after.get(session_id)) \
             if session_id in before else []
         if cuts:
-            problems += _motif_errors(session_id, entry, cuts,
+            problems += _restriction_errors(session_id, entry, cuts,
                                       current.get("evidence") or [])
     extras = sorted(set(by_session) - set(expected))
     if extras:
@@ -1052,16 +1052,16 @@ def _dates_touchees(previous: dict | None, current: dict) -> set[str]:
 
 
 def coherence_errors(week: str, previous: dict | None, current: dict) -> list[str]:
-    """The motive names a day the object does not touch: one of the two is wrong."""
+    """The reason names a day the object does not touch: one of the two is wrong."""
     if previous is None:      # a first revision touches the whole week
         return []
     nommees = _dates_nommees(current.get("reason") or "", week)
     manquantes = sorted(nommees - _dates_touchees(previous, current))
     return [
-        f"revision {current['revision']} : le motif nomme le {_day_label(stamp)} mais "
+        f"revision {current['revision']} : la raison (`reason`) nomme le {_day_label(stamp)} mais "
         "aucune séance de ce jour n'est ajoutée, annulée, déplacée ni modifiée. Soit la "
-        "révision oublie ce jour et il faut l'écrire, soit le motif le nomme sans le "
-        "changer : retire-le du motif, ou porte la circonstance dans `constraints`."
+        "révision oublie ce jour et il faut l'écrire, soit la raison le nomme sans le "
+        "changer : retire-le de la raison, ou porte la circonstance dans `constraints`."
         for stamp in manquantes]
 
 

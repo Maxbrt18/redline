@@ -6,4 +6,4 @@ il enterre l'explication triviale. Pose UNE QUESTION seulement si la décision a
 dépend d'un fait absent. Une exploration ne force aucune décision ; simule avec
 `scripts/week-plan.py preview`. Toute modification du plan suit une charge de la preuve
 inversée, puis passe par une révision typée validée ; une restriction nomme sa règle et
-son fait (`motif`). {pointers}]
+son fait (`restriction`). {pointers}]

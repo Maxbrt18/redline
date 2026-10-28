@@ -7,6 +7,6 @@ aucune séance ne peut être prescrite tant qu'il ne l'est pas.
    `scripts/week-plan.py revise --week {detail} --input`, puis relis-la avec `check`. Sans
    bilan disponible, reste au plus près de la dernière semaine valide : aucune hausse,
    aucune séance de transition, les contrôles datés en vigueur conservés. Une séance
-   retirée ou réduite porte son `motif` (règle et fait), sinon elle reste.
+   retirée ou réduite porte sa `restriction` (`rule` et `fact`), sinon elle reste.
 3. Écris un message court : la suite de la semaine est prête, en une ou deux phrases.
    Ne raconte ni panne ni outil ; le service joint lui-même les séances.

@@ -146,7 +146,7 @@ def test_la_faute_ouvre_les_deux_chemins_corrects():
     """A guard that only says no breeds its own workaround."""
     faute = weekly_plan.coherence_errors("2026-W35", R2, _r3("Rien ne bouge dimanche."))[0]
 
-    assert "retire-le du motif" in faute
+    assert "retire-le de la raison" in faute
     assert "`constraints`" in faute
 
 
@@ -173,7 +173,7 @@ def test_a_future_change_requires_exact_evidence_rule_and_fields():
             "session_id": "w35-mer-ef", "fields": ["status"],
             "trigger": "messenger:mid-42", "context": "indisponibilité déclarée",
             "rule": "retirer la séance impossible",
-            "motif": {"regle": "demande", "fait": "messenger:mid-42"},
+            "restriction": {"rule": "request", "fact": "messenger:mid-42"},
         }],
     })
 
@@ -198,44 +198,44 @@ def _cancel(evidence, motif=None):
     entry = {"session_id": "w35-mer-ef", "fields": ["status"], "trigger": evidence[0],
              "context": "séance du mercredi", "rule": "annuler"}
     if motif is not None:
-        entry["motif"] = motif
+        entry["restriction"] = motif
     current.update({"computed_at": "2026-08-25T10:00:00+02:00", "evidence": evidence,
                     "changes": [entry]})
     return current
 
 
-def test_a_restriction_without_a_typed_motif_is_refused():
+def test_a_restriction_without_a_typed_premise_is_refused():
     """Restrictions without a premise, some of them introduced by a revision."""
     errors = weekly_plan.change_evidence_errors(R2, _cancel(["observation:2026-08-24-ef"]))
 
-    assert any("w35-mer-ef.motif : restriction (annulée) sans motif typé" in error
+    assert any("w35-mer-ef.restriction : restriction (annulée) sans prémisse typée" in error
                for error in errors)
     assert any("Sans prémisse, la séance reste" in error for error in errors)
 
 
-def test_a_rule_motif_must_cite_an_observed_fact():
+def test_a_rule_restriction_must_cite_an_observed_fact():
     evidence = ["observation:2026-08-24-ef", "messenger:mid-42"]
-    good = _cancel(evidence, {"regle": "n3", "fait": "observation:2026-08-24-ef"})
-    vague = _cancel(evidence, {"regle": "n3", "fait": "messenger:mid-42"})
-    absent = _cancel(evidence, {"regle": "n3", "fait": "observation:inventée"})
+    good = _cancel(evidence, {"rule": "n3", "fact": "observation:2026-08-24-ef"})
+    vague = _cancel(evidence, {"rule": "n3", "fact": "messenger:mid-42"})
+    absent = _cancel(evidence, {"rule": "n3", "fact": "observation:inventée"})
 
     assert weekly_plan.change_evidence_errors(R2, good) == []
     assert any("s'applique à un fait observé" in error
                for error in weekly_plan.change_evidence_errors(R2, vague))
-    assert any("motif.fait doit recopier" in error
+    assert any("restriction.fact doit recopier" in error
                for error in weekly_plan.change_evidence_errors(R2, absent))
 
 
-def test_a_request_motif_must_come_from_a_message():
+def test_a_request_restriction_must_come_from_a_message():
     current = _cancel(["observation:2026-08-24-ef"],
-                      {"regle": "demande", "fait": "observation:2026-08-24-ef"})
+                      {"rule": "request", "fact": "observation:2026-08-24-ef"})
 
-    assert any("regle=demande exige un message" in error
+    assert any("rule=request exige un message" in error
                for error in weekly_plan.change_evidence_errors(R2, current))
 
 
 def test_an_unknown_rule_id_is_refused_by_the_schema():
-    entry = _cancel(["observation:x-1"], {"regle": "prudence", "fait": "observation:x-1"})
+    entry = _cancel(["observation:x-1"], {"rule": "prudence", "fact": "observation:x-1"})
 
     assert weekly_plan.CHANGE_SCHEMA.errors(entry["changes"][0], "c")
 

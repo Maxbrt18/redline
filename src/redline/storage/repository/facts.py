@@ -390,7 +390,7 @@ class Facts(StoreBase):
         connection.execute(permit_choices.insert().values(**values))
         self.upsert_prediction_in(connection, {
             "operation": "create", "prediction_key": values["prediction_key"],
-            "domain": "permis-ef", "statement": row["statement"],
+            "domain": "easy-permit", "statement": row["statement"],
             "probability": row["probability"], "due_on": row["due_on"]
             if not isinstance(row["due_on"], str) else dt.date.fromisoformat(row["due_on"]),
             "direction": "neutral"}, actor=actor)

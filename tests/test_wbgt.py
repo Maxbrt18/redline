@@ -135,11 +135,11 @@ def test_la_fraction_directe_reste_bornee():
 
 
 def test_les_bandes_acsm_aux_bornes():
-    assert weather.acsm_band(9.9) == "blanc"
-    assert weather.acsm_band(17.9) == "vert"
-    assert weather.acsm_band(22.9) == "jaune"
-    assert weather.acsm_band(27.9) == "rouge"
-    assert weather.acsm_band(28.0) == "noir"
+    assert weather.acsm_band(9.9) == "white"
+    assert weather.acsm_band(17.9) == "green"
+    assert weather.acsm_band(22.9) == "yellow"
+    assert weather.acsm_band(27.9) == "red"
+    assert weather.acsm_band(28.0) == "black"
 
 
 def test_le_non_convergent_leve_au_lieu_de_rendre_un_nombre(monkeypatch):
@@ -160,6 +160,6 @@ def test_une_seance_reelle_reste_lisible_de_bout_en_bout():
         solar=305.0, lat=45.72627, lon=4.70394,
         when=datetime(2026, 8, 5, 17, 0, tzinfo=UTC))
     assert out["wbgt"] == pytest.approx(25.3, abs=0.6)
-    assert out["bande"] == "rouge"
+    assert out["band"] == "red"
     # The globe is far above the air: low but strong sun.
     assert out["tg"] - 31.0 > 5.0

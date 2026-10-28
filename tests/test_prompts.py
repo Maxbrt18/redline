@@ -726,10 +726,10 @@ def test_tentative_logistics_does_not_inherit_a_plan_change_obligation():
 
 def test_a_restriction_names_its_rule_and_fact_wherever_the_plan_is_revised():
     """A restriction without a premise is the first fault on a prescription."""
-    assert "`motif`" in prompts.plan_change_note()
-    assert "`demande`" in prompts.plan_change_note()
-    assert "`motif`" in DEPTH_NOTES["N2"]
-    assert "`motif`" in PROACTIVE_TRIGGERS["weekly_repair"]
+    assert "`restriction`" in prompts.plan_change_note()
+    assert "`request`" in prompts.plan_change_note()
+    assert "`restriction`" in DEPTH_NOTES["N2"]
+    assert "`restriction`" in PROACTIVE_TRIGGERS["weekly_repair"]
 
 
 def test_weekly_uses_the_dossier_and_closes_every_due_prediction():
@@ -834,7 +834,7 @@ def test_a_skipped_session_is_cancelled_in_the_same_turn():
     (`coaching/corrections.md`)."""
     note = " ".join(prompts.plan_change_note().split())
     assert "QU'IL ANNONCE SAUTER" in note
-    assert "`cancelled`, motif `demande`" in note
+    assert "`cancelled`, restriction `request`" in note
 
 
 def test_a_quality_session_is_judged_on_its_written_criteria_only():

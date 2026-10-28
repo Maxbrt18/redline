@@ -727,15 +727,15 @@ def test_a_reason_that_does_not_fit_the_outcome_is_refused_by_the_database(store
 def test_a_sealed_permit_choice_creates_its_prediction_and_cannot_be_rewritten(store):
     choice = {"iso_week": "2026-W40", "session_key": "w40-mar-ef",
               "scheduled_on": dt.date(2026, 9, 29), "coach_minutes": 40,
-              "prediction_key": "permis-ef-w40-mar-ef",
+              "prediction_key": "easy-permit-w40-mar-ef",
               "statement": "Choix scellé : 40 min.", "probability": .6,
               "due_on": dt.date(2026, 10, 4)}
     store.seal_permit_choice(choice)
     store.seal_permit_choice(choice)  # replayed identically: idempotent
     assert [row["coach_minutes"] for row in store.permit_choice_rows()] == [40]
     prediction = next(row for row in store.prediction_rows()
-                      if row["prediction_key"] == "permis-ef-w40-mar-ef")
-    assert prediction["domain"] == "permis-ef" and prediction["status"] == "open"
+                      if row["prediction_key"] == "easy-permit-w40-mar-ef")
+    assert prediction["domain"] == "easy-permit" and prediction["status"] == "open"
     with pytest.raises(StorageError, match="ne se corrige pas"):
         store.seal_permit_choice({**choice, "coach_minutes": 50})
 
@@ -2035,7 +2035,7 @@ def test_real_plan_preview_leaves_no_revision_and_revise_still_applies(store, mo
     assert store.load_plan("2026-W32")["revisions"][0]["revision"] == 1
 
 
-def test_a_revision_that_cancels_a_session_without_a_typed_motif_is_refused(
+def test_a_revision_that_cancels_a_session_without_a_typed_premise_is_refused(
         store, monkeypatch, capsys):
     """A restriction without a premise can no longer be written."""
     import io
@@ -2061,15 +2061,15 @@ def test_a_revision_that_cancels_a_session_without_a_typed_motif_is_refused(
                         evidence=["observation:2026-08-04-reveil"], changes=[change])
     for command in ("preview", "revise"):
         monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(cut)))
-        with pytest.raises(SchemaError, match="sans motif typé"):
+        with pytest.raises(SchemaError, match="sans prémisse typée"):
             cli._database_command(store, command, "2026-W32", False)
     assert len(store.load_plan("2026-W32")["revisions"]) == 1
 
-    change["motif"] = {"regle": "n3", "fait": "observation:2026-08-04-reveil"}
+    change["restriction"] = {"rule": "n3", "fact": "observation:2026-08-04-reveil"}
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(cut)))
     assert cli._database_command(store, "revise", "2026-W32", False) == 0
     stored = store.load_plan("2026-W32")["revisions"][1]["changes"][0]
-    assert stored["motif"] == {"regle": "n3", "fait": "observation:2026-08-04-reveil"}
+    assert stored["restriction"] == {"rule": "n3", "fact": "observation:2026-08-04-reveil"}
 
 
 def test_a_plan_readback_shows_each_run_gap_to_the_month_without_blocking(
