@@ -22,16 +22,14 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from . import vault_layout
+
 # Les fichiers AVAL : ceux qui résument sans être propriétaires de la science.
 # Les notes de concept et les notes-source n'y figurent pas — chez le propriétaire,
 # l'énoncé vit avec son grade complet, c'est sa raison d'être.
-DOWNSTREAM = (
-    "CLAUDE.md",
-    "ai/hot-cache.md",
-    "athlete/athlete.md",
-    "coaching/current-plan.md",
-    "coaching/protocols.md",
-)
+DOWNSTREAM = ("CLAUDE.md", *(str(path) for path in (
+    vault_layout.HOT_CACHE, vault_layout.ATHLETE_PROFILE, vault_layout.CURRENT_PLAN,
+    vault_layout.PROTOCOLS)))
 
 
 @dataclass(frozen=True)

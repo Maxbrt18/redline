@@ -47,6 +47,7 @@ from scripts.model import (  # noqa: E402
     entrypoint,
     paths,
     session_kinds,
+    vault_layout,
 )
 from scripts.model.errors import ConfigError, InputError  # noqa: E402
 
@@ -195,12 +196,12 @@ def _correction(args, _) -> dict:
     """
     from scripts.model import correction_replay
 
-    journal = paths.vault_root() / correction_replay.CORRECTIONS
+    journal = paths.vault_root() / vault_layout.CORRECTIONS
     known = {entry.key for entry in correction_replay.entries(journal.read_text(encoding="utf-8"))}
     entry = args.entry.strip()
     if entry not in known:
         raise InputError(
-            f"correction : « {entry} » n'est pas une entrée de {correction_replay.CORRECTIONS}. "
+            f"correction : « {entry} » n'est pas une entrée de {vault_layout.CORRECTIONS}. "
             "Écris d'abord l'entrée (« ## AAAA-MM-JJ — titre »), puis passe son titre exact "
             "à --entry.")
     return {"correction_key": args.correction_key, "summary": args.summary}

@@ -17,7 +17,7 @@ from pathlib import Path
 
 from sqlalchemy import exc as sa_exc
 
-from scripts.model import agent_input, session_cycle
+from scripts.model import agent_input, session_cycle, vault_layout
 from scripts.model import ledger as ledger_model
 from scripts.model import weekly_plan as weekly_plan_model
 from scripts.model.context_packet import render_context_packet
@@ -85,9 +85,7 @@ def needs_deployment(path: str) -> bool:
     """Whether integrating this file would change how the running service behaves."""
     return path.startswith(RUNTIME_PATHS) and not path.startswith(RUNTIME_EXEMPT)
 
-CANONICAL_PROJECTIONS = frozenset({
-    "athlete/daily.csv", "athlete/instruments.csv", "athlete/strength-log.csv",
-})
+CANONICAL_PROJECTIONS = frozenset(str(path) for path in vault_layout.PROJECTIONS)
 
 
 @dataclass(frozen=True)
@@ -139,7 +137,7 @@ def _transient(error: StorageError) -> bool:
 
 def forbidden_in_turn(path: str) -> bool:
     """Ce qu'un tour coach n'a jamais le droit de modifier dans le vault."""
-    return (path in CANONICAL_PROJECTIONS or path.startswith("coaching/capabilities/")
+    return (path in CANONICAL_PROJECTIONS or path.startswith(f"{vault_layout.CAPABILITIES}/")
             or needs_deployment(path))
 
 

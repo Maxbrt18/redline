@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from . import strength_log
+from . import strength_log, vault_layout
 from .programme import Programme
 from .views import apply, table
 
@@ -38,7 +38,7 @@ GAP_FLAG = 10.0
 
 
 def target(vault: Path) -> Path:
-    return vault / "coaching" / "strength.md"
+    return vault / vault_layout.STRENGTH
 
 
 def render(programme: Programme, key: str) -> str:
@@ -142,7 +142,7 @@ def refresh(vault: Path, programme: Programme, *, check: bool = False) -> list:
     path = target(vault)
     drifted = [name for name, key in blocks(programme).items()
                if apply(path, name, render(programme, key), check=check)]
-    log = render_log(programme, vault / strength_log.PATH)
+    log = render_log(programme, vault / vault_layout.STRENGTH_LOG_CSV)
     if apply(path, LOG_BLOCK, log, check=check):
         drifted.append(LOG_BLOCK)
     return drifted

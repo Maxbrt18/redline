@@ -14,13 +14,13 @@ def test_epoch_after_pipe():
 def test_wall_clock_same_day():
     now = datetime(2026, 7, 14, 10, 0)
     epoch = _parse_reset_epoch("Limit reached, resets 1:30pm", now=now)
-    assert clock.fromtimestamp(epoch) == datetime(2026, 7, 14, 13, 30, tzinfo=clock.PARIS)
+    assert clock.fromtimestamp(epoch) == datetime(2026, 7, 14, 13, 30, tzinfo=clock.zone())
 
 
 def test_wall_clock_next_day_if_passed():
     now = datetime(2026, 7, 14, 15, 0)
     epoch = _parse_reset_epoch("resets 1:30pm", now=now)
-    assert clock.fromtimestamp(epoch) == datetime(2026, 7, 15, 13, 30, tzinfo=clock.PARIS)
+    assert clock.fromtimestamp(epoch) == datetime(2026, 7, 15, 13, 30, tzinfo=clock.zone())
 
 
 def test_nothing_readable():

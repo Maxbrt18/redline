@@ -24,7 +24,23 @@ def test_the_shipped_example_is_refused_until_filled():
     assert "encore à remplir" in message
     assert "athlete.name" in message and "notebook.place" in message
     assert "athlete.hr_rest" in message and "athlete.hr_max" in message
+    assert "athlete.timezone" in message
     assert "inconnu" not in message
+
+
+def test_the_time_zone_is_declared_and_checked():
+    text = (TEST_VAULT / instance.FILENAME).read_text(encoding="utf-8")
+    assert instance.parse(text).timezone.key == "Europe/Paris"
+    with pytest.raises(instance.InstanceError, match="fuseau inconnu « Mars/Olympus »"):
+        instance.parse(text.replace('"Europe/Paris"', '"Mars/Olympus"'))
+    with pytest.raises(instance.InstanceError, match="timezone"):
+        instance.parse(text.replace('timezone = "Europe/Paris"\n', ""))
+
+
+def test_the_local_time_zone_is_the_one_the_instance_declares():
+    from scripts.model import local_time
+
+    assert local_time.zone().key == "Europe/Paris"
 
 
 def test_a_missing_file_says_what_to_do(tmp_path):

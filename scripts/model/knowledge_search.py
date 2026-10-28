@@ -9,7 +9,7 @@ import unicodedata
 from pathlib import Path
 from typing import TypedDict
 
-from scripts.model import entrypoint, paths
+from scripts.model import entrypoint, paths, vault_layout
 
 STOP = frozenset({"avec", "dans", "pour", "plus", "moins", "comment", "quelle",
                   "quelles", "quel", "quels", "leurs", "notre", "cette", "sont",
@@ -36,7 +36,7 @@ def search(query: str, limit: int = 6, *, root: Path | None = None) -> list[Sear
     if not terms:
         return []
     results: list[SearchHit] = []
-    for folder in ("concepts", "episodes"):
+    for folder in (vault_layout.CONCEPTS, vault_layout.EPISODES):
         for path in (root / folder).glob("*.md"):
             lines = path.read_text(encoding="utf-8").splitlines()
             heading_lines = [line for line in lines[:20]
@@ -61,7 +61,7 @@ def search(query: str, limit: int = 6, *, root: Path | None = None) -> list[Sear
             score -= min(density_penalty, 12)
             # Une fiche de concept ouvre la lecture ; les épisodes en donnent
             # la preuve détaillée quand la synthèse laisse une incertitude.
-            score += 4 if folder == "concepts" else 0
+            score += 4 if folder == vault_layout.CONCEPTS else 0
             line_number, excerpt = max(
                 matches, key=lambda item: (len(terms & words(item[1])),
                                            -len(words(item[1])), item[0] <= 20, -item[0]))

@@ -23,7 +23,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from . import session_kinds
+from . import session_kinds, vault_layout
 from .dose import DOSE_SCHEMA, Dose
 from .notes import NoteError, frontmatter, read_all
 from .schema import Schema, field
@@ -308,8 +308,6 @@ class Programme:
 
 # ------------------------------------------------------ the RPE target of a kind
 
-#: Where the workout notes live, one note per kind of session or strength routine.
-WORKOUTS_DIR = Path("coaching") / "workouts"
 #: The keys a workout note uses to say what it describes. A strength routine declares
 #: `routine:` (its slug); any other note declares the session `kinds:` it covers.
 NOTE_KINDS_SCHEMA = Schema("fiche de séance", [
@@ -321,7 +319,7 @@ NOTE_KINDS_SCHEMA = Schema("fiche de séance", [
 def _workout_notes(vault: Path) -> list[tuple[Path, dict]]:
     """Every workout note with what it declares; raises NoteError on a bad declaration."""
     notes, problems = [], []
-    for path in sorted((vault / WORKOUTS_DIR).glob("*.md")):
+    for path in sorted((vault / vault_layout.WORKOUTS).glob("*.md")):
         data = frontmatter(path)
         try:
             NOTE_KINDS_SCHEMA.validate(data, path.name)
@@ -363,7 +361,7 @@ def target_for(targets: dict[tuple[str, str | None], float], kind: str,
 def load(vault: Path) -> Programme:
     """Every exercise and routine note, validated. Raises NoteError listing every
     broken note -- never a partial programme."""
-    exercises = read_all(vault / "coaching" / "exercises", EXERCISE_SCHEMA)
+    exercises = read_all(vault / vault_layout.EXERCISES, EXERCISE_SCHEMA)
     sessions = {}
     problems = []
     for path, data in _workout_notes(vault):

@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Connection
 
-from scripts.model import commands, ledger, session_cycle, session_kinds, weekly_plan
+from scripts.model import commands, ledger, local_time, session_cycle, session_kinds, weekly_plan
 from scripts.model.activity import Activity
 
 from .database import Database, StorageError
@@ -1240,7 +1240,7 @@ class OperationalStore:
         if workout is None:
             return None
         local_day = observation["started_at"].astimezone(
-            session_cycle.LOCAL_TIMEZONE).date()
+            local_time.zone()).date()
         query = sa.select(session_cycles).join(
             planned_sessions, planned_sessions.c.id == session_cycles.c.source_session_id
         ).join(weekly_plans, weekly_plans.c.id == session_cycles.c.plan_id).where(
@@ -1286,7 +1286,7 @@ class OperationalStore:
             planned = connection.execute(sa.select(planned_sessions).where(
                 planned_sessions.c.id == cycle["source_session_id"])).mappings().one()
             local_day = intake["started_at"].astimezone(
-                session_cycle.LOCAL_TIMEZONE).date()
+                local_time.zone()).date()
             if (local_day != planned["scheduled_on"]
                     or planned["workout"] not in self._compatible_workouts(intake["sport"])):
                 raise StorageError("activité incompatible avec la date ou le type de séance")
@@ -1313,7 +1313,7 @@ class OperationalStore:
             raise StorageError("cette activité est déjà rattachée à une autre séance")
         planned = connection.execute(sa.select(planned_sessions).where(
             planned_sessions.c.id == cycle["source_session_id"])).mappings().one()
-        local_day = observation["started_at"].astimezone(session_cycle.LOCAL_TIMEZONE).date()
+        local_day = observation["started_at"].astimezone(local_time.zone()).date()
         if (local_day != planned["scheduled_on"]
                 or self._workout_for_observation(observation["kind"]) != planned["workout"]):
             raise StorageError("activité incompatible avec la date ou le type de séance")
@@ -1391,7 +1391,7 @@ class OperationalStore:
             for observation in observations_rows:
                 workout = self._workout_for_observation(observation["kind"])
                 local_day = observation["started_at"].astimezone(
-                    session_cycle.LOCAL_TIMEZONE).date()
+                    local_time.zone()).date()
                 candidates = []
                 if workout:
                     candidates = [f"{row.iso_week}:{row.logical_key}" for row in

@@ -55,6 +55,12 @@ def test_a_cited_threshold_is_the_applied_value_said_in_french():
     assert "1,5/10" in gate.text and "{" not in book.render()
 
 
+def test_the_wake_trace_cutoff_is_a_local_time():
+    book = rulebook.parse(DEFAULT_TEXT, rulebook.DEFAULT)
+    assert book.parameters.wake_trace_until.isoformat() == "14:00:00"
+    assert book.parameters.spoken()["wake_trace_until"] == "14:00"
+
+
 @pytest.mark.parametrize("change, message", [
     (("pain_cap = 2", "pain_cap = 2\ncap_douleur = 3"), "inconnu"),
     (("plafond {pain_cap}/10", "plafond {douleur_max}/10"), "seuil inconnu douleur_max"),
@@ -62,6 +68,7 @@ def test_a_cited_threshold_is_the_applied_value_said_in_french():
     (('slug = "terrain"', 'slug = "descente"'), "transition en double : descente"),
     (("assimilation_weeks = []", 'assimilation_weeks = ["W35"]'), "semaine ISO"),
     (('slug = "terrain"', 'slug = "Terrain neuf"'), "slug"),
+    (('wake_trace_until = "14:00"', 'wake_trace_until = "14h"'), "HH:MM"),
 ])
 def test_a_malformed_rulebook_is_refused_with_its_reason(tmp_path, change, message):
     old, new = change

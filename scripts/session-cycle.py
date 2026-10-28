@@ -21,7 +21,7 @@ if str(ROOT) not in sys.path:
 from scripts.model import (  # noqa: E402
     commands,
     entrypoint,
-    session_cycle,
+    local_time,
     weekly_plan,
 )
 from scripts.storage import Database, OperationalStore, StorageError  # noqa: E402
@@ -75,7 +75,7 @@ def main() -> int:
             return 0
         if args.command == "reconcile-strava":
             from scripts import strava
-            after = dt.datetime.now(session_cycle.LOCAL_TIMEZONE) - dt.timedelta(days=args.days)
+            after = dt.datetime.now(local_time.zone()) - dt.timedelta(days=args.days)
             rows = strava.call("/athlete/activities", {
                 "after": int(after.timestamp()), "per_page": args.limit})
             results = []
@@ -94,7 +94,7 @@ def main() -> int:
                              ensure_ascii=False, indent=2))
             return 0
 
-        now = dt.datetime.now(session_cycle.LOCAL_TIMEZONE)
+        now = dt.datetime.now(local_time.zone())
         if args.command == "start":
             payload = {"session_key": args.session_key, "declared_at": now}
             state = _stage_or_apply(

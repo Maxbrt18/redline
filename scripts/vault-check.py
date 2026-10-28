@@ -37,6 +37,7 @@ from scripts.model import (  # noqa: E402
     entrypoint,
     instance,
     ledger,
+    vault_layout,
 )
 from scripts.model import decisions as decision_log  # noqa: E402
 
@@ -62,8 +63,8 @@ SKIP_DIRS = {".git", ".obsidian", ".pytest_cache", ".venv", "inbox", "sources",
 
 CAPABILITIES_DIR = "coaching/capabilities"
 CAPABILITY_STALE_DAYS = 14     # a capability score not re-read in two weeks is stale
-DECISIONS = "coaching/decisions.md"
-CORRECTIONS = "coaching/corrections.md"
+DECISIONS = str(vault_layout.DECISIONS)
+CORRECTIONS = str(vault_layout.CORRECTIONS)
 # What counts as a CARRIER for a ⭐ meta-rule: something that runs, or something the
 # coach reads without choosing to. A fiche, a concept or `decisions.md` are read on
 # demand at N2/N3 only -- citing one is how a rule goes back to sleep.

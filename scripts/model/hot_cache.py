@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from . import decisions as decision_log
-from . import programme
+from . import programme, vault_layout
 from .views import apply
 
 if TYPE_CHECKING:
@@ -30,7 +30,7 @@ STATE_BLOCK = "ETAT"
 
 
 def target(vault: Path) -> Path:
-    return vault / "ai" / "hot-cache.md"
+    return vault / vault_layout.HOT_CACHE
 
 
 def _round(value: float) -> str:
@@ -174,7 +174,7 @@ def state_inputs(store: OperationalStore, vault: Path, today: dt.date) -> dict:
     predictions = store.prediction_rows()
     typed_due = sum(1 for row in predictions if row.get("status") == "open"
                     and _as_date(row["due_on"]) <= today)
-    decisions_path = vault / "coaching" / "decisions.md"
+    decisions_path = vault / vault_layout.DECISIONS
     narrative_due = 0
     if decisions_path.exists():
         narrative_due = sum(1 for entry in decision_log.parse(

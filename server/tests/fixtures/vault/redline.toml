@@ -5,6 +5,7 @@
 name = "Sam"
 hr_rest = 55
 hr_max = 190
+timezone = "Europe/Paris"
 
 [notebook]
 place = "Paris"

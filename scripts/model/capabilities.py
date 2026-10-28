@@ -9,10 +9,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from . import vault_layout
 from .notes import read_all
 from .schema import Schema, field
-
-FOLDER = ("coaching", "capabilities")
 
 CAPABILITY_SCHEMA = Schema("note de capacité", [
     field("type", str, choices=("capacite",)),
@@ -24,4 +23,4 @@ CAPABILITY_SCHEMA = Schema("note de capacité", [
 
 def load(vault: Path) -> dict:
     """Charge les notes d'analyse courantes, sans état opérationnel."""
-    return read_all(vault.joinpath(*FOLDER), CAPABILITY_SCHEMA)
+    return read_all(vault / vault_layout.CAPABILITIES, CAPABILITY_SCHEMA)

@@ -10,6 +10,9 @@ name = "[Prénom]"
 # dit telle au coach, dans le profil de l'athlète.
 hr_rest = "[FC de repos]"
 hr_max = "[FC max]"
+# Le fuseau IANA où vit l'athlète : ses journées, les heures de son programme, ses
+# matins. Le stockage reste en UTC.
+timezone = "[Fuseau IANA, ex. Europe/Paris]"
 
 [notebook]
 # Le lieu de la météo des séances qui n'en déclarent pas (geocodage Open-Meteo).

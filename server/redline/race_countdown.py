@@ -6,7 +6,7 @@ import datetime as dt
 from dataclasses import dataclass
 from typing import Any
 
-from scripts.model import session_cycle
+from scripts.model import local_time
 
 
 @dataclass(frozen=True)
@@ -80,7 +80,7 @@ def compile_deadline(deadline: dict) -> list[Checkpoint]:
         due_on = dt.date.fromisoformat(due_on)
     race_key = str(deadline["deadline_key"])
     race_id = str(deadline.get("id") or race_key)
-    timezone = session_cycle.LOCAL_TIMEZONE
+    timezone = local_time.zone()
     checkpoints = []
     for index, stage in enumerate(STAGES):
         day = due_on - dt.timedelta(days=stage.days_before)

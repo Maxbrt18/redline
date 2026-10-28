@@ -21,6 +21,7 @@ depuis la même valeur : ce que le coach lit est ce que le code applique.
 
 from __future__ import annotations
 
+import datetime as dt
 import string
 import tomllib
 from dataclasses import dataclass
@@ -51,6 +52,8 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
         field("taper_weeks", int, minimum=1, maximum=6),
         field("stall_weeks", int, minimum=1, maximum=12),
         field("stall_tolerance_km", float, minimum=0, maximum=5),
+        field("wake_trace_until", str, pattern=r"([01]\d|2[0-3]):[0-5]\d",
+              note="heure locale HH:MM"),
         field("assimilation_weeks", list, item=field("semaine", str, pattern=WEEK,
                                                      note="semaine ISO, ex. 2026-W35")),
     ])),
@@ -88,12 +91,18 @@ class Parameters:
     taper_weeks: int
     stall_weeks: int
     stall_tolerance_km: float
+    wake_trace_until: dt.time
     assimilation_weeks: tuple[str, ...]
 
     def spoken(self) -> dict[str, str]:
         """Les seuils tels que le texte d'une règle les dit : virgule décimale."""
-        return {name: f"{value:g}".replace(".", ",") if isinstance(value, float)
-                else str(value) for name, value in vars(self).items()
+        def said(value: object) -> str:
+            if isinstance(value, float):
+                return f"{value:g}".replace(".", ",")
+            if isinstance(value, dt.time):
+                return value.strftime("%H:%M")
+            return str(value)
+        return {name: said(value) for name, value in vars(self).items()
                 if not isinstance(value, tuple)}
 
 
@@ -171,6 +180,7 @@ def parse(text: str, source: Path) -> Rulebook:
     raw = payload["parameters"]
     parameters = Parameters(**{
         **raw, "assimilation_weeks": tuple(raw["assimilation_weeks"]),
+        "wake_trace_until": dt.time.fromisoformat(raw["wake_trace_until"]),
         **{name: float(raw[name])
            for name in ("gate_effort_peak", "hard_min_hours", "stall_tolerance_km")}})
     problems = []

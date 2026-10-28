@@ -63,7 +63,7 @@ def _parse_reset_epoch(detail: str, now: datetime | None = None) -> int | None:
         hour = 0
     now = now or clock.now()
     if now.tzinfo is None:
-        now = now.replace(tzinfo=clock.PARIS)
+        now = now.replace(tzinfo=clock.zone())
     target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
     if target <= now:
         target += timedelta(days=1)

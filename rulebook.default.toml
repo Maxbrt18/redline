@@ -32,6 +32,9 @@ taper_weeks = 3
 stall_weeks = 3
 # En dessous de cet écart (km), deux sorties sont « la même » plus longue : bruit GPS.
 stall_tolerance_km = 0.1
+# La trace au réveil se recueille le matin : passé cette heure locale, le carnet ne la
+# demande plus et le rappel ne part plus.
+wake_trace_until = "14:00"
 # Garde-fou n°2 : les semaines d'assimilation planifiées (« 2026-W35 »). Rien de neuf
 # ne s'y place.
 assimilation_weeks = []

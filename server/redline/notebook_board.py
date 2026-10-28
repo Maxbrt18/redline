@@ -26,7 +26,9 @@ from typing import Any
 from scripts import ledger, signals
 from scripts.model import (
     debrief,
+    local_time,
     programme,
+    rulebook,
     session_cycle,
     session_kinds,
     session_labels,
@@ -41,9 +43,6 @@ from . import session_detail
 from .plans import PlanStatus, blocked_session_ids
 
 ACTOR = "carnet"
-#: La trace du matin se recueille le matin ; passé cette heure, le souvenir est
-#: sollicité trop tard (2026-09-15) et le carnet ne la demande plus.
-WAKE_ASK_UNTIL = dt.time(14, 0)
 DAY_LETTERS = ("L", "M", "M", "J", "V", "S", "D")
 #: Libellés d'affichage des capacités ; le slug reste l'identité.
 MOVING_TYPES = session_kinds.MOVING
@@ -123,7 +122,7 @@ def observation_fact(observation: dict, session: dict | None = None,
         "pains": known_pains(observation, labels or {}),
         "enjoyment": _known(observation, "enjoyment"),
         "dplus": _known(observation, "elevation_gain_m"),
-        "started_at": (observation["started_at"].astimezone(session_cycle.LOCAL_TIMEZONE)
+        "started_at": (observation["started_at"].astimezone(local_time.zone())
                        .isoformat() if observation.get("started_at") else None),
         "over": [],
     }
@@ -282,7 +281,7 @@ class Board:
         item["change"] = None
         if change:
             stamp = dt.datetime.fromisoformat((week.revision or {})["computed_at"]).astimezone(
-                session_cycle.LOCAL_TIMEZONE)
+                local_time.zone())
             verb = "Déplacée" if "date" in change.get("fields", []) else "Modifiée"
             item["change"] = f"{verb} le {stamp:%d/%m}."
         link = week.links.get(session["id"]) or {}
@@ -515,7 +514,7 @@ class Board:
 
     @property
     def _morning(self) -> bool:
-        return self.now.time() < WAKE_ASK_UNTIL
+        return self.now.time() < rulebook.current().parameters.wake_trace_until
 
     def answer(self, ask_id: str, value: Any) -> dict:
         """Écrit UNE réponse si la demande est encore ouverte. Rend l'alerte éventuelle."""

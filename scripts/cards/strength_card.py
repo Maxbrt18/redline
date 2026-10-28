@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 from scripts.cards import html, render
-from scripts.model import paths, strength_log
+from scripts.model import paths, strength_log, vault_layout
 from scripts.model.programme import load
 
 
@@ -52,7 +52,7 @@ def page_session(built: dict, history: dict) -> dict:
 
 def snapshot(built: dict, *, root: Path | None = None) -> dict:
     root = root or paths.vault_root()
-    history = strength_log.last_by_slug(root / strength_log.PATH)
+    history = strength_log.last_by_slug(root / vault_layout.STRENGTH_LOG_CSV)
     return page_session(built, history)
 
 

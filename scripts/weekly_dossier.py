@@ -28,7 +28,7 @@ if str(ROOT) not in sys.path:
 from scripts import feasibility, ledger, permit_report, signals  # noqa: E402
 from scripts.model import decisions as decision_log  # noqa: E402
 from scripts.model import predictions as prediction_model  # noqa: E402
-from scripts.model import programme  # noqa: E402
+from scripts.model import programme, vault_layout  # noqa: E402
 
 if TYPE_CHECKING:
     from scripts.storage import OperationalStore
@@ -72,7 +72,7 @@ def render(store: OperationalStore, root: Path, week: str, today: dt.date) -> st
     lines += ["", "Calibration des prédictions typées par domaine (cite-la dans le bilan) :"]
     lines.extend(calibration or ["aucune prédiction typée"])
 
-    decisions_path = root / "coaching" / "decisions.md"
+    decisions_path = root / vault_layout.DECISIONS
     if decisions_path.exists():
         entries = decision_log.parse(decisions_path.read_text(encoding="utf-8"))
         due = sorted((entry for entry in entries if entry.is_due(today)),

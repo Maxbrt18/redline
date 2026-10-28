@@ -12,7 +12,7 @@ from pathlib import Path
 
 import sqlalchemy as sa
 
-from scripts.model import strength_log, weekly_plan
+from scripts.model import strength_log, vault_layout, weekly_plan
 from scripts.model.views import apply as apply_view
 
 from .repository import OperationalStore
@@ -46,14 +46,14 @@ def _csv(path: Path, columns, rows) -> None:
 
 
 def project_daily(store: OperationalStore, root: Path) -> None:
-    _csv(root / "athlete" / "daily.csv",
+    _csv(root / vault_layout.DAILY_CSV,
          ("date", "sommeil", "charge_vie", "envie", "note"),
          [[row["checked_on"].isoformat(), row["sleep"] or "", row["life_load"] or "",
            row["desire"] or "", row["note"] or ""] for row in store.daily_rows()])
 
 
 def project_instruments(store: OperationalStore, root: Path) -> None:
-    path = root / "athlete" / "instruments.csv"
+    path = root / vault_layout.INSTRUMENTS_CSV
     columns = ("semaine", "date_bilan", "cmj_cm", "mollet_d_tendu", "mollet_g_tendu",
                "mollet_d_flechi", "mollet_g_flechi", "plaisir", "canari_dlr",
                "calib_ecart_dlr", "calib_ecart_fc", "sommeil",
@@ -86,7 +86,7 @@ def _strength_row(session: dict, exercise: dict) -> list:
 
 
 def project_strength(store: OperationalStore, root: Path) -> None:
-    _csv(root / strength_log.PATH, strength_log.COLUMNS,
+    _csv(root / vault_layout.STRENGTH_LOG_CSV, strength_log.COLUMNS,
          [_strength_row(session, exercise) for session in store.strength_history()
           for exercise in session["exercises"]])
 
@@ -101,7 +101,7 @@ def _plan_projections(store: OperationalStore, root: Path):
     Il est resté vert pendant que le journal de W33 affichait une révision périmée de
     deux crans, et c'est un humain qui a fini par ouvrir le fichier.
     """
-    for path in sorted((root / "athlete" / "journal").glob("20??-w??.md")):
+    for path in sorted((root / vault_layout.JOURNAL).glob("20??-w??.md")):
         plan = store.load_plan(path.stem.upper())
         if plan:
             yield path, weekly_plan.render_journal(plan)
@@ -110,7 +110,7 @@ def _plan_projections(store: OperationalStore, root: Path):
     # Sans ce garde, la branche hot-cache rendait un chemin absent et `plan_drift` le
     # lisait quand même (FileNotFoundError, CI rouge du 2026-08-16) — un contrôle qui
     # plante ne dit rien sur la dérive qu'il était censé voir.
-    hot_cache = root / "ai" / "hot-cache.md"
+    hot_cache = root / vault_layout.HOT_CACHE
     if plan and hot_cache.exists():
         yield hot_cache, weekly_plan.render_hot_cache(plan)
 
@@ -126,7 +126,7 @@ def ensure_journals(store: OperationalStore, root: Path,
     day = today or dt.date.today()
     created = []
     for week in (weekly_plan.current_week(day), weekly_plan.next_week(day)):
-        path = root / "athlete" / "journal" / f"{week.lower()}.md"
+        path = root / vault_layout.journal(week)
         if path.exists() or store.load_plan(week) is None:
             continue
         _atomic(path, weekly_plan.journal_skeleton(week, day))

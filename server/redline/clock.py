@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 from datetime import date, datetime, time
-from zoneinfo import ZoneInfo
 
-PARIS = ZoneInfo("Europe/Paris")
+from scripts.model.local_time import zone
 
 
 def now() -> datetime:
-    return datetime.now(PARIS)
+    return datetime.now(zone())
 
 
 def today() -> date:
@@ -17,8 +16,8 @@ def today() -> date:
 
 
 def combine(day: date, local_time: time) -> datetime:
-    return datetime.combine(day, local_time, tzinfo=PARIS)
+    return datetime.combine(day, local_time, tzinfo=zone())
 
 
 def fromtimestamp(epoch: float) -> datetime:
-    return datetime.fromtimestamp(epoch, tz=PARIS)
+    return datetime.fromtimestamp(epoch, tz=zone())
