@@ -895,7 +895,8 @@ fond de ses zones, le temps par zone, la séance précédente du même type, la 
 chaussures et la semaine. Les flux allégés et la météo horaire sont relevés chez Strava et
 Open-Meteo au premier affichage, puis gardés dans `strava_activity_intakes.streams` et
 `.weather` ; une panne laisse l'écran sans son graphique. Les zones sont celles de
-`scripts/model/hr_zones.py` (Karvonen, FC max estimée), jamais celles de Strava. Sur une
+Karvonen (`scripts/model/hr_zones.py`) sur la FC de repos et la FC max de
+`redline.toml`, jamais celles de Strava. Sur une
 qualité, la réserve (garde-fou n°6) se déclare d'un geste tant que la séance est dans sa
 fenêtre de complétude : `reserve:<observation>` écrit la mesure `reps_in_reserve`.
 **Course** : J-N, plus longue sortie, jalons, capacités, archives.

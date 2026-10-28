@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from scripts import ledger, signals
-from scripts.model import debrief, hr_zones, programme, session_cycle, transitions
+from scripts.model import debrief, programme, session_cycle, transitions
 from scripts.model import ledger as ledger_model
 from scripts.model.instance import Instance, derived_label
 
@@ -696,7 +696,8 @@ class Board:
             series["bands"] = [[rep["start"], rep["end"]] for rep in (reps or {}).get("reps", [])]
             series["stops"] = [stop for stop in session_detail.stops(s)
                                if stop[1] - stop[0] >= session_detail.STOP_MARK_S]
-        seconds = session_detail.zone_seconds(s) if s else None
+        limits = self.instance.hr_bounds if self.instance is not None else None
+        seconds = session_detail.zone_seconds(s, limits) if s and limits else None
         conditions = (intake or {}).get("weather") or {}
         weather = {key: conditions.get(key) for key in (
             "temp", "ressenti", "humidite", "vent", "conditions", "wbgt")} if conditions else None
@@ -730,8 +731,11 @@ class Board:
             "stops": session_detail.stop_summary(s) if s else None,
             "drift": None if quality or not s else session_detail.drift(s),
             "series": series,
+            # Les bornes partent toujours : la FC moyenne et les km se colorent par
+            # zone même quand le flux de la montre manque.
+            "hr_bounds": list(limits) if limits else None,
             "zones": None if not seconds or not any(seconds) else {
-                "bounds": list(hr_zones.bounds()), "max": hr_zones.HR_MAX_BPM,
+                "max": self.instance.hr_max if self.instance else None,
                 "seconds": seconds},
             "previous": self._previous(observation),
             "weather": weather,

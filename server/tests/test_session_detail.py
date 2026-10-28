@@ -12,15 +12,16 @@ import os
 
 import pytest
 import sqlalchemy as sa
-from conftest import ENGINE_ROOT
+from conftest import ENGINE_ROOT, TEST_VAULT
 from test_notebook_board import Repo
 from test_weekly_plan import revision, session
 
 from redline import session_detail
 from redline.notebook_board import AnswerError, Board
-from scripts.model import hr_zones
+from scripts.model import hr_zones, instance
 
 URL = os.environ.get("TEST_DATABASE_URL", "")
+SAM = instance.load(TEST_VAULT)          # FC de repos 55, FC max 190
 PARIS = dt.timezone(dt.timedelta(hours=1))
 
 
@@ -57,9 +58,10 @@ def stream(seconds=760, stop_at=None, stop_s=30, speed=3.0, hr=150, climb=0.0):
                                          "elapsed_time": time[-1]}])
 
 
-def test_the_zones_are_karvonen_not_strava_s_defaults():
-    assert hr_zones.bounds() == (143, 157, 171, 185)
-    assert [hr_zones.zone(hr) for hr in (130, 143, 156, 157, 184, 195)] == [1, 2, 2, 3, 4, 5]
+def test_the_zones_are_karvonen_on_the_instance_heart_rates():
+    assert SAM.hr_bounds == hr_zones.bounds(55, 190) == (136, 149, 163, 176)
+    assert [hr_zones.zone(hr, SAM.hr_bounds)
+            for hr in (130, 136, 148, 149, 175, 185)] == [1, 2, 2, 3, 4, 5]
 
 
 def test_the_threshold_reads_four_reps_and_no_final_acceleration():
@@ -87,7 +89,7 @@ def test_the_stream_gives_kilometres_moving_time_zones_and_stops():
     # 2 274 m : le dernier kilomètre entamé (274 m) rejoint le précédent.
     assert [split["dist_m"] for split in splits] == [1000, 1274]
     assert splits[0]["pace_s"] == 333 and splits[0]["hr"] == 150 and splits[0]["cadence"] == 164
-    assert session_detail.zone_seconds(flow) == [0, 759 - 1, 0, 0, 0]
+    assert session_detail.zone_seconds(flow, SAM.hr_bounds) == [0, 0, 759 - 1, 0, 0]
     assert session_detail.stops(flow) == [[299, 344]]
     summary = session_detail.stop_summary(flow)
     assert summary["count"] == 1 and summary["total_s"] == 45 and summary["longest_km"] == 1
@@ -193,9 +195,9 @@ def observation_of(store, activity_id):
 def test_a_threshold_detail_reads_its_reps_and_asks_for_the_reserve_once(store):
     observation_id = seed_threshold(store)
     when = dt.datetime(2026, 10, 26, 20, 0, tzinfo=PARIS)
-    board = Board(store, Repo(store), ENGINE_ROOT, when.date(), when)
+    board = Board(store, Repo(store), ENGINE_ROOT, when.date(), when, SAM)
     intake = store.strava_detail(observation_id)
-    store.store_strava_detail(intake["activity_id"], streams=stream(seconds=900, hr=176))
+    store.store_strava_detail(intake["activity_id"], streams=stream(seconds=900, hr=170))
     view = board.session_view(str(observation_id), store.strava_detail(observation_id))
     assert view["quality"] and view["title"] == "Seuil en côte"
     assert [rep["n"] for rep in view["reps"]] == [1, 2, 3, 4]

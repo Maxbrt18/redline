@@ -5,6 +5,11 @@
 [athlete]
 # Le prénom que le coach emploie dans ses messages.
 name = "[Prénom]"
+# FC de repos et FC max, en bpm : les zones Karvonen en dérivent (Z2 à 60 % de la
+# réserve, Z3 à 70 %…), et le haut de la Z2 plafonne les EF. Une FC max estimée se
+# dit telle au coach, dans le profil de l'athlète.
+hr_rest = "[FC de repos]"
+hr_max = "[FC max]"
 
 [notebook]
 # Le lieu de la météo des séances qui n'en déclarent pas (geocodage Open-Meteo).

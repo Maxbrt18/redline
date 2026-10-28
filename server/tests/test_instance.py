@@ -23,6 +23,7 @@ def test_the_shipped_example_is_refused_until_filled():
     message = str(refused.value)
     assert "encore à remplir" in message
     assert "athlete.name" in message and "notebook.place" in message
+    assert "athlete.hr_rest" in message and "athlete.hr_max" in message
     assert "inconnu" not in message
 
 
@@ -64,3 +65,12 @@ def test_a_duplicated_capability_is_refused():
     text += '\n[[capabilities]]\nslug = "cap1-durabilite"\nlabel = "Encore"\n'
     with pytest.raises(instance.InstanceError, match="double"):
         instance.parse(text)
+
+
+def test_heart_rates_give_the_karvonen_bounds():
+    """Les zones de FC se calculent sur les FC de l'instance, jamais sur des valeurs du
+    moteur : le haut de la Z2 (`hr_bounds[1]`) plafonne les EF."""
+    sam = instance.load(TEST_VAULT)
+    assert (sam.hr_rest, sam.hr_max) == (55, 190)
+    assert sam.hr_bounds == (136, 149, 163, 176)
+

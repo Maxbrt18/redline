@@ -141,7 +141,7 @@ def _steps(s: dict):
         yield k, dt, moving
 
 
-def zone_seconds(s: dict, limits: tuple[int, ...] | None = None) -> list[int] | None:
+def zone_seconds(s: dict, limits: tuple[int, ...]) -> list[int] | None:
     """Le temps passé dans chaque zone (Z1 à Z5), arrêts exclus."""
     hr = s.get("hr")
     if not hr:

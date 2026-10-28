@@ -16,7 +16,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts import ledger  # noqa: E402
-from scripts.model import permit  # noqa: E402
+from scripts.model import instance, paths, permit  # noqa: E402
 
 
 def _strava_id(key: str) -> int | None:
@@ -47,23 +47,27 @@ def _group(store: Any, activity_id: int) -> bool | None:
 
 def report(store: Any, today: dt.date, week: str | None = None) -> list[str]:
     choices = list(store.permit_choice_rows())
-    if not choices:
+    period = permit.window(choices)
+    if period is None:
         return []
+    # Le plafond d'une EF est le haut de la Z2 de l'athlète : une seule source, ses FC.
+    hr_cap = instance.load(paths.vault_root()).hr_bounds[1]
     rows = ledger.parse_ledger(store)
     runs = [permit.Run(row.date, row.type,
                        None if row.hours is None else row.hours * 60,
                        row.hr_valid, _strava_id(row.idempotency_key))
-            for row in rows if row.date >= permit.START]
+            for row in rows if row.date >= period.start]
     # Le permis se juge sur la PIRE trace du matin, toutes zones confondues : une zone qui
     # proteste suffit à le refuser. C'est le seul endroit où les zones se rejoignent, et
     # elles s'y rejoignent par le maximum, jamais par une moyenne.
     traces: dict[dt.date, float] = {}
     for row in rows:
-        if row.type == "reveil" and row.pains and row.date >= permit.START:
+        if row.type == "reveil" and row.pains and row.date >= period.start:
             traces[row.date] = max(traces.get(row.date, 0), *row.pains.values())
     weeks = {choice["iso_week"] for choice in choices}
     groups = {run.strava_id: group for run in runs if run.type == "EF" and run.strava_id
               for group in [_group(store, run.strava_id)] if group is not None}
-    lines = permit.evaluate(choices, runs, traces, _caps(store, weeks), groups, today)
-    current = permit.state(lines, store.daily_rows(), today)
+    lines = permit.evaluate(choices, runs, traces, _caps(store, weeks), groups, today,
+                            hr_cap=hr_cap)
+    current = permit.state(lines, store.daily_rows(), today, period)
     return permit.render(lines, current, week)
