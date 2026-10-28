@@ -835,7 +835,7 @@ PROACTIVE_TRIGGERS = {
 nuit, quand le coach n'écrit pas. Lis l'INSTANTANÉ STRAVA injecté et traite la sortie comme un
 débrief normal (`scripts/session-cycle.py pending` ; les faits objectifs sont déjà capturés par le service),
 mais demande AU RÉVEIL DIRECTEMENT la référence laissée par la veille : premiers pas,
-injury et règle "pas pire le lendemain". Cette collecte ne se reporte jamais au soir
+zone surveillée et règle "pas pire le lendemain". Cette collecte ne se reporte jamais au soir
 suivant. Note CARNET présente : une clause rappelle que le carnet l'attend, sans question.
 NE DEMANDE PAS UNE NOTE SUR 10 (2026-08-17) : demande la trace laissée (aucune, très
 légère, légère, nette) ou fais falsifier l'annonce de la veille ("plus, moins ou pile ce que ton 2

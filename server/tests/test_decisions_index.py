@@ -252,3 +252,20 @@ def test_une_rectification_obeit_au_vocabulaire_strict():
 def test_une_rectification_sans_verdict_d_origine_est_refusee():
     with pytest.raises(decisions_index.DecisionFormatError, match="sans verdict d'origine"):
         decisions_index.parse(ENTREE + "\n**Verdict rectifié** (2026-10-09) : tenue — x.\n")
+
+
+def test_la_semaine_de_revue_se_lit_dans_l_annee_de_la_decision():
+    """Le moteur ne connaît ni l'année ni les semaines d'un plan : « W33 » est la W33 de
+    l'année de la décision, et une W03 écrite en décembre tombe en janvier suivant."""
+    assert _decision(ENTREE).review_date == dt.date(2026, 8, 16)
+    hiver = _decision("## 2026-12-14 — Bloc d'hiver\n\n"
+                      "**Prédiction** : un résultat mesurable. Revue : bilan W03.\n")
+    assert hiver.review_date == dt.date(2027, 1, 24)
+    assert not hiver.is_due(dt.date(2026, 12, 31))
+
+
+def test_une_semaine_de_revue_inexistante_est_refusee():
+    """2027 n'a que 52 semaines ISO : une revue W53 ne serait jamais due, en silence."""
+    with pytest.raises(decisions_index.DecisionFormatError, match="W53 n'existe pas"):
+        decisions_index.parse("## 2027-03-01 — Palier\n\n"
+                              "**Prédiction** : un résultat mesurable. Revue : bilan W53.\n")

@@ -66,8 +66,8 @@ def render(ledger, rows: list, instruments: dict, targets: dict,
     volume = ledger.week_volume(week)
     run_km, walk_km, runs = volume.km_run, volume.km_walk, volume.runs
 
-    # La part de marche dans la jauge : c'est elle qui dit si un rouge est injury ou
-    # seulement systémique. La calculer ici évite de la refaire de tête chaque semaine.
+    # La part de marche dans la jauge : c'est elle qui dit si un rouge vient de la blessure
+    # ou n'est que systémique. La calculer ici évite de la refaire de tête chaque semaine.
     walk_h = sum(ledger.row_weight(row, targets)[0] for row in week
                  if row.type in ledger.WALK_TYPES)
     base = sum(ledger.row_weight(row, targets)[0] for row in week) or 1.0

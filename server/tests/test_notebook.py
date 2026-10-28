@@ -65,7 +65,7 @@ def test_current_never_launches_a_stale_or_held_plan(monkeypatch):
         'id': 'a', 'date': '2026-10-02', 'kind': 'strength', 'workout': 'renfo-a',
         'status': 'planned', 'strength': {}}], 'gates': [{
             'id':'hold', 'due':'2026-10-02', 'when':'avant', 'holds':['a'],
-            'question':'Comment va le injury ?', 'on_fail':'Repos'}]})
+            'question':'Comment va la blessure ?', 'on_fail':'Repos'}]})
     assert service.current()['status'] == 'blocked'
     assert service.launch('4242', 'old') is None
 

@@ -871,7 +871,7 @@ ressentis une question à la fois, et la question d'une FC haute), la séance à
 renfo et son bouton. Un jour de repos tient en une ligne et la fiche de demain suit en
 entier. Puis **À venir** (une ligne par jour, la météo pour demain seulement) et
 **Repères**, trois tuiles qui mènent au détail : la semaine en mini-barres (vers
-Semaine), le pic injury face au plafond (écran Injury, `GET /carnet-api/injury` : un point
+Semaine), le pic de douleur face au plafond (écran Douleur, `GET /carnet-api/injury` : un point
 par séance notée et les réveils sur cinq semaines calendaires, l'échelle de l'athlète, le
 pic par semaine, les réveils sans note ; aucun verdict), le compte à rebours (vers Course). La météo dit le ciel et le ressenti au départ, puis la nuit par rapport à la
 séance (avant, pendant, après), avec un picto en couleur dans une pastille teintée du

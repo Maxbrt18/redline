@@ -38,6 +38,6 @@
 .n-pips i { flex: 1; height: 7px; border-radius: 2px; background: var(--ghost); }
 .n-pips i.f { background: var(--data); }
 .n-cp b { font: 700 16px/1 var(--display); text-align: right; }
-/* Chaque capacité porte sa pastille ; les injury gardent leur violet. */
+/* Chaque capacité porte sa pastille ; les blessures gardent leur violet. */
 .n-cp { grid-template-columns: 128px 1fr 30px; }
 .n-cp > span { display: flex; align-items: center; gap: 8px; }

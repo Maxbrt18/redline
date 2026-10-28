@@ -116,7 +116,7 @@ def test_un_debrief_complet_passe_la_frontiere_du_tour(store):
 
 
 def test_donner_un_rpe_ne_casse_jamais_rien(store):
-    """« Effort ressenti 7-8/10 et pic injury 0/10 » a détruit deux tours. Un chiffre
+    """« Effort ressenti 7-8/10 et pic de douleur 0/10 » a détruit deux tours. Un chiffre
     déclaré est le geste le plus banal du coaching : il doit passer, et laisser le
     programme prescriptible."""
     # La séance préexiste au plan : son filigrane de persistance l'a donc déjà vue.

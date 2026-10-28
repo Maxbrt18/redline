@@ -13,7 +13,7 @@ def test_memory_is_bounded_and_keeps_the_open_thread():
 
 
 def test_question_identity_does_not_depend_on_spacing_before_the_question_mark():
-    assert question_fingerprint("Le injury ?") == question_fingerprint("Le injury?")
+    assert question_fingerprint("La blessure ?") == question_fingerprint("La blessure?")
 
 
 def test_partial_answers_and_deferred_topics_remain_explicit():

@@ -48,7 +48,7 @@ def test_a_refused_write_keeps_the_answer_and_names_what_was_not_recorded(make_b
         False, detail="mesure déjà connue", failure=PersistenceFailure.WRITE_REFUSED,
         refused=("measurement.complete",)))
 
-    assert bot._respond("4242", "effort ressenti 7-8/10 et pic injury 0/10")
+    assert bot._respond("4242", "effort ressenti 7-8/10 et pic de douleur 0/10")
 
     envoye = _sent(client)
     assert "EF propre" in envoye
@@ -158,7 +158,7 @@ def test_a_safety_answer_always_leaves_even_without_a_plan(make_bot):
                        plan_context="", plan_change=True)
     bot._agent._result = RunResult(full_text=answer)
 
-    bot._respond("4242", "douleur nette au injury en courant, j'arrête ?")
+    bot._respond("4242", "douleur nette au genou en courant, j'arrête ?")
 
     envoye = _sent(client)
     assert answer in envoye

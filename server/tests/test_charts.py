@@ -53,7 +53,7 @@ MONTH = {
 # live in coaching/exercises/ and coaching/workouts/ (2026-07-25).
 STRENGTH = {
     "session": "a", "date": "mardi 22 juillet", "duration_min": 30,
-    "note": "Injury à 0/10 : version complète.",
+    "note": "Douleur à 0/10 : version complète.",
 }
 
 CARDS = [("chart-workout.py", WORKOUT), ("chart-week.py", WEEK),
@@ -121,9 +121,9 @@ def test_the_fonts_are_committed():
 # Every case below used to be a broken card under matplotlib.
 
 LONG_NAME = "Mollet unipodal genou fléchi ~30° sur marche, charge additionnelle"
-LONG_TARGET = "soléaire — le muscle clé du injury, et le trou n°1 d'avant"
+LONG_TARGET = "soléaire — le muscle clé du mollet, et le trou n°1 d'avant"
 LONG_NOTE = ("1ère séance depuis avril : demi-dose (une série en moins partout), "
-             "SANS pliométrie cette semaine — 2320 m D+ samedi dernier, les injury "
+             "SANS pliométrie cette semaine — 2320 m D+ samedi dernier, les jambes "
              "ont déjà bien encaissé, on ne rajoute pas d'impact par-dessus.")
 
 STRESS = [

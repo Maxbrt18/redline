@@ -121,7 +121,7 @@ def missing_cells_in_notebook(detail: str) -> ClosedProactive | None:
 
 #: La question exacte, sous-chaîne du texte : suivie comme une question posée, elle
 #: donne son sens à un « légère » tapé dans le chat.
-WAKE_QUESTION = ("quelle trace au injury au réveil : aucune, très légère, "
+WAKE_QUESTION = ("quelle trace de douleur au réveil : aucune, très légère, "
                  "légère ou nette ?")
 
 

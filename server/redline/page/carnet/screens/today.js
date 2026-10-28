@@ -281,7 +281,7 @@ function ahead(data, seen) {
   return node;
 }
 // Les repères (maquette « une large, deux demi » validée le 2026-10-10) : la semaine en
-// pleine largeur avec ses barres chiffrées, puis les injury contre leur plafond et la
+// pleine largeur avec ses barres chiffrées, puis les douleurs contre leur plafond et la
 // course côte à côte. Chaque tuile mène à son onglet ; J-N reste à l'encre, le rouge
 // appartient à l'étape en cours.
 function tile(label, onPress, cls, icon) {

@@ -14,7 +14,7 @@ def test_closed_social_messages_are_n0_without_a_model(text):
     "Je fais quoi pour récupérer mon fichier ?",
     "Je doute de ton calcul, tu peux vérifier ?",
     "Je décale ma séance à jeudi",
-    "J'ai mal au injury, je fais quoi aujourd'hui ?",
+    "J'ai mal au genou, je fais quoi aujourd'hui ?",
     "Je suis découragé, je décale ma séance à jeudi",
     "Merci, mais tu as inversé les jours",
     "Quelle est la prochaine séance ?",

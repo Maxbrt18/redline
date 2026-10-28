@@ -102,7 +102,7 @@
 .n-at small .n-sky { width: 16px; height: 16px; margin-right: 4px; vertical-align: -3px; }
 .n-av { font-size: 15px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--muted); }
 /* Les repères (maquette « une large, deux demi », 2026-10-10) : la semaine sur toute la
- * largeur, injury et course dessous ; le bas de chaque demi-tuile s'aligne. */
+ * largeur, douleur et course dessous ; le bas de chaque demi-tuile s'aligne. */
 .n-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
 .n-tile { display: flex; flex-direction: column; align-items: stretch; min-width: 0; padding: 12px 14px 13px; overflow: hidden;
   border: 0; border-radius: 16px; background: var(--panel); color: var(--ink); text-align: left; font: inherit; }
@@ -127,7 +127,7 @@
 .n-mini em.plan { font-weight: 500; color: var(--faint); }
 .n-mini small, .n-mini b { display: block; margin-top: 5px; font: 500 10.5px/1 var(--sans); text-align: center; color: var(--faint); }
 .n-mini b { font-weight: 700; color: var(--red); }
-/* Le pic par semaine contre le plafond, au pointillé de l'écran Injury. */
+/* Le pic par semaine contre le plafond, au pointillé de l'écran Douleur. */
 .n-plot { display: block; width: 100%; height: auto; overflow: visible; }
 .n-plot .base { stroke: var(--grid); stroke-width: 1; }
 .n-plot .cap { stroke: var(--over); stroke-width: 1.2; stroke-dasharray: 3 3; }

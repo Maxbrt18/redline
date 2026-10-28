@@ -364,7 +364,7 @@ def format_message(session: dict, clean: dict) -> str:
             # « Retiré par le garde-fou » n'est pas « pas fait » : le coach lirait
             # une inobservance là où sa propre règle a joué.
             remark = f" — remarque : « {item['note']} »" if item["note"] else ""
-            detail.append(f"- {name} : retiré par le garde-fou injury{remark}")
+            detail.append(f"- {name} : retiré par le garde-fou de douleur{remark}")
             continue
         if item["skipped"]:
             remark = f" — remarque : « {item['note']} »" if item["note"] else ""

@@ -152,7 +152,7 @@ def test_an_undelivered_initiative_is_resent_without_a_new_model_turn(make_bot, 
 
 def test_an_initiative_ready_while_alex_writes_is_kept_not_regenerated(make_bot, store):
     """RWF-008 : le réactif prime sans détruire. Le texte attend la fin de l'échange."""
-    agent = FakeAgent(result=RunResult(full_text="Le injury au réveil ?"))
+    agent = FakeAgent(result=RunResult(full_text="La blessure au réveil ?"))
     bot = make_bot(agent=agent, proactive_active_start=None)
     bot._repo.weekly_plan_context.return_value = PLAN
     job = _claimed(store, "morning")
@@ -171,5 +171,5 @@ def test_an_initiative_ready_while_alex_writes_is_kept_not_regenerated(make_bot,
     bot._respond_proactive(_claimed(store, "morning"))
 
     assert len(agent.calls) == 1
-    assert bot._client.send_burst.call_args.args[1].startswith("Le injury au réveil ?")
+    assert bot._client.send_burst.call_args.args[1].startswith("La blessure au réveil ?")
     assert _job(store, "morning:test")["status"] == "done"

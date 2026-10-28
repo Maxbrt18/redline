@@ -120,7 +120,7 @@ def test_the_reactive_path_never_renders_the_plan_card(repo, client, make_bot):
     """
     due_gate = {"id": "g1", "due": "2000-01-01", "when": "avant",
                 "holds": ["w33-r1-jour-ef"],
-                "question": "Le injury ?", "on_fail": "repos"}
+                "question": "La blessure ?", "on_fail": "repos"}
     repo.weekly_plan_context.side_effect = [context(5), context(
         6, [session(date=TOMORROW.isoformat())], [due_gate])]
     bot = make_bot(repo=repo, client=client,
@@ -152,7 +152,7 @@ def test_a_revision_that_only_records_the_past_says_nothing(repo, client, make_b
     """Le 2026-08-16, rejoué tel quel — et la vraie définition du « fait ».
 
     Sam finit sa SL vallonnée, la débriefe, donne ses trois repères. Le coach écrit
-    r12 pour consigner RPE 3-4, pic injury 0,75-1 et plaisir 7 : une révision de plus,
+    r12 pour consigner RPE 3-4, pic de douleur 0,75-1 et plaisir 7 : une révision de plus,
     dont la liste de séances est IDENTIQUE à celle de r11. Il ne reste rien à faire de
     la semaine, et Sam a pourtant reçu « la suite de la semaine : dim 16/08 : SL
     vallonnée, cible 10 km » — la séance dont il venait de rendre compte.
@@ -163,9 +163,9 @@ def test_a_revision_that_only_records_the_past_says_nothing(repo, client, make_b
     done = [session(status="done")]
     repo.weekly_plan_context.side_effect = [context(11, done), context(12, done)]
     bot = make_bot(repo=repo, client=client,
-                   agent=FakeAgent(result=RunResult(full_text="Très bien, injury discret."),
+                   agent=FakeAgent(result=RunResult(full_text="Très bien, genou discret."),
                                      depth="N1", plan_change=True))
-    bot._respond("4242", "RPE 3-4, pic injury 0.75-1, plaisir 7")
+    bot._respond("4242", "RPE 3-4, pic de douleur 0.75-1, plaisir 7")
 
     assert programmes(client) == []
     assert client.send_burst.call_count == 1, "le coach débriefe quand même"
@@ -285,14 +285,14 @@ def test_a_gate_still_holds_the_prescription_even_on_a_fresh_revision(repo, clie
                                                                       make_bot):
     """Un contrôle daté échu retient la ligne de séances, révision neuve ou pas."""
     due_gate = {"id": "g1", "due": TODAY.isoformat(), "when": "avant",
-                "holds": ["w33-r1-jour-ef"], "question": "le injury ?",
+                "holds": ["w33-r1-jour-ef"], "question": "la blessure ?",
                 "on_fail": "repos"}
     repo.weekly_plan_context.side_effect = [
         context(5),
         context(6, [session(date=TOMORROW.isoformat())], gates=[due_gate]),
     ]
     bot = make_bot(repo=repo, client=client,
-                   agent=FakeAgent(result=RunResult(full_text="Le injury, il donne quoi ?"),
+                   agent=FakeAgent(result=RunResult(full_text="La blessure, elle donne quoi ?"),
                                      depth="N2", plan_change=True))
     repo.persist_turn.return_value = PersistenceResult(
         True, awaiting=(current_week(bot),))

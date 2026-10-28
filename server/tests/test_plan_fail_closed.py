@@ -234,14 +234,14 @@ def test_a_morning_without_a_valid_plan_speaks_without_sessions_and_arms_the_rep
     repo.drain_alerts.return_value = []
     client = MagicMock()
     bot = make_bot(repo=repo, client=client, proactive_active_start=dtime(0, 0),
-                   agent=FakeAgent(result=RunResult(full_text="Bien dormi ? Le injury ?")))
+                   agent=FakeAgent(result=RunResult(full_text="Bien dormi ? La blessure ?")))
     store.proactive.enqueue_job("morning:today", "morning", "", 0)
     job = store.proactive.claim_due_job(1e12)
 
     bot._respond_proactive(ProactiveJob(psid="4242", kind="morning", prompt="matin",
                                         job_id=job["id"]))
 
-    assert _sent(client) == ["Bien dormi ? Le injury ?"]
+    assert _sent(client) == ["Bien dormi ? La blessure ?"]
     jobs = {row["id"]: row for row in store.proactive.jobs()}
     assert jobs["morning:today"]["status"] == "done"
     repair = [row for row in jobs.values() if row["kind"] == "weekly_repair"]
@@ -311,7 +311,7 @@ def test_the_morning_note_survives_the_plan_it_announces(make_bot):
     question du contrôle daté, la relance de fil, la question `daily.csv`. Il ne restait
     qu'une ligne de séance — et un contrôle daté est justement une question à POSER
     avant de prescrire."""
-    client = morning_bot(make_bot, "Le injury, il donne quoi au réveil ce matin ?")
+    client = morning_bot(make_bot, "La blessure, elle donne quoi au réveil ce matin ?")
     sent = " ".join(call.args[1] for call in client.send_burst.call_args_list)
     assert "au réveil ce matin" in sent
     assert "Renfo A" in sent

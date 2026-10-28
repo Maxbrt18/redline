@@ -9,7 +9,7 @@ aliases: [check-in hebdo, checkin-hebdo]
      La 1 est le comparatif forcé ("le relatif se triche mal"), la 2 le révélateur
      corporel, la 6 l'aveu différé institutionnalisé (batterie C, coaching/protocols.md). -->
 
-1. **Le injury, vs dimanche dernier** : ( ) mieux  ( ) pareil  ( ) pire
+1. **La zone surveillée, vs dimanche dernier** : ( ) mieux  ( ) pareil  ( ) pire
 2. **Tes 10 premiers pas ce matin, raconte** : 
 3. **Sommeil** : ( ) ok  ( ) 2-3 mauvaises nuits  ( ) dégradé toute la semaine   → jauge
 4. **Charge de vie** : ( ) normale  ( ) élevée (déménagement, exams, rentrée)   → jauge

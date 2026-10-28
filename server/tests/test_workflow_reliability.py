@@ -97,14 +97,14 @@ def test_rwf001_a_finished_answer_is_delivered_as_written(make_bot):
 
 
 def test_rwf002_a_safety_answer_leaves_even_when_the_week_is_unreadable(make_bot):
-    safety = ("Arrête la séance maintenant. Une douleur injury focale qui augmente "
+    safety = ("Arrête la séance maintenant. Une douleur focale qui augmente "
               "mérite un avis médical avant de recourir.")
     agent = FakeAgent(result=RunResult(full_text=safety), depth="N2", plan_change=True)
     bot = make_bot(agent=agent)
     bot._repo.weekly_plan_context.return_value = ""
     bot._repo.persist_turn.return_value = PersistenceResult(True, invalid=("2026-W39",))
 
-    assert bot._respond(PSID, "j'ai une douleur nette au injury en courant",
+    assert bot._respond(PSID, "j'ai une douleur nette au genou en courant",
                         message_ids=("m3",))
 
     sent = _sent(bot._client)
@@ -478,7 +478,7 @@ def test_rwf014_the_holding_line_is_a_real_remembered_message(make_bot):
 
 
 def test_rwf016_a_turn_is_traceable_by_structured_events_without_text(make_bot, caplog):
-    agent = FakeAgent(result=RunResult(full_text="Réponse privée sur le injury"))
+    agent = FakeAgent(result=RunResult(full_text="Réponse privée sur la blessure"))
     bot = make_bot(agent=agent)
 
     with caplog.at_level(logging.INFO, logger="redline.events"):
@@ -490,7 +490,7 @@ def test_rwf016_a_turn_is_traceable_by_structured_events_without_text(make_bot, 
     assert stages == ["triage", "model", "apply", "shape", "deliver"]
     shape = events[3]
     assert shape["prose_bubbles"] == 1 and shape["added_parts"] == 0
-    assert shape["prose_chars"] == len("Réponse privée sur le injury")
+    assert shape["prose_chars"] == len("Réponse privée sur la blessure")
     turn_ids = {event["turn_id"] for event in events if "turn_id" in event}
     assert len(turn_ids) == 1
     assert all("injury" not in json.dumps(event) and "privée" not in json.dumps(event)

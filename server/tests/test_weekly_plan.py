@@ -42,7 +42,7 @@ def plan(sessions=None):
 
 
 def gate(identifier="w32-injury-48h", due="2026-08-08",
-         question="trace injury encore présente au réveil ?",
+         question="trace de douleur encore présente au réveil ?",
          on_fail="repos et recalcul", **overrides):
     payload = {"id": identifier, "due": due, "when": "apres",
                "question": question, "on_fail": on_fail}
@@ -232,7 +232,7 @@ def test_a_note_that_cites_a_gate_id_is_refused():
     broken["revisions"][0]["gates"] = [{
         "id": "w33-renfoa-report", "due": "2026-08-08",
         "when": "apres",
-        "question": "Le injury au réveil, comparé à hier ?",
+        "question": "La blessure au réveil, comparé à hier ?",
         "on_fail": "Renfo A reste suspendu."}]
     with pytest.raises(SchemaError, match="contrôle daté"):
         weekly_plan.validate(broken)
@@ -294,7 +294,7 @@ def test_a_gate_is_lifted_only_by_a_new_revision_without_it():
     assert weekly_plan.gate_reasons(current, today=dt.date(2026, 8, 8))
     current["revisions"].append(revision(
         2, [session(status="done")], computed_at="2026-08-08T08:30:00+02:00",
-        reason="injury calme au réveil du 08/08, contrôle levé"))
+        reason="genou calme au réveil du 08/08, contrôle levé"))
     assert weekly_plan.gate_reasons(current, today=dt.date(2026, 8, 8)) == []
 
 

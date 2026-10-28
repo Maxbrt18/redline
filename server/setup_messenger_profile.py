@@ -37,8 +37,8 @@ ICE_BREAKERS = [
      "payload": "Fais-moi le point sur ma semaine en cours"},
     {"question": "Où en est ma prépa TargetRace ?",
      "payload": "Où en est ma prépa TargetRace ?"},
-    {"question": "Comment vont mes injury ?",
-     "payload": "Fais le point sur mes injury et la blessure"},
+    {"question": "Comment va ma blessure ?",
+     "payload": "Fais le point sur ma blessure"},
 ]
 
 

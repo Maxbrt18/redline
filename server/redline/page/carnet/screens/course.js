@@ -4,7 +4,7 @@ import {day, dm, fmt, shortDay} from '../format.js';
 import {push} from '../nav.js';
 
 // ------------------------------------------------------------ Course
-// Une pastille par capacité (par son numéro), à la teinte de sa famille : les injury en
+// Une pastille par capacité (par son numéro), à la teinte de sa famille : les blessures en
 // violet, la digestion et la nuit au pétrole de la course, le reste au bleu de la course à pied.
 const CAPABILITY_ICONS = {1: 'run', 2: 'descent', 3: 'food', 4: 'night', 5: 'tib', 6: 'mind'};
 const archiveLabel = entry => entry.kind === 'monthly' && entry.period

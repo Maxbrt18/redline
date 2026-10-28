@@ -892,7 +892,7 @@ def test_the_red_point_moves_from_the_run_to_the_strength_once_done(browser):
 
 
 def test_the_landmarks_open_more_detail(browser):
-    """Les repères mènent au détail : la semaine en barres, l'écran Injury poussé
+    """Les repères mènent au détail : la semaine en barres, l'écran Douleur poussé
     par-dessus Aujourd'hui (2026-10-09)."""
     tab = browser.new_page(viewport={'width': 393, 'height': 852})
     serve(tab)

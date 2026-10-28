@@ -88,8 +88,8 @@ export function loadProgress() {
   // horodater à l'ouverture gonflait la durée d'autant.
   state = (restored && typeof restored === 'object' && restored.steps) ? restored : {
     startedAt: null, performedOn: null, steps: {}, current: 0, review: false,
-    // `opened` distingue « pas encore répondu » de « répondu 0 » : sans lui, un
-    // injury parfaitement silencieux rouvrirait l'écran d'ouverture à chaque
+    // `opened` distingue « pas encore répondu » de « répondu 0 » : sans lui, une
+    // douleur parfaitement silencieuse rouvrirait l'écran d'ouverture à chaque
     // retour sur l'onglet.
     // `pains` : {zone: {before, after}}, une lecture avant et une après par zone.
     pains: {}, opened: false,
