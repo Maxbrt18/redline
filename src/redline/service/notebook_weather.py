@@ -1,13 +1,13 @@
-"""La météo d'une séance à venir, pour la fiche de départ du carnet.
+"""The weather of an upcoming session, for the notebook's departure sheet.
 
-Open-Meteo, gratuit et sans clé, comme `scripts/weather.py` (qui sert le registre :
-la météo d'une séance FAITE). Ici, la prévision d'une séance À VENIR : trois heures
-autour du départ, et l'heure de la nuit. Rien n'est stocké : une prévision change, elle
-se redemande, au plus toutes les 30 minutes par lieu et par jour.
+Open-Meteo, free and keyless, like `scripts/weather.py` (which serves the ledger: the
+weather of a COMPLETED session). Here, the forecast of an UPCOMING session: three hours
+around the start, and the night hour. Nothing is stored: a forecast changes, so it is
+requested again, at most every 30 minutes per place and day.
 
-Le lieu : le `location_label` de la séance s'il existe (« Vincennes »), sinon le lieu par
-défaut du carnet (`[notebook] place` de `redline.toml`). Un nom introuvable ou un réseau absent ne casse rien :
-la fiche s'affiche sans météo.
+The place: the session's `location_label` if present, otherwise the notebook's default
+place (`[notebook] place` in `redline.toml`). An unknown name or a missing network
+breaks nothing: the sheet is shown without weather.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search"
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 TIMEOUT_S = 4
 CACHE_S = 30 * 60
-#: Sans heure prévue, la journée en trois moments : de quoi choisir son créneau.
+#: Without a planned time, the day in three moments: enough to pick a slot.
 DEFAULT_HOURS = (8, 12, 18)
 
 _lock = threading.Lock()
@@ -41,7 +41,7 @@ def _get(url: str, params: dict) -> Any:
 
 
 def place(name: str) -> tuple[str, float, float] | None:
-    """(nom, latitude, longitude) d'un lieu français, ou None s'il est introuvable."""
+    """(name, latitude, longitude) of a French place, or None if not found."""
     key = name.strip().lower()
     with _lock:
         if key in _places:
@@ -73,7 +73,7 @@ def _forecast(lat: float, lon: float, day: dt.date) -> dict:
 
 
 def hours_for(day: dt.date, start: str | None, now: dt.datetime) -> list[int]:
-    """Les heures à montrer : autour du départ prévu, sinon les moments qui restent."""
+    """The hours to show: around the planned start, otherwise the moments that remain."""
     if start:
         first = int(start[:2])
         return [hour for hour in (first, first + 1, first + 2) if hour <= 23]
@@ -83,7 +83,7 @@ def hours_for(day: dt.date, start: str | None, now: dt.datetime) -> list[int]:
 
 
 def forecast(name: str, day: dt.date, start: str | None, now: dt.datetime) -> dict | None:
-    """La prévision lisible d'une séance, ou None si rien n'est disponible."""
+    """The readable forecast of a session, or None if nothing is available."""
     hours = hours_for(day, start, now)
     if not hours or not 0 <= (day - now.date()).days <= 6:
         return None
@@ -109,7 +109,7 @@ def forecast(name: str, day: dt.date, start: str | None, now: dt.datetime) -> di
             "feels": round(hourly["apparent_temperature"][index]),
             "rain": hourly["precipitation_probability"][index],
             "wind": round(hourly["wind_speed_10m"][index]),
-            # Le ciel en code WMO et le jour : l'icône et le mot de la fiche (« éclaircies »).
+            # The sky as a WMO code and the day flag: the sheet's icon and word.
             "code": (hourly.get("weather_code") or [None] * len(times))[index],
             "day": bool((hourly.get("is_day") or [1] * len(times))[index]),
         })

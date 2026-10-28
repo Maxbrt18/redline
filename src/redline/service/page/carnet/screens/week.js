@@ -4,13 +4,12 @@ import {chevron, content, kindIcon, pastille, section} from '../ui.js';
 import {day, dm, fmt, isoDate, kindName, minutesText, paceOf, plannedValue, shortTitle, weekNumber, weekSpan} from '../format.js';
 import {push} from '../nav.js';
 
-// ------------------------------------------------------------ Semaine
-// Un chiffre, une barre, sept lignes (maquette validée le 2026-10-08). Chaque jour tient
-// en une ligne : la séance et un seul chiffre, le fait à l'encre, le prévu en gris, un
-// dépassement en une phrase rouge. Le détail se déplie au toucher, un jour à la fois.
-// Une jauge (maquette G1 validée le 2026-10-10) : elle se remplit jusqu'au fait, un trait
-// marque la limite, et ce qui la dépasse passe en rouge. Pas de pastille : une pastille sur
-// un rail se lit comme un curseur qu'on pourrait faire glisser.
+// ------------------------------------------------------------ Week
+// One figure, one bar, seven lines. Each day fits on one line: the session and a single
+// figure, the fact in ink, the plan in grey, an overshoot in one red phrase. The detail
+// unfolds on touch, one day at a time.
+// A gauge: it fills up to the fact, a tick marks the limit, and what exceeds it turns red.
+// No knob: a knob on a rail reads as a slider that could be dragged.
 function gauge(label, low, high, cap, value, shown, limit, out, floor) {
   const at = number => Math.max(0, Math.min(100, 100 * (number - low) / (high - low)));
   const rail = el('span', null, 'n-rail'), fill = el('i');
@@ -26,8 +25,8 @@ function gauge(label, low, high, cap, value, shown, limit, out, floor) {
   const right = add(el('span', null, 'n-gv'), el('b', shown, out ? 'n-over' : null), el('span', limit));
   return add(el('div', null, 'n-g'), el('span', label), rail, right);
 }
-// Les jauges d'une séance faite, et les mesures qu'elles montrent déjà (la ligne de faits
-// ne les répète pas).
+// The gauges of a completed session, and the measures they already show (the facts line
+// does not repeat them).
 export function gauges(item) {
   const fact = item.fact, target = item.targets || {}, over = new Set(fact.over || []), rows = [], shown = new Set();
   const distanceCap = target.distance_cap_km || target.distance_target_km;
@@ -49,8 +48,8 @@ export function gauges(item) {
   }
   return [rows.length ? add(el('div', null, 'n-gauges'), ...rows) : null, shown];
 }
-// Ce qui a dépassé, en étiquettes après le titre (maquette A validée le 2026-10-10) :
-// l'écart à la limite, pas une phrase. Le jour ouvert le montre sur ses jauges.
+// What overshot, as labels after the title: the gap to the limit, not a sentence. The
+// open day shows it on its gauges.
 function crossing(item) {
   const fact = item.fact, target = item.targets || {}, over = new Set(fact.over || []), tags = [];
   if (over.has('hr_avg')) tags.push('FC +' + fmt(fact.hr_avg - target.hr_cap_bpm, 0));
@@ -59,7 +58,7 @@ function crossing(item) {
   if (over.has('duration_min')) tags.push('+' + (fact.duration_min - target.duration_cap_min) + ' min');
   return tags.map(text => el('span', text, 'n-cross'));
 }
-// Les faits d'une séance. Sous des jauges, une seule ligne, sans ce qu'elles montrent.
+// A session's facts. Under gauges, a single line, without what the gauges show.
 function factLines(fact, shown) {
   const lines = [], parts = [], skip = shown || new Set();
   if (fact.km != null && !skip.has('km')) parts.push(fmt(fact.km, 2) + ' km');
@@ -75,7 +74,7 @@ function factLines(fact, shown) {
   if (feel.length) lines.push(el('p', feel.join(' · ')));
   return lines;
 }
-// Une journée : ses séances du programme et ce qui a été couru hors programme.
+// A day: its programmed sessions and what was run outside the programme.
 function dayRow(date, items, extras, todayIso) {
   const live = items.filter(item => item.kind !== 'rest');
   const runs = live.filter(item => item.kind !== 'strength');
@@ -83,8 +82,8 @@ function dayRow(date, items, extras, todayIso) {
   const main = runs[0] || strength[0];
   const past = date < todayIso;
   let title, value = '', cls = '', alert = '', tags = [], icons = [];
-  // Une sortie faite s'ouvre sur son détail (maquette v2 validée le 2026-10-26) ; ce qui
-  // l'accompagne ce jour-là (renfo, hors programme) reste lisible sous elle.
+  // A completed outing opens on its detail; what accompanies it that day (strength,
+  // unprogrammed) stays readable under it.
   let observed = null;
   const detail = [], beside = [];
   if (!main && !extras.length) { title = 'Repos'; cls = 'rest'; icons = ['rest']; }
@@ -138,7 +137,7 @@ function dayRow(date, items, extras, todayIso) {
   } else if (detail.length) {
     head.type = 'button';
     const panel = add(el('div', null, 'n-kmore'), ...detail);
-    // Le jour déplié le reste quand les chiffres se recalculent derrière.
+    // The unfolded day stays unfolded when the figures are recomputed behind it.
     const opened = app.openDay === date;
     panel.hidden = !opened; head.setAttribute('aria-expanded', String(opened)); wrap.classList.toggle('open', opened);
     head.addEventListener('click', () => {
@@ -154,7 +153,7 @@ function dayRow(date, items, extras, todayIso) {
   }
   return wrap;
 }
-// Une semaine passée en une ligne : son nom, ses dates, le fait sur la cible.
+// A past week on one line: its name, its dates, the fact against the target.
 function weekRow(item) {
   const figure = el('span', null, 'n-wfig');
   if (item.km_target) {
@@ -166,8 +165,7 @@ function weekRow(item) {
   return add(button('', () => push({k: 'week', label: item.week}), 'n-wrow'),
     add(el('span'), 'Semaine ' + weekNumber(item.week), el('small', weekSpan(item.week))), figure, chevron());
 }
-// La semaine en barres, sous son chiffre (rapatriée d'Aujourd'hui le 2026-10-09, à la
-// demande de l'athlète) : plein = fait, pointillé = prévu, filet = repos.
+// The week as bars, under its figure: solid = done, dashed = planned, hairline = rest.
 function weekChart(days) {
   const scale = Math.max(1, ...days.map(item => Math.max(item.done_km || 0, item.planned_km || 0)));
   const bars = el('div', null, 'n-strip'), letters = el('div', null, 'n-letters');
@@ -194,7 +192,7 @@ export function renderWeek(data, root) {
   const monday = day(data.monday);
   const todayIso = app.today ? app.today.date : '';
   const totals = data.totals, open = data.week >= data.current, upcoming = data.week > data.current;
-  // Une semaine à venir n'a rien de fait : son chiffre est la cible, pas un zéro.
+  // An upcoming week has nothing done: its figure is the target, not a zero.
   if (upcoming) content.append(add(el('div', null, 'n-ksum'), el('b', totals.km_target ? '~' + fmt(totals.km_target) : '—'), el('span', 'km prévus')));
   else content.append(add(el('div', null, 'n-ksum'), el('b', fmt(totals.km_done)), el('span', totals.km_target ? 'sur ~' + fmt(totals.km_target) + ' km' : 'km')));
   if (totals.km_target && !upcoming) {
@@ -224,8 +222,8 @@ export function renderWeek(data, root) {
     days.append(dayRow(iso, data.sessions.filter(item => item.date === iso), data.extra.filter(item => item.date === iso), todayIso));
   }
   content.append(days);
-  // La semaine suivante dès que son programme existe (2026-10-18) : le dimanche, c'est
-  // elle qu'on organise.
+  // The next week as soon as its programme exists: on Sunday, that is the one being
+  // organised.
   if (root && data.next) {
     const node = section('Semaine prochaine'), next = data.next;
     const figure = add(el('span', null, 'n-wfig'), next.km_target ? el('small', '~' + fmt(next.km_target) + ' km') : null);
@@ -233,8 +231,8 @@ export function renderWeek(data, root) {
       add(el('span'), 'Semaine ' + weekNumber(next.week), el('small', weekSpan(next.week) + ' · ' + next.runs_planned + ' sorties')), figure, chevron()));
     content.append(node);
   }
-  // Le bilan tient sa place parmi les cartes (2026-10-10) : une ligne grise tant qu'il
-  // n'est pas écrit, la même ligne qu'on touche une fois arrivé.
+  // The review takes its place among the cards: a grey line until it is written, the
+  // same line made touchable once it arrives.
   if (data.review || open || data.cards.length) {
     const node = section('Cartes de la semaine');
     if (data.review) {
@@ -244,7 +242,7 @@ export function renderWeek(data, root) {
     data.cards.forEach(entry => node.append(add(button('', () => push({k: 'entry', id: entry.id, title: entry.title}), 'n-list'), el('span', entry.title), add(el('small', dm(entry.occurred_on)), chevron()))));
     content.append(node);
   }
-  // La racine de l'onglet est toujours la semaine en cours ; les autres se poussent.
+  // The tab's root is always the current week; the others are pushed on top.
   const past = (root && app.views.weeks && app.views.weeks.weeks) || [];
   if (past.length) {
     const node = section('Semaines passées');

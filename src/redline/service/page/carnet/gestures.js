@@ -5,8 +5,8 @@ import {animate, freeze, freezeBar, leave, pageNode, paintMove, render, startMov
 import {ensure, refresh} from './data.js';
 import {sheetShown} from './sheet.js';
 
-// ------------------------------------------------------------ tirer pour actualiser
-// La PWA iOS n'en a pas : en haut de page, tirer au-delà du seuil recalcule tout.
+// ------------------------------------------------------------ pull to refresh
+// The iOS PWA has none: at the top of the page, pulling past the threshold recomputes all.
 const ptr = $('ptr');
 const PULL = 64;
 let pull = null;
@@ -37,11 +37,10 @@ window.addEventListener('touchend', async () => {
   pulled(0);
 });
 
-// ------------------------------------------------------------ glisser pour revenir
-// Depuis n'importe où sur l'écran, comme depuis iOS 26 : un geste franchement
-// horizontal vers la droite. Lâché après la moitié ou avec de l'élan, l'écran part ;
-// sinon il revient, à la même hauteur. Un champ ou un contenu qui défile de côté
-// garde son geste.
+// ------------------------------------------------------------ swipe back
+// From anywhere on the screen, as since iOS 26: a clearly horizontal rightward gesture.
+// Released past halfway or with momentum, the screen leaves; otherwise it returns, at
+// the same height. A field or sideways-scrolling content keeps its gesture.
 let swipe = null;
 function sideways(node) {
   for (node = node instanceof Element ? node : null; node && node !== document.body; node = node.parentElement) {
@@ -50,8 +49,8 @@ function sideways(node) {
   }
   return false;
 }
-// Le geste s'écoute sur l'élément touché : l'écran d'avant se redessine sous le doigt
-// et le détache, mais iOS continue de lui envoyer la suite du geste, et à lui seul.
+// The gesture is listened to on the touched element: the previous screen is redrawn
+// under the finger and detaches it, but iOS keeps sending the rest of the gesture to it alone.
 window.addEventListener('touchstart', event => {
   if (event.touches.length !== 1 || !app.stacks[app.active].length || app.move || swipe
       || app.seance || sheetShown() || !viewer.hidden || $('connected').hidden || sideways(event.target)) return;
@@ -66,7 +65,7 @@ function swipeMove(event) {
   const touch = event.touches[0], dx = touch.clientX - swipe.x, dy = touch.clientY - swipe.y;
   if (!swipe.route) {
     if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
-    // Un défilement déjà parti, un geste vertical ou vers la gauche : ce n'est pas un retour.
+    // Scrolling already under way, a vertical or leftward gesture: not a back swipe.
     if (!event.cancelable || dx < Math.abs(dy) * 1.5 || (pull && pull.d)) { swipeEnd(event); return; }
     pull = null; pulled(0); pageNode.classList.remove('settle');
     const above = freeze(), was = freezeBar();
@@ -90,7 +89,7 @@ function swipeEnd(event) {
   const gone = event.type === 'touchend' && (progress > 0.5 || speed > 0.35) && speed > -0.2;
   const rest = gone ? 1 - progress : progress;
   animate(gone ? 1 : 0, calm.matches ? 0 : Math.round(150 + 200 * rest), gone ? null : () => {
-    // Ramené : l'écran repris tel quel, à la même hauteur, avant que la copie parte.
+    // Brought back: the screen restored as is, at the same height, before the copy leaves.
     app.generation++; app.stacks[app.active].push(done.route); render(done.y); ensure();
   });
 }

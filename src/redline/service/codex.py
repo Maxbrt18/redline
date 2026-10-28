@@ -1,4 +1,4 @@
-"""Exécute Codex via le SDK Python officiel et ses objets typés."""
+"""Runs Codex through the official Python SDK and its typed objects."""
 
 from __future__ import annotations
 
@@ -38,14 +38,14 @@ from .state import StateStore
 
 log = logging.getLogger("redline")
 
-# Le triage ne lit aucun fichier et n'appelle aucune CLI. Lui retirer le shell évite
-# qu'un texte utilisateur ambigu puisse réveiller un outil dont ce tour n'a pas besoin.
+# Triage reads no file and calls no CLI. Removing its shell keeps an ambiguous user
+# text from waking a tool this turn does not need.
 TRIAGE_NO_SHELL_OVERRIDE = "features.shell_tool=false"
-# Codex ne charge nativement que `AGENTS.md`. La constitution du coach vit dans
-# `CLAUDE.md` : l'option est versionnée ici, pas laissée à un `~/.codex/config.toml`
-# que la mise à jour nocturne du runtime peut recréer sans elle.
+# Codex natively loads only `AGENTS.md`. The coach constitution lives in `CLAUDE.md`:
+# the option is versioned here rather than left to a `~/.codex/config.toml` that a
+# runtime update can recreate without it.
 CONSTITUTION_OVERRIDE = 'project_doc_fallback_filenames=["CLAUDE.md"]'
-# Un tour ponctuel (triage, banc d'évaluation) ne paie pas la constitution entière.
+# A one-off turn (triage, evaluation bench) does not pay for the whole constitution.
 NO_PROJECT_DOC_OVERRIDE = "project_doc_max_bytes=0"
 
 TRIAGE_SCHEMA = {
@@ -78,7 +78,7 @@ class _InFlightError(RuntimeError):
 
 
 def _load_sdk() -> Any:
-    """Charge le SDK seulement si Codex est réellement sélectionné."""
+    """Load the SDK only if Codex is actually selected."""
     openai_codex = importlib.import_module("openai_codex")
     sdk_types = importlib.import_module("openai_codex.types")
 
@@ -94,7 +94,7 @@ def _load_sdk() -> Any:
 
 
 class CodexRunner:
-    """Adaptateur du SDK officiel vers le contrat minimal du bot."""
+    """Adapter from the official SDK to the bot's minimal contract."""
 
     provider = "codex"
     MAX_ATTEMPTS = 3
@@ -104,13 +104,13 @@ class CodexRunner:
         self._config = config
         self._state = state
         self._sdk = sdk
-        # Processus outillé du tour en cours : `REDLINE_TURN_ID` est lié à la durée de
-        # vie de `codex app-server`, donc un tour = un processus.
+        # Tooled process of the current turn: `REDLINE_TURN_ID` is tied to the lifetime
+        # of `codex app-server`, so one turn = one process.
         self._client: Any = None
         self._client_turn_id: str | None = None
         self._client_shell_enabled = True
-        # Processus permanent sans shell ni document de projet : le triage de chaque
-        # message le réutilise au lieu de relancer un `app-server`.
+        # Long-lived process with no shell and no project document: the triage of each
+        # message reuses it instead of relaunching an `app-server`.
         self._one_shot_client: Any = None
         self._runs = ActiveRuns("Codex")
 
@@ -120,9 +120,9 @@ class CodexRunner:
             codex_bin=self._config.codex_bin,
             cwd=self._config.vault_path,
             config_overrides=overrides,
-            # `env` est fusionné PAR-DESSUS os.environ par le SDK : il sert à écraser,
-            # pas à filtrer. Les secrets dont l'agent n'a pas besoin sont donc vidés,
-            # sinon Codex les recopie dans ses instantanés de shell, en clair.
+            # The SDK merges `env` ON TOP of os.environ: it overrides, it does not
+            # filter. Secrets the agent does not need are therefore blanked, otherwise
+            # Codex copies them in clear into its shell snapshots.
             env={
                 "PATH": os.environ.get("PATH", ""),
                 **sandbox_overrides(),
@@ -194,22 +194,22 @@ class CodexRunner:
         return {
             "approval_mode": self._sdk.ApprovalMode.deny_all,
             "cwd": self._config.vault_path,
-            # Le style reste obligatoire pour une analyse de pièce jointe en lecture
-            # seule. Le classifieur, lui, reçoit uniquement son schéma de triage.
+            # The style stays mandatory for a read-only attachment analysis. The
+            # classifier receives only its triage schema.
             "developer_instructions": (None if instructions is None
                                        else self._personal(instructions)),
             "model": model,
-            # Redline est un service applicatif, pas un poste de développement :
-            # son isolation est portée par l'utilisateur Unix, l'environnement
-            # purgé, la CLI root-owned et la transaction du tour. Le sandbox Linux
-            # Codex/bubblewrap ajoutait ici une dépendance d'hôte qui empêchait toute
-            # commande de démarrer. ``full_access`` signifie qu'aucun sandbox Codex
-            # n'est monté ; les approbations interactives restent refusées.
+            # Redline is an application service, not a developer workstation: its
+            # isolation comes from the Unix user, the scrubbed environment, the
+            # root-owned CLI and the turn transaction. The Codex/bubblewrap Linux
+            # sandbox added a host dependency that kept every command from starting.
+            # ``full_access`` means no Codex sandbox is mounted; interactive approvals
+            # stay denied.
             "sandbox": self._sdk.Sandbox.full_access,
         }
 
     def _personal(self, text: str) -> str:
-        """Le prénom de l'instance à la place du jeton : tout ce que le modèle lit."""
+        """Substitute the instance athlete name for the token in everything the model reads."""
         return persona.render(text, self._config.instance.athlete_name)
 
     def _open_thread(self, psid: str, model: str | None, mode: SessionMode,
@@ -235,8 +235,8 @@ class CodexRunner:
             "cwd": self._config.vault_path,
             "effort": self._sdk.ReasoningEffort(effort) if effort else None,
             "output_schema": output_schema,
-            # Répéter la politique au niveau du tour empêche un preset ou une reprise
-            # de thread plus ancien de réintroduire bubblewrap.
+            # Repeating the policy at turn level keeps a preset or a resumed older
+            # thread from reintroducing bubblewrap.
             "sandbox": self._sdk.Sandbox.full_access,
         }
         handle = thread.turn(self._personal(message), **options)
@@ -250,7 +250,7 @@ class CodexRunner:
             timed_out.set()
             try:
                 handle.interrupt()
-            except Exception as exc:  # le résultat du tour reste l'autorité finale
+            except Exception as exc:  # the turn result remains the final authority
                 log.warning("Interruption Codex non confirmée : %s", exc)
 
         timer = threading.Timer(timeout, interrupt)
@@ -346,10 +346,10 @@ class CodexRunner:
 
     def one_shot(self, message: str, *, spec: RunSpec, output_schema: dict | None = None,
                  instructions: str | None = None, label: str = "__one_shot__") -> str:
-        """Un tour isolé, sans shell, sans session ni constitution.
+        """An isolated turn, with no shell, session or constitution.
 
-        Sert au triage de chaque message, sur un processus réutilisé, et au banc
-        d'évaluation hors production. Lève l'exception du SDK en cas d'échec.
+        Used for the triage of each message, on a reused process, and for the
+        out-of-production evaluation bench. Raises the SDK exception on failure.
         """
         codex = self._one_shot_codex()
         try:
@@ -361,13 +361,13 @@ class CodexRunner:
         except (_WatchdogError, _CancelledError):
             raise
         except Exception:
-            # Un processus mort ne se réutilise pas : le prochain appel le relance.
+            # A dead process is not reused: the next call restarts it.
             self._close_one_shot_client()
             raise
         return result.final_response or ""
 
     def classify(self, message: str, *, spec: RunSpec | None = None) -> Triage:
-        """Un seul classifieur rapide ; son absence retombe sur le défaut déterministe."""
+        """A single fast classifier; its absence falls back to the deterministic default."""
         if not self._config.triage_enabled:
             return Triage()
         candidate = spec or self._config.routing.plan(Route.TRIAGE).primary

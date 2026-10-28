@@ -1,9 +1,9 @@
-/* La visionneuse : la carte seule, sur fond noir, les commandes en verre sombre. */
-/* Elle commence sous la barre du haut, qui passe au noir : la bande d'état d'iOS suit la barre. */
+/* The viewer: the card alone, on black, the controls in dark glass. */
+/* It starts under the top bar, which turns black: the iOS status bar follows the bar. */
 .n-viewer { position: fixed; inset: calc(env(safe-area-inset-top) + var(--bar)) 0 0; z-index: 20; background: #000; opacity: 0; transition: opacity .18s; }
 :root.n-viewing .n-topbar { background-color: #000; transition: background-color .18s; }
-/* Ses commandes prennent la place de celles de la barre, comme dans Photos : même
- * hauteur que Retour et Réglages, donc rien de transparent sur le bord du haut. */
+/* Its controls take the place of the bar's, as in Photos: same height as Back and
+ * Settings, so nothing transparent on the top edge. */
 .n-topbar .n-vw { display: none; }
 :root.n-viewing .n-topbar .n-vw { display: grid; background: rgb(255 255 255 / .16); color: #fff; box-shadow: none; }
 :root.n-viewing #back, :root.n-viewing #settings { display: none; }

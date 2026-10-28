@@ -1,17 +1,17 @@
-"""Le tableau de bord du carnet : la séance du jour, la semaine, la course.
+"""The notebook dashboard: today's session, the week, the race.
 
-Tout se CALCULE à la lecture, depuis les propriétaires : la révision active du
-programme porte l'intention, le registre PostgreSQL porte le fait, et les fonctions de
-`scripts/ledger.py` font les comptes (volume, douleur, jauge, trajectoire). Rien n'est
-stocké ici : un chiffre affiché sans calcul serait une copie, et une copie dérive.
+Everything is COMPUTED at read time from the owners: the active program revision
+carries the intent, the PostgreSQL ledger carries the fact, and the `scripts/ledger.py`
+functions do the counting (volume, pain, gauge, trajectory). Nothing is stored here: a
+displayed number without a computation would be a copy, and a copy drifts.
 
-Les règles de prescription restent celles du service : un programme absent ne prescrit
-rien, un contrôle daté échu retient ses séances, une révision à réarbitrer se dit. Le
-carnet n'a pas de repli sur le macro-plan.
+Prescription rules stay those of the service: an absent program prescribes nothing, a
+due dated check withholds its sessions, a revision to re-arbitrate is stated. The
+notebook has no fallback on the macro plan.
 
-Écritures : seulement les ressentis que le registre réclame déjà (RPE, douleur,
-plaisir, trace au réveil), par les mêmes méthodes que `ledger-complete.py`, et
-seulement si la demande est encore ouverte au moment de l'écriture.
+Writes: only the feelings the ledger already requests (RPE, pain, enjoyment, wake
+trace), through the same methods as `ledger-complete.py`, and only if the request is
+still open at write time.
 """
 
 from __future__ import annotations
@@ -47,11 +47,11 @@ from .plans import PlanStatus, blocked_session_ids
 
 ACTOR = "carnet"
 MOVING_TYPES = session_kinds.MOVING
-#: Le point du matin : l'état du jour, déclaratif, aux valeurs de `fact-write.py daily`.
+#: The morning check-in: the declarative daily state, with the values of `fact-write.py daily`.
 DAILY_FIELDS = {"sleep": ("bonne", "moyenne", "mauvaise"),
                 "life_load": ("legere", "normale", "elevee")}
-#: Une FC haute à allure comparable pose sa question pendant deux jours ; la réponse va
-#: à l'état du jour de la sortie.
+#: A high heart rate at comparable pace asks its question for two days; the answer goes
+#: to the daily state of the run's day.
 HR_ASK_DAYS = 2
 PLAN_MESSAGES = {PlanStatus[name]: text for name, text in notebook_text.PLAN_MESSAGES.items()}
 
@@ -82,7 +82,7 @@ def _activity(intake: dict | None) -> Activity | None:
 
 
 def known_pains(observation: dict, labels: dict[str, str]) -> list[dict]:
-    """La douleur connue de chaque zone, dans l'ordre des zones déclarées."""
+    """The known pain of each zone, in declared zone order."""
     pains = observation.get("pains") or {}
     ordered = [zone for zone in labels if zone in pains] + sorted(set(pains) - set(labels))
     return [{"zone": zone, "label": labels.get(zone, zone),
@@ -92,14 +92,14 @@ def known_pains(observation: dict, labels: dict[str, str]) -> list[dict]:
 
 def observation_fact(observation: dict, session: dict | None = None,
                      labels: dict[str, str] | None = None) -> dict:
-    """Les mesures connues d'une observation, et les plafonds typés qu'elles franchissent."""
+    """The known measures of an observation, and the typed caps they exceed."""
     duration = _known(observation, "duration_s")
     fact: dict[str, Any] = {
         "observation_id": str(observation["id"]), "kind": observation["kind"],
         "date": observation["occurred_on"].isoformat(),
         "km": _known(observation, "distance_km"),
         "duration_min": round(duration / 60) if duration is not None else None,
-        # Sans brassard, la FC moyenne ne vaut rien : ni affichée, ni comparée (2026-10-20).
+        # Without the armband, the average heart rate is worthless: neither shown nor compared.
         "hr_avg": (None if observation.get("hr_doubt") == "sans_brassard"
                    else _known(observation, "hr_avg_bpm")),
         "rpe": _known(observation, "rpe"),
@@ -120,7 +120,7 @@ def observation_fact(observation: dict, session: dict | None = None,
 
 
 def _scale(metric: str, value: Any) -> float:
-    """Les échelles de l'athlète : RPE et plaisir entiers, douleur au demi-point."""
+    """The athlete's scales: integer RPE and enjoyment, pain in half points."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise AnswerError("Valeur numérique attendue.")
     number = float(value)
@@ -138,7 +138,7 @@ def _fr(value: float) -> str:
 
 
 def _planned(session: dict) -> list[str]:
-    """Ce qui engage, en clair et court, depuis les seuls champs typés."""
+    """What is binding, short and plain, from the typed fields only."""
     parts = []
     target, cap = session.get("distance_target_km"), session.get("distance_cap_km")
     if target is not None:
@@ -169,9 +169,9 @@ class Week:
     revision: dict | None
     held: frozenset[str]
     links: dict[str, dict]
-    observations: list[dict]          # les observations brutes de la semaine
-    rows: list[ledger.Row]            # le registre calculable de la semaine
-    strength: list[dict]              # les comptes rendus de renfo de la semaine
+    observations: list[dict]          # the week's raw observations
+    rows: list[ledger.Row]            # the week's computable ledger
+    strength: list[dict]              # the week's strength reports
 
     @property
     def days(self) -> list[dt.date]:
@@ -180,7 +180,7 @@ class Week:
 
 
 class Board:
-    """Les trois écrans du carnet, calculés pour une date."""
+    """The three notebook screens, computed for a date."""
 
     def __init__(self, ops, repo, root: Path, today: dt.date, now: dt.datetime,
                  instance: Instance | None = None):
@@ -194,7 +194,7 @@ class Board:
 
     @property
     def zones(self) -> list[ledger.PainZone]:
-        """Les zones surveillées actives ; aucune sans registre ni déclaration."""
+        """The active monitored zones; none without a ledger or a declaration."""
         if self._zones is None:
             self._zones = ledger.pain_zones(self.ops) if self.ops is not None else []
         return self._zones
@@ -258,8 +258,8 @@ class Board:
                 "distance_target_km", "distance_cap_km", "duration_cap_min",
                 "rpe_min", "rpe_max", "hr_cap_bpm") if session.get(key) is not None},
         }
-        # Le contexte d'un changement est écrit pour le coach ; l'athlète lit ce qui a
-        # bougé et quand, la consigne de la séance dit déjà le reste.
+        # A change's context is written for the coach; the athlete reads what moved
+        # and when, the session instruction already says the rest.
         change = next((c for c in (week.revision or {}).get("changes") or []
                        if c.get("session_id") == session["id"]), None)
         item["change"] = None
@@ -296,7 +296,7 @@ class Board:
         return [self.session_item(week, session, entries or {}) for session in sessions]
 
     def unplanned(self, week: Week) -> list[dict]:
-        """Ce qui a été couru ou marché sans séance du programme pour le porter."""
+        """What was run or walked with no program session to carry it."""
         linked = {link["observation_id"] for link in week.links.values()
                   if link.get("observation_id")}
         return [{**observation_fact(row, labels=self.zone_labels), "title": row["kind"]}
@@ -361,12 +361,12 @@ class Board:
             for zone in self.zones]}
 
     def injury_view(self, zone: str | None = None, weeks: int = 5) -> dict | None:
-        """L'écran Douleur du carnet (maquette validée le 2026-10-09) : chaque séance notée
-        et chaque réveil sur les semaines calendaires récentes, le pic par semaine, et les
-        réveils décrits sans note. Des faits, jamais de verdict (biais de sous-déclaration).
+        """The notebook Pain screen: each rated session and each wake-up over the recent
+        calendar weeks, the peak per week, and the wake-ups described without a rating.
+        Facts, never a verdict (under-reporting bias).
 
-        Une zone à la fois : `zone` absente, c'est la première déclarée. None quand
-        l'instance n'en surveille aucune, ou que la zone demandée n'existe pas."""
+        One zone at a time: with no `zone`, the first declared one. None when the
+        instance monitors none, or the requested zone does not exist."""
         chosen = next((item for item in self.zones if zone in (None, item.slug)), None)
         if chosen is None:
             return None
@@ -417,11 +417,11 @@ class Board:
 
     # ------------------------------------------------------------ demandes
     def asks(self) -> list[dict]:
-        """Les ressentis que le registre réclame et que l'athlète peut donner d'un geste."""
+        """The feelings the ledger requests and the athlete can give in one tap."""
         asks: list[dict] = []
         yesterday = self.today - dt.timedelta(days=1)
-        # La trace se demande chaque matin, jour de repos compris : sans elle, rien ne
-        # dit si la douleur redescend entre deux séances (décision du 2026-10-15).
+        # The trace is asked every morning, rest days included: without it, nothing
+        # says whether the pain subsides between two sessions.
         effort_yesterday = any(row.date == yesterday and row.type in ledger_model.EFFORT_TYPES
                                for row in self.rows)
         labels = self.zone_labels
@@ -471,8 +471,8 @@ class Board:
         return f"FC haute du {day:%d/%m} :"
 
     def hr_asks(self) -> list[dict]:
-        """La dernière EF récente dont la FC dépasse la référence de même allure : une
-        question à la fois, sur la sortie la plus fraîche dans la mémoire."""
+        """The latest recent easy run whose heart rate exceeds the same-pace reference:
+        one question at a time, on the freshest run in memory."""
         asks: list[dict] = []
         for drift in signals.hr_at_pace(self.rows):
             if drift.delta < signals.HR_DRIFT_BPM or not \
@@ -487,7 +487,7 @@ class Board:
         return asks[-1:]
 
     def _put_daily(self, day: dt.date, **values: str) -> None:
-        """Complète l'état du jour sans effacer ce qui y est déjà."""
+        """Complete the daily state without erasing what is already there."""
         row = self.daily(day)
         merged = {field: row.get(field) for field in ("sleep", "life_load", "desire")}
         note = row.get("note") or ""
@@ -501,7 +501,7 @@ class Board:
         return self.now.time() < rulebook.current().parameters.wake_trace_until
 
     def answer(self, ask_id: str, value: Any) -> dict:
-        """Écrit UNE réponse si la demande est encore ouverte. Rend l'alerte éventuelle."""
+        """Write ONE answer if the request is still open. Return the alert, if any."""
         if ask_id.startswith("reserve:"):
             return self._answer_reserve(ask_id, value)
         ask = next((item for item in self.asks()
@@ -538,8 +538,8 @@ class Board:
                 self.ops.complete_measurement(uuid.UUID(key.rsplit(":", 1)[0]), "pain", trace,
                                               zone=ask["zone"], actor=ACTOR)
             else:
-                # La première zone répondue crée le réveil ; les autres y restent
-                # `pending` et se complètent ensuite, une zone par geste.
+                # The first answered zone creates the wake-up; the others stay
+                # `pending` there and are completed afterwards, one zone per tap.
                 self.ops.add_observation({
                     "occurred_on": self.today, "kind": session_kinds.WAKE_TRACE,
                     "idempotency_key": f"carnet:reveil:{self.today.isoformat()}",
@@ -569,7 +569,7 @@ class Board:
             alert = (f"Carnet : douleur {number:g}/10 au pic{where} sur la séance "
                      f"{ask['kind']} du {day:%d/%m}, au-dessus du plafond de "
                      f"{ledger.ESCULIER_CAP:g}.")
-        # Les ressentis de la sortie sont complets : son débrief n'a plus à attendre.
+        # The run's feelings are complete: its debrief no longer has to wait.
         settled = (self.ops.strava_activity_for_observation(observation_id)
                    if set(ask["fields"]) == {field} else None)
         return {"alert": alert, "activity": settled}
@@ -579,7 +579,7 @@ class Board:
         return next((row for row in self.observations if str(row["id"]) == observation_id), None)
 
     def _linked_session(self, observation: dict) -> dict | None:
-        """La séance du programme que l'observation a réalisée, s'il y en a une."""
+        """The program session the observation fulfilled, if any."""
         week = self.week(week_label(observation["occurred_on"]))
         session_id = next((key for key, link in week.links.items()
                            if str(link.get("observation_id")) == str(observation["id"])), None)
@@ -588,7 +588,7 @@ class Board:
         return next((s for s in week.revision["sessions"] if s["id"] == session_id), None)
 
     def reserve_ask(self, observation: dict, session: dict | None) -> str | None:
-        """La réserve d'une qualité (garde-fou n°6) se demande tant que la séance est fraîche."""
+        """A quality session's reserve (guardrail 6) is asked while the session is fresh."""
         if not debrief.is_quality(session) or _known(observation, "reps_in_reserve") is not None:
             return None
         if self.today - observation["occurred_on"] >= ledger_model.COMPLETION_WINDOW:
@@ -606,7 +606,7 @@ class Board:
         return {"alert": None}
 
     def _previous(self, observation: dict) -> dict | None:
-        """La dernière séance du même type avant celle-ci, pour comparer."""
+        """The last session of the same type before this one, for comparison."""
         earlier = next((row for row in self.observations
                         if row["kind"] == observation["kind"]
                         and row["occurred_on"] < observation["occurred_on"]), None)
@@ -636,7 +636,7 @@ class Board:
                 "retire_at_km": row.get("retire_at_km"), "status": row.get("status")}
 
     def _wake(self, day: dt.date) -> dict:
-        """La trace au réveil du jour (avant la séance) et du lendemain (après), par zone."""
+        """The wake trace of the day (before the session) and the next day (after), per zone."""
         def pains_on(when: dt.date) -> dict[str, float]:
             row = next((row for row in self.observations
                         if row["kind"] == session_kinds.WAKE_TRACE and row["occurred_on"] == when), None)
@@ -667,7 +667,7 @@ class Board:
         return out
 
     def session_view(self, observation_id: str, intake: dict | None) -> dict | None:
-        """Le détail d'une séance faite : le fait, le prévu, les flux lus, le contexte."""
+        """The detail of a completed session: the fact, the plan, the streams read, the context."""
         observation = self._observation(observation_id)
         if observation is None or observation["kind"] not in MOVING_TYPES:
             return None
@@ -725,8 +725,8 @@ class Board:
             "stops": session_detail.stop_summary(s) if s else None,
             "drift": None if quality or not s else session_detail.drift(s),
             "series": series,
-            # Les bornes partent toujours : la FC moyenne et les km se colorent par
-            # zone même quand le flux de la montre manque.
+            # The bounds are always sent: the average heart rate and the km are colored
+            # by zone even when the watch stream is missing.
             "hr_bounds": list(limits) if limits else None,
             "zones": None if not seconds or not any(seconds) else {
                 "max": self.instance.hr_max if self.instance else None,
@@ -739,7 +739,7 @@ class Board:
 
     # ------------------------------------------------------------ écrans
     def ahead(self, week: Week, sessions: list[dict], days: int = 3) -> list[dict]:
-        """Les séances des prochains jours, à travers la fin de semaine s'il le faut."""
+        """The sessions of the coming days, across the week boundary if needed."""
         horizon = self.today + dt.timedelta(days=days)
         pool = list(sessions)
         if week_label(horizon) != week.label:
@@ -758,7 +758,7 @@ class Board:
             ahead_sessions = self.sessions(ahead)
         upcoming = [s for s in ahead_sessions if s["date"] > tomorrow.isoformat()
                     and s["kind"] != "rest" and s["status"] not in {"cancelled", "done"}]
-        # Le prochain JOUR d'entraînement, entier : « EF + renfo », pas la seule EF.
+        # The whole next training DAY: "easy run + strength", not the run alone.
         upcoming = [s for s in upcoming if upcoming and s["date"] == upcoming[0]["date"]]
         today_items = [s for s in sessions if s["date"] == self.today.isoformat()
                        and s["status"] != "cancelled"]
@@ -805,8 +805,8 @@ class Board:
         }
 
     def next_week(self) -> dict | None:
-        """La semaine suivante dès que son programme existe (2026-10-18) : le dimanche,
-        c'est elle qu'on organise. Sans programme valide, rien n'est annoncé."""
+        """The following week as soon as its program exists: on Sunday, it is the one
+        being organized. Without a valid program, nothing is announced."""
         week = self.week(week_label(self.today + dt.timedelta(days=7)))
         if week.status is PlanStatus.INVALID:
             return None
@@ -815,9 +815,8 @@ class Board:
                 "km_target": totals["km_target"], "runs_planned": totals["runs_planned"]}
 
     def weeks_view(self, reviews: dict[str, str], limit: int = 52) -> list[dict]:
-        """Les semaines closes, de la plus récente à la plus ancienne : le fait du registre
-        et la cible de la révision active. La semaine en cours n'y est pas, c'est la
-        racine de l'onglet Semaine."""
+        """The closed weeks, most recent first: the ledger fact and the target of the
+        active revision. The current week is not in it; it is the root of the Week tab."""
         current = week_label(self.today)
         out = []
         for trace in reversed(ledger.trajectory(self.rows, self.today, weeks=limit)):
@@ -837,9 +836,8 @@ class Board:
         planned = [s for s in self.sessions(week) if s["kind"] == "run"
                    and s["status"] not in {"done", "cancelled"}
                    and s["date"] >= self.today.isoformat()]
-        # La sortie longue de la semaine en cours est celle du programme tant qu'elle
-        # n'est pas courue : la plus longue des jours passés n'en est pas une, elle
-        # arrive souvent le week-end (l'athlète, 2026-10-10).
+        # The current week's long run is the program's one until it has been run: the
+        # longest of the past days is not one, it usually comes on the weekend.
         long_run = next((s for s in planned if s["workout"] == session_kinds.LONG
                          and (s["targets"].get("distance_target_km")
                               or s["targets"].get("distance_cap_km"))), None)
@@ -867,7 +865,7 @@ class Board:
              for row in self.ops.latest_capabilities()),
             key=lambda item: (-item["score"], item["number"]))
         longest = ledger.longest_recent(self.rows, self.today + dt.timedelta(days=1))
-        # Une période, une archive : l'image livrée prime sur sa copie récupérée.
+        # One period, one archive: the delivered image takes precedence over its recovered copy.
         seen: set[tuple[str, str]] = set()
         kept = []
         for entry in sorted(archives, key=lambda item: item.get("origin") != "delivery"):
@@ -887,8 +885,7 @@ class Board:
 
         return {
             "race": race,
-            # Le volume de chaque semaine contre son objectif, et sa sortie longue
-            # (maquette B validée le 2026-10-10).
+            # Each week's volume against its target, and its long run.
             "longest": {"km": longest,
                         "weeks": [{"week": trace.label, "km": round(trace.longest, 2),
                                    "volume": round(trace.km, 2), "target": target(trace.label),

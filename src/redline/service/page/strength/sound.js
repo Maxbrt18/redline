@@ -1,19 +1,19 @@
 import {$, button, el} from '../shared/dom.js';
 
-// -------------------------------------------------------------------- son
+// -------------------------------------------------------------------- sound
 //
-/* Le wake lock existait, le son manquait : pendant un isométrique de 45 s ou une
- * planche, on ne regarde pas l'écran. Un oscillateur nu -- aucun asset, aucun
- * octet de plus dans la page, et rien à autoriser dans la CSP.
+/* Sound cues, because during a 45 s isometric or a plank nobody looks at the screen.
+ * A bare oscillator -- no asset, no extra byte in the page, and nothing to allow in
+ * the CSP.
  *
- * L'AudioContext se crée AU PREMIER GESTE et jamais au chargement : iOS refuse
- * de le démarrer hors d'un geste utilisateur, et un contexte créé trop tôt
- * reste muet pour toute la séance. */
+ * The AudioContext is created AT THE FIRST GESTURE and never at load: iOS refuses to
+ * start it outside a user gesture, and a context created too early stays silent for
+ * the whole session. */
 const SOUND_KEY = 'redline:strength:son';
 const INTENSITY_KEY = 'redline:strength:intensite';
-/* La voix est à part, et coupée par défaut : sur iPhone, speechSynthesis prend
- * une session audio exclusive qui met en pause la musique des autres apps, et
- * aucune API web ne la fait se mélanger. Les bips Web Audio, eux, se mixent. */
+/* Voice is separate, and off by default: on iPhone, speechSynthesis takes an exclusive
+ * audio session that pauses other apps' music, and no web API makes it mix. Web Audio
+ * beeps, on the other hand, mix. */
 const VOICE_KEY = 'redline:strength:voix';
 let audio = null;
 let muted = false;
@@ -23,12 +23,11 @@ try { muted = localStorage.getItem(SOUND_KEY) === 'non'; } catch (e) { /* privat
 try { voice = localStorage.getItem(VOICE_KEY) === 'oui'; } catch (e) { /* private mode */ }
 try { intensity = Math.max(0.2, Math.min(1, Number(localStorage.getItem(INTENSITY_KEY)) || 0.8)); } catch (e) { /* private mode */ }
 
-/* Après une mise en veille, iOS laisse le contexte « interrupted » (un état
- * propre à WebKit, que `resume()` hors geste ne relève pas), voire « running »
- * mais muet. On le ferme donc quand la page se cache, et le premier geste au
- * retour en crée un neuf -- sans quoi il fallait fermer la page et la rouvrir. */
+/* After sleep, iOS leaves the context "interrupted" (a WebKit-specific state that
+ * `resume()` outside a gesture does not clear), or even "running" but silent. So it is
+ * closed when the page hides, and the first gesture on return creates a new one. */
 export function dropAudio() {
-  try { audio?.close(); } catch (e) { /* déjà fermé */ }
+  try { audio?.close(); } catch (e) { /* already closed */ }
   audio = null;
 }
 
@@ -49,7 +48,7 @@ export function beep(hertz, seconds, delay = 0) {
     const gain = audio.createGain();
     tone.frequency.value = hertz;
     tone.type = 'triangle';
-    // Une rampe, pas un créneau : un gain coupé net claque dans le haut-parleur.
+    // A ramp, not a step: a gain cut abruptly clicks in the speaker.
     const start = audio.currentTime + delay;
     const level = 0.65 * intensity;
     gain.gain.setValueAtTime(0.0001, start);
@@ -59,7 +58,7 @@ export function beep(hertz, seconds, delay = 0) {
     tone.connect(gain).connect(audio.destination);
     tone.start(start);
     tone.stop(start + seconds);
-  } catch (e) { /* pas de son : la séance continue */ }
+  } catch (e) { /* no sound: the session carries on */ }
 }
 
 export const COUNTDOWN_BEEP = 880;
@@ -85,8 +84,8 @@ export function announce(text) {
   window.speechSynthesis.speak(speech);
 }
 
-/* Le son se règle dans une feuille, ouverte par l'icône de la barre, comme les
- * réglages du carnet : un seul style pour toute l'app (l'athlète, 2026-10-09). */
+/* Sound is adjusted in a sheet, opened by the bar icon, like the notebook's settings:
+ * one style for the whole app. */
 function setMuted(value) {
   muted = value;
   if (muted) window.speechSynthesis?.cancel();
@@ -94,7 +93,7 @@ function setMuted(value) {
   paintSound();
 }
 
-// L'icône de la barre : haut-parleur, barré quand le son est coupé.
+// The bar icon: a speaker, crossed out when sound is off.
 export function paintSound() {
   const node = $('seance-sound');
   node.classList.toggle('muted', muted);

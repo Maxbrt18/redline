@@ -1,4 +1,4 @@
-// Dates, nombres et libellés, en français. Rien ici ne touche au DOM.
+// Dates, numbers and labels, in French. Nothing here touches the DOM.
 import {app} from './state.js';
 
 export const capital = text => text.charAt(0).toUpperCase() + text.slice(1);
@@ -11,11 +11,11 @@ export const dm = value => day(value).toLocaleDateString('fr-FR', {day: '2-digit
 export const humanDate = value => day(value).toLocaleDateString('fr-FR', {day: 'numeric', month: 'long', year: 'numeric'});
 export const weekNumber = label => Number(label.slice(-2));
 export const isoDate = date => date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
-// Les types de séance et leurs libellés viennent du service (`window.REDLINE_KINDS`).
+// Session kinds and their labels come from the service (`window.REDLINE_KINDS`).
 export const kinds = window.REDLINE_KINDS || {};
 export const kindName = Object.fromEntries(Object.entries(kinds).map(([slug, kind]) => [slug, kind.name]));
 export const shortTitle = title => title.split(',')[0].trim();
-// Une heure ne se coupe jamais en fin de ligne : « 19 h 05 » tient d'un bloc.
+// A time is never split at a line end: « 19 h 05 » stays in one piece.
 export const hm = text => Number(text.slice(0, 2)) + '\u00a0h' + (text.slice(3, 5) === '00' ? '' : '\u00a0' + text.slice(3, 5));
 export const startedAt = fact => fact && fact.started_at ? hm(fact.started_at.slice(11, 16)) : '';
 export const paceOf = seconds => Math.floor(seconds / 60) + ':' + String(Math.round(seconds % 60)).padStart(2, '0');
@@ -29,7 +29,7 @@ export function plannedValue(item) {
   if (target.duration_cap_min != null) return '≤' + target.duration_cap_min + ' min';
   return '';
 }
-// Une semaine ISO : son lundi, son étendue en mots, son état par rapport à aujourd'hui.
+// An ISO week: its Monday, its span in words, its state relative to today.
 function mondayOf(label) {
   const year = Number(label.slice(0, 4)), jan4 = new Date(year, 0, 4, 12);
   const monday = new Date(jan4); monday.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7) + (weekNumber(label) - 1) * 7);
@@ -47,7 +47,7 @@ export const raceFacts = race => {
   return [day(race.date).toLocaleDateString('fr-FR', {day: 'numeric', month: 'long'}), race.distance_km ? fmt(race.distance_km) + ' km' : null,
     race.elevation_gain_m ? approx + race.elevation_gain_m + ' D+' + (race.elevation_loss_m ? ' / ' + approx + race.elevation_loss_m + ' D−' : '') : null].filter(Boolean).join(' · ');
 };
-// Le titre d'une carte : le mois pour un monthly, la semaine pour un bilan.
+// A card title: the month for a monthly, the week for a review.
 export function entryTitle(item) {
   if (item.kind === 'monthly' && item.period) return capital(new Date(item.period + '-01T12:00:00').toLocaleDateString('fr-FR', {month: 'long', year: 'numeric'}));
   if (item.kind === 'weekly' && item.period) return 'Bilan W' + item.period.slice(-2);

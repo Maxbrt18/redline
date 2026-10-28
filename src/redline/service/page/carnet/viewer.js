@@ -3,12 +3,12 @@ import {tintBar} from '../shared/theme.js';
 import {calm} from './state.js';
 import {message} from './ui.js';
 
-// ------------------------------------------------------------ visionneuse
-// Une carte s'agrandit dans l'app, en plein écran sur fond noir, sans passer par
-// Safari : pincer ou toucher deux fois pour zoomer, glisser vers le bas pour fermer.
-// Partager ouvre la feuille du téléphone (Photos, Messages) ; sans elle, l'image se
-// télécharge. L'image est préchargée : iOS n'ouvre la feuille que tout de suite
-// après le toucher, pas après une attente réseau.
+// ------------------------------------------------------------ viewer
+// A card enlarges in the app, full screen on black, without going through Safari: pinch
+// or double-tap to zoom, drag down to close.
+// Share opens the phone sheet (Photos, Messages); without it, the image downloads.
+// The image is preloaded: iOS opens the sheet only right after the tap, not after a
+// network wait.
 export const viewer = $('viewer');
 const stage = viewer.querySelector('.n-viewer-stage'), viewed = $('viewer-img');
 const blobs = new Map();
@@ -62,7 +62,7 @@ export function closeViewer() {
   setTimeout(() => { viewer.hidden = true; viewed.removeAttribute('src'); }, calm.matches ? 0 : 180);
 }
 $('viewer-close').addEventListener('click', () => closeViewer(false));
-// La page ne défile pas sous la visionneuse (pas d'overflow: hidden, qui fige la bande d'état d'iOS).
+// The page does not scroll under the viewer (no overflow: hidden, which freezes the iOS status bar).
 viewer.addEventListener('touchmove', event => { if (event.cancelable) event.preventDefault(); }, {passive: false});
 $('viewer-share').addEventListener('click', () => viewing && shareCard(viewing));
 document.addEventListener('keydown', event => { if (event.key === 'Escape') closeViewer(false); });
@@ -101,7 +101,7 @@ function release(event) {
   if (done.kind === 'drag' && zoom.y > 120) { closeViewer(false); return; }
   viewer.style.background = '';
   if (done.kind !== 'pinch' && moved < 10 && Date.now() - done.at < 300) {
-    // Double toucher : zoomer sur la carte, ou revenir à la taille de l'écran.
+    // Double tap: zoom on the card, or return to the screen size.
     if (Date.now() - lastTap < 320) { zoom = zoom.s > 1 ? {s: 1, x: 0, y: 0} : {s: 2.5, x: 0, y: 0}; lastTap = 0; placeImage(true); return; }
     lastTap = Date.now();
   }

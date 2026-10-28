@@ -6,7 +6,7 @@ import {capital, dm, humanDate} from '../format.js';
 import {cardBlob, openViewer, shareCard, shareable} from '../viewer.js';
 import {push, render} from '../nav.js';
 
-// ------------------------------------------------------------ archives et cartes
+// ------------------------------------------------------------ archives and cards
 export function renderArchive(data) {
   let month = '';
   const ordered = [...data.entries].sort((a, b) => b.occurred_on.localeCompare(a.occurred_on));

@@ -1,5 +1,5 @@
-/* Le toucher d'une app, sur toutes les pages : ni zoom (pincement, double tap), ni
- * sélection de texte ou menu contextuel ailleurs que dans un champ. */
+/* App-like touch on every page: no zoom (pinch, double tap), no text selection or
+ * context menu outside an input field. */
 html { touch-action: pan-x pan-y; }
 body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 input, textarea, [contenteditable] { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }

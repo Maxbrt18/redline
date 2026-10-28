@@ -35,11 +35,11 @@ ROUTINE = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")
 
 
 class ReportError(InputError):
-    """Le compte-rendu ne respecte pas le contrat de la page."""
+    """The report does not respect the page contract."""
 
 
 class ExpiredLink(InputError):
-    """La capacité a dépassé sa durée d'utilisation."""
+    """The capability has outlived its validity period."""
 
 
 # ------------------------------------------------------------------------ URL
@@ -122,7 +122,7 @@ def read_sidecar(image: Path) -> tuple | None:
 # --------------------------------------------------------------------- report
 
 def validate_session(session: dict, *, now: int | None = None) -> None:
-    """Refuse un snapshot expiré ou étranger au contrat du générateur."""
+    """Refuse a snapshot that is expired or foreign to the generator contract."""
     sid = session.get("sid")
     workout = session.get("session")
     exercises = session.get("exercises")
@@ -173,12 +173,12 @@ def _sides_of(exercise) -> list:
 
 
 def parse_report(report: dict, exercises: list, zones: dict[str, str] | None = None) -> dict:
-    """Valide puis normalise le contrat posté par la page.
+    """Validate then normalize the contract posted by the page.
 
-    Une valeur hors bornes est une requête invalide, pas une valeur à corriger en
-    silence : transformer 99 en douleur 10 ou ``"false"`` en vrai fabriquerait un
-    fait médical que l'athlète n'a pas saisi. La douleur arrive par zone surveillée
-    (`zones` : {slug: libellé}) ; une zone que l'instance ne surveille pas est refusée.
+    An out-of-range value is an invalid request, not a value to fix silently:
+    turning 99 into pain 10 or ``"false"`` into true would fabricate a medical fact
+    the athlete never entered. Pain arrives per monitored zone (`zones`:
+    {slug: label}); a zone the instance does not monitor is refused.
     """
     exercise_count = len(exercises)
     if not isinstance(report, dict):
@@ -209,8 +209,8 @@ def parse_report(report: dict, exercises: list, zones: dict[str, str] | None = N
         if entry_unknown:
             raise ReportError(f"exercises[{entry_position}] : champs inconnus : "
                               + ", ".join(entry_unknown))
-        # Un index hors séance est refusé, jamais ramené dans les bornes : le
-        # corriger classerait silencieusement « exercice 99 » sous un vrai exercice.
+        # An index outside the session is refused, never clamped into range: fixing
+        # it would silently file "exercise 99" under a real exercise.
         raw_index = entry.get("i")
         if type(raw_index) is not int:
             raise ReportError(f"exercises[{entry_position}].i : entier attendu")
@@ -268,8 +268,8 @@ def parse_report(report: dict, exercises: list, zones: dict[str, str] | None = N
         }
     return {
         "items": items,
-        # Deux lectures qui ne se mélangent pas, comme au registre depuis le
-        # 2026-07-29 : celle d'avant est au repos, celle d'après porte l'effort.
+        # Two readings that never mix: the one before is at rest, the one after
+        # carries the effort.
         "performed_on": performed_on,
         "pains": _parse_pains(report.get("pains"), zones or {}),
         "minutes": _optional_int(report.get("minutes"), 0, 300, "minutes"),
@@ -278,13 +278,12 @@ def parse_report(report: dict, exercises: list, zones: dict[str, str] | None = N
 
 
 def log_entries(session: dict, clean: dict, day: str) -> list:
-    """Les faits d'exercice normalisés que le repository PostgreSQL reçoit.
+    """The normalized exercise facts the PostgreSQL repository receives.
 
     Built from the SAME parsed report the message is built from, so the typed
     log and the sentence the coach reads can never disagree. Written by the route
-    rather than retyped by Claude out of French prose: producer and consumer are
-    code in the same commit, which is exactly the case the vault's rule (« aucun
-    code ne lit de la prose pour en tirer un fait ») exists to forbid.
+    rather than retyped by the model out of prose: code must never read prose to
+    derive a fact, and here producer and consumer live in the same commit.
     """
     exercises = session.get("exercises") or []
     sid = str(session.get("sid") or "")[:64]
@@ -321,7 +320,7 @@ def log_entries(session: dict, clean: dict, day: str) -> list:
 
 
 def _parse_pains(raw: Any, zones: dict[str, str]) -> dict[str, dict]:
-    """{zone: {before, after}} : avant au repos, après l'effort, jamais mélangés."""
+    """{zone: {before, after}}: before at rest, after the effort, never mixed."""
     if raw is None:
         return {}
     if not isinstance(raw, dict):
@@ -364,8 +363,8 @@ def format_message(session: dict, clean: dict) -> str:
             continue
         name = _clean_text(exercise.get("name"))[:80]
         if item["gated"]:
-            # « Retiré par le garde-fou » n'est pas « pas fait » : le coach lirait
-            # une inobservance là où sa propre règle a joué.
+            # "Removed by the guard rail" is not "not done": the coach would read a
+            # non-compliance where its own rule applied.
             remark = f" — remarque : « {item['note']} »" if item["note"] else ""
             detail.append(f"- {name} : retiré par le garde-fou de douleur{remark}")
             continue
@@ -380,9 +379,8 @@ def format_message(session: dict, clean: dict) -> str:
             bits.append(f"{item['score']}/10")
         sides = item["sides"]
         if sides.get("d") or sides.get("g"):
-            # Les deux côtés se lisent séparément ou pas du tout : leur écart est
-            # un drapeau (>10 %, coaching/strength.md), et il disparaît dès qu'on
-            # les mélange.
+            # The two sides are read separately or not at all: their gap is a flag
+            # (>10 %) and it disappears as soon as they are mixed.
             told = [f"{label} {', '.join(str(rep) for rep in sides[key])}"
                     for label, key in (("droite", "d"), ("gauche", "g")) if sides.get(key)]
             bits.append(" · ".join(told))
@@ -400,10 +398,9 @@ def format_message(session: dict, clean: dict) -> str:
         lines.extend(detail)
 
     tail = []
-    # Les deux lectures se disent SÉPARÉMENT et en nommant laquelle est laquelle :
-    # le registre en fait deux séries qui ne se mélangent pas (2026-07-29), la
-    # première au repos, la seconde après l'effort. Un seul chiffre ne répondait
-    # ni à l'une ni à l'autre des deux questions.
+    # The two readings are told SEPARATELY, each named: the ledger keeps two series
+    # that never mix, the first at rest, the second after the effort. A single
+    # figure would answer neither question.
     for reading in clean["pains"].values():
         before, after, label = reading["before"], reading["after"], reading["label"]
         if before is not None and after is not None:

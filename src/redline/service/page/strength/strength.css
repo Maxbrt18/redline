@@ -1,6 +1,6 @@
 /* The interactive strength session -- phone first, one thumb, at arm's length.
  *
- * A screen of the notebook since 2026-10-09: the notebook's bar, title and sheets
+ * A screen of the notebook: the notebook's bar, title and sheets
  * frame it (carnet/seance.css), this file styles what runs inside #seance. Every
  * element rule is scoped there with :where(), so it never reaches the notebook and
  * keeps the specificity of a bare element. Class names are prefixed `p-`.
@@ -31,9 +31,9 @@
 
 /* ------------------------------------------------------------------- header */
 .p-note { margin-top: 16px; color: var(--muted); line-height: 1.42; }
-/* La phrase du garde-fou. Pleine encre, parce qu'elle explique pourquoi la séance
- * affichée n'est pas celle qui était annoncée — pas de cadre ni de pastille pour
- * autant : c'est le poids de l'encre qui la distingue, comme partout ici. */
+/* The safeguard sentence. Full ink, because it explains why the displayed session is
+ * not the announced one -- no frame or pill for that: ink weight is what sets it apart,
+ * as everywhere here. */
 .p-note--gate { color: var(--ink); font-weight: 600; }
 
 /* -------------------------------------------------------------------- steps */
@@ -159,17 +159,17 @@ textarea.p-input { max-width: none; min-height: 96px; resize: vertical; line-hei
 /* Sets already banked, as plain text: "14 · 12 · 11". Data, not chips. */
 .p-tally { margin-top: 10px; font-size: 15px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
-/* Le geste. Un dévoilement, pas une action : le bouton n'a ni surface ni bordure,
- * il ne peut pas être confondu avec l'action qui fait avancer la séance. Les
- * consignes en liste, une par ligne — c'est comme ça qu'on les relit d'un coup
- * d'œil entre deux séries, pas en paragraphe. */
+/* The movement cue. A disclosure, not an action: the button has no surface or border,
+ * so it cannot be mistaken for the action that moves the session forward. Cues as a
+ * list, one per line -- that is how they are re-read at a glance between two sets, not
+ * as a paragraph. */
 .p-how { margin-top: 16px; }
 .p-how__toggle {
   flex: 0 0 auto;
   min-height: 0;
   padding: 0;
-  /* Ni surface ni bordure : héritées de .p-btn, elles lui donnaient l'air d'une
-   * action de la séance, à côté de celle qui en est vraiment une. */
+  /* No surface or border: inherited from .p-btn, they made it look like a session
+   * action, next to the one that really is one. */
   background: none;
   border-color: transparent;
   font-size: 14px;
@@ -187,8 +187,8 @@ textarea.p-input { max-width: none; min-height: 96px; resize: vertical; line-hei
   line-height: 1.4;
   color: var(--muted);
 }
-/* Une puce en tiret cadratin, pas un disque : la même ponctuation que le reste
- * de la page, et rien qui ressemble à une pastille. */
+/* An em-dash bullet, not a disc: the same punctuation as the rest of the page, and
+ * nothing that looks like a pill. */
 .p-how__cue::before { content: "—"; position: absolute; left: 0; color: var(--faint); }
 
 /* What last week's session banked on this exercise. Sits ABOVE the buttons, not
@@ -202,9 +202,9 @@ textarea.p-input { max-width: none; min-height: 96px; resize: vertical; line-hei
 }
 .p-last__value { margin-top: 3px; font-size: 16px; color: var(--muted); }
 
-/* ---------------------------------------------------------------- ouverture */
-/* La lecture de douleur d'avant. Même traitement que la revue de fin : c'est la même
- * question, posée à l'autre bout de la séance. */
+/* ---------------------------------------------------------------- opening */
+/* The pain reading from before. Same treatment as the end review: it is the same
+ * question, asked at the other end of the session. */
 .p-open { margin-top: 30px; }
 .p-open__title {
   font-family: var(--display);
@@ -273,8 +273,8 @@ textarea.p-input { max-width: none; min-height: 96px; resize: vertical; line-hei
 .p-feedback { margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--grid); }
 .p-feedback-disclosure { margin-top: 18px; color: var(--muted); }
 .p-feedback-disclosure summary { cursor: pointer; padding: 12px 0; min-height: 44px; }
-/* Les dépliants : un libellé suivi d'un chevron qui pivote, comme dans le carnet,
- * pas le triangle du navigateur. */
+/* Disclosures: a label followed by a rotating chevron, as in the notebook, not the
+ * browser's triangle. */
 .p-prep summary, .p-feedback-disclosure summary { display: flex; align-items: center; gap: 8px; list-style: none; }
 .p-prep summary::-webkit-details-marker, .p-feedback-disclosure summary::-webkit-details-marker { display: none; }
 .p-prep summary::after, .p-feedback-disclosure summary::after { content: ""; width: 7px; height: 12px; background: var(--faint); -webkit-mask: var(--chevron); mask: var(--chevron); transition: transform .15s; }

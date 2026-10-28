@@ -1,7 +1,7 @@
-// Le carnet sans attendre le réseau : la coquille seule (mise en page, polices,
-// script ; aucune donnée) se garde sur l'appareil et s'ouvre tout de suite. Elle se
-// revalide derrière, et la version suivante sert à l'ouverture suivante. Les données
-// (/carnet-api) ne passent jamais par ici : elles restent l'affaire de la page.
+// The notebook without waiting for the network: the shell alone (layout, fonts,
+// script; no data) is kept on the device and opens at once. It revalidates behind, and
+// the next version serves the next opening. Data (/carnet-api) never goes through here:
+// it stays the page's business.
 const CACHE = 'carnet-shell-v1';
 
 self.addEventListener('install', event => {

@@ -1,4 +1,4 @@
-"""Contrats du stockage runtime, implémentés uniquement par PostgreSQL."""
+"""Runtime storage contracts, implemented only by PostgreSQL."""
 
 from __future__ import annotations
 

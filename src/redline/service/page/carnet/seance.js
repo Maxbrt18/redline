@@ -1,10 +1,9 @@
-// ------------------------------------------------------------ séance guidée
-// Le renfo s'ouvre en plein écran par-dessus le carnet (maquette validée par l'athlète le
-// 2026-10-09) : la barre du carnet avec ✕ à gauche et le son à droite, le grand titre
-// des autres écrans, pas d'onglets. Pendant la séance, ni glissement retour ni tirer
-// pour actualiser : ✕ est la seule sortie, et une séance commencée demande confirmation,
-// en disant que rien n'est perdu. Un lien reçu dans Messenger (/s#t=…) ouvre la même
-// app directement sur la séance ; ✕ mène alors au carnet.
+// ------------------------------------------------------------ guided session
+// Strength opens full screen over the notebook: the notebook bar with a close button on
+// the left and sound on the right, the large title of the other screens, no tabs. During
+// the session, no swipe back and no pull to refresh: close is the only exit, and a started
+// session asks for confirmation, saying nothing is lost. A link received in Messenger
+// (/s#t=…) opens the same app directly on the session; close then leads to the notebook.
 import {$, el} from '../shared/dom.js';
 import {remembered} from '../shared/storage.js';
 import {linkToken} from '../strength/link.js';
@@ -16,11 +15,11 @@ import {EASE, barState, freeze, land, pageNode, remember, render, screen} from '
 import {loadToday} from './data.js';
 import {dismiss, present} from './sheet.js';
 
-const KEPT = 'carnet-seance';  // la séance ouverte, retrouvée si iOS recharge la page
-const RISE = 420;  // ms, un peu plus long qu'un écran poussé : la séance vient de plus loin
+const KEPT = 'carnet-seance';  // the open session, found again if iOS reloads the page
+const RISE = 420;  // ms, a bit longer than a pushed screen: the session comes from further
 const cover = $('seance');
 
-// Le lien de la séance du jour : demandé au service, gardé pour la rouvrir sans réseau.
+// The link of today's session: requested from the service, kept to reopen it offline.
 export async function launchSeance(strength) {
   const key = 'redline:strength:lien:' + strength.session.sid;
   try {
@@ -36,13 +35,13 @@ export async function launchSeance(strength) {
   }
 }
 
-// L'écran qu'on quitte reste visible dessous pendant que la séance monte.
+// The screen being left stays visible underneath while the session rises.
 export function openSeance(token, motion = true) {
   land(); remember();
   const under = motion && !calm.matches ? freeze(true) : null;
   if (under) under.append(document.querySelector('.n-nav').cloneNode(true));
   app.seance = token;
-  if (!app.standalone) { try { sessionStorage.setItem(KEPT, token); } catch { /* sans mémoire : pas de reprise au rechargement */ } }
+  if (!app.standalone) { try { sessionStorage.setItem(KEPT, token); } catch { /* no storage: no resume on reload */ } }
   document.documentElement.classList.add('n-seance');
   cover.hidden = false;
   $('bar-title').textContent = '';
@@ -60,7 +59,7 @@ export function openSeance(token, motion = true) {
 function closeSeance() {
   if (!app.seance) return;
   if (app.standalone) { stopSession(); location.replace('/carnet'); return; }
-  // La séance qui descend est une copie figée ; le carnet est déjà en place dessous.
+  // The descending session is a frozen copy; the notebook is already in place beneath.
   let leaving = null;
   if (!calm.matches) {
     const rect = cover.getBoundingClientRect(), copy = cover.cloneNode(true);
@@ -77,34 +76,34 @@ function closeSeance() {
     leaving.animate([{transform: 'none'}, {transform: 'translateY(100%)'}], {duration: RISE * 0.8, easing: EASE})
       .finished.catch(() => {}).finally(() => leaving.remove());
   }
-  loadToday().catch(() => {});  // le renfo a pu être envoyé : Aujourd'hui le coche
+  loadToday().catch(() => {});  // strength may have been sent: Today ticks it
 }
 
-// Sans animation ni retour au carnet : la séance s'efface (aussi quand l'appareil est déconnecté).
+// No animation, no return to the notebook: the session is removed (also on sign-out).
 export function dropSeance() {
   if (!app.seance) return;
   stopSession();
   app.seance = null;
-  try { sessionStorage.removeItem(KEPT); } catch { /* rien à oublier */ }
+  try { sessionStorage.removeItem(KEPT); } catch { /* nothing to forget */ }
   document.documentElement.classList.remove('n-seance');
   cover.hidden = true;
   document.title = 'Mon carnet — Redline';
 }
 
-// Après un rechargement de la page par iOS, la séance ouverte revient telle quelle.
+// After iOS reloads the page, the open session comes back as it was.
 export function resumeSeance() {
   let kept = null;
   try { kept = sessionStorage.getItem(KEPT); } catch { return; }
   if (kept) openSeance(kept, false);
 }
 
-// Le lien de Messenger : la séance seule, sans passer par la connexion du carnet.
+// The Messenger link: the session alone, without going through the notebook sign-in.
 export function openLink() {
   app.standalone = true;
   $('notice').hidden = true; $('connected').hidden = false;
   openSeance(linkToken(location.hash), false);
 }
-// Retoucher le bouton dans Messenger ne change que le fragment : la séance se rouvre.
+// Re-tapping the button in Messenger only changes the fragment: the session reopens.
 addEventListener('hashchange', () => { if (app.standalone) startSession(linkToken(location.hash)); });
 
 $('seance-close').addEventListener('click', () => {

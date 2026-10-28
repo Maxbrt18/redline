@@ -1,14 +1,14 @@
-"""Le détail d'une séance faite, pour le carnet (maquette v2 validée le 2026-10-26).
+"""The detail of a completed session, for the notebook.
 
-Deux moitiés. Les relevés : les flux de la sortie et ses tours avec leurs bornes, puis la
-météo horaire au départ, demandés aux fournisseurs au premier affichage et gardés avec la
-capture Strava (`store_strava_detail`). Les calculs : des fonctions pures sur ces flux,
-qui rendent des faits (temps par zone, kilomètres, répétitions, arrêts, dérive). La page
-met en forme ; aucun chiffre n'y est compté.
+Two halves. The readings: the run's streams and its laps with their bounds, then the
+hourly weather at the start, requested from the providers on first display and kept with
+the Strava capture (`store_strava_detail`). The computations: pure functions over those
+streams that return facts (time per zone, kilometres, repetitions, stops, drift). The
+page formats; no figure is computed there.
 
-Un flux se lit échantillon par échantillon : l'échantillon `k` couvre l'intervalle qui le
-précède. Un intervalle de plus de `GAP_S` secondes est un arrêt (la montre en pause) ;
-un échantillon sous `MOVING_MPS` ne compte pas dans le temps en mouvement.
+A stream is read sample by sample: sample `k` covers the interval that precedes it. An
+interval longer than `GAP_S` seconds is a stop (the watch paused); a sample below
+`MOVING_MPS` does not count toward moving time.
 """
 
 from __future__ import annotations
@@ -27,22 +27,22 @@ log = logging.getLogger("redline")
 STREAM_KEYS = "time,heartrate,altitude,distance,velocity_smooth,cadence"
 GAP_S = 10
 MOVING_MPS = 0.8
-#: Un kilomètre entamé de moins que ça ne fait pas une ligne : il rejoint le précédent.
+#: A kilometre started with less than this is not a row: it merges into the previous one.
 SPLIT_MIN_M = 300
-#: Sous ce dénivelé, le profil d'altitude n'apprend rien : il n'est pas montré.
+#: Below this elevation gain the altitude profile tells nothing: it is not shown.
 PROFILE_MIN_DPLUS_M = 50
-#: La dérive cardiaque ne se lit que sur une sortie assez longue.
+#: Cardiac drift is only readable on a long enough run.
 DRIFT_MIN_S = 30 * 60
-#: Le graphique n'a pas besoin de plus de points que l'écran n'a de pixels.
+#: The chart needs no more points than the screen has pixels.
 CHART_POINTS = 240
-#: Un arrêt plus court ne se signale pas sur le graphique.
+#: A shorter stop is not marked on the chart.
 STOP_MARK_S = 60
 HR_DROP_S = 60
 
 
-# ------------------------------------------------------------ relevés
+# ------------------------------------------------------------ readings
 def compact(raw: dict, laps: list) -> dict:
-    """Les flux Strava allégés (entiers ou arrondis) et les bornes de chaque tour."""
+    """Slimmed-down Strava streams (integers or rounded) and the bounds of each lap."""
     def data(key: str) -> list:
         stream = raw.get(key) or {}
         values = stream.get("data") if isinstance(stream, dict) else None
@@ -66,11 +66,10 @@ def compact(raw: dict, laps: list) -> dict:
 
 
 def lap_times(laps: list) -> list[list[int]]:
-    """Les bornes [début, fin] de chaque tour, en secondes écoulées depuis le départ.
+    """The [start, end] bounds of each lap, in seconds elapsed since the start.
 
-    Lues sur l'heure de départ et la durée écoulée de chaque tour. Les `start_index` de
-    Strava ne comptent pas dans la même base que les flux : sur le seuil du 2026-10-26,
-    ils plaçaient la première répétition 168 s trop tôt, sur le plat au lieu de la côte.
+    Read from each lap's start time and elapsed duration. Strava's `start_index` values
+    are not on the same basis as the streams and would place laps too early.
     """
     def instant(lap: dict) -> datetime | None:
         try:
@@ -97,7 +96,7 @@ def fetch_streams(activity_id: int) -> dict:
 
 
 def weather_at(query: dict) -> dict:
-    """La météo horaire au point et à l'heure de départ (WBGT compris s'il converge)."""
+    """Hourly weather at the start point and time (WBGT included when it converges)."""
     points = weather.decode_polyline(query["polyline"])
     if not points:
         raise ValueError("polyline vide")
@@ -108,15 +107,15 @@ def weather_at(query: dict) -> dict:
 
 
 def ensure(store: Any, intake: dict) -> dict:
-    """Relève ce qui manque encore à la capture, sans jamais bloquer le détail.
+    """Fetch what the capture still lacks, never blocking the detail.
 
-    Une panne du fournisseur laisse le champ vide : la page montre la séance sans son
-    graphique ou sans sa météo, et le prochain affichage réessaie.
+    A provider outage leaves the field empty: the page shows the session without its
+    chart or weather, and the next display retries.
     """
     activity_id = intake["activity_id"]
     streams, conditions = intake.get("streams"), intake.get("weather")
     fresh: dict[str, dict] = {}
-    # Des flux gardés avant les bornes horodatées (`lap_times`) se relèvent une fois.
+    # Streams kept before the timestamped bounds (`lap_times`) are fetched again once.
     if streams is None or "lap_times" not in streams:
         try:
             streams = fresh["streams"] = fetch_streams(activity_id)
@@ -134,9 +133,9 @@ def ensure(store: Any, intake: dict) -> dict:
     return {**intake, "streams": streams, "weather": conditions}
 
 
-# ------------------------------------------------------------ lectures d'un flux
+# ------------------------------------------------------------ stream readings
 def _steps(s: dict):
-    """(k, durée de l'intervalle, en mouvement ?) pour chaque échantillon après le premier."""
+    """(k, interval duration, moving?) for each sample after the first."""
     time, speed = s["t"], s.get("v")
     for k in range(1, len(time)):
         dt = time[k] - time[k - 1]
@@ -145,7 +144,7 @@ def _steps(s: dict):
 
 
 def zone_seconds(s: dict, limits: tuple[int, ...]) -> list[int] | None:
-    """Le temps passé dans chaque zone (Z1 à Z5), arrêts exclus."""
+    """Time spent in each zone (Z1 to Z5), stops excluded."""
     hr = s.get("hr")
     if not hr:
         return None
@@ -157,12 +156,12 @@ def zone_seconds(s: dict, limits: tuple[int, ...]) -> list[int] | None:
 
 
 def stops(s: dict) -> list[list[int]]:
-    """Les arrêts de la montre : [début, fin] en secondes écoulées."""
+    """The watch stops: [start, end] in elapsed seconds."""
     return [[s["t"][k - 1], s["t"][k]] for k, dt, _ in _steps(s) if dt > GAP_S]
 
 
 def stop_summary(s: dict) -> dict | None:
-    """Les arrêts en un chiffre : combien, combien de temps, et le plus long au km près."""
+    """Stops in one figure: how many, how long, and the longest one to the nearest km."""
     found = [(k, dt) for k, dt, _ in _steps(s) if dt > GAP_S]
     if not found:
         return None
@@ -178,7 +177,7 @@ def _mean(values: list) -> float | None:
 
 
 def km_splits(s: dict) -> list[dict] | None:
-    """Chaque kilomètre : distance, temps en mouvement, FC et cadence moyennes, D+."""
+    """Each kilometre: distance, moving time, mean HR and cadence, elevation gain."""
     distance = s.get("d")
     if not distance:
         return None
@@ -216,7 +215,7 @@ def km_splits(s: dict) -> list[dict] | None:
 
 
 def drift(s: dict) -> dict | None:
-    """La FC moyenne des deux moitiés du temps en mouvement."""
+    """Mean HR of the two halves of the moving time."""
     hr = s.get("hr")
     if not hr:
         return None
@@ -229,7 +228,7 @@ def drift(s: dict) -> dict | None:
 
 
 def series(s: dict, points: int = CHART_POINTS) -> dict:
-    """Les courbes du graphique : moyennes par tranche de temps, `None` pendant un arrêt."""
+    """The chart curves: means per time slice, `None` during a stop."""
     time, hr, alt = s["t"], s.get("hr"), s.get("alt")
     duration = time[-1] or 1
     width = max(1.0, duration / points)
@@ -246,13 +245,13 @@ def series(s: dict, points: int = CHART_POINTS) -> dict:
             out.append(None if mean is None else round(mean, digits) if digits else round(mean))
         return out
 
-    # Chaque point au milieu de sa tranche : il en porte la moyenne.
+    # Each point sits at the middle of its slice and carries its mean.
     return {"t": [round((index + 0.5) * width) for index in range(len(buckets))], "duration": duration,
             "hr": line(hr), "alt": line(alt, 1)}
 
 
 def _at(s: dict, second: float) -> int | None:
-    """La FC de l'échantillon le plus proche d'un instant."""
+    """HR of the sample closest to a given instant."""
     hr = s.get("hr")
     if not hr:
         return None
@@ -260,9 +259,9 @@ def _at(s: dict, second: float) -> int | None:
     return hr[k]
 
 
-# ------------------------------------------------------------ séance de qualité
+# ------------------------------------------------------------ quality session
 def _lap_bounds(laps: Sequence[Lap], s: dict | None) -> list[list[float]]:
-    """Les bornes [début, fin] de chaque tour : horodatées, sinon les durées cumulées."""
+    """The [start, end] bounds of each lap: timestamped, else the cumulated durations."""
     if s and len(s.get("lap_times") or []) == len(laps):
         return s["lap_times"]
     out, clock = [], 0.0
@@ -274,11 +273,10 @@ def _lap_bounds(laps: Sequence[Lap], s: dict | None) -> list[list[float]]:
 
 
 def quality(laps: Sequence[Lap], s: dict | None) -> dict | None:
-    """Les phases d'une séance de qualité et le détail de chaque répétition.
+    """The phases of a quality session and the detail of each repetition.
 
-    Les blocs viennent de la même lecture des tours que la carte des répétitions
-    (`debrief.lap_blocks`) ; échauffement = avant la première, retour au calme = après
-    la dernière.
+    Blocks come from the same lap reading as the repetitions card
+    (`debrief.lap_blocks`); warm-up = before the first, cool-down = after the last.
     """
     blocks = debrief.lap_blocks(laps)
     if blocks is None:
@@ -332,7 +330,7 @@ def quality(laps: Sequence[Lap], s: dict | None) -> dict | None:
     reading = None
     if len(paces) >= 2:
         before = paces[:-1]
-        # Plus vite que toutes les précédentes : la dernière a accéléré (garde-fou n°6).
+        # Faster than all the previous ones: the last repetition accelerated.
         reading = {"last": paces[-1], "fastest_before": min(before), "slowest_before": max(before),
                    "final_acceleration": paces[-1] < min(before)}
     return {"phases": phases, "reps": reps, "reading": reading}

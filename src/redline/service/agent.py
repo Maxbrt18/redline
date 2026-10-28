@@ -1,7 +1,7 @@
-"""Contrat du moteur de conversation utilisé par le bot.
+"""Contract of the conversation engine used by the bot.
 
-Ce module appartient au cœur de l'application. Les détails de transport restent
-dans les implémentations Claude Code et Codex.
+This module belongs to the application core. Transport details stay in the
+Claude Code and Codex implementations.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ PLAN_SCOPES = frozenset({"none", "today", "next", "remaining", "full"})
 
 
 class SessionMode(str, Enum):
-    """Cycle de vie demandé pour un tour de modèle."""
+    """Lifecycle requested for a model turn."""
 
     CONTINUE = "continue"
     ISOLATED = "isolated"
@@ -36,7 +36,7 @@ class SessionMode(str, Enum):
 
 
 class FailureKind(str, Enum):
-    """Cause exploitable par l'orchestrateur, sans analyser un texte d'erreur."""
+    """Cause the orchestrator can act on, without parsing an error text."""
 
     PREFLIGHT = "preflight"
     RATE_LIMIT = "rate_limit"
@@ -60,11 +60,11 @@ class AgentActivity:
 
 @dataclass
 class Triage:
-    """Décision du petit modèle avant le tour principal.
+    """Decision of the small model before the main turn.
 
-    `plan_change` et `plan_asked` répondent à deux questions différentes, et les avoir
-    confondues coûtait cher : le premier dit qu'il faut RELIRE le plan avant de
-    répondre, le second que l'athlète réclame son programme et qu'il doit donc partir.
+    `plan_change` and `plan_asked` answer two different questions and must not be
+    confused: the first says the plan must be RE-READ before answering, the second
+    that the athlete is asking for their program, which must therefore be sent.
     """
 
     depth: str = DEFAULT_DEPTH
@@ -75,9 +75,9 @@ class Triage:
     plan_scope: str = "none"
 
     def __post_init__(self) -> None:
-        # Compatibilité avec les appelants historiques qui ne portaient qu'un booléen.
-        # Une demande explicite garde toujours le droit de faire répéter le programme ;
-        # seule sa portée devient plus précise quand le triage la connaît.
+        # Compatibility with callers that only carried a boolean. An explicit request
+        # always keeps the right to have the program repeated; only its scope becomes
+        # more precise when triage knows it.
         if self.plan_asked and self.plan_scope == "none":
             self.plan_scope = "remaining"
         if self.plan_scope not in PLAN_SCOPES:
@@ -88,11 +88,11 @@ class Triage:
 
 @dataclass
 class RunResult:
-    """Résultat terminal, indépendant du fournisseur.
+    """Terminal result, independent of the provider.
 
-    ``error`` est un détail TECHNIQUE destiné au journal, jamais un texte pour l'athlète :
-    seul ``bot.py`` décide de ce qui lui est dit, à partir de ``failure``.
-    ``silent`` porte le choix typé d'une initiative de ne rien envoyer.
+    ``error`` is a TECHNICAL detail meant for the log, never a text for the athlete:
+    only ``bot.py`` decides what is said to them, based on ``failure``.
+    ``silent`` carries the typed choice of an initiative to send nothing.
     """
 
     session_id: str | None = None
@@ -117,11 +117,11 @@ class RunResult:
 
 @dataclass(frozen=True)
 class RunSpec:
-    """Paramètres d'un tour, indépendants du fournisseur.
+    """Parameters of a turn, independent of the provider.
 
-    Le bot choisit une route dans ``routing.py`` et ne transmet jamais de modèle
-    directement à un adaptateur. Cela permet à Claude et Codex de partager le même
-    contrat, tout en gardant leurs noms de modèles dans une seule configuration.
+    The bot picks a route in ``routing.py`` and never passes a model directly to an
+    adapter. This lets Claude and Codex share the same contract while keeping their
+    model names in a single configuration.
     """
 
     model: str | None
@@ -130,12 +130,12 @@ class RunSpec:
     session_mode: SessionMode = SessionMode.CONTINUE
     read_only: bool = False
     shell_enabled: bool = True
-    # Réponse typée `{send, text}` : une initiative dit si elle parle sans qu'aucun
-    # code n'ait à chercher un mot sentinelle dans sa prose.
+    # Typed `{send, text}` reply: an initiative says whether it speaks without any
+    # code having to look for a sentinel word in its prose.
     structured_reply: bool = False
 
 
-#: Le contrat de sortie d'une initiative, partagé par les deux fournisseurs.
+#: Output contract of an initiative, shared by both providers.
 PROACTIVE_REPLY_SCHEMA = {
     "type": "object",
     "properties": {
@@ -148,7 +148,7 @@ PROACTIVE_REPLY_SCHEMA = {
 
 
 def structured_reply(raw: object) -> tuple[bool, str]:
-    """Valide la sortie typée d'une initiative ; lève ValueError si elle est illisible."""
+    """Validate the typed output of an initiative; raise ValueError if it is unreadable."""
     data = json.loads(raw) if isinstance(raw, str) else raw
     if (not isinstance(data, dict) or set(data) != {"send", "text"}
             or type(data["send"]) is not bool or not isinstance(data["text"], str)):
@@ -165,8 +165,8 @@ class ActiveRun:
 
 
 class ActiveRuns:
-    """Le travail en cours par PSID, pour les deux moteurs : ce que /status montre et
-    ce que /cancel arrête. Chaque moteur ne dit que comment stopper son travail."""
+    """The work in progress per PSID, for both engines: what /status shows and what
+    /cancel stops. Each engine only says how to stop its own work."""
 
     def __init__(self, label: str) -> None:
         self._label = label
@@ -199,7 +199,7 @@ class ActiveRuns:
             run.activity = replace(run.activity, cancelling=True)
         try:
             run.stop()
-        except Exception as exc:  # le résultat du tour reste l'autorité finale
+        except Exception as exc:  # the turn result remains the final authority
             log.warning("Annulation %s non confirmée : %s", self._label, exc)
         return True
 
@@ -210,7 +210,7 @@ class ActiveRuns:
 
 def live_session(state: StateStore, config: Config, provider: str,
                  psid: str) -> str | None:
-    """La session à reprendre, ou None si elle a expiré ou suit d'anciennes instructions."""
+    """The session to resume, or None if it expired or follows outdated instructions."""
     session_id = state.session_id(psid, provider)
     if not session_id:
         return None
@@ -226,7 +226,7 @@ def live_session(state: StateStore, config: Config, provider: str,
 
 
 class AgentRunner(Protocol):
-    """Port minimal dont dépend l'orchestrateur Messenger."""
+    """Minimal port the Messenger orchestrator depends on."""
 
     provider: str
 

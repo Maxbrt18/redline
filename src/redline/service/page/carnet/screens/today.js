@@ -10,12 +10,11 @@ import {push, render, select} from '../nav.js';
 import {loadToday} from '../data.js';
 import {launchSeance, openSeance} from '../seance.js';
 
-// ------------------------------------------------------------ Aujourd'hui
-// Le fil du jour (maquette A validée par l'athlète le 2026-10-09) : ce qui se fait
-// aujourd'hui, dans l'ordre, puis ce qui vient, puis les repères. Le détail décroît avec
-// la distance : l'étape en cours a tout, demain une ligne, la semaine une tuile. Un seul
-// point rouge, l'étape en cours ; il avance du réveil au soir. Un disque plein, sans halo
-// ni pulsation (l'athlète, 2026-10-09 : « ça fait très AI generated »).
+// ------------------------------------------------------------ Today
+// The day's thread: what is done today, in order, then what is coming, then the landmarks.
+// Detail decreases with distance: the current step has everything, tomorrow one line, the
+// week a tile. A single red dot marks the current step; it moves from wake-up to evening.
+// A solid disc, with no halo or pulse.
 function tiles(cells) {
   const grid = el('div', null, 'n-facts' + (cells.length === 3 ? ' three' : ''));
   cells.slice(0, 4).forEach(([value, label, over]) => grid.append(add(el('div'), el('b', value, over ? 'n-over' : null), el('small', label))));
@@ -47,7 +46,7 @@ function overLine(item) {
   return parts.length ? el('p', capital(parts.join(' · ')) + '.', 'n-overline') : null;
 }
 const clockText = at => { const date = new Date(at); return String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0'); };
-// Le renfo du jour : le bouton plein, et la liste des exercices dépliée sous lui.
+// The day's strength session: the solid button, and the exercise list unfolded under it.
 let showExercises = false;
 function launcher(strength) {
   if (!strength || strength.status !== 'ready') return strength && strength.message ? el('p', strength.message, 'n-meta') : null;
@@ -59,7 +58,7 @@ function launcher(strength) {
     list.append(item);
   }
   list.hidden = !showExercises;
-  // Une séance commencée sur ce téléphone se reprend là où elle en est.
+  // A session started on this phone resumes where it stopped.
   const progress = savedProgress(strength.session);
   const go = button(progress ? 'Reprendre la séance →' : 'Séance guidée →', async node => {
     node.disabled = true;
@@ -90,7 +89,7 @@ export const fieldSpec = {
   rpe: {label: 'RPE, séance entière', name: 'le RPE', values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]},
   enjoyment: {label: 'Plaisir', name: 'le plaisir', values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}
 };
-// « pain:genou » : la douleur d'une zone, nommée par son libellé.
+// `pain:<zone>`: a zone's pain, named by its label.
 export function specOf(field, labels) {
   if (!field.startsWith('pain:')) return fieldSpec[field];
   const label = (labels || {})[field] || field.slice(5);
@@ -109,8 +108,8 @@ async function answer(ask, value, card, picked) {
     card.querySelectorAll('button').forEach(node => { node.disabled = false; node.classList.remove('n-picked'); });
   }
 }
-// Toutes les valeurs d'une échelle d'un coup d'œil, sans défilement caché : la
-// douleur tient sur une ligne, le RPE et le plaisir sur deux.
+// All the values of a scale at a glance, with no hidden scrolling: pain fits on one
+// line, RPE and enjoyment on two.
 function chips(values, ask, card, label = value => fmt(value)) {
   const row = el('div', null, 'n-chips');
   row.style.setProperty('--cols', String(values.length <= 7 ? values.length : Math.ceil(values.length / 2)));
@@ -131,7 +130,7 @@ function morning(list) {
   const wakes = list.filter(ask => ask.type === 'wake'), daily = list.find(ask => ask.type === 'daily');
   if (!wakes.length && !daily) return null;
   const card = el('div', null, 'n-check');
-  // Une trace par zone surveillée, chacune son geste.
+  // One trace per monitored zone, each with its own gesture.
   wakes.forEach(wake => card.append(choices('Trace · ' + wake.label, wake.after_effort ? 'après la séance d’hier' : 'sans séance hier', traces, wake.id, card)));
   if (daily) daily.fields.forEach(field => card.append(choices(dailyChoices[field][0], '', dailyChoices[field][1], daily.id + ':' + field, card)));
   card.append(el('p', 'Un geste par ligne. Le coach ne t’écrit que si ça sort de l’ordinaire.', 'n-note'));
@@ -143,9 +142,9 @@ function hrCard(ask) {
   head.append(el('small', ask.hr + ' bpm à ' + paceOf(ask.pace_s) + '/km, contre ' + ask.reference + ' sur tes ' + ask.n + ' EF à allure voisine (+' + (ask.hr - ask.reference) + ').'));
   return add(card, head, choices('Une explication ?', '', hrChoices, ask.id, card));
 }
-// Le débrief, une question à la fois : la première qui manque, son rang parmi les trois,
-// et ce qui suivra. Chaque réponse recalcule l'écran, qui passe à la suivante.
-// Le total : une douleur par zone surveillée, puis le RPE et le plaisir.
+// The debrief, one question at a time: the first missing one, its rank among the total,
+// and what follows. Each answer recomputes the screen, which moves on to the next.
+// The total: one pain per monitored zone, then RPE and enjoyment.
 export const cellCount = ask => Object.keys(ask.labels || {}).length + 2;
 function cellsCard(ask, target) {
   const card = el('div', null, 'n-check');
@@ -161,8 +160,8 @@ function cellsCard(ask, target) {
   if (notes.length) card.append(el('p', notes.join(' '), 'n-note'));
   return card;
 }
-// Une étape du fil : son point, son rôle en petites capitales, son titre, précédé de la
-// pastille de sa famille quand c'est une séance.
+// A step of the thread: its dot, its role in small caps, its title, preceded by its family
+// pill when it is a session.
 const CHECK = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 5.2l2 2 4-4.4"/></svg>';
 export function filStep(phase, kicker, title, small, icon) {
   const node = el('i', null, 'n-node');
@@ -172,8 +171,8 @@ export function filStep(phase, kicker, title, small, icon) {
   if (title) body.append(add(el('h2'), icon ? pastille(icon) : null, title));
   return [add(el('div', null, 'n-step ' + phase + (small ? ' small' : '') + (kicker ? '' : ' bare')), node, body), body];
 }
-// Le fil d'un jour : le point du matin, les questions en retard, ce qui est fait, puis
-// ce qui reste. Le premier geste attendu prend le point rouge.
+// A day's thread: the morning point, overdue questions, what is done, then what remains.
+// The first expected gesture takes the red dot.
 function dayFil(data, items, extras, options) {
   const fil = el('div', null, 'n-fil');
   const used = new Set();
@@ -193,7 +192,7 @@ function dayFil(data, items, extras, options) {
     ...strengths.filter(item => item.status === 'done')]
     .sort((a, b) => ((a.fact || {}).started_at || '~').localeCompare((b.fact || {}).started_at || '~'));
   const pending = [...runs, ...strengths].filter(item => item.status !== 'done');
-  // Les questions sur une séance faite aujourd'hui vont sous elle ; les autres passent devant.
+  // Questions about a session done today go under it; the others come first.
   const ownCells = new Set(done.filter(item => item.fact && item.kind !== 'strength').map(item => 'cell:' + item.fact.observation_id));
   const ownHr = done.some(item => item.kind !== 'strength') && options.today;
   if (options.today) data.asks.filter(ask => !used.has(ask.id) && !ownCells.has(ask.id) && !(ownHr && ask.type === 'hr' && ask.date === data.date))
@@ -244,8 +243,8 @@ function dayFil(data, items, extras, options) {
   });
   return fil;
 }
-// Un jour de repos, demain est le sujet de l'écran : une ligne pour aujourd'hui, puis
-// sa fiche entière, météo comprise.
+// On a rest day, tomorrow is the screen's subject: one line for today, then its full
+// card, weather included.
 function restFil(data) {
   const fil = dayFil(data, [], [], {today: true});
   const [node, body] = filStep('rest', null, null);
@@ -259,7 +258,7 @@ function restFil(data) {
   else if (next.next.length) add(box, el('p', capital(dayNumber(next.next[0].date)), 'n-day'), dayFil(data, next.next, [], {compact: true}));
   return [box, real.length ? next.date : next.next.length ? next.next[0].date : null];
 }
-// Ce qui vient : une ligne par jour, comme dans l'onglet Semaine ; la météo pour demain seulement.
+// What is coming: one line per day, as in the Week tab; weather for tomorrow only.
 function ahead(data, seen) {
   const items = (data.ahead || []).filter(item => !seen.has(item.date));
   if (!items.length) return null;
@@ -280,10 +279,9 @@ function ahead(data, seen) {
   });
   return node;
 }
-// Les repères (maquette « une large, deux demi » validée le 2026-10-10) : la semaine en
-// pleine largeur avec ses barres chiffrées, puis les douleurs contre leur plafond et la
-// course côte à côte. Chaque tuile mène à son onglet ; J-N reste à l'encre, le rouge
-// appartient à l'étape en cours.
+// The landmarks (one wide tile, two half tiles): the week full width with its numbered
+// bars, then pain against its ceiling and running side by side. Each tile leads to its
+// tab; D-N stays in ink, red belongs to the current step.
 function tile(label, onPress, cls, icon) {
   const name = add(el('span', null, 'l'), pastille(icon, true), el('span', label));
   return add(button('', onPress, 'n-tile ' + cls), add(el('span', null, 'n-tlab'), name, chevron()));
@@ -316,8 +314,8 @@ function painPlot(pain) {
   shape('line', {x1: 0, x2: width, y1: lo + 4, y2: lo + 4, class: 'base'}, svg);
   shape('line', {x1: 0, x2: width, y1: y(pain.cap), y2: y(pain.cap), class: 'cap'}, svg);
   shape('text', {x: width, y: y(pain.cap) - 4, 'text-anchor': 'end', class: 'capl'}, svg, 'plafond ' + fmt(pain.cap));
-  // Les étiquettes de semaine sont centrées sur leur point : 12 px de marge les gardent
-  // dans la tuile, quel que soit le nombre de semaines.
+  // Week labels are centred on their point: a 12 px margin keeps them inside the tile,
+  // whatever the number of weeks.
   const step = (width - 30) / Math.max(1, pain.weeks.length - 1);
   pain.weeks.forEach((item, index) => {
     const x = 12 + step * index, now = index === pain.weeks.length - 1 ? ' now' : '';
@@ -336,7 +334,7 @@ function landmarks(data) {
   week.setAttribute('aria-label', 'Semaine ' + weekNumber(data.week) + ' : ' + fmt(totals.km_done) + ' kilomètres courus' + (totals.km_target ? ' sur environ ' + fmt(totals.km_target) : ''));
   grid.append(add(week, add(el('span'), tvalue(fmt(totals.km_done), totals.km_target ? '/' + fmt(totals.km_target) + ' km' : 'km'),
     el('small', runs)), weekBars(data.strip)));
-  // Une tuile par zone surveillée ; aucune quand l'instance n'en surveille pas.
+  // One tile per monitored zone; none when the instance monitors none.
   data.pain.zones.forEach(item => {
     const peak = (item.weeks[item.weeks.length - 1] || {}).peak;
     const pain = tvalue(peak == null ? '—' : fmt(peak), '/10');

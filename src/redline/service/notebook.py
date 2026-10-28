@@ -1,4 +1,4 @@
-"""Carnet : archives documentaires et accès au renfo canonique du jour."""
+"""Notebook: document archives and access to the canonical strength session of the day."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 
 
 def review_period(source_key: str) -> tuple[str, str]:
-    """La clé mensuelle nomme le déclenchement au 1er, donc clôt le mois précédent."""
+    """The monthly key names the trigger on the 1st, hence closes the previous month."""
     match = re.fullmatch(r"proactive:weekly:(20\d{2}-W\d{2})", source_key)
     if match:
         return "weekly", match[1]
@@ -88,7 +88,7 @@ class NotebookService:
         return self.board().injury_view(zone)
 
     def session(self, observation_id: str) -> dict | None:
-        """Le détail d'une séance faite ; ses flux et sa météo se relèvent au premier affichage."""
+        """The detail of a completed session; streams and weather are fetched on first display."""
         board = self.board()
         intake = board.ops.strava_detail(uuid.UUID(observation_id))
         streams = (intake or {}).get("streams")
@@ -103,15 +103,15 @@ class NotebookService:
         return self.board().race_view(archives)
 
     def connected(self, psid: str) -> bool:
-        """Le carnet recueille-t-il les ressentis ? Base illisible : non, Messenger
-        reprend alors son rôle plutôt que de laisser les cellules sans demandeur."""
+        """Does the notebook collect the feelings? Unreadable database: no, Messenger
+        then takes its role back rather than leaving the cells without a requester."""
         try:
             return self.store.has_device(psid)
         except Exception:
             return False
 
     def wake_reminder_due(self) -> bool:
-        """Le carnet attend encore la trace du réveil."""
+        """The notebook still awaits the wake trace."""
         try:
             return any(ask["type"] == "wake" for ask in self.board().asks())
         except Exception:
@@ -139,7 +139,7 @@ class NotebookService:
             snapshot = part.link[1] if part.link else None
             image_kind = "strength" if snapshot else metadata.get("kind", "other")
             image_period = str(snapshot.get("date") or "") if snapshot else metadata.get("period", "")
-            # Le job est l'autorité de la période même si l'agent a donné un mauvais titre.
+            # The job is the authority on the period even if the agent gave a wrong title.
             if image_kind == kind and kind in {"weekly", "monthly"}:
                 image_period = period
             title = (snapshot.get("title") if snapshot else metadata.get("title")) or "Carte"
@@ -183,8 +183,8 @@ class NotebookService:
                     "message": "Ta séance attend une réponse dans Messenger avant de démarrer."}
         built = load(self.root).build(selection_for(session, today.isoformat()))
         snapshot = strength_card.snapshot(built, root=self.root)
-        # Le carnet ne propose pas de refaire une séance déjà consignée, même si le
-        # rapprochement du programme n'a pas encore terminé son tour de coaching.
+        # The notebook does not offer to redo an already recorded session, even if the
+        # program matching has not yet finished its coaching turn.
         import sqlalchemy as sa
 
         from redline.storage.schema import strength_report_claims

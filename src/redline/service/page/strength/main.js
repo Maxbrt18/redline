@@ -8,7 +8,7 @@ import {cancelRetry, retry} from './send.js';
 
 /* The interactive strength session.
  *
- * A screen of the notebook since 2026-10-09 (carnet/seance.js opens and closes
+ * A screen of the notebook (carnet/seance.js opens and closes
  * it). Resolves an opaque capability into its immutable session snapshot, runs it
  * down one exercise at a time, and posts a report back with the same capability.
  *
@@ -33,8 +33,8 @@ function fail(title, text) {
   $('app').hidden = true;
 }
 
-// Le carnet ouvre la séance avec un jeton, et la referme ; `open` dit si elle est à
-// l'écran (le son, le verrou d'écran et les gestes ne servent qu'à ce moment).
+// The notebook opens the session with a token, and closes it; `open` says whether it is
+// on screen (sound, screen lock and gestures only matter then).
 let onScreen = false;
 
 export async function startSession(token) {
@@ -74,15 +74,15 @@ export async function startSession(token) {
   $('boot').hidden = true;
   $('app').hidden = false;
   document.title = session.title || 'Renfo';
-  // Pas encore commencée, la séance s'ouvre sur son titre ; reprise, sur l'exercice en cours.
+  // Not yet started, the session opens on its title; resumed, on the current exercise.
   rendered.live = state.startedAt == null ? state.current : -1;
   renderSession();
   keepAwake();
-  retry();       // un compte-rendu resté en rade repart à la réouverture de la séance
+  retry();       // a report left pending is retried when the session reopens
 }
 
-// Fermée, la séance garde tout sur le téléphone (elle reprendra là) ; un compte rendu
-// en attente de réseau continue de réessayer.
+// Closed, the session keeps everything on the phone (it resumes there); a report waiting
+// for the network keeps retrying.
 export function stopSession() {
   onScreen = false;
   if (session && state) save();
@@ -92,7 +92,7 @@ export function stopSession() {
   dropAudio();
 }
 
-// Commencée et pas encore envoyée : la quitter demande confirmation.
+// Started and not yet sent: leaving it asks for confirmation.
 export const sessionUnfinished = () => !!(onScreen && state && state.startedAt != null && !state.sent && !state.pending);
 
 document.addEventListener('visibilitychange', () => {
@@ -116,10 +116,10 @@ document.addEventListener('visibilitychange', () => {
 
 window.addEventListener('online', retry);
 
-/* Tout geste, n'importe où dans la page, réveille le son et l'écran : iOS ne
- * démarre un AudioContext ni n'accorde le verrou d'écran que dans un geste, et
- * le premier « Démarrer » ne doit pas être le seul à compter. En capture, pour
- * passer avant le gestionnaire du bouton qui peut lancer un bip. */
+/* Any gesture, anywhere on the page, wakes the sound and the screen: iOS only starts an
+ * AudioContext or grants the screen lock inside a gesture, and the first "Démarrer" must
+ * not be the only one that counts. Captured, to run before the button handler that may
+ * play a beep. */
 function onGesture() {
   if (!session || !onScreen) return;
   wakeAudio();

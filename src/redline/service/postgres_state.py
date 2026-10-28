@@ -79,7 +79,7 @@ class PostgresStateStore(StateStore):
         self.proactive = PostgresProactiveState(self)
 
     def register_turn(self, turn_id: str, psid: str) -> None:
-        """Lie la lecture historique à ce tour sans exposer le PSID au shell."""
+        """Bind the history read to this turn without exposing the PSID to the shell."""
         with self.database.transaction() as connection:
             connection.execute(turn_scopes.delete().where(
                 turn_scopes.c.created_at < dt.datetime.now(dt.UTC) - dt.timedelta(days=1)))
@@ -204,14 +204,13 @@ class PostgresStateStore(StateStore):
                         body=clean_body).on_conflict_do_nothing())
             if not created:
                 return
-            # Une livraison ne constitue jamais une preuve que l'athlète a répondu. Une
-            # question ouverte naît d'une déclaration typée du tour (`fact-write.py
-            # ask`) retrouvée dans le texte réellement livré, jamais d'un « ? » de
-            # prose : une question rhétorique n'est pas un agenda à suivre. Un rendu
-            # fermé n'a pas de tour : le service nomme lui-même l'information qu'il
-            # attend (`questions`), soumise au même contrôle de présence dans le texte
-            # livré. Sans cela, une relance fixe restait invisible à la mémoire des
-            # questions et pouvait se reposer (audit du 2026-09-30, constat 4).
+            # A delivery is never proof that the athlete answered. An open question
+            # comes from a typed declaration of the turn (`fact-write.py ask`) found in
+            # the text actually delivered, never from a "?" in prose: a rhetorical
+            # question is not an agenda to follow. A closed rendering has no turn: the
+            # service names the information it awaits itself (`questions`), subject to
+            # the same presence check in the delivered text. Otherwise a fixed reminder
+            # would stay invisible to question memory and could be asked again.
             declared = [{"text": item} for item in questions if item.strip()]
             if turn_id and resolve_questions:
                 declared += list(connection.execute(sa.select(turn_commands.c.payload).where(
@@ -240,13 +239,13 @@ class PostgresStateStore(StateStore):
                     index_where=conversation_questions.c.status.in_(("open", "deferred"))))
 
     def question_known(self, psid: str, text: str) -> bool:
-        """Cette question exacte attend-elle déjà, ou vient-elle d'être soldée ?
+        """Is this exact question already waiting, or was it just settled?
 
-        Ouverte ou reportée : la reposer serait une relance, et la reprise d'un report
-        appartient au coach, qui a le contexte ; un gabarit n'en a pas. Soldée depuis
-        moins de trois jours (répondue, refusée, impossible à préciser) : même fait,
-        même réponse. Au-delà, le même texte peut désigner un fait NOUVEAU (« EF 7 km »
-        revient chaque semaine) : le texte d'un gabarit n'est pas l'identité d'un fait.
+        Open or deferred: asking it again would be a reminder, and resuming a deferral
+        belongs to the coach, who has the context; a template does not. Settled less
+        than three days ago (answered, declined, impossible to specify): same fact,
+        same answer. Beyond that, the same text may designate a NEW fact (an "easy run
+        7 km" recurs every week): a template's text is not a fact's identity.
         """
         recent = dt.datetime.now(dt.UTC) - dt.timedelta(days=3)
         with self.database.engine.connect() as connection:
@@ -258,7 +257,7 @@ class PostgresStateStore(StateStore):
             ).limit(1)).first() is not None
 
     def expire_stale_questions(self, psid: str, *, older_than_days: int = 14) -> int:
-        """Ferme les questions ouvertes restées sans examen : un contexte, pas une dette."""
+        """Close open questions left unexamined: a context, not a debt."""
         limit = dt.datetime.now(dt.UTC) - dt.timedelta(days=older_than_days)
         with self.database.transaction() as connection:
             return connection.execute(conversation_questions.update().where(
@@ -271,11 +270,11 @@ class PostgresStateStore(StateStore):
 
     def begin_outbound_delivery(self, source_key: str, psid: str,
                                 payload_digest: str, payload: dict | None = None) -> str:
-        """Réserve la frontière réseau ; `uncertain` interdit un rejeu aveugle.
+        """Reserve the network boundary; `uncertain` forbids a blind replay.
 
-        Une enveloppe ``failed`` ou ``prepared`` n'a livré aucun fragment : elle peut
-        partir, même recalculée. Une enveloppe déjà livrée n'est jamais renvoyée, même
-        si le contenu proposé diffère : l'entrant a déjà eu sa réponse.
+        A ``failed`` or ``prepared`` envelope delivered no fragment: it may go out, even
+        recomputed. An already delivered envelope is never resent, even if the proposed
+        content differs: the inbound message already got its answer.
         """
         now = dt.datetime.now(dt.UTC)
         with self.database.transaction() as connection:
@@ -306,7 +305,7 @@ class PostgresStateStore(StateStore):
 
     def prepare_outbound_delivery(self, source_key: str, psid: str,
                                   payload_digest: str, payload: dict) -> bool:
-        """Conserve une sortie calculée mais retenue ; False si elle est déjà partie."""
+        """Keep a computed but withheld output; False if it already went out."""
         now = dt.datetime.now(dt.UTC)
         with self.database.transaction() as connection:
             row = connection.execute(sa.select(outbound_deliveries).where(
@@ -354,10 +353,10 @@ class PostgresStateStore(StateStore):
                 raise KeyError(f"enveloppe sortante non finalisable : {source_key}")
 
     def reply_context(self, message_ids: tuple[str, ...]) -> str:
-        """Rend la relation de reply Meta, sans confondre la citation et le présent.
+        """Render the Meta reply relation, without confusing the quote and the present.
 
-        Une référence inconnue reste utile (elle prouve l'intention de répondre), mais
-        son contenu n'est jamais reconstruit au jugé.
+        An unknown reference stays useful (it proves the intent to reply), but its
+        content is never reconstructed by guesswork.
         """
         if not message_ids:
             return ""
@@ -450,10 +449,10 @@ class PostgresStateStore(StateStore):
         return bool(changed)
 
     def relationship_context(self, psid: str, *, threads: bool = True) -> str:
-        """`threads=False` quand le paquet métier du tour porte déjà les fils ouverts."""
+        """`threads=False` when the turn's business packet already carries the open threads."""
         with self.database.engine.connect() as connection:
-            # Une phrase d'attente ou de limite est un message livré, pas un tour de
-            # fond : comptée parmi les huit, elle en chassait le sujet réel.
+            # A holding or limit sentence is a delivered message, not a substantive
+            # turn: counted among the eight, it would push out the real subject.
             rows = list(connection.execute(sa.select(conversation_messages).where(
                 conversation_messages.c.psid == psid,
                 sa.not_(sa.or_(*(
@@ -515,7 +514,7 @@ class PostgresStateStore(StateStore):
             return [dict(row) for row in rows]
 
     def inbound_received_at(self, message_ids: tuple[str, ...]) -> float | None:
-        """Heure de réception du plus ancien message d'un lot, None s'il est inconnu."""
+        """Receipt time of the oldest message of a batch, None if unknown."""
         if not message_ids:
             return None
         with self.database.engine.connect() as connection:
@@ -580,7 +579,7 @@ class PostgresStateStore(StateStore):
             connection.execute(delivery_debts.delete().where(delivery_debts.c.psid == psid))
 
     def missed_session_is_current(self, job_id: str) -> bool:
-        """Une relance attendue dans la file peut avoir perdu sa cause depuis."""
+        """A reminder waiting in the queue may have lost its cause since."""
         if not job_id.startswith("missed-session:"):
             return False
         try:
@@ -601,9 +600,9 @@ class PostgresStateStore(StateStore):
                 connection, row["scheduled_on"], row["routine"]))
 
     def materialize_intelligence(self, now: dt.datetime) -> int:
-        """Transforme les faits typés en travaux durables, une seule fois par cause.
+        """Turn typed facts into durable jobs, once per cause.
 
-        Une transaction, une méthode par cause : chacune rend le nombre de travaux créés.
+        One transaction, one method per cause: each returns the number of jobs created.
         """
         if now.tzinfo is None:
             now = now.replace(tzinfo=local_time.zone())
@@ -612,8 +611,8 @@ class PostgresStateStore(StateStore):
         with self.database.transaction() as connection:
             store = OperationalStore(self.database)
             store.reconcile_strength_cycles_in(connection)
-            # Une prédiction rattachée dont la date est passée sans observation n'a pas
-            # été testée : elle sort de la dette en `void`, jamais en faux.
+            # An attached prediction whose date passed with no observation was not
+            # tested: it leaves the debt as `void`, never as false.
             store.settle_unobserved_predictions_in(connection, local.date(),
                                                    actor="intelligence")
             predictions = connection.execute(sa.select(coach_predictions).where(
@@ -677,14 +676,14 @@ class PostgresStateStore(StateStore):
 
     @staticmethod
     def _materialize_races(connection, utc: dt.datetime) -> int:
-        """La feuille de route de chaque course, recalée quand sa date bouge."""
+        """The roadmap of each race, rescheduled when its date moves."""
         created = 0
         races = connection.execute(sa.select(deadlines).where(
             deadlines.c.athlete_id == ATHLETE, deadlines.c.kind == "race")).mappings()
         for race in races:
             prefix = f"race:{race['id']}:"
-            # Une date déplacée ou une course clôturée annule le vieux réveil :
-            # l'identité de la course reste, celle du calendrier change.
+            # A moved date or a closed race cancels the old wake-up: the race identity
+            # stays, the calendar identity changes.
             obsolete = proactive_jobs.c.job_key.startswith(prefix, autoescape=True)
             if race["status"] != "done":
                 obsolete = sa.and_(obsolete, ~proactive_jobs.c.job_key.startswith(
@@ -706,7 +705,7 @@ class PostgresStateStore(StateStore):
 
     @staticmethod
     def _materialize_corrections(connection, utc: dt.datetime) -> int:
-        """Une erreur du coach corrigée et pas encore annoncée, dans sa semaine."""
+        """A coach error that was corrected and not yet announced, within its week."""
         created = 0
         corrections = connection.execute(sa.select(correction_deliveries).where(
             correction_deliveries.c.athlete_id == ATHLETE,
@@ -714,8 +713,8 @@ class PostgresStateStore(StateStore):
         for correction in corrections:
             expires = correction["registered_at"] + CORRECTION_ANNOUNCE_WINDOW
             if expires <= utc:
-                # Une annonce déjà en file depuis avant cette règle expire aussi, comme
-                # le fait `_expire_in` pour toute échéance dépassée.
+                # An announcement already queued before this rule expires too, as
+                # `_expire_in` does for any overdue deadline.
                 connection.execute(proactive_jobs.update().where(
                     sa.or_(proactive_jobs.c.job_key == f"correction:{correction['correction_key']}",
                            proactive_jobs.c.job_key.like(f"correction-id:{correction['id']}:%")),
@@ -749,10 +748,10 @@ class PostgresStateStore(StateStore):
     def _materialize_daily_signal(connection, store: OperationalStore,
                                   predictions: Sequence[RowMapping],
                                   local: dt.datetime, utc: dt.datetime) -> int:
-        """La sentinelle : signaux faibles, envie, prédictions échues, séances manquées."""
+        """The sentinel: weak signals, motivation, due predictions, missed sessions."""
         created = 0
-        # Même lecture que la CLI et le dossier du bilan : registre typé et
-        # cadence travaillée exprès, sur une seule définition (`signals.current`).
+        # Same read as the CLI and the review dossier: typed ledger and deliberately
+        # worked cadence, on a single definition (`signals.current`).
         signals = [str(signal) for signal in signal_model.current(store)]
         recent_daily = list(connection.execute(sa.select(daily_checkins).where(
             daily_checkins.c.athlete_id == ATHLETE,
@@ -886,7 +885,7 @@ class PostgresProactiveState(ProactiveState):
             return None
 
     def claim_job(self, job_id: str) -> dict | None:
-        """Réclame UN job en attente, dû ou non : le tour qui l'absorbe le porte."""
+        """Claim ONE pending job, due or not: the turn that absorbs it carries it."""
         with self.database.transaction() as connection:
             row = connection.execute(sa.select(proactive_jobs).where(
                 proactive_jobs.c.job_key == job_id, proactive_jobs.c.status == "pending",
@@ -900,7 +899,7 @@ class PostgresProactiveState(ProactiveState):
             return self._job(dict(row), attempts=attempts, status="running")
 
     def hasten_job(self, job_id: str, due: float) -> bool:
-        """Avance l'échéance d'un job encore en attente ; ne la recule jamais."""
+        """Advance the due time of a still pending job; never push it back."""
         with self.database.transaction() as connection:
             return connection.execute(proactive_jobs.update().where(
                 proactive_jobs.c.job_key == job_id, proactive_jobs.c.status == "pending",
@@ -960,10 +959,10 @@ class PostgresProactiveState(ProactiveState):
                 raise KeyError(f"job proactif inconnu ou déjà soldé : {job_id}")
 
     def reopen_job(self, job_id: str, due: float, expire_at: float) -> None:
-        """Rouvre explicitement un job terminé après une réparation opérateur.
+        """Explicitly reopen a finished job after an operator repair.
 
-        Ce n'est pas `retry_job` : une reprise manuelle efface l'acquittement ancien,
-        sinon une ligne `pending` conserverait paradoxalement son `completed_at`.
+        Not `retry_job`: a manual resume clears the old acknowledgement, otherwise a
+        `pending` row would paradoxically keep its `completed_at`.
         """
         with self.database.transaction() as connection:
             result = connection.execute(proactive_jobs.update().where(
@@ -976,10 +975,10 @@ class PostgresProactiveState(ProactiveState):
 
     def release_job(self, job_id: str, delay: float = 60.0, *,
                     expire_at: float = 0.0) -> bool:
-        """Remet un job réclamé en file, toujours avec une échéance.
+        """Put a claimed job back in the queue, always with a due time.
 
-        Rend False quand la nouvelle échéance dépasse déjà l'expiration : le job est
-        alors soldé en `failed`, jamais relâché sans fin.
+        Returns False when the new due time already exceeds the expiry: the job is then
+        settled as `failed`, never released endlessly.
         """
         due = _at(time.time() + delay)
         fallback = _at(expire_at) if expire_at else None
@@ -996,7 +995,7 @@ class PostgresProactiveState(ProactiveState):
                         status="failed", completed_at=dt.datetime.now(dt.UTC),
                         last_error="expiré avant livraison"))
                 return False
-            # Un report n'est pas une tentative : seul un échec consomme le plafond.
+            # A deferral is not an attempt: only a failure consumes the cap.
             connection.execute(proactive_jobs.update().where(
                 proactive_jobs.c.job_key == job_id).values(
                     status="pending", due_at=due, expires_at=expires,
@@ -1014,7 +1013,7 @@ class PostgresProactiveState(ProactiveState):
             self._purge_old_jobs(connection)
 
     def recover_running_jobs(self) -> int:
-        """Reprend les claims de l'ancien processus au démarrage du service."""
+        """Take over the previous process's claims at service startup."""
         with self.database.transaction() as connection:
             return connection.execute(proactive_jobs.update().where(
                 proactive_jobs.c.status == "running"
@@ -1029,12 +1028,10 @@ class PostgresProactiveState(ProactiveState):
             return [self._job(dict(row)) for row in connection.execute(query).mappings()]
 
     def marked(self, name: str) -> bool:
-        """Ce marqueur a-t-il déjà été posé ? Un marqueur est une PRÉSENCE de ligne.
+        """Has this marker already been set? A marker is the PRESENCE of a row.
 
-        Il portait une `value` dont `"1"` était la seule valeur légale, refusée par un
-        `raise` -- le vestige d'un store JSON clé/valeur. Un paramètre à une seule
-        valeur acceptable ne documente rien, il invite à en essayer une autre : le
-        double de test, lui, acceptait tout ce qu'on lui donnait.
+        It takes no value: a parameter with a single acceptable value documents nothing
+        and invites trying another.
         """
         with self.database.engine.connect() as connection:
             return bool(connection.execute(sa.select(sa.exists().where(
@@ -1064,7 +1061,7 @@ class PostgresProactiveState(ProactiveState):
             config.proactive_min_gap_hours * 3600
 
     def finish_delivery(self, job_id: str, now: dt.datetime) -> None:
-        """Acquitte atomiquement le budget et le job dont le message est parti."""
+        """Atomically acknowledge the budget and the job whose message went out."""
         with self.database.transaction() as connection:
             connection.execute(sa.text(
                 "SELECT pg_advisory_xact_lock(hashtext('redline:proactive-budget'))"))

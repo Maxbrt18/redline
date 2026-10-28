@@ -1,8 +1,8 @@
-"""Événements d'exploitation structurés : une ligne JSON par étape d'un tour.
+"""Structured operational events: one JSON line per step of a turn.
 
-Ils répondent aux questions qu'une ligne narrative laissait ouvertes (quel message,
-quelle route, combien de temps par étape, pourquoi rien n'est parti) sans jamais
-porter le texte d'un message ni une donnée de santé : identifiants, durées, causes.
+They answer the questions a narrative line left open (which message, which route, how
+long per step, why nothing went out) without ever carrying message text or health
+data: identifiers, durations, causes.
 
     journalctl -u coach-messenger -o cat | jq 'select(.turn_id == "…")'
 """
@@ -16,14 +16,14 @@ from typing import Any
 
 log = logging.getLogger("redline.service.events")
 
-#: Champs autorisés. Un champ inconnu est refusé plutôt que journalisé : c'est la
-#: seule façon de garantir qu'aucun texte de message ne se glisse un jour ici.
+#: Allowed fields. An unknown field is refused rather than logged: this is the only
+#: way to guarantee that no message text ever slips in here.
 FIELDS = frozenset({
     "turn_id", "inbound_ids", "job_id", "kind", "stage", "route", "model", "effort",
     "duration_ms", "outcome", "failure", "commands_applied", "command_kinds",
     "delivery", "fragments", "retry_in_s", "attempt", "depth", "plan", "cause",
     "restored", "runtime_tree", "age_s", "model_calls",
-    # Forme de l'enveloppe : des compteurs, jamais le texte.
+    # Shape of the envelope: counters, never the text.
     "prose_chars", "prose_bubbles", "added_chars", "added_parts", "questions",
 })
 
@@ -38,7 +38,7 @@ def emit(event: str, **fields: Any) -> None:
 
 
 class Stopwatch:
-    """Durée d'une étape en millisecondes, mesurée sur l'horloge monotone."""
+    """Duration of a step in milliseconds, measured on the monotonic clock."""
 
     def __init__(self) -> None:
         self._started = time.monotonic()

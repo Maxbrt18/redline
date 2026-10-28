@@ -1,5 +1,5 @@
-// Un réglage gardé sur cet appareil. Sans stockage (navigation privée, appareil plein),
-// la lecture rend null et l'écriture ne fait rien : la page marche sans.
+// A setting kept on this device. Without storage (private browsing, full device),
+// reads return null and writes do nothing: the page works without it.
 export function remembered(key, value) {
   try { if (value === undefined) return localStorage.getItem(key); localStorage.setItem(key, value); }
   catch { return null; }

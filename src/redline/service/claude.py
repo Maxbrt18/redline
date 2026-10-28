@@ -70,9 +70,9 @@ def _parse_reset_epoch(detail: str, now: datetime | None = None) -> int | None:
     return int(target.timestamp())
 
 
-#: Ce qu'un tour autonome peut faire. Partagé avec `deploy/claude-runtime-smoke.py`,
-#: qui refuse une nouvelle version de Claude Code si elle bloque la forme exacte d'un
-#: appel de CLI du coach : la 2.1.287 a refusé `… < /tmp/x.json` le 11/10.
+#: What an autonomous turn may do. Shared with `deploy/claude-runtime-smoke.py`, which
+#: rejects a new Claude Code version if it blocks the exact shape of a coach CLI call
+#: (for instance one that redirects input from a file).
 AUTONOMOUS_PERMISSIONS = (
     "--permission-mode", "dontAsk",
     "--tools", "Read,Glob,Grep,Edit,Write,Bash",
@@ -89,8 +89,8 @@ class _Stream:
     session: str | None = None
     result_text: str | None = None
     is_error: bool = False
-    # Le modèle a produit au moins un message : un échec ensuite n'est plus un
-    # échec de démarrage, et le tour ne se rejoue pas.
+    # The model produced at least one message: a later failure is no longer a startup
+    # failure, and the turn is not replayed.
     started: bool = False
     structured: object = None
 
@@ -99,8 +99,8 @@ class ClaudeCodeRunner:
     """Runs `claude -p` with session continuity and terminal result semantics."""
 
     provider = "claude"
-    # Tentatives du même profil tant qu'aucun travail n'a commencé (session morte,
-    # binaire qui tombe au démarrage) ; au-delà, la route essaie son profil de repli.
+    # Attempts with the same profile while no work has started (dead session, binary
+    # crashing at startup); beyond that, the route tries its fallback profile.
     MAX_ATTEMPTS = 3
     RETRY_DELAY = 5  # seconds, multiplied by the attempt number
 
@@ -116,13 +116,12 @@ class ClaudeCodeRunner:
         return self._runs.cancel(psid)
 
     def _agent_env(self, turn_id: str | None = None) -> dict:
-        """L'environnement du CLI, purgé de ce qu'il n'a pas à connaître.
+        """The CLI environment, scrubbed of what it has no need to know.
 
-        `CLAUDE_CODE_OAUTH_TOKEN` reste : c'est avec lui que le binaire s'authentifie.
-        Tout le reste des secrets du service (jeton de page, app secret, etc.) est
-        vidé — le CLI ne poste aucun message, et un secret
-        présent dans un environnement finit tôt ou tard écrit sur le disque par un
-        outil qui journalise son contexte.
+        `CLAUDE_CODE_OAUTH_TOKEN` stays: the binary authenticates with it. All the
+        service's other secrets (page token, app secret, etc.) are blanked: the CLI
+        posts no message, and a secret present in an environment sooner or later gets
+        written to disk by a tool that logs its context.
         """
         environment = {
             **os.environ,
@@ -234,8 +233,8 @@ class ClaudeCodeRunner:
                 return RunResult(error=f"panne Claude en cours de tour : {last_detail}"[:500],
                                  failure=FailureKind.IN_FLIGHT, work_started=True)
             if session_id:
-                # Rien n'a démarré avec cette session : elle est probablement morte
-                # (« No conversation found »). La tentative suivante repart sans elle.
+                # Nothing started with this session: it is probably dead
+                # ("No conversation found"). The next attempt restarts without it.
                 self._state.clear_session(psid, self.provider)
             if attempt < self.MAX_ATTEMPTS:
                 time.sleep(self.RETRY_DELAY * attempt)
@@ -261,8 +260,8 @@ class ClaudeCodeRunner:
                 command += ["--model", candidate.model]
             if candidate.read_only:
                 command += ["--permission-mode", "dontAsk", "--tools", "Read,Glob,Grep"]
-            # Le triage est lui aussi une requête Claude : sans ce flag, chaque message
-            # payait un premier appel au défaut xhigh avant même la réponse réelle.
+            # Triage is also a Claude request: without this flag, every message would
+            # pay a first call at the default (highest) effort before the real reply.
             if candidate.effort:
                 command += ["--effort", candidate.effort]
             try:
@@ -291,13 +290,13 @@ class ClaudeCodeRunner:
 
     def one_shot(self, message: str, *, spec: RunSpec, output_schema: dict | None = None,
                  instructions: str | None = None, label: str = "__one_shot__") -> str:
-        """Un tour isolé, sans outil, sans session ni constitution : le contrat de
-        `CodexRunner.one_shot`, pour le banc d'évaluation hors production.
+        """An isolated turn, with no tool, session or constitution: the contract of
+        `CodexRunner.one_shot`, for the out-of-production evaluation bench.
 
-        Le dossier de travail est vide : `CLAUDE.md` du vault ne se charge pas, comme
-        Codex n'en chargeait aucun. `instructions` remplace le prompt système. Avec
-        `output_schema`, rend la sortie structurée sérialisée en JSON. Lève en cas
-        d'échec : le banc doit voir l'erreur, pas une réponse vide.
+        The working directory is empty, so the vault's `CLAUDE.md` is not loaded, as
+        Codex loaded none. `instructions` replaces the system prompt. With
+        `output_schema`, returns the structured output serialized as JSON. Raises on
+        failure: the bench must see the error, not an empty reply.
         """
         command = [self._config.claude_bin, "-p", self._personal(message),
                    "--output-format", "json", "--permission-mode", "dontAsk", "--tools", ""]
@@ -325,13 +324,13 @@ class ClaudeCodeRunner:
         return str(payload.get("result") or "")
 
     def close(self) -> None:
-        """Claude Code ne conserve aucun processus entre deux tours."""
+        """Claude Code keeps no process between two turns."""
         for psid in self._runs.psids():
             self.cancel(psid)
 
     @staticmethod
     def _parse_triage(raw: str) -> Triage | None:
-        """Parse sans masquer l'absence de résultat, pour activer le fallback."""
+        """Parse without hiding a missing result, so the fallback can kick in."""
         line = next((part.strip() for part in (raw or "").splitlines() if part.strip()), "")
         fields = [field.strip() for field in line.split("|")]
         match = _DEPTH.search(fields[0] if fields else "")
@@ -404,11 +403,11 @@ class ClaudeCodeRunner:
 
     @staticmethod
     def _classify_failure(detail: str) -> tuple[FailureKind | None, float | None]:
-        """Classe une panne connue du CLI : (cause, instant de reprise lisible).
+        """Classify a known CLI failure: (cause, readable resume instant).
 
-        Aucun texte pour l'athlète ne sort d'ici : le bot décide seul de ce qu'il dit.
-        Une panne inconnue rend (None, None) et suit la règle « travail commencé ou
-        non ».
+        No text for the athlete comes out of here: the bot alone decides what it says.
+        An unknown failure returns (None, None) and follows the "work started or not"
+        rule.
         """
         lowered = detail.lower()
         if any(w in lowered for w in ("usage limit", "rate limit", "session limit")):
@@ -422,7 +421,7 @@ class ClaudeCodeRunner:
         return None, None
 
     def _personal(self, text: str) -> str:
-        """Le prénom de l'instance à la place du jeton : tout ce que le modèle lit."""
+        """Substitute the instance athlete name for the token in everything the model reads."""
         return persona.render(text, self._config.instance.athlete_name)
 
     def _command(self, message: str, session_id: str | None,
@@ -439,13 +438,13 @@ class ClaudeCodeRunner:
         if not shell_enabled:
             command += ["--permission-mode", "dontAsk", "--tools", ""]
         elif read_only:
-            # La pièce jointe est une source non fiable : le moteur peut la lire, mais
-            # ne dispose matériellement d'aucun outil d'écriture ni d'exécution.
+            # The attachment is an untrusted source: the engine may read it but has
+            # physically no write or execution tool.
             command += ["--permission-mode", "dontAsk", "--tools", "Read,Glob,Grep"]
         else:
-            # Le canal autonome a besoin d'éditer le vault et d'appeler ses CLI, pas
-            # d'un shell général. `dontAsk` refuse toute capacité hors de l'allowlist
-            # au lieu de bloquer un processus sans terminal en attendant une réponse.
+            # The autonomous channel needs to edit the vault and call its CLIs, not a
+            # general shell. `dontAsk` denies any capability outside the allowlist
+            # instead of blocking a terminal-less process waiting for an answer.
             command += list(AUTONOMOUS_PERMISSIONS)
         if model is None:
             model = self._config.routing.plan(Route.N1).primary.model

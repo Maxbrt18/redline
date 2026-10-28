@@ -6,11 +6,10 @@ import {gauges} from './week.js';
 import {cellCount, specOf} from './today.js';
 import {ensure, loadToday} from '../data.js';
 
-// ------------------------------------------------------------ Détail d'une séance faite
-// Maquette v2 validée par l'athlète le 2026-10-26, en palette « Sable » : des cartes au lieu
-// des filets, une tête qui dit la séance en un grand chiffre et une barre, la couleur des
-// zones de FC partout où une FC s'affiche, le rouge pour les répétitions (l'intensité).
-// Tout est calculé par le service (/carnet-api/session/<id>) ; ici on met en forme.
+// ------------------------------------------------------------ Completed session detail
+// Sand palette: cards instead of rules, a head that states the session as a big figure and
+// a bar, HR zone colours wherever an HR is shown, red for repetitions (intensity).
+// Everything is computed by the service (/carnet-api/session/<id>); here we only format.
 const SD_CHART_W = 340, SD_LABEL_W = 22, SD_PLOT_W = SD_CHART_W - SD_LABEL_W, SD_HR_H = 112, SD_ALT_H = 52;
 const SD_HR_LOW = 100, SD_HR_HIGH = 200;
 const SD_ICONS = {
@@ -32,9 +31,9 @@ const sdDuration = seconds => {
 const sdMinutes = seconds => Math.round(seconds / 60) + '′';
 const sdZone = (hr, bounds) => 1 + bounds.filter(edge => hr >= edge).length;
 const sdZoneChip = n => { const chip = el('span', 'Z' + n, 'n-zc'); chip.style.setProperty('--zc', 'var(--z' + n + ')'); return chip; };
-// Les bornes viennent de l'instance (Karvonen sur ses FC), jamais d'une valeur par défaut.
+// The bounds come from the instance (Karvonen on its HR values), never from a default.
 const sdBounds = data => data.hr_bounds || [];
-// La cible d'effort en mots : « 6-7 » pour une bande, « 4 » pour une valeur unique.
+// The effort target in words: "6-7" for a band, "4" for a single value.
 const sdAim = target => target.rpe_min != null && target.rpe_min !== target.rpe_max ? target.rpe_min + '-' + target.rpe_max : String(target.rpe_max);
 function sdHead(title, aside) {
   return add(el('div', null, 'n-dh'), el('h2', title), aside ? el('span', aside) : null);
@@ -46,7 +45,7 @@ function sdFamily(data) {
   return kindName[data.kind] || data.kind;
 }
 
-// ---- la tête : le grand chiffre, puis la séance en une barre
+// ---- the head: the big figure, then the session as a bar
 function sdStrip(data) {
   if (data.phases && data.phases.length) {
     const total = data.phases.reduce((sum, phase) => sum + phase.time_s, 0) || 1;
@@ -114,7 +113,7 @@ function sdFacts(data) {
   return grid;
 }
 
-// ---- le ressenti : trois tuiles, et la question en un geste tant qu'il en manque
+// ---- the feel: three tiles, and the one-gesture question while any is missing
 function sdSegments(value) {
   const bar = el('span', null, 'n-dseg');
   for (let index = 1; index <= 10; index++) {
@@ -155,7 +154,7 @@ function sdFeelings(data) {
   const ask = data.ask, missing = ask ? ask.fields : [];
   const box = add(el('section', null, 'n-dsec'), sdHead('Ressenti', ask ? 'un geste par valeur' : 'déclaré après la séance'));
   const grid = el('div', null, 'n-dtiles');
-  // Une tuile de douleur par zone surveillée, connue ou encore demandée.
+  // One pain tile per monitored zone, known or still asked.
   const known = Object.fromEntries((data.fact.pains || []).map(item => ['pain:' + item.zone, item]));
   const watched = Object.keys(ask ? ask.labels : {}).length ? Object.entries(ask.labels)
     : (data.fact.pains || []).map(item => ['pain:' + item.zone, item.label]);
@@ -184,7 +183,7 @@ function sdFeelings(data) {
   return box;
 }
 
-// ---- prévu et fait
+// ---- planned and done
 function sdPlan(data) {
   if (!data.plan) return null;
   const [rules] = gauges({fact: data.fact, targets: data.plan.targets});
@@ -212,10 +211,10 @@ function sdPlan(data) {
   return add(el('section', null, 'n-dsec'), sdHead('Prévu et fait'), card);
 }
 
-// ---- les graphiques : la FC sur le fond de ses zones, l'altitude dessous
+// ---- charts: HR over the background of its zones, altitude below
 const sdX = (seconds, duration) => SD_PLOT_W * seconds / (duration || 1);
 const sdY = hr => SD_HR_H * (SD_HR_HIGH - Math.max(SD_HR_LOW, Math.min(SD_HR_HIGH, hr))) / (SD_HR_HIGH - SD_HR_LOW);
-// `joined` : une aire ne se coupe pas aux arrêts, seule une ligne le montre.
+// `joined`: an area is not cut at stops, only a line shows them.
 function sdPath(times, values, duration, y, joined = false) {
   let path = '', open = false;
   values.forEach((value, index) => {
@@ -256,7 +255,7 @@ function sdChart(data) {
     shape('text', {x: sdX((start + end) / 2, duration), y: -4, class: 'rep'}, svg, String(index + 1));
   });
   shape('path', {d: sdPath(series.t, series.hr, duration, sdY), class: 'hr'}, svg);
-  // Le pic s'écrit quand aucune répétition ne le dit déjà dans son tableau.
+  // The peak is written when no repetition already states it in its table.
   if (!(series.bands || []).length) {
     const peak = series.hr.indexOf(Math.max(...known));
     shape('text', {x: sdX(series.t[peak], duration), y: sdY(Math.max(...known)) - 5, class: 'v'}, svg, String(Math.max(...known)));
@@ -285,7 +284,7 @@ function sdChart(data) {
   return box;
 }
 
-// ---- les répétitions (qualité) ou les kilomètres (le reste)
+// ---- repetitions (quality) or kilometres (the rest)
 function sdReps(data) {
   const bounds = sdBounds(data), table = el('div', null, 'n-dreps');
   table.append(add(el('div', null, 'n-drh'), el('span'), el('span', 'Durée'), el('span', 'D+'), el('span', 'Allure'), el('span', 'FC moy'), el('span', 'Cad.')));
@@ -379,7 +378,7 @@ function sdWork(data) {
   return add(el('section', null, 'n-dsec'), sdHead('Au kilomètre', 'temps en mouvement'), card);
 }
 
-// ---- temps par zone, comparaison, conditions, semaine
+// ---- time per zone, comparison, conditions, week
 function sdZones(data) {
   if (!data.zones) return null;
   const seconds = data.zones.seconds, total = seconds.reduce((a, b) => a + b, 0) || 1, top = Math.max(...seconds) || 1;

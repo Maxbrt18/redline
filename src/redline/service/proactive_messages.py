@@ -1,8 +1,8 @@
-"""Rendus fermés des initiatives qui ne demandent aucun jugement de coach.
+"""Closed renderings of initiatives that need no coach judgement.
 
-Une donnée déjà typée n'a pas besoin d'un modèle pour devenir une question stable.
-Ce module reste volontairement petit : si un déclencheur doit arbitrer, expliquer ou
-réviser une prescription, il demeure dans le chemin agent.
+Already-typed data does not need a model to become a stable question. This module
+stays deliberately small: a trigger that must arbitrate, explain or revise a
+prescription stays on the agent path.
 """
 
 from __future__ import annotations
@@ -17,17 +17,17 @@ from redline.model import session_kinds
 
 @dataclass(frozen=True)
 class ClosedProactive:
-    """`question` : l'information réellement attendue, sous-chaîne exacte de `text`.
+    """`question`: the information actually expected, an exact substring of `text`.
 
-    Elle devient une question suivie après livraison confirmée, comme celle d'un tour
-    d'agent, et interdit de reposer la même. Vide pour un envoi qui n'attend rien
-    (message opérateur) et pour une prise de nouvelles sociale.
+    It becomes a tracked question after confirmed delivery, like one from an agent
+    turn, and forbids asking the same one again. Empty for a send that expects nothing
+    (operator message) and for a social check-in.
     """
     text: str
     markers: tuple[str, ...] = ()
     question: str = ""
-    #: Le texte part avec un bouton vers le carnet : la réponse s'y donne d'un tap,
-    #: sans tour de conversation, donc il n'attend aucune réponse ici.
+    #: The text goes out with a button to the notebook: the answer is given there in
+    #: one tap, with no conversation turn, so no reply is awaited here.
     notebook: bool = False
 
 
@@ -75,7 +75,7 @@ def _missing_cells(detail: str) -> ClosedProactive | None:
 
 
 def _base(column: str) -> str:
-    """« Dlr:genou » → « Dlr » (même règle que `ledger.column_base`)."""
+    """`Dlr:zone` -> `Dlr` (same rule as `ledger.column_base`)."""
     return column.split(":", 1)[0]
 
 
@@ -140,7 +140,7 @@ def _gear_alert(detail: str) -> ClosedProactive:
 
 
 def _operator_message(detail: str) -> ClosedProactive | None:
-    """Un texte écrit hors du service (bilan fait depuis le Mac), livré tel quel."""
+    """A text written outside the service (e.g. a review made from a laptop), delivered as is."""
     text = str(_object(detail).get("text") or "").strip()
     return ClosedProactive(text) if text else None
 

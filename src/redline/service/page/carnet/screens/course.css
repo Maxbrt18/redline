@@ -3,7 +3,7 @@
 .n-head h1 { margin: 0; font-size: 44px; }
 .n-head .goal { text-align: right; }
 .n-head .goal b { font: 700 26px/1 var(--display); }
-/* Volume et sortie longue : le fait sur son objectif, la sortie longue en chiffres dessous. */
+/* Volume and long run: the fact against its target, the long run in figures below. */
 .n-vchart { display: block; width: 100%; height: auto; margin-top: 14px; overflow: visible; }
 .n-vchart .track { fill: var(--ghost); }
 .n-vchart .done { fill: var(--data); }
@@ -38,6 +38,6 @@
 .n-pips i { flex: 1; height: 7px; border-radius: 2px; background: var(--ghost); }
 .n-pips i.f { background: var(--data); }
 .n-cp b { font: 700 16px/1 var(--display); text-align: right; }
-/* Chaque capacité porte sa pastille ; les blessures gardent leur violet. */
+/* Each capability carries its pill; the injury ones keep their purple. */
 .n-cp { grid-template-columns: 128px 1fr 30px; }
 .n-cp > span { display: flex; align-items: center; gap: 8px; }

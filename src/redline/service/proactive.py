@@ -51,13 +51,14 @@ class ProactiveJob:
     # Time-sensitive trigger: exempt from the minimum gap between two proactive
     # messages.
     priority: bool = False
-    # Combien de fois ce travail a déjà été réclamé, celle-ci comprise : les reprises
-    # sont plafonnées sur ce compteur durable.
+    # How many times this job has been claimed so far, this one included: retries
+    # are capped on this durable counter.
     attempts: int = 1
-    # La carte des répétitions d'une séance de qualité, calculée à la capture Strava :
-    # le service la rend après le tour, sans la laisser au choix du modèle.
+    # Repetition card of a quality session, computed at Strava capture: the service
+    # renders it after the turn instead of leaving it to the model.
     workout_card: dict | None = None
-    # Débrief d'une séance de qualité : il engage un jugement et ne tourne pas en N1.
+    # Debrief of a quality session: it commits a judgement, so it never runs at the
+    # lightest routing level.
     quality: bool = False
 
 
@@ -68,26 +69,26 @@ class ProactiveScheduler:
     TICK = 60
     MORNING_GRACE_HOURS = 3   # the morning note only makes sense shortly after its time
     HEALTH_PING_SECONDS = 300  # heartbeat to healthchecks.io (if configured)
-    # Publication Git et synchronisation du vault quand le worker est libre.
+    # Git publication and vault sync, run when the worker is idle.
     MAINTENANCE_SECONDS = 600
     DEBRIEF_MAX_LATE_HOURS = 2   # beyond that, debriefing the session is out of time
-    # Une capture ratée juste après l'upload se reprend à la minute pendant les
-    # premières minutes (un raté passager ne doit pas coûter 5 min de plus), puis
-    # toutes les 5 min : une erreur qui se répète n'use pas le quota Strava.
+    # A capture that fails right after the upload is retried every minute during the
+    # first minutes (a transient failure must not cost 5 more minutes), then every
+    # 5 min so that a repeating error does not burn the Strava quota.
     CAPTURE_RETRY_FAST = 60
     CAPTURE_RETRY_SLOW = 300
     CAPTURE_FAST_WINDOW = 180
-    # Dernier recours pour une cellule déclarative vide : assez tard pour que la
-    # journée ait eu ses occasions naturelles de la réclamer (la question s'accroche
-    # normalement à un message qui part de toute façon), assez tôt pour rester dans
-    # la fenêtre de politesse. Au-delà de minuit la cellule sort de sa fenêtre et
-    # devient `?` : la réclamer le lendemain n'obtient plus un souvenir (2026-08-06).
+    # Last resort for an empty declarative cell: late enough for the day to have had
+    # its natural occasions to claim it (the question normally rides on a message that
+    # goes out anyway), early enough to stay inside the polite window. Past midnight
+    # the cell leaves its window and becomes `?`: claiming it the next day no longer
+    # obtains a memory.
     CELLS_CLAIM_HOUR = 20
     #: The missing wake trace is asked for once in the morning, while the notebook
     #: still takes it (`wake_trace_until` in the rulebook), after the morning message
     #: has had time to be read.
     WAKE_REMINDER_AT = dtime(10, 30)
-    # Le bilan anticipé ne double pas le mot du matin ni la demande du réveil.
+    # The early weekly review must not double the morning note or the wake request.
     WEEKLY_EARLIEST = dtime(12, 0)
 
     def __init__(self, bot: CoachBot, state: StateStore, config: Config) -> None:
@@ -95,8 +96,8 @@ class ProactiveScheduler:
         self._state = state
         self._config = config
         self._stop = threading.Event()
-        # Un signal (webhook Strava, ressentis du carnet) réveille la boucle sans
-        # attendre le prochain tick.
+        # A signal (Strava webhook, notebook feelings) wakes the loop without waiting
+        # for the next tick.
         self._nudge = threading.Event()
         self._thread: threading.Thread | None = None
         self._captured_on_arrival: set[str] = set()
@@ -120,7 +121,7 @@ class ProactiveScheduler:
             self._thread.join(timeout)
 
     def nudge(self) -> None:
-        """Fait tourner la boucle tout de suite (sûr depuis n'importe quel thread)."""
+        """Run the loop right away (safe from any thread)."""
         self._nudge.set()
 
     def _loop(self) -> None:
@@ -184,12 +185,12 @@ class ProactiveScheduler:
             self._bot.submit_proactive(job)
 
     def _capture_arrivals(self) -> None:
-        """Capture une sortie dès son arrivée, sans attendre son débrief.
+        """Capture an activity as soon as it arrives, without waiting for its debrief.
 
-        La sortie entre ainsi au registre tout de suite : le carnet peut demander ses
-        ressentis pendant que le débrief attend son signal (titre renommé, ressentis
-        donnés, message) ou son délai. Une seule tentative ici par activité : un échec
-        se reprend au moment du débrief, avec ses reprises bornées.
+        The activity enters the ledger immediately: the notebook can ask for its
+        feelings while the debrief waits for its signal (renamed title, feelings given,
+        message) or its delay. One attempt per activity here: a failure is retried at
+        debrief time, with bounded retries.
         """
         for job in self._state.proactive.jobs(active_only=True):
             if (job["kind"] != "strava_debrief" or job["status"] != "pending"
@@ -212,7 +213,7 @@ class ProactiveScheduler:
             log.info("Proactive budget blocking: %s", reason)
 
     def _user_active(self, psid: str) -> bool:
-        """Une conversation en cours : message reçu, tour en vol ou réponse récente."""
+        """An ongoing conversation: message received, turn in flight or recent reply."""
         return self._bot.conversation_active(psid)
 
     def _materialize_triggers(self, psid: str, now: datetime) -> None:
@@ -220,12 +221,12 @@ class ProactiveScheduler:
         pro = self._state.proactive
 
         self._state.materialize_intelligence(now)
-        # Dette fermée et idempotente : elle ne dépend pas de la réussite du mot du
-        # matin et récupère donc aussi un rendu manqué avant un redémarrage/déploiement.
+        # Closed, idempotent debt: it does not depend on the morning note succeeding,
+        # so it also recovers a render missed before a restart or deployment.
         if self._bot is not None:
             self._bot.materialize_strength_card(psid, now)
-            # Invariant déterministe : une semaine courante sans programme valide a un
-            # propriétaire, un job de réparation unique et borné.
+            # Deterministic invariant: a current week without a valid program has one
+            # owner, a single bounded repair job.
             self._bot.materialize_week_repair(now)
 
         # Materialize periodic triggers with stable ids. Enqueue is idempotent, so
@@ -252,23 +253,22 @@ class ProactiveScheduler:
         wake_until = rulebook.current().parameters.wake_trace_until
         if (self._bot is not None and self._wake_checked_on != today
                 and self.WAKE_REMINDER_AT <= now.time() < wake_until):
-            # Une lecture par matin suffit : la trace manquante ne peut qu'être remplie
-            # ensuite, et la livraison revérifie avant d'envoyer.
+            # One read per morning is enough: the missing trace can only be filled in
+            # afterwards, and delivery re-checks before sending.
             self._wake_checked_on = today
             if self._bot.wake_reminder_due(psid):
                 pro.enqueue_job(f"trace-reveil:{today}", "trace_reveil", "", now.timestamp(),
                                 expire_at=clock.combine(now.date(), wake_until).timestamp())
 
         if now.hour >= self.CELLS_CLAIM_HOUR and self._bot is not None:
-            # Le dernier recours Messenger ne réclame que ce qui vit dans la mémoire
-            # de l'athlète. D+/D- sont des calculs Strava : les laisser armer ce job
-            # produisait une question générique après que tous les ressentis avaient
-            # déjà été donnés (2026-08-30).
+            # The Messenger last resort only claims what lives in the athlete's memory.
+            # D+/D- are Strava computations: letting them arm this job would produce a
+            # generic question after all the feelings were already given.
             claimable = []
             for entry in self._bot.pending_ledger_cells(now.date()):
-                # La trace `wake-trace` se recueille au réveil, en aucune/légère/nette.
-                # La laisser entrer ici la transforme en demande `/10` le soir,
-                # puis en souvenir sollicité trop tard (2026-09-15).
+                # The `wake-trace` is collected on waking, as none/light/clear. Letting
+                # it in here would turn it into a `/10` request in the evening, i.e. a
+                # memory solicited too late.
                 if entry.get("type") == session_kinds.WAKE_TRACE:
                     continue
                 missing = [column for column in entry["missing"]
@@ -278,8 +278,8 @@ class ProactiveScheduler:
             if claimable:
                 oldest = claimable[0]
                 detail = json.dumps({
-                    # Le read model normalise déjà la date en ISO ; ``str`` accepte
-                    # aussi un objet date sans imposer un second contrat de type.
+                    # The read model already normalizes the date to ISO; ``str`` also
+                    # accepts a date object without imposing a second type contract.
                     "date": str(oldest["date"]),
                     "type": oldest["type"],
                     "missing": oldest["missing"],
@@ -296,12 +296,11 @@ class ProactiveScheduler:
                             now.timestamp())
 
     def _sunday_settled(self, now: datetime) -> bool:
-        """Le bilan part dès que le dimanche ne peut plus le changer (2026-10-18).
+        """The review goes out as soon as Sunday can no longer change it.
 
-        Attendre 19 h laissait l'athlète sans semaine suivante tout l'après-midi. Soldé
-        veut dire : chaque séance du jour faite, manquée ou annulée, et aucun débrief
-        Strava en attente, pour que le bilan lise la dernière sortie et passe après
-        son débrief. L'heure fixe reste le repli quand une séance n'est pas soldée.
+        Settled means: every session of the day done, missed or cancelled, and no
+        Strava debrief pending, so the review reads the last activity and comes after
+        its debrief. The fixed hour remains the fallback when a session is not settled.
         """
         if self._bot is None or now.time() < self.WEEKLY_EARLIEST:
             return False
@@ -329,16 +328,16 @@ class ProactiveScheduler:
                 if not isinstance(snapshot, dict) or not snapshot.get("activity"):
                     raise ValueError("instantané Strava vide après capture")
             except strava.StravaNotFound as exc:
-                # Supprimée ou privée : la reprise toutes les 5 min a coûté 1 500
-                # appels par activité entre le 17 et le 25/09, sans rien changer.
+                # Deleted or private: retrying every 5 min only burns API calls and
+                # never changes the outcome.
                 log.warning("Strava activity %s gone: %s", record["detail"], exc)
                 pro.fail_job(record["id"], "activité introuvable sur Strava")
                 return None
             except Exception as exc:
                 log.error("Strava activity %s not captured (%s): %s",
                           record["detail"], type(exc).__name__, exc)
-                # L'échéance s'ancre au premier échec : au-delà, la sortie n'appelle
-                # plus un débrief à chaud et le job se solde au lieu de boucler.
+                # The deadline is anchored at the first failure: beyond it, the activity
+                # no longer calls for a hot debrief and the job closes instead of looping.
                 window = self.DEBRIEF_MAX_LATE_HOURS * 3600
                 failing_for = (window - (record["expire_at"] - time.time())
                                if record.get("expire_at") else 0.0)
@@ -373,8 +372,8 @@ class ProactiveScheduler:
     def _job(cls, psid: str, record: dict) -> ProactiveJob:
         kind, detail = record["kind"], record.get("detail", "")
         snapshot = record.get("snapshot")
-        # Une initiative fermée (carte, J+1, relances typées) ne construit même pas de
-        # prompt : le bot la rend sans posséder de chemin vers l'agent.
+        # A closed initiative (card, next-day, typed reminders) does not even build a
+        # prompt: the bot renders it without owning a path to the agent.
         prompt = (build_proactive_prompt(kind, detail)
                   if kind in PROACTIVE_TRIGGERS else "")
         if prompt and isinstance(snapshot, dict):

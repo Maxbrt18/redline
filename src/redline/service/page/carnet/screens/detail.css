@@ -1,8 +1,7 @@
-/* Détail d'une séance faite (maquette v2 validée par l'athlète le 2026-10-26, palette Sable).
- * Cet écran a ses cartes au lieu des filets du reste du carnet : « triste, pas lisible
- * avec toutes ces lignes » sur la v1. Titres de groupe au-dessus des cartes, comme Réglages.
- * La couleur a un sens : la teinte de la famille dans la pastille, la rampe des zones de
- * FC (--z1 à --z5) partout où une FC s'affiche, le rouge pour les répétitions. */
+/* Detail of a completed session (sand palette). This screen uses cards instead of the
+ * rules used elsewhere in the notebook: many lines were hard to read. Group titles sit
+ * above the cards, as in Settings. Colour has a meaning: the family tint in the pill, the
+ * HR zone ramp (--z1 to --z5) wherever an HR is shown, red for repetitions. */
 .n-dh { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 26px 4px 8px; }
 .n-dh h2 { font: 600 12px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; }
 .n-dh span { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
@@ -11,7 +10,7 @@
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) :is(.n-dcard, .n-dtile, .n-dlink) { box-shadow: inset 0 .5px 0 rgb(255 255 255 / .06); } }
 .n-dcard { border-radius: 18px; padding: 16px; }
 
-/* La tête : sur le sable, un grand chiffre, puis la séance en une barre. */
+/* The head: on sand, a big figure, then the session as a bar. */
 .n-dhero { --h: var(--h-run); background: var(--sand); border-radius: 22px; padding: 16px 18px 18px; margin-top: 10px; }
 .n-dkind { display: flex; align-items: center; gap: 9px; margin: 0; font: 600 13.5px var(--sans); }
 .n-dhero .n-pas { background: color-mix(in oklab, var(--h) var(--tile-pas-mix), var(--sand)); }
@@ -37,7 +36,7 @@
 .n-dslab .r { right: 0; }
 .n-dslab .q { transform: translateX(-50%); color: var(--red); font-weight: 600; }
 
-/* Tuiles : un chiffre chacune. */
+/* Tiles: one figure each. */
 .n-dtiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
 .n-dh + .n-dtiles { margin-top: 0; }
 .n-dtiles.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -62,7 +61,7 @@
 .n-dpend { color: var(--faint); border-bottom: 1.5px dashed var(--faint); }
 .n-dsec .n-check { background: var(--card); margin-top: 8px; }
 
-/* Prévu et fait. */
+/* Planned and done. */
 .n-dcard .n-gauges { margin-top: 0; }
 .n-dsteps { display: grid; gap: 8px; margin-top: 16px; }
 .n-dstep { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px;
@@ -76,7 +75,7 @@
 .n-dnotefold { margin-top: 10px; }
 .n-dnotefold summary { min-height: 36px; font-size: 13.5px; color: var(--muted); }
 
-/* Les graphiques : la FC sur ses zones, l'altitude dessous, un même axe du temps. */
+/* Charts: HR on its zones, altitude below, one shared time axis. */
 .n-dchart svg { display: block; width: 100%; height: auto; overflow: visible; }
 .n-dclab { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--muted); margin: 0 0 6px; }
 .n-dclab b { color: var(--ink); font-weight: 600; }
@@ -100,7 +99,7 @@
 .n-daxis span { position: absolute; transform: translateX(-50%); }
 .n-daxis span:first-child { transform: none; }
 
-/* Les répétitions : un numéro rouge, la FC à la couleur de sa zone. */
+/* Repetitions: a red number, HR in its zone's colour. */
 .n-dreps { margin-top: 18px; }
 .n-drh, .n-drr { display: grid; grid-template-columns: 30px repeat(5, minmax(0, 1fr)); align-items: center; gap: 4px; }
 .n-drh { font: 600 10.5px/1 var(--sans); letter-spacing: .05em; text-transform: uppercase; color: var(--muted); padding: 0 0 8px; }
@@ -116,7 +115,7 @@
 .n-dnote { font-size: 13px; color: var(--muted); margin: 12px 0 0; line-height: 1.45; }
 .n-dnote b { color: var(--ink); font-weight: 600; }
 
-/* La lecture : un constat par ligne, en mots ; la réserve se donne d'un geste. */
+/* The reading: one finding per line, in words; the caveat is given in one gesture. */
 .n-dread { margin-top: 14px; display: grid; gap: 6px; }
 .n-dread-row { display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: start; padding: 10px 12px; border-radius: 12px;
   font-size: 14px; line-height: 1.4; background: color-mix(in oklab, var(--ink) 4%, transparent); }
@@ -127,7 +126,7 @@
 .n-dask { display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: start; margin-bottom: 10px; }
 .n-dchoice button { background: var(--card); font-size: 14.5px; }
 
-/* Au kilomètre : l'allure en barre, la FC à la couleur de sa zone. */
+/* Per kilometre: pace as a bar, HR in its zone's colour. */
 .n-dkm { margin-top: 16px; }
 .n-dkh, .n-dkr { display: grid; grid-template-columns: 30px 44px minmax(0, 1fr) 56px 40px; align-items: center; gap: 8px; }
 .n-dkh { font: 600 10.5px/1 var(--sans); letter-spacing: .05em; text-transform: uppercase; color: var(--muted); padding-bottom: 6px; }
@@ -139,7 +138,7 @@
 .n-dkr .bar i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: var(--h-run); }
 .n-dkr .cad { color: var(--muted); font-weight: 500; }
 
-/* Temps par zone. */
+/* Time per zone. */
 .n-dzones { display: grid; gap: 11px; }
 .n-dz { display: grid; grid-template-columns: 86px 1fr 70px; align-items: center; gap: 10px; font-size: 13px; }
 .n-dz .n-zc { margin-right: 6px; }
@@ -150,7 +149,7 @@
 .n-dz > span:last-child b { font: 600 16px var(--display); }
 .n-dz > span:last-child small { color: var(--muted); margin-left: 4px; }
 
-/* Comparaison, semaine, liens. */
+/* Comparison, week, links. */
 .n-dcrow { display: grid; grid-template-columns: minmax(0, 1fr) 70px 70px; gap: 8px; padding: 8px 0; align-items: baseline; font-size: 14px; }
 .n-dcrow + .n-dcrow { border-top: 1px solid color-mix(in oklab, var(--ink) 7%, transparent); }
 .n-dcrow span:first-child { color: var(--muted); }
@@ -169,7 +168,7 @@
 .n-dlink small { color: var(--muted); font-size: 13px; white-space: nowrap; }
 .n-dlink .n-dico { color: var(--faint); }
 
-/* Le lien vers le détail, sous une séance faite d'Aujourd'hui. */
+/* The link to the detail, under a completed session on Today. */
 .n-dopen { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 44px; margin-top: 8px; padding: 0;
   border: 0; background: none; color: var(--ink); font-size: 14.5px; font-weight: 500; text-align: left; }
 .n-dlink:active, .n-dopen:active { opacity: .5; transition: none; }

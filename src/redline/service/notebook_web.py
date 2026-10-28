@@ -1,4 +1,4 @@
-"""Routes privées du carnet ; seules la coquille et les ressources sont publiques."""
+"""Private notebook routes; only the shell and the resources are public."""
 
 from __future__ import annotations
 
@@ -46,13 +46,13 @@ def register(app: Flask, notebook: NotebookService, psid: str,
              alert: Callable[[str, str], None] | None = None, place: str = "Paris",
              cues: dict | None = None,
              settled: Callable[[int], None] | None = None) -> None:
-    """`alert(texte, clé)` réveille le coach quand une réponse franchit un plafond ;
-    `cues` porte les consignes d'exécution des exercices, pour la séance guidée ;
-    `settled(activité)` avance le débrief d'une sortie dont les ressentis sont complets."""
+    """`alert(text, key)` wakes the coach when an answer crosses a cap;
+    `cues` carries the exercises' execution cues, for the guided session;
+    `settled(activity)` advances the debrief of a run whose feelings are complete."""
     document = page.notebook_document(render.CARDS_DIR, cues,
                                       session_labels.for_page()).encode("utf-8")
-    # La coquille ne porte aucune donnée : elle se revalide (304) et voyage compressée.
-    # Mesure du 2026-10-08 : 162 Ko re-téléchargés à chaque ouverture, en `no-store`.
+    # The shell carries no data: it is revalidated (304) and travels compressed.
+    # `no-store` would re-download it in full on every open.
     document_etag = hashlib.sha256(document).hexdigest()[:16]
     document_gzip = gzip.compress(document, mtime=0)
     origin = urlsplit(notebook.base_url)
@@ -113,8 +113,8 @@ def register(app: Flask, notebook: NotebookService, psid: str,
                        background_color="#f7f5f2", theme_color="#f7f5f2",
                        icons=[{"src": "/carnet-install-icon.png", "sizes": "512x512", "type": "image/png"}])
 
-    # La coquille gardée sur l'appareil : le service worker ne garde que `/carnet`, qui
-    # ne porte aucune donnée ; il ne touche jamais aux routes /carnet-api.
+    # The shell kept on the device: the service worker only keeps `/carnet`, which
+    # carries no data; it never touches the /carnet-api routes.
     @app.get("/carnet-sw.js")
     def notebook_worker():
         return app.response_class((page.PAGE_DIR / "carnet" / "sw.js").read_bytes(),
@@ -142,7 +142,7 @@ def register(app: Flask, notebook: NotebookService, psid: str,
         body = request.get_json(silent=True)
         if not isinstance(body, dict) or set(body) != {"token"} or not isinstance(body["token"], str):
             return jsonify(error="Lien invalide."), 400
-        # Une ancienne notification reste ouvrable sur un appareil déjà connecté.
+        # An old notification stays openable on an already connected device.
         if notebook.store.authenticate(psid, request.cookies.get(COOKIE, "")):
             return jsonify(status="ok")
         device = notebook.store.exchange(psid, body["token"])

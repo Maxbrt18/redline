@@ -20,8 +20,8 @@ class TurnOutcome:
     result: RunResult
     persistence: PersistenceResult | None
     base_head: str
-    # L'identité du tour survit à son exécution : la trace d'un proactif s'écrit APRÈS
-    # la livraison Messenger, et elle a besoin de relire ce que le tour a déposé.
+    # The turn identity outlives its execution: a proactive trace is written AFTER the
+    # Messenger delivery and needs to re-read what the turn left behind.
     turn_id: str = ""
     spec: RunSpec | None = None
     model_calls: int = 0
@@ -30,9 +30,9 @@ class TurnOutcome:
 class TurnExecutor:
     """Run, persist or fully abandon a model turn.
 
-    Un tour produit exactement une réponse : celle du modèle qui a travaillé. Aucune
-    seconde rédaction ne la relit ni ne la remplace après persistance ; les commandes
-    ont déjà été validées une à une pendant le tour (`stage_command`).
+    A turn produces exactly one reply: that of the model that did the work. No second
+    writing pass re-reads or replaces it after persistence; the commands were already
+    validated one by one during the turn (`stage_command`).
     """
 
     def __init__(self, agent: AgentRunner, repo: VaultRepo, state: StateStore) -> None:
@@ -62,15 +62,15 @@ class TurnExecutor:
                     if retry_at and not result.retry_at:
                         result = replace(result, retry_at=retry_at)
                     return TurnOutcome(result, None, base_head, turn_id, used_spec, calls)
-                # Une tentative ratée peut avoir laissé un fichier ou une commande
-                # préparée malgré son erreur. On remet la transaction et le worktree
-                # dans l'état initial avant d'essayer le profil de repli.
+                # A failed attempt may have left a file or a prepared command despite
+                # its error. The transaction and the worktree are reset to their
+                # initial state before trying the fallback profile.
                 log.warning("Route %s en échec ; tentative de repli %d/%d",
                             plan.route, attempt + 2, len(plan.attempts))
                 self._reset_for_retry(turn_id, base_head)
                 if spec.session_mode is SessionMode.CONTINUE:
                     self._state.clear_session(psid, self._agent.provider)
-            if result is None or used_spec is None:  # pragma: no cover - route non vide
+            if result is None or used_spec is None:  # pragma: no cover - route is never empty
                 raise RuntimeError("route agent vide")
             if (not result.full_text.strip() and not result.silent
                     and not used_spec.structured_reply
@@ -94,8 +94,8 @@ class TurnExecutor:
                 )
             return TurnOutcome(result, persisted, base_head, turn_id, used_spec, calls)
         finally:
-            # Les JSON remis aux CLI (`--input`, src/redline/model/agent_input.py) ne
-            # survivent pas au tour : un tour suivant ne relit jamais ceux-ci.
+            # The JSON files handed to the CLIs (`--input`, src/redline/model/agent_input.py)
+            # do not outlive the turn: a later turn never re-reads them.
             self._repo.clear_turn_inputs(turn_id)
             if persisted is None or not persisted.writes_applied:
                 self._repo.discard_turn(turn_id)
@@ -105,11 +105,11 @@ class TurnExecutor:
 
     def read_only(self, psid: str, prompt: str, *, plan: RoutePlan,
                   turn_id: str | None = None) -> RunResult:
-        """Exécute une analyse sans persister, avec le même fallback borné.
+        """Run an analysis without persisting, with the same bounded fallback.
 
-        La lecture seule est une frontière applicative : même sans sandbox Codex,
-        toute commande PostgreSQL préparée et tout changement Git sont détruits avant
-        de rendre la réponse.
+        Read-only is an application boundary: even without a Codex sandbox, any
+        prepared PostgreSQL command and any Git change are destroyed before the reply
+        is returned.
         """
         base_head = self._repo.head()
         actual_turn_id = turn_id or str(uuid.uuid4())
@@ -137,7 +137,7 @@ class TurnExecutor:
                 self._repo.abandon_turn(base_head)
 
     def _reset_for_retry(self, turn_id: str, base_head: str) -> None:
-        """Nettoie une tentative échouée sans réinitialiser inutilement Git."""
+        """Clean up a failed attempt without needlessly resetting Git."""
         self._repo.discard_turn(turn_id)
         try:
             dirty = self._repo.head() != base_head or not self._repo.is_clean()

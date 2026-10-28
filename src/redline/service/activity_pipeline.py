@@ -1,4 +1,4 @@
-"""Pipeline déterministe d'une activité Strava avant tout jugement de coaching."""
+"""Deterministic pipeline for a Strava activity, ahead of any coaching judgement."""
 
 from __future__ import annotations
 
@@ -49,10 +49,10 @@ def _gear(gear_id: str) -> dict:
 
 @dataclass
 class ActivityPipeline:
-    """Capture, enrichit et rend l'état prêt pour le débrief.
+    """Capture, enrich and render the state ready for the debrief.
 
-    Les appels externes restent hors transaction. Chaque résultat est ensuite écrit
-    idempotemment avec son état ; une panne météo n'annule donc jamais l'activité.
+    External calls stay outside any transaction. Each result is then written
+    idempotently with its state, so a weather outage never cancels the activity.
     """
 
     store: OperationalStore
@@ -62,11 +62,11 @@ class ActivityPipeline:
     gear_fetch: GearFetch = _gear
 
     def run(self, activity_id: int, *, fresh_words: bool = False) -> dict[str, Any]:
-        """`fresh_words` relit titre et description pour le débrief qui part.
+        """`fresh_words` re-reads title and description for the debrief going out.
 
-        La capture se fait dès l'arrivée de la sortie, souvent avant que l'athlète ne la
-        renomme : sans relecture, le débrief lirait « Morning Run ». Une relecture
-        ratée garde les mots capturés, jamais ne bloque le débrief.
+        Capture happens as soon as the run arrives, often before the athlete renames it:
+        without a re-read the debrief would read the default title. A failed re-read
+        keeps the captured words and never blocks the debrief.
         """
         activity_id = int(activity_id)
         intake = self._captured_intake(activity_id)
@@ -91,8 +91,8 @@ class ActivityPipeline:
                 self.store.sync_strava_gear(self.gear_fetch(gear_id))
                 gear_state = "known"
             except Exception as exc:
-                # Le débrief de la sortie reste prioritaire. Le prochain webhook ou
-                # gear-sync rejouera ce rafraîchissement idempotent.
+                # The run's debrief stays the priority. The next webhook or
+                # gear-sync replays this idempotent refresh.
                 gear_state = "failed"
                 log.warning("Synchronisation du matériel Strava %s échouée : %s",
                             gear_id, exc)
@@ -114,7 +114,7 @@ class ActivityPipeline:
         from redline.model import debrief
 
         if debrief.is_quality(session):
-            # Lu par le service : un débrief de qualité engage un jugement (N2).
+            # Read by the service: a quality debrief calls for a judgement.
             snapshot["quality"] = True
             card = self._quality_card(activity_id, activity.laps, session, day)
             if card:
@@ -136,7 +136,7 @@ class ActivityPipeline:
         return replace(activity, name=fresh.name, description=fresh.description)
 
     def _feelings(self, observation_id: Any) -> dict:
-        """RPE, douleur et plaisir déjà donnés (carnet) : le débrief part souvent après."""
+        """RPE, pain and enjoyment already given (notebook): the debrief often goes out later."""
         if not observation_id:
             return {}
         try:
@@ -147,11 +147,10 @@ class ActivityPipeline:
 
     def _gaps(self, activity_id: int,
               observation_id: Any) -> tuple[list[str], dict | None, Any]:
-        """Prévu/fait et FC à allure comparable, calculés avant le tour (audit du 11/10).
+        """Planned vs done and HR at comparable pace, computed before the turn.
 
-        Rend aussi la séance prévue et la date de la sortie, que la carte des
-        répétitions reprend. Une lecture ratée prive le débrief de ses écarts, jamais
-        de son départ.
+        Also returns the planned session and the run date, which the repetitions card
+        reuses. A failed read deprives the debrief of its gaps, never of its departure.
         """
         if not observation_id:
             return [], None, None
@@ -182,29 +181,28 @@ class ActivityPipeline:
     @staticmethod
     def _quality_card(activity_id: int, laps: tuple[Lap, ...], session: dict | None,
                       day: Any) -> dict | None:
-        """Les répétitions d'une séance de qualité, prêtes pour la carte.
+        """The repetitions of a quality session, ready for the card.
 
-        Le 15/10, le premier fractionné avec Redline est parti sans carte : elle était
-        laissée au choix du modèle, et un débrief court l'a sautée. Le service la
-        construit donc lui-même depuis les tours Strava, comme la carte de renfo.
+        Left to the model's choice, a short debrief could skip the card, so the service
+        builds it itself from the Strava laps, like the strength card.
         """
         from redline.model import debrief
 
         date = f"{day:%d/%m}" if hasattr(day, "strftime") else ""
         card = debrief.quality_card(laps, session, date)
         if card is None:
-            # Une qualité sans tours lisibles (pas de lap, allure continue) n'a pas de
-            # carte : ça se voit au journal plutôt que par un silence.
+            # A quality session with no readable laps (no lap, continuous pace) has no
+            # card: this shows in the log rather than as a silence.
             log.warning("Séance de qualité %s sans répétitions lisibles dans ses tours : "
                         "pas de carte", activity_id)
         return card
 
     def _captured_intake(self, activity_id: int) -> dict | None:
-        """Relit le fait durable avant tout nouvel appel Strava.
+        """Re-read the durable fact before any new Strava call.
 
-        Un redémarrage entre la capture et le tour agent ne doit jamais transformer
-        une activité déjà acquise en nouvelle dépendance réseau. Les enrichissements
-        en échec restent rejouables séparément ; le coeur du débrief, lui, est acquis.
+        A restart between capture and the agent turn must never turn an already
+        acquired activity into a new network dependency. Failed enrichments stay
+        replayable separately; the core of the debrief is acquired.
         """
         try:
             intake = self.store.strava_intake(activity_id)
@@ -218,7 +216,7 @@ class ActivityPipeline:
 
     @staticmethod
     def _snapshot(activity: Activity, captured: dict, enrichments: dict) -> dict:
-        """Paquet borné donné au coach, sans polyline ni second appel fournisseur."""
+        """Bounded packet given to the coach, with no polyline nor second provider call."""
         return {
             "source": "strava_capture",
             "activity": activity_model.summary(activity),

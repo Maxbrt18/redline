@@ -1,9 +1,9 @@
-"""Politique de routage des tours agent.
+"""Routing policy for agent turns.
 
-Le bot ne connaît jamais les noms de modèles des fournisseurs. Il demande un
-profil (triage, N0–N3, analyse profonde ou proactif lourd) et ce module fournit le
-plan de tentatives correspondant. Les adaptateurs Claude et Codex consomment le
-même ``RunSpec`` ; seuls leurs noms de modèle par défaut diffèrent ici.
+The bot never knows provider model names. It asks for a profile (triage, N0-N3,
+deep analysis or heavy proactive) and this module supplies the matching attempt
+plan. The Claude and Codex adapters consume the same ``RunSpec``; only their
+default model names differ here.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from .agent import RunSpec, SessionMode
 
 
 class Route(StrEnum):
-    """Identifiants stables des profils de travail."""
+    """Stable identifiers of the work profiles."""
 
     TRIAGE = "TRIAGE"
     N0 = "N0"
@@ -40,7 +40,7 @@ class Route(StrEnum):
 
 @dataclass(frozen=True)
 class RoutePlan:
-    """Tentative principale et replis bornés d'une route."""
+    """Primary attempt and bounded fallbacks of a route."""
 
     route: Route
     primary: RunSpec
@@ -65,7 +65,7 @@ class RoutePlan:
         )
 
     def with_structured_reply(self) -> RoutePlan:
-        """Toutes les tentatives rendent `{send, text}` au lieu d'une prose libre."""
+        """Every attempt returns `{send, text}` instead of free prose."""
         return replace(
             self,
             primary=replace(self.primary, structured_reply=True),
@@ -75,7 +75,7 @@ class RoutePlan:
 
 @dataclass(frozen=True)
 class RoutingConfig:
-    """Configuration immuable de toutes les routes et de leur fallback."""
+    """Immutable configuration of all routes and their fallbacks."""
 
     provider: str
     plans: Mapping[Route, RoutePlan]
@@ -121,7 +121,7 @@ class RoutingConfig:
         return primary if not fallback else f"{primary} (repli : {fallback})"
 
     def validate(self) -> None:
-        """Vérifie aussi les configurations assemblées sans ``from_env``."""
+        """Also validate configurations assembled without ``from_env``."""
         for route in _ROUTE_ORDER:
             plan = self.plan(route)
             for index, spec in enumerate(plan.attempts):
@@ -139,7 +139,7 @@ class RoutingConfig:
         agent_timeout_heavy: int = 5400,
         triage_timeout: int = 10,
     ) -> RoutingConfig:
-        """Construit les profils canoniques sans consulter l'environnement."""
+        """Build the canonical profiles without consulting the environment."""
         normalized_provider = provider.strip().lower()
         try:
             defaults = _PROVIDER_DEFAULTS[normalized_provider]
@@ -149,8 +149,8 @@ class RoutingConfig:
             Route.TRIAGE: triage_timeout,
             Route.N0: agent_timeout,
             Route.N1: agent_timeout,
-            # Le raisonnement N2/N3 garde le watchdog profond : le coût prime
-            # sur la latence, sans interrompre un travail utile déjà commencé.
+            # N2/N3 reasoning keeps the deep watchdog: cost outweighs latency, and
+            # useful work already started is not interrupted.
             Route.N2: agent_timeout_deep,
             Route.N3: agent_timeout_deep,
             Route.DEEP: agent_timeout_deep,
@@ -187,7 +187,7 @@ class RoutingConfig:
         agent_timeout_heavy: int,
         triage_timeout: int,
     ) -> RoutingConfig:
-        """Construit les profils puis applique les variables ``AGENT_<ROUTE>_*``."""
+        """Build the profiles, then apply the ``AGENT_<ROUTE>_*`` variables."""
         base = cls.default(
             provider,
             agent_timeout=agent_timeout,
@@ -204,9 +204,9 @@ class RoutingConfig:
             primary = replace(current.primary, model=primary_model, effort=primary_effort)
             _validate_target(base.provider, route, primary, prefix)
             fallbacks: tuple[RunSpec, ...] = ()
-            # Le triage n'a pas de repli : attendre un second classifieur après un
-            # délai dépassé coûtait jusqu'à une minute de « Vu » sans signe de vie.
-            # Une surcharge qui en décrirait un est refusée plutôt qu'ignorée.
+            # Triage has no fallback: waiting for a second classifier after a timeout
+            # would leave up to a minute of "seen" with no sign of life. An override
+            # that described one is rejected rather than ignored.
             if not current.fallbacks:
                 for suffix in ("FALLBACK_MODEL", "FALLBACK_EFFORT"):
                     if _envtext(prefix + suffix, None) is not None:
@@ -245,9 +245,9 @@ def _spec(target: _TargetDefault, timeout: int, mode: SessionMode, *, read_only:
     )
 
 
-# Sol est volontairement limité à medium/high : Sol Max est exclu par conception.
-# Le triage est un classifieur rapide : effort bas et aucun repli. Un verdict absent
-# retombe sur le défaut déterministe `Triage()`, qui ne verrouille rien.
+# Sol is deliberately limited to medium/high: Sol Max is excluded by design.
+# Triage is a fast classifier: low effort and no fallback. A missing verdict falls
+# back to the deterministic default `Triage()`, which locks nothing.
 _PROVIDER_DEFAULTS: dict[str, dict[Route, tuple[_TargetDefault, _TargetDefault | None]]] = {
     "codex": {
         Route.TRIAGE: (_TargetDefault("gpt-6-luna", "low"), None),
@@ -264,13 +264,13 @@ _PROVIDER_DEFAULTS: dict[str, dict[Route, tuple[_TargetDefault, _TargetDefault |
         Route.HEAVY: (_TargetDefault("gpt-6-sol", "high"),
                       _TargetDefault("gpt-6-luna", "max")),
     },
-    # Haiku est épinglé : l'alias `haiku` du CLI stable résout encore Haiku 4.5,
-    # plus ancien et dix fois plus cher (prévol du 2026-10-08). Sonnet et Opus
-    # suivent leur alias, que le prévol nocturne résout et affiche.
-    # N0 à N2 partagent Sonnet : la session continue garde ainsi son cache, qui
-    # est propre à chaque modèle. Un repli change de modèle, sinon il retombe sur
-    # le même quota. N3 prend l'effort par défaut d'Opus 5.5, recalibré ; /deep et
-    # le proactif lourd gardent high.
+    # Haiku is pinned: the `haiku` alias of the stable CLI still resolves to an
+    # older, far more expensive Haiku. Sonnet and Opus follow their alias, which the
+    # nightly preflight resolves and displays.
+    # N0 to N2 share Sonnet so the continued session keeps its cache, which is
+    # specific to each model. A fallback changes model, otherwise it would hit the
+    # same quota. N3 takes the Opus default effort; /deep and heavy proactive keep
+    # high.
     "claude": {
         Route.TRIAGE: (_TargetDefault("claude-haiku-5-5", "low"), None),
         Route.N0: (_TargetDefault("sonnet", "low"),
@@ -293,15 +293,15 @@ _CODEX_EFFORTS = frozenset(
     {"none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"})
 _CODEX_MODEL_EFFORTS = {
     "gpt-6-luna": frozenset({"none", "low", "medium", "high", "xhigh", "max"}),
-    # La politique produit exclut volontairement les deux niveaux les plus chers.
+    # Product policy deliberately excludes the two most expensive levels.
     "gpt-6-sol": frozenset({"none", "low", "medium", "high", "xhigh"}),
 }
 
 
 def default_models(provider: str) -> frozenset[str]:
-    """Les modèles que les profils canoniques d'un fournisseur nomment, toutes routes et
-    replis confondus : la seule liste de modèles du dépôt, que le banc relit pour borner
-    ce qu'il a le droit de payer."""
+    """The models named by a provider's canonical profiles, all routes and fallbacks
+    combined: the only model list in the repository, which the bench re-reads to bound
+    what it may pay for."""
     return frozenset(
         target.model
         for primary, fallback in _PROVIDER_DEFAULTS[provider.strip().lower()].values()

@@ -1,4 +1,4 @@
-"""Compilation déterministe d'une échéance course en jalons exécutables."""
+"""Deterministic compilation of a race deadline into executable milestones."""
 
 from __future__ import annotations
 
@@ -35,10 +35,10 @@ STAGES = (
     Stage("terrain", 90, "Terrain et inconnues",
           "Fermer ou planifier les inconnues de parcours, règlement, reconnaissance et matériel.",
           "Les inconnues critiques sont soit résolues, soit portées par une échéance typée."),
-    # Ces deux jalons VÉRIFIENT une date, ils n'en imposent pas une (2026-09-27) : le
-    # calendrier générique disait « répétition de course » à J-45 quand le plan de
-    # L'athlète la place en W45 (~J-25). Deux propriétaires du calendrier de course, c'est
-    # un jalon qui pousse une séance que le plan interdit. Le plan décide la date.
+    # These two milestones CHECK a date, they do not impose one: a generic calendar
+    # would schedule the rehearsal at a fixed offset the plan may contradict. Two
+    # owners of the race calendar means a milestone pushing a session the plan
+    # forbids. The plan decides the date.
     Stage("systemes", 60, "Systèmes en conditions réelles",
           "Vérifier que durée, terrain, nuit, nutrition, digestion et chaussures ont chacun une "
           "répétition représentative datée dans le plan ou une échéance typée, ou déjà faite.",
@@ -74,7 +74,7 @@ STAGES = (
 
 
 def compile_deadline(deadline: dict) -> list[Checkpoint]:
-    """Transforme une date de course en calendrier stable et rejouable."""
+    """Turn a race date into a stable, replayable calendar."""
     due_on = deadline["due_on"]
     if isinstance(due_on, str):
         due_on = dt.date.fromisoformat(due_on)

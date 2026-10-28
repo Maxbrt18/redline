@@ -1,4 +1,4 @@
-"""Horloge civile du coach ; le stockage conserve ses timestamps en UTC."""
+"""The coach's civil clock; storage keeps its timestamps in UTC."""
 
 from __future__ import annotations
 

@@ -1,16 +1,16 @@
-/* La séance guidée, un écran plein par-dessus le carnet (carnet/seance.js) : la barre
- * garde ✕ et le son, les onglets, Retour et Réglages s'effacent. */
+/* The guided session, a full screen over the notebook (carnet/seance.js): the bar
+ * keeps close and sound, the tabs, Back and Settings disappear. */
 .n-sv { display: none; }
 :root.n-seance .n-sv { display: grid; }
 :root.n-seance #page, :root.n-seance .n-nav, :root.n-seance #ptr, :root.n-seance #back, :root.n-seance #settings { display: none; }
 :root.n-seance .n-app { padding-bottom: calc(48px + env(safe-area-inset-bottom)); }
 #seance { font-size: 17px; line-height: 1.45; }
-/* Elle monte du bas par-dessus l'écran qu'on quitte, figé dessous ; elle redescend à la sortie. */
+/* It rises from the bottom over the screen being left, frozen beneath; it descends on exit. */
 #seance.n-rising { position: relative; z-index: 4; min-height: 100vh; background: var(--bg); box-shadow: 0 -8px 30px rgb(0 0 0 / .12); }
 .n-move.n-falling { z-index: 5; box-shadow: 0 -8px 30px rgb(0 0 0 / .12); }
-/* Le haut-parleur, barré quand le son est coupé. */
+/* The speaker, struck through when sound is off. */
 #seance-sound .off, #seance-sound.muted .on { display: none; }
 #seance-sound.muted .off { display: inline; }
-/* Quitter une séance commencée : ce qui se passe, puis les deux choix, comme une feuille d'action iOS. */
+/* Leaving a started session: what happens, then the two choices, like an iOS action sheet. */
 .n-leave { margin: 0 8px 18px; font: 400 15px/1.4 var(--sys); color: var(--muted); text-align: center; }
 #leave-stay { font-weight: 600; }

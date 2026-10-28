@@ -1,5 +1,5 @@
 """The notebook, assembled into ONE self-contained document; the guided strength
-session is one of its screens, and /s serves the same document (2026-10-09).
+session is one of its screens, and /s serves the same document.
 
 Same doctrine as the cards (src/redline/cards/render.py): stylesheet, script and
 fonts are inlined, so there is no asset path to get wrong between the Mac and the
@@ -11,7 +11,7 @@ The code is WRITTEN as ES modules -- one file per role, `shared/` for what both
 pages use -- and assembled here at startup (`bundle`): imports are checked, then
 dropped, and the modules are concatenated in a declared order into one script.
 No build step, no bundler to install on the VPS; the source reads like modules
-and the page ships like before (2026-10-09). The rules a module follows are
+and the page ships as one script. The rules a module follows are
 enforced by tests/test_page_modules.py.
 
 The design tokens and the fonts are READ FROM THE VAULT (src/redline/cards/), which
@@ -52,8 +52,8 @@ FONT_FACES = (
 # The page's modules, in evaluation order. A module only declares at its top level
 # (functions, constants, listeners): it never calls an import there, so the order
 # matters for listener registration only. `carnet/main.js` comes last and starts the
-# page. The guided strength session is a screen of the notebook (2026-10-09): its
-# modules ship in the same script, and /s serves the same document.
+# page. The guided strength session is a screen of the notebook: its modules ship in
+# the same script, and /s serves the same document.
 CARNET_SCRIPT = (
     "shared/dom.js", "shared/storage.js", "shared/theme.js",
     "strength/session.js", "strength/link.js", "strength/timers.js", "strength/sound.js",
@@ -114,9 +114,9 @@ def _styles(files: tuple[str, ...]) -> str:
     return "".join(_read(PAGE_DIR / name, name) for name in files)
 
 
-# Le thème avant le premier affichage : épinglé dans le carnet (data-theme) ou celui
-# du téléphone, et la bande d'état d'iOS (`theme-color`) qui le suit. Les modules le
-# tiennent ensuite à jour (shared/theme.js).
+# The theme before first paint: the one pinned in the notebook (data-theme) or the
+# phone's, and the iOS status bar (`theme-color`) that follows it. The modules keep it
+# up to date afterwards (shared/theme.js).
 _THEME_HEAD = (
     '<meta name="theme-color" content="#f7f5f2">'
     "<script>(()=>{try{const t=localStorage.getItem('carnet-theme');"
@@ -135,8 +135,8 @@ def _read(path: Path, what: str) -> str:
 
 
 def _font_css(fonts_dir: Path, display: str = "swap") -> str:
-    """`display="block"` pour le carnet : les polices sont dans la page, elles arrivent
-    avec elle ; `swap` y dessinait une frame en police système, puis tout se décalait."""
+    """`display="block"` for the notebook: the fonts are inlined in the page and arrive
+    with it; `swap` would paint a frame in the system font, then shift everything."""
     rules = []
     for family, filename, weight in FONT_FACES:
         path = fonts_dir / filename
@@ -155,26 +155,23 @@ def _font_css(fonts_dir: Path, display: str = "swap") -> str:
 
 
 def _cue_script(cues) -> str:
-    """`window.REDLINE_HOW` -- les consignes d'exécution, par slug d'exercice.
+    """`window.REDLINE_HOW` -- the execution cues, by exercise slug.
 
-    ELLES VOYAGENT DANS LA PAGE, PAS DANS LE SNAPSHOT (2026-07-31). Elles coûtent
-    2,5 kB sur un document servi une fois puis en 304 ; le snapshot ne porte que le
-    slug, que la prescription possède déjà.
+    THEY TRAVEL IN THE PAGE, NOT IN THE SNAPSHOT. They cost about 2.5 kB on a document
+    served once then answered with a 304; the snapshot only carries the slug, which
+    the prescription already owns.
 
-    Ce que ça change, dit franchement : `/s` ne portait AUCUNE donnée, c'était sa
-    propriété de sécurité. Elle porte maintenant des consignes de mouvement. Pas
-    de donnée de santé, pas de nom, pas de dose, rien de personnel — « Genou
-    fléchi à ~30°, amplitude maximale » est dans n'importe quel manuel. Mais la
-    page n'est plus une coquille vide, et le dire vaut mieux que le découvrir.
-    (Arbitrage de l'athlète, 2026-07-31.)
+    Consequence: `/s` no longer carries zero data, it carries movement cues. No health
+    data, no name, no dose, nothing personal -- a cue such as "knee bent to ~30
+    degrees, full range" is in any manual. The page is no longer an empty shell.
 
-    Corollaire : le document est assemblé au démarrage. Les consignes font donc
-    partie du runtime et leur mise à jour passe par un déploiement du service.
+    The document is assembled at startup, so the cues are part of the runtime and
+    updating them takes a deployment of the service.
     """
     if not cues:
         return ""
-    # `</` échappé : sans ça, une consigne contenant « </script> » fermerait la
-    # balise. Aucune ne le fait aujourd'hui ; c'est l'entrée qui décide, pas nous.
+    # `</` is escaped: otherwise a cue containing "</script>" would close the tag.
+    # The input decides what a cue contains, not us.
     payload = json.dumps(cues, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
     return f"<script>window.REDLINE_HOW={payload}</script>"
 
@@ -192,7 +189,7 @@ def _kinds_script(kinds) -> str:
 
 def document(cards_dir: Path, cues=None, kinds=None) -> str:
     """The page served at /s: the notebook itself, which opens straight onto the
-    guided session of the link (2026-10-09). `cues` maps an exercise slug to its
+    guided session of the link. `cues` maps an exercise slug to its
     execution cues.
 
     The cues are PASSED IN, not read here: this module is a declared leaf (standard
@@ -209,10 +206,10 @@ def build(cards_dir: Path, cues=None, kinds=None) -> tuple:
     return html, hashlib.sha256(html.encode("utf-8")).hexdigest()[:16]
 
 
-# L'écran de lancement de la PWA iOS, par taille d'iPhone en portrait : (largeur et
-# hauteur CSS, densité). iOS n'affiche une image que si elle a exactement la taille de
-# l'écran ; sans elle, il ouvre l'app sur un écran blanc, même en thème sombre. Le fond
-# uni est la règle d'Apple (le premier écran sans son contenu) et suit tokens.css.
+# The iOS PWA launch screen, per portrait iPhone size: (CSS width, CSS height, density).
+# iOS only shows an image of exactly the screen's size; without one it opens the app on
+# a white screen, even in dark theme. The plain fill follows Apple's rule (the first
+# screen without its content) and tracks tokens.css.
 LAUNCH_SCREENS = (
     (440, 956, 3), (430, 932, 3), (428, 926, 3), (420, 912, 3), (414, 896, 3), (414, 896, 2),
     (402, 874, 3), (393, 852, 3), (390, 844, 3), (375, 812, 3), (375, 667, 2),
@@ -222,7 +219,7 @@ _LAUNCH = re.compile(r"(\d{3,4})x(\d{3,4})-(light|dark)")
 
 
 def _png(width: int, height: int, rgb: tuple[int, int, int]) -> bytes:
-    """Un PNG uni, bibliothèque standard seulement (module feuille)."""
+    """A plain-colour PNG, standard library only (leaf module)."""
     def chunk(kind: bytes, data: bytes) -> bytes:
         return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
     row = b"\x00" + bytes(rgb) * width
@@ -232,7 +229,7 @@ def _png(width: int, height: int, rgb: tuple[int, int, int]) -> bytes:
 
 @functools.lru_cache(maxsize=32)
 def launch_image(name: str) -> bytes | None:
-    """`1179x2556-dark` → le PNG de cet écran, ou None si la taille n'est pas un iPhone connu."""
+    """`1179x2556-dark` -> the PNG for that screen, or None if the size is not a known iPhone."""
     match = _LAUNCH.fullmatch(name)
     if not match:
         return None
@@ -255,17 +252,17 @@ def _launch_links() -> str:
 
 
 def notebook_document(cards_dir: Path, cues=None, kinds=None) -> str:
-    """Coquille du carnet, sans aucune donnée personnelle ni secret ; les consignes
-    d'exécution des exercices (`cues`) y voyagent pour la séance guidée."""
+    """The notebook shell, with no personal data or secret; the exercises' execution
+    cues (`cues`) travel in it for the guided session."""
     css = _read(cards_dir / "tokens.css", "tokens.css") + _styles(CARNET_STYLE)
     return (
         '<!doctype html><html lang="fr"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">'
         '<meta name="color-scheme" content="light dark">'
         '<meta name="robots" content="noindex,nofollow">'
-        # La bande d'état iOS suit `theme-color` : une seule balise, alimentée par le thème
-        # résolu (Auto, Clair ou Sombre) et non par `media`, qui ne connaît que celui du
-        # téléphone. Posée avant le premier affichage, puis tenue à jour par la page.
+        # The iOS status bar follows `theme-color`: a single tag, fed by the resolved
+        # theme (Auto, Light or Dark) and not by `media`, which only knows the phone's.
+        # Set before first paint, then kept up to date by the page.
         f"{_THEME_HEAD}"
         '<meta name="apple-mobile-web-app-capable" content="yes">'
         '<link rel="manifest" href="/carnet-manifest.json">'
