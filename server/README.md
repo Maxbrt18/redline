@@ -115,7 +115,7 @@ comme annulés parce qu'une projection ou un push Git a échoué.
 | `prompts.py` | choix des textes injectés à chaque tour et des workflows proactifs |
 | `scripts/coach/fr/` | les mots du coach et du service : `prompts/*.md`, `messages.py` (notes), `replies.py` (limites), `initiatives.py`, `notebook.py`, `session_labels.py`, `calendar.py` |
 | `strength.py`, `page/` | capacités opaques et page de renforcement |
-| `scripts/storage/repository.py` | transactions et faits opérationnels |
+| `scripts/storage/repository/` | transactions et faits opérationnels, un module par agrégat |
 | `scripts/storage/projector.py` | vues Obsidian régénérables |
 
 Pour modifier un comportement :
@@ -125,7 +125,7 @@ Pour modifier un comportement :
 - décision d'envoi : `bot.py` ;
 - forme du programme : `scripts/model/weekly_plan.py` ;
 - rendu Messenger du programme : `plans.py` ;
-- persistance d'un fait : `scripts/storage/repository.py` ;
+- persistance d'un fait : le module de son agrégat dans `scripts/storage/repository/` ;
 - calendrier d'une initiative : `proactive.py`.
 
 ## Invariants
