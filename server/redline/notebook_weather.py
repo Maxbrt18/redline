@@ -20,6 +20,8 @@ import urllib.parse
 import urllib.request
 from typing import Any
 
+from scripts.model import local_time
+
 GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search"
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 TIMEOUT_S = 4
@@ -60,7 +62,7 @@ def _forecast(lat: float, lon: float, day: dt.date) -> dict:
         if cached and time.monotonic() - cached[0] < CACHE_S:
             return cached[1]
     data = _get(FORECAST_URL, {
-        "latitude": lat, "longitude": lon, "timezone": "Europe/Paris",
+        "latitude": lat, "longitude": lon, "timezone": local_time.zone().key,
         "start_date": day.isoformat(), "end_date": day.isoformat(),
         "hourly": "temperature_2m,apparent_temperature,precipitation_probability,"
                   "wind_speed_10m,weather_code,is_day",

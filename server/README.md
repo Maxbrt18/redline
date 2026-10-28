@@ -85,7 +85,7 @@ comme annulés parce qu'une projection ou un push Git a échoué.
 |---|---|
 | `app.py` | composition, vérifications de démarrage et cycle de vie |
 | `config.py` | lecture unique du `.env` et de l'environnement au démarrage |
-| `clock.py` | horloge civile (Europe/Paris) ; le stockage reste en UTC |
+| `clock.py` | horloge civile, au fuseau de `redline.toml` (`[athlete] timezone`) ; le stockage reste en UTC |
 | `events.py` | événements d'exploitation structurés, une ligne JSON par étape |
 | `web.py` | routes HTTP, authentification et normalisation des entrées |
 | `bot.py` | orchestration conversationnelle et politique de livraison |

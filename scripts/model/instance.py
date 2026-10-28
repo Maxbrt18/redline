@@ -18,6 +18,7 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from . import hr_zones
 from .errors import ConfigError
@@ -38,6 +39,8 @@ INSTANCE_SCHEMA = Schema("redline.toml", [
               note="la FC de repos, en bpm : la base des zones Karvonen"),
         field("hr_max", int, minimum=120, maximum=230,
               note="la FC max, en bpm, mesurée ou estimée"),
+        field("timezone", str, minimum=1, maximum=64,
+              note="le fuseau IANA où vit l'athlète, ex. « Europe/Paris »"),
     ])),
     field("notebook", dict, schema=Schema("[notebook]", [
         field("place", str, minimum=1, maximum=80,
@@ -82,6 +85,7 @@ class Instance:
     capabilities: tuple[Capability, ...]
     hr_rest: int
     hr_max: int
+    timezone: ZoneInfo
 
     @property
     def hr_bounds(self) -> tuple[int, ...]:
@@ -114,6 +118,14 @@ def placeholders(payload: Any, where: str = "") -> list[str]:
     return []
 
 
+def _timezone(name: str) -> ZoneInfo:
+    try:
+        return ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError):
+        raise InstanceError(f"{FILENAME} : fuseau inconnu « {name} » (nom IANA attendu, "
+                            "ex. « Europe/Paris »)") from None
+
+
 def parse(text: str) -> Instance:
     try:
         payload = tomllib.loads(text)
@@ -144,6 +156,7 @@ def parse(text: str) -> Instance:
                            for entry in payload["capabilities"]),
         hr_rest=athlete["hr_rest"],
         hr_max=athlete["hr_max"],
+        timezone=_timezone(athlete["timezone"]),
     )
 
 

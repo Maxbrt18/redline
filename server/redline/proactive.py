@@ -21,11 +21,10 @@ import requests
 
 from scripts import strava
 from scripts.model import ledger as ledger_model
-from scripts.model import session_kinds
+from scripts.model import rulebook, session_kinds
 
 from . import clock
 from .config import Config
-from .notebook_board import WAKE_ASK_UNTIL
 from .prompts import PROACTIVE_TRIGGERS, build_proactive_prompt, strava_snapshot_note
 from .state import StateStore
 
@@ -84,10 +83,9 @@ class ProactiveScheduler:
     # la fenêtre de politesse. Au-delà de minuit la cellule sort de sa fenêtre et
     # devient `?` : la réclamer le lendemain n'obtient plus un souvenir (2026-08-06).
     CELLS_CLAIM_HOUR = 20
-    #: La trace du réveil que le carnet n'a pas reçue se rappelle le matin même, tant
-    #: que le carnet la prend encore (jusqu'à WAKE_ASK_UNTIL). Jamais le soir : c'est
-    #: un souvenir trop tardif (correction du 2026-09-15). 10 h 30 laisse au mot du
-    #: matin (07:45) le temps d'être lu sans relance immédiate.
+    #: The missing wake trace is asked for once in the morning, while the notebook
+    #: still takes it (`wake_trace_until` in the rulebook), after the morning message
+    #: has had time to be read.
     WAKE_REMINDER_AT = dtime(10, 30)
     # Le bilan anticipé ne double pas le mot du matin ni la demande du réveil.
     WEEKLY_EARLIEST = dtime(12, 0)
@@ -251,14 +249,15 @@ class ProactiveScheduler:
                 pro.enqueue_job(f"morning:{today}", "morning", "", now.timestamp(),
                                 expire_at=grace_end)
 
+        wake_until = rulebook.current().parameters.wake_trace_until
         if (self._bot is not None and self._wake_checked_on != today
-                and self.WAKE_REMINDER_AT <= now.time() < WAKE_ASK_UNTIL):
+                and self.WAKE_REMINDER_AT <= now.time() < wake_until):
             # Une lecture par matin suffit : la trace manquante ne peut qu'être remplie
             # ensuite, et la livraison revérifie avant d'envoyer.
             self._wake_checked_on = today
             if self._bot.wake_reminder_due(psid):
                 pro.enqueue_job(f"trace-reveil:{today}", "trace_reveil", "", now.timestamp(),
-                                expire_at=clock.combine(now.date(), WAKE_ASK_UNTIL).timestamp())
+                                expire_at=clock.combine(now.date(), wake_until).timestamp())
 
         if now.hour >= self.CELLS_CLAIM_HOUR and self._bot is not None:
             # Le dernier recours Messenger ne réclame que ce qui vit dans la mémoire

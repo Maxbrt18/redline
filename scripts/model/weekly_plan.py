@@ -76,7 +76,7 @@ SESSION_SCHEMA = Schema("séance planifiée", [
     field("title", str, minimum=1),
     field("date", str, pattern=DATE_RE, note="AAAA-MM-JJ"),
     field("start_time", str, required=False, pattern=TIME_RE,
-          note="HH:MM, heure locale Europe/Paris ; absent si le créneau n'est pas fixé"),
+          note="HH:MM, heure locale de l'athlète ; absent si le créneau n'est pas fixé"),
     field("kind", str, choices=KINDS),
     field("workout", str, choices=WORKOUTS),
     field("routine", str, required=False, pattern=r"[a-z0-9][a-z0-9-]{0,39}",

@@ -14,7 +14,7 @@ from sqlalchemy import RowMapping
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from scripts import signals as signal_model
-from scripts.model import commands, session_cycle
+from scripts.model import commands, local_time
 from scripts.storage.database import Database
 from scripts.storage.repository import ATHLETE, CORRECTION_ANNOUNCE_WINDOW, OperationalStore
 from scripts.storage.schema import (
@@ -598,8 +598,8 @@ class PostgresStateStore(StateStore):
         Une transaction, une méthode par cause : chacune rend le nombre de travaux créés.
         """
         if now.tzinfo is None:
-            now = now.replace(tzinfo=session_cycle.LOCAL_TIMEZONE)
-        local = now.astimezone(session_cycle.LOCAL_TIMEZONE)
+            now = now.replace(tzinfo=local_time.zone())
+        local = now.astimezone(local_time.zone())
         utc = now.astimezone(dt.UTC)
         with self.database.transaction() as connection:
             store = OperationalStore(self.database)
@@ -645,7 +645,7 @@ class PostgresStateStore(StateStore):
                 missed_at = ((row["planned_for"] + dt.timedelta(hours=4))
                              if row["planned_for"] else dt.datetime.combine(
                                  row["scheduled_on"], dt.time(22, 0),
-                                 tzinfo=session_cycle.LOCAL_TIMEZONE))
+                                 tzinfo=local_time.zone()))
                 if local >= missed_at:
                     connection.execute(session_cycles.update().where(
                         session_cycles.c.id == row["id"]).values(

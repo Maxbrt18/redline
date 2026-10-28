@@ -30,7 +30,6 @@ from pathlib import Path
 
 from .errors import InputError
 
-CORRECTIONS = "coaching/corrections.md"
 LEDGER = "server/tests/fixtures/corrections-replay.json"
 SCENARIOS = "server/tests/fixtures/coaching-scenarios.json"
 MODES = ("scenario", "code", "hors-banc", "a-rejouer")

@@ -12,6 +12,8 @@ import datetime as dt
 import pytest
 from conftest import VAULT_ROOT, load_script
 
+from scripts.model import vault_layout
+
 decisions_index = load_script("decisions-index")
 
 APRES = dt.date(2026, 8, 16)
@@ -86,7 +88,7 @@ def test_une_rubrique_mal_fermee_refuse_au_lieu_de_disparaitre():
 
 def test_toutes_les_rubriques_du_vault_reel_sont_indexables():
     """Garantie de forme, pas verdict calendaire : le contenu change sans le code."""
-    texte = (VAULT_ROOT / decisions_index.DECISIONS).read_text(encoding="utf-8")
+    texte = (VAULT_ROOT / vault_layout.DECISIONS).read_text(encoding="utf-8")
     decisions = decisions_index.parse(texte)
     assert sum(len(decision.predictions) for decision in decisions) == len(
         decisions_index.PREDICTION_START.findall(texte)

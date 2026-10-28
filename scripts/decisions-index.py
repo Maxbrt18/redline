@@ -34,6 +34,7 @@ if str(ROOT) not in sys.path:
 from scripts.model import (  # noqa: E402
     entrypoint,
     paths,
+    vault_layout,
     views,
 )
 
@@ -58,7 +59,6 @@ from scripts.model.decisions import (  # noqa: E402,F401
 from scripts.model.errors import InputError  # noqa: E402
 from scripts.model.views import ViewDrift  # noqa: E402
 
-DECISIONS = "coaching/decisions.md"
 BLOCK = "INDEX"
 
 
@@ -137,7 +137,7 @@ def main() -> int:
     mode.add_argument("--calibration", action="store_true")
     args = parser.parse_args()
 
-    path = args.root / DECISIONS
+    path = args.root / vault_layout.DECISIONS
     text = path.read_text(encoding="utf-8")
     today = dt.date.today()
     try:

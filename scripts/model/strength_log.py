@@ -34,7 +34,6 @@ from pathlib import Path
 
 from .views import csv_rows as rows
 
-PATH = "athlete/strength-log.csv"
 COLUMNS = ("date", "sid", "seance", "slug", "valeurs", "droite", "gauche", "score", "passe",
            "status", "completed_slots", "note")
 

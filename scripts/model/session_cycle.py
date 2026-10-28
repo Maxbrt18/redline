@@ -10,7 +10,8 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import json
-from zoneinfo import ZoneInfo
+
+from .local_time import zone as local_time_zone
 
 TERMINAL_STATES = frozenset({"missed", "cancelled", "closed"})
 # Un cycle dont l'exécution a déjà laissé une trace ne redevient jamais une simple
@@ -20,7 +21,6 @@ OBSERVED_STATES = frozenset({"started", "completed"})
 #: que d'habitude » ou « très légère » n'est ni légère ni nulle (l'athlète, audit du 11/10).
 MORNING_TRACES = ("aucune", "tres-legere", "legere", "nette")
 MORNING_TRACE_VALUES = {"aucune": 0, "tres-legere": 0.5, "legere": 1, "nette": 2}
-LOCAL_TIMEZONE = ZoneInfo("Europe/Paris")
 
 
 def scheduled_for(day: str | dt.date, start_time: str | None) -> dt.datetime | None:
@@ -30,7 +30,7 @@ def scheduled_for(day: str | dt.date, start_time: str | None) -> dt.datetime | N
     if isinstance(day, str):
         day = dt.date.fromisoformat(day)
     local_time = dt.time.fromisoformat(start_time)
-    return dt.datetime.combine(day, local_time, tzinfo=LOCAL_TIMEZONE)
+    return dt.datetime.combine(day, local_time, tzinfo=local_time_zone())
 
 
 def plan_digest(session: dict) -> str:
@@ -71,5 +71,5 @@ def local_wall_clock(value: str) -> dt.datetime:
     """Interprète l'heure locale Strava, qui ne porte volontairement aucun `Z`."""
     parsed = dt.datetime.fromisoformat(value)
     if parsed.tzinfo is not None:
-        return parsed.astimezone(LOCAL_TIMEZONE)
-    return parsed.replace(tzinfo=LOCAL_TIMEZONE)
+        return parsed.astimezone(local_time_zone())
+    return parsed.replace(tzinfo=local_time_zone())
