@@ -204,7 +204,7 @@ p, h1, h2, ol, ul { margin: 0; padding: 0; list-style: none; }
   overflow-wrap: anywhere;   /* long tile values wrap -- no more text[:11]+'…' */
 }
 
-/* A textual instrument (the shin trend) is a sentence, not a figure. */
+/* A textual instrument (the pain trend) is a sentence, not a figure. */
 .tile__value--text {
   font-family: var(--sans);
   font-size: 22px;

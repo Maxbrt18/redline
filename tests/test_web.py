@@ -137,7 +137,7 @@ def app_bot(make_config, store, tmp_path):
             return None
 
         def pain_zones(self):
-            return [{"slug": "injury", "label": "Injury", "active": True}]
+            return [{"slug": "genou", "label": "Genou", "active": True}]
 
     def factory(**overrides):
         config = make_config(**{"vault_path": str(tmp_path), **overrides})
@@ -182,11 +182,11 @@ def test_session_page_is_conditional(app_bot):
 
 def test_report_reaches_the_athletes_own_queue(app_bot, store):
     client, bot, _ = app_bot()
-    _, body = token_body(store, report={"pains": {"injury": {"after": 1}}, "minutes": 30})
+    _, body = token_body(store, report={"pains": {"genou": {"after": 1}}, "minutes": 30})
     assert post(client, body).status_code == 201
     psid, text = bot.inbound[0]
     assert psid == "4242"
-    assert "Renfo A, os & tendons" in text and "Injury : 1/10 après" in text
+    assert "Renfo A, os & tendons" in text and "Genou : 1/10 après" in text
 
 
 def test_opaque_capability_resolves_the_exact_session(app_bot, store):
@@ -225,10 +225,10 @@ def test_session_resolution_contract_and_body_are_strict(app_bot, store):
 
 def test_report_accepts_the_same_opaque_capability(app_bot, store):
     client, bot, _ = app_bot()
-    _, body = token_body(store, report={"pains": {"injury": {"after": 2}}, "minutes": 31})
+    _, body = token_body(store, report={"pains": {"genou": {"after": 2}}, "minutes": 31})
     assert post(client, body).status_code == 201
     assert len(bot.inbound) == 1
-    assert "Injury : 2/10 après" in bot.inbound[0][1]
+    assert "Genou : 2/10 après" in bot.inbound[0][1]
 
 
 def test_revoked_capability_cannot_submit_a_report(app_bot, store):
@@ -273,7 +273,7 @@ def test_report_body_is_bounded_before_json_decoding(app_bot):
 def test_a_session_can_only_be_reported_once(app_bot, store):
     """Replaying the same link costs one reply, never a second agent turn."""
     client, bot, _ = app_bot()
-    _, body = token_body(store, report={"pains": {"injury": {"after": 1}}})
+    _, body = token_body(store, report={"pains": {"genou": {"after": 1}}})
     assert post(client, body).status_code == 201
     assert post(client, body).status_code == 200
     assert len(bot.inbound) == 1
@@ -305,7 +305,7 @@ def test_report_route_is_absent_without_an_owner(app_bot, store):
 def test_the_report_lands_in_the_typed_log_too(app_bot, store):
     """The route passes a relational structure to the PostgreSQL repository."""
     client, bot, _ = app_bot()
-    _, body = token_body(store, report={"pains": {"injury": {"after": 1}}, "exercises": [
+    _, body = token_body(store, report={"pains": {"genou": {"after": 1}}, "exercises": [
         {"i": 0, "score": 6, "reps": [14, 12, 11, 10]}]})
     post(client, body)
 
@@ -337,14 +337,14 @@ def test_an_unwritable_log_is_retryable_and_not_claimed(app_bot, store, monkeypa
     client, bot, _ = app_bot()
     monkeypatch.setattr(bot.operational_store, "accept_strength_report",
                         lambda *a, **k: (_ for _ in ()).throw(OSError("base indisponible")))
-    _, body = token_body(store, report={"pains": {"injury": {"after": 2}}})
+    _, body = token_body(store, report={"pains": {"genou": {"after": 2}}})
     assert post(client, body).status_code == 503
     assert bot.inbound == []
 
 
 def test_invalid_report_is_rejected_instead_of_silently_clamped(app_bot, store):
     client, bot, _ = app_bot()
-    _, body = token_body(store, report={"pains": {"injury": {"after": 99}}})
+    _, body = token_body(store, report={"pains": {"genou": {"after": 99}}})
     response = post(client, body)
     assert response.status_code == 400
     assert response.get_json()["status"] == "invalid"

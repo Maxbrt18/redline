@@ -121,7 +121,7 @@ def day(value: str) -> dt.date:
 
 def week(value: str) -> str:
     if not re.fullmatch(r"20\d{2}-W(?:0[1-9]|[1-4]\d|5[0-3])", value):
-        raise argparse.ArgumentTypeError("semaine ISO attendue : 2026-W33")
+        raise argparse.ArgumentTypeError("semaine ISO attendue : 2030-W33")
     return value
 
 

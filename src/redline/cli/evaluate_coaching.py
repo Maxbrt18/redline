@@ -45,7 +45,7 @@ def main() -> int:
                 started = time.monotonic()
                 spec = judge_spec
                 verdict = judge(runner, review_prompt(
-                    case['candidate'], case['message'], {}, today='2026-09-06'), spec=spec)
+                    case['candidate'], case['message'], {}, today='2030-09-01'), spec=spec)
                 accepted = bool(verdict)
                 row = {'scenario': case, 'model': spec.model, 'effort': spec.effort,
                        'review_approved': accepted,
@@ -82,10 +82,10 @@ def main() -> int:
                     label='__coaching_eval__')
                 row['answer'] = answer
                 row['shape_checks'] = shape_checks(answer, case)
-                plans = ({'2026-W36': json.dumps({'sessions': [{'date': '2026-09-06', 'distance_max_km': 8}]})}
+                plans = ({'2030-W35': json.dumps({'sessions': [{'date': '2030-09-01', 'distance_max_km': 8}]})}
                          if case['id'] == 'conflicting-data' else {})
                 verdict = judge(runner, review_prompt(
-                    answer, case['message'], plans, today='2026-09-06', context=context),
+                    answer, case['message'], plans, today='2030-09-01', context=context),
                     spec=judge_spec)
                 row['review_approved'] = bool(verdict)
                 row['review_reason'] = getattr(verdict, 'reason', None)

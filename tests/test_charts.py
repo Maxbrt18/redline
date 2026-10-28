@@ -43,9 +43,9 @@ WEEK = {
 MONTH = {
     "month": "Juillet 2026", "km": 148, "dplus": 1900, "sessions": 16,
     "weeks": [{"label": "W27", "km": 23}, {"label": "W28", "km": 20}],
-    "capabilities": {"Durabilité": 2, "Descente": 1, "Nuit": 0,
-                     "Digestion": 1, "Mental": 2, "Allure": 3},
-    "race_name": "TargetRace", "race_date": "2026-11-28",
+    "capabilities": {"Endurance": 2, "Vitesse": 1, "Côtes": 0,
+                     "Ravitaillement": 1, "Mental": 2, "Allure": 3},
+    "race_name": "TargetRace", "race_date": "2026-11-26",
 }
 # A SELECTION of the programme, not a session: the exercises and their doses
 # live in coaching/exercises/ and coaching/workouts/.
@@ -118,7 +118,7 @@ def test_the_fonts_are_committed():
 # -------------------------------------------------------------------- stress
 # Every case below used to be a broken card under matplotlib.
 
-LONG_NAME = "Mollet unipodal genou fléchi ~30° sur marche, charge additionnelle"
+LONG_NAME = "Mollet unipodal talon fléchi ~30° sur marche, charge additionnelle"
 LONG_TARGET = "soléaire — le muscle clé du mollet, et le trou n°1 d'avant"
 LONG_NOTE = ("1ère séance depuis avril : demi-dose (une série en moins partout), "
              "SANS pliométrie cette semaine — 2320 m D+ samedi dernier, les jambes "
@@ -323,7 +323,7 @@ def test_the_worst_payload_the_schema_allows_still_gets_a_sidecar(tmp_path):
         "date": "mardi 25 novembre 2026",
         "duration_min": 38,
         "note": "N" * 300,                    # SELECTION_SCHEMA: maximum=300
-        "gate": {"zone": "injury", "pain_max": 2,
+        "gate": {"zone": "genou", "pain_max": 2,
                  "drop": ["plyometrics", "calf-raise-straight"],
                  "say": "S" * 200},           # GATE_SCHEMA: maximum=200
     }

@@ -147,9 +147,9 @@
  * the label in ink; only the pill tells the family. With no tinted card, red keeps its
  * meaning everywhere: the day's letter, the ceiling crossed. */
 .n-tile.week { --h: var(--h-run); }
-.n-tile.tib { --h: var(--h-tib); }
+.n-tile.pain { --h: var(--h-pain); }
 .n-tile.race { --h: var(--h-race); }
-.n-tile.week, .n-tile.tib, .n-tile.race { background: var(--sand); }
+.n-tile.week, .n-tile.pain, .n-tile.race { background: var(--sand); }
 .n-tlab .l { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .n-tile .n-tlab .l { color: var(--ink); }
 .n-tile .n-pas { background: color-mix(in oklab, var(--h) var(--tile-pas-mix), var(--sand)); }

@@ -211,7 +211,7 @@
   {
     "id": "ambiguous-pain",
     "route": "N2",
-    "message": "J’ai une petite gêne au injury, je sais pas trop.",
+    "message": "J’ai une petite gêne au genou, je sais pas trop.",
     "context": "Aucun autre fait actuel vérifié. Aucun outil exécuté, aucune écriture confirmée.",
     "understanding": "Gêne ambiguë, pas diagnostic.",
     "ask": "Retentissement actuel.",
@@ -530,7 +530,7 @@
   },
   {
     "id": "no-initiative-cap",
-    "origin": "coaching/corrections.md 2026-08-27",
+    "origin": "coaching/corrections.md",
     "route": "N1",
     "message": "Pourquoi je n'ai pas eu le mot du matin ?",
     "context": "Aucun plafond d'initiatives quotidiennes n'existe : Sam l'a refusé plusieurs fois. Journal du service : panne d'authentification du moteur de 7 h 30 à 9 h 10, le mot du matin n'a pas pu être rédigé.",
@@ -551,7 +551,7 @@
   },
   {
     "id": "rdl-already-loaded",
-    "origin": "coaching/corrections.md 2026-09-14",
+    "origin": "coaching/corrections.md",
     "route": "N3",
     "message": "Non, le RDL je le fais avec un haltère de 10 kg, et avant avec le kettlebell.",
     "context": "Registre renfo : RDL de la séance A fait le 14/09 avec un haltère de 10 kg, toutes les séances précédentes avec un kettlebell. Le coach venait de proposer un départ à 2 kg par main comme si le RDL était au poids du corps. Règle de strength.md : un seul exercice change à la fois, prochaine hausse possible du RDL A à 2x6 kg après 3x10 propres avec deux répétitions en réserve.",
@@ -572,10 +572,10 @@
   },
   {
     "id": "weekly-volume-is-computed",
-    "origin": "coaching/corrections.md 2026-08-13 et 2026-08-02",
+    "origin": "coaching/corrections.md",
     "route": "N1",
     "message": "C'est quoi le kilométrage de la semaine dernière ?",
-    "context": "Sortie de ledger.py --semaine 2026-W32 lue pendant ce tour : Volume 30,18 km courus en 4 sorties. Le volume cible du macro-plan pour W32 était ~28 km.",
+    "context": "Sortie de ledger.py --semaine 2030-W31 lue pendant ce tour : Volume 30,18 km courus en 4 sorties. Le volume cible du macro-plan pour W32 était ~28 km.",
     "understanding": "Question factuelle sur un chiffre calculable.",
     "ask": "Rien.",
     "avoid": "Dire que le chiffre ne peut pas être confirmé ; citer le volume cible du plan comme un fait.",
@@ -592,7 +592,7 @@
   },
   {
     "id": "intermittent-stays-intermittent",
-    "origin": "coaching/corrections.md 2026-08-27",
+    "origin": "coaching/corrections.md",
     "route": "N2",
     "message": "Des pics à 1/10 mais pas tout le temps, à peu près comme d'habitude.",
     "context": "Programme : EF facile vendredi. Pic de douleur d'effort hebdomadaire à 1/10 depuis trois semaines. Protocole : plafond 2/10 pendant l'effort, sur sa table ; une gêne intermittente et habituelle sous ce plafond ne retire pas une EF.",
@@ -613,15 +613,15 @@
   },
   {
     "id": "no-two-silent-weeks-before-threshold",
-    "origin": "coaching/corrections.md 2026-09-07",
+    "origin": "coaching/corrections.md",
     "route": "N2",
     "message": "Pourquoi on n'a toujours pas repris le seuil ?",
     "context": "Règlement en vigueur : aucun préalable de deux semaines à 0/10 avant une qualité ; la première exposition au seuil est l'unique nouveauté de sa semaine. Pic de douleur d'effort 1/10 sur trois semaines. Le seuil prévu le 16/09 a été annulé ; aucune nouveauté n'est prévue cette semaine.",
     "understanding": "Question sur un report, avec un soupçon de frustration.",
     "ask": "Rien.",
-    "avoid": "Exiger deux semaines de injury silencieux, ou tout préalable retiré.",
+    "avoid": "Exiger deux semaines de genou silencieux, ou tout préalable retiré.",
     "posture": "Expliquer la vraie condition et proposer la suite.",
-    "ideal": "Rien ne l'empêche côté injury : il faut juste qu'il soit la seule nouveauté de sa semaine. On peut le caler la semaine prochaine.",
+    "ideal": "Rien ne l'empêche côté genou : il faut juste qu'il soit la seule nouveauté de sa semaine. On peut le caler la semaine prochaine.",
     "acceptance": [
       "Aucun préalable de semaines à 0/10.",
       "La condition réelle (une seule nouveauté) est nommée.",
@@ -634,7 +634,7 @@
   },
   {
     "id": "long-run-without-fixed-percentage",
-    "origin": "coaching/decisions.md 2026-09-27",
+    "origin": "coaching/decisions.md",
     "route": "N2",
     "message": "Je peux faire 16 km dimanche ? J'étais à 13,6 cette semaine.",
     "context": "Règlement en vigueur : aucun pourcentage fixe ne borne la sortie longue ; elle se juge sur la tolérance observée et l'historique, et reste la nouveauté de sa semaine. Plus longue des 30 jours : 13,6 km. Pic de douleur d'effort 1/10 sur trois semaines, aucune trace au réveil après la dernière sortie longue. Historique : sorties de 17 à 24 km les années précédentes. Aucune autre nouveauté prévue cette semaine.",
@@ -642,7 +642,7 @@
     "ask": "Rien.",
     "avoid": "Invoquer une règle de pourcentage ; refuser ou accepter sans nommer la tolérance ; oublier le critère d'arrêt.",
     "posture": "Décider sur la tolérance et l'historique, poser un critère d'arrêt concret.",
-    "ideal": "Vu comment ton injury encaisse et ce que tu as déjà couru, 16 km peut passer si c'est la seule nouveauté de la semaine : allure facile, et on redescend si la douleur dépasse 2 ou si le réveil tire le lendemain.",
+    "ideal": "Vu comment ton genou encaisse et ce que tu as déjà couru, 16 km peut passer si c'est la seule nouveauté de la semaine : allure facile, et on redescend si la douleur dépasse 2 ou si le réveil tire le lendemain.",
     "acceptance": [
       "Aucun pourcentage de progression n'est cité comme règle.",
       "La décision s'appuie sur la tolérance et l'historique.",
@@ -656,10 +656,10 @@
   },
   {
     "id": "wake-trace-within-its-series",
-    "origin": "coaching/corrections.md 2026-08-11 (soir, fracture de fatigue)",
+    "origin": "coaching/corrections.md",
     "route": "N1",
-    "message": "Réveil : trace légère au injury, diffuse comme d'hab. Peut-être un poil plus nette qu'hier.",
-    "context": "Série du réveil sur 8 semaines : aucune 4 fois, légère 5 fois, nette 0 fois ; hier, légère. Localisation habituelle : bord interne du injury, diffuse, jamais en un point. Aucune douleur nocturne ni gêne à la marche signalée. Hier : EF de 7 km, pic de douleur d'effort 1/10. Programme : repos aujourd'hui, EF de 8 km facile demain. Protocole : une douleur focale, nocturne ou qui gêne la marche mérite un avis ; une trace légère et diffuse à l'intérieur de sa série est un indicateur de charge, pas un drapeau.",
+    "message": "Réveil : trace légère au genou, diffuse comme d'hab. Peut-être un poil plus nette qu'hier.",
+    "context": "Série du réveil sur 8 semaines : aucune 4 fois, légère 5 fois, nette 0 fois ; hier, légère. Localisation habituelle : face interne du genou, diffuse, jamais en un point. Aucune douleur nocturne ni gêne à la marche signalée. Hier : EF de 7 km, pic de douleur d'effort 1/10. Programme : repos aujourd'hui, EF de 8 km facile demain. Protocole : une douleur focale, nocturne ou qui gêne la marche mérite un avis ; une trace légère et diffuse à l'intérieur de sa série est un indicateur de charge, pas un drapeau.",
     "understanding": "Lecture de réveil ordinaire, à situer dans sa propre série.",
     "ask": "Rien.",
     "avoid": "Hypothèse de fracture ou de lésion, imagerie, avis médical, stade de douleur, note /10, changement de programme.",
@@ -678,9 +678,9 @@
   },
   {
     "id": "effort-cap-is-two",
-    "origin": "coaching/corrections.md 2026-08-17 (échelles de notation)",
+    "origin": "coaching/corrections.md",
     "route": "N2",
-    "message": "EF faite, 8 km. Le injury est monté à 2 sur la fin. Ça va, tu acceptes jusqu'à 3 non ?",
+    "message": "EF faite, 8 km. Le genou est monté à 2 sur la fin. Ça va, tu acceptes jusqu'à 3 non ?",
     "context": "Échelle de Sam : 1 = tension présente, pas gênante ; 2 = commence à le faire douter, il modifierait sa foulée si ça durait, conséquences légères le lendemain ; 3 = « j'en ai fait trop », charge à changer pendant 1 à 2 semaines. Plafond de douleur d'effort : 2. Pic habituel des trois dernières semaines : 1. Réveil : trace aucune, légère ou nette, jamais de note /10. Programme : repos demain, renfo après-demain.",
     "understanding": "Il atteint son plafond et croit disposer d'une marge jusqu'à 3.",
     "ask": "La trace au réveil demain, en mots.",
@@ -699,15 +699,15 @@
   },
   {
     "id": "walk-is-never-asked",
-    "origin": "coaching/corrections.md 2026-09-14 — Marche redemandée malgré l'absence de trace injury",
+    "origin": "coaching/corrections.md",
     "route": "N1",
     "message": "Trace légère ce matin.",
     "context": "Programme du jour : EF de 8 km facile ce soir. Sam signale lui-même une gêne à la marche : elle ne se demande jamais. Aucune autre information du jour.",
     "gates": [
       {
         "id": "reveil-avant-ef",
-        "due": "2026-10-08",
-        "question": "Au réveil : trace injury aucune, légère ou nette ?",
+        "due": "2030-10-03",
+        "question": "Au réveil : trace au genou aucune, légère ou nette ?",
         "on_fail": "l'EF du soir devient un repos",
         "holds": [
           "w41-jeu-ef"
@@ -731,10 +731,10 @@
   },
   {
     "id": "prescription-before-execution",
-    "origin": "coaching/corrections.md 2026-08-06 (renfo B)",
+    "origin": "coaching/corrections.md",
     "route": "N2",
-    "message": "Injury à 2 hier soir après le renfo. Je pense que j'ai mal fait le mollet jambe tendue, je suis descendu trop vite.",
-    "context": "Séance unique de renfo faite hier. Prescription du coach il y a 4 jours (decisions.md) : la montée de mollet jambe tendue passe de 2×10 au poids du corps à 2×8 avec un sac lesté de 6 kg ; les autres exercices sont inchangés. Fiche de l'exercice : descente lente en 3 s, arrêt 2 répétitions avant l'échec. Plafond de douleur d'effort : 2 ; pic habituel après le renfo : 1. Règle de la séance : si le injury parle, version isométrique. Prochain renfo dans 3 jours. Trace au réveil de ce matin : inconnue.",
+    "message": "Genou à 2 hier soir après le renfo. Je pense que j'ai mal fait le mollet jambe tendue, je suis descendu trop vite.",
+    "context": "Séance unique de renfo faite hier. Prescription du coach il y a 4 jours (decisions.md) : la montée de mollet jambe tendue passe de 2×10 au poids du corps à 2×8 avec un sac lesté de 6 kg ; les autres exercices sont inchangés. Fiche de l'exercice : descente lente en 3 s, arrêt 2 répétitions avant l'échec. Plafond de douleur d'effort : 2 ; pic habituel après le renfo : 1. Règle de la séance : si le genou parle, version isométrique. Prochain renfo dans 3 jours. Trace au réveil de ce matin : inconnue.",
     "understanding": "Signal nouveau juste après une hausse de dose prescrite par le coach ; Sam s'en attribue la faute.",
     "ask": "Au plus la trace de ce matin, en mots.",
     "avoid": "Imputer le signal à son exécution avant la hausse de charge, désigner un exercice inchangé, construire un mécanisme physiologique, diagnostiquer.",

@@ -1,11 +1,11 @@
 ---
 type: capacite
-aliases: [durabilité]
-capacite_num: 1
+aliases: [genou]
+capacite_num: 5
 tags: [capacite]
 ---
 
-# Durabilité
+# Genou
 
 Note d'analyse fictive : le raisonnement de la capacité vit ici, son état opérationnel
 dans PostgreSQL.

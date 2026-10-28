@@ -1,12 +1,12 @@
 ---
 type: seance-type
-capacite: [nuit, mental]
+capacite: [vitesse, mental]
 rpe_cible: 3
 duree_min: 75
 phase: [specifique-2]
 statut: actif
 ---
 
-# nocturne
+# fractionne
 
 Fiche fictive du vault de test.

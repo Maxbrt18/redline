@@ -54,7 +54,7 @@ def _cli_call_allowed(binary: str, model: str, cwd: str) -> None:
     (Path(cwd) / path).parent.mkdir(parents=True, exist_ok=True)
     (Path(cwd) / path).write_text("{}", encoding="utf-8")
     cli = ("/usr/local/bin/redline-agent-cli week-plan.py preview "
-           f"--week 2026-W01 --input {path}")
+           f"--week 2030-W01 --input {path}")
     prompt = (f"Lance exactement cette commande avec l'outil Bash, une seule fois, sans "
               f"la modifier : {cli}\nPuis réponds FIN.")
     env = {key: value for key, value in os.environ.items() if key != "REDLINE_TURN_ID"}

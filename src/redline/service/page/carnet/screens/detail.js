@@ -158,7 +158,7 @@ function sdFeelings(data) {
   const known = Object.fromEntries((data.fact.pains || []).map(item => ['pain:' + item.zone, item]));
   const watched = Object.keys(ask ? ask.labels : {}).length ? Object.entries(ask.labels)
     : (data.fact.pains || []).map(item => ['pain:' + item.zone, item.label]);
-  const feelings = watched.map(([field, label]) => [field, 'Douleur ' + label, 'tib', (known[field] || {}).value]);
+  const feelings = watched.map(([field, label]) => [field, 'Douleur ' + label, 'pain', (known[field] || {}).value]);
   feelings.push(['rpe', 'Effort (RPE)', '', data.fact.rpe], ['enjoyment', 'Plaisir', '', data.fact.enjoyment]);
   feelings.forEach(([metric, label, cls, value]) => {
     if (value == null) {

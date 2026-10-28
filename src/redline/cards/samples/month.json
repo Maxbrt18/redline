@@ -1,5 +1,5 @@
 {
-  "month": "Juillet 2026",
+  "month": "Juillet 2030",
   "km": 186.4,
   "dplus": 4820,
   "sessions": 19,
@@ -10,14 +10,14 @@
     {"label": "W30", "km": 51.8}
   ],
   "capabilities": {
-    "Durabilité": 3,
-    "Descente technique": 1,
-    "Course de nuit": 0,
-    "Digestion à l'effort": 2,
+    "Endurance": 3,
+    "Vitesse": 2,
+    "Côtes": 1,
+    "Ravitaillement": 2,
     "Mental": 2,
-    "Allure de course": 3
+    "Allure marathon": 3
   },
   "cap_scale": 5,
   "race_name": "TargetRace",
-  "race_date": "2026-11-28"
+  "race_date": "2030-12-08"
 }

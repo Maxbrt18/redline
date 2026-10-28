@@ -339,7 +339,7 @@ function landmarks(data) {
     const peak = (item.weeks[item.weeks.length - 1] || {}).peak;
     const pain = tvalue(peak == null ? '—' : fmt(peak), '/10');
     if (peak > data.pain.cap) pain.classList.add('n-over');
-    grid.append(add(tile(item.label, () => push({k: 'injury', zone: item.zone}), 'tib', 'tib'), pain, el('small', 'pic de la semaine'),
+    grid.append(add(tile(item.label, () => push({k: 'injury', zone: item.zone}), 'pain', 'pain'), pain, el('small', 'pic de la semaine'),
       add(el('span', null, 'n-tfoot'), painPlot({cap: data.pain.cap, weeks: item.weeks}))));
   });
   const race = data.race;

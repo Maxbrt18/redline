@@ -2,7 +2,7 @@
 type: seance-type
 routine: assimilation
 aliases: [renfo assimilation, semaine d'assimilation]
-capacite: [injury]
+capacite: [genou]
 title: "Renfo, semaine d'assimilation"
 rule: "Isométriques seulement. On garde l'activation, on retire les dégâts."
 exercises:

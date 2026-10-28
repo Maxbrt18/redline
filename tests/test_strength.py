@@ -24,7 +24,7 @@ SESSION = {
     "exercises": [
         {"slug": "warmup-a", "name": "Échauffement",
          "dose": dose(measure="time", seconds=180)},
-        {"slug": "calf-raise-bent", "name": "Mollet unipodal, genou FLÉCHI ~30°",
+        {"slug": "calf-raise-bent", "name": "Mollet unipodal, talon FLÉCHI ~30°",
          "target": "soléaire", "dose": dose(measure="amrap", sets=2, side="each")},
         {"slug": "plyometrics", "name": "Pliométrie",
          "dose": dose(measure="contacts", contacts=40, block=10)},
@@ -32,7 +32,7 @@ SESSION = {
 }
 
 
-ZONES = {"injury": "Injury"}
+ZONES = {"genou": "Genou"}
 
 
 def parsed(report: dict, session: dict = SESSION) -> dict:
@@ -106,7 +106,7 @@ def test_sidecar_absent_or_not_a_session(tmp_path):
 def test_parser_refuses_out_of_range_numbers_instead_of_forging_bounds():
     with pytest.raises(strength.ReportError):
         strength.parse_report({
-            "pains": {"injury": {"after": 99}}, "minutes": -5, "note": "ok",
+            "pains": {"genou": {"after": 99}}, "minutes": -5, "note": "ok",
             "exercises": [{"i": 1, "score": 42, "reps": [12, -3, "x", 9999]}],
         }, SESSION["exercises"], ZONES)
 
@@ -131,7 +131,7 @@ def test_parser_refuses_junk():
 
 def test_format_message_reads_like_the_athlete_wrote_it():
     message = strength.format_message(SESSION, parsed({
-        "pains": {"injury": {"after": 1}}, "minutes": 32,
+        "pains": {"genou": {"after": 1}}, "minutes": 32,
         "note": "Le soléaire a lâché avant le gastroc.",
         "exercises": [
             {"i": 0, "score": 3},
@@ -148,14 +148,14 @@ def test_format_message_reads_like_the_athlete_wrote_it():
     # the left/right gap, which is a flag.
     assert "droite 14, 11 · gauche 12, 10" in message
     assert "- Pliométrie : pas fait" in message
-    assert "Injury : 1/10 après la séance (rien avant)." in message
+    assert "Genou : 1/10 après la séance (rien avant)." in message
     assert "« Le soléaire a lâché avant le gastroc. »" in message
 
 
 def test_format_message_without_any_report():
     message = strength.format_message(SESSION, parsed({}))
     assert message.startswith("Séance de renfo terminée")
-    assert "Injury" not in message
+    assert "Genou" not in message
 
 
 # ------------------------------------------------- the typed session log
@@ -239,26 +239,26 @@ def test_an_untouched_exercise_leaves_no_row():
 # ---------------------------------------------- the two readings of each zone
 
 @pytest.mark.parametrize("report,said", [
-    ({"before": 1, "after": 3}, "Injury : 1/10 avant, 3/10 après (monté)."),
-    ({"before": 3, "after": 1}, "Injury : 3/10 avant, 1/10 après (descendu)."),
-    ({"before": 2, "after": 2}, "Injury : 2/10 avant, 2/10 après (stable)."),
-    ({"before": 2}, "Injury : 2/10 avant de commencer."),
-    ({"after": 2}, "Injury : 2/10 après la séance (rien avant)."),
+    ({"before": 1, "after": 3}, "Genou : 1/10 avant, 3/10 après (monté)."),
+    ({"before": 3, "after": 1}, "Genou : 3/10 avant, 1/10 après (descendu)."),
+    ({"before": 2, "after": 2}, "Genou : 2/10 avant, 2/10 après (stable)."),
+    ({"before": 2}, "Genou : 2/10 avant de commencer."),
+    ({"after": 2}, "Genou : 2/10 après la séance (rien avant)."),
 ])
 def test_the_two_readings_never_get_merged(report, said):
     """The ledger keeps two series that never mix: the rest reading and the effort peak.
     A single figure answered neither -- "2/10 after" means nothing without what it was
     before."""
-    assert said in strength.format_message(SESSION, parsed({"pains": {"injury": report}}))
+    assert said in strength.format_message(SESSION, parsed({"pains": {"genou": report}}))
 
 
 def test_each_zone_is_reported_under_its_own_name():
-    zones = {"genou": "Genou", "cheville": "Cheville"}
-    clean = strength.parse_report({"pains": {"genou": {"before": 1, "after": 3},
+    zones = {"talon": "Talon", "cheville": "Cheville"}
+    clean = strength.parse_report({"pains": {"talon": {"before": 1, "after": 3},
                                              "cheville": {"after": 0}}},
                                   SESSION["exercises"], zones)
     message = strength.format_message(SESSION, clean)
-    assert "Genou : 1/10 avant, 3/10 après (monté)." in message
+    assert "Talon : 1/10 avant, 3/10 après (monté)." in message
     assert "Cheville : 0/10 après la séance (rien avant)." in message
 
 

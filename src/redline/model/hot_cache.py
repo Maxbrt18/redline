@@ -87,7 +87,7 @@ def render(ledger, rows: list, instruments: dict, targets: dict,
     verdict = f" — **{' et '.join(red)} au rouge**" if red else ""
     walk_note = (f", dont **{walk_share} % de marche**" if walk_share >= 25 else "")
 
-    short = label.split("-")[-1]          # « 2026-W30 » -> « W30 »
+    short = label.split("-")[-1]          # « 2030-W30 » -> « W30 »
     sorties = f"{runs} sortie" + ("s" if runs > 1 else "")
     # A week is "bouclée" only once it is CLOSED: mid-week the missing days would fake a
     # collapse in volume and ratio.

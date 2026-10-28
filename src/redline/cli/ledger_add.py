@@ -165,7 +165,7 @@ def main() -> int:
     parser.add_argument("--start-local", default="",
                         help="heure locale ISO rendue par strava.py (`start_local`)")
     parser.add_argument("--session-key", default="",
-                        help="appariement explicite, ex. 2026-W34:w34-ven-ef")
+                        help="appariement explicite, ex. 2030-W34:w34-ven-ef")
     for item in table.INPUTS:
         parser.add_argument(f"--{option_of(item)}", default="",
                             help=f"champ « {item.name} »"

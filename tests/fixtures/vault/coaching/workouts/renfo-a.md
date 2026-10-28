@@ -3,7 +3,7 @@ type: seance-type
 min_gap_h: {strength: 48}
 routine: a
 aliases: [renfo A, séance A, renfo unique, séance unique]
-capacite: [injury, descente]
+capacite: [genou, cotes]
 title: "Renfo, séance unique"
 rule: "Arrête 2 répétitions avant l'échec. Si la zone surveillée parle : version isométrique."
 exercises:

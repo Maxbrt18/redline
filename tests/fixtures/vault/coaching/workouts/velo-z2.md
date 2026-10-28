@@ -1,7 +1,7 @@
 ---
 type: seance-type
 kinds: [bike]
-capacite: [durabilite, injury]
+capacite: [endurance, genou]
 rpe_cible: 3
 duree_min: 75
 phase: [base, general, specifique-1, specifique-2]

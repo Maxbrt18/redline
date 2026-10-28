@@ -29,7 +29,7 @@ class SessionCycles(StoreBase):
         try:
             week, logical_key = session_key.split(":", 1)
         except ValueError as exc:
-            raise StorageError("session_key attendu sous la forme 2026-W34:identifiant") from exc
+            raise StorageError("session_key attendu sous la forme 2030-W34:identifiant") from exc
         if not week or not logical_key:
             raise StorageError("session_key incomplet")
         return week, logical_key

@@ -32,6 +32,9 @@ EXAMPLE = "redline.example.toml"
 PLACEHOLDER = re.compile(r"\[[^\]]*\]")
 SLUG = r"[a-z0-9][a-z0-9-]{0,39}"
 
+#: The pictograms the notebook draws for a capability (`PAS_ICONS` in `ui.js`).
+CAPABILITY_ICONS = ("run", "descent", "food", "night", "pain", "mind")
+
 INSTANCE_SCHEMA = Schema("redline.toml", [
     field("athlete", dict, schema=Schema("[athlete]", [
         field("name", str, minimum=1, maximum=40,
@@ -58,6 +61,8 @@ INSTANCE_SCHEMA = Schema("redline.toml", [
         "capacité", dict, schema=Schema("[[capabilities]]", [
             field("slug", str, pattern=SLUG),
             field("label", str, minimum=1, maximum=30),
+            field("icon", str, required=False, choices=CAPABILITY_ICONS,
+                  note="le pictogramme de la capacité dans le carnet"),
         ]))),
     # What `vault-check.py` holds the vault to; without it, nothing is checked for it.
     field("vault", dict, required=False, schema=Schema("[vault]", [
@@ -87,6 +92,7 @@ class InstanceError(ConfigError):
 class Capability:
     slug: str
     label: str
+    icon: str = "run"
 
 
 @dataclass(frozen=True)
@@ -119,6 +125,12 @@ class Instance:
             if capability.slug == slug:
                 return capability.label
         return derived_label(slug)
+
+    def capability_icon(self, slug: str) -> str:
+        for capability in self.capabilities:
+            if capability.slug == slug:
+                return capability.icon
+        return "run"
 
 
 def derived_label(slug: str) -> str:
@@ -181,7 +193,7 @@ def parse(text: str) -> Instance:
         athlete_name=athlete["name"],
         place=payload["notebook"]["place"],
         injuries=tuple(Injury(entry["slug"], entry["label"]) for entry in injuries),
-        capabilities=tuple(Capability(entry["slug"], entry["label"])
+        capabilities=tuple(Capability(entry["slug"], entry["label"], entry.get("icon", "run"))
                            for entry in payload["capabilities"]),
         hr_rest=athlete["hr_rest"],
         hr_max=athlete["hr_max"],

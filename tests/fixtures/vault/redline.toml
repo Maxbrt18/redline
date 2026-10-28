@@ -11,32 +11,38 @@ timezone = "Europe/Paris"
 place = "Paris"
 
 [[injuries]]
-slug = "injury"
-label = "Injury"
+slug = "genou"
+label = "Genou"
 
 [[capabilities]]
-slug = "cap1-durabilite"
-label = "Durabilité"
+slug = "cap1-endurance"
+label = "Endurance"
+icon = "run"
 
 [[capabilities]]
-slug = "cap2-descente"
-label = "Descente"
+slug = "cap2-vitesse"
+label = "Vitesse"
+icon = "run"
 
 [[capabilities]]
-slug = "cap3-digestion"
-label = "Digestion"
+slug = "cap3-ravitaillement"
+label = "Ravitaillement"
+icon = "food"
 
 [[capabilities]]
-slug = "cap4-nuit"
-label = "Nuit"
+slug = "cap4-cotes"
+label = "Côtes"
+icon = "descent"
 
 [[capabilities]]
-slug = "cap5-injury"
-label = "Injury"
+slug = "cap5-genou"
+label = "Genou"
+icon = "pain"
 
 [[capabilities]]
 slug = "cap6-mental"
 label = "Mental"
+icon = "mind"
 
 [vault]
 note_types = ["capacite", "exercice", "seance-type"]

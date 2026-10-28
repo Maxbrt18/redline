@@ -58,8 +58,8 @@ def test_the_walk_share_uses_the_gauge_formula_not_a_copy_of_it():
 
 
 def test_a_quiet_week_carries_no_red_verdict():
-    rows = [Row(dt.date(2026, 3, 2), "easy", km=8.0, hours=0.8, pains={"injury": 0.0}),
-            Row(dt.date(2026, 3, 4), "easy", km=8.0, hours=0.8, pains={"injury": 0.0})]
+    rows = [Row(dt.date(2026, 3, 2), "easy", km=8.0, hours=0.8, pains={"genou": 0.0}),
+            Row(dt.date(2026, 3, 4), "easy", km=8.0, hours=0.8, pains={"genou": 0.0})]
     block = hot_cache.render(ledger, rows, {"2026-W10": Instruments()}, RPE_TARGETS)
     assert "au rouge" not in block
     assert "% de marche" not in block   # zero hiking: the mention has no reason to appear
@@ -91,13 +91,13 @@ def _state(**overrides):
         "deadlines": [
             {"deadline_key": "verdict-cortex", "due_on": dt.date(2026, 9, 6),
              "status": "todo", "blocks": "descente courue"},
-            {"deadline_key": "targetrace", "due_on": dt.date(2026, 11, 28),
+            {"deadline_key": "targetrace", "due_on": dt.date(2026, 11, 26),
              "status": "scheduled", "kind": "race"},
         ],
         "capabilities": [{"slug": "durabilite", "score": 2, "scale": 5},
                          {"slug": "descente", "score": 1, "scale": 5}],
         "typed_due": 0,
-        "race_on": dt.date(2026, 11, 28), "today": dt.date(2026, 10, 5),
+        "race_on": dt.date(2026, 11, 26), "today": dt.date(2026, 10, 5),
     }
     inputs.update(overrides)
     return hot_cache.render_state(ledger, rows, **inputs)
@@ -107,7 +107,7 @@ def test_the_state_block_carries_what_decides_the_next_weeks():
     block = _state()
     assert "sans nouveau record depuis 3 semaine(s) close(s)" in block
     assert "protocole des baisses ouvert" in block
-    assert "course le 28/11, dans 7 semaine(s)" in block
+    assert "course le 26/11, dans 7 semaine(s)" in block
     assert "verdict-cortex (06/09), bloque descente courue" in block
     assert "targetrace" not in block.split("Échéances échues")[1].split("\n")[0]
     assert "durabilite 2/5 · descente 1/5" in block
@@ -131,29 +131,29 @@ def test_refresh_fills_the_state_block_only_where_it_is_declared(tmp_path):
             return []
 
         def latest_capabilities(self):
-            return [{"slug": "injury", "score": 3, "scale": 5}]
+            return [{"slug": "genou", "score": 3, "scale": 5}]
 
         def prediction_rows(self):
             return [{"status": "open", "due_on": dt.date(2026, 9, 1)}]
 
         def pain_zones(self):
-            return [{"slug": "injury", "label": "Injury", "active": True}]
+            return [{"slug": "genou", "label": "Genou", "active": True}]
 
     rows = [Row(dt.date(2026, 9, 20), "long", km=10.8, hours=1.3)]
     assert hot_cache.refresh(tmp_path, ledger, rows, {}, store=Store(),
                              today=dt.date(2026, 9, 27))
     text = cache.read_text(encoding="utf-8")
-    assert "injury 3/5" in text and "Prédictions à solder** : 1" in text
+    assert "genou 3/5" in text and "Prédictions à solder** : 1" in text
     assert not hot_cache.refresh(tmp_path, ledger, rows, {}, store=Store(),
                                  today=dt.date(2026, 9, 27), check=True)
 
 
 def test_each_watched_zone_has_its_own_trend_in_the_form_block():
     rows = [Row(dt.date(2026, 3, 2), "easy", km=8.0, hours=0.8,
-                pains={"genou": 2.0, "cheville": 0.5})]
-    zones = [ledger.PainZone("genou", "Genou"), ledger.PainZone("cheville", "Cheville")]
+                pains={"talon": 2.0, "cheville": 0.5})]
+    zones = [ledger.PainZone("talon", "Talon"), ledger.PainZone("cheville", "Cheville")]
     block = hot_cache.render(ledger, rows, {}, RPE_TARGETS, zones=zones)
-    assert "Genou W10 2/—" in block and "Cheville W10 0,5/—" in block
+    assert "Talon W10 2/—" in block and "Cheville W10 0,5/—" in block
 
 
 def test_without_a_watched_zone_the_form_block_says_so():

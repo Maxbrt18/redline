@@ -1,6 +1,6 @@
 ---
 type: seance-type
-capacite: [durabilite]
+capacite: [endurance]
 rpe_cible: 5
 duree_min: 70
 phase: [general, specifique-1, specifique-2]

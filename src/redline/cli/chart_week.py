@@ -4,7 +4,7 @@
 Form: one thin column per day (km done, zero baseline, honest), standing in a
 pale, wider column for the planned volume -- under-done leaves pale room above,
 over-done stands out of it. Demanding days say "qualité" under the day name. The
-review instruments (volume, load gauge, shins, enjoyment, CMJ) sit in a strip of
+review instruments (volume, load gauge, pain, enjoyment, CMJ) sit in a strip of
 figures; one that crosses its limit turns red.
 
 Input: WEEK_SCHEMA in src/redline/model/cards.py, from --input (stdin outside a turn).
@@ -38,7 +38,7 @@ def build_tiles(data: dict) -> list[dict]:
                       "sub": f"ratio {fmt_num(round(ratio, 2))} / 1,3" if ratio is not None else "",
                       "status": "bad" if over else "ok"})
     if data.get("pain") is not None:
-        tiles.append({"label": "Injury", "value": str(data["pain"]),
+        tiles.append({"label": "Douleur", "value": str(data["pain"]),
                       "status": data.get("pain_flag"), "kind": "text"})
     if data.get("plaisir") is not None:
         tiles.append({"label": "Plaisir", "value": f"{fmt_num(data['plaisir'])} / 10"})

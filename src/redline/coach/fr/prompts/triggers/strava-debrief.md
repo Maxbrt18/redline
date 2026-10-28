@@ -32,7 +32,7 @@
    faute ; une allure ne se compare qu'au sein de la séance. Une EF un peu rapide
    n'entre pas dans ce mandat. Une qualité se juge sur les SEULS critères écrits dans sa séance :
    sans cible de FC = la FC n'est ni doute ni reproche, juste un repère situé dans
-   les zones d'`athlete/athlete.md` (2026-10-15). N'ajoute aucun écart à `ecarts`.
+   les zones d'`athlete/athlete.md`. N'ajoute aucun écart à `ecarts`.
    Décision changée : son propriétaire ; sinon la ligne du registre suffit. Une
    CALIBRATION, RPE et réserve connus, ajoute une ligne datée aux Calibrations de
    sa fiche dans `coaching/workouts/`. La carte des répétitions part seule : n'en génère

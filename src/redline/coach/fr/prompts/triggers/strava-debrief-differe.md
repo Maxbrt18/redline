@@ -4,7 +4,7 @@ débrief normal (`scripts/session-cycle.py pending` ; les faits objectifs sont d
 mais demande AU RÉVEIL DIRECTEMENT la référence laissée par la veille : premiers pas,
 zone surveillée et règle "pas pire le lendemain". Cette collecte ne se reporte jamais au soir
 suivant. Note CARNET présente : une clause rappelle que le carnet l'attend, sans question.
-NE DEMANDE PAS UNE NOTE SUR 10 (2026-08-17) : demande la trace laissée (aucune, très
+NE DEMANDE PAS UNE NOTE SUR 10 : demande la trace laissée (aucune, très
 légère, légère, nette) ou fais falsifier l'annonce de la veille ("plus, moins ou pile ce que ton 2
 d'hier annonçait ?"), plus les premiers pas et le test du toucher. Son mot va tel quel
 dans `--dlr` (aucune, très légère, légère, nette), et tu ne le narres pas.

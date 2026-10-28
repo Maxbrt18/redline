@@ -30,7 +30,7 @@ DAY_SCHEMA = Schema("jour", [
 ])
 
 WEEK_SCHEMA = Schema("semaine", [
-    field("period", str, required=False, pattern=r"20\d{2}-W\d{2}", note="période canonique du bilan, ex. 2026-W39"),
+    field("period", str, required=False, pattern=r"20\d{2}-W\d{2}", note="période canonique du bilan, ex. 2030-W39"),
     field("week", str, note="le titre court, ex. W30"),
     field("dates", str, required=False),
     field("days", list, minimum=1, maximum=7, item=field("jour", dict, schema=DAY_SCHEMA),
@@ -52,7 +52,7 @@ WEEK_TOTAL_SCHEMA = Schema("semaine du mois", [
 ])
 
 MONTH_SCHEMA = Schema("mois", [
-    field("period", str, required=False, pattern=r"20\d{2}-\d{2}", note="période canonique du bilan, ex. 2026-09"),
+    field("period", str, required=False, pattern=r"20\d{2}-\d{2}", note="période canonique du bilan, ex. 2030-09"),
     field("month", str, note="le titre, ex. Juillet 2026"),
     field("km", float, required=False, minimum=0),
     field("dplus", float, required=False, minimum=0),

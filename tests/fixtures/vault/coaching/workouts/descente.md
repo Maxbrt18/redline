@@ -1,6 +1,6 @@
 ---
 type: seance-type
-capacite: [descente, injury]
+capacite: [cotes, genou]
 rpe_cible: 4
 duree_min: 60
 phase: [specifique-1, specifique-2]

@@ -10,7 +10,7 @@ from redline.model import transitions, weekly_plan
 from redline.model.schema import SchemaError
 from redline.model.transitions import LONG_RUN_STEP, Problem, Rules
 
-RACE = dt.date(2026, 11, 28)
+RACE = dt.date(2026, 11, 26)
 TAPER = ("2026-W46", "2026-W47", "2026-W48")
 
 

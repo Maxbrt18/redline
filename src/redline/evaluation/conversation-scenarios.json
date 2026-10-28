@@ -1,7 +1,7 @@
 [
   {
     "id": "verbose-listening",
-    "today": "2026-09-30",
+    "today": "2030-09-25",
     "context": "Récit fictif. Aucune décision de programme demandée.",
     "history": [],
     "turns": [
@@ -25,7 +25,7 @@
   },
   {
     "id": "few-words",
-    "today": "2026-09-30",
+    "today": "2030-09-25",
     "context": "Une seule question attend une réponse : durée du moment agréable, aucun enjeu médical.",
     "history": [
       {
@@ -54,7 +54,7 @@
   },
   {
     "id": "hesitant",
-    "today": "2026-09-30",
+    "today": "2030-09-25",
     "context": "Question sur le plaisir de la séance, pas sur la sécurité ni une prescription.",
     "history": [
       {
@@ -83,7 +83,7 @@
   },
   {
     "id": "frustrated-correction",
-    "today": "2026-09-30",
+    "today": "2030-09-25",
     "context": "Le coach a confondu vendredi et jeudi. Le plan vérifié place le renfo vendredi. Aucun déplacement à effectuer.",
     "history": [
       {
@@ -112,7 +112,7 @@
   },
   {
     "id": "just-listen",
-    "today": "2026-09-30",
+    "today": "2030-09-25",
     "context": "Pas de signal physique ni demande de conseil.",
     "history": [],
     "turns": [
@@ -136,7 +136,7 @@
   },
   {
     "id": "direct-advice",
-    "today": "2026-09-30",
+    "today": "2030-09-25",
     "context": "Question pratique sur une habitude logistique, sans conseil sportif ni prescription médicale.",
     "history": [],
     "turns": [
@@ -160,7 +160,7 @@
   },
   {
     "id": "long-context",
-    "today": "2026-09-30",
+    "today": "2030-09-25",
     "context": "Contexte fictif daté. Trois sujets clos ou reportés. Aucune révision demandée.",
     "history": [
       {
@@ -225,7 +225,7 @@
   },
   {
     "id": "light-banter",
-    "today": "2026-09-30",
+    "today": "2030-09-25",
     "context": "Échange social, sans demande de séance.",
     "history": [],
     "turns": [
@@ -249,7 +249,7 @@
   },
   {
     "id": "emotion-with-task",
-    "today": "2026-09-30",
+    "today": "2030-09-25",
     "context": "Le bilan déjà calculé et vérifié pour la semaine précédente donne 30,18 km en 4 sorties.",
     "history": [],
     "turns": [
@@ -266,7 +266,7 @@
   },
   {
     "id": "answer-already-given",
-    "today": "2026-09-30",
+    "today": "2030-09-25",
     "context": "Aucun symptôme nouveau. Conversation logistique uniquement.",
     "history": [
       {
@@ -303,7 +303,7 @@
   },
   {
     "id": "simple-correction-deep",
-    "today": "2026-09-30",
+    "today": "2030-09-25",
     "context": "Les chiffres vérifiés portent 30,18 km, pas 31. Aucun autre changement.",
     "history": [
       {
@@ -325,7 +325,7 @@
   },
   {
     "id": "safety-over-style",
-    "today": "2026-09-30",
+    "today": "2030-09-25",
     "context": "Aucun plan nécessaire pour une précaution immédiate ; aucune donnée ni écriture simulée ne prouve un diagnostic.",
     "history": [],
     "turns": [

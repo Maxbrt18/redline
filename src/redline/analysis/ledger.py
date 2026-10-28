@@ -7,7 +7,7 @@ that drifts.
 
 Usage:
     python3 scripts/ledger.py                       # the last week
-    python3 scripts/ledger.py --semaine 2026-W30    # the load line for a weekly review
+    python3 scripts/ledger.py --semaine 2030-W30    # the load line for a weekly review
     python3 scripts/ledger.py --tendance-douleur 3  # last 3 weeks
     python3 scripts/ledger.py --csv                 # both tables, normalized, on stdout
 
@@ -386,7 +386,7 @@ def _week_label(day: dt.date) -> str:
 
 
 def normalize_week(text: str, known: list[str]) -> str:
-    """« 31 », « W31 », « 2026-w31 » -> « 2026-W31 », rejecting unknown weeks.
+    """« 31 », « W31 », « 2030-w31 » -> « 2030-W31 », rejecting unknown weeks.
 
     Without this, `--semaine 31` would raise nothing: the label would match no row, the
     week would come out empty and the gauge would print « 0.00 h-éq (0/100) », a perfectly
@@ -395,7 +395,7 @@ def normalize_week(text: str, known: list[str]) -> str:
     raw = text.strip().upper().replace(" ", "")
     match = re.fullmatch(r"(?:(\d{4})-?)?W?(\d{1,2})", raw)
     if not match:
-        raise ValueError(f"semaine illisible : « {text} » (attendu 2026-W30, W30 ou 30)")
+        raise ValueError(f"semaine illisible : « {text} » (attendu 2030-W30, W30 ou 30)")
     year, week = match.group(1), int(match.group(2))
     if year:
         label = f"{year}-W{week:02d}"
@@ -1057,8 +1057,7 @@ def week_report(store: LedgerStore, rows: list[Row], instruments: dict, targets:
                  f"charge_vie={instr.life_load or 'non déclarée'})")
     dminus = week_descent(week_rows)
     if dminus:
-        lines.append(f"D− de la semaine : {dminus} m — c'est LUI que compte la jauge "
-                     f"(confrontation n°2, volet dénivelé, 2026-08-16)")
+        lines.append(f"D− de la semaine : {dminus} m — c'est LUI que compte la jauge")
     zones = pain_zones(store)
     for zone in zones:
         pain = pain_trend(week_rows, 1, zone.slug)
@@ -1090,7 +1089,7 @@ def week_report(store: LedgerStore, rows: list[Row], instruments: dict, targets:
         longest = longest_recent(rows, reference)
         if longest is not None:
             lines.append(f"Plus longue des 30 j : {longest:.1f} km — repère, pas un plafond "
-                         "(aucun pourcentage fixe, décision du 2026-09-27)")
+                         "(aucun pourcentage fixe)")
         race_on = next_race_date(store, today)
         projection = race_projection(rows, today, race_on) if race_on else None
         if projection:
@@ -1127,7 +1126,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--root", default=paths.vault_root(), type=Path)
-    parser.add_argument("--semaine", dest="week", help="ex. 2026-W30")
+    parser.add_argument("--semaine", dest="week", help="ex. 2030-W30")
     parser.add_argument("--tendance-douleur", dest="pain_weeks", type=int, metavar="N")
     parser.add_argument("--csv", action="store_true", help="export normalisé sur stdout")
     parser.add_argument("--cible-sl", dest="target_km", type=float, metavar="KM",

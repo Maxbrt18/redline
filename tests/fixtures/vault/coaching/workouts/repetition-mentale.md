@@ -1,6 +1,6 @@
 ---
 type: seance-type
-capacite: [mental, digestion]
+capacite: [mental, ravitaillement]
 duree_min: 30
 phase: [general, specifique-1, specifique-2]
 statut: actif

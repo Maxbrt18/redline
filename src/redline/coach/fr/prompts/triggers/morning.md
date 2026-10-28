@@ -12,7 +12,7 @@ Prépare le mot du matin.
    le carnet attend la trace. Puis lis l'état récent du registre et `python3 scripts/session-cycle.py pending`.
    Le service joint lui-même, après ton texte, le bloc "Aujourd'hui :" rendu
    depuis le programme : type, cible, plafond, RPE, zones et consigne de chaque
-   séance, ou "rien de prévu". Ne le redis pas, même reformulé (2026-10-22) : commente
+   séance, ou "rien de prévu". Ne le redis pas, même reformulé : commente
    seulement ce que ce bloc ne dit pas, et s'il dit déjà tout, ne parle pas de la
    séance. Un jour de renfo, le service génère et joint la carte depuis
    la prescription `strength` du plan. Lis `coaching/strength.md` pour le RAISONNEMENT

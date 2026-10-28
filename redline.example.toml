@@ -30,14 +30,17 @@ place = "[Ville]"
 # label = "Cheville"
 
 # Les capacités que le cockpit suit, dans l'ordre d'affichage. Le slug est celui que
-# `fact-write.py capability` enregistre ; le libellé est ce que le carnet affiche.
+# `fact-write.py capability` enregistre ; le libellé est ce que le carnet affiche ;
+# l'icône, facultative, est l'une de run, descent, food, night, pain, mind.
 [[capabilities]]
-slug = "cap1-durabilite"
-label = "Durabilité"
+slug = "cap1-endurance"
+label = "Endurance"
+icon = "run"
 
 [[capabilities]]
-slug = "cap2-descente"
-label = "Descente"
+slug = "cap2-vitesse"
+label = "Vitesse"
+icon = "run"
 
 # Ce que `vault-check.py` vérifie dans le vault. Facultatif : sans ce bloc, ni le type
 # des notes ni le budget de lecture ne sont contrôlés.

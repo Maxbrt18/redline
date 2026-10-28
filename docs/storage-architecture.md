@@ -170,9 +170,6 @@ checkout que les agents peuvent lire et modifier. `server/.env.example` document
 clés sans porter de valeur. Une copie `server/.env` n'est admise qu'en développement
 local et ne doit jamais subsister sur le VPS.
 
-La bascule depuis l'ancien stockage Markdown/JSON a eu lieu le 2026-08-13 et son
-outillage a été retiré du dépôt le 2026-08-18, une fois la parité vérifiée.
-
 ## Sauvegarde gratuite, chiffrée et hors VPS
 
 Il n'y a ni stockage objet payant, ni abonnement de sauvegarde, ni service permanent

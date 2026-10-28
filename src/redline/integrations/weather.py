@@ -14,7 +14,7 @@ Strava only gives a local wall-clock time, WITHOUT a timezone. This is the one c
 to know:
 
   python3 scripts/weather.py --polyline 'ki{eFvqfiVsBc@...' \
-      --time '2026-08-05T19:01:46' --local
+      --time '2030-06-15T19:01:46' --local
 
 `--local` means "this time is the local time of the start place"; the script resolves
 the offset itself from Open-Meteo (`timezone=auto` on the coordinates). NEVER append
@@ -376,7 +376,7 @@ def parse_time(value, local=False):
         if dt.tzinfo is not None:
             raise ValueError(
                 f"--local attend une heure SANS fuseau (le `start_local` de "
-                f"Strava, ex. '2026-08-05T19:01:46'), reçu {value!r}. Si "
+                f"Strava, ex. '2030-06-15T19:01:46'), reçu {value!r}. Si "
                 "l'heure porte déjà son fuseau, retire --local."
             )
         return dt
@@ -387,7 +387,7 @@ def parse_time(value, local=False):
             "murale (`start_local`) : passe-la telle quelle avec "
             "--local, le script résout le décalage depuis les coordonnées. "
             "N'ajoute JAMAIS un `Z` toi-même — ça la déclare UTC et décale la "
-            "lecture de 2 h l'été à Paris (bug du 2026-08-05)."
+            "lecture de l'écart entre UTC et l'heure locale."
         )
     return dt
 

@@ -13,7 +13,7 @@ def typed_observation(day: dt.date, kind="easy", *, strava=123, pains=None,
     """The pain of the fictional zone is born `pending`, as the repository creates it."""
     return {"occurred_on": day, "kind": kind, "strava_activity_id": strava,
             "measurements": measurements,
-            "pains": {"injury": PENDING} if pains is None else pains}
+            "pains": {"genou": PENDING} if pains is None else pains}
 
 
 def test_every_session_type_is_classified():
@@ -52,15 +52,15 @@ def test_typed_completeness_reads_metric_states():
         rpe={"state": "pending"},
     )
     assert table.missing_observation_fields(observation) == [
-        "RPE", "Plaisir", "Dlr:injury", "D+", "D-"]
+        "RPE", "Plaisir", "Dlr:genou", "D+", "D-"]
 
 
 def test_each_watched_zone_is_claimed_under_its_own_name():
     observation = typed_observation(
         dt.date(2026, 8, 4), strava=None, rpe={"state": "known", "value": 3},
         enjoyment={"state": "known", "value": 6},
-        pains={"genou": PENDING, "cheville": {"state": "known", "value": 1}})
-    assert table.missing_observation_fields(observation) == ["Dlr:genou"]
+        pains={"talon": PENDING, "cheville": {"state": "known", "value": 1}})
+    assert table.missing_observation_fields(observation) == ["Dlr:talon"]
 
 
 def test_without_a_watched_zone_no_pain_is_claimed():
@@ -71,7 +71,7 @@ def test_without_a_watched_zone_no_pain_is_claimed():
 def test_unavailable_only_resolves_declarative_metrics():
     unavailable = {"state": "unavailable"}
     observation = typed_observation(
-        dt.date(2026, 8, 4), rpe=unavailable, pains={"injury": unavailable},
+        dt.date(2026, 8, 4), rpe=unavailable, pains={"genou": unavailable},
         enjoyment=unavailable, elevation_gain_m=unavailable,
         elevation_loss_m=unavailable,
     )
@@ -81,7 +81,7 @@ def test_unavailable_only_resolves_declarative_metrics():
 def test_readings_require_pain_but_palpation_requires_no_number():
     reading = typed_observation(dt.date(2026, 8, 4), kind="wake-trace", strava=None)
     palpation = typed_observation(dt.date(2026, 8, 4), kind="palpation", strava=None)
-    assert table.missing_observation_fields(reading) == ["Dlr:injury"]
+    assert table.missing_observation_fields(reading) == ["Dlr:genou"]
     assert table.missing_observation_fields(palpation) == []
 
 

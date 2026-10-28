@@ -36,5 +36,5 @@ EPISODES = Path("episodes")
 
 
 def journal(week: str) -> Path:
-    """The journal note of an ISO week such as `2026-W45`."""
+    """The journal note of an ISO week such as `2030-W45`."""
     return JOURNAL / f"{week.lower()}.md"

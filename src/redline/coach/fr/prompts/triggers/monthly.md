@@ -11,9 +11,9 @@ ont été écrites. Ce score ne se raconte pas à ⟨athlète⟩ sans objet conc
 Envoie un ou deux textos sur la
 tendance et le point de vigilance du mois à venir. TRAVAIL MENTAL : la capacité
 n°6 ne se nourrit d'AUCUNE séance, donc personne ne la nourrit. S'il existe un objet
-concret ce mois-ci, prends-en UN, précis et tournant : la nuit, la descente sur jambes
-mortes, les scénarios d'abandon pré-joués (`coaching/pre-mortem-2026-11-29.md`), le
-coping plan du km 32 écrit à l'avance DANS SES MOTS. Propose-le par une question
+concret ce mois-ci, prends-en UN, précis et tournant : une difficulté propre à la
+course visée, les scénarios d'abandon pré-joués du pré-mortem, le coping plan d'un
+moment dur de la course écrit à l'avance DANS SES MOTS. Propose-le par une question
 ouverte, pas un exposé, et écris sa réponse là où elle vit ; sans objet concret, n'en
 force aucun. Si pertinent, une seule preuve de `coaching/mental-bank.md`, textuelle,
 jamais deux fois la même dans le mois. Le retour sur le coach se propose de temps en
