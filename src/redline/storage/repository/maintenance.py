@@ -1,4 +1,4 @@
-"""Comptes, purge et jeton de projection."""
+"""Counts, purge and projection token."""
 
 from __future__ import annotations
 
@@ -92,29 +92,25 @@ class Maintenance(StoreBase):
             return {name: connection.execute(sa.select(sa.func.count()).select_from(table)).scalar_one()
                     for name, table in tables.items()}
 
-    #: Ce qui EXPIRE, et au bout de combien de jours. Rien qui porte un FAIT : les
-    #: marqueurs sont des traces de mécanique consultées le jour même et jamais après.
+    #: What EXPIRES, and after how many days. Nothing that carries a FACT: markers are
+    #: mechanism traces consulted the same day and never afterwards.
     #:
-    #: ⭐ Une seule table était purgée (`proactive_jobs`, cent dernières). Les autres
-    #: grossissaient sans fin : un marqueur par incident signalé et par cellule
-    #: réclamée, emporté dans chaque sauvegarde chiffrée bi-horaire.
+    #: `turn_commands` does NOT expire: `command_key` is the idempotence barrier.
+    #: Deleting it would let an old command be queued again, even when a business
+    #: constraint later blocked its second effect.
     #:
-    #: `turn_commands` N'EXPIRE PAS : `command_key` est la barrière d'idempotence. La
-    #: supprimer après 30 jours permettait de remettre une vieille commande en attente,
-    #: même quand une contrainte métier empêchait ensuite son second effet.
-    #:
-    #: Le journal d'audit n'expire pas : l'application ne peut ni le modifier ni
-    #: l'effacer. `projection_states` n'est pas un journal, seulement un bit durable.
+    #: The audit log does not expire: the application can neither modify nor erase it.
+    #: `projection_states` is not a log, only a durable bit.
     EXPIRY_DAYS: ClassVar[dict[str, int]] = {
-        "proactive_markers": 90,   # « déjà signalé aujourd'hui », « déjà réclamé »
-        "inbound_messages": 90,    # bien au-delà de la fenêtre de rejeu de Meta
-        "strength_session_links": 30,  # délai après expiration, pour diagnostic
+        "proactive_markers": 90,   # "already reported today", "already claimed"
+        "inbound_messages": 90,    # well beyond the platform's replay window
+        "strength_session_links": 30,  # delay after expiry, for diagnosis
     }
 
     def purge_expired(self, now: dt.datetime | None = None) -> dict[str, int]:
-        """Efface les traces de mécanique périmées. Rend ce qui a été supprimé.
+        """Delete expired mechanism traces and return what was removed.
 
-        Appelée au démarrage, avant qu'un tour ne soit en vol.
+        Called at startup, before any turn is in flight.
         """
         moment = now or dt.datetime.now(dt.UTC)
         removed: dict[str, int] = {}

@@ -1,4 +1,4 @@
-"""Contrat d'entrée et règles de complétude des observations PostgreSQL."""
+"""Input contract and completeness rules for PostgreSQL observations."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ ENJOYMENT_TYPES = session_kinds.ENJOYMENT
 
 @dataclass(frozen=True)
 class ObservationInput:
-    """Une option de `ledger-add.py` et sa destination dans l'observation typée."""
+    """An option of `ledger-add.py` and its destination in the typed observation."""
 
     name: str
     pattern: str
@@ -78,11 +78,11 @@ INPUT_SCHEMA = Schema("observation", [
 
 
 class LedgerError(InputError):
-    """Une observation refusée à la frontière d'entrée."""
+    """An observation rejected at the input boundary."""
 
 
 def canonical_value(name: str, value: str) -> str:
-    """Arrondit une valeur brute seulement si le champ attend une telle précision."""
+    """Round a raw value only if the field expects such a precision."""
     text = value.strip()
     if text in ("", UNKNOWN):
         return text
@@ -102,8 +102,8 @@ def canonical_value(name: str, value: str) -> str:
 
 
 def required_columns(kind: str) -> tuple[str, ...]:
-    """Les ressentis hors douleur nécessaires pour qu'une observation ait une valeur
-    clinique. La douleur se réclame par zone (`requires_pain`)."""
+    """The non-pain ratings an observation needs to be usable. Pain is requested per
+    zone (`requires_pain`)."""
     needed: list[str] = []
     if kind in EFFORT_TYPES:
         needed.append("RPE")
@@ -112,15 +112,15 @@ def required_columns(kind: str) -> tuple[str, ...]:
     return tuple(needed)
 
 
-# ----------------------------------------------------------- douleur par zone
-#: La colonne de douleur d'une zone, telle qu'un manque la nomme : « Dlr:genou ».
+# ------------------------------------------------------------- pain per zone
+#: The pain column of a zone, as a gap names it: « Dlr:genou ».
 PAIN_COLUMN = "Dlr"
 PAIN_PATTERN = r"(10|\d)(\.\d)?"
 PAIN_NOTE = "le pic de la séance, pas la moyenne"
 
 
 def requires_pain(kind: str) -> bool:
-    """La douleur de chaque zone surveillée est due pour l'effort et le repos."""
+    """Pain for every watched zone is due for effort and rest observations."""
     return kind in REST_TYPES or kind in EFFORT_TYPES
 
 
@@ -129,7 +129,7 @@ def pain_column(zone: str) -> str:
 
 
 def column_base(column: str) -> str:
-    """« Dlr:genou » → « Dlr » ; les autres colonnes restent elles-mêmes."""
+    """`Dlr:genou` -> `Dlr`; other columns stay as they are."""
     return column.split(":", 1)[0]
 
 
@@ -139,11 +139,11 @@ def column_zone(column: str) -> str | None:
 
 
 def parse_pains(values: list[str], zones: list[str]) -> dict[str, str]:
-    """`--dlr genou=2 --dlr cheville=?` → {zone: valeur brute}.
+    """`--dlr genou=2 --dlr cheville=?` -> {zone: raw value}.
 
-    Une valeur sans zone n'est permise que s'il n'y a qu'une zone surveillée : deviner
-    laquelle d'entre plusieurs reviendrait à ranger la douleur d'un genou sur une
-    cheville. Une zone inconnue, nommée deux fois, ou une valeur illisible est refusée.
+    A value without a zone is allowed only when a single zone is watched: guessing which
+    of several would file the pain of one zone under another. An unknown zone, a zone
+    named twice, or an unreadable value is rejected.
     """
     readings: dict[str, str] = {}
     for raw in values:
@@ -165,19 +165,19 @@ def parse_pains(values: list[str], zones: list[str]) -> dict[str, str]:
 
 
 def pain_facts(pains: dict[str, dict]) -> list[str]:
-    """« douleur genou=2 » pour chaque zone connue d'une observation."""
+    """`douleur genou=2` for each known zone of an observation."""
     return [f"douleur {zone}={reading['value']}" for zone, reading in sorted(pains.items())
             if reading.get("state") == "known"]
 
 
 def pending_pains(pains: dict[str, dict]) -> list[str]:
-    """Les zones encore attendues d'une observation, nommées comme ledger-complete."""
+    """The zones still expected for an observation, named as ledger-complete names them."""
     return [f"pain:{zone}" for zone, reading in sorted(pains.items())
             if reading.get("state") == "pending"]
 
 
 def strength_pain_facts(pains: dict[str, dict]) -> list[str]:
-    """« genou 1->2/10 » : la douleur d'une séance de renfo, avant puis après."""
+    """`genou 1->2/10`: the pain of a strength session, before then after."""
     def shown(value: object) -> str:
         return "?" if value is None else str(value)
     return [f"{zone} {shown(moments.get('before'))}->{shown(moments.get('after'))}/10"
@@ -185,7 +185,7 @@ def strength_pain_facts(pains: dict[str, dict]) -> list[str]:
 
 
 def pain_reading(value: str) -> dict:
-    """Une valeur brute de douleur → la lecture typée (« ? » = demandée puis perdue)."""
+    """A raw pain value -> the typed reading (`?` = asked, then lost)."""
     if value == UNKNOWN:
         return {"state": "unavailable"}
     text = value.replace(",", ".")
@@ -198,7 +198,7 @@ def pain_reading(value: str) -> dict:
     return {"state": "known", "value": float(number)}
 
 
-# Les observations antérieures ont été écrites sous un contrat moins exigeant.
+# Earlier observations were written under a less demanding contract.
 COMPLETENESS_FROM = dt.date(2026, 7, 30)
 COMPLETION_WINDOW = dt.timedelta(days=2)
 
@@ -209,7 +209,7 @@ METRIC_COLUMNS = {
 
 
 def missing_observation_fields(observation: dict) -> list[str]:
-    """Champs encore requis d'une observation typée ; la douleur, zone par zone."""
+    """Fields still required for a typed observation; pain is checked zone by zone."""
     kind = observation.get("kind", "")
     metrics = observation.get("measurements", {})
     required: list[str] = []
@@ -265,5 +265,5 @@ def observation_completeness_errors(observations: list[dict], today: dt.date) ->
 
 
 def cell_key(entry: dict, column: str) -> str:
-    """Identité stable d'un ressenti à réclamer."""
+    """Stable identity of a rating to request."""
     return f"{entry['date']}:{entry['type']}:{column}"

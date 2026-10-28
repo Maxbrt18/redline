@@ -1,9 +1,9 @@
-"""Noms des intentions transactionnelles comprises par le stockage."""
+"""Names of the transactional intents understood by the storage layer."""
 
 OBSERVATION_ADD = "observation.add"
 ACTIVITY_LINK = "activity.link"
 MEASUREMENT_COMPLETE = "measurement.complete"
-#: FC moyenne déclarée douteuse (sans brassard, ou contexte hors fatigue), 2026-10-20.
+#: Average heart rate declared doubtful (no armband, or a non-fatigue context).
 HR_DOUBT = "measurement.hr_doubt"
 EXPOSURE_UPSERT = "exposure.upsert"
 PLAN_REVISE = "plan.revise"
@@ -15,13 +15,13 @@ QUESTION_ASK = "question.ask"
 DEADLINE_UPSERT = "deadline.upsert"
 SESSION_START = "session.start"
 SESSION_MATCH = "session.match"
-#: L'angle d'attaque choisi pour un message proactif. Une commande de tour, donc annulée
-#: avec le tour ; elle ne mute rien, elle DÉPOSE — voir `OperationalStore.turn_angle`.
+#: The angle chosen for a proactive message. A turn command, so cancelled with the turn;
+#: it mutates nothing, it DEPOSITS -- see `OperationalStore.turn_angle`.
 PROACTIVE_ANGLE = "proactive.angle"
 GEAR_UPSERT = "gear.upsert"
 PREDICTION_UPSERT = "prediction.upsert"
 CORRECTION_REGISTER = "correction.register"
-#: Permis EF : le choix du coach, scellé avant que l'athlète ne décide (2026-09-27).
+#: Easy-run permit: the coach's choice, sealed before the athlete decides.
 PERMIT_SEAL = "permit.seal"
 
 ACTIVE = (

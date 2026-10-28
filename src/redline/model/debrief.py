@@ -1,14 +1,11 @@
-"""Les écarts calculés d'une sortie : ce que la montre ne dit pas à l'athlète.
+"""Computed gaps of an outing: what the watch does not tell the athlete.
 
-Audit du 2026-10-11. Les moments où Redline lui a appris quelque chose sont des
-comparaisons calculées : FC montée à allure comparable avant le rhume, renfo de 73 min
-pour 30 prévues, SL « roulante » à 164 bpm pour un plafond de 157. Sur 26 débriefs, 4
-seulement portaient une comparaison ; 13 ouvraient sur trois chiffres relus sur Strava.
-Le service calcule donc ces écarts avant le tour et les joint à l'instantané : le coach
-n'a plus à les reconstruire, ni la tentation de réciter la montre à leur place.
+Useful debriefs rest on computed comparisons (planned vs done, HR drift at comparable
+pace), not on figures recited from the watch. The service computes these gaps before the
+turn and attaches them to the snapshot, so the coach does not rebuild them.
 
-Fonction pure : la ligne du registre, la séance prévue et la dérive de FC entrent, des
-phrases courtes et chiffrées sortent. Rien n'est écrit.
+Pure functions: the ledger row, the planned session and the HR drift go in, short
+numeric phrases come out. Nothing is written.
 """
 
 from __future__ import annotations
@@ -29,7 +26,7 @@ def _signed(value: float) -> str:
 
 
 def planned_vs_done(row: Any, session: dict | None) -> list[str]:
-    """Chaque cible typée de la séance mise en regard de ce qui a été fait."""
+    """Each typed target of the session set against what was done."""
     if not session:
         return []
     out = []
@@ -39,9 +36,8 @@ def planned_vs_done(row: Any, session: dict | None) -> list[str]:
                 out.append(f"distance {_fr(row.km)} km pour un {label} de "
                            f"{_fr(session[key])} ({_signed(row.km - session[key])})")
                 break
-    # Une durée plafond ne se compare que si c'est elle que l'athlète a lue : le rendu
-    # (`weekly_plan.distance_of`) la tait dès qu'une distance engage. Le 15/10, « 57 min
-    # pour 55 » lui a été reproché sur un plafond qu'aucun message ne lui avait donné.
+    # A duration cap is compared only if it is the one the athlete read: the rendering
+    # (`weekly_plan.distance_of`) omits it as soon as a distance is committed.
     shown_by_distance = (session.get("distance_cap_km") is not None
                          or session.get("distance_target_km") is not None)
     if (row.hours is not None and session.get("duration_cap_min") is not None
@@ -49,7 +45,7 @@ def planned_vs_done(row: Any, session: dict | None) -> list[str]:
         minutes = row.hours * 60
         out.append(f"durée {minutes:.0f} min pour un plafond de {session['duration_cap_min']} "
                    f"({_signed(round(minutes - session['duration_cap_min']))})")
-    # Une FC courue sans brassard ne se compare à aucun plafond (2026-10-20).
+    # HR recorded without the armband is never compared to a cap.
     hr = row.hr_avg if getattr(row, "hr_doubt", None) != "sans_brassard" else None
     if hr is not None and session.get("hr_cap_bpm") is not None:
         out.append(f"FC moyenne {hr} pour un plafond de {session['hr_cap_bpm']} "
@@ -63,23 +59,22 @@ def planned_vs_done(row: Any, session: dict | None) -> list[str]:
 
 
 def gaps(row: Any, session: dict | None, drift: Any | None) -> list[str]:
-    """Les écarts d'une sortie, dans l'ordre où ils servent : prévu/fait, puis la FC."""
+    """The gaps of an outing, in the order they are used: planned/done, then HR."""
     out = planned_vs_done(row, session)
     if drift is not None:
         out.append("FC à allure comparable : " + str(drift))
     return out
 
 
-# ------------------------------------------------------------------ répétitions
+# ------------------------------------------------------------------ repetitions
 
-#: Les séances dont le débrief porte la carte des répétitions. Une SL ou une course
-#: sont exigeantes sans être fractionnées : leurs tours sont des kilomètres, pas des reps.
+#: Sessions whose debrief carries the repetitions card. A long run or a race is demanding
+#: without being fractioned: its laps are kilometres, not reps.
 QUALITY_WORKOUTS = session_kinds.REPETITIONS
-#: Écart minimal d'allure entre le plus lent des tours rapides et le plus rapide des
-#: tours lents. En dessous, les tours sont des tours automatiques d'une allure
-#: continue, pas une alternance effort/récup.
+#: Minimal pace ratio between the slowest fast lap and the fastest slow lap. Below it, the
+#: laps are automatic laps of a steady pace, not an effort/recovery alternation.
 MIN_SPLIT_RATIO = 1.12
-#: Un tour plus court est un double appui sur le bouton, pas une phase de la séance.
+#: A shorter lap is a double button press, not a phase of the session.
 MIN_LAP_S = 10
 
 
@@ -87,13 +82,12 @@ def is_quality(session: dict | None) -> bool:
     if not session:
         return False
     return (session.get("workout") in QUALITY_WORKOUTS
-            # Une transition que le règlement marque `quality` en est une aussi,
-            # quel que soit son workout.
+            # A transition the rulebook marks `quality` counts too, whatever its workout.
             or session.get("transition") in rulebook.current().quality_kinds)
 
 
 def _phases(laps: Sequence[Lap]) -> list[dict]:
-    """Les tours lisibles, dans l'ordre : durée, distance, FC, allure (s/km)."""
+    """The readable laps, in order: duration, distance, HR, pace (s/km)."""
     out = []
     for index, lap in enumerate(laps):
         time_s = lap.moving_s
@@ -117,18 +111,17 @@ def _merge(phases: list[dict]) -> dict:
 
 
 def lap_blocks(laps: Sequence[Lap]) -> list[tuple[bool, list[dict]]] | None:
-    """Les tours lisibles groupés en blocs d'effort (`True`) et de récupération.
+    """The readable laps grouped into effort (`True`) and recovery blocks.
 
-    Sans modèle : les tours se rangent par allure et se coupent au plus grand saut ;
-    le côté rapide est l'effort. Des tours rapides contigus forment UN bloc (tours
-    automatiques pendant une répétition). Chaque tour garde son rang (`index`) dans la
-    liste reçue. `None` quand les tours ne montrent pas une alternance nette d'au moins
-    deux efforts.
+    Model-free: laps are sorted by pace and cut at the largest jump; the fast side is the
+    effort. Contiguous fast laps form ONE block (automatic laps during a repetition). Each
+    lap keeps its rank (`index`) in the list received. `None` when the laps do not show a
+    clear alternation of at least two efforts.
     """
     phases = _phases(laps)
     if len(phases) < 3:
         return None
-    # Une récup arrêtée (distance nulle) est lente par nature : elle ne place pas la coupe.
+    # A stopped recovery (zero distance) is slow by nature: it does not set the cut.
     paces = sorted(phase["pace"] for phase in phases if phase["pace"] != float("inf"))
     ratio, cut = max(((paces[i + 1] / paces[i], i) for i in range(len(paces) - 1)
                       if paces[i] > 0), default=(0.0, -1))
@@ -148,10 +141,10 @@ def lap_blocks(laps: Sequence[Lap]) -> list[tuple[bool, list[dict]]] | None:
 
 
 def workout_reps(laps: Sequence[Lap]) -> list[dict] | None:
-    """Les répétitions lues sur les tours Strava, chacune avec la récup qui la suit.
+    """The repetitions read from the Strava laps, each with the recovery that follows it.
 
-    Les tours lents entre deux répétitions forment sa récup ; échauffement et retour au
-    calme restent hors carte (`lap_blocks` dit comment les blocs se lisent).
+    The slow laps between two repetitions form its recovery; warm-up and cool-down stay
+    off the card (`lap_blocks` says how blocks are read).
     """
     blocks = lap_blocks(laps)
     if blocks is None:
@@ -172,7 +165,7 @@ def workout_reps(laps: Sequence[Lap]) -> list[dict] | None:
 
 def quality_card(laps: Sequence[Lap], session: dict | None,
                  date: str = "") -> dict | None:
-    """La charge utile de `chart-workout.py` pour une séance de qualité, sinon None."""
+    """The `chart-workout.py` payload for a quality session, else None."""
     if session is None or not is_quality(session):
         return None
     reps = workout_reps(laps)

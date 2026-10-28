@@ -16,9 +16,9 @@ from .errors import InputError
 from .schema import Schema, SchemaError
 
 FENCE = "---"
-#: Frontmatter déjà lu, par fichier et par état disque (mtime, taille). Mesure du
-#: 2026-10-08 : une ouverture du carnet relisait ~415 notes en YAML pur Python, soit
-#: 90 % de ses 0,65 s. Une note modifiée change de mtime ou de taille et se relit.
+#: Frontmatter already read, per file and disk state (mtime, size): parsing hundreds of
+#: notes with pure-Python YAML dominates a page load. A modified note changes mtime or
+#: size and is read again.
 _PARSED: dict[Path, tuple[tuple[int, int], dict]] = {}
 
 
@@ -40,7 +40,7 @@ def frontmatter(path: Path) -> dict:
     """The frontmatter of a note, parsed. Raises NoteError, never a YAML trace.
 
     `safe_load` only: a vault note has no business instantiating Python objects.
-    Une copie est rendue : l'appelant peut la modifier sans toucher au cache.
+    A copy is returned: the caller can modify it without touching the cache.
     """
     try:
         stat = path.stat()

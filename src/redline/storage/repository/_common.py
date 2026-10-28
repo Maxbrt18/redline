@@ -21,8 +21,8 @@ from ..schema import (
 )
 
 ATHLETE = "sam"
-#: Une capture Strava sans ses flux ni sa météo : ce que lisent le débrief et le cycle
-#: de séance. Les flux (plusieurs centaines de points) ne servent qu'au détail du carnet.
+#: A Strava capture without its streams or weather: what the debrief and the session
+#: cycle read. Streams (hundreds of points) are only needed for the notebook detail.
 _INTAKE_CORE = tuple(column for column in strava_activity_intakes.c
                      if column.name not in {"streams", "weather"})
 
@@ -54,24 +54,23 @@ def _audit(connection: Connection, actor: str, action: str,
 
 
 def _request_projection(connection: Connection) -> None:
-    """Un seul jeton durable : toutes les vues se régénèrent ensemble."""
+    """A single durable token: all views regenerate together."""
     connection.execute(pg_insert(projection_states).values(
         singleton=True, dirty_since=sa.func.clock_timestamp(),
     ).on_conflict_do_update(index_elements=[projection_states.c.singleton], set_={
-        # Renouveler le jeton empêche le projecteur d'acquitter une mutation
-        # arrivée pendant sa génération.
+        # Renewing the token stops the projector from acknowledging a mutation
+        # that arrived while it was generating.
         "dirty_since": sa.func.clock_timestamp(),
     }))
 
 
-#: Une correction s'annonce dans la semaine où elle est consignée, ou jamais : l'audit du
-#: 2026-10-09 a compté sept excuses livrées 23 à 26 jours après l'erreur, hors de tout
-#: contexte. Passé ce délai, l'annonce expire ; la correction reste au journal.
+#: A correction is announced within the week it is recorded, or never: a late apology
+#: arrives out of context. Past this window the announcement expires; the correction
+#: stays in the log.
 CORRECTION_ANNOUNCE_WINDOW = dt.timedelta(days=7)
 
-#: Les observations qui tranchent une prédiction d'elles-mêmes (2026-10-10). Le réveil
-#: porte sa trace, par zone, dans `pain_readings` : 0 aucune, 0,5 très légère, 1 légère,
-#: 2 nette.
+#: Observations that settle a prediction by themselves. The wake-up carries its trace,
+#: per zone, in `pain_readings`: 0 none, 0.5 very slight, 1 slight, 2 clear.
 RESOLVING_KINDS = (session_kinds.WAKE_TRACE,)
 #: Motifs d'une FC moyenne douteuse (schéma `ck_observation_metrics_hr_doubt`).
 HR_DOUBTS = ("sans_brassard", "contexte")
@@ -83,7 +82,7 @@ _RULE_OPERATORS = {"<=": lambda a, b: a <= b, "<": lambda a, b: a < b,
 
 
 def _resolution_rule(rule: dict | None, due_on: dt.date) -> dict:
-    """`{kind, date, success_if: "<=1"}` → colonnes typées ; refuse au lieu d'interpréter."""
+    """`{kind, date, success_if: "<=1"}` → typed columns; rejects instead of interpreting."""
     if not rule:
         return dict.fromkeys(RESOLUTION_COLUMNS)
     kind = rule.get("kind")

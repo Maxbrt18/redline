@@ -1,20 +1,15 @@
-"""Garde-fou n°8 calculé : transitions typées et faisabilité à rebours.
+"""Computed guardrail no. 8: typed transitions and backward feasibility.
 
-Né le 2026-10-01 pour porter la règle de la séance-transition, qui n'avait aucun porteur.
-Le 2026-10-04, les fenêtres de fragilité +3/+4 sont retirées (decisions.md) : elles
-modélisaient un délai que la biographie de l'athlète ne démontre pas, et leur combinaison
-rendait la préparation infaisable. Ce qui reste :
+1. **at most one transition per week** (`per_week_errors`, called by revision
+   validation);
+2. **a backward solver** that places the remaining first-time sessions on the weeks left
+   before the taper and, if no placement exists, says which waiver or relaxation would
+   make one possible.
 
-1. **une transition au plus par semaine** (`per_week_errors`, appelé par la validation
-   d'une révision) ;
-2. **un solveur à rebours** qui place les premières fois encore à faire sur les semaines
-   restantes avant l'affûtage, et qui, si aucun placement n'existe, dit quel renoncement
-   ou quel assouplissement le rendrait possible.
+Easy increases (long-run step, longer easy run, extra outing) are not transitions: they
+go through the observable gate (`rulebook.py`), read at the review.
 
-Les hausses faciles (palier de SL, EF allongée, sortie de plus) ne sont pas des
-transitions : elles passent par la porte observable (`rulebook.py`), lue au bilan.
-
-⚠ Le solveur NE DÉCIDE RIEN. Ses hypothèses sont imprimées avec son verdict.
+The solver DECIDES NOTHING. Its assumptions are printed with its verdict.
 """
 
 from __future__ import annotations
@@ -25,14 +20,14 @@ from itertools import combinations
 
 from . import rulebook
 
-#: Une nouveauté non typée, déduite : une sortie longue au-delà de la plus longue des
-#: 30 jours. Ce n'est pas une transition : c'est une hausse facile, qui passe par la porte
-#: observable et se cumule avec une transition (decisions.md 2026-10-04).
+#: An untyped, derived novelty: a long outing beyond the longest of the last 30 days. It
+#: is not a transition but an easy increase, which goes through the observable gate and
+#: stacks with a transition.
 LONG_RUN_STEP = "palier-sl"
 
 
 def kinds() -> tuple[str, ...]:
-    """Les natures qu'une transition peut porter : celles du règlement de l'instance."""
+    """The kinds a transition may carry: those of the instance rulebook."""
     return rulebook.current().kinds
 
 
@@ -42,7 +37,7 @@ def label(kind: str) -> str:
     return rulebook.current().label(kind)
 
 
-# ------------------------------------------------------------------ semaines ISO
+# ------------------------------------------------------------------ ISO weeks
 
 def week_of(day: dt.date) -> str:
     year, number, _ = day.isocalendar()
@@ -63,11 +58,11 @@ def short(week: str) -> str:
 
 
 def day_of(value: dt.date | str) -> dt.date:
-    """Une date de séance : texte ISO dans le JSON, `date` dans une commande de tour."""
+    """A session date: ISO text in the JSON, `date` in a turn command."""
     return value if isinstance(value, dt.date) else dt.date.fromisoformat(value)
 
 
-# ------------------------------------------------------------------ fenêtres
+# ------------------------------------------------------------------ windows
 
 @dataclass(frozen=True)
 class Transition:
@@ -84,10 +79,10 @@ class Transition:
 
 
 def opened(sessions: list[dict], as_of: dt.date) -> list[Transition]:
-    """Les transitions d'une révision qui comptent : faites, ou encore au programme.
+    """The transitions of a revision that count: done, or still on the programme.
 
-    Une séance passée qui n'a pas été faite (toujours `planned` après sa date) n'a pas eu
-    lieu ; une séance annulée non plus.
+    A past session that was not done (still `planned` after its date) did not happen;
+    neither did a cancelled one.
     """
     found = []
     for session in sessions:
@@ -101,8 +96,8 @@ def opened(sessions: list[dict], as_of: dt.date) -> list[Transition]:
 
 
 def per_week_errors(sessions: list[dict], where: str) -> list[str]:
-    """Une nature connue du règlement, et pas plus de transitions par semaine que lui :
-    contrôle interne à une révision."""
+    """A kind known to the rulebook, and no more transitions per week than it allows:
+    a check internal to one revision."""
     book = rulebook.current()
     problems = [f"{where} : séance {session['id']}, transition « {session['transition']} » "
                 f"inconnue du règlement (attendues : {', '.join(book.kinds)})"
@@ -118,24 +113,24 @@ def per_week_errors(sessions: list[dict], where: str) -> list[str]:
             f"garde-fou n°8 : {allowed} au plus"]
 
 
-# ------------------------------------------------------------------ solveur à rebours
+# ------------------------------------------------------------------ backward solver
 
 @dataclass(frozen=True)
 class Problem:
-    """Les semaines restantes, ce qui y est déjà décidé, et ce qu'il reste à y placer."""
+    """The remaining weeks, what is already decided in them, and what is left to place."""
 
     race_on: dt.date
-    weeks: tuple[str, ...]                       # de la semaine courante à l'affûtage exclu
-    assimilation: frozenset[str]                 # garde-fou n°2 : rien ne s'y ajoute
-    taper: tuple[str, ...]                       # affûtage et course : aucune nouveauté
-    fixed: dict[str, tuple[str, ...]]            # nouveautés portées par une révision active
-    required: tuple[str, ...]                    # premières fois encore à placer
-    done: tuple[str, ...] = ()                   # premières fois déjà faites
+    weeks: tuple[str, ...]                       # current week up to the taper, excluded
+    assimilation: frozenset[str]                 # guardrail no. 2: nothing is added
+    taper: tuple[str, ...]                       # taper and race: no novelty
+    fixed: dict[str, tuple[str, ...]]            # novelties carried by an active revision
+    required: tuple[str, ...]                    # first times still to place
+    done: tuple[str, ...] = ()                   # first times already done
 
 
 @dataclass(frozen=True)
 class Rules:
-    per_week: int | None = None   # garde-fou n°8 ; None : celui du règlement
+    per_week: int | None = None   # guardrail no. 8; None: the rulebook's
     open_assimilation: bool = False
 
 
@@ -155,11 +150,11 @@ class Schedule:
 
 
 def solve(problem: Problem, rules: Rules | None = None) -> Schedule | None:
-    """Le meilleur placement, ou None s'il n'en existe aucun.
+    """The best placement, or None if there is none.
 
-    Meilleur = toutes les premières fois placées, puis le plus de paliers de SL possibles
-    (un palier ne compte pas comme transition : il est seulement exclu de l'assimilation),
-    puis les transitions le plus tôt possible. Recherche exhaustive : l'espace est minuscule.
+    Best = all first times placed, then as many long-run steps as possible (a step does not
+    count as a transition: it is only excluded from assimilation), then transitions as
+    early as possible. Exhaustive search: the space is tiny.
     """
     rules = rules or Rules()
     per_week = (rules.per_week if rules.per_week is not None
@@ -213,7 +208,7 @@ class Verdict:
 
 
 def diagnose(problem: Problem) -> Verdict:
-    """Le verdict sous les règles actuelles ; s'il n'y en a pas, chaque levier isolé."""
+    """The verdict under the current rules; if there is none, each lever in isolation."""
     per_week = rulebook.current().parameters.transitions_per_week
     current = Option("règles actuelles", solve(problem))
     if current.schedule is not None:
@@ -238,7 +233,7 @@ def _option_lines(option: Option, weeks: tuple[str, ...], prefix: str) -> list[s
 
 
 def render(verdict: Verdict) -> list[str]:
-    """Le verdict tel qu'il part au bilan : court, hypothèses comprises."""
+    """The verdict as sent to the review: short, assumptions included."""
     problem = verdict.problem
     lines = [f"Faisabilité à rebours (garde-fou n°8, calculée) : course le "
              f"{problem.race_on:%d/%m}, affûtage {short(problem.taper[0])}-"

@@ -1,17 +1,16 @@
-"""Les deux racines : le MOTEUR (ce dépôt) et le VAULT (les notes d'une instance).
+"""The two roots: the ENGINE (this repository) and the VAULT (an instance's notes).
 
-Elles ont longtemps été le même dossier, et le code dérivait l'emplacement des notes
-de celui de ses propres fichiers (`Path(__file__).parent.parent`). C'est ce qui
-empêchait d'installer le moteur ailleurs que dans le vault qu'il sert.
+They are distinct so the engine can be installed somewhere other than the vault it
+serves; note locations are never derived from the code's own file location.
 
-La règle, désormais :
-- le code, les gabarits et les fixtures se trouvent depuis `ENGINE_ROOT` ;
-- tout ce qu'une instance écrit ou lit comme note se trouve depuis `vault_root()`.
+The rule:
+- code, templates and fixtures are found from `ENGINE_ROOT`;
+- everything an instance writes or reads as a note is found from `vault_root()`.
 
-`VAULT_PATH` est la variable que le service lit déjà (`redline.service.config`) : une seule
-variable pour les deux, pour qu'un script lancé par le coach et le service voient le
-même vault. Absente, le vault est le dépôt du moteur lui-même -- le déploiement
-historique en un seul dossier continue de marcher sans configuration.
+`VAULT_PATH` is the variable the service already reads (`redline.service.config`): one
+variable for both, so a script launched by the coach and the service see the same
+vault. When unset, the vault is the engine repository itself, so a single-folder
+deployment works without configuration.
 """
 
 from __future__ import annotations
@@ -37,6 +36,6 @@ def outbox_dir() -> Path:
 
 
 def vault_root() -> Path:
-    """Le vault de l'instance, lu à l'appel (le service charge son .env après import)."""
+    """The instance's vault, read at call time (the service loads its .env after import)."""
     raw = os.environ.get("VAULT_PATH", "").strip()
     return Path(raw).expanduser().resolve() if raw else ENGINE_ROOT

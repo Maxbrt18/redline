@@ -1,4 +1,4 @@
-"""Archives immuables du carnet et capacités privées, sauvegardées avec PostgreSQL."""
+"""Immutable notebook archives and private capabilities, backed up with PostgreSQL."""
 
 from __future__ import annotations
 
@@ -72,7 +72,7 @@ class NotebookStore:
             )).scalar_one_or_none() is not None
 
     def has_device(self, psid: str) -> bool:
-        """Un appareil connecté et valide : le carnet peut recueillir les ressentis."""
+        """A connected, valid device exists: the notebook can collect the athlete's feedback."""
         with self.database.engine.connect() as connection:
             return connection.execute(sa.select(credentials.c.token_hash).where(
                 credentials.c.psid == psid, credentials.c.purpose == "device",
@@ -95,7 +95,7 @@ class NotebookStore:
             ).order_by(entries.c.slot)).scalars()]
 
     def save_many(self, psid: str, source_key: str, records: list[dict]) -> list[str]:
-        """Tout le lot est conservé avant l'envoi ; aucun préfixe partiellement enregistré."""
+        """The whole batch is stored before sending; no partially saved prefix."""
         ids = []
         with self.database.transaction() as connection:
             for values in records:
@@ -109,7 +109,7 @@ class NotebookStore:
 
     @staticmethod
     def _visible():
-        # Un artefact préparé dont la réponse n'est jamais partie reste interne.
+        # A prepared artifact whose reply was never sent stays internal.
         return sa.or_(entries.c.origin == "recovered", sa.exists(sa.select(1).where(
             outbound_deliveries.c.source_key == entries.c.source_key,
             outbound_deliveries.c.psid == entries.c.psid,

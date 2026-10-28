@@ -1,8 +1,8 @@
-"""Machine d'état pure d'une séance, indépendante du transport et du stockage.
+"""Pure state machine of a session, independent of transport and storage.
 
-Le programme dit ce qui doit avoir lieu. Ce module dit où en est cette séance dans
-son cycle opérationnel. Les rappels et les débriefs se branchent sur ces états ; ils
-ne les redéfinissent pas chacun de leur côté.
+The program says what must happen. This module says where that session stands in its
+operational cycle. Reminders and debriefs hook onto these states; they do not each
+redefine them.
 """
 
 from __future__ import annotations
@@ -14,17 +14,16 @@ import json
 from .local_time import zone as local_time_zone
 
 TERMINAL_STATES = frozenset({"missed", "cancelled", "closed"})
-# Un cycle dont l'exécution a déjà laissé une trace ne redevient jamais une simple
-# intention parce que le programme est révisé ensuite.
+# A cycle whose execution has already left a trace never reverts to a mere intention
+# because the program is revised afterwards.
 OBSERVED_STATES = frozenset({"started", "completed"})
-#: « Très légère » (0,5) depuis le 2026-10-11 : sa base habituelle est légère, et « mieux
-#: que d'habitude » ou « très légère » n'est ni légère ni nulle (l'athlète, audit du 11/10).
+#: "Very light" (0.5) is distinct: it is neither light nor none.
 MORNING_TRACES = ("aucune", "tres-legere", "legere", "nette")
 MORNING_TRACE_VALUES = {"aucune": 0, "tres-legere": 0.5, "legere": 1, "nette": 2}
 
 
 def scheduled_for(day: str | dt.date, start_time: str | None) -> dt.datetime | None:
-    """Compose la date du plan et son heure locale en instant non ambigu."""
+    """Combine the plan date and its local time into an unambiguous instant."""
     if not start_time:
         return None
     if isinstance(day, str):
@@ -34,10 +33,10 @@ def scheduled_for(day: str | dt.date, start_time: str | None) -> dt.datetime | N
 
 
 def plan_digest(session: dict) -> str:
-    """Empreinte des champs qui rendent caduque une relance attachée à la séance."""
+    """Fingerprint of the fields that make a reminder attached to the session stale."""
     visible = {key: session.get(key) for key in (
-        # `calibration` n'existe plus (2026-10-09) ; sa clé reste dans l'empreinte pour
-        # que les cycles déjà stockés gardent la leur et ne paraissent pas révisés.
+        # `calibration` no longer exists; its key stays in the fingerprint so that
+        # stored cycles keep theirs and do not appear revised.
         "title", "date", "start_time", "kind", "workout", "routine", "status", "calibration",
         "location_label", "carbs_target_g_h",
         "distance_target_km", "distance_cap_km", "duration_cap_min",
@@ -49,7 +48,7 @@ def plan_digest(session: dict) -> str:
 
 
 def synchronized_state(current: str | None, plan_status: str, *, changed: bool) -> str:
-    """Réconcilie un cycle avec la dernière révision sans ressusciter un terminal."""
+    """Reconcile a cycle with the latest revision without resurrecting a terminal state."""
     if current == "closed":
         return current
     if current == "completed":
@@ -68,7 +67,7 @@ def synchronized_state(current: str | None, plan_status: str, *, changed: bool) 
 
 
 def local_wall_clock(value: str) -> dt.datetime:
-    """Interprète l'heure locale Strava, qui ne porte volontairement aucun `Z`."""
+    """Interpret Strava local time, which deliberately carries no `Z`."""
     parsed = dt.datetime.fromisoformat(value)
     if parsed.tzinfo is not None:
         return parsed.astimezone(local_time_zone())

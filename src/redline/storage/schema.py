@@ -1,8 +1,7 @@
-"""Schéma relationnel canonique.
+"""Canonical relational schema.
 
-Les CHECK protègent une ligne ; UNIQUE/FK protègent les relations. Les règles qui
-dépendent de plusieurs lignes restent des transactions métier testées, conformément
-aux garanties de PostgreSQL.
+CHECKs protect a row; UNIQUE/FK protect relationships. Rules that span several rows
+stay as tested business transactions, in line with PostgreSQL guarantees.
 """
 
 from __future__ import annotations
@@ -96,10 +95,9 @@ strava_activity_intakes = sa.Table(
     sa.Column("wbgt_value", sa.Numeric(4, 1)),
     sa.Column("wbgt_attempts", sa.Integer, nullable=False, server_default="0"),
     sa.Column("wbgt_error", sa.Text, nullable=False, server_default=""),
-    # Ce que le détail de séance du carnet montre et que la capture ne garde pas : les
-    # flux allégés (temps, FC, altitude, distance, vitesse, cadence) et la météo horaire
-    # au départ. Données fournisseur relevées une fois, au premier affichage ; jamais
-    # lues par le coach (2026-10-26).
+    # Session-detail data the logbook shows and the capture does not keep: the light
+    # streams (time, HR, altitude, distance, speed, cadence) and the hourly weather at the
+    # start. Provider data fetched once, on first display; never read by the coach.
     sa.Column("streams", JSONB),
     sa.Column("weather", JSONB),
     sa.Column("fetched_at", sa.DateTime(timezone=True), nullable=False,
@@ -148,8 +146,8 @@ MEASUREMENT_DEFINITIONS: dict[str, tuple[Any, str]] = {
     "enjoyment": (sa.Numeric(3, 1), "value BETWEEN 0 AND 10"),
     "carbs_g_h": (sa.Numeric(5, 1), "value BETWEEN 0 AND 200"),
     "gut_symptoms": (sa.Numeric(3, 1), "value BETWEEN 0 AND 10"),
-    # La réserve d'une séance de qualité (garde-fou n°6, 2026-10-26) : répétitions
-    # entières encore possibles au même effort, déclarées dans le carnet.
+    # Reserve of a quality session: whole repetitions still possible at the same effort,
+    # declared in the logbook.
     "reps_in_reserve": (sa.SmallInteger, "value BETWEEN 0 AND 5"),
 }
 
@@ -178,9 +176,9 @@ observation_metrics = sa.Table(
               sa.ForeignKey("redline.observations.id", ondelete="CASCADE"), primary_key=True),
     sa.Column("recorded_at", sa.DateTime(timezone=True), nullable=False, server_default=UTC_NOW),
     *_measurement_columns(),
-    # FC moyenne déclarée douteuse (audit d'effet du 2026-10-19) : la mesure reste
-    # immuable, l'annotation dit ce qu'elle vaut. `sans_brassard` l'invalide partout,
-    # `contexte` (repas, maladie déclarés) la sort des comparaisons de FC à allure.
+    # Declared average HR flagged as doubtful: the measure stays immutable, the annotation
+    # says what it is worth. `sans_brassard` invalidates it everywhere, `contexte` (declared
+    # meal, illness) removes it from pace-HR comparisons.
     sa.Column("hr_doubt", sa.Text),
     sa.CheckConstraint(
         "hr_avg_bpm_state <> 'known' OR hr_max_bpm_state <> 'known' "
@@ -190,9 +188,9 @@ observation_metrics = sa.Table(
         "AND hr_avg_bpm_state = 'known')", name="ck_observation_metrics_hr_doubt"),
 )
 
-# Les zones que l'instance surveille (`[[injuries]]` de redline.toml), synchronisées
-# au démarrage : la référence des lectures de douleur. Une zone retirée de la config
-# passe inactive, jamais supprimée -- son historique reste lisible et rattaché.
+# Zones the instance watches (`[[injuries]]` in redline.toml), synchronized at startup:
+# the reference for pain readings. A zone removed from the config becomes inactive, never
+# deleted -- its history stays readable and attached.
 PAIN_ZONE_PATTERN = "^[a-z0-9][a-z0-9-]{0,39}$"
 pain_zones = sa.Table(
     "pain_zones", metadata,
@@ -205,9 +203,9 @@ pain_zones = sa.Table(
     sa.CheckConstraint("label <> '' AND char_length(label) <= 40", name="ck_pain_zones_label"),
 )
 
-# La douleur d'une observation, UNE LIGNE PAR ZONE : deux zones ne partagent jamais une
-# colonne, sinon une hausse au genou se lirait comme une hausse à la cheville. Mêmes
-# états et même immuabilité que les autres mesures (`observation_metrics`).
+# Pain of an observation, ONE ROW PER ZONE: two zones never share a column, otherwise a
+# rise in one zone would read as a rise in another. Same states and same immutability as
+# the other measures (`observation_metrics`).
 pain_readings = sa.Table(
     "pain_readings", metadata,
     sa.Column("observation_id", UUID_PK,
@@ -226,8 +224,8 @@ pain_readings = sa.Table(
         "(state <> 'known' AND value IS NULL)", name="ck_pain_readings_value"),
 )
 
-# Une exposition est une intention/dose déclarée, pas une cause reconstruite depuis une
-# moyenne. `candidate` garde une hypothèse hors des calculs jusqu'à confirmation.
+# An exposure is a declared intention/dose, not a cause reconstructed from an average.
+# `candidate` keeps a hypothesis out of the calculations until confirmed.
 session_exposures = sa.Table(
     "session_exposures", metadata,
     _id(),
@@ -342,7 +340,7 @@ strength_sessions = sa.Table(
     sa.CheckConstraint("char_length(note) <= 300", name="ck_strength_sessions_note"),
 )
 
-# La douleur d'une séance de renfo, avant et après, par zone surveillée.
+# Pain of a strength session, before and after, per watched zone.
 strength_pain_readings = sa.Table(
     "strength_pain_readings", metadata,
     sa.Column("strength_session_id", UUID_PK,
@@ -413,10 +411,9 @@ plan_revisions = sa.Table(
               sa.ForeignKey("redline.weekly_plans.id", ondelete="CASCADE"), nullable=False),
     sa.Column("revision", sa.Integer, nullable=False),
     sa.Column("computed_at", sa.DateTime(timezone=True), nullable=False),
-    # Horloge de la base, distincte de `computed_at` fourni par le producteur du
-    # plan. C'est le watermark canonique pour savoir si une activité est entrée
-    # APRÈS l'arbitrage ; une empreinte ne peut pas distinguer un changement de
-    # contrat technique d'un nouveau fait.
+    # Database clock, distinct from the producer-supplied `computed_at` of the plan. It is
+    # the canonical watermark for whether an activity arrived AFTER the arbitration; a
+    # fingerprint cannot tell a technical contract change from a new fact.
     sa.Column("persisted_at", sa.DateTime(timezone=True), nullable=False,
               server_default=UTC_NOW),
     sa.Column("reason", sa.Text, nullable=False),
@@ -424,7 +421,7 @@ plan_revisions = sa.Table(
     sa.Column("constraints", JSONB, nullable=False, server_default=sa.text("'[]'::jsonb")),
     sa.Column("changes", JSONB, nullable=False, server_default=sa.text("'[]'::jsonb")),
     sa.Column("calibration_target", sa.SmallInteger),
-    # Le volume couru visé de la semaine : l'intention, jamais le fait (le registre).
+    # Targeted running volume of the week: the intention, never the fact (the ledger).
     sa.Column("volume_target_km", sa.Numeric(5, 1)),
     sa.UniqueConstraint("plan_id", "revision", name="uq_plan_revisions_number"),
     sa.CheckConstraint("revision >= 1", name="ck_plan_revisions_number"),
@@ -456,15 +453,15 @@ planned_sessions = sa.Table(
     sa.Column("hr_cap_bpm", sa.SmallInteger),
     sa.Column("cadence_target", sa.SmallInteger),
     sa.Column("demanding", sa.Boolean, nullable=False),
-    # Garde-fou n°8 typé : la nature qui sort des 30 derniers jours. NULL = séance connue.
+    # Typed guardrail: the kind that drops out of the last 30 days. NULL = known session.
     sa.Column("transition", sa.Text),
     sa.Column("calibration", sa.Boolean, nullable=False, server_default=sa.false()),
     sa.Column("location_label", sa.Text),
     sa.Column("carbs_target_g_h", sa.SmallInteger),
-    # Pour les JSONB optionnels, l'absence métier est un NULL SQL. Le défaut
-    # JSONB de SQLAlchemy transforme sinon Python None en `null` JSON : `IS NULL`
-    # devient faux et les contraintes conditionnelles prennent une absence pour un
-    # objet présent. La CI PostgreSQL est la porte qui couvre cette représentation.
+    # For optional JSONB, a business absence is an SQL NULL. The SQLAlchemy JSONB default
+    # otherwise turns Python None into JSON `null`: `IS NULL` becomes false and conditional
+    # constraints take an absence for a present object. The PostgreSQL CI covers this
+    # representation.
     sa.Column("strength_spec", JSONB(none_as_null=True)),
     sa.Column("note", sa.Text),
     sa.UniqueConstraint("revision_id", "logical_key", name="uq_planned_sessions_key"),
@@ -478,8 +475,8 @@ planned_sessions = sa.Table(
     sa.CheckConstraint(
         f"(workout = '{session_kinds.STRENGTH}') = (routine IS NOT NULL AND {_slug('routine')})",
         name="ck_planned_sessions_routine"),
-    # Le plan porte l'intention. ``done`` appartient exclusivement à
-    # ``session_cycles.state`` et n'est ajouté que dans les vues de lecture.
+    # The plan carries the intention. ``done`` belongs exclusively to
+    # ``session_cycles.state`` and is only added in the read views.
     sa.CheckConstraint("status IN ('planned','cancelled')",
                        name="ck_planned_sessions_status"),
     sa.CheckConstraint("rpe_min IS NULL OR rpe_min BETWEEN 0 AND 10",
@@ -509,8 +506,8 @@ planned_sessions = sa.Table(
     sa.CheckConstraint(
         f"(workout = '{session_kinds.STRENGTH}') = (strength_spec IS NOT NULL)",
         name="ck_planned_sessions_strength_owner"),
-    # Les natures possibles sont celles du règlement de l'instance (`rulebook.toml`),
-    # vérifiées à l'écriture du programme : la base n'en garde que la forme.
+    # Possible kinds are those of the instance rulebook (`rulebook.toml`), checked when the
+    # program is written: the database only keeps the shape.
     sa.CheckConstraint(
         "transition IS NULL OR transition ~ '^[a-z0-9][a-z0-9-]{0,39}$'",
         name="ck_planned_sessions_transition"),
@@ -600,8 +597,8 @@ planned_session_sources = sa.Table(
     sa.CheckConstraint("source <> ''", name="ck_planned_session_sources_source"),
 )
 
-# Les deux sortes de contrôle daté (2026-08-18). Un ENUM PostgreSQL plutôt qu'un texte
-# libre : la valeur est fermée dans le modèle, elle doit l'être ici aussi.
+# The two kinds of dated check. A PostgreSQL ENUM rather than free text: the value is
+# closed in the model, so it must be closed here too.
 gate_when = sa.Enum("avant", "apres", name="gate_when", schema="redline")
 
 plan_gates = sa.Table(
@@ -613,12 +610,10 @@ plan_gates = sa.Table(
     sa.Column("due_on", sa.Date, nullable=False),
     sa.Column("question", sa.Text, nullable=False),
     sa.Column("on_fail", sa.Text, nullable=False),
-    # ⭐ 2026-08-18. `when` et `holds` typent le contrôle : pré-condition qui retient
-    # les séances nommées, ou observation qui ne retient rien. La table les avait
-    # OUBLIÉS le jour où le schéma les a gagnés, et un store relationnel qui n'a pas
-    # de colonne ne se plaint pas : il écrit les champs qu'il connaît et jette le
-    # reste. La révision partait valide et revenait mutilée, donc invalide.
-    # `redline.gate_when` plutôt qu'un CHECK : le modèle a deux valeurs, la base aussi.
+    # `when` and `holds` type the check: a precondition that holds named sessions back, or an
+    # observation that holds nothing back. A relational store without a column silently drops
+    # fields it does not know, so a revision would go in valid and come back mutilated.
+    # `redline.gate_when` rather than a CHECK: the model has two values, so does the database.
     sa.Column("applies_when", gate_when, nullable=False),
     sa.Column("holds", JSONB(none_as_null=True), nullable=True),
     sa.UniqueConstraint("revision_id", "logical_key", name="uq_plan_gates_key"),
@@ -697,9 +692,8 @@ messenger_message_refs = sa.Table(
               sa.ForeignKey("redline.conversation_messages.id", ondelete="CASCADE",
                             name="fk_messenger_message_refs_conversation_message"),
               nullable=False),
-    # Une réponse du coach peut être découpée en plusieurs textos Messenger. Le corps
-    # exact de chaque morceau est gardé ici : répondre au deuxième ne doit pas citer
-    # indistinctement toute la rafale.
+    # A coach reply can be split into several Messenger texts. The exact body of each chunk
+    # is kept here: replying to the second must not quote the whole burst indiscriminately.
     sa.Column("body", sa.Text, nullable=False),
     sa.Column("created_at", sa.DateTime(timezone=True), nullable=False,
               server_default=UTC_NOW),
@@ -722,7 +716,7 @@ conversation_questions = sa.Table(
                             ondelete="SET NULL",
                             name="fk_conversation_questions_source_platform")),
     sa.Column("status", sa.Text, nullable=False, server_default="open"),
-    # Message examiné explicitement par le coach ; jamais une correspondance lexicale.
+    # Message explicitly examined by the coach; never a lexical match.
     sa.Column("candidate_answer_message_id", UUID_PK,
               sa.ForeignKey("redline.conversation_messages.id", ondelete="SET NULL",
                             name="fk_conversation_questions_candidate_answer")),
@@ -754,8 +748,8 @@ deadlines = sa.Table(
     sa.Column("starts_on", sa.Date),
     sa.Column("ends_on", sa.Date),
     sa.Column("context", JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")),
-    # Présent = une action de l'athlète, montrée dans son carnet sous ce libellé court.
-    # Absent = une échéance de travail du coach, qui ne quitte jamais le vault.
+    # Present = an athlete action, shown in the logbook under this short label.
+    # Absent = a coach working deadline, which never leaves the vault.
     sa.Column("athlete_label", sa.Text),
     sa.CheckConstraint("status IN ('todo','scheduled','done')", name="ck_deadlines_status"),
     sa.CheckConstraint("athlete_label IS NULL OR char_length(athlete_label) BETWEEN 3 AND 80",
@@ -806,11 +800,11 @@ coach_predictions = sa.Table(
     sa.Column("used_at", sa.DateTime(timezone=True)),
     sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=UTC_NOW),
     sa.Column("resolved_at", sa.DateTime(timezone=True)),
-    # L'observation qui tranche la prédiction (2026-10-10) : à son écriture, la prédiction
-    # se solde seule ; la date passée sans elle, elle passe en `void`, jamais en faux.
+    # The observation that settles the prediction: once written, the prediction settles by
+    # itself; with the date passed without it, it becomes `void`, never false.
     sa.Column("resolves_kind", sa.Text),
     sa.Column("resolves_on", sa.Date),
-    # La zone dont la douleur au réveil tranche la prédiction.
+    # The zone whose waking pain settles the prediction.
     sa.Column("resolves_zone", sa.Text),
     sa.Column("success_op", sa.Text),
     sa.Column("success_value", sa.Numeric(4, 1)),
@@ -843,9 +837,9 @@ coach_predictions = sa.Table(
                             name="fk_coach_predictions_zone"),
 )
 
-# Permis EF (décision du 2026-09-27) : le choix du coach pour une EF déléguée, scellé
-# AVANT que l'athlète ne décide. Immuable : une deuxième écriture identique est idempotente,
-# une écriture différente est refusée -- un choix qu'on corrige après coup ne prouve rien.
+# Easy-run permit: the coach's choice for a delegated easy run, sealed BEFORE the athlete
+# decides. Immutable: a second identical write is idempotent, a different write is
+# refused -- a choice corrected after the fact proves nothing.
 permit_choices = sa.Table(
     "permit_choices", metadata,
     _id(),
@@ -884,10 +878,10 @@ agent_sessions = sa.Table(
     sa.Column("provider", sa.Text, nullable=False),
     sa.Column("session_id", sa.Text, nullable=False),
     sa.Column("last_seen_at", sa.DateTime(timezone=True), nullable=False),
-    # L'empreinte des instructions sous lesquelles la session a été ouverte. Une session
-    # est dérivée de son prompt : quand il change, elle ne vaut plus (voir
-    # `redline.service.prompts.STYLE_DIGEST`). Nullable : les sessions d'avant le 2026-08-16 n'en
-    # portent pas, et une empreinte absente est traitée comme une empreinte périmée.
+    # Fingerprint of the instructions the session was opened under. A session is derived from
+    # its prompt: when the prompt changes, the session is stale (see
+    # `redline.service.prompts.STYLE_DIGEST`). Nullable: older sessions carry none, and an
+    # absent fingerprint is treated as a stale one.
     sa.Column("prompt_digest", sa.Text),
     sa.CheckConstraint("provider IN ('codex','claude')", name="ck_agent_sessions_provider"),
     sa.CheckConstraint("psid <> '' AND session_id <> ''", name="ck_agent_sessions_identity"),
@@ -963,8 +957,8 @@ proactive_jobs = sa.Table(
     sa.Column("status", sa.Text, nullable=False, server_default="pending"),
     sa.Column("attempts", sa.Integer, nullable=False, server_default="0"),
     sa.Column("completed_at", sa.DateTime(timezone=True)),
-    # Pourquoi un job s'est arrêté sans livrer. `done` veut dire livré ou volontairement
-    # silencieux ; `failed` veut dire perdu, et la cause reste lisible sans journal.
+    # Why a job stopped without delivering. `done` means delivered or deliberately silent;
+    # `failed` means lost, and the cause stays readable without a log.
     sa.Column("last_error", sa.Text, nullable=False, server_default=""),
     sa.CheckConstraint("status IN ('pending','running','done','failed')",
                        name="ck_proactive_jobs_status"),
@@ -1014,8 +1008,8 @@ strength_report_claims = sa.Table(
 
 strength_session_links = sa.Table(
     "strength_session_links", metadata,
-    # Capability brute dans le fragment et le navigateur seulement. Une fuite de
-    # sauvegarde ou une lecture SQL ne doit pas suffire à ouvrir une séance.
+    # Raw capability in the fragment and the browser only. A backup leak or an SQL read must
+    # not be enough to open a session.
     sa.Column("token_hash", sa.Text, primary_key=True),
     sa.Column("psid", sa.Text, nullable=False),
     sa.Column("session_key", sa.Text, nullable=False),
@@ -1053,9 +1047,9 @@ outbound_deliveries = sa.Table(
     sa.Column("source_key", sa.Text, primary_key=True),
     sa.Column("psid", sa.Text, nullable=False),
     sa.Column("payload_digest", sa.Text, nullable=False),
-    # L'enveloppe calculée elle-même : une reprise la RENVOIE au lieu de refaire le tour
-    # modèle qui l'a produite. `prepared` = calculée, pas encore tentée (proactif retenu
-    # parce que l'athlète écrit, par exemple).
+    # The computed envelope itself: a resume RETURNS it instead of redoing the model turn that
+    # produced it. `prepared` = computed, not yet attempted (proactive held back because the
+    # athlete is writing, for example).
     sa.Column("payload", JSONB),
     sa.Column("status", sa.Text, nullable=False),
     sa.Column("attempts", sa.Integer, nullable=False, server_default="1"),
@@ -1092,9 +1086,8 @@ turn_commands = sa.Table(
     sa.Column("payload", JSONB, nullable=False),
     sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=UTC_NOW),
     sa.Column("applied_at", sa.DateTime(timezone=True)),
-    # Les lignes `proactive_message.add` déjà appliquées restent la preuve
-    # d'idempotence d'anciens tours, mais aucune nouvelle intention de ce type ne peut
-    # être créée : elle n'a plus de handler.
+    # Already-applied `proactive_message.add` rows stay as the idempotence proof of past turns,
+    # but no new intention of this type can be created: it has no handler anymore.
     sa.CheckConstraint(
         "kind IN (" + ",".join(f"'{kind}'" for kind in commands.ACTIVE) + ") OR "
         "(kind = 'proactive_message.add' AND applied_at IS NOT NULL)",
@@ -1122,19 +1115,18 @@ audit_events = sa.Table(
 )
 
 
-# ⭐ LES INVARIANTS QUI REGARDENT L'ANCIENNE LIGNE, et que ce fichier taisait.
+# Invariants that look at the OLD row, which this file would otherwise not mention.
 #
-# Un CHECK juge une ligne isolée. « Une mesure connue est immuable », « les révisions
-# sont contiguës », « l'audit est append-only » comparent l'ancienne valeur à la
-# nouvelle : ce sont des triggers, et ils ne vivaient QUE dans les migrations qui les
-# ont créés. Conséquences : `alembic check` compare des métadonnées, donc il ne les voit
-# pas et ne verra jamais leur disparition ; et quiconque lit ce fichier -- qui se dit le
-# schéma canonique -- ne pouvait pas savoir qu'ils existent.
+# A CHECK judges an isolated row. "A known measure is immutable", "revisions are
+# contiguous", "the audit is append-only" compare the old value to the new one: they are
+# triggers, and they lived ONLY in the migrations that created them. Consequences:
+# `alembic check` compares metadata, so it cannot see them nor their disappearance; and
+# anyone reading this file -- the canonical schema -- could not know they exist.
 #
-# Ce qui est déclaré ici est leur PRÉSENCE, pas leur corps : dupliquer le PL/pgSQL
-# ferait deux sources de vérité pour une seule fonction. `test_postgres_storage.py`
-# compare cette table à `pg_trigger` dans les deux sens -- rien qui manque, rien
-# d'inconnu -- et les tests SQL d'UPDATE/DELETE prouvent que leurs corps MORDENT.
+# What is declared here is their PRESENCE, not their body: duplicating the PL/pgSQL would
+# make two sources of truth for one function. `test_postgres_storage.py` compares this
+# table to `pg_trigger` both ways -- nothing missing, nothing unknown -- and the SQL
+# UPDATE/DELETE tests prove their bodies actually bite.
 TRIGGERS: dict[str, str] = {
     "trg_measurement_history": "observation_metrics",
     "trg_pain_reading_history": "pain_readings",
@@ -1146,15 +1138,15 @@ TRIGGERS: dict[str, str] = {
 }
 
 
-# Les index font partie du modèle courant : Alembic peut ainsi détecter leur dérive.
+# Indexes are part of the current model, so Alembic can detect their drift.
 sa.Index("ix_observations_day", observations.c.athlete_id, observations.c.occurred_on.desc())
 sa.Index("ix_observations_supersedes", observations.c.supersedes_id)
 sa.Index("ix_turn_commands_pending", turn_commands.c.turn_id,
          postgresql_where=turn_commands.c.applied_at.is_(None))
 sa.Index("ix_turn_scopes_created", turn_scopes.c.created_at)
-# Une question ne peut être ouverte qu'une fois ; une fois résolue, la même question
-# posée plus tard est une nouvelle question (un « comment tu te sens ce matin ? »
-# quotidien ne doit pas rester « déjà traité » à vie).
+# A question can only be open once; once resolved, the same question asked later is a new
+# question (a daily "how do you feel this morning?" must not stay "already handled" for
+# good).
 sa.Index("ix_conversation_questions_open_fingerprint",
          conversation_questions.c.psid, conversation_questions.c.fingerprint, unique=True,
          postgresql_where=conversation_questions.c.status.in_(("open", "deferred")))

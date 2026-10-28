@@ -50,8 +50,7 @@ PER_SIDE = " / jambe"
 # Every field that accepts a scalar OR a [low, high] pair, with its ceiling.
 # `sets` is in here because the programme really prescribes ranges of sets --
 # "2-3× jusqu'à échec technique" (strength.md, exercice 3). Modelling that as a
-# plain int would have forced the vault to round a prescription to fit the code,
-# which is the failure this refactor exists to prevent.
+# plain int would force the vault to round a prescription to fit the code.
 BOUNDS = {"sets": 12, "reps": 200, "seconds": 3600}
 
 
@@ -159,12 +158,10 @@ class Dose:
     def slots(self) -> list:
         """The validations the page will ask for, IN ORDER -- one dict each.
 
-        THIS IS THE ONE PLACE THE DECOMPOSITION EXISTS. Until 2026-07-31 this was
-        an integer, sent to the page and never read there: `slotsFor()` rebuilt
-        the list in JavaScript from `sets` and `side` alone. Two implementations
-        of one fact, one of them ignored -- and it is by that gap that the
-        plyometric BLOCKS fell on the floor, since the JS side had no notion of
-        them and walked 40 contacts as a single slot.
+        THIS IS THE ONE PLACE THE DECOMPOSITION EXISTS. The page never rebuilds the
+        list from `sets` and `side`: two implementations of one fact would diverge,
+        and the plyometric BLOCKS would be lost if the page walked all contacts as a
+        single slot.
 
         Keys are short because they ride in a URL: `n`/`of` = rank and total
         (SETS, or BLOCKS -- never the slot count, which doubles per side), `s` =
@@ -172,7 +169,7 @@ class Dose:
         """
         if self.measure == "contacts":
             contacts = _required(self.contacts, self.measure, "contacts")
-            # No block declared: the whole thing is one slot, as before.
+            # No block declared: the whole thing is one slot.
             block = self.block or contacts
             count = contacts // block
             return [{"n": i + 1, "of": count, "t": block} for i in range(count)]

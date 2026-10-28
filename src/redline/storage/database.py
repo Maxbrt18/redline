@@ -1,4 +1,4 @@
-"""Connexion PostgreSQL et frontière transactionnelle unique."""
+"""PostgreSQL connection and the single transactional boundary."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from redline.model.errors import StorageError
 
 
 def expected_schema_revision(config_path: Path) -> str:
-    """La tête Alembic portée par le code en cours d'exécution."""
+    """The Alembic head carried by the running code."""
     from alembic.config import Config
     from alembic.script import ScriptDirectory
 
@@ -37,15 +37,15 @@ class Database:
             connect_args={
                 "application_name": application_name,
                 "connect_timeout": 5,
-                # Une panne DB doit rendre un 503 rapidement, pas immobiliser le
-                # seul worker HTTP jusqu'à la fin d'un timeout réseau implicite.
+                # A DB outage must surface quickly as a 503 instead of pinning the
+                # only HTTP worker until an implicit network timeout expires.
                 "options": "-c statement_timeout=30000 -c lock_timeout=10000",
             },
         )
 
     @contextmanager
     def transaction(self) -> Iterator[Connection]:
-        """Une commande métier = une transaction, rollback automatique sur erreur."""
+        """One business command = one transaction, automatic rollback on error."""
         try:
             with self.engine.begin() as connection:
                 yield connection

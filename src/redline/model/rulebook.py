@@ -1,22 +1,20 @@
-"""Le règlement compilé : les garde-fous EN VIGUEUR, une ligne chacun, et leurs paramètres.
+"""The compiled rulebook: the guardrails IN FORCE, one line each, and their parameters.
 
-Né de l'audit du 2026-09-27. Les garde-fous vivaient dans la prose du plan, entrelacés
-avec leur histoire (« ajouté le… », « corrigé le… », chiffres barrés). Le modèle devait
-retrouver la version en vigueur dans un palimpseste, et une version ancienne remontait.
-Le règlement sépare les deux choses :
+Guardrails must not live in plan prose interleaved with their history, or the model has
+to dig the current version out of a palimpsest. The rulebook keeps the two apart:
 
-- **la règle en vigueur** : courte, paramétrée, gradée, avec son propriétaire ;
-- **son raisonnement et son histoire** : restent chez le propriétaire nommé.
+- **the rule in force**: short, parameterised, graded, with its owner;
+- **its reasoning and history**: stay with the named owner.
 
-Le règlement appartient à l'instance : `rulebook.toml` à la racine du vault. Sans lui,
-le moteur applique `rulebook.default.toml`, son règlement par défaut. L'un remplace
-l'autre en entier : une fusion partielle ferait coexister deux versions d'une même
-règle, la faute que ce module existe pour empêcher.
+The rulebook belongs to the instance: `rulebook.toml` at the vault root. Without it the
+engine applies `rulebook.default.toml`, its default. One replaces the other entirely: a
+partial merge would let two versions of the same rule coexist, the very fault this module
+exists to prevent.
 
-Il est la SOURCE UNIQUE des seuils que le code applique (`scripts/ledger.py`,
-`scripts/feasibility.py`, `transitions.py`) et des natures de transition qu'un
-programme peut porter. Un seuil cité dans le texte d'une règle (`{pain_cap}`) est rendu
-depuis la même valeur : ce que le coach lit est ce que le code applique.
+It is the SINGLE SOURCE of the thresholds the code applies (`scripts/ledger.py`,
+`scripts/feasibility.py`, `transitions.py`) and of the transition kinds a programme may
+carry. A threshold cited in a rule's text (`{pain_cap}`) is rendered from the same value:
+what the coach reads is what the code applies.
 """
 
 from __future__ import annotations
@@ -37,8 +35,8 @@ DEFAULT = Path(__file__).with_name("rulebook.default.toml")
 SLUG = r"[a-z0-9][a-z0-9-]{0,39}"
 WEEK = r"\d{4}-W(0[1-9]|[1-4]\d|5[0-3])"
 
-#: Les règles que le moteur applique lui-même : le coach doit les lire, sinon le code
-#: refuserait au programme ce que le règlement injecté ne dit pas.
+#: Rules the engine enforces itself: the coach must read them, otherwise the code would
+#: reject from the programme what the injected rulebook does not state.
 ENFORCED = ("n2", "n7", "n8", "po", "s9")
 
 RULEBOOK_SCHEMA = Schema("rulebook.toml", [
@@ -77,7 +75,7 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
 
 
 class RulebookError(ConfigError):
-    """Règlement illisible ou non conforme."""
+    """Unreadable or non-conforming rulebook."""
 
 
 @dataclass(frozen=True)
@@ -95,7 +93,7 @@ class Parameters:
     assimilation_weeks: tuple[str, ...]
 
     def spoken(self) -> dict[str, str]:
-        """Les seuils tels que le texte d'une règle les dit : virgule décimale."""
+        """Thresholds as a rule's text states them: decimal comma."""
         def said(value: object) -> str:
             if isinstance(value, float):
                 return f"{value:g}".replace(".", ",")
@@ -116,7 +114,7 @@ class TransitionKind:
 
 @dataclass(frozen=True)
 class Rule:
-    """Une règle en vigueur. `text` est ce que le coach applique ; le reste le situe."""
+    """A rule in force. `text` is what the coach applies; the rest locates it."""
 
     id: str
     title: str
@@ -149,14 +147,14 @@ class Rulebook:
         return frozenset(kind.slug for kind in self.transitions if kind.quality)
 
     def label(self, slug: str) -> str:
-        """Le libellé déclaré ; un slug retiré du règlement depuis reste lisible."""
+        """The declared label; a slug since removed from the rulebook stays readable."""
         for kind in self.transitions:
             if kind.slug == slug:
                 return kind.label
         return slug
 
     def render(self) -> str:
-        """Le bloc injecté au coach : la règle en vigueur, jamais son histoire."""
+        """The block injected to the coach: the rule in force, never its history."""
         lines = ["[RÈGLEMENT EN VIGUEUR, invisible, ne pas réciter. Il fait foi sur toute "
                  "formulation plus ancienne ; le raisonnement vit chez le propriétaire.]"]
         lines.extend("- " + rule.line() for rule in self.rules)
@@ -212,7 +210,7 @@ def parse(text: str, source: Path) -> Rulebook:
 
 
 def location(vault: Path) -> Path:
-    """Le règlement de l'instance s'il existe, sinon celui du moteur."""
+    """The instance rulebook if it exists, else the engine's."""
     own = vault / FILENAME
     return own if own.is_file() else DEFAULT
 
@@ -223,16 +221,16 @@ def _load(path: Path, _mtime_ns: int) -> Rulebook:
 
 
 def load(vault: Path) -> Rulebook:
-    """Le règlement du vault, relu s'il a changé depuis : le service ne redémarre pas."""
+    """The vault rulebook, reread if it changed: the service does not restart."""
     path = location(vault)
     return _load(path, path.stat().st_mtime_ns)
 
 
 def current() -> Rulebook:
-    """Le règlement du vault de ce processus (`VAULT_PATH`)."""
+    """The rulebook of this process's vault (`VAULT_PATH`)."""
     return load(paths.vault_root())
 
 
 def render() -> str:
-    """Le bloc du règlement en vigueur, tel qu'il part avec chaque paquet."""
+    """The rulebook block in force, as sent with each packet."""
     return current().render()

@@ -1,7 +1,7 @@
-"""Persistance opérationnelle Redline, chargée paresseusement.
+"""Operational persistence, loaded lazily.
 
-PostgreSQL possède les faits. Le Markdown n'est qu'une projection lisible dans
-Obsidian et peut être entièrement régénéré.
+PostgreSQL owns the facts. Markdown is only a readable projection and can be
+fully regenerated.
 """
 
 from typing import TYPE_CHECKING

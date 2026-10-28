@@ -31,8 +31,6 @@ PENDING = (
     "src/redline/cli",
     "src/redline/evaluation",
     "src/redline/integrations",
-    "src/redline/model",
-    "src/redline/storage",
     "tests",
 )
 

@@ -1,4 +1,4 @@
-"""Politiques transactionnelles propres aux révisions de programme hebdomadaire."""
+"""Transactional policies specific to weekly program revisions."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ GATE_EVIDENCE = re.compile(
 
 def enforce_gate_resolution(connection: Connection, athlete_id: str,
                             previous_revision: Any, revision: dict) -> None:
-    """Une porte disparue nomme le fait canonique ou le repli qui l'a fermée."""
+    """A gate that disappears must name the canonical fact or fallback that closed it."""
     previous_gates = list(connection.execute(sa.select(plan_gates).where(
         plan_gates.c.revision_id == previous_revision["id"])).mappings())
     if not previous_gates:

@@ -1,4 +1,4 @@
-"""Le programme hebdomadaire : révisions, séances, contrôles, arbitrage."""
+"""The weekly program: revisions, sessions, gates, arbitration."""
 
 from __future__ import annotations
 
@@ -141,9 +141,9 @@ class Plans(StoreBase):
             connection.execute(plan_gates.insert().values(
                 id=uuid.uuid4(), revision_id=revision_id, logical_key=gate["id"],
                 due_on=gate["due"], question=gate["question"], on_fail=gate["on_fail"],
-                # `when` est un mot réservé SQL : la colonne s'appelle `applies_when`,
-                # et la traduction vit ICI, dans le seul module qui connaît les deux
-                # vocabulaires. Le modèle n'a pas à porter un nom de base de données.
+                # `when` is a reserved SQL word: the column is `applies_when`, and the
+                # translation lives HERE, the only module that knows both vocabularies.
+                # The model must not carry a database column name.
                 applies_when=gate["when"],
                 holds=gate["holds"] if "holds" in gate else sa.null()))
         self._sync_session_cycles(connection, plan_id, cycle_inputs)
@@ -151,12 +151,12 @@ class Plans(StoreBase):
                {"week": week, "revision": revision["revision"]})
         _request_projection(connection)
         loaded = self._load_plan_connection(connection, week)
-        if loaded is None:  # impossible après l'INSERT, sauf corruption transactionnelle
+        if loaded is None:  # impossible after the INSERT, barring transactional corruption
             raise StorageError(f"programme {week} introuvable après écriture")
         return loaded
 
     def active_plans(self) -> dict[str, dict]:
-        """La révision active de chaque semaine qui a un programme, par semaine ISO."""
+        """The active revision of each week that has a program, keyed by ISO week."""
         with self.database.engine.connect() as connection:
             weeks = connection.execute(sa.select(weekly_plans.c.iso_week).where(
                 weekly_plans.c.athlete_id == self.athlete_id
@@ -198,7 +198,7 @@ class Plans(StoreBase):
 
     @staticmethod
     def _raises_load(previous: dict[str, Any], proposed: list[dict]) -> bool:
-        """Détecte une hausse concrète, sans confondre clôture et charge nouvelle."""
+        """Detect a concrete increase, without confusing closure with new load."""
         numeric = ("distance_target_km", "distance_cap_km", "duration_cap_min",
                    "carbs_target_g_h")
         for session in proposed:
@@ -219,10 +219,10 @@ class Plans(StoreBase):
 
     def _sync_session_cycles(self, connection: Connection, plan_id: uuid.UUID,
                              sessions: list[tuple[uuid.UUID, dict]]) -> None:
-        """Projette la révision active vers un cycle stable par séance logique.
+        """Project the active revision onto one stable cycle per logical session.
 
-        Une révision append-only recrée les lignes ``planned_sessions``. Le cycle, lui,
-        survit aux révisions : son identité est ``plan_id + logical_key``.
+        An append-only revision recreates the ``planned_sessions`` rows. The cycle
+        survives revisions: its identity is ``plan_id + logical_key``.
         """
         existing = {row["logical_key"]: row for row in connection.execute(
             sa.select(session_cycles).where(session_cycles.c.plan_id == plan_id)
@@ -268,7 +268,7 @@ class Plans(StoreBase):
 
     @staticmethod
     def _cancel_gut_review(connection: Connection, cycle_id: uuid.UUID) -> None:
-        """Une séance annulée ou retirée du plan n'a plus de retour digestif à demander."""
+        """A session cancelled or removed from the plan no longer needs a gut-feedback request."""
         connection.execute(proactive_jobs.update().where(
             proactive_jobs.c.job_key == f"gut-review:{cycle_id}",
             proactive_jobs.c.status == "pending",
@@ -346,13 +346,13 @@ class Plans(StoreBase):
         return {"week": week, "revisions": revisions}
 
     def plan_needs_arbitration(self, week: str, revision: int) -> bool:
-        """Une charge non rattachée est-elle entrée après cette révision ?
+        """Did an unlinked load arrive after this revision?
 
-        Le watermark vient de PostgreSQL, pas de `computed_at` fourni dans le JSON.
-        Une activité déjà connue au moment de la révision a donc été arbitrée ; une
-        activité planifiée liée à son cycle n'est jamais une surprise. Cette lecture
-        reste vraie lorsque le format des entrées évolue, contrairement à une
-        comparaison de hashes de contrats différents.
+        The watermark comes from PostgreSQL, not from a `computed_at` supplied in the
+        JSON. An activity already known when the revision was made was therefore
+        arbitrated; a planned activity linked to its cycle is never a surprise. This
+        reading stays true when the input format evolves, unlike a comparison of
+        hashes of different contracts.
         """
         with self.database.engine.connect() as connection:
             persisted_at = connection.execute(sa.select(

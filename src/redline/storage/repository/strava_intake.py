@@ -1,4 +1,4 @@
-"""Les activités Strava capturées, enrichies et rattachées."""
+"""Strava activities: captured, enriched and linked."""
 
 from __future__ import annotations
 
@@ -73,11 +73,11 @@ class StravaIntake(StoreBase):
 
     def ingest_strava_activity(self, activity: Activity,
                                *, actor: str = "strava-ingestion") -> dict:
-        """Capture les faits objectifs avant tout raisonnement de coaching.
+        """Capture the objective facts before any coaching reasoning.
 
-        Une activité n'est convertie en observation typée que si le plan offre un
-        candidat unique le même jour. Sinon le distillat reste durable et l'ambiguïté
-        est exposée ; aucune taxonomie sportive n'est inventée à partir d'un titre.
+        An activity becomes a typed observation only if the plan offers a single
+        candidate that day. Otherwise the capture stays durable and the ambiguity is
+        exposed; no sport taxonomy is inferred from a title.
         """
         activity_id = int(activity.id or 0)
         if activity_id <= 0:
@@ -174,10 +174,10 @@ class StravaIntake(StoreBase):
                                  *, value: float | None = None,
                                  unavailable: bool = False, error: str = "",
                                  actor: str = "strava-enrichment") -> str:
-        """Persiste un enrichissement et le projette sur l'observation, si elle existe.
+        """Persist an enrichment and project it onto the observation, if one exists.
 
-        L'intake garde le résultat même quand le rapprochement est encore ambigu. Un
-        appariement ultérieur récupère donc D- et WBGT sans rappeler les fournisseurs.
+        The intake keeps the result even while the match is still ambiguous, so a later
+        match recovers the elevation loss and WBGT without calling the providers again.
         """
         definitions = {
             "elevation_loss": ("elevation_loss_m", int),
@@ -219,10 +219,10 @@ class StravaIntake(StoreBase):
                 ).where(observation_metrics.c.observation_id == observation_id)
                 ).one()
                 if stored[0] == "known":
-                    # Le coach a pu consigner la séance avant le webhook : sa mesure
-                    # reste (une mesure connue est immuable) et l'écart n'est qu'une
-                    # trace. Le 2026-09-26, lever ici annulait la capture entière et
-                    # le débrief expirait après deux heures de reprises.
+                    # The coach may have recorded the session before the webhook: its
+                    # measurement stays (a known measurement is immutable) and the
+                    # discrepancy is only a trace. Raising here would roll back the
+                    # whole capture.
                     if clean_value is None or float(stored[1]) != float(clean_value):
                         payload["observation_kept"] = float(stored[1])
                 else:
@@ -281,7 +281,7 @@ class StravaIntake(StoreBase):
             )).scalar_one_or_none()
 
     def strava_detail(self, observation_id: Any) -> dict | None:
-        """La capture Strava d'une observation, avec ses flux et sa météo s'ils sont relevés."""
+        """The Strava capture of an observation, with its streams and weather if recorded."""
         with self.database.engine.connect() as connection:
             row = connection.execute(sa.select(strava_activity_intakes).where(
                 strava_activity_intakes.c.observation_id == observation_id,
@@ -292,7 +292,7 @@ class StravaIntake(StoreBase):
     def store_strava_detail(self, activity_id: int, *, streams: dict | None = None,
                             weather: dict | None = None,
                             actor: str = "carnet") -> None:
-        """Garde les flux allégés et la météo relevés pour le détail de séance."""
+        """Keep the lightened streams and the weather recorded for the session detail."""
         values: dict[str, Any] = {}
         if streams is not None:
             values["streams"] = streams
@@ -312,7 +312,7 @@ class StravaIntake(StoreBase):
                    aggregate_id, {"kept": sorted(values)})
 
     def observation_feelings(self, observation_id: Any) -> dict:
-        """RPE, plaisir et douleur par zone connus d'une observation, sans l'attente."""
+        """Known RPE, enjoyment and per-zone pain of an observation, without the wait."""
         metrics = ("rpe", "enjoyment")
         with self.database.engine.connect() as connection:
             row = connection.execute(sa.select(*(
@@ -343,19 +343,15 @@ class StravaIntake(StoreBase):
             for kind in ("elevation_loss", "wbgt")
         }
     def activity_recorded(self, strava_activity_id: int) -> bool:
-        """Cette identité Strava exacte a-t-elle atterri au registre ?
+        """Has this exact Strava identity landed in the ledger?
 
-        ⭐ LA CONTREPARTIE DE `required_weeks`. Un tour prescriptif doit prouver qu'il a
-        révisé la semaine ; rien n'exigeait qu'un débrief prouve qu'il a consigné la
-        séance dont il parlait. Le 13/08 le coach a répondu 18 s après un `exec` que le
-        bac à sable a tué (« bwrap: Failed RTM_NEWADDR »), sans rien lire ni rien
-        écrire, et le service a journalisé un succès. Le 14/08 il a rendu SILENCE parce
-        que `strava.py` n'avait pas ses identifiants. Deux sorties jamais consignées,
-        découvertes trois jours plus tard par un volume hebdomadaire faux.
+        The counterpart of `required_weeks`: a prescriptive turn must prove it revised
+        the week, and a debrief must likewise prove it recorded the session it talked
+        about.
 
-        Ce contrôle ne prouve jamais l'absence du fait : une observation Messenger peut
-        exister sans avoir encore été rattachée. Il prouve uniquement que le débrief a
-        écrit ou réconcilié l'identité Strava qu'il avait reçue.
+        This check never proves the absence of the fact: a chat observation can exist
+        without having been linked yet. It only proves that the debrief wrote or
+        reconciled the Strava identity it received.
         """
         with self.database.engine.connect() as connection:
             return connection.execute(sa.select(sa.func.count()).select_from(observations).where(

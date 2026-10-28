@@ -1,11 +1,10 @@
-"""La ligne « Forme » de `ai/hot-cache.md`, rendue depuis le registre.
+"""The "Forme" line of `ai/hot-cache.md`, rendered from the ledger.
 
-Cette ligne seulement : sur les ~900 mots du bloc « Où on en est », elle seule est de
-l'état dérivé. Le reste est du jugement éditorial, et le générer reviendrait à
-dériver de la prose depuis de la prose — ce que l'anti-POC de CLAUDE.md interdit.
+Only this line is generated: it is the only derived state in the status block. The rest
+is editorial judgement, and generating it would derive prose from prose.
 
-Ce que ça achète n'est pas de la place mais la non-dérive : tapés à la main, ces
-chiffres devenaient faux en silence à chaque ligne ajoutée au registre.
+The point is not saving space but preventing drift: figures typed by hand went silently
+stale each time a row was added to the ledger.
 """
 
 from __future__ import annotations
@@ -21,10 +20,8 @@ if TYPE_CHECKING:
     from redline.storage import OperationalStore
 
 BLOCK = "FORME"
-#: Le second bloc généré : l'état qui décide des prochaines semaines, recalculé à chaque
-#: projection. Ajouté le 2026-09-27 : la prose manuelle qui le portait avait deux
-#: semaines de retard (« zéro transition jusqu'à W38 », une confrontation « jamais
-#: écrite d'avance » déjà choisie) dans le seul fichier lu à chaque tour.
+#: The second generated block: the state that drives the coming weeks, recomputed on
+#: every projection so that hand-written prose cannot go stale in the file read each turn.
 STATE_BLOCK = "ETAT"
 
 
@@ -38,19 +35,18 @@ def _round(value: float) -> str:
 
 def render(ledger, rows: list, instruments: dict, targets: dict,
            today: dt.date | None = None, zones: list | None = None) -> str:
-    """Le paragraphe Forme pour la dernière semaine du registre.
+    """The Forme paragraph for the latest week of the ledger.
 
-    `ledger` est le module `scripts/ledger.py`, passé en argument plutôt qu'importé :
-    `model/` ne dépend de rien au-dessus de lui, et c'est ce qui garde cette couche
-    importable sur une machine sans dépendances.
+    `ledger` is the `scripts/ledger.py` module, passed in rather than imported:
+    `model/` depends on nothing above it, which keeps this layer importable on a machine
+    without dependencies.
     """
     per_week = ledger.eq_hours_per_week(rows, instruments, targets)
     if not per_week:
         return "- **Forme** : registre vide."
-    # Une semaine dont toutes les lignes sont à poids nul (une lecture spontanée
-    # posée avant la première séance de la semaine, par exemple) n'est pas encore
-    # « bouclée » : elle n'a juste pas commencé. On rend la dernière semaine qui
-    # porte un vrai poids, sinon (registre neuf) la plus récente quand même.
+    # A week whose rows all have zero weight (e.g. a spontaneous reading logged before the
+    # first session) has not started yet. Render the latest week with real weight, else
+    # (fresh ledger) the most recent one anyway.
     weighted = {label: h for label, h in per_week.items() if h > 0}
     label = max(weighted) if weighted else max(per_week)
     week = [row for row in rows if row.week == label]
@@ -59,25 +55,24 @@ def render(ledger, rows: list, instruments: dict, targets: dict,
     h_eq, level, _ = ledger.equivalent_hours(week, instr, targets)
     ratio = ledger.acute_chronic_ratio(per_week, label)
 
-    # Le volume vient de `ledger.week_volume` et de nulle part ailleurs : cette ligne et
-    # `ledger.py --semaine` doivent dire le même kilométrage par construction, pas par
-    # coïncidence de deux sommes écrites à deux endroits.
+    # Volume comes from `ledger.week_volume` only: this line and `ledger.py --semaine`
+    # must report the same mileage by construction, not by coincidence of two sums.
     volume = ledger.week_volume(week)
     run_km, walk_km, runs = volume.km_run, volume.km_walk, volume.runs
 
-    # La part de marche dans la jauge : c'est elle qui dit si un rouge vient de la blessure
-    # ou n'est que systémique. La calculer ici évite de la refaire de tête chaque semaine.
+    # Walking share of the gauge: it tells whether a red comes from the injury or is
+    # merely systemic.
     walk_h = sum(ledger.row_weight(row, targets)[0] for row in week
                  if row.type in ledger.WALK_TYPES)
     base = sum(ledger.row_weight(row, targets)[0] for row in week) or 1.0
     walk_share = round(100 * walk_h / base)
 
-    # Deux séries, jamais fusionnées : « pendant l'effort » et « au repos » ne
-    # répondent pas à la même question, et la règle Esculier a besoin des deux.
+    # Two series, never merged: "during effort" and "at rest" answer different questions
+    # and the pain rule needs both.
     def peak(series) -> str:
         return _round(series.peak) if series.n else "—"
 
-    # Une tendance par zone surveillée, jamais une seule pour toutes.
+    # One trend per monitored zone, never a single one for all.
     trends = [(zone.label, " → ".join(
         f"{w.week.split('-')[-1]} {peak(w.effort)}/{peak(w.rest)}"
         for w in ledger.pain_trend(rows, 3, zone.slug))) for zone in zones or []]
@@ -94,15 +89,13 @@ def render(ledger, rows: list, instruments: dict, targets: dict,
 
     short = label.split("-")[-1]          # « 2026-W30 » -> « W30 »
     sorties = f"{runs} sortie" + ("s" if runs > 1 else "")
-    # ⭐ « Bouclée » seulement une fois la semaine CLOSE (2026-09-27). Le samedi 26/09,
-    # ce bloc lu à chaque tour annonçait « W39 bouclée — 13 km, ratio 0,3 » : un
-    # effondrement fabriqué par deux jours manquants, le piège exact que `ledger.py`
-    # avait déjà corrigé pour la trajectoire le 20/08 (objection de l'athlète).
+    # A week is "bouclée" only once it is CLOSED: mid-week the missing days would fake a
+    # collapse in volume and ratio.
     day = today or dt.date.today()
     iso = day.isocalendar()
     if label == f"{iso.year}-W{iso.week:02d}":
-        # Rien qui change chaque jour : la vue est contrôlée contre sa régénération,
-        # et une date du jour la ferait dériver quotidiennement sans rien apprendre.
+        # Nothing that changes daily: the view is checked against its regeneration, and a
+        # current date would make it drift every day.
         state = f"{short} en cours, semaine ouverte, ratio partiel"
     else:
         state = f"{short} bouclée"
@@ -120,7 +113,7 @@ def render(ledger, rows: list, instruments: dict, targets: dict,
 
 
 def _short(text: str, limit: int = 60) -> str:
-    """Le bloc est lu à chaque tour et compte dans le budget du hot-cache."""
+    """Truncate: the block is read every turn and counts against the hot-cache budget."""
     text = " ".join(str(text).split())
     return text if len(text) <= limit else text[:limit - 1].rstrip() + "…"
 
@@ -132,8 +125,8 @@ def _as_date(value: Any) -> dt.date:
 def render_state(ledger, rows: list, *, deadlines: list[dict], capabilities: list[dict],
                  typed_due: int, race_on: dt.date | None,
                  today: dt.date) -> str:
-    """Le bloc ÉTAT : ce qui décide des prochaines semaines, calculé et daté."""
-    # Aucune date du jour dans le rendu : il ne change qu'avec les faits ou la semaine.
+    """The ÉTAT block: the computed state that drives the coming weeks."""
+    # No current date in the output: it changes only with the facts or the week.
     lines = ["- **État calculé** depuis PostgreSQL et decisions.md par "
              "`scripts/hot-cache.py`, ne pas l'éditer."]
     trajectory = []
@@ -168,7 +161,7 @@ def render_state(ledger, rows: list, *, deadlines: list[dict], capabilities: lis
 
 
 def state_inputs(store: OperationalStore, vault: Path, today: dt.date) -> dict:
-    """Lit ce que le bloc ÉTAT affiche, chez chaque propriétaire."""
+    """Read what the ÉTAT block displays, from each owner."""
     predictions = store.prediction_rows()
     typed_due = sum(1 for row in predictions if row.get("status") == "open"
                     and _as_date(row["due_on"]) <= today)
@@ -184,12 +177,12 @@ def state_inputs(store: OperationalStore, vault: Path, today: dt.date) -> dict:
 def refresh(vault: Path, ledger, rows: list, instruments: dict,
             *, store: Any = None, check: bool = False,
             today: dt.date | None = None) -> bool:
-    """True si un bloc avait dérivé. Avec `check`, rien n'est écrit.
+    """True if a block had drifted. With `check`, nothing is written.
 
-    Les cibles de RPE se résolvent ICI, depuis le vault : le bloc Forme doit rendre
-    exactement la même jauge que `ledger.py --semaine`, et une seconde source de
-    cibles suffirait à les faire diverger en silence (2026-08-08). Le bloc ÉTAT n'est
-    rendu que si le fichier porte ses marqueurs et qu'un store est fourni.
+    RPE targets are resolved HERE, from the vault: the Forme block must render exactly the
+    same gauge as `ledger.py --semaine`, and a second source of targets would let them
+    diverge silently. The ÉTAT block is rendered only if the file carries its markers and
+    a store is provided.
     """
     day = today or dt.date.today()
     targets = programme.rpe_targets(vault)

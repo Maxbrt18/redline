@@ -1,4 +1,4 @@
-"""Observations, mesures, douleurs par zone, expositions et état du jour."""
+"""Observations, measurements, per-zone pain, exposures and daily state."""
 
 from __future__ import annotations
 
@@ -129,9 +129,9 @@ class Observations(StoreBase):
 
     def sync_pain_zones(self, zones: list[tuple[str, str]], *,
                         actor: str = "application") -> None:
-        """Aligne la référence sur `[[injuries]]` : une zone retirée passe inactive.
+        """Align the reference on `[[injuries]]`: a removed zone becomes inactive.
 
-        Jamais supprimée : ses lectures passées restent rattachées et lisibles.
+        Never deleted: its past readings stay attached and readable.
         """
         with self.database.transaction() as connection:
             declared = {slug for slug, _ in zones}
@@ -150,7 +150,7 @@ class Observations(StoreBase):
                    {"zones": sorted(declared)})
 
     def pain_zones(self) -> list[dict]:
-        """Les zones surveillées, actives d'abord, dans l'ordre de leur déclaration."""
+        """Monitored zones, active first, in declaration order."""
         with self.database.engine.connect() as connection:
             return [dict(row) for row in connection.execute(sa.select(
                 pain_zones.c.slug, pain_zones.c.label, pain_zones.c.active,
@@ -165,9 +165,9 @@ class Observations(StoreBase):
 
     def _pain_values_in(self, connection: Connection, kind: str,
                         given: dict) -> dict[str, dict[str, Any]]:
-        """Une lecture par zone active : la valeur donnée, sinon `pending` si le type
-        d'observation exige la douleur, `not_applicable` sinon. Une zone inconnue ou
-        retirée est refusée plutôt que rangée dans une autre."""
+        """One reading per active zone: the given value, else `pending` if the observation
+        type requires pain, `not_applicable` otherwise. An unknown or removed zone is
+        rejected rather than filed under another one."""
         active = self._active_zones_in(connection)
         unknown = sorted(set(given) - set(active))
         if unknown:
@@ -200,10 +200,10 @@ class Observations(StoreBase):
 
     def doubt_hr(self, observation_id: uuid.UUID, reason: str, note: str,
                  *, actor: str = "application") -> None:
-        """Déclare douteuse une FC moyenne connue, une seule fois, avec son motif.
+        """Flag a known average HR as doubtful, once, with its reason.
 
-        La mesure reste immuable : seule l'annotation dit ce qu'elle vaut. Le motif
-        textuel (les mots de l'athlète) part dans le journal d'audit.
+        The measurement stays immutable: only the annotation says what it is worth. The
+        free-text reason (the athlete's words) goes to the audit log.
         """
         with self.database.transaction() as connection:
             self.doubt_hr_in(connection, observation_id, reason, note, actor=actor)
@@ -241,13 +241,10 @@ class Observations(StoreBase):
         state_column = observation_metrics.c[f"{metric}_state"]
         result = connection.execute(observation_metrics.update().where(
             observation_metrics.c.observation_id == observation_id,
-            # ⭐ SEUL `known` est immuable. `not_applicable` a longtemps été bloqué avec
-            # lui, alors que ce n'est pas une mesure : c'est le DÉFAUT de toute colonne
-            # absente à la création (`_metric_values`). Une séance consignée sans ses
-            # chiffres devenait donc définitivement incomplétable — le vélo du
-            # 2026-08-13, consigné à la main après un débrief aveugle, a pesé zéro dans
-            # la jauge de W33 pendant trois jours, ses 1 h 43 et ses 647 m de D+
-            # irrattrapables. Un défaut d'absence n'est pas une donnée : il se remplit.
+            # Only `known` is immutable. `not_applicable` is not a measurement: it is the
+            # DEFAULT of any column absent at creation (`_metric_values`). Locking it
+            # would make a session recorded without its figures permanently
+            # incompletable. An absence default is not data: it can be filled in.
             state_column.in_(("pending", "unavailable", "not_applicable")),
         ).values({state_column: state,
                   observation_metrics.c[metric]: None if unavailable else value}))
@@ -260,7 +257,7 @@ class Observations(StoreBase):
     def _complete_pain_in(self, connection: Connection, observation_id: uuid.UUID,
                           zone: str | None, value: float | None, *, unavailable: bool,
                           actor: str) -> None:
-        """Comme toute mesure : seule une lecture `known` est immuable."""
+        """Like any measurement: only a `known` reading is immutable."""
         zones = list(connection.execute(sa.select(pain_readings.c.zone).where(
             pain_readings.c.observation_id == observation_id)).scalars())
         if zone is None:
@@ -290,12 +287,12 @@ class Observations(StoreBase):
 
     def link_activity(self, idempotency_key: str, strava_activity_id: int, *,
                       actor: str = "application") -> uuid.UUID:
-        """Rattache une observation existante à son identité Strava exacte.
+        """Attach an existing observation to its exact Strava identity.
 
-        Une observation née dans Messenger peut précéder l'arrivée de l'activité chez
-        Strava. Le fait ne se duplique pas : son identité externe s'ajoute à la ligne
-        existante. Rejouer le même rattachement est idempotent ; viser une autre activité
-        est un conflit explicite.
+        An observation created in the chat can precede the activity's arrival at Strava.
+        The fact is not duplicated: its external identity is added to the existing row.
+        Replaying the same link is idempotent; targeting another activity is an explicit
+        conflict.
         """
         with self.database.transaction() as connection:
             return self.link_activity_in(
@@ -405,8 +402,8 @@ class Observations(StoreBase):
             incoming = {name: _plain(value) for name, value in values.items()}
             if comparable == incoming:
                 return existing["id"]
-            # L'intention peut être précisée ou corrigée plus tard, comme sa dose ou
-            # sa tolérance. Même clé, même exposition ; l'audit conserve la trace.
+            # The intent can be refined or corrected later, like its dose or tolerance.
+            # Same key, same exposure; the audit log keeps the trace.
             exposure_id = existing["id"]
             connection.execute(session_exposures.update().where(
                 session_exposures.c.id == exposure_id).values(

@@ -1,45 +1,40 @@
-"""L'état du jour agrégé pour la jauge (PostgreSQL `daily_checkins`).
+"""The day's state aggregated for the gauge (PostgreSQL `daily_checkins`).
 
-Le sommeil et la charge de vie sont deux **multiplicateurs de la jauge** (×1,1 à ×1,2,
-`coaching/protocols.md`) et deux co-facteurs documentés des deux blessures. Ils ne
-vivaient que dans `athlete/instruments.csv`, **une ligne par semaine**, renseignée le
-dimanche : en semaine, le coach prescrivait sans savoir comment l'athlète avait dormi, et
-le garde-fou n°4 (« 2-3 mauvaises nuits = semaine d'assimilation ») ne pouvait se
-déclencher qu'avec jusqu'à six jours de retard.
+Sleep and life load are two **gauge multipliers** (`coaching/protocols.md`) and two
+documented co-factors of the injuries. They are recorded per day so that the coach
+knows how the athlete slept during the week, and the "2-3 bad nights" guard-rail can
+trigger without waiting for a weekly entry.
 
-**Contrainte de conception, non négociable** : cette donnée reste **déclarative et
-conversationnelle**. Le ressenti de sommeil, la charge de vie et l'envie restent trois
-mots, pas trois scores, et ne se restituent jamais en courbe.
+**Design constraint**: this data stays **declarative and conversational**. Sleep feeling,
+life load and desire stay three words, not three scores, and are never rendered as a
+curve.
 
-**Une cellule vide est légitime** : il ne répond pas tous les jours, et une valeur
-devinée serait pire qu'une absence (même règle qu'au registre).
-
+**An empty cell is legitimate**: the athlete does not answer every day, and a guessed
+value would be worse than an absence (same rule as the ledger).
 """
 
 from __future__ import annotations
 
-# --------------------------------------------------------------- l'agrégation
+# ------------------------------------------------------------------ aggregation
 #
-# Les deux seuils ci-dessous sont la seule chose de ce module qui touche à un nombre
-# qui arbitre (la jauge). Ils sont ici, nommés, plutôt qu'enfouis dans une compréhension
-# de liste : c'est ce qu'un rituel de confrontation doit pouvoir attaquer.
+# The thresholds below are the only numbers in this module that arbitrate (the gauge).
+# They are named here rather than buried in a comprehension, so they can be challenged.
 
-# Garde-fou n°4 du plan, mot pour mot : « 2-3 mauvaises nuits consécutives = on traite la
-# semaine comme une semaine d'assimilation ». Le vocabulaire de la jauge distingue déjà
-# ces deux paliers, on ne fait que les alimenter.
+# Guard-rail: 2-3 consecutive bad nights mean the week is treated as an absorption week.
+# The gauge vocabulary already distinguishes these two levels; this only feeds them.
 BAD_NIGHTS_FOR_ALERT = 2
 BAD_NIGHTS_FOR_WEEK = 4
 
-# Une journée lourde n'est pas une semaine lourde. Le multiplicateur ×1,1 vise le
-# « seau à stress » d'une PÉRIODE (déménagement, rentrée, examens), pas un mardi pénible.
+# A heavy day is not a heavy week. The multiplier targets the stress bucket of a PERIOD,
+# not a single hard day.
 HEAVY_DAYS_FOR_ELEVEE = 3
 
 
 def sleep_of(days: list) -> str | None:
-    """La valeur `sommeil` de la jauge pour cette semaine, ou None si rien n'est déclaré.
+    """The gauge `sommeil` value for this week, or None if nothing is declared.
 
-    None et pas « ok » : une semaine sans déclaration n'est pas une bonne semaine, et
-    lui faire dire « ok » ferait taire un multiplicateur par défaut.
+    None and not "ok": a week without declaration is not a good week, and reporting "ok"
+    would silence a multiplier by default.
     """
     declared = [day["sommeil"] for day in days if "sommeil" in day]
     if not declared:

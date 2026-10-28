@@ -1,10 +1,9 @@
-"""Calibration des prédictions typées, par domaine, depuis leurs lignes PostgreSQL.
+"""Calibration of typed predictions, per domain, from their PostgreSQL rows.
 
-Audit du 2026-10-09 : le score de Brier seul cachait ce qui comptait. Sur le corps,
-7 prédictions confrontées sur 20 ; une moyenne calculée sur les 7 qu'on a bien voulu
-solder ne mesure pas la calibration, elle mesure ce qu'on a choisi de regarder. La
-ligne montre donc aussi ce qui a échappé au score : `void` et échues encore ouvertes,
-et combien de soldes sont venus d'une observation plutôt que d'un verdict rédigé.
+The Brier score alone hides what matters: an average over the few predictions that
+happened to be settled measures what was chosen for review, not calibration. The line
+therefore also shows what escaped the score: `void` and overdue-but-open predictions,
+and how many settlements came from an observation rather than a written verdict.
 """
 
 from __future__ import annotations

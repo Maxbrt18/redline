@@ -1,41 +1,33 @@
-"""Les signes qu'un clavier de téléphone ne porte pas, et qui ne doivent donc entrer
-nulle part dans ce qui finit devant le coach ou devant l'athlète.
+"""Glyphs that a phone keyboard cannot type, and which must therefore not enter anything
+that ends up in front of the coach or the athlete.
 
-⭐ LA RÈGLE A DEUX CANAUX, ET UN SEUL ÉTAIT GARDÉ (2026-08-19). Le 17/08, la consigne
-typographique a reçu son porteur : `BANNED_GLYPHS` plus un test qui scanne les textes
-injectés. Ce test ne voit que les chaînes ÉCRITES DANS LE CODE. Or le plus gros bloc
-injecté à chaque tour prescriptif est le programme lui-même, rendu par
-`weekly_plan.as_json()` -- des textes que le coach a écrits la veille et que le service
-lui remet sous les yeux le lendemain.
+The typographic rule has two channels: the prose written in code, guarded by
+`BANNED_GLYPHS` plus a test that scans injected texts, and the data channel. The largest
+block injected on each prescriptive turn is the program itself, rendered by
+`weekly_plan.as_json()`: texts the coach wrote earlier and the service puts back in front
+of it later (for example a gate `question` interpolated verbatim into the hidden
+instruction, or a `note` sent to the athlete's phone). Without a check on that channel,
+the instruction is contradicted by its own context, and the loop closes on itself since
+the coach writes the next revision after reading the previous one.
 
-Au 19/08, le programme W34 en portait quatre : un tiret cadratin dans la `question` du
-contrôle du 23/08, que `prompts.gate_note()` interpole VERBATIM dans l'instruction
-invisible; un signe moins U+2212 dans la `note` du 22/08, qui part sur le téléphone de
-L'athlète et sur la carte; deux autres dans `constraints`. La consigne se faisait donc
-démentir par son propre contexte, exactement comme avant le 17/08, mais par le canal
-des données au lieu du canal de la prose. Et la boucle se referme sur elle-même : le
-coach écrit la révision suivante après avoir lu la précédente.
+Why a REFUSAL and not a rewrite: `redline/textutils.py` holds that `strip_links` is the
+only mechanical rewrite allowed on coach output, and that the rest is fixed in the
+prompt. A silent normalization here would clean the trace without ever teaching the rule.
 
-Pourquoi un REFUS et pas une réécriture : `redline/textutils.py` pose que `strip_links`
-est la seule réécriture mécanique autorisée sur la sortie du coach, et que le reste se
-corrige dans le prompt. Une normalisation silencieuse ici serait la régression que cette
-règle interdit -- elle nettoierait la trace sans jamais apprendre la règle.
-
-Pourquoi à l'ÉCRITURE et pas à la lecture : cette règle porte sur le clavier du
-producteur, pas sur la structure persistée. Seul le texte qui entre est jugé ; le
-schéma du plan, lui, reste unique et ne garde aucun numéro de version historique.
+Why at WRITE time and not at read time: the rule concerns the producer's keyboard, not
+the persisted structure. Only the incoming text is judged; the plan schema stays single.
 """
 
 from __future__ import annotations
 
-#: Ce qu'un clavier de téléphone ne porte pas. `src/redline/service/prompts.py` réexporte
-#: cette liste : le prompt qui l'interdit et le contrôle qui la fait respecter ne
-#: peuvent pas diverger s'ils lisent la même constante.
+#: What a phone keyboard cannot type. `src/redline/service/prompts.py` re-exports this
+#: list: the prompt that forbids them and the check that enforces it cannot diverge if
+#: they read the same constant.
 BANNED_GLYPHS = "—–·…«»“”’→•−≥≤⚠⭐"
 
-#: Ce qu'on tape à la place, nommé pour que le message d'erreur ouvre le chemin correct
-#: au lieu de se contenter de fermer le mauvais (⭐ règle du 2026-08-06 : un garde-fou
-#: qui n'ouvre pas de chemin correct fabrique son contournement).
+#: What to type instead, named so that the error message opens the correct path instead
+#: of merely closing the wrong one (a guard that opens no correct path breeds its own
+#: workaround).
 REPLACEMENTS = {
     "—": "une virgule, un point, ou deux phrases",
     "–": "un trait d'union simple (-)",
@@ -57,7 +49,7 @@ REPLACEMENTS = {
 
 
 def banned_in(text: str) -> list[str]:
-    """Les signes interdits présents, dans l'ordre où ils apparaissent."""
+    """The banned glyphs present, in order of first appearance."""
     seen: list[str] = []
     for char in text or "":
         if char in BANNED_GLYPHS and char not in seen:
@@ -66,7 +58,7 @@ def banned_in(text: str) -> list[str]:
 
 
 def errors(text: str, where: str, label: str) -> list[str]:
-    """Le refus, avec le signe fautif, son contexte et ce qui se tape à la place."""
+    """The refusal, with the offending glyph, its context and what to type instead."""
     problems = []
     for glyph in banned_in(text):
         index = text.find(glyph)

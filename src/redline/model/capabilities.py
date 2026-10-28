@@ -1,8 +1,8 @@
-"""Notes d'analyse des six capacités course.
+"""Analysis notes of the running capabilities.
 
-Leur frontmatter ne porte plus aucun état opérationnel : scores, statuts, dates et
-prochains tests vivent exclusivement dans PostgreSQL. Les notes gardent seulement
-leur identité Obsidian et le raisonnement humain de leur corps.
+Their frontmatter carries no operational state: scores, statuses, dates and next tests
+live exclusively in PostgreSQL. The notes keep only their Obsidian identity and the
+human reasoning of their body.
 """
 
 from __future__ import annotations
@@ -22,5 +22,5 @@ CAPABILITY_SCHEMA = Schema("note de capacité", [
 
 
 def load(vault: Path) -> dict:
-    """Charge les notes d'analyse courantes, sans état opérationnel."""
+    """Load the current analysis notes, without operational state."""
     return read_all(vault / vault_layout.CAPABILITIES, CAPABILITY_SCHEMA)
