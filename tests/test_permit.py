@@ -55,7 +55,7 @@ def test_declared_life_load_and_group_restrict_the_week():
     tue = MON + dt.timedelta(days=1)
     lines = permit.evaluate([_choice("w40-mar-ef", tue, 40)], [_ef(tue, 40, strava_id=7)],
                             {}, {}, {7: True}, today=tue + dt.timedelta(days=1), hr_cap=HR_CAP)
-    current = permit.state(lines, [{"checked_on": MON, "life_load": "elevee"}],
+    current = permit.state(lines, [{"checked_on": MON, "life_load": "high"}],
                            today=tue + dt.timedelta(days=1), period=PERIOD)
     reasons = current.restricted_weeks["2026-W40"]
     assert any("charge de vie" in reason for reason in reasons)

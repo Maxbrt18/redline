@@ -15,6 +15,8 @@ value would be worse than an absence (same rule as the ledger).
 
 from __future__ import annotations
 
+from .vocabulary import LifeLoad, Sleep, WeekLifeLoad, WeekSleep
+
 # ------------------------------------------------------------------ aggregation
 #
 # The thresholds below are the only numbers in this module that arbitrate (the gauge).
@@ -27,28 +29,29 @@ BAD_NIGHTS_FOR_WEEK = 4
 
 # A heavy day is not a heavy week. The multiplier targets the stress bucket of a PERIOD,
 # not a single hard day.
-HEAVY_DAYS_FOR_ELEVEE = 3
+HEAVY_DAYS_FOR_HIGH = 3
 
 
 def sleep_of(days: list) -> str | None:
-    """The gauge `sommeil` value for this week, or None if nothing is declared.
+    """The gauge sleep value for this week, or None if nothing is declared.
 
     None and not "ok": a week without declaration is not a good week, and reporting "ok"
     would silence a multiplier by default.
     """
-    declared = [day["sommeil"] for day in days if "sommeil" in day]
+    declared = [day["sleep"] for day in days if "sleep" in day]
     if not declared:
         return None
-    bad = declared.count("mauvaise")
+    bad = declared.count(Sleep.POOR)
     if bad >= BAD_NIGHTS_FOR_WEEK:
-        return "degrade_semaine"
+        return WeekSleep.BAD_WEEK
     if bad >= BAD_NIGHTS_FOR_ALERT:
-        return "2_3_mauvaises_nuits"
-    return "ok"
+        return WeekSleep.BAD_NIGHTS
+    return WeekSleep.OK
 
 
 def life_load_of(days: list) -> str | None:
-    declared = [day["charge_vie"] for day in days if "charge_vie" in day]
+    declared = [day["life_load"] for day in days if "life_load" in day]
     if not declared:
         return None
-    return "elevee" if declared.count("elevee") >= HEAVY_DAYS_FOR_ELEVEE else "normale"
+    return (WeekLifeLoad.HIGH if declared.count(LifeLoad.HIGH) >= HEAVY_DAYS_FOR_HIGH
+            else WeekLifeLoad.NORMAL)

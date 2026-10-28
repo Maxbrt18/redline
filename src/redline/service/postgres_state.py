@@ -17,6 +17,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from redline.analysis import signals as signal_model
 from redline.model import commands, local_time
+from redline.model.vocabulary import Desire, ThreadStatus
 from redline.storage.database import Database
 from redline.storage.repository import ATHLETE, CORRECTION_ANNOUNCE_WINDOW, OperationalStore
 from redline.storage.schema import (
@@ -470,7 +471,7 @@ class PostgresStateStore(StateStore):
                 conversation_questions.c.resolved_at.desc()).limit(12)).mappings())
             thread_rows = list(connection.execute(sa.select(conversation_threads).where(
                 conversation_threads.c.athlete_id == ATHLETE,
-                conversation_threads.c.status == "ouvert").order_by(
+                conversation_threads.c.status == ThreadStatus.OPEN).order_by(
                     conversation_threads.c.opened_on.desc())).mappings()) if threads else []
         return render_memory([dict(row) for row in rows], [dict(row) for row in open_rows],
                              [dict(row) for row in thread_rows],
@@ -757,7 +758,7 @@ class PostgresStateStore(StateStore):
             daily_checkins.c.athlete_id == ATHLETE,
             daily_checkins.c.checked_on >= local.date() - dt.timedelta(days=21),
         ).order_by(daily_checkins.c.checked_on.desc()).limit(3)).mappings())
-        if len(recent_daily) == 3 and all(row["desire"] == "basse" for row in recent_daily):
+        if len(recent_daily) == 3 and all(row["desire"] == Desire.LOW for row in recent_daily):
             signals.append("envie basse sur les trois dernières lectures")
         due_predictions = [row for row in predictions if row["due_on"] <= local.date()]
         if due_predictions:

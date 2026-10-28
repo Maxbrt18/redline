@@ -214,21 +214,21 @@ def test_a_known_heart_rate_is_doubted_once_with_its_cause(store):
     payload["measurements"]["hr_avg_bpm"] = {"state": "known", "value": 157}
     oid = store.add_observation(payload)
     with pytest.raises(StorageError):
-        store.doubt_hr(oid, "sans_brassard", "  ")
+        store.doubt_hr(oid, "no_sensor", "  ")
     with pytest.raises(StorageError):
         store.doubt_hr(oid, "poignet", "pas de brassard")
-    store.doubt_hr(oid, "sans_brassard", "pas de capteur FC, 95 % des points ratés")
+    store.doubt_hr(oid, "no_sensor", "pas de capteur FC, 95 % des points ratés")
     row = next(r for r in store.observation_rows() if r["id"] == oid)
-    assert row["hr_doubt"] == "sans_brassard"
+    assert row["hr_doubt"] == "no_sensor"
     assert row["measurements"]["hr_avg_bpm"]["value"] == 157
     with pytest.raises(StorageError):
-        store.doubt_hr(oid, "contexte", "repas")
+        store.doubt_hr(oid, "context", "repas")
 
 
 def test_an_unknown_heart_rate_cannot_be_doubted(store):
     oid = store.add_observation(observation())
     with pytest.raises(StorageError):
-        store.doubt_hr(oid, "contexte", "repas une heure avant")
+        store.doubt_hr(oid, "context", "repas une heure avant")
 
 
 def test_a_metric_never_recorded_can_still_be_filled_later(store):
@@ -1339,7 +1339,7 @@ def test_database_constraints_reject_invalid_typed_domains(store):
     with pytest.raises(StorageError):
         store.evaluate_capability({
             "capability_number": 1, "slug": "test", "need": "test",
-            "score": 6, "scale": 5, "status": "vert",
+            "score": 6, "scale": 5, "status": "green",
             "evaluated_on": dt.date(2026, 8, 13)})
     assert store.latest_capabilities() == []
 
@@ -1352,7 +1352,7 @@ def _capability_cli(*extra: str, turn_id: str = "") -> subprocess.CompletedProce
     return subprocess.run([
         *cli_command("fact-write"), "capability", "--capability-number", "5",
         "--slug", "cap5-genou", "--need", "Genou intact", "--score", "3", "--scale", "5",
-        "--status", "orange", "--evaluated-on", "2026-10-11", *extra,
+        "--status", "amber", "--evaluated-on", "2026-10-11", *extra,
     ], cwd=ENGINE_ROOT, env=env, capture_output=True, text=True, check=False)
 
 
@@ -1401,7 +1401,7 @@ def test_the_common_cli_stages_directly_in_postgres_then_applies_atomically(stor
     # the system one, without SQLAlchemy.
     process = subprocess.run([
         *cli_command("fact-write"), "thread", "--key", "cli-commun",
-        "--opened-on", "2026-08-13", "--kind", "suspens", "--status", "ouvert",
+        "--opened-on", "2026-08-13", "--kind", "open_loop", "--status", "open",
         "--body", "même commande pour Claude et Codex",
     ], cwd=ENGINE_ROOT, env={**os.environ, "DATABASE_URL": URL,
                             "REDLINE_TURN_ID": turn_id},
@@ -1566,10 +1566,10 @@ def test_less_frequent_operational_facts_share_the_staged_boundary(store):
     turn_id = "63101651-859c-4295-a86b-17f19812c747"
     commands = [
         ("daily:test", "daily.upsert", {"day": dt.date(2026, 8, 13),
-                                        "sleep": "bonne", "note": "ok"}),
+                                        "sleep": "good", "note": "ok"}),
         ("thread:test", "thread.upsert", {
             "thread_key": "injury-jeudi", "opened_on": dt.date(2026, 8, 13),
-            "kind": "ressenti", "body": "à revoir", "status": "ouvert"}),
+            "kind": "feeling", "body": "à revoir", "status": "open"}),
         ("deadline:test", "deadline.upsert", {
             "deadline_key": "controle-w34", "due_on": dt.date(2026, 8, 17),
             "item": "contrôle", "fact_owner": "protocols", "status": "todo"}),
@@ -1853,8 +1853,8 @@ def test_the_daily_state_never_makes_the_plan_stale(store):
     """Same reason: saying one slept badly feeds the gauge, it does not make the program
     wrong."""
     store.append_plan_revision("2026-W33", _plan_revision(1), actor="test")
-    store.put_daily({"day": dt.date(2026, 8, 14), "sleep": "mauvaise",
-                     "life_load": "elevee", "desire": "normale"})
+    store.put_daily({"day": dt.date(2026, 8, 14), "sleep": "poor",
+                     "life_load": "high", "desire": "normal"})
     assert store.plan_needs_arbitration("2026-W33", 1) is False
 
 
@@ -2213,9 +2213,9 @@ def test_service_lines_do_not_push_the_real_exchange_out_of_memory(store):
 def test_memory_leaves_threads_to_the_packet_when_asked(store):
     state = PostgresStateStore(store.database)
     state.claim_inbound("m", "4242", "text", "Salut")
-    store.upsert_thread({"thread_key": "chaussures", "status": "ouvert",
+    store.upsert_thread({"thread_key": "chaussures", "status": "open",
                          "body": "Essai de la nouvelle paire à reprendre.",
-                         "opened_on": dt.date(2026, 9, 20), "kind": "suspens",
+                         "opened_on": dt.date(2026, 9, 20), "kind": "open_loop",
                          "follow_up_on": None})
     assert "chaussures" in state.relationship_context("4242")
     without = state.relationship_context("4242", threads=False)

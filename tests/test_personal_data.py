@@ -25,7 +25,10 @@ FORBIDDEN = {
 }
 FROZEN = ("migrations/",)
 TOKEN = re.compile(r"[\w-]+")
-PAST_DATE = re.compile(r"\b20[0-2]\d-(?:\d\d-\d\d|\d\d\b|W\d\d)")
+PAST_DATE = re.compile(
+    r"\b20[0-2]\d-(?:\d\d-\d\d|\d\d\b|W\d\d)"
+    r"|(?:janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre"
+    r"|décembre) 20[0-2]\d", re.IGNORECASE)
 
 
 def _tracked_texts():

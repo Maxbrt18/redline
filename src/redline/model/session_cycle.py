@@ -11,6 +11,8 @@ import datetime as dt
 import hashlib
 import json
 
+from redline.model.vocabulary import MORNING_TRACE_PAIN, MorningTrace
+
 from .local_time import zone as local_time_zone
 
 TERMINAL_STATES = frozenset({"missed", "cancelled", "closed"})
@@ -18,8 +20,8 @@ TERMINAL_STATES = frozenset({"missed", "cancelled", "closed"})
 # because the program is revised afterwards.
 OBSERVED_STATES = frozenset({"started", "completed"})
 #: "Very light" (0.5) is distinct: it is neither light nor none.
-MORNING_TRACES = ("aucune", "tres-legere", "legere", "nette")
-MORNING_TRACE_VALUES = {"aucune": 0, "tres-legere": 0.5, "legere": 1, "nette": 2}
+MORNING_TRACES = tuple(MorningTrace)
+MORNING_TRACE_VALUES = MORNING_TRACE_PAIN
 
 
 def scheduled_for(day: str | dt.date, start_time: str | None) -> dt.datetime | None:

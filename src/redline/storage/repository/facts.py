@@ -9,6 +9,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Connection
 
+from redline.model.vocabulary import ThreadStatus
+
 from ..database import StorageError
 from ..schema import (
     audit_events,
@@ -86,7 +88,7 @@ class Facts(StoreBase):
             "opened_on": row["opened_on"], "kind": row["kind"], "body": row["body"],
             "follow_up_on": row.get("follow_up_on"), "status": row["status"],
             "closed_at": (row.get("closed_at") or dt.datetime.now(dt.UTC)
-                          if row["status"] == "clos" else None)}
+                          if row["status"] == ThreadStatus.CLOSED else None)}
         actual_id = connection.execute(pg_insert(conversation_threads).values(
             **values).on_conflict_do_update(
             constraint="uq_conversation_threads_key", set_={key: value for key, value in values.items()
@@ -370,7 +372,7 @@ class Facts(StoreBase):
         scheduled_on = row["scheduled_on"]
         if isinstance(scheduled_on, str):
             scheduled_on = dt.date.fromisoformat(scheduled_on)
-        values = {"athlete_id": self.athlete_id, "domain": "ef",
+        values = {"athlete_id": self.athlete_id, "domain": "easy",
                   "iso_week": row["iso_week"], "session_key": row["session_key"],
                   "scheduled_on": scheduled_on, "coach_minutes": int(row["coach_minutes"]),
                   "prediction_key": row["prediction_key"]}

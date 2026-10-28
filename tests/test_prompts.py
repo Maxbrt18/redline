@@ -438,7 +438,7 @@ def test_missing_cells_publish_the_real_one_metric_cli_contract():
 
 def test_style_names_relational_memory_and_its_closed_vocabularies():
     assert f"{prompts.AGENT_CLI} fact-write.py thread" in STYLE_PROMPT
-    assert "`ouvert` ou `clos`" in _flat(STYLE_PROMPT)
+    assert "`open` ou `closed`" in _flat(STYLE_PROMPT)
     assert "ces deux mots exactement" in STYLE_PROMPT
     assert "coaching/adherence.md" in STYLE_PROMPT
     assert "coaching/corrections.md" in STYLE_PROMPT

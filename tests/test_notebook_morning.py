@@ -62,16 +62,16 @@ def board(ops, hour=8):
 
 
 def test_the_morning_check_completes_the_day_without_erasing_it():
-    ops = Ops(daily=[{"checked_on": TODAY, "sleep": None, "life_load": "elevee",
+    ops = Ops(daily=[{"checked_on": TODAY, "sleep": None, "life_load": "high",
                       "desire": None, "note": "partiels"}])
     ask = next(item for item in board(ops).asks() if item["type"] == "daily")
     assert ask["fields"] == ["sleep"]
-    board(ops).answer(ask["id"] + ":sleep", "mauvaise")
-    assert ops.daily == [{"checked_on": TODAY, "sleep": "mauvaise", "life_load": "elevee",
+    board(ops).answer(ask["id"] + ":sleep", "poor")
+    assert ops.daily == [{"checked_on": TODAY, "sleep": "poor", "life_load": "high",
                           "desire": None, "note": "partiels"}]
     assert not [item for item in board(ops).asks() if item["type"] == "daily"]
     with pytest.raises(AnswerError):
-        board(ops).answer(ask["id"] + ":life_load", "normale")
+        board(ops).answer(ask["id"] + ":life_load", "normal")
 
 
 def test_the_morning_check_is_not_asked_in_the_afternoon():
@@ -85,10 +85,10 @@ def test_a_high_heart_rate_asks_once_and_the_answer_goes_to_that_day():
     asks = [item for item in board(ops, hour=15).asks() if item["type"] == "hr"]
     assert [(item["date"], item["hr"], item["reference"]) for item in asks] == \
         [((TODAY - dt.timedelta(days=1)).isoformat(), 160, 150)]
-    result = board(ops, hour=15).answer(asks[0]["id"], "sommeil")
+    result = board(ops, hour=15).answer(asks[0]["id"], "sleep")
     assert result == {"alert": None}
     day = ops.daily[0]
-    assert day["checked_on"] == TODAY - dt.timedelta(days=1) and day["sleep"] == "mauvaise"
+    assert day["checked_on"] == TODAY - dt.timedelta(days=1) and day["sleep"] == "poor"
     assert day["note"] == "FC haute du 07/10 : nuit courte"
     assert not [item for item in board(ops, hour=15).asks() if item["type"] == "hr"]
 
@@ -99,7 +99,7 @@ def test_nothing_special_behind_a_high_heart_rate_goes_to_the_coach():
     ask = next(item for item in board(ops, hour=15).asks() if item["type"] == "hr")
     with pytest.raises(AnswerError):
         board(ops, hour=15).answer(ask["id"], "fatigue")
-    alert = board(ops, hour=15).answer(ask["id"], "rien")["alert"]
+    alert = board(ops, hour=15).answer(ask["id"], "none")["alert"]
     assert "159 contre 150" in alert
 
 

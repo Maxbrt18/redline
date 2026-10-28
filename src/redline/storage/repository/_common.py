@@ -12,6 +12,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Connection
 
 from redline.model import session_kinds
+from redline.model.vocabulary import HrDoubt
 
 from ..database import Database, StorageError
 from ..schema import (
@@ -72,8 +73,8 @@ CORRECTION_ANNOUNCE_WINDOW = dt.timedelta(days=7)
 #: Observations that settle a prediction by themselves. The wake-up carries its trace,
 #: per zone, in `pain_readings`: 0 none, 0.5 very slight, 1 slight, 2 clear.
 RESOLVING_KINDS = (session_kinds.WAKE_TRACE,)
-#: Motifs d'une FC moyenne douteuse (schéma `ck_observation_metrics_hr_doubt`).
-HR_DOUBTS = ("sans_brassard", "contexte")
+#: Why an average HR may be doubtful (schema `ck_observation_metrics_hr_doubt`).
+HR_DOUBTS = tuple(HrDoubt)
 RESOLUTION_COLUMNS = ("resolves_kind", "resolves_on", "resolves_zone", "success_op",
                       "success_value")
 _RULE_OPERATORS = {"<=": lambda a, b: a <= b, "<": lambda a, b: a < b,

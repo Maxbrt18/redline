@@ -32,6 +32,7 @@ from redline.model import (
 )
 from redline.model import instance as instance_model
 from redline.model import startup_budget as budget
+from redline.model.vocabulary import ThreadStatus
 
 # The programme layer needs PyYAML to read a note's frontmatter, which a bare vault
 # checkout on the Mac may not have. `model.ledger` above has no dependency at all:
@@ -455,7 +456,7 @@ def check_threads(vault: Vault, report: Report) -> None:
     rows = _read_postgres(report, "fils ouverts", lambda store: store.thread_rows())
     if rows is None:
         return
-    late = [row for row in rows if row["status"] == "ouvert" and row["follow_up_on"]
+    late = [row for row in rows if row["status"] == ThreadStatus.OPEN and row["follow_up_on"]
             and row["follow_up_on"] < dt.date.today()]
     if late:
         first = late[0]

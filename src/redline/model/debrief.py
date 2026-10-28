@@ -13,6 +13,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
+from redline.model.vocabulary import HrDoubt
+
 from . import rulebook, session_kinds
 from .activity import Lap
 
@@ -46,7 +48,7 @@ def planned_vs_done(row: Any, session: dict | None) -> list[str]:
         out.append(f"durée {minutes:.0f} min pour un plafond de {session['duration_cap_min']} "
                    f"({_signed(round(minutes - session['duration_cap_min']))})")
     # HR recorded without the armband is never compared to a cap.
-    hr = row.hr_avg if getattr(row, "hr_doubt", None) != "sans_brassard" else None
+    hr = row.hr_avg if getattr(row, "hr_doubt", None) != HrDoubt.NO_SENSOR else None
     if hr is not None and session.get("hr_cap_bpm") is not None:
         out.append(f"FC moyenne {hr} pour un plafond de {session['hr_cap_bpm']} "
                    f"({_signed(hr - session['hr_cap_bpm'])})")

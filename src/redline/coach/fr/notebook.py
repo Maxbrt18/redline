@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 #: The answers to the question asked after a high heart rate at a comparable pace.
-HR_REASONS = {"sommeil": "nuit courte", "rhume": "début de rhume",
-              "chaleur": "chaleur ou terrain", "rien": "rien de spécial"}
+HR_REASONS = {"sleep": "nuit courte", "cold": "début de rhume",
+              "heat": "chaleur ou terrain", "none": "rien de spécial"}
 
 #: Why no session is shown, by plan status name.
 PLAN_MESSAGES = {

@@ -109,8 +109,8 @@ def test_un_reveil_sans_trace_ne_sécrit_pas(monkeypatch, capsys, trace):
     assert "réveil sans trace" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize("word, value", [("aucune", "0"), ("Légère", "1"), ("legere", "1"),
-                                         ("très légère", "0.5"), ("nette", "2")])
+@pytest.mark.parametrize("word, value", [("none", "0"), ("Light", "1"), ("light", "1"),
+                                         ("very light", "0.5"), ("clear", "2")])
 def test_le_mot_de_alex_devient_la_valeur(monkeypatch, capsys, word, value):
     add = _load_writer()
     _zones(monkeypatch, add)

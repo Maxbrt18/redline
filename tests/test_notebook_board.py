@@ -171,14 +171,14 @@ def test_a_net_wake_trace_alerts_the_coach_with_the_session_condition(store):
     """The condition lives in the session, the alert triggers it."""
     seed_week(store)
     morning = dt.datetime(2026, 10, 7, 8, 0, tzinfo=PARIS)
-    alert = board(store, morning).answer("wake:2026-10-07:genou", "nette")["alert"]
+    alert = board(store, morning).answer("wake:2026-10-07:genou", "clear")["alert"]
     assert "trace nette" in alert and "condition écrite dans la séance" in alert
 
 
 def test_a_very_light_wake_trace_is_half_a_point(store):
     seed_week(store)
     morning = dt.datetime(2026, 10, 7, 8, 0, tzinfo=PARIS)
-    assert board(store, morning).answer("wake:2026-10-07:genou", "tres-legere") == {"alert": None}
+    assert board(store, morning).answer("wake:2026-10-07:genou", "very-light") == {"alert": None}
     [reveil] = [row for row in store.observation_rows() if row["kind"] == "wake-trace"]
     assert reveil["pains"]["genou"] == {"state": "known", "value": 0.5}
 
@@ -197,7 +197,7 @@ def test_the_morning_trace_is_asked_in_the_morning_only_and_in_its_own_words(sto
         "statement": "trace au plus légère au réveil du lendemain de SL",
         "probability": .75, "due_on": dt.date(2026, 10, 11),
         "resolves_on": {"kind": "wake-trace", "date": "2026-10-07", "success_if": "<=1"}})
-    assert board(store, morning).answer(wake["id"], "legere") == {"alert": None}
+    assert board(store, morning).answer(wake["id"], "light") == {"alert": None}
     [prediction] = store.prediction_rows()
     assert (prediction["status"], prediction["outcome"]) == ("resolved", True)
     reveil = [row for row in store.observation_rows() if row["kind"] == "wake-trace"]
@@ -231,10 +231,10 @@ def test_the_race_and_only_alex_s_deadlines_reach_the_course_tab(store):
         "status": "todo"})
     store.evaluate_capability({
         "capability_number": 5, "slug": "cap5-genou", "need": "Genou intact",
-        "score": 3, "scale": 5, "status": "orange", "evaluated_on": dt.date(2026, 10, 4)})
+        "score": 3, "scale": 5, "status": "amber", "evaluated_on": dt.date(2026, 10, 4)})
     store.evaluate_capability({
         "capability_number": 3, "slug": "cap3-ravitaillement", "need": "Digérer",
-        "score": 0, "scale": 5, "status": "rouge", "evaluated_on": dt.date(2026, 10, 4)})
+        "score": 0, "scale": 5, "status": "red", "evaluated_on": dt.date(2026, 10, 4)})
     archives = [
         {"id": "a", "kind": "monthly", "period": "2026-09", "origin": "recovered"},
         {"id": "b", "kind": "monthly", "period": "2026-09", "origin": "delivery"},
