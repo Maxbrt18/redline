@@ -705,6 +705,30 @@ def test_a_prediction_resolved_without_its_observation_is_rectified_to_void(stor
         "resolved"] == 0
 
 
+def test_a_settled_prediction_keeps_why_it_failed_and_the_calibration_counts_it(store):
+    for key in ("refuted", "untested"):
+        store.upsert_prediction({
+            "prediction_key": key, "domain": "corps", "statement": "trace légère",
+            "probability": .7, "due_on": dt.date(2026, 10, 5)})
+    store.upsert_prediction({"prediction_key": "refuted", "operation": "resolve",
+                             "outcome": False, "reason": "optimistic"})
+    store.upsert_prediction({"prediction_key": "untested", "operation": "resolve",
+                             "outcome": None, "void": True, "reason": "exposure"})
+    reasons = {row["prediction_key"]: row["outcome_reason"] for row in store.prediction_rows()}
+    assert reasons == {"refuted": "optimistic", "untested": "exposure"}
+    (line,) = prediction_model.calibration_lines(store.prediction_rows(), dt.date(2026, 10, 9))
+    assert "réfutée optimiste 1" in line and "void exposition 1" in line
+
+
+def test_a_reason_that_does_not_fit_the_outcome_is_refused_by_the_database(store):
+    store.upsert_prediction({
+        "prediction_key": "held", "domain": "corps", "statement": "trace légère",
+        "probability": .7, "due_on": dt.date(2026, 10, 5)})
+    with pytest.raises(StorageError):
+        store.upsert_prediction({"prediction_key": "held", "operation": "resolve",
+                                 "outcome": True, "reason": "optimistic"})
+
+
 def test_a_sealed_permit_choice_creates_its_prediction_and_cannot_be_rewritten(store):
     choice = {"iso_week": "2026-W40", "session_key": "w40-mar-ef",
               "scheduled_on": dt.date(2026, 9, 29), "coach_minutes": 40,
@@ -2117,8 +2141,7 @@ def test_the_weekly_dossier_is_computed_from_the_same_functions_as_the_clis(stor
     assert "en cours" not in text.split("Trajectoire")[1].split("Plus longue des")[0]
     assert "Plus longue des 30 j : 13.6 km" in text
     assert "verdict-cortex (due le 06/09)" in text and "bloque descente courue" in text
-    assert "Prédictions narratives échues dans decisions.md" in text
-    assert "**Verdict** (2026-09-27)" in text
+    assert "--reason optimistic" in text and "narrative" not in text
     assert "Faisabilité à rebours : aucune course typée" in text
     store.upsert_deadline({"deadline_key": "targetrace", "due_on": dt.date(2026, 11, 28),
                            "kind": "race", "item": "TargetRace",

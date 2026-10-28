@@ -35,12 +35,10 @@ from scripts.model import (  # noqa: E402
 
 GENERATOR_TIMEOUT = 120
 
-# Tout script qui écrit un bloc entre marqueurs a sa place ici. Un générateur absent
-# de cette liste est un générateur que personne ne relance — c'était le cas de
-# `decisions-index.py` du 23 au 29/07 : il annonçait un `--check (CI)` que ni la CI,
-# ni le hook, ni ce script n'appelaient. L'index n'était à jour que par chance.
+# Every script that writes a block between markers belongs here: a generator missing
+# from this list is one nobody reruns.
 OPERATIONAL_GENERATORS = ("hot-cache.py",)
-STATIC_GENERATORS = ("strength-tables.py", "decisions-index.py")
+STATIC_GENERATORS = ("strength-tables.py",)
 GENERATORS = OPERATIONAL_GENERATORS + STATIC_GENERATORS
 
 

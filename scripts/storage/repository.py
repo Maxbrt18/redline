@@ -2354,6 +2354,7 @@ class OperationalStore:
                 updates = {"status": "resolved", "outcome": outcome,
                            "brier_score": (probability - float(outcome)) ** 2,
                            "resolved_at": now}
+            updates["outcome_reason"] = row.get("reason")
             connection.execute(coach_predictions.update().where(
                 coach_predictions.c.id == existing["id"]).values(**updates))
             aggregate_id = existing["id"]
@@ -2374,7 +2375,7 @@ class OperationalStore:
                 raise StorageError("une rectification exige son motif")
             connection.execute(coach_predictions.update().where(
                 coach_predictions.c.id == existing["id"]).values(
-                    status="void", outcome=None, brier_score=None))
+                    status="void", outcome=None, brier_score=None, outcome_reason=None))
             aggregate_id = existing["id"]
             action = "prediction.rectified"
         elif operation == "challenge":

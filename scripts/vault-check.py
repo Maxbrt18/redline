@@ -35,7 +35,6 @@ from scripts.model import (  # noqa: E402
     ledger,
     vault_layout,
 )
-from scripts.model import decisions as decision_log  # noqa: E402
 from scripts.model import instance as instance_model  # noqa: E402
 from scripts.model import startup_budget as budget  # noqa: E402
 
@@ -429,37 +428,27 @@ def check_decisions_order(vault: Vault, report: Report) -> None:
         report.ok("décisions antéchronologiques", f"{len(dates)} décisions")
 
 
-def check_prediction_debt(vault: Vault, report: Report) -> None:
-    """Une prédiction échue reçoit un verdict daté, ou le contrôle passe au rouge.
+#: Two weekly reviews to settle a due prediction before the check turns red.
+PREDICTION_GRACE_DAYS = 14
 
-    Réponse pré-engagée de la décision du 2026-08-16 : si le rappel du prompt ne suffit
-    pas à fermer les prédictions, « il faut un contrôle vault-check rouge ». Le 27/09 il
-    en restait 43, la plus ancienne attendue depuis W32, pendant que les bilans lisaient
-    seulement les prédictions typées de PostgreSQL. Deux bilans de grâce, puis rouge.
-    """
-    text = vault.text(DECISIONS)
-    if text is None:
-        report.skip("prédictions soldées", f"{DECISIONS} est introuvable")
+
+def check_prediction_debt(vault: Vault, report: Report) -> None:
+    """A due prediction receives its verdict: amber at first, red after two reviews."""
+    rows = _read_postgres(report, "prédictions soldées", lambda store: store.prediction_rows())
+    if rows is None:
         return
     today = dt.date.today()
-    try:
-        entries = decision_log.parse(text)
-    except decision_log.DecisionFormatError as exc:
-        report.fail("prédictions soldées", str(exc).splitlines())
-        return
-    due = sorted((entry for entry in entries if entry.is_due(today)),
-                 key=lambda entry: -decision_log.overdue_days(entry, today))
-    late = [entry for entry in due
-            if decision_log.overdue_days(entry, today) > decision_log.DEBT_GRACE_DAYS]
-    lines = [f"{entry.date} (revue W{entry.review_week}, +"
-             f"{decision_log.overdue_days(entry, today)} j) — {entry.title}"
-             for entry in (late or due)]
+    due = sorted((row for row in rows if row["status"] == "open" and row["due_on"] < today),
+                 key=lambda row: row["due_on"])
+    lines = [f"{row['prediction_key']} (échue le {row['due_on']}, +"
+             f"{(today - row['due_on']).days} j)" for row in due]
+    late = [line for row, line in zip(due, lines, strict=True)
+            if (today - row["due_on"]).days > PREDICTION_GRACE_DAYS]
     if late:
-        report.fail(
-            "prédictions soldées",
-            [f"{len(late)} prédiction(s) échue(s) depuis plus de "
-             f"{decision_log.DEBT_GRACE_DAYS} j sans verdict ; ferme chacune par "
-             f"`{decision_log.verdict_template(today)}`", *lines])
+        report.fail("prédictions soldées",
+                    [f"{len(late)} prédiction(s) échue(s) depuis plus de "
+                     f"{PREDICTION_GRACE_DAYS} j ; ferme chacune avec "
+                     "`fact-write.py prediction --key <clé> --outcome true|false|void`", *late])
     elif due:
         report.warn("prédictions soldées",
                     f"{len(due)} à fermer au prochain bilan : " + " · ".join(lines[:3]))
@@ -730,7 +719,7 @@ CHECKS = (
 )
 
 OPERATIONAL_CHECKS = frozenset({
-    check_postgres_storage, check_observations,
+    check_postgres_storage, check_observations, check_prediction_debt,
     check_cockpit_freshness, check_weekly_plans, check_echeances, check_threads,
     check_generated_views,
 })

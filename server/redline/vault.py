@@ -561,8 +561,7 @@ class VaultRepo:
         except Exception:  # le dossier est une aide, jamais une porte
             log.exception("Dossier du bilan %s non calculé", week)
             return ("[DOSSIER DU BILAN indisponible : calcul en échec, voir les journaux. "
-                    "Relance toi-même ledger.py, signals.py, decisions-index.py --due et "
-                    "fact-read.py predictions --due.]")
+                    "Relance toi-même ledger.py, signals.py et fact-read.py predictions --due.]")
 
     def weekly_plan_message(self, week: str, today: str = "", since: str = "",
                             exclude_ids=frozenset()) -> str:

@@ -49,6 +49,7 @@ from scripts.model import (  # noqa: E402
     session_kinds,
     vault_layout,
 )
+from scripts.model import predictions as prediction_model  # noqa: E402
 from scripts.model.errors import ConfigError, InputError  # noqa: E402
 
 if TYPE_CHECKING:
@@ -162,9 +163,16 @@ def _prediction(args, _) -> dict:
     if args.rectify is not None:
         return {"prediction_key": args.key, "operation": "rectify", "reason": args.rectify}
     if args.outcome is not None:
+        allowed = {"false": prediction_model.REFUTED_REASONS,
+                   "void": prediction_model.VOID_REASONS}.get(args.outcome, ())
+        if args.reason is not None and args.reason not in allowed:
+            raise InputError(f"--reason {args.reason} ne va pas avec --outcome {args.outcome}"
+                             + (f" (attendu : {', '.join(allowed)})" if allowed else ""))
         return {"prediction_key": args.key, "operation": "resolve",
                 "outcome": args.outcome == "true" if args.outcome != "void" else None,
-                "void": args.outcome == "void"}
+                "void": args.outcome == "void", "reason": args.reason}
+    if args.reason is not None:
+        raise InputError("--reason accompagne --outcome false ou void")
     missing = [name for name in ("domain", "statement", "probability", "due_on")
                if getattr(args, name) is None]
     if missing:
@@ -422,6 +430,10 @@ def parser() -> argparse.ArgumentParser:
     prediction.add_argument("--direction", choices=("increase", "decrease", "neutral"),
                             default="neutral")
     prediction.add_argument("--outcome", choices=("true", "false", "void"))
+    prediction.add_argument(
+        "--reason", choices=(*prediction_model.REFUTED_REASONS, *prediction_model.VOID_REASONS),
+        help="pourquoi : optimistic/cautious pour une réfutée (moins bien ou mieux que "
+             "prédit) ; instrument/exposure/scope/superseded pour une void")
     prediction.add_argument(
         "--resolves", choices=(session_kinds.WAKE_TRACE,),
         help="observation qui solde seule la prédiction à son écriture (void si la date "
