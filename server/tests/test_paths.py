@@ -9,20 +9,20 @@ import os
 import subprocess
 import sys
 
-from conftest import VAULT_ROOT
+from conftest import ENGINE_ROOT
 
 from scripts.model import paths
 
 
 def test_without_configuration_the_vault_is_the_engine_itself(monkeypatch):
     monkeypatch.delenv("VAULT_PATH", raising=False)
-    assert paths.vault_root() == paths.ENGINE_ROOT == VAULT_ROOT
+    assert paths.vault_root() == paths.ENGINE_ROOT == ENGINE_ROOT
 
 
 def test_vault_path_moves_the_vault_and_nothing_else(monkeypatch, tmp_path):
     monkeypatch.setenv("VAULT_PATH", str(tmp_path))
     assert paths.vault_root() == tmp_path.resolve()
-    assert paths.ENGINE_ROOT == VAULT_ROOT
+    assert paths.ENGINE_ROOT == ENGINE_ROOT
 
 
 def test_a_cli_launched_from_elsewhere_reads_the_configured_vault(tmp_path):

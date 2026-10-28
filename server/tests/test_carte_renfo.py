@@ -16,7 +16,7 @@ import json
 import subprocess
 import sys
 
-from conftest import VAULT_ROOT
+from conftest import ENGINE_ROOT
 
 
 def reussit(process: subprocess.CompletedProcess, geste: str) -> subprocess.CompletedProcess:
@@ -27,7 +27,7 @@ def reussit(process: subprocess.CompletedProcess, geste: str) -> subprocess.Comp
 def carte(selection: dict, sortie) -> subprocess.CompletedProcess:
     return subprocess.run(
         [sys.executable, "scripts/chart-strength.py", "--html", "-o", str(sortie)],
-        cwd=VAULT_ROOT, input=json.dumps(selection),
+        cwd=ENGINE_ROOT, input=json.dumps(selection),
         capture_output=True, text=True, check=False)
 
 
@@ -57,7 +57,7 @@ def test_la_carte_accepte_les_modulations_que_le_matin_prescrit(tmp_path):
     # ce qui a déjà disparu de la séance.
     selection = {
         "session": "a", "date": "2026-08-14", "half_dose": True,
-        "gate": {"shin_max": 2, "drop": ["plyometrics"],
+        "gate": {"zone": "injury", "pain_max": 2, "drop": ["plyometrics"],
                  "say": "si ça tire, on retire les bonds"},
         "note": "demi-dose, injury surveillé",
     }

@@ -330,9 +330,9 @@ def _week_plan_cli():
     """Charge `scripts/week-plan.py`, dont le tiret interdit un import normal."""
     import importlib.util
 
-    from conftest import VAULT_ROOT
+    from conftest import ENGINE_ROOT
     spec = importlib.util.spec_from_file_location(
-        "week_plan_cli", VAULT_ROOT / "scripts" / "week-plan.py")
+        "week_plan_cli", ENGINE_ROOT / "scripts" / "week-plan.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module

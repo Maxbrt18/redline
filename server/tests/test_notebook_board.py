@@ -13,7 +13,7 @@ import os
 
 import pytest
 import sqlalchemy as sa
-from conftest import VAULT_ROOT
+from conftest import ENGINE_ROOT
 from test_weekly_plan import revision, session
 
 from redline.notebook_board import AnswerError, Board
@@ -115,7 +115,7 @@ def seed_week(store):
 
 
 def board(store, when=dt.datetime(2026, 10, 7, 20, 0, tzinfo=PARIS)):
-    return Board(store, Repo(store), VAULT_ROOT, when.date(), when)
+    return Board(store, Repo(store), ENGINE_ROOT, when.date(), when)
 
 
 def test_today_puts_the_fact_next_to_the_typed_intention(store):
@@ -299,7 +299,7 @@ def test_routes_serve_the_three_screens_and_hand_a_crossing_to_the_coach(
     monkeypatch.setattr(clock, "today", lambda: evening.date())
     config = make_config()
     archive = NotebookStore(store.database)
-    service = NotebookService(archive, Repo(store), MagicMock(), VAULT_ROOT,
+    service = NotebookService(archive, Repo(store), MagicMock(), ENGINE_ROOT,
                               "https://coach.test", operational=store)
     monkeypatch.setattr(service, "current", lambda: {"status": "none"})
     bot = RecordingBot()
@@ -346,7 +346,7 @@ def test_the_last_feeling_of_a_strava_run_brings_its_debrief_forward(
     monkeypatch.setattr(clock, "today", lambda: evening.date())
     config = make_config()
     archive = NotebookStore(store.database)
-    service = NotebookService(archive, Repo(store), MagicMock(), VAULT_ROOT,
+    service = NotebookService(archive, Repo(store), MagicMock(), ENGINE_ROOT,
                               "https://coach.test", operational=store)
     state, nudge = MagicMock(), MagicMock()
     client = create_app(config, MagicMock(), state, notebook=service,

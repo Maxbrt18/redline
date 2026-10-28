@@ -9,7 +9,7 @@ import datetime as dt
 import json
 
 import pytest
-from conftest import VAULT_ROOT, load_script
+from conftest import ENGINE_ROOT, load_script
 
 from scripts.model import correction_replay as replay
 
@@ -109,4 +109,4 @@ def test_vault_check_rouge_sur_reference_cassee_orange_sur_dette(tmp_path):
 
 def test_le_registre_reel_respecte_son_schema():
     """Forme seulement : sa complétude est un contenu, jugé par vault-check."""
-    replay.load_ledger((VAULT_ROOT / replay.LEDGER).read_text(encoding="utf-8"))
+    replay.load_ledger((ENGINE_ROOT / replay.LEDGER).read_text(encoding="utf-8"))

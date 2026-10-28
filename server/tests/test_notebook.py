@@ -5,7 +5,7 @@ import json
 from unittest.mock import MagicMock
 
 import pytest
-from conftest import VAULT_ROOT
+from conftest import ENGINE_ROOT
 
 from redline import clock
 from redline.delivery import EnvelopeBuilder
@@ -31,7 +31,7 @@ def test_capture_freezes_image_and_message_before_outbox_pruning(tmp_path):
     archive.write(image, kind='weekly', title='W39', period='2026-W39')
     store = MagicMock()
     store.source_entries.return_value = []
-    notebook = NotebookService(store, MagicMock(), MagicMock(), VAULT_ROOT, 'https://coach.test')
+    notebook = NotebookService(store, MagicMock(), MagicMock(), ENGINE_ROOT, 'https://coach.test')
     envelope = EnvelopeBuilder('4242', 'proactive:weekly:2026-W39').text('Le bilan exact').image(outbox, image).build()
     notebook.capture(envelope)
     saved = store.save_many.call_args.args[2][0]
@@ -55,7 +55,7 @@ def test_stale_metadata_cannot_label_a_replaced_image(tmp_path):
 
 def test_current_never_launches_a_stale_or_held_plan(monkeypatch):
     repo, state, store = MagicMock(), MagicMock(), MagicMock()
-    service = NotebookService(store, repo, state, VAULT_ROOT, 'https://coach.test')
+    service = NotebookService(store, repo, state, ENGINE_ROOT, 'https://coach.test')
     repo.validate_weekly_plan.return_value = PlanStatus.STALE
     assert service.launch('4242', 'old') is None
     state.issue_strength_link.assert_not_called()
@@ -71,7 +71,7 @@ def test_current_never_launches_a_stale_or_held_plan(monkeypatch):
 
 
 def test_launch_checks_the_exact_version_shown_to_the_user(monkeypatch):
-    service = NotebookService(MagicMock(), MagicMock(), MagicMock(), VAULT_ROOT, 'https://coach.test')
+    service = NotebookService(MagicMock(), MagicMock(), MagicMock(), ENGINE_ROOT, 'https://coach.test')
     monkeypatch.setattr(service, 'current', lambda: {'status':'ready', 'signature':'new', 'session':{'sid':'a'}})
     assert service.launch('4242', 'old') is None
     service.state.issue_strength_link.assert_not_called()
@@ -85,7 +85,7 @@ def test_the_shell_keeps_itself_and_launches_on_the_theme_background(make_config
     from redline import page
     from redline.web import create_app
 
-    service = NotebookService(MagicMock(), MagicMock(), MagicMock(), VAULT_ROOT, 'https://coach.test')
+    service = NotebookService(MagicMock(), MagicMock(), MagicMock(), ENGINE_ROOT, 'https://coach.test')
     client = create_app(make_config(), RecordingBot(), MagicMock(), notebook=service).test_client()
     worker = client.get('/carnet-sw.js')
     assert worker.status_code == 200 and worker.mimetype == 'text/javascript'
@@ -95,7 +95,7 @@ def test_the_shell_keeps_itself_and_launches_on_the_theme_background(make_config
     assert image.headers['Cache-Control'] == 'public, max-age=604800'
     assert client.get('/carnet-launch/100x100-dark.png').status_code == 404
     assert client.get('/carnet-launch/1179x2556-blue.png').status_code == 404
-    document = page.notebook_document(VAULT_ROOT / 'scripts' / 'cards')
+    document = page.notebook_document(ENGINE_ROOT / 'scripts' / 'cards')
     assert ('(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) '
             'and (orientation: portrait) and (prefers-color-scheme: dark)" '
             'href="/carnet-launch/1179x2556-dark.png"') in document

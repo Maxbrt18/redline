@@ -49,7 +49,7 @@ the facts before it speaks**.
 | `templates/` | Note templates for a vault (athlete onboarding, weekly review, debrief…) |
 | `CLAUDE.md` | A **template** of the agent's instruction file: reading ladder, calibration rule, fact-ownership table |
 | `docs/storage-architecture.md` | Why PostgreSQL owns operational facts and Git owns knowledge |
-| `server/tests/` | 1,921 tests (engine, storage, web app, prompts); 197 skip without PostgreSQL or a populated vault |
+| `server/tests/` | 1,976 tests (engine, storage, web app, prompts), run against a fictional vault; 159 skip without PostgreSQL |
 
 ## The cards
 
@@ -75,8 +75,9 @@ python3 scripts/chart-week.py -o /tmp/week.png < scripts/cards/samples/week.json
 
 The knowledge vault of the original deployment (athlete profile, journal, decisions,
 corrections, research notes, strength programme) is private and deliberately absent. Bring
-your own: the scripts expect a vault laid out as described in `CLAUDE.md`. The 43 tests
-that assert the *content* of a populated vault stay skipped until you bring one.
+your own: the scripts expect a vault laid out as described in `CLAUDE.md`. The test suite
+ships a small fictional one, Sam's, in `server/tests/fixtures/vault/`: the tests run on a
+temporary copy of it through `VAULT_PATH`, exactly as the service runs on yours.
 
 ## Running it
 
@@ -92,8 +93,8 @@ playwright install chromium   # the page and card tests drive a real browser
 PYTHONPATH=.:server pytest -q server/tests
 ```
 
-Every skip carries its reason: 154 need PostgreSQL (`TEST_DATABASE_URL`), 43 need a
-populated vault, and the browser tests need `playwright install chromium`.
+Every skip carries its reason: 159 need PostgreSQL (`TEST_DATABASE_URL`), and the browser
+tests need `playwright install chromium`.
 
 To commit changes, run `git config core.hooksPath .githooks` first: it enables the
 pre-commit hook that regenerates the generated views before every commit.

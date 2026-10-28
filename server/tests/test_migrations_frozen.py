@@ -9,9 +9,9 @@ se réécrit pas.
 
 import ast
 
-from conftest import VAULT_ROOT
+from conftest import ENGINE_ROOT
 
-VERSIONS = VAULT_ROOT / "migrations" / "versions"
+VERSIONS = ENGINE_ROOT / "migrations" / "versions"
 
 
 def test_no_revision_reads_the_live_schema_declaration():

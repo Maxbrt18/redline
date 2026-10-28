@@ -11,7 +11,7 @@ Claude sur le web. Le seul endroit qui couvre tout le monde est le code qui comm
 import re
 import subprocess
 
-from conftest import VAULT_ROOT, git, load_script
+from conftest import ENGINE_ROOT, git, load_script
 
 from redline.vault import VaultRepo
 from scripts.model import hot_cache, strength_tables, views, weekly_plan
@@ -28,7 +28,7 @@ class TestTheEntryPoint:
         sortirait en erreur au prochain commit du bot, qui l'avale et le logge."""
         regen = load_script('regen-views')
         for name in regen.GENERATORS:
-            assert (VAULT_ROOT / "scripts" / name).exists(), name
+            assert (ENGINE_ROOT / "scripts" / name).exists(), name
 
     def test_no_generated_block_in_the_vault_is_an_orphan(self):
         """LE test de la liste, réécrit le 2026-07-29. La version d'avant cherchait
@@ -43,7 +43,7 @@ class TestTheEntryPoint:
         owned = {hot_cache.BLOCK, hot_cache.STATE_BLOCK, decisions_index.BLOCK,
                  weekly_plan.BLOCK,
                  strength_tables.LOG_BLOCK, *strength_tables.BLOCKS}
-        found = {name for note in VAULT_ROOT.rglob("*.md")
+        found = {name for note in ENGINE_ROOT.rglob("*.md")
                  if ".git" not in note.parts
                  for name in MARKER.findall(note.read_text(encoding="utf-8"))}
         assert found, "aucun marqueur trouvé : le test ne prouverait rien"

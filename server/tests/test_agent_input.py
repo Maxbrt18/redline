@@ -15,7 +15,7 @@ import sys
 from unittest.mock import MagicMock
 
 import pytest
-from conftest import SERVER_DIR, VAULT_ROOT
+from conftest import ENGINE_ROOT, SERVER_DIR
 
 from redline import persona
 from redline.agent import RunResult
@@ -79,14 +79,14 @@ def test_the_turn_directory_is_ignored_by_git():
     """Le service fait `git add -A` : sans ça, chaque JSON partirait dans un commit."""
     result = subprocess.run(
         ["git", "check-ignore", "-q", f"{agent_input.DIRECTORY}/{TURN}.json"],
-        cwd=VAULT_ROOT, check=False)
+        cwd=ENGINE_ROOT, check=False)
     assert result.returncode == 0
 
 
 def test_week_plan_reads_the_revision_from_input():
     """`revise` et `preview` déclarent `--input` : le prompt le leur dicte."""
     result = subprocess.run(
-        [sys.executable, "scripts/week-plan.py", "--help"], cwd=VAULT_ROOT,
+        [sys.executable, "scripts/week-plan.py", "--help"], cwd=ENGINE_ROOT,
         capture_output=True, text=True, check=True)
     assert "--input" in result.stdout
 
