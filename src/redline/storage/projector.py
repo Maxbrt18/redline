@@ -1,4 +1,4 @@
-"""Projections Obsidian/Git régénérables depuis PostgreSQL."""
+"""Obsidian/Git projections, regenerable from PostgreSQL."""
 
 from __future__ import annotations
 
@@ -31,12 +31,10 @@ def _atomic(path: Path, text: str) -> None:
 
 
 def _csv(path: Path, columns, rows) -> None:
-    """Un CSV projeté, écrit atomiquement. UNE façon de le faire, pour les trois.
+    """Write a projected CSV atomically; the single path shared by all CSV projections.
 
-    Les trois projections écrivaient le même format dans trois styles différents, dont
-    deux avec un `import io` à l'intérieur de la boucle des lignes. Le seul détail qui
-    compte est celui-ci : `csv` échappe les virgules et les guillemets d'une note libre,
-    donc aucune ne se concatène à la main.
+    `csv` escapes commas and quotes in a free-text note, so rows are never concatenated
+    by hand.
     """
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator="\n")
@@ -92,24 +90,19 @@ def project_strength(store: OperationalStore, root: Path) -> None:
 
 
 def _plan_projections(store: OperationalStore, root: Path):
-    """Ce que PostgreSQL dit que chaque bloc de programme doit contenir.
+    """What PostgreSQL says each program block must contain.
 
-    ⭐ SOURCE UNIQUE DE LA LISTE : `project_plans` l'écrit, `plan_drift` la vérifie.
-    Deux copies de cette boucle, c'est la garantie qu'un jour l'une des deux oublie un
-    fichier — et c'est exactement ce qui s'est passé jusqu'au 2026-08-16 : le contrôle
-    `vues générées à jour` annonçait couvrir « + plan hebdo » sans jamais le regarder.
-    Il est resté vert pendant que le journal de W33 affichait une révision périmée de
-    deux crans, et c'est un humain qui a fini par ouvrir le fichier.
+    Single source of the list: `project_plans` writes it, `plan_drift` checks it. Two
+    copies of this loop would eventually disagree about which files they cover.
     """
     for path in sorted((root / vault_layout.JOURNAL).glob("20??-w??.md")):
         plan = store.load_plan(path.stem.upper())
         if plan:
             yield path, weekly_plan.render_journal(plan)
     plan = store.load_plan(weekly_plan.current_week())
-    # `.exists()` comme le glob ci-dessus : une projection vise un fichier qui EXISTE.
-    # Sans ce garde, la branche hot-cache rendait un chemin absent et `plan_drift` le
-    # lisait quand même (FileNotFoundError, CI rouge du 2026-08-16) — un contrôle qui
-    # plante ne dit rien sur la dérive qu'il était censé voir.
+    # `.exists()` like the glob above: a projection targets a file that EXISTS.
+    # Without this guard `plan_drift` would read a missing path and crash instead of
+    # reporting drift.
     hot_cache = root / vault_layout.HOT_CACHE
     if plan and hot_cache.exists():
         yield hot_cache, weekly_plan.render_hot_cache(plan)
@@ -117,11 +110,10 @@ def _plan_projections(store: OperationalStore, root: Path):
 
 def ensure_journals(store: OperationalStore, root: Path,
                     today: dt.date | None = None) -> list[Path]:
-    """Crée le journal de la semaine courante et de la suivante quand un programme existe.
+    """Create the journal for the current and next week when a program exists.
 
-    Une projection vise un fichier qui existe (voir `_plan_projections`) : sans
-    journal, le programme restait invisible dans Obsidian (W36 et W39). La création
-    n'appartient plus au modèle ; un fichier existant n'est jamais réécrit.
+    A projection targets an existing file (see `_plan_projections`): without a journal
+    the program would stay invisible in Obsidian. An existing file is never rewritten.
     """
     day = today or dt.date.today()
     created = []
@@ -141,22 +133,24 @@ def project_plans(store: OperationalStore, root: Path) -> None:
 
 
 def plan_drift(store: OperationalStore, root: Path) -> list[str]:
-    """Les blocs de programme qui ne disent plus ce que PostgreSQL dit — sans rien
-    réécrire, parce qu'un contrôle qui répare en silence n'est pas un contrôle."""
+    """Program blocks that no longer match PostgreSQL, without rewriting anything.
+
+    A check that silently repairs is not a check.
+    """
     return [str(path.relative_to(root))
             for path, content in _plan_projections(store, root)
             if apply_view(path, weekly_plan.BLOCK, content, check=True)]
 
 
 def plan_view_count(store: OperationalStore, root: Path) -> int:
-    """Combien de blocs de programme existent — ce que le contrôle a le droit de citer."""
+    """How many program blocks exist: the count a check is allowed to cite."""
     return sum(1 for _ in _plan_projections(store, root))
 
 
 def project_all(store: OperationalStore, root: Path,
                 *, finalize: Callable[[], None] | None = None) -> None:
-    # Verrou de session : Mac, VPS et hook Git ne peuvent jamais entremêler deux
-    # générations. L'outbox reste non acquittée si un seul fichier échoue.
+    # Session lock: the Mac, the VPS and the Git hook never interleave two generations.
+    # The outbox stays unacknowledged if a single file fails.
     with store.database.engine.connect() as lock_connection:
         lock_connection.execute(sa.text(
             "SELECT pg_advisory_lock(hashtext('redline:obsidian-projector'))"))

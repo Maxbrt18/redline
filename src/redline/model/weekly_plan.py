@@ -1,6 +1,6 @@
-"""Validation et rendu des programmes hebdomadaires canoniques dans PostgreSQL.
+"""Validation and rendering of the canonical weekly plans stored in PostgreSQL.
 
-Les journaux Obsidian n'en sont que des projections en lecture seule.
+The Obsidian journals are read-only projections of them.
 """
 
 from __future__ import annotations
@@ -28,14 +28,14 @@ BLOCK = "WEEK_PLAN"
 KINDS = tuple(dict.fromkeys(session_kinds.family(slug) for slug in session_kinds.PLANNED))
 WORKOUTS = session_kinds.PLANNED
 INTENT_STATUSES = ("planned", "cancelled")
-# ``done`` existe dans le read model rendu depuis ``session_cycles`` et dans les
-# révisions historiques. Une nouvelle révision ne peut plus l'écrire.
+# ``done`` exists in the read model rendered from ``session_cycles`` and in historical
+# revisions. A new revision can no longer write it.
 STATUSES = (*INTENT_STATUSES, "done")
-# Les états qui SOLDENT une séance : elle a eu lieu, ou elle n'aura pas lieu. Dans les
-# deux cas elle appartient au récit de la semaine et plus jamais à la prescription.
-# Écrit en négatif (« pas encore soldée ») plutôt qu'en positif (« planned ») pour
-# qu'un statut ajouté plus tard reste prescriptible par défaut : oublier une séance à
-# faire est pire que d'en afficher une de trop.
+# States that SETTLE a session: it happened or it never will. Either way it belongs to the
+# week's story and is never prescribable again.
+# Written negatively ("not yet settled") rather than positively ("planned") so that a
+# status added later stays prescribable by default: forgetting a session to do is worse
+# than showing one too many.
 SETTLED_STATUSES = frozenset({"done", "cancelled"})
 HARD_WORKOUTS = session_kinds.DEMANDING
 
@@ -54,7 +54,7 @@ STRENGTH_SPEC_SCHEMA = Schema("modulation de renforcement", [
 
 SESSION_SCHEMA = Schema("séance planifiée", [
     field("id", str, pattern=r"[a-z0-9][a-z0-9-]+"),
-    # Human-facing text is part of the persisted transaction.  Renderers must
+    # Human-facing text is part of the persisted transaction. Renderers must
     # never maintain a second, incomplete taxonomy of workout labels.
     field("title", str, minimum=1),
     field("date", str, pattern=DATE_RE, note="AAAA-MM-JJ"),
@@ -93,25 +93,19 @@ GATE_WHEN = ("avant", "apres")
 
 # A dated condition is typed so it cannot be prescribed around once due.
 #
-# ⭐ `when` EST LA QUESTION CENTRALE, et elle vaut d'être posée à l'écriture (2026-08-18).
-# Un contrôle daté sait deux choses très différentes :
+# `when` is the central question and is asked at write time. A dated gate is one of two
+# very different things:
 #
-#   avant  -- une PRÉ-CONDITION. Sa réponse existe avant les séances qu'il retient, et
-#             tant qu'elle manque, ces séances ne se prescrivent pas.
-#   apres  -- une OBSERVATION. Sa réponse n'existe qu'une fois la séance faite. Elle
-#             informe la suite ; elle ne retient rien, parce qu'il n'y a rien qu'elle
-#             PUISSE retenir sans se mordre la queue.
+#   avant  -- a PRECONDITION. Its answer exists before the sessions it holds, and while
+#             it is missing those sessions are not prescribed.
+#   apres  -- an OBSERVATION. Its answer exists only once the session is done. It
+#             informs what follows and holds nothing, because it cannot hold anything
+#             without waiting on itself.
 #
-# Le 2026-08-18 le programme portait « après le bloc de pliométrie de la séance A, la
-# cheville a-t-elle parlé ? », échéance le jour de cette séance A. Une observation, donc,
-# écrite dans le seul moule qui existait : celui d'une pré-condition. Le service a fait ce
-# qu'on lui demandait, il a retenu la prescription -- en attendant la réponse à une
-# question qui exigeait de faire la séance qu'il retenait. L'athlète a reçu un message qui
-# nommait son renfo, posait la question, et ne livrait pas la carte.
-#
-# Un contrôle doit trancher, et « avant » se paie d'un `holds` qui NOMME les séances
-# retenues. Les anciennes lignes ont été normalisées une fois en base : le modèle
-# courant n'a donc aucun dialecte historique à interpréter.
+# An observation written as a precondition would hold the very session it asks about.
+# A gate must decide, and "avant" requires a `holds` that NAMES the held sessions.
+# Legacy rows were normalized once in the database, so the current model has no
+# historical dialect to interpret.
 GATE_SCHEMA = Schema("contrôle daté", [
     field("id", str, pattern=r"[a-z0-9][a-z0-9-]+"),
     field("due", str, pattern=DATE_RE, note="AAAA-MM-JJ"),
@@ -129,34 +123,31 @@ CHANGE_FIELDS = (
     "added", "removed", "title", "date", "start_time", "workout", "status",
     "distance_target_km", "distance_cap_km", "duration_cap_min", "rpe_min",
     "rpe_max", "hr_zone", "cadence_target", "demanding", "transition",
-    # `calibration` n'existe plus depuis le 2026-10-09 ; le nom reste lisible dans les
-    # `changes` des révisions déjà écrites, qui sont relues et validées en entier.
+    # `calibration` is no longer written; the name stays valid in the `changes` of
+    # existing revisions, which are re-read and validated in full.
     "calibration",
     "carbs_target_g_h", "location_label", "strength", "note",
 )
 
-#: ⭐ UNE RESTRICTION NOMME SA PRÉMISSE EN TYPE (audit du 2026-10-09). L'erreur du coach
-#: qui touche le plus souvent une prescription est la restriction sans prémisse : 19
-#: incidents contre 9 erreurs permissives, à raison de deux par semaine malgré des
-#: rappels écrits partout en prose. Sept passaient par une révision (renfo A retiré le
-#: 11/08, EF retirée sur « intermittent » le 27/08, RDL et fréquence le 14/09…). Une
-#: `rule` en texte libre ne se vérifie pas ; un identifiant du règlement et un fait de
-#: `evidence`, si. `demande` couvre ce que l'athlète a lui-même demandé.
+#: A restriction names its premise as a type. A restriction without a premise is the most
+#: frequent prescription error, and free-text reminders did not prevent it. A free-text
+#: `rule` cannot be verified; a rulebook identifier and an `evidence` fact can. `demande`
+#: covers what the athlete asked for directly.
 REQUEST_MOTIF = "demande"
 
 
 def motif_rules() -> tuple[str, ...]:
-    """Les motifs d'une restriction : les règles du règlement de l'instance, ou demande."""
+    """The motives of a restriction: the instance rulebook's rules, or a request."""
     return (*(rule.id for rule in rulebook.current().rules), REQUEST_MOTIF)
 
 
-#: Les préfixes d'un FAIT : ce que le registre, Strava, un avis ou un contrôle ont dit.
-#: Une règle du règlement ne s'applique qu'à un fait ; une demande vient d'un message.
+#: Prefixes of a FACT: what the ledger, Strava, an opinion or a gate said.
+#: A rulebook rule applies only to a fact; a request comes from a message.
 _FACT_TRIGGER = re.compile(r"^(?:observation|exposure|medical|gate|incident|strength|strava):")
 _REQUEST_TRIGGER = re.compile(r"^(?:messenger|request|availability):")
 
 def _known_rule(motif: dict) -> list[str]:
-    """La règle nommée existe dans le règlement de l'instance, lu à la validation."""
+    """The named rule exists in the instance rulebook, read at validation time."""
     if motif["regle"] in motif_rules():
         return []
     return [f"champ « regle » : {motif['regle']!r} inconnu "
@@ -180,8 +171,8 @@ CHANGE_SCHEMA = Schema("preuve d'un changement de séance", [
           note="le contexte ou l'intention confirmée qui donne son sens à la preuve"),
     field("rule", str, minimum=3,
           note="la règle de coaching appliquée à cette preuve"),
-    # Optionnel à la lecture : les révisions d'avant le 2026-10-10 n'en portent pas.
-    # Exigé à l'écriture sur toute restriction (`change_evidence_errors`).
+    # Optional on read: older revisions do not carry it.
+    # Required on write for any restriction (`change_evidence_errors`).
     field("motif", dict, required=False, schema=MOTIF_SCHEMA,
           note="obligatoire si la séance est retirée, annulée ou réduite"),
 ])
@@ -192,16 +183,16 @@ REVISION_SCHEMA = Schema("révision hebdomadaire", [
     field("reason", str, minimum=3),
     field("evidence", list, minimum=1, item=field("preuve", str)),
     field("constraints", list, item=field("contrainte", str)),
-    # Optionnel pour relire l'historique ; obligatoire à la frontière `revise` dès
-    # qu'une prescription future change (voir `change_evidence_errors`).
+    # Optional so history can be read; required at the `revise` boundary as soon as a
+    # future prescription changes (see `change_evidence_errors`).
     field("changes", list, required=False,
           item=field("changement", dict, schema=CHANGE_SCHEMA)),
-    # Optional: the revisions written before 2026-08-08 carry none, and a week
-    # that conditions nothing on a date is the normal case.
+    # Optional: older revisions carry none, and a week that conditions nothing on a date
+    # is the normal case.
     field("gates", list, required=False,
           item=field("contrôle", dict, schema=GATE_SCHEMA)),
-    # Optionnel à la lecture : les révisions d'avant le 2026-10-07 n'en portent pas.
-    # Exigé à l'écriture dès que la semaine court (`typed_target_errors`).
+    # Optional on read: older revisions do not carry it.
+    # Required on write once the week is running (`typed_target_errors`).
     field("volume_target_km", float, required=False, minimum=1, maximum=200,
           note="volume couru visé sur la semaine entière, en km"),
     field("sessions", list, minimum=1,
@@ -216,11 +207,11 @@ WEEKLY_PLAN_SCHEMA = Schema("plan hebdomadaire", [
 
 
 def now_stamp() -> str:
-    """L'instant réel de l'écriture, en heure locale et avec son décalage.
+    """The real instant of the write, in local time with its offset.
 
-    ⭐ Extrait ici (2026-08-25) pour que ce soit UNE fonction, patchable en test et
-    citée par un seul appelant : `week-plan.py revise`. Le champ `computed_at` était
-    rempli par le modèle, qui n'a pas d'horloge -- voir le commentaire de `revise`.
+    A single function, patchable in tests and called from one place only:
+    `week-plan.py revise`. The `computed_at` field used to be filled by the model, which
+    has no clock -- see the comment in `revise`.
     """
     return dt.datetime.now().astimezone().replace(microsecond=0).isoformat()
 
@@ -241,23 +232,20 @@ def _week_dates(week: str) -> set[str]:
     return {(monday + dt.timedelta(days=i)).isoformat() for i in range(7)}
 
 
-# `title` et `note` sont les DEUX seuls champs de la révision qui partent tels quels
-# chez l'athlète -- texto du matin et carte du programme. `reason`, `evidence` et
-# `constraints` sont l'archive, personne ne les lui envoie. Le 2026-08-11 la frontière
-# n'existait pas : un replan lui a expédié « Renfo A reporté : ... (trigger replan de
-# rev.1) ... (gate w33-renfoa-report) » et la moitié de la semaine désaccentuée. Un
-# schéma qui accepte n'importe quelle chaîne dans un champ qu'il PUBLIE ne protège rien.
+# `title` and `note` are the ONLY two revision fields sent verbatim to the athlete --
+# morning text message and program card. `reason`, `evidence` and `constraints` are the
+# archive and are never sent. A schema that accepts any string in a field it PUBLISHES
+# protects nothing.
 #
-# Append-only : les révisions déjà écrites ne peuvent plus être réparées. La règle ne
-# juge donc que ce qui s'écrit à partir de cet instant -- sans quoi W33 r2, écrite le
-# matin même du correctif, deviendrait invalide et bloquerait toute prescription
-# jusqu'à W34. Comparaison de chaînes ISO, comme le reste du module (`gate["due"] <
-# written_on`) : tous les `computed_at` du vault portent le même décalage local.
+# Append-only: already-written revisions cannot be repaired. The rule therefore judges
+# only what is written from now on, otherwise an old revision would become invalid and
+# block all prescription. ISO string comparison, like the rest of the module
+# (`gate["due"] < written_on`): all `computed_at` values carry the same local offset.
 _INTERNAL_RE = re.compile(r"\b(?:rev|r[ée]vision)\.?\s*\d", re.IGNORECASE)
 
 
 def _text_errors(text: str, where: str, label: str, gate_ids: list[str]) -> list[str]:
-    """`title`/`note` : ce que l'athlète lit, jugé comme tel."""
+    """`title`/`note`: what the athlete reads, judged as such."""
     problems = []
     for gate_id in gate_ids:
         if gate_id in text:
@@ -274,17 +262,17 @@ def _text_errors(text: str, where: str, label: str, gate_ids: list[str]) -> list
 
 
 def written_text_errors(revision: dict, where: str = "revision") -> list[str]:
-    """Les signes interdits dans le texte D'UNE révision qu'on s'apprête à écrire.
+    """The forbidden marks in the text of ONE revision about to be written.
 
-    ⭐ Appelée par `week-plan.py revise` sur la révision NEUVE, jamais par `validate()`.
-    L'historique est append-only et `revise` valide le plan entier : la même règle posée
-    dans `semantic_errors` refuserait la révision du jour à cause du texte de la veille,
-    donc bloquerait le coach sur une faute devenue incorrigible. Ici, seul ce qui entre
-    est jugé, et le programme se nettoie au rythme où il se révise.
+    Called by `week-plan.py revise` on the NEW revision, never by `validate()`. History is
+    append-only and `revise` validates the whole plan: the same rule in `semantic_errors`
+    would reject today's revision because of an older text, blocking the coach on an
+    uncorrectable fault. Here only what comes in is judged, and the program cleans up as
+    it is revised.
 
-    Tous les champs de prose y passent, pas seulement `title`/`note` : `as_json()` rend
-    la révision ACTIVE ENTIÈRE, donc `reason`, `evidence`, `constraints` et le texte des
-    contrôles datés sont réinjectés au coach à chaque tour prescriptif au même titre.
+    Every prose field is checked, not only `title`/`note`: `as_json()` renders the ENTIRE
+    ACTIVE revision, so `reason`, `evidence`, `constraints` and the gate text are fed back
+    to the coach on every prescriptive turn just like them.
     """
     problems = []
     for label in ("reason",):
@@ -298,12 +286,11 @@ def written_text_errors(revision: dict, where: str = "revision") -> list[str]:
             if gate.get(label):
                 problems += typography.errors(
                     gate[label], f"{where}.gate[{gate.get('id', '?')}]", label)
-        # Décision de l'athlète du 2026-10-11 : la marche ne se demande jamais, il signale
-        # lui-même une gêne. 29 questions en trois semaines, aucune réponse « modifiée ».
-        # Décision du 2026-10-11 : une pré-condition ne retient plus de séance. 19
-        # contrôles bloquants en deux mois, aucun échec sur son critère ; 23 changements
-        # de séance sur 25 venaient d'un message de l'athlète. La condition s'écrit dans la
-        # séance, et l'alerte « nette » du carnet la déclenche.
+        # Walking is never asked about: the athlete reports any discomfort unprompted.
+        # A precondition no longer holds any session: blocking gates never failed on their
+        # criterion, and nearly all session changes came from an athlete message. The
+        # condition is written in the session itself, and the logbook's "clear" alert
+        # triggers it.
         if gate.get("when") == "avant":
             problems.append(
                 f"{where}.gate[{gate.get('id', '?')}] : une pré-condition ne retient plus de "
@@ -319,11 +306,11 @@ def written_text_errors(revision: dict, where: str = "revision") -> list[str]:
 
 
 def intention_errors(revision: dict, where: str = "revision") -> list[str]:
-    """Refuse de recopier l'exécution dans une révision neuve.
+    """Refuse to copy execution into a new revision.
 
-    Le schéma de lecture garde ``done`` pour les plans historiques et les vues
-    enrichies depuis les cycles. La frontière d'écriture est volontairement plus
-    étroite : une révision dit ce qui est prévu ou annulé, jamais ce qui a eu lieu.
+    The read schema keeps ``done`` for historical plans and for views enriched from the
+    cycles. The write boundary is deliberately narrower: a revision says what is planned
+    or cancelled, never what happened.
     """
     return [
         f"{where}.{session.get('id', '?')} : status=done appartient au cycle de "
@@ -334,12 +321,12 @@ def intention_errors(revision: dict, where: str = "revision") -> list[str]:
 
 
 def typed_target_errors(revision: dict, where: str = "revision") -> list[str]:
-    """Le volume visé et le plafond de FC se typent, comme une date à venir (2026-10-07).
+    """The target volume and the HR cap are typed, like a future date.
 
-    « Environ 41 km sur cinq sorties » vivait dans `constraints`, donc nulle part pour
-    le code : le carnet ne pouvait pas afficher « 14,1 / ~41 km » sans lire de la
-    prose. Une révision neuve qui prescrit de la course le donne en chiffre ; le
-    registre reste seul à dire ce qui a été couru.
+    "About 41 km over five outings" lived in `constraints`, so nowhere the code could see
+    it: the logbook could not show "14.1 / ~41 km" without reading prose. A new revision
+    that prescribes running gives it as a number; the ledger remains the only source of
+    what was run.
     """
     runs = [session for session in revision.get("sessions") or []
             if session.get("kind") == "run" and session.get("status") != "cancelled"]
@@ -348,10 +335,10 @@ def typed_target_errors(revision: dict, where: str = "revision") -> list[str]:
         problems.append(f"{where}.volume_target_km : manquant — le volume couru visé de "
                         "la semaine entière, en km (séances déjà faites comprises), celui "
                         "que les contraintes annoncent en prose")
-    # Même raison pour la FC : « Z1-Z2, 130-157 bpm » se lit, il ne se compare pas.
-    # Le carnet met le fait (FC moyenne Strava) en regard de ce plafond. Il reste hors
-    # de CHANGE_FIELDS : il double `hr_zone`, dont tout changement exige déjà sa preuve,
-    # et le premier ajout sur une séance existante n'est pas une nouvelle prescription.
+    # Same for HR: "Z1-Z2, 130-157 bpm" is readable but not comparable. The logbook sets
+    # the fact (Strava average HR) against this cap. It stays out of CHANGE_FIELDS: it
+    # duplicates `hr_zone`, whose every change already requires evidence, and the first
+    # addition on an existing session is not a new prescription.
     problems.extend(
         f"{where}.{session.get('id', '?')}.hr_cap_bpm : manquant — le plafond de FC "
         f"MOYENNE en bpm que hr_zone « {session['hr_zone']} » annonce en texte"
@@ -400,12 +387,12 @@ def _session_errors(session: dict, where: str) -> list[str]:
 
 
 def _strength_programme_errors(session: dict, where: str) -> list[str]:
-    """Résout une prescription de renfo contre son vrai programme.
+    """Resolve a strength prescription against its real programme.
 
-    Le schéma prouve la forme de ``strength`` ; seul ``Programme.build`` peut prouver
-    que sa variante et ses exercices existent. On ne valide que la révision active :
-    l'historique append-only peut contenir une ancienne erreur devenue irréparable,
-    mais une nouvelle révision ne doit jamais l'activer.
+    The schema proves the shape of ``strength``; only ``Programme.build`` can prove that
+    its variant and exercises exist. Only the active revision is validated: append-only
+    history may hold an old error that can no longer be fixed, but a new revision must
+    never activate it.
     """
     if session.get("workout") != session_kinds.STRENGTH or not session.get("routine"):
         return []
@@ -423,11 +410,11 @@ def _strength_programme_errors(session: dict, where: str) -> list[str]:
 
 
 def _gate_typing_errors(gate: dict, where: str, sessions: list[dict]) -> list[str]:
-    """`when` et `holds` : ce qu'un contrôle daté a le droit de retenir.
+    """`when` and `holds`: what a dated gate may hold.
 
-    `when` est obligatoire. « Avant » se paie d'un `holds` qui nomme les séances
-    retenues -- écrire « je retiens la séance A » juste à côté d'une question qui
-    demande comment la séance A s'est passée est une contradiction visible.
+    `when` is required. "Before" requires a `holds` naming the held sessions -- writing
+    "I hold session A" next to a question asking how session A went is a visible
+    contradiction.
     """
     problems = []
     when = gate["when"]
@@ -450,8 +437,8 @@ def _gate_typing_errors(gate: dict, where: str, sessions: list[dict]) -> list[st
                 f"{where} : `holds` cite « {session_id} », qui n'est pas une séance de "
                 "cette révision")
             continue
-        # Retenir une séance déjà passée au moment où la question se pose n'a aucun
-        # effet : elle a eu lieu. C'est le signe qu'on voulait une observation.
+        # Holding a session already past when the question is asked has no effect: it
+        # happened. That signals an observation was intended.
         if known[session_id] < gate["due"]:
             problems.append(
                 f"{where} : retient « {session_id} » du {known[session_id]}, antérieure "
@@ -468,9 +455,9 @@ def semantic_errors(plan: dict, where: str = "weekly_plan",
         return problems
     week = plan["week"]
     allowed = _week_dates(week)
-    # Le renfo se résout contre le programme du jour : c'est une garde de prescription.
-    # Une semaine close n'a plus rien à prescrire, et le programme a pu changer depuis
-    # (fusion A/B du 2026-10-04) -- la juger ainsi rendrait son archive illisible.
+    # Strength resolves against the current programme: this is a prescription guard.
+    # A closed week has nothing left to prescribe, and the programme may have changed since
+    # -- judging it that way would make its archive unreadable.
     prescribable = dt.date.fromisocalendar(int(week[:4]), int(week[-2:]), 7) \
         >= (today or dt.date.today())
     revisions = plan["revisions"]
@@ -506,10 +493,10 @@ def semantic_errors(plan: dict, where: str = "weekly_plan",
             problems.append(f"{prefix} : identifiants de contrôle daté dupliqués")
         for gate in gates:
             where_gate = f"{prefix}.gate[{gate['id']}]"
-            # A gate belongs to the week that carries it.  A condition landing
-            # past Sunday has a different owner -- `redline.deadlines`, whose overdue
-            # check already exists -- otherwise it would sit in a plan
-            # nothing looks at once the week is over.
+            # A gate belongs to the week that carries it. A condition landing past Sunday
+            # has a different owner -- `redline.deadlines`, whose overdue check already
+            # exists -- otherwise it would sit in a plan nothing looks at once the week is
+            # over.
             if gate["due"] not in allowed:
                 problems.append(
                     f"{where_gate} : échéance {gate['due']} hors de {week} — "
@@ -567,32 +554,24 @@ def active(plan: dict) -> dict:
 
 
 def scheduled(sessions: list[dict]) -> list[dict]:
-    """Ce qui figure au programme : tout sauf ce qui a été annulé.
+    """What is on the programme: everything except what was cancelled.
 
-    Vue DESCRIPTIVE — elle raconte la semaine, séances faites comprises. C'est celle
-    du journal, de la carte et du hot-cache.
+    DESCRIPTIVE view -- it tells the week's story, completed sessions included. It is the
+    one used by the journal, the card and the hot-cache.
     """
     return [session for session in sessions if session["status"] != "cancelled"]
 
 
 def remaining(sessions: list[dict], *, since: str = "") -> list[dict]:
-    """Ce qu'il RESTE à faire, à partir de `since` : la vue PRESCRIPTIVE.
+    """What REMAINS to do from `since`: the PRESCRIPTIVE view.
 
-    ⭐ Une séance faite ou annulée n'engage plus rien, et cette phrase n'a le droit
-    d'exister qu'une fois. Le 2026-08-16, l'athlète finit sa SL vallonnée à 9 h, le coach
-    la débriefe correctement, et le bloc canonique posté juste après la lui redonne à
-    faire : « la suite de la semaine — dim 16/08 : SL vallonnée, cible 10 km ». La
-    donnée était juste (r11 l'avait passée à `done` à l'arrivée du fichier Strava), et
-    les deux autres rendus du même objet lisaient bien `status` — la carte affichait
-    « · fait », le journal « (fait) ». Seul le rendu Messenger, le seul que l'athlète lise
-    vraiment et le seul à affirmer « la suite », filtrait sur la DATE et sur elle seule.
+    A completed or cancelled session commits to nothing, and that rule must live in one
+    place only. Each rendering of the same object used to filter on its own, and the most
+    assertive one ("the rest of the week") filtered on DATE alone, handing back a session
+    already done. A rendering never redefines what a session to do is; it asks here.
 
-    Un objet, trois rendus, trois filtres réécrits à la main : c'est le rendu le plus
-    affirmatif qui en savait le moins. D'où cette fonction, et la règle qui va avec :
-    un rendu ne redéfinit jamais ce qu'est une séance à faire, il le demande ici.
-
-    `since` est une borne INCLUSIVE : la journée en cours reste prescriptible tant que
-    sa séance n'est pas faite.
+    `since` is an INCLUSIVE bound: the current day stays prescribable until its session
+    is done.
     """
     return [session for session in sessions
             if session["status"] not in SETTLED_STATUSES
@@ -600,32 +579,25 @@ def remaining(sessions: list[dict], *, since: str = "") -> list[dict]:
 
 
 def due_gates(plan: dict, today: dt.date | None = None) -> list[dict]:
-    """Les contrôles datés dont le jour est venu, des DEUX sortes.
+    """The dated gates whose day has come, of BOTH kinds.
 
-    Ce sont les questions à poser aujourd'hui, et rien d'autre : depuis le 2026-08-18,
-    c'est `blocking_gates` qui dit lesquelles retiennent une prescription. Confondre
-    les deux revient à fermer une porte chaque fois qu'on ouvre la bouche.
+    These are the questions to ask today and nothing else: `blocking_gates` says which
+    ones hold a prescription. Confusing the two closes a door every time a question is
+    asked.
 
-    Une réponse ne s'obtient qu'en POSANT la question : un contrôle échu est donc
-    l'état normal du matin où il tombe, jamais une avarie.
-
-    La confondre avec un programme cassé a tué le mot du matin du 2026-08-12 : le
-    contrôle de douleur du jour rendait `check` non nul, la persistance refusait le tour,
-    et le message de coach qui posait précisément la question du contrôle était jeté
-    au profit d'un « le programme n'a pas passé ses contrôles ». Un mécanisme fait
-    pour produire une question produisait une panne.
+    An answer is only obtained by ASKING the question: a due gate is the normal state of
+    the morning it falls on, never a failure. Treating it as a broken program makes
+    persistence reject the turn and drop the very message that asks the question.
     """
     return due_gates_of(active(plan), today)
 
 
 def due_gates_of(revision: dict, today: dt.date | None = None) -> list[dict]:
-    """Les contrôles échus d'UNE révision, quand on l'a déjà sous la main.
+    """The due gates of ONE revision, when it is already at hand.
 
-    Le service tient la révision active sous forme de JSON -- `weekly_plan_context` a
-    payé le `show` -- et n'a donc pas de plan à donner à `due_gates`. Il portait pour
-    ça sa propre comparaison de dates, et sa propre partition par `when` : deux copies
-    de ce que ce module déclare, exactement de part et d'autre de la frontière où le
-    désaccord du 2026-08-18 s'est produit.
+    The service holds the active revision as JSON and has no plan to give `due_gates`.
+    Keeping its own date comparison and its own partition by `when` would duplicate what
+    this module declares, on exactly the boundary where a disagreement would show.
     """
     as_of = today or dt.date.today()
     return [gate for gate in (revision.get("gates") or [])
@@ -634,31 +606,28 @@ def due_gates_of(revision: dict, today: dt.date | None = None) -> list[dict]:
 
 
 def split_by_when(gates: list[dict]) -> tuple[list[dict], list[dict]]:
-    """(pré-conditions, observations) — deux consignes, jamais un seul paquet.
+    """(preconditions, observations) -- two instructions, never one bundle.
 
-    Les fondre est ce qui a produit le message du 2026-08-18 : une observation portait
-    l'interdiction de prescrire d'une pré-condition, le coach a posé la question ET
-    retenu la carte de la séance sur laquelle il la posait.
+    Merging them lets an observation carry a precondition's ban on prescribing: the coach
+    would ask the question AND hold the card of the session it is asked about.
     """
     return ([gate for gate in gates if gate["when"] == "avant"],
             [gate for gate in gates if gate["when"] == "apres"])
 
 
 def blocking_gates(plan: dict, today: dt.date | None = None) -> list[dict]:
-    """Les contrôles échus qui RETIENNENT réellement une prescription.
+    """The due gates that really HOLD a prescription.
 
-    ⭐ 2026-08-18 : `due_gates` rendait les deux sortes, et tout le service traitait le
-    résultat comme un blocage. Une observation -- « comment la cheville a réagi pendant
-    la séance » -- gelait donc la semaine en attendant une réponse qui exigeait de faire
-    la séance gelée. C'est cette fonction, et non `due_gates`, que consultent la
-    validation et la persistance : une question qu'on pose n'est pas une porte qu'on
-    ferme.
+    `due_gates` returns both kinds, and treating the whole result as a block freezes the
+    week on an observation whose answer requires doing the frozen session. Validation and
+    persistence consult this function, not `due_gates`: a question asked is not a door
+    closed.
     """
     return split_by_when(due_gates(plan, today))[0]
 
 
 def gate_reasons(plan: dict, today: dt.date | None = None) -> list[str]:
-    """Le texte des contrôles échus, tel qu'il est servi au coach."""
+    """The text of the due gates, as served to the coach."""
     return [f"contrôle daté du {gate['due']} non levé — DEMANDE À L'ATHLÈTE AVANT "
             f"TOUTE PRESCRIPTION : {gate['question']} ; à défaut : {gate['on_fail']}. "
             "Le contrôle ne se lève qu'en enregistrant une révision dont le motif "
@@ -673,17 +642,11 @@ def as_json(plan: dict) -> str:
 
 
 def distance_of(session: dict) -> str:
-    """Ce qui ENGAGE en distance ou en durée, dans l'ordre où ça se lit.
+    """What COMMITS in distance or duration, in reading order.
 
-    ⭐ SOURCE UNIQUE (2026-08-18). Trois rendus du même objet en portaient chacun leur
-    version : le texto Messenger (`redline/vault.py`), le journal et le hot-cache (ici),
-    la carte PNG (`chart-plan.py`). Trois arbres, trois copies, et rien qui les tienne
-    ensemble -- la même famille que le filtre « ce qui reste à faire », que `remaining()`
-    a dû unifier après que le seul rendu affirmant « la suite de la semaine » se soit
-    trouvé être le moins bien informé des trois.
-
-    Un champ ajouté à `SESSION_SCHEMA` demandait trois éditions dans trois arbres. Il
-    en demande une, ici, et les trois rendus la reçoivent.
+    Single source. The text message, the journal and hot-cache, and the PNG card each used
+    to carry their own version; a field added to `SESSION_SCHEMA` now needs one edit here
+    and every rendering receives it.
     """
     target, cap = session.get("distance_target_km"), session.get("distance_cap_km")
     if target is not None and cap is not None:
@@ -698,12 +661,12 @@ def distance_of(session: dict) -> str:
 
 
 def details_of(session: dict, *, cadence_unit: str = "") -> list[str]:
-    """Tout ce qui engage sur une séance, dans l'ordre, sans son titre ni son statut.
+    """Everything a session commits to, in order, without its title or status.
 
-    L'ordre fait partie du contrat : distance, RPE, zone FC, cadence, note. Chaque rendu
-    ne décide plus que de son séparateur et de son balisage -- et `cadence_unit` est la
-    seule différence réelle entre les trois, le journal nommant l'unité que le texto et
-    la carte laissent implicite.
+    The order is part of the contract: distance, RPE, HR zone, cadence, note. Each
+    rendering only decides its separator and markup -- and `cadence_unit` is the one real
+    difference, the journal naming the unit that the text message and the card leave
+    implicit.
     """
     details = [distance_of(session)]
     if session.get("rpe_min") is not None:
@@ -738,11 +701,9 @@ def render_journal(plan: dict) -> str:
         lines += [f"Volume couru visé : ~{revision['volume_target_km']:g} km", ""]
     lines.extend(_session_line(session) for session in revision["sessions"])
     gates = revision.get("gates") or []
-    # ⭐ Le journal disait de TOUS les contrôles qu'ils refusent le programme. Depuis le
-    # 2026-08-18 c'est faux de la moitié d'entre eux : une observation (`apres`) se pose
-    # et ne retient rien. La projection que l'athlète lit affirmait donc le contraire du
-    # code qui décide -- et c'est précisément la confusion qui a coûté le mot du matin
-    # du 18/08. Une vue qui ment sur la règle est pire qu'une vue absente.
+    # The journal must not claim that ALL gates refuse the program: an observation
+    # (`apres`) is asked and holds nothing. A view that misstates the rule is worse than
+    # no view.
     for kind, titre in (
         ("avant", "**Pré-conditions** (aucune séance retenue ne se prescrit tant "
                   "qu'une révision ne porte pas la réponse) :"),
@@ -767,14 +728,12 @@ MONTHS = ("janvier", "février", "mars", "avril", "mai", "juin", "juillet", "ao�
 
 
 def journal_skeleton(week: str, today: dt.date) -> str:
-    """Le journal d'une semaine qui a un programme mais pas encore de fichier.
+    """The journal of a week that has a program but no file yet.
 
-    Né le 2026-09-27 : W36 et W39 n'avaient pas de journal. Sa création était une étape
-    confiée au modèle dans le bilan (« crée le journal de la semaine suivante »), sautée
-    deux fois sur quatre, et le projecteur n'écrit que dans un fichier qui existe : le
-    programme était canonique en base et invisible dans Obsidian, pendant que le
-    hot-cache renvoyait à un chemin absent. La structure suit les journaux existants ;
-    le bloc de programme est rempli juste après par la projection.
+    Creating it cannot be left to the model: the projector only writes into an existing
+    file, so a program without a journal is canonical in the database yet invisible in
+    Obsidian. The structure follows the existing journals; the program block is filled
+    right after by the projection.
     """
     year, number = week.split("-W")
     monday = dt.date.fromisocalendar(int(year), int(number), 1)
@@ -807,20 +766,13 @@ def render_hot_cache(plan: dict) -> str:
             "Macro-plan jamais prescriptible.")
 
 
-#: ⭐ UNE RÉVISION SE RELIT AVANT DE SE RACONTER (2026-08-25).
+#: A revision is read back before it is narrated.
 #:
-#: Le coach compose le tableau des séances de tête, l'envoie sur stdin, et recevait pour
-#: toute réponse « révision N enregistrée et validée ». Il n'a jamais vu ce qu'il venait
-#: d'écrire : il enchaînait sur un message à l'athlète décrivant ce qu'il CROYAIT avoir
-#: écrit. Le 25/08, r3 annonçait dans son propre motif un jogging le jeudi, un renfo B
-#: décalé et un repos le mardi ; l'objet ne portait qu'une annulation d'EF le mercredi.
-#: Les deux autres faits du message de l'athlète n'existaient nulle part, et r4 a reconduit
-#: l'oubli du jogging.
-#:
-#: Le contrat rend donc la semaine telle qu'elle EST, jour par jour, jours vides et
-#: séances annulées compris -- c'est le seul rendu du vault qui les montre au coach
-#: avant qu'il parle. Le diff dit ce qui a bougé, la semaine dit ce qui en résulte, et
-#: aucun des deux ne se déduit de l'autre : un oubli ne se voit que dans le second.
+#: The coach composes the session table from memory and sends it on stdin; the CLI renders
+#: the week as it IS, day by day, empty days and cancelled sessions included -- the only
+#: rendering that shows them to the coach before it speaks. The diff says what moved, the
+#: week says what results, and neither can be deduced from the other: an omission is only
+#: visible in the second.
 def _revision_index(revision: dict | None) -> dict[str, dict]:
     return {s["id"]: s for s in (revision or {}).get("sessions", [])}
 
@@ -831,7 +783,7 @@ def _day_label(stamp: str) -> str:
 
 
 def _comparable(session: dict) -> tuple:
-    """Ce dont un changement mérite d'être signalé : ce qui ENGAGE, pas la prose."""
+    """What deserves a change flag: what COMMITS, not prose."""
     return (session.get("title"), session.get("workout"), session.get("status"),
             session.get("distance_target_km"), session.get("distance_cap_km"),
             session.get("rpe_min"), session.get("rpe_max"), session.get("demanding"),
@@ -853,10 +805,10 @@ def _changed_session_fields(previous: dict | None, current: dict,
         if new is None:
             changed[session_id] = {"removed"}
             continue
-        # `done` n'est pas une intention : `load_plan` le pose depuis le cycle, et
-        # `intention_errors` impose `planned` à l'écriture. Le 27/10, une séance faite
-        # le matin même comptait donc comme « changée » et exigeait une justification
-        # impossible : aucune révision ne passait plus de la journée.
+        # `done` is not an intent: `load_plan` sets it from the cycle, and
+        # `intention_errors` requires `planned` on write. A session done earlier today
+        # must therefore not count as "changed", or it would demand an impossible
+        # justification and block every revision of the day.
         if old.get("status") == "done" and new.get("status") == "planned":
             old = {**old, "status": "planned"}
         fields = {name for name in CHANGE_FIELDS if name not in {"added", "removed"}
@@ -867,10 +819,10 @@ def _changed_session_fields(previous: dict | None, current: dict,
 
 
 def restrictions(old: dict, new: dict | None) -> list[str]:
-    """Ce qui, d'une révision à l'autre, RETIRE à une séance future.
+    """What, from one revision to the next, REMOVES from a future session.
 
-    Ajouter, déplacer ou allonger n'en fait pas partie : seule la restriction a fauté
-    en série. Une séance déjà annulée ne se restreint plus.
+    Adding, moving or lengthening is not one: only restriction needs a typed premise.
+    An already cancelled session is no longer restricted.
     """
     if old.get("status") == "cancelled":
         return []
@@ -932,8 +884,8 @@ _AUTHORITATIVE_TRIGGER = re.compile(
 
 
 def change_evidence_errors(previous: dict | None, current: dict) -> list[str]:
-    """Chaque changement futur nomme sa preuve et la règle qui le transforme en décision ;
-    une restriction y ajoute son `motif` typé (2026-10-10)."""
+    """Each future change names its evidence and the rule that turns it into a decision;
+    a restriction adds its typed `motif`."""
     if previous is None:
         return []
     as_of = str(current.get("computed_at") or now_stamp())[:10]
@@ -987,7 +939,7 @@ def change_evidence_errors(previous: dict | None, current: dict) -> list[str]:
 
 
 def revision_diff(previous: dict | None, current: dict) -> list[str]:
-    """Ce qui a bougé entre deux révisions, une ligne par séance touchée."""
+    """What moved between two revisions, one line per touched session."""
     avant, apres = _revision_index(previous), _revision_index(current)
     lignes = []
     for session_id, session in apres.items():
@@ -1012,7 +964,7 @@ def revision_diff(previous: dict | None, current: dict) -> list[str]:
 
 
 def revision_week_lines(week: str, revision: dict) -> list[str]:
-    """La semaine résultante, un jour par ligne, vides et annulées comprises."""
+    """The resulting week, one day per line, empty and cancelled days included."""
     monday = dt.date.fromisocalendar(int(week[:4]), int(week[-2:]), 1)
     par_jour: dict[str, list[dict]] = {}
     for session in revision.get("sessions", []):
@@ -1031,7 +983,7 @@ def revision_week_lines(week: str, revision: dict) -> list[str]:
 
 
 def revision_readback(week: str, previous: dict | None, current: dict) -> str:
-    """Ce que la CLI rend au coach : le diff, puis la semaine telle qu'elle est."""
+    """What the CLI returns to the coach: the diff, then the week as it is."""
     depuis = f"r{previous['revision']}" if previous else "rien (première révision)"
     diff = revision_diff(previous, current) or [
         "AUCUNE séance ajoutée, annulée, déplacée ni modifiée. Si le message de l'athlète "
@@ -1056,17 +1008,14 @@ def revision_readback(week: str, previous: dict | None, current: dict) -> str:
     return "\n".join(bloc)
 
 
-#: ⭐ LE MOTIF ET L'OBJET SE JUGENT ENSEMBLE (2026-08-25). `semantic_errors` vérifiait
-#: des invariants physiologiques -- 48 h entre renfo A et B, jours exigeants
-#: consécutifs -- et jamais si la révision FAIT ce qu'elle DIT.
-#: La r3 du 25/08 annonçait dans son motif une sortie le jeudi et un renfo B décalé ;
-#: l'objet ne touchait que le mercredi. Elle est passée validée, et le coach a raconté
-#: son motif à l'athlète.
+#: THE MOTIVE AND THE OBJECT ARE JUDGED TOGETHER. `semantic_errors` checks physiological
+#: invariants -- spacing between strength sessions, consecutive demanding days -- but not
+#: whether the revision DOES what it SAYS.
 #:
-#: Le contrôle porte sur les jours parce que c'est la seule affirmation d'un motif qu'un
-#: programme puisse contredire mécaniquement. Il ouvre les deux chemins corrects : soit
-#: la révision oublie ce jour, soit le motif le nomme sans le changer -- et une
-#: circonstance qui ne change rien vit dans `constraints`, pas dans le motif.
+#: The check is on days because that is the only claim of a motive that a program can
+#: mechanically contradict. It leaves the two correct paths open: either the revision
+#: forgets that day, or the motive names it without changing it -- and a circumstance
+#: that changes nothing lives in `constraints`, not in the motive.
 _JOURS_NOMMES = {nom: index for index, nom in enumerate(WEEKDAYS)}
 _DATE_COURTE = re.compile(r"\b(\d{2})/(\d{2})\b")
 _DATE_ISO = re.compile(r"\b(20\d{2}-\d{2}-\d{2})\b")
@@ -1103,8 +1052,8 @@ def _dates_touchees(previous: dict | None, current: dict) -> set[str]:
 
 
 def coherence_errors(week: str, previous: dict | None, current: dict) -> list[str]:
-    """Le motif nomme un jour que l'objet ne touche pas : l'un des deux ment."""
-    if previous is None:      # une première révision touche toute la semaine
+    """The motive names a day the object does not touch: one of the two is wrong."""
+    if previous is None:      # a first revision touches the whole week
         return []
     nommees = _dates_nommees(current.get("reason") or "", week)
     manquantes = sorted(nommees - _dates_touchees(previous, current))
@@ -1117,12 +1066,12 @@ def coherence_errors(week: str, previous: dict | None, current: dict) -> list[st
 
 
 def sessions_orphelines(previous: dict | None, current: dict) -> list[str]:
-    """Les jours que CETTE révision laisse sans rien à faire.
+    """The days THIS revision leaves with nothing to do.
 
-    Pas une faute : renoncer à une séance est une décision de coaching ordinaire. Mais
-    c'est la forme exacte qu'a prise l'oubli du 25/08, et elle ne se voit dans aucun
-    rendu -- l'annulé sort de `scheduled()`, donc du texto, de la carte et du hot-cache.
-    Le coach la reçoit donc nommée, avec la question qui va avec.
+    Not a fault: giving up a session is an ordinary coaching decision. But it is easy to
+    miss in every rendering -- a cancelled session leaves `scheduled()`, hence the text
+    message, the card and the hot-cache. The coach therefore receives it named, with the
+    accompanying question.
     """
     avant = _revision_index(previous)
     par_jour: dict[str, list[dict]] = {}

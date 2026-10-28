@@ -1,23 +1,22 @@
-"""Comment chaque correction de l'athlète se rejoue, lu dans un registre typé.
+"""How each correction from the athlete is replayed, read from a typed registry.
 
-`coaching/corrections.md` raconte l'erreur et nomme son porteur ; `vault-check.py`
-(« règles de méta portées ») vérifie qu'un porteur est NOMMÉ, jamais qu'il porte. Pour une
-règle de code, un test la fige. Pour une règle de rédaction, portée par un prompt ou
-CLAUDE.md, seul un scénario rejoué par `redline.cli.evaluate_coaching` peut montrer qu'elle
-tient encore. Au 2026-10-04, 6 des 51 corrections avaient un scénario.
+`coaching/corrections.md` tells the error and names its carrier; `vault-check.py`
+verifies that a carrier is NAMED, never that it carries. A code rule is frozen by a test.
+A drafting rule, carried by a prompt or CLAUDE.md, can only be shown to still hold by a
+scenario replayed by `redline.cli.evaluate_coaching`.
 
-Le registre du vault (`vault_layout.CORRECTIONS_REPLAY`) donne à chaque correction un
-mode de rejeu, choisi par un humain et jamais deviné depuis la prose :
+The vault registry (`vault_layout.CORRECTIONS_REPLAY`) gives each correction a replay
+mode, chosen by a human and never guessed from prose:
 
-- `scenario` : un ou plusieurs scénarios de `coaching-scenarios.json` la rejouent ;
-- `code` : le correctif est déterministe et vit dans les fichiers nommés (`carriers`) ;
-- `hors-banc` : rien ne se rejoue en conversation (contenu d'une note corrigé, règle de
-  maintenance du vault, mécanisme retiré) ; `note` dit pourquoi ;
-- `a-rejouer` : le correctif vit dans une consigne du modèle et n'a pas encore de
-  scénario. C'est la dette que le banc doit résorber.
+- `scenario`: one or more scenarios of `coaching-scenarios.json` replay it;
+- `code`: the fix is deterministic and lives in the named files (`carriers`);
+- `hors-banc`: nothing replays in conversation (corrected note content, vault
+  maintenance rule, removed mechanism); `note` says why;
+- `a-rejouer`: the fix lives in a model instruction and has no scenario yet. This is the
+  debt the bench must pay down.
 
-Ce module ne lit de `corrections.md` que l'identité des entrées (titre de section ou
-première cellule de tableau), comme le contrôle des porteurs.
+This module reads only the identity of the entries from `corrections.md` (section title
+or first table cell), like the carrier check.
 """
 
 from __future__ import annotations
@@ -33,7 +32,7 @@ from .errors import InputError
 
 SCENARIOS = "src/redline/evaluation/coaching-scenarios.json"
 MODES = ("scenario", "code", "hors-banc", "a-rejouer")
-#: Une correction nouvelle a deux bilans pour recevoir son mode de rejeu.
+#: A new correction has this many days to receive its replay mode.
 GRACE_DAYS = 14
 
 HEADING = re.compile(r"^#{2,3} (\d{4}-\d{2}-\d{2}.*)$", re.MULTILINE)
@@ -41,7 +40,7 @@ DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
 class ReplayFormatError(InputError):
-    """Le registre ne respecte pas son schéma : on refuse au lieu d'interpréter."""
+    """The registry does not follow its schema: reject rather than interpret."""
 
 
 @dataclass(frozen=True)
@@ -56,10 +55,10 @@ class Correction:
 
 
 def entries(text: str) -> list[Correction]:
-    """Les corrections du journal, identifiées par leur titre ou leur première cellule.
+    """The corrections of the journal, identified by their title or first cell.
 
-    Une ligne de tableau sans libellé après sa date se distingue par le début de la
-    cellule suivante : plusieurs lignes historiques partagent la même date.
+    A table row with no label after its date is told apart by the start of the next
+    cell: several rows can share the same date.
     """
     found = [Correction(match.group(1).strip()) for match in HEADING.finditer(text)]
     for line in text.splitlines():
@@ -105,8 +104,8 @@ class Audit:
 
 def audit(vault: Path, corrections_text: str, today: dt.date,
           engine: Path = paths.ENGINE_ROOT) -> Audit:
-    """`corrections_text` vient de l'appelant (le `Vault` de vault-check). Le registre se
-    lit dans le vault, les scénarios dans le moteur ; un porteur vit dans l'un ou l'autre."""
+    """`corrections_text` comes from the caller (the `Vault` of vault-check). The registry
+    is read in the vault, the scenarios in the engine; a carrier lives in either."""
     corrections = entries(corrections_text)
     ledger = load_ledger((vault / vault_layout.CORRECTIONS_REPLAY).read_text(encoding="utf-8"))
     scenario_ids = {case["id"] for case in

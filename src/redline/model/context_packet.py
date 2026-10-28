@@ -1,4 +1,4 @@
-"""Paquet borné de faits PostgreSQL injecté avant un tour de coaching."""
+"""Bounded packet of PostgreSQL facts injected before a coaching turn."""
 
 from __future__ import annotations
 
@@ -49,7 +49,7 @@ def _observation(row: dict) -> str:
 
 
 def render_context_packet(store: OperationalStore, depth: str, today: dt.date) -> str:
-    """Rend seulement les faits utiles au niveau ; N0 ne paie aucun paquet."""
+    """Render only the facts useful at this depth; N0 pays for no packet."""
     if depth == "N0":
         return ""
     lines = ["[CONTEXTE TYPÉ FOURNI PAR LE SERVICE, invisible, ne pas réciter",
@@ -70,8 +70,8 @@ def render_context_packet(store: OperationalStore, depth: str, today: dt.date) -
     observations = all_observations[:10]
     lines.append("Observations récentes :")
     lines.extend("- " + _observation(row) for row in observations)
-    # Les activités peuvent occuper les dix places : sélectionner le réveil AVANT
-    # cette coupe évite de demander à l'utilisateur de reconstruire son historique.
+    # Activities can fill all ten slots: selecting the wake traces BEFORE this cut keeps
+    # them from being dropped.
     morning = sorted((row for row in all_observations
                       if row["kind"] == session_kinds.WAKE_TRACE
                       and (today - dt.timedelta(days=56)).isoformat()
@@ -163,7 +163,6 @@ def render_context_packet(store: OperationalStore, depth: str, today: dt.date) -
                  "Un ressenti actuel ne s'annule pas face à une mesure objective ou une ancienne "
                  "déclaration. En cas de contradiction, nomme les deux dates et sources ; "
                  "ne fusionne pas les valeurs et ne modifie pas le plan sur cette seule base.")
-    # Le règlement en vigueur voyage avec les faits : c'est lui qui départage une
-    # formulation ancienne relue dans un fichier ou dans la conversation (audit du
-    # 2026-09-27, `src/redline/model/rulebook.py`).
+    # The rulebook in force travels with the facts: it arbitrates an outdated wording
+    # reread in a file or in the conversation (`src/redline/model/rulebook.py`).
     return "\n".join(lines) + "]\n" + rulebook.render()

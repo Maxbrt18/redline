@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Repère les fiches pertinentes du corpus ; la fiche reste à lire avant de la citer."""
+"""Locate relevant corpus notes; the note must still be read before citing it."""
 
 from __future__ import annotations
 
@@ -50,17 +50,17 @@ def search(query: str, limit: int = 6, *, root: Path | None = None) -> list[Sear
                 continue
             coverage = len(set().union(*(terms & words(line) for _, line in matches)))
             best_passage = max(len(terms & words(line)) for _, line in matches)
-            # Une longue fiche qui disperse les mots sur 500 lignes ne doit pas
-            # battre une fiche qui les rapproche dans le même passage.
+            # A long note spreading the words over 500 lines must not beat a note that
+            # keeps them together in the same passage.
             best_lines = [line for _, line in matches
                           if len(terms & words(line)) == best_passage]
-            # Un paragraphe très long peut contenir tous les mots par hasard.
-            # La densité départage ces faux positifs sans évincer la fiche longue.
+            # A very long paragraph can contain every word by chance. Density breaks the
+            # tie on these false positives without ousting the long note.
             density_penalty = min(len(words(line)) // 8 for line in best_lines)
             score = best_passage * 16 + coverage * 3 + heading_matches * 8
             score -= min(density_penalty, 12)
-            # Une fiche de concept ouvre la lecture ; les épisodes en donnent
-            # la preuve détaillée quand la synthèse laisse une incertitude.
+            # A concept note opens the reading; episodes give the detailed evidence
+            # when the synthesis leaves an uncertainty.
             score += 4 if folder == vault_layout.CONCEPTS else 0
             line_number, excerpt = max(
                 matches, key=lambda item: (len(terms & words(item[1])),

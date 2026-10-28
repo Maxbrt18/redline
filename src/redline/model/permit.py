@@ -1,13 +1,13 @@
-"""Permis EF (décision de l'athlète du 2026-09-27) : l'état du permis se CALCULE.
+"""Easy-run permit: the permit state is COMPUTED.
 
-Rien n'est stocké hormis le choix scellé du coach (`permit_choices`) : ce que l'athlète a
-couru vient du registre, la trace du lendemain aussi, les déclarations de charge de vie
-de l'état du jour, le groupe de la capture Strava. Le statut (accompagné, permis,
-retrait, restriction) en dérive, comme tout état dérivé du vault.
+Nothing is stored except the coach's sealed choice (`permit_choices`): what the athlete
+ran comes from the ledger, so does the next-day trace; life-load declarations come from
+the daily state, the group flag from the Strava capture. The status (supervised, permit,
+withdrawal, restriction) derives from them, like any state derived from the vault.
 
-Ce qui n'est PAS détecté ici, et le rapport le dit : un parcours neuf (il faudrait
-comparer des tracés), et la grosse forme tant que son seuil n'est pas fixé.
-Méthode : `coaching/protocols.md` § Permis EF.
+What is NOT detected here, and the report says so: a new route (it would need track
+comparison), and a big form signal while its threshold is unset.
+Method: `coaching/protocols.md`, permit section.
 """
 
 from __future__ import annotations
@@ -18,26 +18,26 @@ from dataclasses import dataclass, field
 
 from . import session_kinds
 
-#: La conduite accompagnée dure autant de semaines ISO, celle du premier choix scellé
-#: comprise ; l'obtention se juge à la fin de la dernière.
+#: The supervised period lasts this many ISO weeks, including the week of the first
+#: sealed choice; the permit is judged at the end of the last one.
 PERMIT_WEEKS = 3
-#: Critères d'obtention (protocols.md § Permis EF).
+#: Criteria for obtaining the permit.
 MIN_EF = 5
 TOLERANCE_MIN = 10
-#: Durée de la conduite accompagnée après un déclencheur de retrait.
+#: Length of the supervised period after a withdrawal trigger.
 WITHDRAWAL_DAYS = 14
-#: Grosse forme : progression de l'allure à FC égale. Sans historique, pas de seuil
-#: honnête ; il se fixe au jugement d'obtention. D'ici là le signal s'affiche, il ne
-#: déclenche rien.
+#: Big form: pace progression at equal heart rate. Without history there is no honest
+#: threshold; it is set when the permit is judged. Until then the signal is displayed
+#: and triggers nothing.
 BIG_FORM_THRESHOLD: float | None = None
-#: Trace du réveil : 2 = nette (aucune 0, très légère 0,5, légère 1, nette 2).
+#: Waking trace: 2 = clear (none 0, very light 0.5, light 1, clear 2).
 NET_TRACE = 2
 DAYS = ("lun", "mar", "mer", "jeu", "ven", "sam", "dim")
 
 
 @dataclass(frozen=True)
 class Run:
-    """Une sortie du registre, réduite à ce que le permis lit."""
+    """A ledger run, reduced to what the permit reads."""
 
     date: dt.date
     type: str
@@ -87,15 +87,15 @@ def _day(value: dt.date | str) -> dt.date:
 
 @dataclass(frozen=True)
 class Window:
-    """La conduite accompagnée : du lundi du premier choix scellé à l'obtention."""
+    """The supervised period: from the Monday of the first sealed choice to the judgment."""
 
     start: dt.date
     obtention_week: str
 
 
 def window(choices: Iterable[dict]) -> Window | None:
-    """Le permis commence avec le premier choix que le coach scelle : aucune date
-    d'instance dans le code, et aucune fenêtre tant que rien n'est scellé."""
+    """The permit starts with the first choice the coach seals: no instance date in the
+    code, and no window while nothing is sealed."""
     days = [_day(choice["scheduled_on"]) for choice in choices]
     if not days:
         return None
@@ -107,10 +107,10 @@ def window(choices: Iterable[dict]) -> Window | None:
 def evaluate(choices: Iterable[dict], runs: Iterable[Run], traces: dict[dt.date, float],
              caps: dict[str, int | None], groups: dict[int, bool],
              today: dt.date, *, hr_cap: int) -> list[EfLine]:
-    """Une ligne par EF scellée : le choix du coach face à ce que l'athlète a couru.
+    """One line per sealed easy run: the coach's choice against what the athlete ran.
 
-    `hr_cap` : le haut de la Z2 de l'athlète (`Instance.hr_bounds[1]`). Une EF dont la
-    FC moyenne le dépasse est « trop rapide ».
+    `hr_cap`: the top of the athlete's Z2 (`Instance.hr_bounds[1]`). A run whose
+    average heart rate exceeds it is "too fast" (`trop rapide`).
     """
     by_day: dict[dt.date, list[Run]] = {}
     for run in runs:
@@ -154,7 +154,7 @@ class State:
 
 def state(lines: list[EfLine], daily: Iterable[dict], today: dt.date,
           period: Window) -> State:
-    """Accompagné, permis ou retrait, dérivé des lignes et des déclarations."""
+    """Supervised, permit or withdrawal, derived from the lines and the declarations."""
     withdrawal_until = None
     for line in lines:
         if line.triggers:
@@ -208,7 +208,7 @@ def _fmt_minutes(value: float | None) -> str:
 
 
 def render(lines: list[EfLine], current: State, week: str | None = None) -> list[str]:
-    """Le bloc lisible par le coach, au bilan ou à la demande."""
+    """The block the coach reads, at the review or on request."""
     shown = [line for line in lines if week is None or iso_week(line.date) == week]
     out = [f"Permis EF : {current.phase}."]
     if current.withdrawal_until is not None:

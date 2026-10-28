@@ -1,4 +1,4 @@
-"""Un tour d'agent : ses commandes préparées, appliquées ensemble ou jetées."""
+"""An agent turn: its staged commands, applied together or discarded."""
 
 from __future__ import annotations
 
@@ -24,12 +24,13 @@ from ._common import StoreBase, _audit, _jsonable, _uuid
 class TurnCommands(StoreBase):
     def stage_command(self, turn_id: str, command_key: str, kind: str,
                       payload: dict) -> uuid.UUID:
-        """Enregistre une intention seulement si le tour entier reste applicable.
+        """Record an intent only if the whole turn remains applicable.
 
-        Chaque commande préparée est rejouée avec celles qui la précèdent dans un
-        SAVEPOINT. Le rejeu est rembobiné avant le commit : le domaine ne bouge pas,
-        mais une incohérence revient immédiatement à la CLI et la commande fautive
-        n'entre jamais dans le tour. `apply_turn_with_receipts` répète le contrôle au commit final.
+        Each staged command is replayed with the ones before it inside a SAVEPOINT. The
+        replay is rolled back before the commit: the domain does not move, but an
+        inconsistency returns to the CLI immediately and the faulty command never
+        enters the turn. `apply_turn_with_receipts` repeats the check at the final
+        commit.
         """
         command_id = uuid.uuid4()
         canonical_payload = _jsonable(payload)
@@ -54,11 +55,11 @@ class TurnCommands(StoreBase):
             return row["id"]
 
     def preview_command(self, kind: str, payload: dict, *, turn_id: str = "") -> int:
-        """Teste avec les commandes en attente, sans conserver aucun effet.
+        """Test against the pending commands, keeping no effect.
 
-        Le même moteur contrôle la simulation et l'application. Le SAVEPOINT
-        englobe aussi la commande temporaire, l'audit et les projections. Une
-        simulation n'est pas une réservation : l'application revérifie l'état.
+        The same engine checks the simulation and the application. The SAVEPOINT also
+        wraps the temporary command, the audit and the projections. A simulation is not
+        a reservation: the application re-checks the state.
         """
         actual_turn_id = turn_id or str(uuid.uuid4())
         with self.database.transaction() as connection:
@@ -74,25 +75,21 @@ class TurnCommands(StoreBase):
                 preview.rollback()
 
     def apply_turn_with_receipts(self, turn_id: str) -> tuple[int, tuple[dict, ...]]:
-        """Applique tout le tour dans l'unique transaction canonique, puis relit ses reçus.
+        """Apply the whole turn in the single canonical transaction, then re-read its receipts.
 
-        Les reçus ne sortent qu'après le commit. Un rejeu conserve les preuves
-        déjà enregistrées, mais son compteur de nouvelles applications reste nul.
+        Receipts are only released after the commit. A replay keeps the proofs already
+        recorded, but its count of new applications stays zero.
 
-        **Les faits sont inconditionnels.** Une séance, une mesure, un état du jour
-        sont de la vérité terrain ; le programme hebdomadaire en est un CALCUL. Jusqu'au
-        2026-08-14 cette méthode annulait les faits quand le plan qui en dérive était
-        périmé — elle jetait la séance pour protéger le calcul, exactement à l'envers
-        de la doctrine du vault (« une séance non consignée est perdue », « l'état
-        dérivé se recalcule »). Ce jour-là, deux débriefs corrects ont été détruits et
-        L'athlète a reçu de la plomberie à la place de son coaching.
+        Facts are unconditional. A session, a measurement, a daily state are ground
+        truth; the weekly program is a COMPUTATION derived from them. A stale plan must
+        never roll back the facts.
 
-        La péremption d'un plan n'est donc plus une erreur d'écriture : c'est un VERDICT
-        DE PRESCRIPTIBILITÉ, rendu par `VaultRepo.validate_weekly_plan`, qui retient la
-        prescription sans toucher ni aux faits ni à la conversation.
+        Plan staleness is therefore not a write error: it is a PRESCRIBABILITY VERDICT,
+        returned by `VaultRepo.validate_weekly_plan`, which withholds the prescription
+        without touching the facts or the conversation.
 
-        Ce qui reste refusé ici est ce que ce tour écrit MAL : une révision de plan
-        invalide n'entre pas en base, parce que l'écriture elle-même est fautive.
+        What is still rejected here is what this turn writes BADLY: an invalid plan
+        revision does not enter the database, because the write itself is faulty.
         """
         with self.database.transaction() as connection:
             applied = self._apply_turn_in(connection, turn_id)
@@ -109,7 +106,7 @@ class TurnCommands(StoreBase):
         return applied, receipts
 
     def pending_turn_kinds(self, turn_id: str) -> tuple[str, ...]:
-        """Les types de commandes encore non appliquées d'un tour, dans l'ordre."""
+        """The command kinds of a turn not yet applied, in order."""
         with self.database.engine.connect() as connection:
             kinds = connection.execute(sa.select(turn_commands.c.kind).where(
                 turn_commands.c.turn_id == _uuid(turn_id),
@@ -161,9 +158,9 @@ class TurnCommands(StoreBase):
             connection.execute(turn_commands.update().where(
                 turn_commands.c.id == row["id"]).values(applied_at=sa.func.now()))
             applied += 1
-        # Seules les semaines que CE tour a révisées sont relues : écrire un plan
-        # invalide est une faute d'écriture. L'état d'une semaine qu'on n'a pas
-        # touchée ne regarde pas les faits qu'on vient d'enregistrer.
+        # Only the weeks THIS turn revised are re-read: writing an invalid plan is a
+        # write fault. The state of a week that was not touched is unrelated to the
+        # facts just recorded.
         from redline.model import weekly_plan as weekly_plan_model
         for week in revised_weeks:
             plan = self._load_plan_connection(connection, week)
@@ -236,19 +233,19 @@ class TurnCommands(StoreBase):
 
     def _apply_proactive_angle(self, connection: Connection, payload: dict,
                                actor: str) -> None:
-        """L'angle n'a rien à muter : la commande EST le dépôt.
+        """The angle has nothing to mutate: the command IS the deposit.
 
-        Le propriétaire de l'angle livré est `proactive_messages.angle`, et cette
-        ligne-là n'existe qu'APRÈS la livraison Messenger — bien après la frontière de
-        persistance. La commande de tour sert donc de consigne : `turn_angle()` la
-        relit au moment d'écrire la trace. L'appliquer, c'est l'acquitter, et un tour
-        abandonné l'emporte avec lui, ce qui est exactement le comportement voulu.
+        The owner of the delivered angle is `proactive_messages.angle`, and that row only
+        exists AFTER the chat delivery, well past the persistence boundary. The turn
+        command therefore acts as the instruction: `turn_angle()` re-reads it when the
+        trace is written. Applying it acknowledges it, and an abandoned turn takes it
+        away, which is the intended behavior.
         """
         if not str(payload.get("angle", "")).strip():
             raise ValueError("angle vide")
 
     def turn_angle(self, turn_id: str) -> str:
-        """L'angle déposé par ce tour, ou la chaîne vide s'il n'en a pas déposé."""
+        """The angle deposited by this turn, or the empty string if it deposited none."""
         if not turn_id:
             return ""
         with self.database.transaction() as connection:
@@ -259,7 +256,7 @@ class TurnCommands(StoreBase):
         return str((row or {}).get("angle", "")).strip()
 
     def _apply_question_ask(self, connection: Connection, payload: dict, actor: str) -> None:
-        """Déclaration seulement ; les marqueurs attendent la livraison du texte exact."""
+        """Declaration only; the markers wait for delivery of the exact text."""
         text = payload.get("text")
         if not isinstance(text, str) or not 3 <= len(text.strip()) <= 500:
             raise ValueError("question attendue entre 3 et 500 caractères")

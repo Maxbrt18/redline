@@ -1,14 +1,14 @@
-"""Ce qui distingue une instance d'une autre : `redline.toml`, à la racine du vault.
+"""What distinguishes one instance from another: `redline.toml`, at the vault root.
 
-Le moteur ne connaît ni le prénom de l'athlète, ni la blessure qu'il surveille, ni
-les capacités qu'il suit. Tout ce qui changerait d'un athlète à l'autre se lit ici,
-une fois, et voyage typé jusqu'au code qui en a besoin. Un prompt, un écran ou une
-règle qui écrirait l'une de ces valeurs en dur réintroduirait le moteur à un seul
-athlète que ce fichier existe pour défaire.
+The engine knows neither the athlete's name, nor the injury being watched, nor the
+capabilities being tracked. Everything that would vary from one athlete to another is
+read here, once, and travels typed to the code that needs it. A prompt, screen or rule
+that hardcoded one of these values would reintroduce the single-athlete engine this
+file exists to undo.
 
-Fermé par défaut, comme le reste des schémas du dépôt : un champ inconnu est une
-erreur, et un `[…]` resté tel quel dans `redline.example.toml` aussi -- un gabarit à
-moitié rempli finirait mot pour mot dans un message à l'athlète.
+Closed by default, like the repository's other schemas: an unknown field is an error,
+and so is a `[…]` left as-is from `redline.example.toml` -- a half-filled template
+would end up word for word in a message to the athlete.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ from .startup_budget import Tier, ceiling_errors
 FILENAME = "redline.toml"
 EXAMPLE = "redline.example.toml"
 
-#: Un gabarit non rempli : `[Prénom]`, `[ville]`… Jamais une valeur légitime ici.
+#: An unfilled template value (`[Prénom]`, `[ville]`...). Never a legitimate value here.
 PLACEHOLDER = re.compile(r"\[[^\]]*\]")
 SLUG = r"[a-z0-9][a-z0-9-]{0,39}"
 
@@ -47,7 +47,7 @@ INSTANCE_SCHEMA = Schema("redline.toml", [
         field("place", str, minimum=1, maximum=80,
               note="le lieu de la météo des séances sans lieu déclaré"),
     ])),
-    # Zéro, une ou plusieurs zones : un athlète sans blessure n'a rien à déclarer.
+    # Zero or more zones: an athlete with no injury has nothing to declare.
     field("injuries", list, required=False, item=field(
         "zone", dict, schema=Schema("[[injuries]]", [
             field("slug", str, pattern=SLUG),
@@ -80,7 +80,7 @@ INSTANCE_SCHEMA = Schema("redline.toml", [
 
 
 class InstanceError(ConfigError):
-    """`redline.toml` absent, illisible, non conforme ou encore à remplir."""
+    """`redline.toml` is missing, unreadable, non-conforming or still to be filled in."""
 
 
 @dataclass(frozen=True)
@@ -110,11 +110,11 @@ class Instance:
 
     @property
     def hr_bounds(self) -> tuple[int, ...]:
-        """Les FC où commencent Z2 à Z5. Le haut de la Z2 (`[1]`) plafonne les EF."""
+        """The heart rates where Z2 to Z5 start. The top of Z2 (`[1]`) caps easy runs."""
         return hr_zones.bounds(self.hr_rest, self.hr_max)
 
     def capability_label(self, slug: str) -> str:
-        """Le libellé déclaré, sinon celui que porte le slug."""
+        """The declared label, otherwise the one derived from the slug."""
         for capability in self.capabilities:
             if capability.slug == slug:
                 return capability.label
@@ -122,12 +122,12 @@ class Instance:
 
 
 def derived_label(slug: str) -> str:
-    """`cap2-descente` → « Descente » : lisible même sans déclaration."""
+    """`cap2-descente` -> `Descente`: readable even without a declaration."""
     return slug.split("-", 1)[-1].capitalize()
 
 
 def placeholders(payload: Any, where: str = "") -> list[str]:
-    """Les valeurs encore au gabarit, nommées par leur chemin."""
+    """The values still at their template placeholder, named by path."""
     if isinstance(payload, dict):
         return [problem for key, value in payload.items()
                 for problem in placeholders(value, f"{where}.{key}" if where else key)]
@@ -152,8 +152,8 @@ def parse(text: str) -> Instance:
         payload = tomllib.loads(text)
     except tomllib.TOMLDecodeError as exc:
         raise InstanceError(f"{FILENAME} illisible : {exc}") from None
-    # Le gabarit d'abord : `hr_max = "[FC max]"` est un champ à remplir, pas une erreur
-    # de type à déchiffrer.
+    # Placeholders first: `hr_max = "[FC max]"` is a field to fill in, not a type error
+    # to decipher.
     unfilled = placeholders(payload)
     if unfilled:
         raise InstanceError("\n  - ".join([f"{FILENAME} incomplet :", *unfilled]))
@@ -192,7 +192,7 @@ def parse(text: str) -> Instance:
 
 
 def load(vault: Path) -> Instance:
-    """L'instance du vault ; une erreur qui dit quoi faire, jamais un défaut silencieux."""
+    """The vault's instance; an error that says what to do, never a silent default."""
     path = vault / FILENAME
     if not path.is_file():
         raise InstanceError(

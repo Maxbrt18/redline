@@ -1,4 +1,4 @@
-"""Le cycle d'une séance prévue : départ, rattachement, statut."""
+"""The cycle of a planned session: start, linking, status."""
 
 from __future__ import annotations
 
@@ -193,11 +193,11 @@ class SessionCycles(StoreBase):
                 "observed_started_at": observed_at.isoformat()})
 
     def week_session_links(self, week: str) -> dict[str, dict]:
-        """Le cycle de chaque séance d'une semaine et l'observation qui l'a soldée.
+        """The cycle of each session in a week and the observation that settled it.
 
-        Lecture du carnet : il met le fait (l'observation) en regard de l'intention
-        (la séance). Rien n'est recopié ; l'observation se relit par son identifiant
-        dans `observation_rows`.
+        Read by the notebook: it sets the fact (the observation) next to the intent (the
+        session). Nothing is copied; the observation is re-read by its id in
+        `observation_rows`.
         """
         with self.database.engine.connect() as connection:
             rows = connection.execute(sa.select(
@@ -209,7 +209,7 @@ class SessionCycles(StoreBase):
         return {row["logical_key"]: dict(row) for row in rows}
 
     def session_cycle_status(self, week: str | None = None) -> list[dict]:
-        """Vue de diagnostic pour le coach : attentes et ambiguïtés."""
+        """Diagnostic view for the coach: pending expectations and ambiguities."""
         with self.database.engine.connect() as connection:
             query = sa.select(
                 weekly_plans.c.iso_week, session_cycles, planned_sessions.c.title,

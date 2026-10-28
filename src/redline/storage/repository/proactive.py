@@ -1,4 +1,4 @@
-"""Les initiatives envoyées."""
+"""Proactive messages that were sent."""
 
 from __future__ import annotations
 

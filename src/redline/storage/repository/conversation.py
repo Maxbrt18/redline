@@ -1,4 +1,4 @@
-"""Questions posées à l'athlète et recherche dans les échanges."""
+"""Questions asked to the athlete and search across the exchanges."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ class Conversation(StoreBase):
                     conversation_questions.c.asked_at.desc()).limit(limit)).mappings()]
 
     def conversation_search(self, psid: str, query: str, limit: int = 6) -> list[dict]:
-        """Recherche des messages passés avec provenance et voisinage immédiat."""
+        """Search past messages, with provenance and the immediately adjacent messages."""
         if not psid or not 3 <= len(query.strip()) <= 160 or not 1 <= limit <= 12:
             raise ValueError("psid, recherche de 3 à 160 caractères et limite 1 à 12 attendus")
         french: Any = sa.literal_column("'french'::regconfig")
@@ -64,7 +64,7 @@ class Conversation(StoreBase):
 
     def conversation_search_for_turn(self, turn_id: str, query: str,
                                      limit: int = 6) -> list[dict]:
-        """Le seul périmètre historique exposé à la CLI de l'agent."""
+        """The only history scope exposed to the agent CLI."""
         try:
             identifier = uuid.UUID(turn_id)
         except (ValueError, TypeError) as exc:

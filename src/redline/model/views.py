@@ -14,8 +14,8 @@ from .errors import InputError
 
 
 def csv_rows(path: Path) -> list:
-    """Les lignes d'une vue CSV, cellules vides retirées : un appelant lit `row.get(...)`,
-    jamais une valeur silencieusement plausible (comme au registre)."""
+    """The rows of a CSV view, empty cells dropped: a caller reads `row.get(...)`, never a
+    silently plausible value (as with the ledger)."""
     if not path.exists():
         return []
     with path.open(encoding="utf-8", newline="") as handle:

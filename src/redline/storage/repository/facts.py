@@ -1,4 +1,4 @@
-"""Capacités, fils, échéances, matériel, prédictions, permis et corrections."""
+"""Capabilities, threads, deadlines, gear, predictions, permits and corrections."""
 
 from __future__ import annotations
 
@@ -45,12 +45,10 @@ class Facts(StoreBase):
 
     def add_capability_evaluation_in(self, connection: Connection, row: dict,
                                      *, actor: str = "application") -> bool:
-        """Une évaluation par capacité et par jour, immuable une fois écrite.
+        """One evaluation per capability per day, immutable once written.
 
-        Renvoie False quand la même évaluation existait déjà (rejeu sans effet). Un
-        contenu différent pour le même jour est refusé : le 2026-10-13, un
-        `--next-test` corrigé pour le 2026-10-11 a été ignoré par le conflit alors que
-        la CLI annonçait « enregistré ».
+        Returns False when the same evaluation already existed (a no-op replay). Different
+        content for the same day is rejected so that a conflict never silently drops it.
         """
         evaluation_id = _uuid(row.get("id"))
         values = {
@@ -140,11 +138,11 @@ class Facts(StoreBase):
             self.upsert_gear_in(connection, row, actor=actor)
 
     def sync_strava_gear(self, row: dict, *, actor: str = "strava-gear-sync") -> None:
-        """Rafraîchit le compteur fournisseur sans écraser le rôle personnalisé.
+        """Refresh the provider's distance counter without overwriting the custom role.
 
-        Une paire inconnue entre avec un rôle explicitement à qualifier et un seuil
-        d'inspection conservateur. Le premier réglage humain de ces deux champs reste
-        ensuite propriétaire : Strava connaît les kilomètres, pas l'usage prévu.
+        An unknown pair enters with an explicit "to qualify" role and a conservative
+        inspection threshold. The first manual setting of those two fields then stays
+        authoritative: Strava knows the kilometres, not the intended use.
         """
         gear_id = str(row.get("gear_id") or row.get("id") or "").strip()
         name = str(row.get("name") or row.get("nickname") or "").strip()
@@ -249,10 +247,10 @@ class Facts(StoreBase):
             aggregate_id = existing["id"]
             action = "prediction.resolved"
         elif operation == "rectify":
-            # Une prédiction soldée alors que sa condition n'a pas été tenue, ou sans
-            # l'observation qui devait la trancher, n'a pas été testée : elle passe en
-            # `void`, motif à l'appui. Jamais l'inverse, et jamais vrai ↔ faux : un score
-            # qu'on retourne après coup n'est plus une calibration (audit du 2026-10-09).
+            # A prediction settled while its condition was not met, or without the
+            # observation meant to settle it, was never tested: it becomes `void`, with
+            # a reason. Never the reverse, and never true <-> false: a score flipped
+            # after the fact is no longer a calibration.
             if existing is None:
                 raise StorageError(f"prédiction inconnue : {row['prediction_key']}")
             if existing["status"] == "void":
@@ -280,7 +278,7 @@ class Facts(StoreBase):
         _audit(connection, actor, action, "prediction", aggregate_id, _jsonable(row))
 
     def _prediction_zone_in(self, connection: Connection, zone: str | None) -> str:
-        """La zone que la prédiction attend : nommée, ou la seule zone surveillée."""
+        """The zone the prediction expects: the named one, or the only monitored zone."""
         active = self._active_zones_in(connection)
         if zone is None:
             if len(active) != 1:
@@ -294,7 +292,7 @@ class Facts(StoreBase):
 
     def _observed_value_in(self, connection: Connection, kind: str,
                            day: dt.date, zone: str) -> float | None:
-        """La dernière valeur connue, dans cette zone, de l'observation qui tranche."""
+        """The latest known value, in this zone, of the settling observation."""
         value = connection.execute(sa.select(pain_readings.c.value).join(
             observations, observations.c.id == pain_readings.c.observation_id).where(
                 observations.c.athlete_id == self.athlete_id,
@@ -306,10 +304,10 @@ class Facts(StoreBase):
     def settle_observed_predictions_in(self, connection: Connection, kind: str,
                                        day: dt.date, zone: str, value: float | None,
                                        *, actor: str = "application") -> int:
-        """Solde les prédictions ouvertes qui attendaient cette observation, dans sa zone.
+        """Settle the open predictions that were waiting for this observation, in its zone.
 
-        `value=None` : l'observation est déclarée indisponible ou n'est jamais venue ;
-        la prédiction n'a pas été testée, elle passe en `void`, jamais en faux.
+        `value=None`: the observation is declared unavailable or never came; the
+        prediction was not tested, so it becomes `void`, never false.
         """
         bound = connection.execute(sa.select(coach_predictions).where(
             coach_predictions.c.athlete_id == self.athlete_id,
@@ -332,10 +330,10 @@ class Facts(StoreBase):
 
     def settle_unobserved_predictions_in(self, connection: Connection, today: dt.date,
                                          *, actor: str = "application") -> int:
-        """Ferme les prédictions dont la date d'observation est passée.
+        """Close the predictions whose observation date has passed.
 
-        L'observation venue sans déclencher le solde (écrite avant le rattachement)
-        tranche encore ; son absence rend la prédiction `void`.
+        An observation that arrived without triggering settlement (written before the
+        binding) still settles; its absence makes the prediction `void`.
         """
         pending = connection.execute(sa.select(
             coach_predictions.c.resolves_kind, coach_predictions.c.resolves_on,
@@ -364,10 +362,10 @@ class Facts(StoreBase):
 
     def seal_permit_choice_in(self, connection: Connection, row: dict,
                               *, actor: str = "application") -> None:
-        """Scelle le choix du coach et sa prédiction dans la même transaction.
+        """Seal the coach's choice and its prediction in the same transaction.
 
-        Le choix est immuable : la même écriture rejouée ne fait rien, une écriture qui
-        le changerait est refusée. La prédiction liée est ce qui le rend falsifiable.
+        The choice is immutable: replaying the same write does nothing, a write that
+        would change it is rejected. The linked prediction is what makes it falsifiable.
         """
         scheduled_on = row["scheduled_on"]
         if isinstance(scheduled_on, str):
@@ -453,11 +451,11 @@ class Facts(StoreBase):
             self.register_correction_in(connection, row, actor=actor)
 
     def correction_rows(self) -> list[dict]:
-        """Les corrections, avec le nombre de récidives et la date de la première.
+        """The corrections, with the number of recurrences and the date of the first.
 
-        Une récidive remplace le résumé sous la même clé ; sans ce compte, la ligne ne
-        disait plus qu'une erreur était revenue (audit du 2026-10-09). Le journal
-        d'audit garde chaque version : il suffit de le compter.
+        A recurrence replaces the summary under the same key; without this count the row
+        would no longer show that a mistake came back. The audit log keeps every version,
+        so counting it is enough.
         """
         events = sa.select(
             audit_events.c.aggregate_id,

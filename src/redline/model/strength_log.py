@@ -1,31 +1,24 @@
-"""Format de la projection `athlete/strength-log.csv` issue de PostgreSQL.
+"""Format of the `athlete/strength-log.csv` projection from PostgreSQL.
 
-Toute la progression de `coaching/strength.md` repose sur deux nombres — le compte
-atteint sur les séries « jusqu'à échec technique », et l'auto-notation 0-10 de la
-difficulté (0-5 → on progresse · 6-7 → on tient le palier · 8-10 → on régresse).
-Le fichier dit lui-même pourquoi les repos de 90 s sont prescrits : *« ces séries ne
-valent que par le nombre atteint, et ce nombre n'est comparable d'une séance à
-l'autre que si le repos qui le précède est le même »*.
+The whole strength progression rests on two numbers: the count reached on the sets
+taken "to technical failure", and the 0-10 self-rated difficulty (0-5 -> progress,
+6-7 -> hold the step, 8-10 -> regress). The count is only comparable from one session
+to the next if the rest that precedes it is the same.
 
-Or jusqu'au 2026-07-31 ce nombre partait dans une **phrase française** vers la file
-du coach, atterrissait dans la colonne Note d'une ligne de registre, et n'existait
-**nulle part sous forme typée**. Conséquences, toutes les trois réelles : la règle de
-progression n'était applicable par rien d'autre que la mémoire d'une conversation ;
-la page de séance rouvrait identique chaque semaine, sans savoir ce qui avait été
-fait la fois d'avant ; et le **falsifieur du choix « sans matériel »** (bilan W36,
-[[decisions]] 2026-07-21) n'avait aucune série à interroger.
+Those numbers must exist in typed form: otherwise the progression rule can only be
+applied from the memory of a conversation, and the session page cannot know what was
+done last time.
 
-**Ce que ce fichier possède, et ce qu'il ne possède pas.** Il possède le détail
-**par exercice** d'une séance de renfo. Il ne possède pas la séance elle-même : les
-faits de niveau séance (RPE, douleur, durée) restent au [[ledger|registre]], une
-ligne, comme pour toute autre séance. Un fait, un propriétaire.
+What this file owns, and what it does not. It owns the per-exercise detail of a
+strength session. It does not own the session itself: session-level facts (RPE, pain,
+duration) stay in the ledger, one row, like any other session. One fact, one owner.
 
-**Droite et gauche ne se moyennent pas.** L'écart gauche/droite est un drapeau du
-test de capacité mollet (>10 %, `strength.md`), et il est invisible dès qu'on
-additionne les deux côtés. D'où deux colonnes plutôt qu'une, exclusives de `valeurs`.
+Right and left are never averaged. The left/right gap is a flag of the calf capacity
+test (>10 %), and it disappears as soon as both sides are added. Hence two columns
+rather than one, exclusive of `valeurs`.
 
-L'écriture et la validation appartiennent à PostgreSQL (`strength_sets` et ses
-contraintes) ; ce module ne fait que lire la projection.
+Writing and validation belong to PostgreSQL (`strength_sets` and its constraints); this
+module only reads the projection.
 """
 
 from __future__ import annotations
@@ -47,11 +40,10 @@ def series(value: str | None) -> list:
 
 
 def last_by_slug(path: Path) -> dict:
-    """{slug: ligne} — pour chaque exercice, la DERNIÈRE séance qui l'a journalisé.
+    """{slug: row} - for each exercise, the LAST session that logged it.
 
-    « Dernière » se lit sur la date puis sur l'ordre du fichier : deux séances le
-    même jour (A le matin, B le soir) se départagent par l'ordre d'écriture, qui est
-    l'ordre réel.
+    "Last" is read on the date, then on file order: two sessions on the same day are
+    ordered by write order, which is the real order.
     """
     latest: dict = {}
     for row in rows(path):
@@ -65,10 +57,10 @@ def last_by_slug(path: Path) -> dict:
 
 
 def human(row: dict, limit: int = 64) -> str:
-    """Ce que la page affiche sous l'exercice en cours : « D 14·12·11 · G 13·11 — 6/10 ».
+    """What the page shows under the current exercise: `D 14·12·11 · G 13·11 — 6/10`.
 
-    Rendu ICI et pas dans la page, comme `Dose.human()` : une seule fonction du dépôt
-    fabrique une ligne lisible, et la page ne formate rien.
+    Rendered HERE and not in the page, like `Dose.human()`: a single function builds the
+    readable line, and the page formats nothing.
     """
     if row.get("status") == "gated":
         return "retiré — douleur"

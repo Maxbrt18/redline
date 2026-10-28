@@ -1,23 +1,23 @@
-"""Les zones de fréquence cardiaque, en bpm, pour les calculs.
+"""Heart rate zones, in bpm, for calculations.
 
-Méthode Karvonen sur la FC de repos et la FC max de l'athlète, déclarées dans
-`redline.toml` (`[athlete] hr_rest`, `hr_max`) ; le raisonnement et l'usage de chaque
-zone vivent dans le profil de l'athlète. Ce module ne porte que la méthode, jamais les
-valeurs d'un athlète. Les zones par défaut de Strava ne sont PAS celles du coaching : le
-plafond d'EF est le haut de la Z2 Karvonen.
+Karvonen method on the athlete's resting and maximum heart rate, declared in
+`redline.toml` (`[athlete] hr_rest`, `hr_max`); the reasoning and use of each zone live
+in the athlete's profile. This module carries only the method, never an athlete's
+values. Strava's default zones are NOT the coaching ones: the easy-run cap is the top of
+the Karvonen Z2.
 """
 
 from __future__ import annotations
 
-#: Bornes basses de Z2 à Z5, en % de la réserve cardiaque.
+#: Lower bounds of Z2 to Z5, as a share of the heart rate reserve.
 RESERVE_SHARES = (0.60, 0.70, 0.80, 0.90)
 
 
 def bounds(rest: int, peak: int) -> tuple[int, ...]:
-    """Les FC où commencent Z2, Z3, Z4 et Z5."""
+    """The heart rates where Z2, Z3, Z4 and Z5 start."""
     return tuple(int(rest + share * (peak - rest)) for share in RESERVE_SHARES)
 
 
 def zone(hr: float, limits: tuple[int, ...]) -> int:
-    """La zone (1 à 5) d'une FC : une FC égale à une borne appartient à la zone du dessus."""
+    """The zone (1 to 5) of a heart rate; a rate equal to a bound belongs to the zone above."""
     return 1 + sum(1 for edge in limits if hr >= edge)

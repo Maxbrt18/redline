@@ -1,4 +1,4 @@
-"""Les séances de renforcement et leurs rapports."""
+"""Strength sessions and their reports."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ from ._common import StoreBase, _audit, _request_projection, _uuid
 class Strength(StoreBase):
     def strength_evidence_in(self, connection: Connection, day: dt.date,
                              routine: str | None) -> list:
-        """Rapports compatibles ; leur présence n'identifie pas seule une séance."""
+        """Compatible reports; their presence alone does not identify a session."""
         if not routine:
             return []
         return list(connection.execute(sa.select(strength_sessions.c.id).where(
@@ -42,10 +42,10 @@ class Strength(StoreBase):
 
     def reconcile_strength_cycles_in(self, connection: Connection, *,
                                       actor: str = "strength-reconciliation") -> int:
-        """Raccorde seulement les correspondances bijectives date/type de renfo.
+        """Link only one-to-one date/type matches of strength sessions.
 
-        Aucun doublon de registre ni heure de fin inventée. Une ambiguïté conserve
-        les faits tels quels et interdit d'en déduire une absence de séance.
+        No ledger duplicate and no invented end time. An ambiguity keeps the facts as
+        they are and forbids inferring that a session did not happen.
         """
         rows = connection.execute(sa.select(
             session_cycles, planned_sessions.c.scheduled_on, planned_sessions.c.routine,
@@ -82,7 +82,7 @@ class Strength(StoreBase):
 
     def accept_strength_report(self, payload: dict, max_per_day: int, *,
                                actor: str = "strength-page") -> str:
-        """Persiste séance et message durable ; renvoie accepted, duplicate ou quota."""
+        """Persist the session and a durable message; return accepted, duplicate or quota."""
         today = payload["performed_on"]
         session_key = payload["session_key"]
         with self.database.transaction() as connection:
@@ -229,7 +229,7 @@ class Strength(StoreBase):
             return list(sessions.values())
 
     def previous_strength_prescription(self, session: dict, today: dt.date) -> dict | None:
-        """Dernière prescription du même type rapportée avant l'ouverture courante."""
+        """Last prescription of the same type reported before the current opening."""
         query = sa.select(strength_sessions.c.prescription).where(
             strength_sessions.c.athlete_id == self.athlete_id,
             strength_sessions.c.workout == session["session"],

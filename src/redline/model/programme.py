@@ -69,8 +69,8 @@ EXERCISE_SCHEMA = Schema("exercice", [
     field("tags", list, required=False, item=field("tag", str)),
 ])
 
-# Les clés françaises sont le contrat commun des notes de séance et de la base
-# Obsidian `coaching/seances-types.base` ; elles sont donc validées strictement ici.
+# The French keys are the shared contract of the session notes and of the Obsidian base
+# `coaching/seances-types.base`, so they are validated strictly here.
 SESSION_SCHEMA = Schema("séance", [
     field("type", str, choices=("seance-type",)),
     field("title", str, note="le titre imprimé en tête de card"),
@@ -112,16 +112,15 @@ VARIANT_SCHEMA = Schema("variante", [
     field("add", list, required=False, item=field("slug", str)),
 ])
 
-# Le garde-fou de douleur de la séance du jour. IL EST UNE DONNÉE ÉCRITE PAR LE
-# COACH LE MATIN, jamais une règle que la page invente : la note de renfo dit par
-# exemple « si la zone est >2/10 : version dégradée », et c'est au coach de décider ce
-# que ça veut dire aujourd'hui. La page lit une zone, un seuil, une liste et une
-# phrase — elle n'interprète rien. Sans `zone`, le seuil vaut pour chaque zone
-# surveillée : une seule au-dessus suffit.
+# The pain gate of the day's session. It is DATA WRITTEN BY THE COACH in the morning,
+# never a rule the page invents: the coach decides what the strength note's condition
+# means today. The page reads a zone, a threshold, a list and a sentence and interprets
+# nothing. Without `zone`, the threshold applies to every monitored zone: a single one
+# above it is enough.
 #
-# Pourquoi la page redemande alors que le coach a déjà demandé le matin : le lien
-# arrive avec le message et traîne souvent une heure ou deux dans le téléphone
-# avant le premier exercice. L'état de 8 h n'est pas celui de 18 h.
+# The page asks again although the coach already asked in the morning: the link often
+# sits in the phone for hours before the first exercise, and the morning state is not
+# the evening state.
 GATE_SCHEMA = Schema("garde-fou", [
     field("zone", str, required=False, pattern=r"[a-z0-9][a-z0-9-]{0,39}",
           note="la zone surveillée que le seuil regarde ; absente, toutes"),
@@ -231,9 +230,8 @@ class Programme:
     def build(self, selection: dict) -> dict:
         """A selection of the programme -> the session of the day, resolved.
 
-        This is the whole point of the refactor: the morning run picks and
-        modulates, it does not retype nine exercises and their doses. Everything
-        here is validated, and every refusal names what it expected.
+        The morning run picks and modulates, it does not retype the exercises and their
+        doses. Everything here is validated, and every refusal names what it expected.
         """
         choice = SELECTION_SCHEMA.validate(selection, "séance du jour")
         session = self.session(choice["session"])
@@ -284,9 +282,8 @@ class Programme:
 
         gate = choice.get("gate")
         if gate:
-            # Un garde-fou qui nomme un exercice absent de la séance ne se
-            # déclencherait jamais, et personne ne s'en apercevrait : même refus
-            # que pour « drop », et pour la même raison.
+            # A gate naming an exercise absent from the session would never fire and
+            # nobody would notice: same refusal as for "drop", for the same reason.
             unknown = [slug for slug in (gate.get("drop") or [])
                        if slug not in {p.slug for p in kept}]
             if unknown:

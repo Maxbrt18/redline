@@ -1,50 +1,48 @@
-# Le règlement par défaut du moteur : les garde-fous EN VIGUEUR et les seuils que le
-# code applique. Une instance qui veut le sien copie ce fichier à la racine de son vault
-# sous le nom `rulebook.toml` : il remplace alors celui-ci en entier, jamais en partie.
+# The engine's default rulebook: the guardrails IN FORCE and the thresholds the code
+# applies. An instance that wants its own copies this file to its vault root as
+# `rulebook.toml`: it then replaces this one entirely, never in part.
 #
-# Le règlement compile ce qui a été décidé ; il ne décide rien. Changer le SENS d'une
-# règle est une décision de coaching : une entrée datée dans `coaching/decisions.md`,
-# puis le propriétaire de la règle, puis ce fichier, dans le même commit. L'histoire
-# d'une règle vit chez son propriétaire, jamais ici : une version ancienne qui remonte
-# est exactement ce que ce fichier existe pour empêcher.
+# The rulebook compiles what was decided; it decides nothing. Changing the MEANING of a
+# rule is a coaching decision: a dated entry in `coaching/decisions.md`, then the rule's
+# owner, then this file, in the same commit. A rule's history lives with its owner, never
+# here: an old version resurfacing is exactly what this file exists to prevent.
 
-# ------------------------------------------------------------------ seuils appliqués
+# ------------------------------------------------------------------ applied thresholds
 
 [parameters]
-# Garde-fou n°8 : une transition est une séance dont la NATURE sort d'autant de jours.
-# C'est aussi la fenêtre de la plus longue sortie récente, le repère d'un palier de SL.
+# Guardrail no. 8: a transition is a session whose KIND has been absent for this many days.
+# It is also the window of the longest recent outing, the reference for a long-run step.
 transition_lookback_days = 30
-# Garde-fou n°8 : transitions au plus par semaine, contrôlé à l'écriture du programme.
+# Guardrail no. 8: at most this many transitions per week, checked when the programme is written.
 transitions_per_week = 1
-# La porte : une hausse facile s'ajoute si le pic d'effort hebdo de chaque zone reste
-# à ce niveau ou en dessous…
+# The gate: an easy increase may be added if each zone's weekly effort peak stays at or
+# below this level...
 gate_effort_peak = 1.5
-# … sans hausse sur autant de semaines.
+# ... over this many weeks without an increase.
 gate_trend_weeks = 2
-# Garde-fou n°3 : plafond de douleur à l'effort, sur sa table.
+# Guardrail no. 3: pain cap during effort, on its table.
 pain_cap = 2
-# Garde-fou n°7 : une séance plus longue (en heures) est un jour exigeant.
+# Guardrail no. 7: a session at least this long (in hours) counts as a hard day.
 hard_min_hours = 1.25
-# L'affûtage couvre les N dernières semaines, semaine de course incluse.
+# The taper covers the last N weeks, race week included.
 taper_weeks = 3
-# La plus longue sortie sans nouveau record sur autant de semaines CLOSES ouvre le
-# protocole d'instruction des baisses.
+# A longest outing with no new record over this many CLOSED weeks opens the protocol that
+# investigates drops.
 stall_weeks = 3
-# En dessous de cet écart (km), deux sorties sont « la même » plus longue : bruit GPS.
+# Below this gap (km), two outings are "the same" longest one: GPS noise.
 stall_tolerance_km = 0.1
-# La trace au réveil se recueille le matin : passé cette heure locale, le carnet ne la
-# demande plus et le rappel ne part plus.
+# The waking trace is collected in the morning: after this local time the logbook stops
+# asking for it and the reminder is no longer sent.
 wake_trace_until = "14:00"
-# Garde-fou n°2 : les semaines d'assimilation planifiées (« 2026-W35 »). Rien de neuf
-# ne s'y place.
+# Guardrail no. 2: the planned assimilation weeks (ISO weeks). Nothing new is placed in them.
 assimilation_weeks = []
 
 # ------------------------------------------------------------------ transitions
 
-# Les NATURES de séance qu'une transition peut porter. Le slug est ce que le programme
-# enregistre ; le libellé, ce que le carnet et le bilan affichent. `race_first` : une
-# première fois que la course exige avant l'affûtage (le solveur à rebours la place).
-# `quality` : la séance se débriefe comme une qualité, répétition par répétition.
+# The session KINDS a transition may carry. The slug is what the programme records; the
+# label, what the logbook and the review display. `race_first`: a first time the race
+# requires before the taper (the backward solver places it). `quality`: the session is
+# debriefed as a quality session, repetition by repetition.
 [[transitions]]
 slug = "qualite"
 label = "1re qualité"
@@ -67,14 +65,14 @@ slug = "reconnaissance"
 label = "reconnaissance du tracé"
 race_first = true
 
-# ------------------------------------------------------------------ règles
+# ------------------------------------------------------------------ rules
 
-# Une ligne par règle, injectée au coach à chaque tour : courte, sans histoire. `text`
-# peut citer un seuil entre accolades (`{pain_cap}`) : la valeur appliquée et la valeur
-# dite au coach sont ainsi la même. `owner` nomme le fichier du vault qui porte le
-# raisonnement ; `enforced_by`, ce qui l'applique.
+# One line per rule, injected to the coach every turn: short, without history. `text` may
+# cite a threshold in braces (`{pain_cap}`): the applied value and the value told to the
+# coach are thus the same. `owner` names the vault file holding the reasoning;
+# `enforced_by`, what applies the rule.
 #
-# Les règles n2, n7, n8, po et s9 sont appliquées par le moteur : elles sont obligatoires.
+# Rules n2, n7, n8, po and s9 are enforced by the engine: they are mandatory.
 
 [[rules]]
 id = "n1"

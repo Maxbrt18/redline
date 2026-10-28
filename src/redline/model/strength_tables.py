@@ -2,8 +2,7 @@
 
 Lives here rather than in `scripts/strength-tables.py` so that both consumers can
 simply import it: the CLI that regenerates the tables, and the `vault-check.py`
-control that reports a drift. A hyphenated file name is not an importable module,
-which is why the control used to reach for `importlib.spec_from_file_location`.
+control that reports a drift. A hyphenated file name is not an importable module.
 """
 
 from __future__ import annotations
@@ -26,14 +25,14 @@ def blocks(programme: Programme) -> dict[str, str]:
 
 HEADERS = ["#", "Exercice", "Dose", "Repos", "Depuis"]
 
-# La vue du journal : ce qui a été RÉELLEMENT fait, en face du programme.
+# The log view: what was ACTUALLY done, set against the programme.
 LOG_BLOCK = "RENFO_JOURNAL"
 LOG_HEADERS = ["Exercice", "Total, 3 dernières séances", "Écart G/D", "Score"]
 LOG_SESSIONS = 3
 
-# Le drapeau du test de capacité mollet (`strength.md` § Instrument). Il est
-# **affiché**, jamais interprété : l'étendre des conditions standardisées du test
-# aux séries de séance est un arbitrage de coaching, pas un effet de bord de code.
+# Flag of the calf capacity test (`strength.md` § Instrument). It is only **displayed**,
+# never interpreted: extending it from the test's standardised conditions to session sets
+# is a coaching call, not a side effect of code.
 GAP_FLAG = 10.0
 
 
@@ -57,14 +56,14 @@ def render(programme: Programme, key: str) -> str:
 
 
 def _totals(row: dict) -> tuple:
-    """(droite, gauche, sans côté) pour une séance et un exercice."""
+    """(right, left, sideless) totals for one session and one exercise."""
     return (sum(strength_log.series(row.get("droite"))),
             sum(strength_log.series(row.get("gauche"))),
             sum(strength_log.series(row.get("valeurs"))))
 
 
 def _gap(row: dict) -> str:
-    """« D 37 / G 34 (−8 %) » — le côté faible, chiffré, ou « — »."""
+    """"D 37 / G 34 (−8 %)": the weaker side, quantified, or "—"."""
     right, left, _ = _totals(row)
     if not (right and left):
         return "—"
@@ -74,12 +73,11 @@ def _gap(row: dict) -> str:
 
 
 def render_log(programme: Programme, path: Path) -> str:
-    """Ce que les dernières séances ont banqué, exercice par exercice.
+    """What the latest sessions banked, exercise by exercise.
 
-    Une ligne par exercice, dans l'ordre du programme, avec le total des séries des
-    trois dernières séances (ancienne → récente). Le détail série par série reste
-    dans le CSV : cette vue répond aux deux seules questions qu'on lui pose — est-ce
-    que ça progresse, et est-ce que les deux jambes suivent.
+    One line per exercise, in programme order, with the set totals of the last three
+    sessions (oldest -> newest). Set-by-set detail stays in the CSV: this view answers the
+    only two questions asked of it, is it progressing and do both legs keep up.
     """
     rows = strength_log.rows(path)
     if not rows:
@@ -90,11 +88,11 @@ def render_log(programme: Programme, path: Path) -> str:
     for row in rows:
         by_slug.setdefault(row.get("slug", ""), []).append(row)
 
-    # L'ordre du programme, pas celui du fichier : la vue se lit en face des tables
-    # ci-dessus. Un exercice retiré depuis garde sa ligne, à la fin.
+    # Programme order, not file order: the view is read next to the tables above. A
+    # since-removed exercise keeps its row, at the end.
     order = []
-    # Les séries menées À L'ÉCHEC technique : leur score de difficulté n'est pas un
-    # instrument. Voir la colonne Score plus bas.
+    # Sets taken to technical FAILURE: their difficulty score is not an instrument. See
+    # the Score column below.
     amrap = set()
     for key in blocks(programme).values():
         for prescription in programme.prescriptions(key):
@@ -116,17 +114,15 @@ def render_log(programme: Programme, path: Path) -> str:
             total = right + left + plain
             totals.append("—" if session.get("passe") else (str(total) if total else "fait"))
         note = programme.exercises.get(slug)
-        # Le pipe s'écrit nu : table() l'échappe une fois, ce dont Obsidian a
-        # besoin pour lire un alias de wikilink dans une cellule.
+        # The pipe is written plain: table() escapes it once, which Obsidian needs to
+        # read a wikilink alias inside a cell.
         name = f"[[{slug}|{note['name']}]]" if note else slug
         last = recent[-1]
-        # Une série qu'on arrête À L'ÉCHEC technique finit par construction près du haut
-        # de l'échelle : son score ne dit pas si la dose est trop lourde, et la règle
-        # « 8-10 → on régresse » n'a même pas d'objet pour elle (régresser quoi ? le
-        # critère d'arrêt EST l'échec). Sa donnée de progression est le COMPTE, dans la
-        # colonne d'à côté, comme le disent les fiches. Afficher un score nu à côté des
-        # exercices à dose fixe les rendait comparables, et un 10/10 s'y lisait comme
-        # une alarme — c'est arrivé au bilan du 2026-08-20 (coaching/corrections.md).
+        # A set stopped at technical FAILURE ends near the top of the scale by construction:
+        # its score does not say whether the dose is too heavy, and the "8-10 -> regress"
+        # rule has no object for it (the stopping criterion IS failure). Its progression
+        # datum is the COUNT, in the adjacent column. A bare score next to fixed-dose
+        # exercises would make them comparable and a 10/10 would read as an alarm.
         score = "à l'échec" if slug in amrap else (
             f"{last['score']}/10" if last.get("score") else "—")
         table_rows.append([name, " → ".join(totals), _gap(last), score])
