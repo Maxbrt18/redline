@@ -11,12 +11,14 @@ import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from scripts.model.errors import ExternalError
+
 if TYPE_CHECKING:  # annotations seulement : le banc n'impose aucun moteur à l'import
     from evaluation.runner import OneShot
     from redline.agent import RunSpec
 
 
-class ReviewUnavailable(Exception):
+class ReviewUnavailable(ExternalError):
     """Aucun verdict obtenu : indisponibilité distincte d'un refus sémantique."""
 
 

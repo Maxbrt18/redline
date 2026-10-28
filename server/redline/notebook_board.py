@@ -26,6 +26,7 @@ from typing import Any
 from scripts import ledger, signals
 from scripts.model import debrief, programme, session_cycle, transitions
 from scripts.model import ledger as ledger_model
+from scripts.model.errors import InputError
 from scripts.model.instance import Instance, derived_label
 
 from . import session_detail
@@ -60,7 +61,7 @@ PLAN_MESSAGES = {
 }
 
 
-class AnswerError(ValueError):
+class AnswerError(InputError):
     """Une réponse refusée : demande close, valeur hors échelle ou inconnue."""
 
 

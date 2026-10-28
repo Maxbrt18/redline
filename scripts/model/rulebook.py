@@ -28,6 +28,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from . import paths
+from .errors import ConfigError
 from .schema import Schema, SchemaError, field
 
 FILENAME = "rulebook.toml"
@@ -72,7 +73,7 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
 ])
 
 
-class RulebookError(ValueError):
+class RulebookError(ConfigError):
     """Règlement illisible ou non conforme."""
 
 

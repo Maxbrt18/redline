@@ -34,6 +34,7 @@ if str(ROOT) not in sys.path:
 from scripts.model import (  # noqa: E402
     claims,
     correction_replay,
+    entrypoint,
     instance,
     ledger,
 )
@@ -1055,4 +1056,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    entrypoint.run(main)

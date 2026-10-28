@@ -20,11 +20,15 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts import ledger  # noqa: E402
+from scripts import (  # noqa: E402
+    ledger,
+)
 from scripts.model import (  # noqa: E402
+    entrypoint,
     hot_cache,
     paths,
 )
+from scripts.model.errors import InputError  # noqa: E402
 from scripts.model.views import ViewDrift  # noqa: E402
 
 
@@ -43,16 +47,16 @@ def main() -> int:
         drifted = hot_cache.refresh(args.root, ledger, rows, instruments,
                                     store=store, check=args.check)
     except ViewDrift as exc:
-        sys.exit(str(exc))
+        raise InputError(str(exc)) from exc
 
     if not drifted:
         print("Blocs Forme et État déjà à jour.")
     elif args.check:
-        sys.exit("Blocs du hot-cache dérivés — régénère avec `python3 scripts/hot-cache.py`.")
+        raise InputError("Blocs du hot-cache dérivés — régénère avec `python3 scripts/hot-cache.py`.")
     else:
         print("Blocs Forme et État régénérés.")
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    entrypoint.run(main)

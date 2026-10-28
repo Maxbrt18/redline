@@ -19,6 +19,8 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from scripts.model.errors import InputError
+
 PAGE_PATH = "/s"
 SIDECAR_SUFFIX = ".link"
 BUTTON_TITLE = "Ouvrir la séance"   # Messenger caps a button title at 20 characters
@@ -31,11 +33,11 @@ TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{32}$")
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]+")
 
 
-class ReportError(ValueError):
+class ReportError(InputError):
     """Le compte-rendu ne respecte pas le contrat de la page."""
 
 
-class ExpiredLink(ValueError):
+class ExpiredLink(InputError):
     """La capacité a dépassé sa durée d'utilisation."""
 
 

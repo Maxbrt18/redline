@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from scripts.model import paths
+from scripts.model.errors import InputError
 
 #: Ignoré par Git (`.gitignore`) : le service fait `git add -A` en fin de tour.
 DIRECTORY = ".agent-tmp"
@@ -30,7 +31,7 @@ DIRECTORY = ".agent-tmp"
 _SUFFIX = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
 
 
-class AgentInputError(ValueError):
+class AgentInputError(InputError):
     """Le fichier nommé n'est pas celui que ce tour a le droit de remettre."""
 
 

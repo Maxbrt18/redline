@@ -35,7 +35,10 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts import ledger as gauge  # noqa: E402
-from scripts.model import paths  # noqa: E402
+from scripts.model import (  # noqa: E402
+    entrypoint,
+    paths,
+)
 
 # Une cadence à allure égale qui MONTE mérite un regard. Elle ne porte pas sa cause :
 # travail volontaire, terrain, allure, bruit de mesure et protection sont des hypothèses.
@@ -260,4 +263,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    entrypoint.run(main)

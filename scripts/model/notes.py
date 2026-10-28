@@ -12,6 +12,7 @@ from pathlib import Path
 
 import yaml
 
+from .errors import InputError
 from .schema import Schema, SchemaError
 
 FENCE = "---"
@@ -21,7 +22,7 @@ FENCE = "---"
 _PARSED: dict[Path, tuple[tuple[int, int], dict]] = {}
 
 
-class NoteError(ValueError):
+class NoteError(InputError):
     """The note cannot be read, or does not conform. Names the file."""
 
 

@@ -30,7 +30,10 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.cards import cli, render, strength_card  # noqa: E402
-from scripts.model import paths  # noqa: E402
+from scripts.model import (  # noqa: E402
+    entrypoint,
+    paths,
+)
 from scripts.model.notes import NoteError  # noqa: E402
 from scripts.model.schema import SchemaError  # noqa: E402
 
@@ -40,6 +43,7 @@ from scripts.model.schema import SchemaError  # noqa: E402
 # from its own package), which is what makes reaching into server/ safe here.
 sys.path.insert(0, str(ROOT / "server"))
 from redline import strength  # noqa: E402
+from scripts.model.errors import InputError  # noqa: E402
 
 
 def write_link(out: Path, built: dict) -> None:
@@ -57,13 +61,13 @@ def main() -> None:
         target, built = strength_card.render_card(
             cli.read_input(args.input), out, root=paths.vault_root(), html_only=args.html)
     except (NoteError, SchemaError) as exc:
-        sys.exit(f"Séance non générée — {exc}")
+        raise InputError(f"Séance non générée — {exc}") from exc
     except render.CardOverflow as exc:
-        sys.exit(f"Card non générée — {exc}")
+        raise InputError(f"Card non générée — {exc}") from exc
     if not args.html:
         write_link(out, built)
     print(target)
 
 
 if __name__ == "__main__":
-    main()
+    entrypoint.run(main)

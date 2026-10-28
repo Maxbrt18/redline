@@ -33,7 +33,12 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.model import agent_input, commands  # noqa: E402
+from scripts.model import (  # noqa: E402
+    agent_input,
+    commands,
+    entrypoint,
+)
+from scripts.model.errors import ConfigError  # noqa: E402
 from scripts.model.notes import NoteError  # noqa: E402
 from scripts.model.schema import SchemaError  # noqa: E402
 from scripts.model.weekly_plan import (  # noqa: E402
@@ -81,7 +86,7 @@ EXIT_STALE = 3
 def _database_store():
     url = (os.environ.get("DATABASE_URL") or "").strip()
     if not url:
-        raise SystemExit("DATABASE_URL obligatoire : le journal ne contient qu'une projection")
+        raise ConfigError("DATABASE_URL obligatoire : le journal ne contient qu'une projection")
     from scripts.storage import Database, OperationalStore
     return OperationalStore(Database(url, application_name="week-plan"))
 
@@ -202,4 +207,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    entrypoint.run(main)

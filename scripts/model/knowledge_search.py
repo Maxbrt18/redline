@@ -9,7 +9,7 @@ import unicodedata
 from pathlib import Path
 from typing import TypedDict
 
-from scripts.model import paths
+from scripts.model import entrypoint, paths
 
 STOP = frozenset({"avec", "dans", "pour", "plus", "moins", "comment", "quelle",
                   "quelles", "quel", "quels", "leurs", "notre", "cette", "sont",
@@ -89,4 +89,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    entrypoint.run(main)

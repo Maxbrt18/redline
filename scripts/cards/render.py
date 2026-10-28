@@ -14,6 +14,8 @@ import os
 import sys
 from pathlib import Path
 
+from scripts.model.errors import InputError
+
 CARDS_DIR = Path(__file__).resolve().parent
 FONTS_DIR = CARDS_DIR / "fonts"
 TOKENS = CARDS_DIR / "tokens.css"   # palette and faces, shared with the session page
@@ -36,7 +38,7 @@ FONT_FACES = (
 )
 
 
-class CardOverflow(RuntimeError):
+class CardOverflow(InputError):
     """The layout could not hold its content. Raised BEFORE writing any PNG."""
 
 
@@ -183,5 +185,5 @@ def emit(body: str, out_path: str, *, html_only: bool = False, **kwargs) -> None
     try:
         render(body, str(target), **kwargs)
     except CardOverflow as exc:
-        sys.exit(f"Card non générée — {exc}")
+        raise InputError(f"Card non générée — {exc}") from exc
     print(target)

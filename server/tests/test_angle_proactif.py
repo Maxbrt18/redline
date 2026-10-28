@@ -26,6 +26,7 @@ from conftest import load_script
 from redline.prompts import PROACTIVE_TRIGGERS, build_proactive_prompt
 from redline.vault import VaultRepo
 from scripts.model import commands
+from scripts.model.errors import InputError
 
 fact_write = load_script("fact-write")
 
@@ -63,7 +64,7 @@ def test_the_cli_refuses_an_angle_outside_a_turn(monkeypatch, capsys):
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://x/y")
     monkeypatch.setattr("sys.argv", ["fact-write.py", "angle", "titre Strava"])
 
-    with pytest.raises(SystemExit) as refus:
+    with pytest.raises(InputError) as refus:
         fact_write.main()
 
     assert "tour" in str(refus.value)

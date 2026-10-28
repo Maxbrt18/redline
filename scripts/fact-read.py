@@ -19,9 +19,10 @@ if str(ROOT / "server") not in sys.path:
     sys.path.insert(0, str(ROOT / "server"))
 
 from redline.race_countdown import compile_deadline
+from scripts.model import entrypoint, voice
 from scripts.model import ledger as table
 from scripts.model import predictions as prediction_model
-from scripts.model import voice
+from scripts.model.errors import ConfigError, InputError
 
 
 def _known(row: dict, metric: str, suffix: str = "") -> str | None:
@@ -278,14 +279,14 @@ def parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = parser().parse_args()
     if not args.database_url:
-        raise SystemExit("DATABASE_URL obligatoire")
+        raise ConfigError("DATABASE_URL obligatoire")
     from scripts.storage import Database, OperationalStore
 
     database = Database(args.database_url, application_name="fact-read")
     store = OperationalStore(database)
     limit = getattr(args, "limit", 1)
     if limit < 1 or limit > 1000:
-        raise SystemExit("limit attendu entre 1 et 1000")
+        raise InputError("limit attendu entre 1 et 1000")
     if args.command == "questions":
         lines = [f"{row['id']} · {row['status']} · posée {row['asked_at']} · "
                  f"reprise {row['follow_up_on'] or 'non fixée'} · {row['question']} · "
@@ -293,7 +294,7 @@ def main() -> int:
     elif args.command == "conversation":
         turn_id = os.environ.get("REDLINE_TURN_ID", "").strip()
         if not turn_id:
-            raise SystemExit("REDLINE_TURN_ID obligatoire pour la conversation")
+            raise InputError("REDLINE_TURN_ID obligatoire pour la conversation")
         lines = []
         for group in store.conversation_search_for_turn(turn_id, args.query, min(limit, 12)):
             hit = group["hit"]
@@ -340,4 +341,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    entrypoint.run(main)

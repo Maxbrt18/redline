@@ -41,7 +41,11 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.model import agent_input  # noqa: E402
+from scripts.model import (  # noqa: E402
+    agent_input,
+    entrypoint,
+)
+from scripts.model.errors import InputError  # noqa: E402
 
 
 def descent(dplus: float, altitude: list) -> int:
@@ -74,9 +78,9 @@ def main() -> int:
         altitude = _altitude(args.altitude or agent_input.read_text(args.input))
         print(descent(args.dplus, altitude))
     except ValueError as exc:
-        sys.exit(f"D− incalculable — {exc}")
+        raise InputError(f"D− incalculable — {exc}") from exc
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    entrypoint.run(main)

@@ -10,6 +10,8 @@ import sqlalchemy as sa
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.exc import SQLAlchemyError
 
+from scripts.model.errors import StorageError
+
 
 def expected_schema_revision(config_path: Path) -> str:
     """La tête Alembic portée par le code en cours d'exécution."""
@@ -21,10 +23,6 @@ def expected_schema_revision(config_path: Path) -> str:
     if not revision:
         raise StorageError("aucune tête Alembic dans le code déployé")
     return revision
-
-
-class StorageError(RuntimeError):
-    """Une opération de persistance a échoué sans exposer de secret de connexion."""
 
 
 class Database:

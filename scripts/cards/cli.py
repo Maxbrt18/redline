@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 
 from scripts.model import agent_input
+from scripts.model.errors import InputError
 from scripts.model.schema import Schema, SchemaError
 
 
@@ -31,9 +31,9 @@ def read_input(path: str | None) -> dict:
     try:
         return agent_input.read_json(path)
     except json.JSONDecodeError as exc:
-        sys.exit(f"JSON illisible : {exc}")
+        raise InputError(f"JSON illisible : {exc}") from exc
     except agent_input.AgentInputError as exc:
-        sys.exit(str(exc))
+        raise InputError(str(exc)) from exc
 
 
 def read_input_json(schema: Schema, path: str | None) -> dict:
@@ -45,4 +45,4 @@ def read_input_json(schema: Schema, path: str | None) -> dict:
     try:
         return schema.validate(read_input(path), schema.name)
     except SchemaError as exc:
-        sys.exit(f"Card non générée — {exc}")
+        raise InputError(f"Card non générée — {exc}") from exc

@@ -27,6 +27,8 @@ if str(ROOT / "server") not in sys.path:
     sys.path.insert(0, str(ROOT / "server"))
 
 from redline.postgres_state import PostgresStateStore  # noqa: E402
+from scripts.model import entrypoint  # noqa: E402
+from scripts.model.errors import ConfigError  # noqa: E402
 from scripts.storage import Database  # noqa: E402
 
 KEY = re.compile(r"^[a-z0-9][a-z0-9-]{2,60}$")
@@ -45,7 +47,7 @@ def main() -> int:
         parser.error("--text vide")
     url = (os.environ.get("DATABASE_URL") or "").strip()
     if not url:
-        raise SystemExit("DATABASE_URL obligatoire")
+        raise ConfigError("DATABASE_URL obligatoire")
     state = PostgresStateStore(Database(url, application_name="operator-message"))
     now = time.time()
     job_key = f"operator:{args.key}"
@@ -57,4 +59,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    entrypoint.run(main)

@@ -20,6 +20,8 @@ from urllib.parse import urlparse
 
 import requests
 
+from scripts.model.errors import ExternalError
+
 MAX_ATTACHMENTS = 4
 MAX_REDIRECTS = 3
 CHUNK_SIZE = 64 * 1024
@@ -38,7 +40,7 @@ ALLOWED_DOCUMENT_TYPES = {
 REDIRECT_CODES = frozenset({301, 302, 303, 307, 308})
 
 
-class AttachmentError(RuntimeError):
+class AttachmentError(ExternalError):
     """Erreur présentable à l'athlète, sans recopier URL ni réponse distante."""
 
 

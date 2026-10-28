@@ -10,6 +10,8 @@ import csv
 import re
 from pathlib import Path
 
+from .errors import InputError
+
 
 def csv_rows(path: Path) -> list:
     """Les lignes d'une vue CSV, cellules vides retirées : un appelant lit `row.get(...)`,
@@ -22,7 +24,7 @@ def csv_rows(path: Path) -> list:
                 for entry in csv.DictReader(handle)]
 
 
-class ViewDrift(RuntimeError):
+class ViewDrift(InputError):
     """The generated block no longer matches its source."""
 
 

@@ -18,6 +18,8 @@ from __future__ import annotations
 import datetime as dt
 import re
 
+from .errors import InputError
+
 # A prediction "revue W36" comes due once that week has ended. The week carries no
 # year: it is the W36 of the decision's ISO year, unless that one ended more than half
 # a year before the decision -- a "W03" written in December means next January. No
@@ -93,7 +95,7 @@ FIXED_REVIEW = re.compile(r"^\*\*Revue fixée\*\*\s*\(\d{4}-\d{2}-\d{2}\)\s*:?\s
                           re.MULTILINE)
 
 
-class DecisionFormatError(ValueError):
+class DecisionFormatError(InputError):
     """A prediction-looking rubric would be silently absent from the index."""
 
 

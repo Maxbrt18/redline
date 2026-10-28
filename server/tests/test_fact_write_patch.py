@@ -21,6 +21,8 @@ import datetime as dt
 import pytest
 from conftest import load_script
 
+from scripts.model.errors import InputError
+
 fact_write = load_script("fact-write")
 
 
@@ -89,7 +91,7 @@ def test_patch_sur_un_fil_preserve_le_corps():
 def test_sans_patch_un_champ_obligatoire_manquant_est_refuse_et_nomme():
     """L'obligation a quitté argparse : si elle n'est plus testée, elle disparaît."""
     args = parse("deadline", "--key", "d-1", "--due-on", "2026-08-23")
-    with pytest.raises(SystemExit) as refus:
+    with pytest.raises(InputError) as refus:
         fact_write._payload(args, None)
     message = str(refus.value)
     assert "--item" in message and "--fact-owner" in message and "--status" in message
@@ -110,7 +112,7 @@ def test_patch_sur_une_cle_inexistante_refuse_au_lieu_de_creer_a_trous():
         def deadline_rows(self):
             return [deadline_row(deadline_key="autre")]
 
-    with pytest.raises(SystemExit, match="clé inexistante"):
+    with pytest.raises(InputError, match="clé inexistante"):
         fact_write._existing(Store(), "deadline", "d-1")
 
 
@@ -159,7 +161,7 @@ def test_une_correction_n_entre_en_base_qu_ecrite_au_journal(tmp_path, monkeypat
     _, kind, payload = fact_write._payload(args)
     assert kind == "correction.register"
     assert payload == {"correction_key": "k", "summary": "s"}
-    with pytest.raises(SystemExit, match="n'est pas une entrée"):
+    with pytest.raises(InputError, match="n'est pas une entrée"):
         fact_write._payload(parse("correction", "--correction-key", "k", "--summary", "s",
                                   "--entry", "2026-09-17 — inventée"))
 
@@ -179,5 +181,5 @@ def test_une_prediction_corps_se_rattache_au_reveil_qui_la_tranche():
     assert payload["resolves_on"] == {"kind": "reveil", "date": "2026-10-19",
                                       "success_if": "<=1"}
     assert "resolves_on" not in fact_write._payload(parse(*base))[2]
-    with pytest.raises(SystemExit, match="vont ensemble"):
+    with pytest.raises(InputError, match="vont ensemble"):
         fact_write._payload(parse(*base, "--resolves", "reveil"))
