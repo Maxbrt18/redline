@@ -175,7 +175,10 @@ def test_agent_cli_policy_is_sorted_unique_and_points_to_tracked_scripts():
 
 def test_every_cli_named_to_the_live_agent_is_in_the_root_owned_policy():
     references = set()
-    for path in (ROOT / "CLAUDE.md", ROOT / "server" / "redline" / "prompts.py"):
+    texts = sorted(path for path in (ROOT / "scripts" / "coach").rglob("*")
+                   if path.suffix in {".md", ".py"})
+    assert texts
+    for path in (ROOT / "CLAUDE.md", *texts):
         references.update(re.findall(r"scripts/([a-z0-9-]+\.py)", path.read_text(
             encoding="utf-8")))
     assert references <= set(_agent_tool_policy())

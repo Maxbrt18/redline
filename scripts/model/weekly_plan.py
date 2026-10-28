@@ -719,7 +719,7 @@ def blocking_gates(plan: dict, today: dt.date | None = None) -> list[dict]:
 
 def gate_reasons(plan: dict, today: dt.date | None = None) -> list[str]:
     """Le texte des contrôles échus, tel qu'il est servi au coach."""
-    return [f"contrôle daté du {gate['due']} non levé — DEMANDE À SAM AVANT "
+    return [f"contrôle daté du {gate['due']} non levé — DEMANDE À L'ATHLÈTE AVANT "
             f"TOUTE PRESCRIPTION : {gate['question']} ; à défaut : {gate['on_fail']}. "
             "Le contrôle ne se lève qu'en enregistrant une révision dont le motif "
             "porte SA réponse, jamais en le retirant du programme."

@@ -3,7 +3,7 @@
 Two note shapes, both already native to the vault (`coaching/capabilities/cap*.md`
 and `coaching/workouts/*.md` do the same thing):
 
-  - `coaching/exercises/<slug>.md` -- one movement as it is PRESCRIBED TO SAM.
+  - `coaching/exercises/<slug>.md` -- one movement as it is PRESCRIBED TO THE ATHLETE.
     Frontmatter: the dose. Body: why it is there, with its sources. The file name
     is the slug; there is no `slug:` field to keep in sync with itself.
   - `coaching/workouts/renfo-*.md` -- a session: its title, the rule printed at

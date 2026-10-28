@@ -112,7 +112,8 @@ comme annulés parce qu'une projection ou un push Git a échoué.
 | `textutils.py` | découpage en rafale, partagé par l'agent et le transport |
 | `outbox.py` | cycle de vie des images et sidecars |
 | `strength_artifact.py` | carte renfo rendue depuis la prescription typée |
-| `prompts.py` | textes injectés et workflows proactifs |
+| `prompts.py` | choix des textes injectés à chaque tour et des workflows proactifs |
+| `scripts/coach/fr/` | les mots de ces textes : `prompts/*.md` et `messages.py` |
 | `strength.py`, `page/` | capacités opaques et page de renforcement |
 | `scripts/storage/repository.py` | transactions et faits opérationnels |
 | `scripts/storage/projector.py` | vues Obsidian régénérables |
@@ -120,7 +121,7 @@ comme annulés parce qu'une projection ou un push Git a échoué.
 Pour modifier un comportement :
 
 - ton, méthode ou règle de coaching : `CLAUDE.md` ou son propriétaire dans le vault ;
-- texte injecté par le service : `prompts.py` ;
+- texte injecté par le service : `scripts/coach/fr/` ; quand il est injecté : `prompts.py` ;
 - décision d'envoi : `bot.py` ;
 - forme du programme : `scripts/model/weekly_plan.py` ;
 - rendu Messenger du programme : `plans.py` ;

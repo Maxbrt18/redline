@@ -292,7 +292,7 @@ def test_due_gate_is_exposed_only_when_due():
     assert weekly_plan.gate_reasons(current, today=dt.date(2026, 8, 7)) == []
     reasons = weekly_plan.gate_reasons(current, today=dt.date(2026, 8, 8))
     assert reasons[0].startswith("contrôle daté du 2026-08-08 non levé")
-    assert "DEMANDE À SAM" in reasons[0]
+    assert "DEMANDE À L'ATHLÈTE" in reasons[0]
     assert "jamais en le retirant du programme" in reasons[0]
 
 
