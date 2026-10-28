@@ -9,9 +9,7 @@ from __future__ import annotations
 import datetime as dt
 from collections.abc import Sequence
 
-DAYS = ("lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche")
-MONTHS = ("janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août",
-          "septembre", "octobre", "novembre", "décembre")
+from .calendar import DAYS, MONTHS
 
 #: How a missing ledger cell is asked for: the unit asked, not the unit stored.
 LABELS = {

@@ -7,7 +7,7 @@ declared attributes; no module lists slugs of its own.
 
 Which strength routine a `strength` session follows is instance data: the routines are
 the workout notes of the vault that declare `routine:` (see `programme.py`).
-Athlete-facing labels live in `session_labels.py`.
+Athlete-facing labels live in `scripts/coach/fr/session_labels.py`.
 """
 
 from __future__ import annotations

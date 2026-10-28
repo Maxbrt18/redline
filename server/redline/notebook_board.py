@@ -24,6 +24,10 @@ from pathlib import Path
 from typing import Any
 
 from scripts import ledger, signals
+from scripts.coach.fr import notebook as notebook_text
+from scripts.coach.fr import session_labels
+from scripts.coach.fr.calendar import DAY_LETTERS
+from scripts.coach.fr.notebook import HR_REASONS, PAIN_SCALE
 from scripts.model import (
     debrief,
     local_time,
@@ -31,7 +35,6 @@ from scripts.model import (
     rulebook,
     session_cycle,
     session_kinds,
-    session_labels,
     transitions,
 )
 from scripts.model import ledger as ledger_model
@@ -43,37 +46,18 @@ from . import session_detail
 from .plans import PlanStatus, blocked_session_ids
 
 ACTOR = "carnet"
-DAY_LETTERS = ("L", "M", "M", "J", "V", "S", "D")
-#: Libellés d'affichage des capacités ; le slug reste l'identité.
 MOVING_TYPES = session_kinds.MOVING
 #: Le point du matin : l'état du jour, déclaratif, aux valeurs de `fact-write.py daily`.
 DAILY_FIELDS = {"sleep": ("bonne", "moyenne", "mauvaise"),
                 "life_load": ("legere", "normale", "elevee")}
-#: Une FC haute à allure comparable pose sa question discriminante (alarme n°4 du plan) :
-#: la réponse va à l'état du jour de la sortie ; « rien de spécial » part au coach.
-HR_REASONS = {"sommeil": "nuit courte", "rhume": "début de rhume",
-              "chaleur": "chaleur ou terrain", "rien": "rien de spécial"}
+#: Une FC haute à allure comparable pose sa question pendant deux jours ; la réponse va
+#: à l'état du jour de la sortie.
 HR_ASK_DAYS = 2
-PLAN_MESSAGES = {
-    PlanStatus.INVALID: "Le programme de la semaine n’est pas encore prêt : il arrive "
-                        "dans Messenger.",
-    PlanStatus.STALE: "Une activité non prévue doit être arbitrée : le coach revoit "
-                      "le programme avant la prochaine séance.",
-    PlanStatus.AWAITING: "Une question t’attend dans Messenger avant une séance.",
-}
+PLAN_MESSAGES = {PlanStatus[name]: text for name, text in notebook_text.PLAN_MESSAGES.items()}
 
 
 class AnswerError(InputError):
     """Une réponse refusée : demande close, valeur hors échelle ou inconnue."""
-
-
-# L'échelle de l'athlète, en ses mots : propriétaire `coaching/protocols.md` (§ Comment lire
-# la douleur). Le carnet la montre à côté des points pour qu'un chiffre se relise.
-PAIN_SCALE = [
-    {"value": 1, "text": "La tension est là, pas gênante."},
-    {"value": 2, "text": "Tu commences à douter, tu changerais ta foulée\u202f; le lendemain, conséquences légères."},
-    {"value": 3, "text": "« J’en ai fait trop » : 1 à 2 semaines de charge à revoir."},
-]
 
 
 def week_label(day: dt.date) -> str:

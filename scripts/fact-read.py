@@ -19,7 +19,8 @@ if str(ROOT / "server") not in sys.path:
     sys.path.insert(0, str(ROOT / "server"))
 
 from redline.race_countdown import compile_deadline
-from scripts.model import entrypoint, session_labels, voice
+from scripts.coach.fr import session_labels
+from scripts.model import entrypoint, voice
 from scripts.model import ledger as table
 from scripts.model import predictions as prediction_model
 from scripts.model.errors import ConfigError, InputError

@@ -21,7 +21,16 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import ClassVar
 
-from scripts.model import commands as command_model
+from scripts.coach.fr import replies
+from scripts.coach.fr.replies import (
+    ATTACHMENT_UNREADABLE,
+    EMPTY_REPLY,
+    EMPTY_REPLY_APPLIED,
+    OUTAGE_NOTICE,
+    PLAN_UNAVAILABLE_LINE,
+    UNRECORDED_GENERIC,
+    UNRECORDED_LABELS,
+)
 from scripts.model import ledger as ledger_model
 from scripts.model import session_kinds
 from scripts.model import weekly_plan as weekly_plan_model
@@ -112,48 +121,9 @@ CONTROL_COMMANDS = frozenset({"/status", "/cancel"})
 # Niveaux dont le paquet métier porte déjà les fils ouverts (`context_packet.py`).
 PACKET_THREAD_DEPTHS = frozenset({"N2", "N3"})
 
-# ⭐ UNE SEULE VOIX POUR LES LIMITES. Aucune phrase n'est fabriquée par un adaptateur :
-# elles disent à l'athlète ce qui se passe POUR LUI et ce qui va arriver, jamais le
-# mécanisme (« watchdog », « tour », « contrôle »). Classe 2 de la doctrine d'erreur :
-# une phrase précise, une fois, seulement quand il attend quelque chose qui ne viendra
-# pas dans un délai humain ou qu'une donnée qu'il a donnée n'est pas enregistrée.
 FAILURE_REPLIES = {
-    FailureKind.WATCHDOG: (
-        "Je n'ai pas réussi à finir ma réponse à temps. Redis-moi l'essentiel en une "
-        "phrase et je repars de là."),
-    FailureKind.IN_FLIGHT: (
-        "Ma réponse s'est interrompue en route. Renvoie-moi ton message quand tu veux, "
-        "je reprends de zéro."),
-}
-OUTAGE_NOTICE = (
-    "Je n'arrive pas à te répondre tout de suite. Je garde ton message et je te réponds "
-    "dès que possible.")
-EMPTY_REPLY = "Je n'ai pas réussi à formuler ma réponse. Redis-moi l'essentiel et je repars de là."
-EMPTY_REPLY_APPLIED = (
-    "J'ai bien noté ce que tu m'as donné, mais ma réponse ne s'est pas écrite. Dis-moi si "
-    "tu attendais autre chose.")
-PLAN_UNAVAILABLE_LINE = (
-    "Je n'ai pas de programme valide pour cette semaine en ce moment, donc pas de séance "
-    "à te donner tant qu'il n'est pas refait. Je m'en occupe.")
-ATTACHMENT_UNREADABLE = (
-    "Je n'ai pas réussi à lire ce fichier en entier. Envoie-moi seulement la page ou "
-    "l'image qui compte.")
-UNRECORDED_GENERIC = (
-    "Attention : ce que tu viens de me donner n'a pas pu être enregistré. Ne le considère "
-    "pas comme noté ; redis-le-moi dans un moment.")
-# Ce que l'athlète a donné, nommé dans ses mots. Les commandes internes (question déclarée,
-# angle, fil) n'apparaissent pas : leur perte ne change rien pour lui.
-UNRECORDED_LABELS = {
-    command_model.OBSERVATION_ADD: "ta séance",
-    command_model.EXPOSURE_UPSERT: "ta séance",
-    command_model.MEASUREMENT_COMPLETE: "tes ressentis sur la séance",
-    command_model.HR_DOUBT: "ta FC douteuse",
-    command_model.PLAN_REVISE: "le changement de programme",
-    command_model.DAILY_UPSERT: "ton état du jour",
-    command_model.SESSION_START: "ton départ",
-    command_model.SESSION_MATCH: "le rattachement de ta sortie",
-    command_model.ACTIVITY_LINK: "le rattachement de ta sortie",
-    command_model.GEAR_UPSERT: "ton matériel",
+    FailureKind.WATCHDOG: replies.TIMED_OUT,
+    FailureKind.IN_FLIGHT: replies.INTERRUPTED,
 }
 
 
@@ -164,11 +134,7 @@ def unrecorded_line(kinds: Iterable[str]) -> str:
         return UNRECORDED_GENERIC
     labels = list(dict.fromkeys(UNRECORDED_LABELS[kind] for kind in kinds
                                 if kind in UNRECORDED_LABELS))
-    if not labels:
-        return ""
-    joined = labels[0] if len(labels) == 1 else ", ".join(labels[:-1]) + " et " + labels[-1]
-    return (f"Attention : je n'ai pas pu enregistrer {joined}. Ne le considère pas comme "
-            "noté ; redis-le-moi dans un moment.")
+    return replies.unrecorded(labels) if labels else ""
 
 
 #: Les initiatives qui demandaient des ressentis que le carnet recueille désormais.

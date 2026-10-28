@@ -10,8 +10,11 @@ import json
 import re
 from itertools import pairwise
 
+from scripts.coach.fr import session_labels
+from scripts.coach.fr.calendar import DAYS as WEEKDAYS
+
 from . import instance as instance_model
-from . import paths, rulebook, session_kinds, session_labels, transitions, typography
+from . import paths, rulebook, session_kinds, transitions, typography
 from . import programme as strength_programme
 from .notes import NoteError
 from .programme import GATE_SCHEMA as STRENGTH_GATE_SCHEMA
@@ -730,7 +733,6 @@ def as_json(plan: dict) -> str:
     return json.dumps(active(plan), ensure_ascii=False, indent=2)
 
 
-WEEKDAYS = ("lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche")
 
 
 def distance_of(session: dict) -> str:
