@@ -121,7 +121,7 @@ def missing_cells(to_ask: str, cell_keys: str, to_fetch: str, lapsed: str, *,
                      + cell_keys)
     if to_fetch:
         parts.append(
-            "NE DEMANDE PAS CECI À SAM, il ne peut pas le savoir : "
+            "NE DEMANDE PAS CECI À ⟨athlète⟩, il ne peut pas le savoir : "
             + to_fetch + ". Ces cellules se calculent depuis "
             "Strava. Va les chercher avec `python3 scripts/strava.py streams <id> "
             "--keys altitude | python3 scripts/descent.py --dplus <D+>`, puis complète "

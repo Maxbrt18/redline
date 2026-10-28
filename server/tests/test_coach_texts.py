@@ -48,3 +48,11 @@ def test_no_injected_text_keeps_a_placeholder():
 
 def test_fill_replaces_only_the_values_given():
     assert fr.fill("{a} et {b}", a="1") == "1 et {b}"
+
+
+def test_the_texts_name_the_athlete_by_the_token_only():
+    """The test athlete's name, written out, would reach a real athlete as is."""
+    for path in (ENGINE_ROOT / "scripts" / "coach").rglob("*"):
+        if path.suffix in {".md", ".py"}:
+            assert not re.search(r"\bsam\b", path.read_text(encoding="utf-8"),
+                                 re.IGNORECASE), path.name

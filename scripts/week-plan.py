@@ -4,7 +4,7 @@
 Codes de sortie de `check` et `show`, et la distinction porte tout le reste :
 
 - ``0`` prescriptible ;
-- ``2`` valide mais EN ATTENTE D'UNE RÉPONSE DE SAM — un contrôle daté est échu.
+- ``2`` valide mais EN ATTENTE D'UNE RÉPONSE DE L'ATHLÈTE — un contrôle daté est échu.
   Le programme est intact, `show` l'imprime quand même sur stdout, et la conduite à
   tenir est de POSER la question du contrôle (elle est sur stderr), pas de réparer
   quoi que ce soit ;
