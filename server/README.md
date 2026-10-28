@@ -921,7 +921,7 @@ effacer la ligne), et l'explication d'une FC haute à allure comparable sur une 
 deux derniers jours (`signals.hr_at_pace`) : écrite dans l'état du jour de la sortie,
 « rien de spécial » part au coach. La
 demande est recalculée à l'écriture ; close, elle est refusée (409). La trace passe
-par `complete_measurement` ou une observation `reveil` (`carnet:reveil:<date>`). Une
+par `complete_measurement` ou une observation `wake-trace` (`carnet:reveil:<date>`). Une
 douleur d'effort au-dessus de 2 ou une trace nette est transmise au coach comme un
 message, pour qu'il réponde ; les autres réponses ne coûtent aucun tour de modèle. Le
 menu

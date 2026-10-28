@@ -1,5 +1,6 @@
 ---
 type: seance-type
+kinds: [threshold, hills]
 capacite: [durabilite, injury]
 rpe_cible: 6
 duree_min: 50

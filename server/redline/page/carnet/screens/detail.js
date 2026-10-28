@@ -41,8 +41,8 @@ function sdHead(title, aside) {
 }
 function sdFamily(data) {
   if (data.quality) return 'Course · séance de qualité';
-  if (data.kind === 'SL' || data.workout === 'SL') return 'Course · sortie longue';
-  if (data.kind === 'EF') return 'Course · endurance fondamentale';
+  if (data.kind === 'long' || data.workout === 'long') return 'Course · sortie longue';
+  if (data.kind === 'easy') return 'Course · endurance fondamentale';
   return kindName[data.kind] || data.kind;
 }
 
@@ -415,7 +415,7 @@ function sdPrevious(data) {
   if (data.quality && repDplus != null && before.rep_dplus != null && Math.abs(repDplus - before.rep_dplus) > 0.2 * Math.max(repDplus, before.rep_dplus)) {
     card.append(el('p', 'Côte ' + (repDplus > before.rep_dplus ? 'plus raide' : 'moins raide') + ' que la dernière fois : les allures ne se comparent pas d’une côte à l’autre.', 'n-dnote'));
   }
-  const title = data.quality ? 'Le seuil précédent' : data.kind === 'SL' ? 'La sortie longue précédente' : 'La séance précédente du même type';
+  const title = data.quality ? 'Le seuil précédent' : data.kind === 'long' ? 'La sortie longue précédente' : 'La séance précédente du même type';
   return add(el('section', null, 'n-dsec'), sdHead(title, dm(before.date)), card);
 }
 function sdConditions(data) {

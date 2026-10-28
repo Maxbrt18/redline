@@ -1,5 +1,6 @@
 ---
 type: seance-type
+kinds: [strides]
 capacite: [injury]
 rpe_cible: 3
 duree_min: 40

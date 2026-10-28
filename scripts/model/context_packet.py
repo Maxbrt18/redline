@@ -8,7 +8,7 @@ from collections.abc import Callable, Iterable
 from typing import TYPE_CHECKING, Any
 
 from scripts.model import ledger as ledger_model
-from scripts.model import rulebook
+from scripts.model import rulebook, session_kinds
 from scripts.storage import StorageError
 
 if TYPE_CHECKING:
@@ -73,7 +73,7 @@ def render_context_packet(store: OperationalStore, depth: str, today: dt.date) -
     # Les activités peuvent occuper les dix places : sélectionner le réveil AVANT
     # cette coupe évite de demander à l'utilisateur de reconstruire son historique.
     morning = sorted((row for row in all_observations
-                      if row["kind"] == "reveil"
+                      if row["kind"] == session_kinds.WAKE_TRACE
                       and (today - dt.timedelta(days=56)).isoformat()
                       <= _day(row["occurred_on"]) < today.isoformat()),
                      key=lambda row: _day(row["occurred_on"]), reverse=True)[:8]

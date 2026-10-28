@@ -1,5 +1,6 @@
 ---
 type: seance-type
+kinds: [long]
 capacite: [durabilite, descente, digestion]
 rpe_cible: 4.5
 duree_min: 90

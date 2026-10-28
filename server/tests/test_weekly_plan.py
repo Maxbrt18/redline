@@ -6,23 +6,25 @@ import json
 
 import pytest
 
-from scripts.model import weekly_plan
+from scripts.model import session_kinds, weekly_plan
 from scripts.model.schema import SchemaError
 
 
-def session(identifier="w32-lun-ef", date="2026-08-03", workout="EF", **overrides):
+def session(identifier="w32-lun-ef", date="2026-08-03", workout="easy", **overrides):
     payload = {
         "id": identifier, "title": overrides.pop("title", workout), "date": date,
-        "kind": "run" if workout in {"EF", "SL", "seuil", "cotes"} else "strength",
+        "kind": session_kinds.family(workout),
         "workout": workout, "status": "planned", "distance_target_km": 7.0,
         "distance_cap_km": 9.0, "rpe_min": 2, "rpe_max": 3,
-        "demanding": workout in {"SL", "seuil", "cotes"},
+        "demanding": workout in {"long", "threshold", "hills"},
         "sources": ["[[current-plan]]"],
     }
     if payload["kind"] != "run":
         for key in ("distance_target_km", "distance_cap_km", "rpe_min", "rpe_max"):
             payload.pop(key)
+    if workout == session_kinds.STRENGTH:
         payload["strength"] = {}
+        payload["routine"] = "a"
     payload.update(overrides)
     return payload
 
@@ -75,8 +77,8 @@ def test_remaining_drops_what_is_settled_and_what_is_behind():
     (« la suite de la semaine », sur le téléphone de Sam) était le seul à ignorer
     `status`. Le 2026-08-16 il lui a redonné à faire la SL qu'il venait de courir.
     """
-    ran = session("w33-dim-sl", date="2026-08-16", workout="SL", status="done")
-    dropped = session("w33-jeu-b", date="2026-08-13", workout="renfo-b", status="cancelled")
+    ran = session("w33-dim-sl", date="2026-08-16", workout="long", status="done")
+    dropped = session("w33-jeu-b", date="2026-08-13", workout="strength", routine="b", status="cancelled")
     ahead = session("w33-lun-ef", date="2026-08-17")
     behind = session("w33-sam-ef", date="2026-08-15")
     sessions = [ran, dropped, ahead, behind]
@@ -132,7 +134,7 @@ def test_a_session_time_is_optional_but_strictly_local():
 
 
 def test_location_and_gut_target_are_typed():
-    long_run = session("w32-dim-sl", "2026-08-09", "SL", start_time="08:00",
+    long_run = session("w32-dim-sl", "2026-08-09", "long", start_time="08:00",
                        location_label="Bois de Vincennes", carbs_target_g_h=60)
     assert weekly_plan.validate(plan([long_run]))
     with pytest.raises(SchemaError, match="cible digestive"):
@@ -147,13 +149,13 @@ def test_retired_proactive_fields_are_refused_not_silently_stored(retired):
     """Repère mental, coordonnées et météo sont retirés le 2026-09-28 : un plan qui les
     écrit encore doit échouer bruyamment, pas porter un réglage que rien ne lit."""
     with pytest.raises(SchemaError):
-        weekly_plan.validate(plan([session("sl", "2026-08-09", "SL",
+        weekly_plan.validate(plan([session("sl", "2026-08-09", "long",
                                            start_time="08:00", **retired)]))
 
 
 def test_current_schema_owns_strength_modulation():
     strength = session(
-        "w32-jeu-a", "2026-08-06", "renfo-a", kind="strength",
+        "w32-jeu-a", "2026-08-06", "strength", routine="a", kind="strength",
         demanding=False)
     strength.pop("strength")
     revision = written_today(sessions=[strength])
@@ -167,7 +169,7 @@ def test_current_schema_owns_strength_modulation():
 
 def test_active_strength_variant_must_exist_in_the_programme():
     strength = session(
-        "w32-jeu-a", "2026-08-06", "renfo-a", kind="strength",
+        "w32-jeu-a", "2026-08-06", "strength", routine="a", kind="strength",
         demanding=False, strength={"variant": "full"})
     with pytest.raises(SchemaError, match="variante « full » non déclarée"):
         weekly_plan.validate(plan([strength]), today=dt.date(2026, 8, 4))
@@ -175,7 +177,7 @@ def test_active_strength_variant_must_exist_in_the_programme():
 
 def test_active_strength_drop_must_name_an_exercise_in_the_programme():
     strength = session(
-        "w32-jeu-b", "2026-08-06", "renfo-b", kind="strength",
+        "w32-jeu-b", "2026-08-06", "strength", routine="b", kind="strength",
         demanding=False, strength={"drop": ["box-drop"]})
     with pytest.raises(SchemaError, match="box-drop n'est pas dans la séance b"):
         weekly_plan.validate(plan([strength]), today=dt.date(2026, 8, 4))
@@ -184,17 +186,17 @@ def test_active_strength_drop_must_name_an_exercise_in_the_programme():
 def test_a_closed_week_is_not_judged_against_todays_strength_programme():
     """W39 : un « drop » d'exercice retiré du programme après coup vidait l'archive."""
     strength = session(
-        "w32-jeu-b", "2026-08-06", "renfo-b", kind="strength",
+        "w32-jeu-b", "2026-08-06", "strength", routine="b", kind="strength",
         demanding=False, strength={"drop": ["box-drop"]})
     assert weekly_plan.validate(plan([strength]), today=dt.date(2026, 8, 10))
 
 
 def test_an_invalid_historical_strength_variant_does_not_freeze_the_append_only_plan():
     broken = revision(1, sessions=[session(
-        "w32-jeu-a", "2026-08-06", "renfo-a", kind="strength",
+        "w32-jeu-a", "2026-08-06", "strength", routine="a", kind="strength",
         demanding=False, strength={"variant": "full"})])
     repaired = revision(2, sessions=[session(
-        "w32-jeu-a", "2026-08-06", "renfo-a", kind="strength",
+        "w32-jeu-a", "2026-08-06", "strength", routine="a", kind="strength",
         demanding=False, strength={})])
     assert weekly_plan.validate(
         {"week": "2026-W32", "revisions": [broken, repaired]})
@@ -266,18 +268,23 @@ def test_a_session_outside_its_iso_week_is_refused():
 def test_two_real_hard_days_in_a_row_are_refused_but_easy_jogs_are_not():
     weekly_plan.validate(plan([session("lun", "2026-08-03"),
                                session("mar", "2026-08-04")]))
-    hard = [session("lun-sl", "2026-08-03", "SL"),
-            session("mar-seuil", "2026-08-04", "seuil")]
+    hard = [session("lun-sl", "2026-08-03", "long"),
+            session("mar-seuil", "2026-08-04", "threshold")]
     with pytest.raises(SchemaError, match="jours exigeants consécutifs"):
         weekly_plan.validate(plan(hard))
 
 
-def test_strength_b_inside_48_hours_of_long_run_is_refused():
-    with pytest.raises(SchemaError, match="renfo B à moins de 48 h"):
+def test_a_routine_keeps_the_gap_its_note_declares():
+    """renfo-b.md declares `min_gap_h: {strength: 48, long: 48}`."""
+    with pytest.raises(SchemaError, match="routine b à moins de 48 h d'une séance long"):
         weekly_plan.validate(plan([
-            session("lun-sl", "2026-08-03", "SL"),
-            session("mar-b", "2026-08-04", "renfo-b"),
-        ]))
+            session("lun-sl", "2026-08-03", "long"),
+            session("mar-b", "2026-08-04", "strength", routine="b"),
+        ]), today=dt.date(2026, 8, 3))
+    assert weekly_plan.validate(plan([
+        session("lun-sl", "2026-08-03", "long"),
+        session("mer-b", "2026-08-05", "strength", routine="b"),
+    ]), today=dt.date(2026, 8, 3))
 
 
 def test_due_gate_is_exposed_only_when_due():
@@ -316,7 +323,7 @@ def test_a_gate_already_expired_when_written_is_refused():
 def test_renderers_show_only_the_active_revision_and_postgresql_owner():
     current = plan()
     current["revisions"].append(revision(
-        2, [session("new-sl", "2026-08-03", "SL", distance_target_km=10.0,
+        2, [session("new-sl", "2026-08-03", "long", distance_target_km=10.0,
                     distance_cap_km=10.0, status="done")]))
     journal = weekly_plan.render_journal(current)
     hot = weekly_plan.render_hot_cache(current)
@@ -598,7 +605,7 @@ def test_a_running_week_states_its_volume_in_a_number():
     fresh = written_today()
     del fresh["volume_target_km"]
     assert "volume_target_km" in weekly_plan.typed_target_errors(fresh)[0]
-    strength_only = written_today(sessions=[session("w32-mar-renfo", workout="renfo-a")])
+    strength_only = written_today(sessions=[session("w32-mar-renfo", workout="strength", routine="a")])
     del strength_only["volume_target_km"]
     assert weekly_plan.typed_target_errors(strength_only) == []
     zoned = written_today(sessions=[session(hr_zone="Z1-Z2, 130-157 bpm")])
@@ -653,3 +660,24 @@ def test_a_new_precondition_no_longer_holds_a_session():
                for problem in weekly_plan.written_text_errors(holding))
     assert not any("ne retient plus" in problem
                    for problem in weekly_plan.written_text_errors(revision(gates=[gate()])))
+
+
+def test_a_strength_session_names_its_routine_and_only_it_does():
+    strength = session("w32-jeu-a", "2026-08-06", "strength", demanding=False)
+    strength.pop("routine")
+    with pytest.raises(SchemaError, match="routine manque"):
+        weekly_plan.validate(plan([strength]))
+    easy = session(routine="a")
+    with pytest.raises(SchemaError, match="routine ne vaut que pour une séance strength"):
+        weekly_plan.validate(plan([easy]))
+
+
+def test_a_routine_the_vault_does_not_declare_is_refused():
+    strength = session("w32-jeu-z", "2026-08-06", "strength", routine="z", demanding=False)
+    with pytest.raises(SchemaError, match="séance « z » inconnue"):
+        weekly_plan.validate(plan([strength]), today=dt.date(2026, 8, 3))
+
+
+def test_the_kind_is_the_family_of_the_workout():
+    with pytest.raises(SchemaError, match="kind doit valoir run pour easy"):
+        weekly_plan.validate(plan([session(kind="bike")]))

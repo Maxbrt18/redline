@@ -5,11 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from scripts.cards import strength_card
+from scripts.model import session_kinds
 
 from . import strength
 from .outbox import Outbox
 
-WORKOUT_SESSION = {"renfo-a": "a", "renfo-b": "b"}
 STRENGTH_CARD_PREFIX = "strength-"
 
 
@@ -27,12 +27,12 @@ def selection_for(session: dict, today: str) -> dict:
     spec = session.get("strength")
     if not isinstance(spec, dict):
         raise ValueError("prescription strength absente du plan")
-    workout = session.get("workout")
-    if workout not in WORKOUT_SESSION:
-        raise ValueError(f"workout de renforcement inconnu : {workout}")
+    routine = session.get("routine")
+    if session.get("workout") != session_kinds.STRENGTH or not routine:
+        raise ValueError(f"séance de renforcement sans routine : {session.get('id')}")
     return {
-        "session": WORKOUT_SESSION[workout],
+        "session": routine,
         "date": today,
-        "sid": f"{session.get('id', workout)}-{today}",
+        "sid": f"{session.get('id', routine)}-{today}",
         **spec,
     }

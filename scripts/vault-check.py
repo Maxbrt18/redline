@@ -50,7 +50,7 @@ try:
     from scripts.model.capabilities import load as load_capabilities
     from scripts.model.notes import NoteError
     from scripts.model.programme import load as load_programme
-    from scripts.model.strength_tables import BLOCKS, refresh
+    from scripts.model.strength_tables import refresh
     from scripts.model.views import ViewDrift
 except ImportError as exc:
     MODEL_UNAVAILABLE = str(exc)
@@ -955,7 +955,7 @@ def check_generated_views(vault: Vault, report: Report) -> None:
         report.fail("vues générées à jour", problems)
     else:
         report.ok("vues générées à jour",
-                  f"{len(BLOCKS)} table(s) + journal renfo + blocs Forme et État "
+                  "tables de renfo + journal renfo + blocs Forme et État "
                   f"+ {seen} bloc(s) de programme")
 
 

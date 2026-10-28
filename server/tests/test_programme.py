@@ -141,5 +141,5 @@ def test_an_exercise_note_missing_its_dose_is_refused():
 def test_a_session_without_exercises_is_refused():
     problems = SESSION_SCHEMA.errors(
         {"type": "seance-type", "title": "T", "rule": "une règle assez longue",
-         "exercises": []}, "renfo-x.md")
+         "exercises": [], "routine": "x"}, "renfo-x.md")
     assert problems == ["renfo-x.md : champ « exercises » : longueur 0, minimum 1"]

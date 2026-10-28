@@ -33,6 +33,7 @@ from scripts import (  # noqa: E402
 from scripts.model import (  # noqa: E402
     entrypoint,
     rulebook,
+    session_kinds,
     transitions,
 )
 from scripts.model.errors import ConfigError  # noqa: E402
@@ -43,7 +44,7 @@ def novelties(sessions: list[dict], rows: list, as_of: dt.date) -> tuple[str, ..
     SL quand une sortie longue dépasse la plus longue des 30 jours qui la précèdent."""
     found = [transition.kind for transition in transitions.opened(sessions, as_of)]
     for session in sessions:
-        if session.get("workout") != "SL" or session.get("status") == "cancelled":
+        if session.get("workout") != session_kinds.LONG or session.get("status") == "cancelled":
             continue
         planned = session.get("distance_cap_km") or session.get("distance_target_km")
         day = transitions.day_of(session["date"])

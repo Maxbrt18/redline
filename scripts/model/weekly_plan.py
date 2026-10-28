@@ -11,8 +11,9 @@ import re
 from itertools import pairwise
 
 from . import instance as instance_model
-from . import paths, rulebook, transitions, typography
+from . import paths, rulebook, session_kinds, session_labels, transitions, typography
 from . import programme as strength_programme
+from .notes import NoteError
 from .programme import GATE_SCHEMA as STRENGTH_GATE_SCHEMA
 from .schema import Schema, SchemaError, field
 
@@ -22,9 +23,8 @@ TIME_RE = r"(?:[01]\d|2[0-3]):[0-5]\d"
 STAMP_RE = r"20\d{2}-\d{2}-\d{2}T.+"
 BLOCK = "WEEK_PLAN"
 
-KINDS = ("run", "strength", "test", "rest", "bike", "hike")
-WORKOUTS = ("EF", "SL", "seuil", "cotes", "lignes", "cadence", "course",
-            "renfo-a", "renfo-b", "test-mollet", "repos", "velo", "rando")
+KINDS = tuple(dict.fromkeys(session_kinds.family(slug) for slug in session_kinds.PLANNED))
+WORKOUTS = session_kinds.PLANNED
 INTENT_STATUSES = ("planned", "cancelled")
 # ``done`` existe dans le read model rendu depuis ``session_cycles`` et dans les
 # révisions historiques. Une nouvelle révision ne peut plus l'écrire.
@@ -35,7 +35,7 @@ STATUSES = (*INTENT_STATUSES, "done")
 # qu'un statut ajouté plus tard reste prescriptible par défaut : oublier une séance à
 # faire est pire que d'en afficher une de trop.
 SETTLED_STATUSES = frozenset({"done", "cancelled"})
-HARD_WORKOUTS = {"SL", "seuil", "cotes", "course"}
+HARD_WORKOUTS = session_kinds.DEMANDING
 
 # Une note de séance planifiée décrit ce qui devra être fait. Les résultats vivent
 # dans l'observation et le cycle, puis le read model ajoute seulement le statut
@@ -79,6 +79,8 @@ SESSION_SCHEMA = Schema("séance planifiée", [
           note="HH:MM, heure locale Europe/Paris ; absent si le créneau n'est pas fixé"),
     field("kind", str, choices=KINDS),
     field("workout", str, choices=WORKOUTS),
+    field("routine", str, required=False, pattern=r"[a-z0-9][a-z0-9-]{0,39}",
+          note="la routine de renfo, telle que sa fiche la déclare ; seulement pour strength"),
     field("status", str, choices=STATUSES),
     field("distance_target_km", float, required=False, minimum=0),
     field("distance_cap_km", float, required=False, minimum=0),
@@ -429,7 +431,11 @@ def _session_errors(session: dict, where: str) -> list[str]:
         problems.append(f"{where} : RPE minimum {lo} au-dessus du maximum {hi}")
     workout = session.get("workout")
     duration = session.get("duration_cap_min", 0)
-    expected_hard = workout in HARD_WORKOUTS or (workout == "EF" and duration > 75)
+    if workout in session_kinds.BY_SLUG and session.get("kind") != session_kinds.family(workout):
+        problems.append(f"{where} : kind doit valoir {session_kinds.family(workout)} "
+                        f"pour {workout}")
+    expected_hard = (workout in HARD_WORKOUTS
+                     or (workout == session_kinds.EASY and duration > 75))
     if session.get("demanding") != expected_hard:
         problems.append(
             f"{where} : demanding doit valoir {str(expected_hard).lower()} pour {workout}")
@@ -437,13 +443,16 @@ def _session_errors(session: dict, where: str) -> list[str]:
         problems.append(f"{where} : une course exige une cible, un plafond ou une durée")
     if session.get("transition") and session.get("kind") == "rest":
         problems.append(f"{where} : un repos n'est pas une transition")
-    if session.get("carbs_target_g_h") is not None and workout not in {"SL", "course"}:
-        problems.append(f"{where} : une cible digestive ne se teste que sur SL ou course")
-    strength = session.get("strength")
-    is_strength = workout in {"renfo-a", "renfo-b"}
-    if strength is not None and not is_strength:
-        problems.append(f"{where} : strength ne vaut que pour renfo-a ou renfo-b")
-    if is_strength and strength is None:
+    if session.get("carbs_target_g_h") is not None and workout not in session_kinds.FUELLED:
+        problems.append(f"{where} : une cible digestive ne se teste que sur "
+                        + " ou ".join(sorted(session_kinds.FUELLED)))
+    is_strength = workout == session_kinds.STRENGTH
+    for name in ("strength", "routine"):
+        if session.get(name) is not None and not is_strength:
+            problems.append(f"{where} : {name} ne vaut que pour une séance strength")
+    if is_strength and session.get("routine") is None:
+        problems.append(f"{where} : routine manque — la routine de renfo que sa fiche déclare")
+    if is_strength and session.get("strength") is None:
         problems.append(
             f"{where} : strength manque. Même sans modulation, écris strength={{}} "
             "pour figer la prescription de carte")
@@ -458,11 +467,10 @@ def _strength_programme_errors(session: dict, where: str) -> list[str]:
     l'historique append-only peut contenir une ancienne erreur devenue irréparable,
     mais une nouvelle révision ne doit jamais l'activer.
     """
-    workout = session.get("workout")
-    if workout not in {"renfo-a", "renfo-b"}:
+    if session.get("workout") != session_kinds.STRENGTH or not session.get("routine"):
         return []
     selection = {
-        "session": {"renfo-a": "a", "renfo-b": "b"}[workout],
+        "session": session["routine"],
         "date": session["date"],
         "sid": session["id"],
         **(session.get("strength") or {}),
@@ -551,6 +559,8 @@ def semantic_errors(plan: dict, where: str = "weekly_plan",
                 if session.get(label):
                     problems.extend(_text_errors(
                         session[label], f"{prefix}.{session['id']}", label, gate_ids))
+        if revision is revisions[-1] and prescribable:
+            problems.extend(_spacing_errors(sessions, prefix))
 
         if len(gate_ids) != len(set(gate_ids)):
             problems.append(f"{prefix} : identifiants de contrôle daté dupliqués")
@@ -577,22 +587,29 @@ def semantic_errors(plan: dict, where: str = "weekly_plan",
             if (second - first).days == 1:
                 problems.append(
                     f"{prefix} : jours exigeants consécutifs {first} et {second}")
+    return problems
 
-        active = [s for s in sessions if s["status"] != "cancelled"]
-        strength_a = [dt.date.fromisoformat(s["date"]) for s in active
-                      if s["workout"] == "renfo-a"]
-        strength_b = [dt.date.fromisoformat(s["date"]) for s in active
-                      if s["workout"] == "renfo-b"]
-        for a in strength_a:
-            for b in strength_b:
-                if abs((a - b).days) < 2:
-                    problems.append(f"{prefix} : renfo A et B espacés de moins de 48 h")
-        long_runs = [dt.date.fromisoformat(s["date"]) for s in active
-                     if s["workout"] == "SL"]
-        for b in strength_b:
-            for long_run in long_runs:
-                if abs((b - long_run).days) < 2:
-                    problems.append(f"{prefix} : renfo B à moins de 48 h d'une SL")
+
+def _spacing_errors(sessions: list[dict], prefix: str) -> list[str]:
+    """The gaps each strength routine declares (`min_gap_h`), checked day by day."""
+    try:
+        routines = strength_programme.load(paths.vault_root()).sessions
+    except NoteError:
+        return []   # the programme error itself is reported by _strength_programme_errors
+    active = [s for s in sessions if s["status"] != "cancelled"]
+    problems, seen = [], set()
+    for session in active:
+        gaps = (routines.get(session.get("routine") or "") or {}).get("min_gap_h") or {}
+        day = dt.date.fromisoformat(session["date"])
+        for other in active:
+            hours = gaps.get(other["workout"])
+            pair = frozenset((session["id"], other["id"]))
+            if other is session or hours is None or pair in seen:
+                continue
+            if abs((dt.date.fromisoformat(other["date"]) - day).days) * 24 < hours:
+                seen.add(pair)
+                problems.append(f"{prefix} : routine {session['routine']} à moins de "
+                                f"{hours} h d'une séance {other['workout']} ({other['date']})")
     return problems
 
 
@@ -936,7 +953,8 @@ def restrictions(old: dict, new: dict | None) -> list[str]:
     if old_minutes is not None and new_minutes is not None and new_minutes < old_minutes:
         found.append("plafond de durée abaissé")
     if old.get("workout") in HARD_WORKOUTS and new.get("workout") not in HARD_WORKOUTS:
-        found.append(f"{old['workout']} remplacée par {new.get('workout')}")
+        found.append(f"{session_labels.short(old['workout'])} remplacée par "
+                     f"{session_labels.short(new['workout'])}")
     old_strength, new_strength = old.get("strength") or {}, new.get("strength") or {}
     if set(new_strength.get("drop") or []) - set(old_strength.get("drop") or []):
         found.append("exercice retiré du renfo")

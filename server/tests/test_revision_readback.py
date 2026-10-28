@@ -15,17 +15,20 @@ import pytest
 from scripts.model import weekly_plan
 
 
-def _session(session_id, date, title="EF", status="planned", workout="EF"):
-    return {"id": session_id, "date": date, "title": title, "kind": "run",
-            "workout": workout, "status": status, "demanding": False}
+def _session(session_id, date, title="EF", status="planned", workout="easy", routine=None):
+    session = {"id": session_id, "date": date, "title": title, "kind": "run",
+               "workout": workout, "status": status, "demanding": False}
+    if routine:
+        session["routine"] = routine
+    return session
 
 
 R4 = {
     "revision": 4,
     "sessions": [
-        _session("w35-mer-a", "2026-08-26", "Renfo A", workout="renfo-a"),
+        _session("w35-mer-a", "2026-08-26", "Renfo A", workout="strength", routine="a"),
         _session("w35-jeu-b", "2026-08-27", "Renfo B", status="cancelled",
-                 workout="renfo-b"),
+                 workout="strength", routine="b"),
         _session("w35-ven-ef", "2026-08-28"),
     ],
 }
@@ -94,9 +97,9 @@ def test_la_relecture_reclame_une_relecture():
 R2 = {
     "revision": 2,
     "sessions": [
-        _session("w35-mar-a", "2026-08-25", "Renfo A", workout="renfo-a"),
+        _session("w35-mar-a", "2026-08-25", "Renfo A", workout="strength", routine="a"),
         _session("w35-mer-ef", "2026-08-26"),
-        _session("w35-jeu-b", "2026-08-27", "Renfo B", workout="renfo-b"),
+        _session("w35-jeu-b", "2026-08-27", "Renfo B", workout="strength", routine="b"),
     ],
 }
 
@@ -182,10 +185,10 @@ def test_a_session_done_today_is_not_a_change_to_justify():
     impossible toute révision du jour, `done` étant refusé à l'écriture."""
     previous = {"revision": 3, "sessions": [
         _session("w44-mar-ef", "2026-10-27", status="done"),
-        _session("w44-jeu-sl", "2026-10-29", workout="SL")]}
+        _session("w44-jeu-sl", "2026-10-29", workout="long")]}
     current = {"revision": 4, "computed_at": "2026-10-27T11:00:00+01:00",
                "sessions": [_session("w44-mar-ef", "2026-10-27"),
-                            _session("w44-jeu-sl", "2026-10-29", workout="SL")]}
+                            _session("w44-jeu-sl", "2026-10-29", workout="long")]}
 
     assert weekly_plan.change_evidence_errors(previous, current) == []
 
@@ -243,7 +246,7 @@ def test_an_unknown_rule_id_is_refused_by_the_schema():
      "plafond de distance abaissé"),
     ({"distance_target_km": 12.0}, {"distance_target_km": 9.0}, "cible de distance abaissée"),
     ({"duration_cap_min": 60}, {"duration_cap_min": 45}, "plafond de durée abaissé"),
-    ({"workout": "SL"}, {"workout": "EF"}, "SL remplacée par EF"),
+    ({"workout": "long"}, {"workout": "easy"}, "SL remplacée par EF"),
     ({"strength": {}}, {"strength": {"drop": ["rdl"]}}, "exercice retiré du renfo"),
     ({"strength": {}}, {"strength": {"half_dose": True}}, "renfo en demi-dose"),
 ])
@@ -256,7 +259,7 @@ def test_every_kind_of_cut_is_a_restriction(before, after, attendu):
     ({"distance_cap_km": 8.0}, {"distance_cap_km": 10.0}),
     ({"distance_target_km": 9.0}, {"distance_target_km": 10.0}),
     ({"date": "2026-08-26"}, {"date": "2026-08-27"}),
-    ({"workout": "EF"}, {"workout": "SL"}),
+    ({"workout": "easy"}, {"workout": "long"}),
     ({"status": "cancelled"}, {"status": "cancelled", "note": "toujours annulée"}),
 ])
 def test_adding_moving_or_lengthening_is_not_a_restriction(before, after):

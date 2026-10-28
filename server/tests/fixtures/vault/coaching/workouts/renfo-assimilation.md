@@ -1,5 +1,6 @@
 ---
 type: seance-type
+routine: assimilation
 aliases: [renfo assimilation, semaine d'assimilation]
 capacite: [injury]
 title: "Renfo, semaine d'assimilation"

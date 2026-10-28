@@ -16,7 +16,7 @@ def _choice(key, day, minutes):
 
 
 def _ef(day, minutes, hr=150, strava_id=None):
-    return permit.Run(day, "EF", minutes, hr, strava_id)
+    return permit.Run(day, "easy", minutes, hr, strava_id)
 
 
 def test_a_run_ef_is_compared_to_the_sealed_choice():

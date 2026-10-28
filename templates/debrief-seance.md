@@ -10,7 +10,7 @@ aliases: [débrief séance, debrief-seance]
      (coaching/protocols.md batterie E). Le RPE se lit en voyant la cible du jour :
      au-dessus = séance RATÉE (mandat de réprimande, athlete/athlete.md). -->
 
-**Séance** : <EF | SL | seuil | côtes | cadence | course | rando | renfoA | renfoB>
+**Séance** : <EF | SL | seuil | côtes | cadence | course | rando | renfo>
 **Effort ressenti (RPE)** : ___ /10   ← cible du jour : ___ /10
 **Douleur** : pic ___ /10 — et elle a :
   ( ) disparu à l'échauffement   ( ) apparu puis s'est dissipé

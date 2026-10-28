@@ -21,6 +21,7 @@ import requests
 
 from scripts import strava
 from scripts.model import ledger as ledger_model
+from scripts.model import session_kinds
 
 from . import clock
 from .config import Config
@@ -266,10 +267,10 @@ class ProactiveScheduler:
             # déjà été donnés (2026-08-30).
             claimable = []
             for entry in self._bot.pending_ledger_cells(now.date()):
-                # La trace `reveil` se recueille au réveil, en aucune/légère/nette.
+                # La trace `wake-trace` se recueille au réveil, en aucune/légère/nette.
                 # La laisser entrer ici la transforme en demande `/10` le soir,
                 # puis en souvenir sollicité trop tard (2026-09-15).
-                if entry.get("type") == "reveil":
+                if entry.get("type") == session_kinds.WAKE_TRACE:
                     continue
                 missing = [column for column in entry["missing"]
                            if ledger_model.column_base(column) in {"RPE", "Dlr", "Plaisir"}]

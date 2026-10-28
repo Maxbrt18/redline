@@ -48,8 +48,8 @@ def _row(date, kind, key, identifier=1):
             "kind": kind, "idempotency_key": key}
 
 
-VELO = _row("2026-08-13", "vélo", "messenger:2026-08-13:velo-remplace-renfob")
-REVEIL = _row("2026-08-13", "reveil", "messenger:abc:reveil", identifier=2)
+VELO = _row("2026-08-13", "bike", "messenger:2026-08-13:velo-remplace-renfob")
+REVEIL = _row("2026-08-13", "wake-trace", "messenger:abc:reveil", identifier=2)
 
 
 def test_a_date_resolves_the_key_the_coach_cannot_guess():
@@ -71,7 +71,7 @@ def test_an_ambiguous_date_lists_the_candidates_with_their_keys():
     with pytest.raises(InputError) as refus:
         cli.resolve_key(_Store([VELO, REVEIL]), "", "2026-08-13", "")
     message = str(refus.value)
-    assert "vélo" in message and "reveil" in message
+    assert "bike" in message and "wake-trace" in message
     assert VELO["idempotency_key"] in message
     assert "--type" in message
 
@@ -79,7 +79,7 @@ def test_an_ambiguous_date_lists_the_candidates_with_their_keys():
 def test_a_type_disambiguates_without_needing_the_key():
     cli = _cli()
     assert cli.resolve_key(_Store([VELO, REVEIL]), "", "2026-08-13",
-                           "reveil") == REVEIL["idempotency_key"]
+                           "wake-trace") == REVEIL["idempotency_key"]
 
 
 def test_a_date_without_any_observation_names_where_to_look():

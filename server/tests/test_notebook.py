@@ -62,7 +62,7 @@ def test_current_never_launches_a_stale_or_held_plan(monkeypatch):
     monkeypatch.setattr(clock, 'today', lambda: dt.date(2026, 10, 2))
     repo.validate_weekly_plan.return_value = PlanStatus.AWAITING
     repo.weekly_plan_context.return_value = json.dumps({'revision': 1, 'sessions': [{
-        'id': 'a', 'date': '2026-10-02', 'kind': 'strength', 'workout': 'renfo-a',
+        'id': 'a', 'date': '2026-10-02', 'kind': 'strength', 'workout': 'strength', 'routine': 'a',
         'status': 'planned', 'strength': {}}], 'gates': [{
             'id':'hold', 'due':'2026-10-02', 'when':'avant', 'holds':['a'],
             'question':'Comment va la blessure ?', 'on_fail':'Repos'}]})

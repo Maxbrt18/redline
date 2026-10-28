@@ -23,7 +23,7 @@ from typing import Any
 
 from flask import Flask, jsonify, request
 
-from scripts.model import paths, strength_log
+from scripts.model import paths, session_labels, strength_log
 from scripts.storage.database import expected_schema_revision
 from scripts.storage.repository import OperationalStore
 
@@ -324,7 +324,8 @@ def create_app(config: Config, bot: CoachBot, state: Any,
 
     # ---- interactive strength session
 
-    session_html, session_etag = page.build(paths.ENGINE_ROOT / "scripts" / "cards", cues)
+    session_html, session_etag = page.build(paths.ENGINE_ROOT / "scripts" / "cards", cues,
+                                            session_labels.for_page())
 
     @app.get(strength.PAGE_PATH)
     def session_page():

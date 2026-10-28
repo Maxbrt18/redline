@@ -584,13 +584,13 @@ class PostgresStateStore(StateStore):
             store.reconcile_strength_cycles_in(connection)
             row = connection.execute(sa.select(
                 session_cycles.c.state, planned_sessions.c.scheduled_on,
-                planned_sessions.c.workout,
+                planned_sessions.c.routine,
             ).join(planned_sessions,
                    planned_sessions.c.id == session_cycles.c.source_session_id).where(
                 session_cycles.c.id == cycle_id, session_cycles.c.athlete_id == ATHLETE,
             )).mappings().one_or_none()
             return bool(row and row["state"] == "missed" and not store.strength_evidence_in(
-                connection, row["scheduled_on"], row["workout"]))
+                connection, row["scheduled_on"], row["routine"]))
 
     def materialize_intelligence(self, now: dt.datetime) -> int:
         """Transforme les faits typés en travaux durables, une seule fois par cause.
@@ -627,7 +627,8 @@ class PostgresStateStore(StateStore):
         cycles = connection.execute(sa.select(
             session_cycles, weekly_plans.c.iso_week, planned_sessions.c.title,
             planned_sessions.c.scheduled_on, planned_sessions.c.kind,
-            planned_sessions.c.workout, planned_sessions.c.carbs_target_g_h,
+            planned_sessions.c.workout, planned_sessions.c.routine,
+            planned_sessions.c.carbs_target_g_h,
         ).join(weekly_plans, weekly_plans.c.id == session_cycles.c.plan_id).join(
             planned_sessions,
             planned_sessions.c.id == session_cycles.c.source_session_id).where(
@@ -639,7 +640,7 @@ class PostgresStateStore(StateStore):
                       "title": row["title"], "workout": row["workout"]}
             if row["state"] == "planned" and row["kind"] != "rest":
                 if store.strength_evidence_in(
-                        connection, row["scheduled_on"], row["workout"]):
+                        connection, row["scheduled_on"], row["routine"]):
                     continue
                 missed_at = ((row["planned_for"] + dt.timedelta(hours=4))
                              if row["planned_for"] else dt.datetime.combine(
@@ -763,8 +764,7 @@ class PostgresStateStore(StateStore):
                 ~sa.exists().where(
                     strength_sessions.c.athlete_id == ATHLETE,
                     strength_sessions.c.performed_on == planned_sessions.c.scheduled_on,
-                    planned_sessions.c.workout == sa.literal("renfo-") +
-                        strength_sessions.c.workout,
+                    planned_sessions.c.routine == strength_sessions.c.workout,
                 ))).scalar_one()
         if missed_count >= 2:
             signals.append(f"{missed_count} séances manquées sur 21 jours")

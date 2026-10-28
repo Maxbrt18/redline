@@ -25,7 +25,7 @@ class Store:
             {
                 "prediction_key": "closed", "domain": "charge",
                 "probability": 0.5, "due_on": dt.date(2026, 8, 1),
-                "status": "resolved", "brier_score": 0.25, "resolves_kind": "reveil",
+                "status": "resolved", "brier_score": 0.25, "resolves_kind": "wake-trace",
                 "resolves_on": dt.date(2026, 7, 31), "success_op": "<=", "success_value": 1, "challenge": None,
                 "used_at": None, "statement": "déjà jugée",
             },
@@ -120,7 +120,7 @@ def test_expositions_ne_rend_par_defaut_que_les_faits_confirmes():
 
 def test_la_calibration_par_domaine_montre_ce_qui_echappe_au_score():
     lines = fact_read.predictions(Store(), today=dt.date(2026, 8, 25))
-    assert "se solde au reveil du 2026-07-31 si <=1" in lines[3]
+    assert "se solde au réveil du 2026-07-31 si <=1" in lines[3]
     assert lines[-2:] == [
         "Calibration adherence · soldées 0 (dont 0 par observation) · void 0 · "
         "échues ouvertes 1 · Brier moyen —",

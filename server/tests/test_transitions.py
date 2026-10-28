@@ -14,7 +14,7 @@ RACE = dt.date(2026, 11, 28)
 TAPER = ("2026-W46", "2026-W47", "2026-W48")
 
 
-def _session(identifier, day, kind=None, status="planned", workout="EF", **extra):
+def _session(identifier, day, kind=None, status="planned", workout="easy", **extra):
     payload = {"id": identifier, "date": day, "status": status, "workout": workout,
                "kind": "run", **extra}
     if kind:
@@ -131,8 +131,8 @@ class FakeStore(SimpleNamespace):
 
 
 def test_build_problem_reads_plans_race_and_done_firsts():
-    long_run = _session("w40-dim-sl", "2026-10-04", workout="SL", distance_cap_km=16.0)
-    rows = [SimpleNamespace(type="SL", km=13.69, date=dt.date(2026, 9, 27))]
+    long_run = _session("w40-dim-sl", "2026-10-04", workout="long", distance_cap_km=16.0)
+    rows = [SimpleNamespace(type="long", km=13.69, date=dt.date(2026, 9, 27))]
     store = FakeStore(plans={
         "2026-W37": {"sessions": [_session("w37-reco", "2026-09-10", "reconnaissance",
                                            status="done")]},

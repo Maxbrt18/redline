@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from . import rulebook
+from . import rulebook, session_kinds
 
 
 def _fr(value: float) -> str:
@@ -72,7 +72,7 @@ def gaps(row: Any, session: dict | None, drift: Any | None) -> list[str]:
 
 #: Les séances dont le débrief porte la carte des répétitions. Une SL ou une course
 #: sont exigeantes sans être fractionnées : leurs tours sont des kilomètres, pas des reps.
-QUALITY_WORKOUTS = frozenset({"seuil", "cotes", "lignes"})
+QUALITY_WORKOUTS = session_kinds.REPETITIONS
 #: Écart minimal d'allure entre le plus lent des tours rapides et le plus rapide des
 #: tours lents. En dessous, les tours sont des tours automatiques d'une allure
 #: continue, pas une alternance effort/récup.

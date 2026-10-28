@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Connection
 
-from scripts.model import commands, ledger, session_cycle, weekly_plan
+from scripts.model import commands, ledger, session_cycle, session_kinds, weekly_plan
 
 from .database import Database, StorageError
 from .plan_policy import enforce_gate_resolution
@@ -120,7 +120,7 @@ CORRECTION_ANNOUNCE_WINDOW = dt.timedelta(days=7)
 #: Les observations qui tranchent une prédiction d'elles-mêmes (2026-10-10). Le réveil
 #: porte sa trace, par zone, dans `pain_readings` : 0 aucune, 0,5 très légère, 1 légère,
 #: 2 nette.
-RESOLVING_KINDS = ("reveil",)
+RESOLVING_KINDS = (session_kinds.WAKE_TRACE,)
 #: Motifs d'une FC moyenne douteuse (schéma `ck_observation_metrics_hr_doubt`).
 HR_DOUBTS = ("sans_brassard", "contexte")
 RESOLUTION_COLUMNS = ("resolves_kind", "resolves_on", "resolves_zone", "success_op",
@@ -581,6 +581,7 @@ class OperationalStore:
             "occurred_on": payload["occurred_on"],
             "started_at": payload.get("started_at"),
             "kind": payload["kind"],
+            "routine": payload.get("routine"),
             "idempotency_key": payload["idempotency_key"],
             "strava_activity_id": int(strava_id) if strava_id else None,
             "gear_id": payload.get("gear_id"),
@@ -600,8 +601,8 @@ class OperationalStore:
                 observation_metrics.c.observation_id == existing["id"]
             )).mappings().one()
             expected = self._metric_values(payload.get("measurements", {}))
-            comparable = ("occurred_on", "started_at", "kind", "strava_activity_id", "gear_id",
-                          "note", "supersedes_id")
+            comparable = ("occurred_on", "started_at", "kind", "routine", "strava_activity_id",
+                          "gear_id", "note", "supersedes_id")
             stored_pains = self._pains_of_in(connection, existing["id"])
             given_pains = {zone: reading for zone, reading in self._pain_values_in(
                 connection, values["kind"], payload.get("pains", {})).items()
@@ -870,21 +871,12 @@ class OperationalStore:
 
     @staticmethod
     def _observation_kind_for_workout(workout: str) -> str | None:
-        return {
-            "EF": "EF", "SL": "SL", "seuil": "seuil", "cotes": "côtes",
-            "lignes": "lignes", "cadence": "cadence", "course": "course",
-            "velo": "vélo", "rando": "rando",
-        }.get(workout)
+        kind = session_kinds.BY_SLUG.get(workout)
+        return workout if kind is not None and kind.recorded else None
 
     @staticmethod
     def _compatible_workouts(sport: str) -> tuple[str, ...]:
-        if sport in {"Run", "TrailRun", "VirtualRun"}:
-            return ("EF", "SL", "seuil", "cotes", "lignes", "cadence", "course")
-        if sport in {"Ride", "VirtualRide", "MountainBikeRide", "GravelRide"}:
-            return ("velo",)
-        if sport in {"Hike", "Walk"}:
-            return ("rando",)
-        return ()
+        return session_kinds.planned_for_sport(sport)
 
     @classmethod
     def _strava_measurements(cls, distilled: dict,
@@ -1248,12 +1240,8 @@ class OperationalStore:
 
     @staticmethod
     def _workout_for_observation(kind: str) -> str | None:
-        return {
-            "EF": "EF", "SL": "SL", "seuil": "seuil", "côtes": "cotes",
-            "lignes": "lignes", "cadence": "cadence", "course": "course",
-            "vélo": "velo", "rando": "rando", "renfoA": "renfo-a",
-            "renfoB": "renfo-b",
-        }.get(kind)
+        found = session_kinds.BY_SLUG.get(kind)
+        return kind if found is not None and found.planned else None
 
     def _auto_match_observation_in(self, connection: Connection, observation_id: uuid.UUID,
                                    session_key: str | None, *, actor: str) -> str | None:
@@ -1273,6 +1261,8 @@ class OperationalStore:
             planned_sessions.c.scheduled_on == local_day,
             planned_sessions.c.workout == workout,
         )
+        if observation.get("routine"):
+            query = query.where(planned_sessions.c.routine == observation["routine"])
         if session_key:
             week, logical_key = self._split_session_key(session_key)
             query = query.where(weekly_plans.c.iso_week == week,
@@ -1482,6 +1472,7 @@ class OperationalStore:
                     "occurred_on": row["occurred_on"],
                     "started_at": row["started_at"],
                     "kind": row["kind"],
+                    "routine": row["routine"],
                     "idempotency_key": row["idempotency_key"],
                     "strava_activity_id": row["strava_activity_id"],
                     "gear_id": row["gear_id"],
@@ -1612,14 +1603,14 @@ class OperationalStore:
 
     # ------------------------------------------------------------------- renfo
     def strength_evidence_in(self, connection: Connection, day: dt.date,
-                             workout: str) -> list:
+                             routine: str | None) -> list:
         """Rapports compatibles ; leur présence n'identifie pas seule une séance."""
-        if workout not in {"renfo-a", "renfo-b"}:
+        if not routine:
             return []
         return list(connection.execute(sa.select(strength_sessions.c.id).where(
             strength_sessions.c.athlete_id == self.athlete_id,
             strength_sessions.c.performed_on == day,
-            strength_sessions.c.workout == workout.removeprefix("renfo-"),
+            strength_sessions.c.workout == routine,
         )).scalars())
 
     def reconcile_strength_cycles_in(self, connection: Connection, *,
@@ -1630,20 +1621,20 @@ class OperationalStore:
         les faits tels quels et interdit d'en déduire une absence de séance.
         """
         rows = connection.execute(sa.select(
-            session_cycles, planned_sessions.c.scheduled_on, planned_sessions.c.workout,
+            session_cycles, planned_sessions.c.scheduled_on, planned_sessions.c.routine,
         ).join(planned_sessions,
                planned_sessions.c.id == session_cycles.c.source_session_id).where(
             session_cycles.c.athlete_id == self.athlete_id,
             session_cycles.c.state != "cancelled",
-            planned_sessions.c.workout.in_(("renfo-a", "renfo-b")),
+            planned_sessions.c.workout == session_kinds.STRENGTH,
         ).order_by(session_cycles.c.id).with_for_update(of=session_cycles)).mappings().all()
         groups: dict[tuple, list] = {}
         for row in rows:
-            groups.setdefault((row["scheduled_on"], row["workout"]), []).append(row)
+            groups.setdefault((row["scheduled_on"], row["routine"]), []).append(row)
         changed = 0
         now = dt.datetime.now(dt.UTC)
-        for (day, workout), candidates in groups.items():
-            reports = self.strength_evidence_in(connection, day, workout)
+        for (day, routine), candidates in groups.items():
+            reports = self.strength_evidence_in(connection, day, routine)
             if len(candidates) != 1 or len(reports) != 1:
                 continue
             row = candidates[0]
@@ -1909,7 +1900,8 @@ class OperationalStore:
                 title=session["title"], scheduled_on=session["date"],
                 start_time=(dt.time.fromisoformat(session["start_time"])
                             if session.get("start_time") else None), kind=session["kind"],
-                workout=session["workout"], status=session["status"],
+                workout=session["workout"], routine=session.get("routine"),
+                status=session["status"],
                 distance_target_km=session.get("distance_target_km"),
                 distance_cap_km=session.get("distance_cap_km"),
                 duration_cap_min=session.get("duration_cap_min"),
@@ -2111,7 +2103,7 @@ class OperationalStore:
                 for key in ("distance_target_km", "distance_cap_km"):
                     if stored[key] is not None:
                         session[key] = float(stored[key])
-                for key in ("duration_cap_min", "rpe_min", "rpe_max", "hr_zone",
+                for key in ("routine", "duration_cap_min", "rpe_min", "rpe_max", "hr_zone",
                             "hr_cap_bpm", "cadence_target", "transition", "location_label",
                             "carbs_target_g_h", "note"):
                     if stored[key] is not None:

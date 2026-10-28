@@ -46,6 +46,7 @@ from scripts.model import (  # noqa: E402
     commands,
     entrypoint,
     paths,
+    session_kinds,
 )
 from scripts.model.errors import ConfigError, InputError  # noqa: E402
 
@@ -421,7 +422,7 @@ def parser() -> argparse.ArgumentParser:
                             default="neutral")
     prediction.add_argument("--outcome", choices=("true", "false", "void"))
     prediction.add_argument(
-        "--resolves", choices=("reveil",),
+        "--resolves", choices=(session_kinds.WAKE_TRACE,),
         help="observation qui solde seule la prédiction à son écriture (void si la date "
              "passe sans elle)")
     prediction.add_argument("--resolves-on", type=day, metavar="AAAA-MM-JJ")

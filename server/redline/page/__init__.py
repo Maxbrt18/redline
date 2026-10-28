@@ -179,7 +179,18 @@ def _cue_script(cues) -> str:
     return f"<script>window.REDLINE_HOW={payload}</script>"
 
 
-def document(cards_dir: Path, cues=None) -> str:
+def _kinds_script(kinds) -> str:
+    """`window.REDLINE_KINDS` -- each session kind's labels and family, by slug.
+
+    The page names and draws a kind from this table only; it keeps no list of its own.
+    """
+    if not kinds:
+        return ""
+    payload = json.dumps(kinds, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+    return f"<script>window.REDLINE_KINDS={payload}</script>"
+
+
+def document(cards_dir: Path, cues=None, kinds=None) -> str:
     """The page served at /s: the notebook itself, which opens straight onto the
     guided session of the link (2026-10-09). `cues` maps an exercise slug to its
     execution cues.
@@ -187,14 +198,14 @@ def document(cards_dir: Path, cues=None) -> str:
     The cues are PASSED IN, not read here: this module is a declared leaf (standard
     library only), and reading a note's frontmatter needs the model layer and PyYAML.
     """
-    return notebook_document(cards_dir, cues)
+    return notebook_document(cards_dir, cues, kinds)
 
 
-def build(cards_dir: Path, cues=None) -> tuple:
+def build(cards_dir: Path, cues=None, kinds=None) -> tuple:
     """(document, etag). Assembled once at startup: the page has no per-request
     content; personal data is resolved from a fragment capability. The tag is the
     bare hash; Flask's set_etag() adds the quotes."""
-    html = document(cards_dir, cues)
+    html = document(cards_dir, cues, kinds)
     return html, hashlib.sha256(html.encode("utf-8")).hexdigest()[:16]
 
 
@@ -243,7 +254,7 @@ def _launch_links() -> str:
     return "".join(links)
 
 
-def notebook_document(cards_dir: Path, cues=None) -> str:
+def notebook_document(cards_dir: Path, cues=None, kinds=None) -> str:
     """Coquille du carnet, sans aucune donnée personnelle ni secret ; les consignes
     d'exécution des exercices (`cues`) y voyagent pour la séance guidée."""
     css = _read(cards_dir / "tokens.css", "tokens.css") + _styles(CARNET_STYLE)
@@ -265,6 +276,7 @@ def notebook_document(cards_dir: Path, cues=None) -> str:
         f"<style>{_font_css(cards_dir / 'fonts', 'block')}{css}</style></head><body>"
         f"{_read(PAGE_DIR / 'carnet' / 'carnet.html', 'carnet.html')}"
         f"{_cue_script(cues)}"
+        f"{_kinds_script(kinds)}"
         f"<script>{bundle(CARNET_SCRIPT)}</script>"
         '</body></html>'
     )

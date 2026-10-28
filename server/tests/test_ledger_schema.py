@@ -8,7 +8,7 @@ from scripts.model import ledger as table
 PENDING = {"state": "pending"}
 
 
-def typed_observation(day: dt.date, kind="EF", *, strava=123, pains=None,
+def typed_observation(day: dt.date, kind="easy", *, strava=123, pains=None,
                       **measurements) -> dict:
     """La douleur de la zone fictive naît `pending`, comme le repository la crée."""
     return {"occurred_on": day, "kind": kind, "strava_activity_id": strava,
@@ -26,14 +26,14 @@ def test_every_session_type_is_classified():
 
 
 def test_input_requires_a_date_and_a_known_type():
-    assert table.INPUT_SCHEMA.errors({"Type": "EF"}, "observation")
+    assert table.INPUT_SCHEMA.errors({"Type": "easy"}, "observation")
     problems = table.INPUT_SCHEMA.errors(
         {"Date": "2026-08-20", "Type": "footing"}, "observation")
     assert any("Type" in problem for problem in problems)
 
 
 def test_only_declarative_inputs_may_be_unavailable():
-    base = {"Date": "2026-08-20", "Type": "EF"}
+    base = {"Date": "2026-08-20", "Type": "easy"}
     assert table.INPUT_SCHEMA.errors({**base, "km": "?"}, "observation")
     assert table.INPUT_SCHEMA.errors(
         {**base, "RPE": "?", "Plaisir": "?"}, "observation") == []
@@ -41,7 +41,7 @@ def test_only_declarative_inputs_may_be_unavailable():
 
 
 def test_notes_accept_pipes_because_the_markdown_table_is_gone():
-    payload = {"Date": "2026-08-20", "Type": "EF", "Note": "EF | très souple"}
+    payload = {"Date": "2026-08-20", "Type": "easy", "Note": "EF | très souple"}
     assert table.INPUT_SCHEMA.errors(payload, "observation") == []
 
 
@@ -79,7 +79,7 @@ def test_unavailable_only_resolves_declarative_metrics():
 
 
 def test_readings_require_pain_but_palpation_requires_no_number():
-    reading = typed_observation(dt.date(2026, 8, 4), kind="reveil", strava=None)
+    reading = typed_observation(dt.date(2026, 8, 4), kind="wake-trace", strava=None)
     palpation = typed_observation(dt.date(2026, 8, 4), kind="palpation", strava=None)
     assert table.missing_observation_fields(reading) == ["Dlr:injury"]
     assert table.missing_observation_fields(palpation) == []
@@ -106,6 +106,6 @@ def test_unavailable_is_never_read_as_a_value():
 
 
 def test_cell_key_is_stable_and_metric_specific():
-    entry = {"date": "2026-08-04", "type": "renfoA", "missing": ["RPE", "Dlr"]}
-    assert table.cell_key(entry, "RPE") == "2026-08-04:renfoA:RPE"
+    entry = {"date": "2026-08-04", "type": "strength", "missing": ["RPE", "Dlr"]}
+    assert table.cell_key(entry, "RPE") == "2026-08-04:strength:RPE"
     assert table.cell_key(entry, "RPE") != table.cell_key(entry, "Dlr")

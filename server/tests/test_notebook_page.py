@@ -11,6 +11,7 @@ from playwright.sync_api import sync_playwright
 from redline.page import document as session_document
 from redline.page import notebook_document
 from scripts.cards import render
+from scripts.model import session_labels
 from scripts.model.dose import Dose
 
 BASE = 'https://redline.test'
@@ -20,14 +21,14 @@ ENTRY = {'id':'one', 'kind':'monthly', 'title':'Monthly · 2026-09', 'period':'2
 
 def ef(identifier, date, status='planned', fact=None):
     return {'id': identifier, 'date': date, 'title': 'EF, permis accompagné', 'kind': 'run',
-            'workout': 'EF', 'status': status, 'start_time': None, 'location': None,
+            'workout': 'easy', 'status': status, 'start_time': None, 'location': None,
             'note': 'Tu choisis la durée.', 'planned': ['≤55 min', 'RPE 2-3', 'Z1-Z2, 130-157 bpm'],
             'fact': fact, 'entry_id': None, 'transition': None,
             'targets': {'duration_cap_min': 55, 'rpe_min': 2, 'rpe_max': 3, 'hr_cap_bpm': 157}}
 
 
 RENFO = {'id': 'w41-ven-renfo', 'date': '2026-10-09', 'title': 'Renfo, séance unique',
-         'kind': 'strength', 'workout': 'renfo-a', 'status': 'planned', 'start_time': None,
+         'kind': 'strength', 'workout': 'strength', 'routine': 'a', 'status': 'planned', 'start_time': None,
          'location': None, 'note': None, 'planned': [], 'fact': None, 'entry_id': None,
          'transition': None, 'targets': {}}
 DONE = ef('w41-mar-ef', '2026-10-06', 'done', {
@@ -36,7 +37,7 @@ DONE = ef('w41-mar-ef', '2026-10-06', 'done', {
     'enjoyment': 8, 'started_at': '2026-10-06T07:10:00+02:00', 'over': ['hr_avg']})
 TOTALS = {'km_done': 14.06, 'km_target': 41, 'runs_done': 2, 'runs_planned': 5, 'dplus': 27,
           'strength_done': 1, 'strength_planned': 2, 'load': 25}
-STRIP = [{'date': f'2026-10-{day:02d}', 'letter': letter, 'abbr': 'EF', 'today': day == 9,
+STRIP = [{'date': f'2026-10-{day:02d}', 'letter': letter, 'abbr': 'easy', 'today': day == 9,
           'done_km': 8.35 if day == 6 else None, 'planned_km': 16 if day == 11 else None,
           'planned_label': '≤55′' if day == 9 else None, 'long': day == 11, 'rest': day == 5}
          for day, letter in zip(range(5, 12), 'LMMJVSD', strict=True)]
@@ -47,7 +48,7 @@ TODAY = {
     'ahead': [],
     'strip': STRIP, 'totals': TOTALS,
     'asks': [{'id': 'cell:6b0f3c1e-1d1a-4a39-9e0d-5c1b0b5d2f10', 'type': 'cells',
-              'date': '2026-10-07', 'kind': 'EF', 'km': 5.71, 'fields': ['pain:injury', 'rpe'],
+              'date': '2026-10-07', 'kind': 'easy', 'km': 5.71, 'fields': ['pain:injury', 'rpe'],
               'labels': {'pain:injury': 'Injury'}}],
     'pain': {'cap': 2.0, 'zones': [{'zone': 'injury', 'label': 'Injury', 'weeks': [
         {'week': '2026-W40', 'peak': 1.5}, {'week': '2026-W41', 'peak': 1.0}]}]},
@@ -62,9 +63,9 @@ WEEK = {'week': '2026-W41', 'monday': '2026-10-05', 'current': '2026-W41',
         'totals': TOTALS, 'strip': STRIP, 'review': None, 'cards': [ENTRY]}
 INJURY = {'zone': 'injury', 'label': 'Injury', 'zones': [{'zone': 'injury', 'label': 'Injury'}],
           'cap': 2.0, 'start': '2026-09-28', 'today': '2026-10-09', 'week': '2026-W41',
-          'points': [{'date': '2026-10-03', 'pain': 1.5, 'kind': 'SL', 'long': True},
-                     {'date': '2026-10-06', 'pain': 0.5, 'kind': 'EF', 'long': False},
-                     {'date': '2026-10-07', 'pain': 2.5, 'kind': 'EF', 'long': False}],
+          'points': [{'date': '2026-10-03', 'pain': 1.5, 'kind': 'long', 'long': True},
+                     {'date': '2026-10-06', 'pain': 0.5, 'kind': 'easy', 'long': False},
+                     {'date': '2026-10-07', 'pain': 2.5, 'kind': 'easy', 'long': False}],
           'wakes': [{'date': '2026-10-08', 'pain': 0.0}],
           'weeks': [{'week': '2026-W40', 'peak': 1.5, 'n': 1, 'wake': None},
                     {'week': '2026-W41', 'peak': 2.5, 'n': 2, 'wake': 0.0}],
@@ -95,7 +96,7 @@ def browser():
 
 def serve(tab, answers=None):
     tab.route(BASE + '/carnet', lambda route: route.fulfill(
-        content_type='text/html', body=notebook_document(render.CARDS_DIR)))
+        content_type='text/html', body=notebook_document(render.CARDS_DIR, kinds=session_labels.for_page())))
     def respond(route):
         path = route.request.url.split('/carnet-api/')[1]
         if path == 'today':
@@ -868,7 +869,7 @@ def test_the_red_point_moves_from_the_run_to_the_strength_once_done(browser):
         'km': 8.35, 'duration_min': 48, 'hr_avg': 162, 'rpe': None, 'pains': [], 'enjoyment': None,
         'started_at': '2026-10-09T07:10:00+02:00', 'over': ['hr_avg'], 'observation_id': 'obs'})
     after = {**TODAY, 'sessions': [done, RENFO], 'asks': [
-        {'id': 'cell:obs', 'type': 'cells', 'date': '2026-10-09', 'kind': 'EF', 'km': 8.35,
+        {'id': 'cell:obs', 'type': 'cells', 'date': '2026-10-09', 'kind': 'easy', 'km': 8.35,
          'fields': ['pain:injury', 'rpe', 'enjoyment'], 'labels': {'pain:injury': 'Injury'}}]}
     tab = browser.new_page(viewport={'width': 393, 'height': 852})
     answers = []

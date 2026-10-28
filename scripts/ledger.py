@@ -42,6 +42,7 @@ from scripts.model import (  # noqa: E402
     paths,
     programme,
     rulebook,
+    session_kinds,
 )
 from scripts.model import ledger as table  # noqa: E402
 from scripts.model.errors import InputError  # noqa: E402
@@ -49,41 +50,11 @@ from scripts.model.errors import InputError  # noqa: E402
 POINTS_PER_EQ_HOUR = 14.0          # calibrated 2026-07-19, coaching/protocols.md
 LEVEL_CAP, RATIO_CAP = 85, 1.3
 
-QUALITY_TYPES = {"seuil", "côtes"}
-HALF_TYPES = {"rando", "vélo", "renfoA", "renfoB"}
+QUALITY_TYPES = session_kinds.QUALITY
+HALF_TYPES = session_kinds.HALF_LOAD
 
-# ⭐ LE TERME DE DÉNIVELÉ LIT LE D−, PAS LE D+ (confrontation n°2, volet dénivelé,
-# 2026-08-16 — `decisions.md`). Ce que les heures ne captent pas, c'est la descente :
-# on y va plus VITE, donc elle pèse moins en temps, alors qu'elle coûte plus en
-# mécanique (impact, freinage, choc à l'impact +23 à 30 % — [[src-vernillo-course-en-pente]]).
-# La montée, elle, est déjà payée par le temps qu'elle fait perdre, et son surcoût
-# énergétique résiduel est 4 à 18 fois plus petit que ce que le terme facturait
-# ([[src-minetti-cout-pente]]).
-#
-# Effet mesuré sur la série : 6 semaines sur 8 ne bougent pas (une boucle a D− = D+).
-# Seules bougent les deux journées de Lac-A — la montée pure du 19/07 (1108 m D+,
-# 17 m D−) qui cesse d'être surfacturée, et la descente pure du 21/07 (20 m D+,
-# 1096 m D−) qui cesse d'être gratuite.
-#
-# Le terme reste réservé à ce qui se COURT ou se MARCHE : « Vélo Z2 : ×0,5 » ne porte
-# aucun dénivelé (ni impact ni excentrique). La table est explicite et exhaustive — un
-# test le vérifie — parce qu'un `else` avait déjà donné au vélo le poids d'une course.
-DESCENT_WEIGHT = {
-    # Descente COURUE : impact, freinage, excentrique. Terme plein.
-    "EF": 1.0, "SL": 1.0, "seuil": 1.0, "côtes": 1.0, "lignes": 1.0,
-    "cadence": 1.0, "course": 1.0,
-    # Descente MARCHÉE : excentrique réel (Maeo 2017 : 5 min suffisent à inoculer),
-    # mais impact par appui bien moindre. Moitié, comme le temps.
-    "rando": 0.5,
-    "vélo": 0.0,                   # ni impact ni excentrique : aucun terme de dénivelé
-    "renfoA": 0.0, "renfoB": 0.0,  # en salle, un dénivelé n'a pas de sens
-    "instruments": 0.0, "palpation": 0.0,
-    "lecture": 0.0, "reveil": 0.0,  # types de repos, écartés en amont de toute façon
-}
-
-# Le RPE cible ne vit PAS ici : il est déclaré `rpe_cible` dans coaching/workouts/*.md
-# et se résout par `model.programme.rpe_targets()`. La copie en dur qui occupait cette
-# place a été supprimée le 2026-08-08 (voir la note là-bas).
+# The gauge counts the descent, not the climb: the climb is already paid in time.
+# Each kind's share of it is `session_kinds.descent_weight`.
 
 
 @dataclass
@@ -91,6 +62,8 @@ class Row:
     date: dt.date
     type: str
     idempotency_key: str = ""
+    #: The strength routine, when the session is a `strength` one and it is known.
+    routine: str | None = None
     km: float | None = None
     hours: float | None = None
     hr_avg: int | None = None
@@ -231,6 +204,7 @@ def parse_ledger(store: LedgerStore) -> list[Row]:
         rows.append(Row(
             date=observation["occurred_on"], type=observation["kind"],
             idempotency_key=observation.get("idempotency_key", ""),
+            routine=observation.get("routine"),
             km=km,
             hours=hours,
             hr_avg=_known_int(observation, "hr_avg_bpm"),
@@ -251,19 +225,20 @@ def parse_ledger(store: LedgerStore) -> list[Row]:
     # durée et leur douleur de la jauge. On les fusionne donc au CALCUL seulement.
     # Les anciennes séances ont parfois les deux formes : l'observation générale
     # gagne sur la même date/type, notamment parce qu'elle peut porter un RPE global.
-    workout_type = {"a": "renfoA", "b": "renfoB", "assimilation": "renfoA"}
-    occupied = {(row.date, row.type) for row in rows}
+    strength = session_kinds.STRENGTH
+    occupied = {(row.date, row.routine) for row in rows if row.type == strength}
     for session in store.strength_history():
-        kind = workout_type.get(session.get("workout") or "")
-        if kind is None:
+        routine = session.get("workout")
+        if not routine:
             continue
-        key = (session["performed_on"], kind)
-        if key in occupied:
+        key = (session["performed_on"], routine)
+        if key in occupied or (session["performed_on"], None) in occupied:
             continue
         duration = session.get("duration_minutes")
         rows.append(Row(
             date=session["performed_on"],
-            type=kind,
+            type=strength,
+            routine=routine,
             hours=duration / 60 if duration is not None else None,
             pains={zone: float(moments["after"])
                    for zone, moments in (session.get("pains") or {}).items()
@@ -334,11 +309,11 @@ def row_weight(row: Row, targets: dict) -> tuple[float, bool]:
     if row.type in table.REST_TYPES or not row.hours:
         return 0.0, False
     weighted = row.hours * (0.5 if row.type in HALF_TYPES else 1.0)
-    weighted += (row.dminus / 600) * DESCENT_WEIGHT.get(row.type, 1.0)
+    weighted += (row.dminus / 600) * session_kinds.descent_weight(row.type)
     missed = False
     if row.type in QUALITY_TYPES:
         weighted += 0.5
-        target = targets.get(row.type)
+        target = programme.target_for(targets, row.type, row.routine)
         missed = bool(row.rpe and target and row.rpe > target)
         if missed:
             weighted += 0.5
@@ -369,7 +344,7 @@ def over_target(rows: list[Row], targets: dict) -> list[TargetFlag]:
     """
     flags = []
     for row in sorted(rows, key=lambda r: r.date):
-        target = targets.get(row.type)
+        target = programme.target_for(targets, row.type, row.routine)
         if row.rpe is not None and target is not None and row.rpe > target:
             flags.append(TargetFlag(row.date, row.type, row.rpe, target))
     return flags
@@ -557,7 +532,7 @@ def pain_trend(rows: list[Row], weeks_back: int, zone: str) -> list[PainWeek]:
             rest=_series([value for r in week if (value := r.pain_at(zone)) is not None
                           and r.type in table.REST_TYPES]),
             wake=_series([value for r in week if (value := r.pain_at(zone)) is not None
-                          and r.type == "reveil"])))
+                          and r.type == session_kinds.WAKE_TRACE])))
     return out
 
 
@@ -638,7 +613,7 @@ def esculier_check(rows: list[Row], zone: str,
     """
     past = history if history is not None else rows
     wake = {row.date: value for row in rows
-            if row.type == "reveil" and (value := row.pain_at(zone)) is not None}
+            if row.type == session_kinds.WAKE_TRACE and (value := row.pain_at(zone)) is not None}
     flags = []
     for row in sorted(rows, key=lambda r: r.date):
         # Positif, pas « not in REST_TYPES » : la règle Esculier parle de ce qu'une
@@ -692,7 +667,7 @@ def _pain_gate_cases(rows: list[Row], label: str, previous: str,
     else:
         cases.append(("✓" if now <= before else "✗",
                       f"tendance : {before:g} → {now:g}"))
-    wakes = [row for row in rows if row.week == label and row.type == "reveil"]
+    wakes = [row for row in rows if row.week == label and row.type == session_kinds.WAKE_TRACE]
     measured = [(row.date, value) for row in wakes
                 if (value := row.pain_at(zone)) is not None]
     base = rest_peak(rows, _week_start(label), zone)
@@ -749,8 +724,8 @@ def gate(rows: list[Row], label: str, instr: Instruments,
 # Les types du registre qui comptent comme « couru », par opposition à la marche et au
 # renfo. La distinction porte la lecture : une jauge rouge faite de rando ne dit pas la
 # même chose qu'une jauge rouge faite de course (objection de l'athlète du 2026-07-21).
-RUN_TYPES = {"EF", "SL", "seuil", "côtes", "lignes", "cadence", "course"}
-WALK_TYPES = {"rando"}
+RUN_TYPES = session_kinds.RUN
+WALK_TYPES = session_kinds.WALK
 
 
 @dataclass

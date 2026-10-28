@@ -200,8 +200,8 @@ function dayFil(data, items, extras, options) {
     .forEach(ask => {
       if (ask.type !== 'hr' && ask.type !== 'cells') return;
       used.add(ask.id);
-      const what = ask.type === 'hr' ? 'EF' : kindName[ask.kind] || ask.kind;
-      const [node, body] = filStep(take(), 'À compléter', what + ' de ' + dayNumber(ask.date) + (ask.km ? ' · ' + fmt(ask.km) + ' km' : ''), true, kindIcon(ask.type === 'hr' ? 'EF' : ask.kind));
+      const what = ask.type === 'hr' ? kindName.easy : kindName[ask.kind] || ask.kind;
+      const [node, body] = filStep(take(), 'À compléter', what + ' de ' + dayNumber(ask.date) + (ask.km ? ' · ' + fmt(ask.km) + ' km' : ''), true, kindIcon(ask.type === 'hr' ? 'easy' : ask.kind));
       fil.append(add(node, add(body, ask.type === 'hr' ? hrCard(ask) : cellsCard(ask))));
     });
   done.forEach(item => {

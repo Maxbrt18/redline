@@ -24,7 +24,14 @@ from pathlib import Path
 from typing import Any
 
 from scripts import ledger, signals
-from scripts.model import debrief, programme, session_cycle, transitions
+from scripts.model import (
+    debrief,
+    programme,
+    session_cycle,
+    session_kinds,
+    session_labels,
+    transitions,
+)
 from scripts.model import ledger as ledger_model
 from scripts.model.errors import InputError
 from scripts.model.instance import Instance, derived_label
@@ -37,13 +44,8 @@ ACTOR = "carnet"
 #: sollicité trop tard (2026-09-15) et le carnet ne la demande plus.
 WAKE_ASK_UNTIL = dt.time(14, 0)
 DAY_LETTERS = ("L", "M", "M", "J", "V", "S", "D")
-WORKOUT_ABBR = {
-    "EF": "EF", "SL": "SL", "seuil": "seuil", "cotes": "côtes", "lignes": "lignes",
-    "cadence": "cad.", "course": "course", "renfo-a": "R", "renfo-b": "R",
-    "test-mollet": "test", "repos": "repos", "velo": "vélo", "rando": "rando",
-}
 #: Libellés d'affichage des capacités ; le slug reste l'identité.
-MOVING_TYPES = ledger.RUN_TYPES | {"rando", "vélo"}
+MOVING_TYPES = session_kinds.MOVING
 #: Le point du matin : l'état du jour, déclaratif, aux valeurs de `fact-write.py daily`.
 DAILY_FIELDS = {"sleep": ("bonne", "moyenne", "mauvaise"),
                 "life_load": ("legere", "normale", "elevee")}
@@ -327,12 +329,12 @@ class Board:
                 if planned_km is None and targets.get("duration_cap_min"):
                     planned_label = f"≤{targets['duration_cap_min']}′"
             abbr = "+".join(dict.fromkeys(
-                WORKOUT_ABBR.get(s["workout"], s["workout"]) for s in same)) or ""
+                session_labels.short(s["workout"]) for s in same)) or ""
             days.append({
                 "date": iso, "letter": DAY_LETTERS[index], "abbr": abbr,
                 "today": day == self.today, "done_km": round(done, 2) or None,
                 "planned_km": planned_km, "planned_label": planned_label,
-                "long": any(s["workout"] == "SL" for s in same),
+                "long": any(s["workout"] == session_kinds.LONG for s in same),
                 "rest": not any(s["kind"] != "rest" for s in same),
             })
         return days
@@ -383,7 +385,7 @@ class Board:
         rows = [row for row in self.rows
                 if start <= row.date <= self.today and row.pain_at(slug) is not None]
         efforts = [row for row in rows if row.type in ledger_model.EFFORT_TYPES]
-        wakes = [row for row in rows if row.type == "reveil"]
+        wakes = [row for row in rows if row.type == session_kinds.WAKE_TRACE]
         table = []
         for index in range(weeks):
             label = week_label(start + dt.timedelta(weeks=index))
@@ -393,7 +395,7 @@ class Board:
                           "wake": max(wake, default=None)})
         column = ledger_model.pain_column(slug)
         missing = sorted({obs["occurred_on"] for obs in self.observations
-                          if obs["kind"] == "reveil" and obs["occurred_on"] <= self.today
+                          if obs["kind"] == session_kinds.WAKE_TRACE and obs["occurred_on"] <= self.today
                           and self.today - obs["occurred_on"] < dt.timedelta(days=14)
                           and column in ledger_model.missing_observation_fields(obs)},
                          reverse=True)
@@ -403,7 +405,7 @@ class Board:
             "cap": ledger.ESCULIER_CAP, "start": start.isoformat(), "today": self.today.isoformat(),
             "week": week_label(self.today),
             "points": [{"date": row.date.isoformat(), "pain": row.pains[slug], "kind": row.type,
-                        "long": row.type == "SL"} for row in efforts],
+                        "long": row.type == session_kinds.LONG} for row in efforts],
             "wakes": [{"date": row.date.isoformat(), "pain": row.pains[slug]} for row in wakes],
             "weeks": table, "missing": [day.isoformat() for day in missing],
             "scale": PAIN_SCALE,
@@ -436,13 +438,13 @@ class Board:
         woke_today = False
         for row in self.observations:
             day = row["occurred_on"]
-            if row["kind"] == "reveil" and day == self.today:
+            if row["kind"] == session_kinds.WAKE_TRACE and day == self.today:
                 woke_today = True
             if day > self.today or day < ledger_model.COMPLETENESS_FROM \
                     or self.today - day >= ledger_model.COMPLETION_WINDOW:
                 continue
             missing = ledger_model.missing_observation_fields(row)
-            if row["kind"] == "reveil":
+            if row["kind"] == session_kinds.WAKE_TRACE:
                 if day == self.today and self._morning:
                     asks.extend({"id": f"wake-cell:{row['id']}:{zone}", "type": "wake",
                                  "zone": zone, "label": labels.get(zone, zone),
@@ -549,7 +551,7 @@ class Board:
                 # La première zone répondue crée le réveil ; les autres y restent
                 # `pending` et se complètent ensuite, une zone par geste.
                 self.ops.add_observation({
-                    "occurred_on": self.today, "kind": "reveil",
+                    "occurred_on": self.today, "kind": session_kinds.WAKE_TRACE,
                     "idempotency_key": f"carnet:reveil:{self.today.isoformat()}",
                     "note": "trace au réveil déclarée dans le carnet", "source": ACTOR,
                     "measurements": {},
@@ -647,7 +649,7 @@ class Board:
         """La trace au réveil du jour (avant la séance) et du lendemain (après), par zone."""
         def pains_on(when: dt.date) -> dict[str, float]:
             row = next((row for row in self.observations
-                        if row["kind"] == "reveil" and row["occurred_on"] == when), None)
+                        if row["kind"] == session_kinds.WAKE_TRACE and row["occurred_on"] == when), None)
             return {item["zone"]: item["value"]
                     for item in known_pains(row, self.zone_labels)} if row else {}
 
@@ -847,7 +849,7 @@ class Board:
         # La sortie longue de la semaine en cours est celle du programme tant qu'elle
         # n'est pas courue : la plus longue des jours passés n'en est pas une, elle
         # arrive souvent le week-end (l'athlète, 2026-10-10).
-        long_run = next((s for s in planned if s["workout"] == "SL"
+        long_run = next((s for s in planned if s["workout"] == session_kinds.LONG
                          and (s["targets"].get("distance_target_km")
                               or s["targets"].get("distance_cap_km"))), None)
         milestones = []
