@@ -48,7 +48,7 @@ def test_every_gate_field_has_a_column():
         f"{missing} : déclaré sur le contrôle daté, rangé nulle part dans "
         "redline.plan_gates. Une révision partirait valide et reviendrait mutilée. "
         "Ajoute la colonne par une migration, sa lecture et son écriture dans "
-        "scripts/storage/repository.py, et son renommage éventuel ci-dessus.")
+        "scripts/storage/repository/plans.py, et son renommage éventuel ci-dessus.")
 
 
 def test_every_session_field_has_a_column():
@@ -70,7 +70,7 @@ def test_every_revision_field_has_a_column():
     assert missing <= REVISION_ELSEWHERE, (
         f"{sorted(missing - REVISION_ELSEWHERE)} : déclaré sur la révision, rangé nulle "
         "part dans redline.plan_revisions. Ajoute la colonne par une migration, sa "
-        "lecture et son écriture dans scripts/storage/repository.py, et son renommage "
+        "lecture et son écriture dans scripts/storage/repository/plans.py, et son renommage "
         "éventuel ci-dessus -- ou nomme-le dans REVISION_ELSEWHERE en disant où il vit.")
 
 
