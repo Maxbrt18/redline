@@ -78,7 +78,7 @@ warn_redundant_casts = true
 
 [[tool.mypy.overrides]]
 # No stubs published, and the import is already guarded at the call site.
-module = ["waitress", "playwright.*", "youtube_transcript_api.*", "redline.*"]
+module = ["waitress", "playwright.*", "redline.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
