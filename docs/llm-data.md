@@ -41,9 +41,10 @@ opens is sent to the provider:
 - Messages from other Messenger users: they are dropped before any turn.
 - Raw attachments after their turn: the temporary file is deleted.
 - Secrets: the service environment (tokens, `DATABASE_URL`) and `REDLINE_STATE_DIR` (the
-  Strava token cache) are outside the vault checkout and never put in a prompt. The
-  agent's file tools are not sandboxed to that checkout, though: keep these files
-  readable only by the accounts that need them.
+  Strava token cache) are outside the vault checkout and never put in a prompt.
+  Claude's file tools are confined to the vault (`--restricted`), and the attachment
+  folder during an attachment turn; Codex reads with the service account's rights.
+  Keep the environment file readable only by root and the deploy account.
 
 ## Reducing what is sent
 

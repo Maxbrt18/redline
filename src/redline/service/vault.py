@@ -209,7 +209,9 @@ class VaultRepo:
         repository, whether the vault is a different one or the same.
         `deploy/verify-release.sh` recomputes the same value from the deployed SHA.
         """
-        trees = [self._git("rev-parse", f"{ref}:{path}", log_errors=False,
+        # The engine checkout belongs to the deploy account, not to the service user.
+        trees = [self._git("-c", f"safe.directory={self._engine_root}", "rev-parse",
+                           f"{ref}:{path}", log_errors=False,
                            cwd=self._engine_root).stdout.strip()
                  for path in RUNTIME_TREES]
         if not all(trees):

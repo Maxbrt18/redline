@@ -1,6 +1,7 @@
 """Model profiles and session isolation in ClaudeCodeRunner."""
 
 import json
+import subprocess
 from dataclasses import replace
 from functools import partial
 
@@ -284,3 +285,40 @@ def test_the_bench_follows_the_production_provider(make_config):
     check_model(config, config.routing.plan(Route.N2).primary)
     with pytest.raises(ValueError, match="non autorisé"):
         check_model(config, RunSpec("gpt-6-sol", "high", 60))
+
+
+# ---- confinement: no settings file, no MCP server, file tools inside the vault
+
+def _confined(command):
+    return "--restricted" in command and "--strict-mcp-config" in command
+
+
+@pytest.mark.parametrize("options", [
+    {}, {"read_only": True}, {"shell_enabled": False}, {"structured": True}])
+def test_every_turn_is_confined(make_config, options):
+    """A turn that wrote `.claude/settings.json` in the vault would otherwise have its
+    hooks run by the next call."""
+    command = ClaudeCodeRunner(make_config(), state=None)._command("bilan", None, **options)
+    assert _confined(command)
+
+
+def test_an_attachment_turn_reads_only_the_attachment_folder_outside_the_vault(make_config):
+    config = make_config()
+    command = ClaudeCodeRunner(config, state=None)._command("photo", None, read_only=True)
+    assert command[command.index("--add-dir") + 1] == config.attachment_dir
+    assert command[command.index("--tools") + 1] == "Read,Glob,Grep"
+
+
+def test_triage_and_the_bench_are_confined_too(make_config, monkeypatch):
+    seen = []
+
+    def run(command, **_):
+        seen.append(command)
+        return subprocess.CompletedProcess(command, 0, stdout=json.dumps(
+            {"result": "N1 | - | - | - | - | none", "structured_output": {}}), stderr="")
+
+    monkeypatch.setattr(subprocess, "run", run)
+    runner = ClaudeCodeRunner(make_config(), state=None)
+    runner.classify("salut")
+    runner.one_shot("ok", spec=RunSpec(model="sonnet", effort="low", timeout=10))
+    assert len(seen) == 2 and all(_confined(command) for command in seen)

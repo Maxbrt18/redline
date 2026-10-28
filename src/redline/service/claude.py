@@ -70,10 +70,17 @@ def _parse_reset_epoch(detail: str, now: datetime | None = None) -> int | None:
     return int(target.timestamp())
 
 
+#: Every `claude` call: no user, project or vault settings file is loaded, no MCP server
+#: either, and the file tools stay inside the working directory. A turn may write a
+#: note; it may never write a hook, a permission or a server that the next call would
+#: load, nor reach the service's environment file or venv.
+CONFINEMENT = ("--restricted", "--strict-mcp-config")
+
 #: What an autonomous turn may do. Shared with `deploy/claude-runtime-smoke.py`, which
 #: rejects a new Claude Code version if it blocks the exact shape of a coach CLI call
 #: (for instance one that redirects input from a file).
 AUTONOMOUS_PERMISSIONS = (
+    *CONFINEMENT,
     "--permission-mode", "dontAsk",
     "--tools", "Read,Glob,Grep,Edit,Write,Bash",
     "--allowedTools",
@@ -255,7 +262,8 @@ class ClaudeCodeRunner:
         route = self._config.routing.plan(Route.TRIAGE)
         candidates = (spec or route.primary, *route.fallbacks)
         for attempt, candidate in enumerate(candidates, start=1):
-            command = [self._config.claude_bin, "-p", self._personal(TRIAGE_PROMPT + message)]
+            command = [self._config.claude_bin, "-p", self._personal(TRIAGE_PROMPT + message),
+                       *CONFINEMENT]
             if candidate.model:
                 command += ["--model", candidate.model]
             if candidate.read_only:
@@ -299,7 +307,8 @@ class ClaudeCodeRunner:
         failure: the bench must see the error, not an empty reply.
         """
         command = [self._config.claude_bin, "-p", self._personal(message),
-                   "--output-format", "json", "--permission-mode", "dontAsk", "--tools", ""]
+                   "--output-format", "json", *CONFINEMENT,
+                   "--permission-mode", "dontAsk", "--tools", ""]
         if instructions:
             command += ["--system-prompt", self._personal(instructions)]
         if output_schema is not None:
@@ -436,11 +445,13 @@ class ClaudeCodeRunner:
         if structured:
             command += ["--json-schema", json.dumps(PROACTIVE_REPLY_SCHEMA)]
         if not shell_enabled:
-            command += ["--permission-mode", "dontAsk", "--tools", ""]
+            command += [*CONFINEMENT, "--permission-mode", "dontAsk", "--tools", ""]
         elif read_only:
             # The attachment is an untrusted source: the engine may read it but has
-            # physically no write or execution tool.
-            command += ["--permission-mode", "dontAsk", "--tools", "Read,Glob,Grep"]
+            # physically no write or execution tool. It lives outside the vault, so its
+            # folder is the one directory added to the confinement.
+            command += [*CONFINEMENT, "--add-dir", self._config.attachment_dir,
+                        "--permission-mode", "dontAsk", "--tools", "Read,Glob,Grep"]
         else:
             # The autonomous channel needs to edit the vault and call its CLIs, not a
             # general shell. `dontAsk` denies any capability outside the allowlist

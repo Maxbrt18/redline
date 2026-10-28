@@ -644,6 +644,33 @@ without a runtime change.
 
 ## Deployment
 
+### Two accounts
+
+The service never runs as the account that deploys it. A coaching turn can write
+files, so everything the service can write is something a turn can write:
+
+| Account | Owns | Writes |
+|---|---|---|
+| `ubuntu` (deploy, sudo) | the engine checkout, the venvs, the Claude runtime | deployments, the nightly runtime update |
+| `redline` (service, no sudo, no login) | `/var/lib/redline`: the vault, `state/` (outbox, attachments, Strava token), `~/.claude` | notes, cards, sessions |
+
+The unit (`deploy/systemd/coach-messenger.service`) makes the rest of the file system
+read-only (`ProtectSystem=strict`, `ProtectHome=read-only`). `redline-agent-cli` refuses to
+run if the service account can write the engine's `src/` or the venv, and every
+`claude` call is confined (`--restricted`): no settings file, hook or MCP server written
+by a turn is ever loaded, and the file tools stay inside the vault.
+
+```bash
+sudo useradd --system --home-dir /var/lib/redline --shell /usr/sbin/nologin redline
+sudo install -d -o redline -g redline -m 0700 /var/lib/redline /var/lib/redline/state
+sudo -u redline git clone <vault remote> /var/lib/redline/vault
+```
+
+The vault's Git credentials (a deploy key with write access to the vault repository
+only) belong to `redline`.
+
+### Release
+
 Deployment is external to the service: prior backup, repository update,
 dependency installation, migrations, checks, systemd restart, verification
 of the commit **actually started**, then post-deployment backup. An HTTP 200

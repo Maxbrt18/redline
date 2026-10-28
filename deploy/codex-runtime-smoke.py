@@ -38,14 +38,14 @@ def main() -> int:
                 cwd=args.cwd,
                 developer_instructions=None,
                 model=model,
-                sandbox=Sandbox.full_access,
+                sandbox=Sandbox.workspace_write,
             )
             result = thread.turn(
                 "Réponds exactement OK. N'utilise aucun outil.",
                 approval_mode=ApprovalMode.deny_all,
                 cwd=args.cwd,
                 effort=ReasoningEffort("low"),
-                sandbox=Sandbox.full_access,
+                sandbox=Sandbox.workspace_write,
             ).run()
             response = getattr(result, "final_response", "")
             if not isinstance(response, str) or not response.strip():

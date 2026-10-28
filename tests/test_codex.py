@@ -5,9 +5,11 @@ from dataclasses import replace
 from enum import Enum
 from types import SimpleNamespace
 
+from redline.model import paths
 from redline.service.agent import FailureKind, RunSpec, SessionMode, Triage
 from redline.service.codex import (
     CONSTITUTION_OVERRIDE,
+    NETWORK_OVERRIDE,
     NO_PROJECT_DOC_OVERRIDE,
     TRIAGE_NO_SHELL_OVERRIDE,
     CodexRunner,
@@ -133,7 +135,7 @@ def test_a_first_turn_uses_the_sdk_and_persists_its_native_thread(make_config, s
     kind, _, options = client.calls[0]
     assert kind == "start"
     assert options["model"] == "gpt-6-luna"
-    assert options["sandbox"] is _Sandbox.full_access
+    assert options["sandbox"] is _Sandbox.workspace_write
     assert options["approval_mode"] is _ApprovalMode.deny_all
     assert "droit de contredire" in options["developer_instructions"]
     assert store.session_id("4242", "codex") == "thread-1"
@@ -148,16 +150,19 @@ def test_each_writable_codex_process_receives_its_turn_id(make_config, store):
     assert sdk.configs[-1]["env"]["REDLINE_TURN_ID"] == "turn-42"
 
 
-def test_production_turns_do_not_start_a_codex_sandbox(make_config, store):
-    """No bubblewrap namespace sits on the path of the business CLIs."""
+def test_production_turns_run_in_the_workspace_sandbox(make_config, store):
+    """A turn writes the vault and the state directory, nothing else; the network stays
+    open for Strava and PostgreSQL."""
     runner, client, sdk = _runner(make_config, store)
 
     runner.run("4242", "lis Strava", turn_id="turn-42")
 
-    assert sdk.configs[-1]["config_overrides"] == (CONSTITUTION_OVERRIDE,)
-    assert client.calls[0][2]["sandbox"] is _Sandbox.full_access
+    assert sdk.configs[-1]["config_overrides"] == (
+        CONSTITUTION_OVERRIDE, NETWORK_OVERRIDE,
+        f'sandbox_workspace_write.writable_roots=["{paths.state_dir()}"]')
+    assert client.calls[0][2]["sandbox"] is _Sandbox.workspace_write
     _, turn_options = client.threads[0].turn_calls[0]
-    assert turn_options["sandbox"] is _Sandbox.full_access
+    assert turn_options["sandbox"] is _Sandbox.workspace_write
 
 
 def test_triage_process_cannot_keep_the_next_turns_environment(make_config, store):
@@ -292,11 +297,11 @@ def test_triage_uses_a_structured_output_schema_without_a_shell(make_config, sto
     assert triage == Triage("N2", True, "Je regarde ça", False, False)
     assert sdk.configs[0]["config_overrides"] == (
         TRIAGE_NO_SHELL_OVERRIDE, NO_PROJECT_DOC_OVERRIDE)
-    assert client.calls[0][2]["sandbox"] is _Sandbox.full_access
+    assert client.calls[0][2]["sandbox"] is _Sandbox.workspace_write
     assert client.calls[0][2]["developer_instructions"] is None
     _, turn_options = client.threads[0].turn_calls[0]
     assert turn_options["output_schema"]["additionalProperties"] is False
-    assert turn_options["sandbox"] is _Sandbox.full_access
+    assert turn_options["sandbox"] is _Sandbox.workspace_write
 
 
 def test_triage_timeout_falls_back_to_the_default_without_a_second_profile(
@@ -331,7 +336,7 @@ def test_one_codex_process_serves_every_triage_and_one_serves_each_turn(make_con
 
     overrides = [config["config_overrides"] for config in sdk.configs]
     assert overrides.count((TRIAGE_NO_SHELL_OVERRIDE, NO_PROJECT_DOC_OVERRIDE)) == 1
-    assert overrides.count((CONSTITUTION_OVERRIDE,)) == 2
+    assert sum(1 for config in overrides if config[0] == CONSTITUTION_OVERRIDE) == 2
     assert len(sdk.configs) == 3
 
 
@@ -386,10 +391,10 @@ def test_attachment_turn_keeps_the_coaching_session_without_codex_sandbox(
     runner.run("4242", "analyse ce PDF", spec=_spec(runner, read_only=True))
 
     assert client.calls[0][:2] == ("resume", "thread-live")
-    assert client.calls[0][2]["sandbox"] is _Sandbox.full_access
+    assert client.calls[0][2]["sandbox"] is _Sandbox.workspace_write
     assert "droit de contredire" in client.calls[0][2]["developer_instructions"]
     _, turn_options = client.threads[0].turn_calls[0]
-    assert turn_options["sandbox"] is _Sandbox.full_access
+    assert turn_options["sandbox"] is _Sandbox.workspace_write
 
 
 def test_timeout_interrupts_the_native_turn_handle(make_config, store, monkeypatch):
