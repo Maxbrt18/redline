@@ -1,4 +1,4 @@
-"""Composition du moteur de conversation sélectionné au démarrage."""
+"""Composition of the conversation engine selected at startup."""
 
 from .agent import AgentRunner
 from .claude import ClaudeCodeRunner
@@ -12,5 +12,5 @@ def build_agent(config: Config, state: StateStore) -> AgentRunner:
         return ClaudeCodeRunner(config, state)
     if config.agent_provider == "codex":
         return CodexRunner(config, state)
-    # Config valide déjà ce champ ; cette garde protège les constructions directes.
+    # Config already validates this field; this guard protects direct constructions.
     raise ValueError(f"fournisseur d'agent inconnu : {config.agent_provider!r}")

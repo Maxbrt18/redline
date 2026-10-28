@@ -1,4 +1,4 @@
-// ------------------------------------------------------------ réglages
+// ------------------------------------------------------------ settings
 import {$, add, button, el} from '../shared/dom.js';
 import {remembered} from '../shared/storage.js';
 import {chooseTheme, tintBar} from '../shared/theme.js';
@@ -8,7 +8,7 @@ import {lock} from './session.js';
 import {api} from './api.js';
 import {stamp} from './data.js';
 
-// Dans les réglages aussi, tant que le carnet n'est pas sur l'écran d'accueil.
+// In the settings too, as long as the notebook is not on the home screen.
 function installRow() {
   const slot = $('install');
   slot.replaceChildren();
@@ -28,13 +28,13 @@ function installRow() {
   add(row, el('span', 'Sur l’écran d’accueil'), add(el('small', app.installPrompt ? 'Installer' : 'Comment faire'), app.installPrompt ? null : chevron()));
   add(slot, add(el('div', null, 'n-group'), row), how);
 }
-// Le thème : Auto suit le téléphone, Clair ou Sombre l'épinglent sur cet appareil.
+// The theme: Auto follows the phone, Light or Dark pin it on this device.
 export function showTheme(pinned) {
   document.querySelectorAll('[data-theme-choice]').forEach(node => node.setAttribute('aria-pressed', String(node.dataset.themeChoice === (pinned || 'auto'))));
 }
 document.querySelectorAll('[data-theme-choice]').forEach(node => node.addEventListener('click', () => showTheme(chooseTheme(node.dataset.themeChoice))));
-// Se déconnecter est rare et sans retour sur cet appareil : une confirmation sur
-// place, qui dit aussi comment revenir et comment tout couper.
+// Signing out is rare and irreversible on this device: an in-place confirmation, which
+// also says how to come back and how to cut everything off.
 const device = $('device'), logoutRow = $('logout');
 logoutRow.addEventListener('click', () => {
   const box = el('div', null, 'n-cell n-confirm');
@@ -47,11 +47,11 @@ logoutRow.addEventListener('click', () => {
     }, 'n-action'), button('Annuler', () => device.replaceChildren(logoutRow), 'n-quiet')));
   device.replaceChildren(box);
 });
-// ------------------------------------------------------------ feuilles
-// Une feuille qui monte du bas, comme sur iOS : elle se ferme en la glissant vers le
-// bas, en touchant à côté, avec la croix ou Échap. La page ne défile pas dessous.
-// Trois feuilles partagent ce geste : les réglages, le son de la séance et la sortie
-// d'une séance commencée. Une seule est ouverte à la fois.
+// ------------------------------------------------------------ sheets
+// A sheet rising from the bottom, as on iOS: it closes by dragging it down, by tapping
+// outside, with the cross or Escape. The page does not scroll beneath.
+// Three sheets share this gesture: the settings, the session sound and the exit of a
+// started session. Only one is open at a time.
 const sheet = $('sheet');
 let openWrap = null, opener = null, sheetTimer = null, settleSheet = null;
 export const sheetShown = () => Boolean(document.querySelector('.n-sheetwrap:not([hidden])'));

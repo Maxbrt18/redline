@@ -44,10 +44,10 @@ class AttachmentRequest:
 
 @dataclass(frozen=True)
 class MaintenanceRequest:
-    """Publication Git et synchronisation du vault, quand plus rien n'attend.
+    """Git publication and vault sync, once nothing else is waiting.
 
-    Elles vivent dans le worker parce qu'elles touchent le même dépôt que les tours,
-    mais jamais sur le chemin d'une réponse.
+    They live in the worker because they touch the same repository as the turns, but
+    never on the path of a reply.
     """
 
 
@@ -133,7 +133,7 @@ class WorkQueue:
             self._cv.notify()
 
     def submit_maintenance(self) -> None:
-        """Demande une maintenance ; plusieurs demandes en attente n'en font qu'une."""
+        """Request maintenance; several pending requests collapse into one."""
         with self._cv:
             self._maintenance = True
             self._cv.notify()
@@ -144,11 +144,11 @@ class WorkQueue:
             self._cv.notify()
 
     def retry(self, item: WorkItem) -> None:
-        """Remet un entrant échoué en file sans repasser par le debounce.
+        """Requeue a failed inbound without going through the debounce again.
 
-        Le message Meta reste ``pending`` jusqu'à une vraie réponse. La nouvelle
-        tentative garde exactement son identité : une réponse déjà calculée pour ces
-        messages est renvoyée depuis PostgreSQL, jamais recalculée par le modèle.
+        The Meta message stays ``pending`` until a real reply. The new attempt keeps
+        its exact identity: a reply already computed for these messages is resent from
+        PostgreSQL, never recomputed by the model.
         """
         if isinstance(item, (ProactiveJob, MaintenanceRequest)):
             raise TypeError("seuls les entrants se rejouent par cette file")

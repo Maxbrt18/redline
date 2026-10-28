@@ -1,4 +1,4 @@
-"""Mémoire relationnelle compacte, déterministe et limitée au coaching utile."""
+"""Compact, deterministic relational memory, limited to what coaching needs."""
 
 from __future__ import annotations
 
@@ -9,9 +9,9 @@ from redline.model import voice
 
 _SPACE = re.compile(r"\s+")
 
-#: Préfixes de `source_key` des lignes que le service envoie sans tour de fond :
-#: phrase d'attente, panne, limite. Elles restent en base et citables, mais ne
-#: comptent pas parmi les derniers échanges rendus au coach.
+#: `source_key` prefixes of lines the service sends without a full turn: waiting
+#: line, outage, limit. They stay in the database and quotable, but do not count
+#: among the latest exchanges rendered to the coach.
 SERVICE_LINE_PREFIXES = ("holding", "failure", "outage")
 
 

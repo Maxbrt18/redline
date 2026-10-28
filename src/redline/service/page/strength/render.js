@@ -7,7 +7,7 @@ import {advance} from './actions.js';
 import {control, stepHead} from './control.js';
 import {applyGate, gateFired, renderOpening, renderPreparation, renderReview} from './review.js';
 
-// « Vendredi 9 octobre », comme sous les titres du carnet ; une date illisible reste telle quelle.
+// "Vendredi 9 octobre", as under the notebook's titles; an unreadable date is left as is.
 function inWords(date) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) return date;
   const words = new Date(date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -27,8 +27,8 @@ export function renderSession() {
   note.hidden = !session.note;
   $('rule').textContent = session.rule || '';
 
-  // L'ouverture passe avant tout : tant qu'elle n'est pas répondue ou passée, il
-  // n'y a pas de séance à dérouler -- c'est elle qui arme le garde-fou.
+  // The opening comes first: until it is answered or skipped there is no session to
+  // run -- it is what arms the safeguard.
   const opening = !!session.gate && !state.opened;
   $('open').hidden = !opening;
   if (opening) {
@@ -41,9 +41,8 @@ export function renderSession() {
   applyGate();
   renderPreparation();
   if (progressOf(state.current).gated && !state.review && !state.viewingRetired) advance();
-  // Sa PROPRE ligne, pas celle de la note de séance : l'écrire dans `#note`
-  // effaçait en silence ce que le coach avait écrit le matin, exactement le
-  // jour où il a le plus de choses à dire.
+  // Its OWN line, not the session note's: writing it into `#note` would silently
+  // erase what the coach wrote in the morning.
   const gate = $('gate');
   gate.textContent = gateFired() ? session.gate.say : '';
   gate.hidden = !gateFired();

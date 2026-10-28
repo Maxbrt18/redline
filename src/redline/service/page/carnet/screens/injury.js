@@ -4,13 +4,12 @@ import {day, fmt, weekNumber} from '../format.js';
 import {swap} from '../nav.js';
 
 // ------------------------------------------------------------ Injury
-// Poussé depuis la tuile des repères (maquette validée le 2026-10-09) : un point par
-// séance notée et chaque réveil chiffré sur une même échelle graduée (2026-10-10 : les
-// réveils posés sous l'axe, sans valeur, ne se lisaient pas), le plafond en pointillé,
-// l'échelle de l'athlète en ses mots, puis le pic par semaine et les réveils sans note. Des
-// faits, aucun verdict.
+// Pushed from the landmarks tile: one dot per rated session and each numeric wake-up
+// reading on one graduated scale (wake-up readings under the axis, without a value, were
+// unreadable), the ceiling dashed, the athlete's scale in their own words, then the peak
+// per week and the unrated wake-up readings. Facts, no verdict.
 function painChart(data) {
-  // `left` : la gouttière des graduations ; le tracé commence après elle.
+  // `left`: the gutter for the graduations; the plot starts after it.
   const width = Math.min(content.clientWidth || 353, 580), base = 128, days = 7 * data.weeks.length - 1, left = 18;
   const start = day(data.start).getTime();
   const span = width - left - 8;
@@ -34,11 +33,11 @@ function painChart(data) {
   });
   data.points.forEach(item => shape('circle', {cx: x(item.date), cy: y(item.pain), r: item.long ? 6 : 4.2,
     class: (item.long ? 'sl' : 'run') + (item.pain > data.cap ? ' out' : '')}, svg));
-  // Le réveil d'un jour, juste avant la séance de ce jour : le matin vient d'abord.
+  // A day's wake-up reading comes just before that day's session: morning first.
   data.wakes.forEach(item => shape('rect', {x: x(item.date) - 8.5, y: y(item.pain) - 3.5, width: 7, height: 7, rx: 1.5, class: 'wk'}, svg));
   return svg;
 }
-// Plusieurs zones surveillées : un sélecteur en tête, une zone affichée à la fois.
+// Several monitored zones: a selector on top, one zone shown at a time.
 function zonePicker(data) {
   const row = el('div', null, 'n-choices' + (data.zones.length === 2 ? ' two' : ''));
   data.zones.forEach(item => row.append(button(item.label, () => swap({k: 'injury', zone: item.zone}),

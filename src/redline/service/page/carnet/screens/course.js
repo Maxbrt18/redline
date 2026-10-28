@@ -4,16 +4,15 @@ import {day, dm, fmt, shortDay} from '../format.js';
 import {push} from '../nav.js';
 
 // ------------------------------------------------------------ Course
-// Une pastille par capacité (par son numéro), à la teinte de sa famille : les blessures en
-// violet, la digestion et la nuit au pétrole de la course, le reste au bleu de la course à pied.
+// One pill per capability (by number), in its family's tint: injuries in purple,
+// digestion and night in teal, the rest in running blue.
 const CAPABILITY_ICONS = {1: 'run', 2: 'descent', 3: 'food', 4: 'night', 5: 'tib', 6: 'mind'};
 const archiveLabel = entry => entry.kind === 'monthly' && entry.period
   ? 'Monthly · ' + new Date(entry.period + '-01T12:00:00').toLocaleDateString('fr-FR', {month: 'long', year: 'numeric'})
   : entry.kind === 'weekly' && entry.period ? 'Weekly · W' + entry.period.slice(-2) : entry.title;
-// Le volume de chaque semaine contre son objectif, et sa sortie longue sur sa propre
-// ligne de chiffres (maquette B validée le 2026-10-10). Rien ne s'empile : la barre dit
-// où en est la semaine, la ligne du dessous dit sa sortie longue. Celle de la semaine en
-// cours est celle du programme tant qu'elle n'est pas courue.
+// Each week's volume against its target, and its long run on its own line of figures.
+// Nothing is stacked: the bar says where the week stands, the line below gives its long
+// run. The current week's long run is the programmed one until it has been run.
 function volumeChart(longest) {
   const weeks = longest.weeks, width = Math.min(content.clientWidth || 353, 580);
   const top = 30, base = 140, bar = 32, band = width / weeks.length;

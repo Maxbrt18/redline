@@ -1,4 +1,4 @@
-// La connexion de l'appareil : ouvrir le carnet, le verrouiller, passer la main à Safari.
+// The device sign-in: open the notebook, lock it, hand over to Safari.
 import {$} from '../shared/dom.js';
 import {app, skies} from './state.js';
 import {content, message, notice} from './ui.js';
@@ -17,8 +17,8 @@ export function lock(text) {
   content.replaceChildren(); $('connected').hidden = true; $('locked').hidden = false;
   message(''); notice(text);
 }
-// Navigateurs intégrés de Meta : leur cookie ne suit pas dans Safari, et un lien
-// consommé ici ne servirait plus là-bas. Le lien reste donc intact jusqu'au choix.
+// Meta in-app browsers: their cookie does not carry over to Safari, and a link
+// consumed here would no longer work there. The link therefore stays intact until chosen.
 export const embedded = /FBAN|FBAV|FB_IAB|Messenger|Instagram/i.test(navigator.userAgent);
 export function handoff(token) {
   notice(''); $('handoff').hidden = false;
@@ -31,17 +31,17 @@ export function handoff(token) {
 }
 export async function connect(token) {
   const entry = new URLSearchParams(location.hash.slice(1)).get('entry');
-  // Retirer le secret avant toute navigation et ne jamais le stocker en JavaScript.
+  // Remove the secret before any navigation and never store it in JavaScript.
   history.replaceState(null, '', '/carnet');
-  // Une carte reçue dans Messenger s'ouvre par-dessus Aujourd'hui : le retour y mène.
+  // A card received in Messenger opens on top of Today: back leads there.
   if (entry) app.stacks.today = [{k: 'entry', id: entry}];
-  // Les chiffres gardés d'aujourd'hui s'affichent tout de suite ; ceux d'un autre jour
-  // n'attendent qu'une panne de réseau.
+  // Kept figures from today show right away; those from another day only wait for a
+  // network failure.
   app.stash = recall();
   if (app.stash && app.stash.views.today.date === isoDate(new Date())) hydrate(app.stash);
-  // L'échange du lien part le premier ; les chiffres demandés pendant ce temps l'attendent.
+  // The link exchange goes first; figures requested meanwhile wait for it.
   if (token) app.connecting = api('connect', {token});
-  // La structure de l'app est là tout de suite ; les chiffres prennent leur place.
+  // The app structure is there at once; the figures take their place.
   notice(''); $('locked').hidden = true; $('connected').hidden = false; render(); ensure();
   resumeSeance();
   if (token) {

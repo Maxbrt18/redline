@@ -24,8 +24,8 @@ log = logging.getLogger("redline")
 
 @dataclass(frozen=True)
 class DeliveredMessage:
-    """Un texto réellement accepté par Meta, avec l'identifiant qui permettra
-    ensuite de reconnaître un swipe-reply vers CE texto précis."""
+    """A text actually accepted by Meta, with the identifier that later lets a
+    swipe-reply to THIS exact text be recognized."""
 
     message_id: str
     text: str
@@ -168,8 +168,8 @@ class MessengerClient:
         return self._post(message)
 
     ATTEMPTS = 3
-    # (connexion, lecture). Meta répond en une seconde : attendre une minute une
-    # réponse perdue retardait chaque fragment de trois minutes au pire.
+    # (connect, read). Meta answers within a second: waiting a minute for a lost
+    # response would delay each fragment by up to three minutes.
     TIMEOUT = (5, 10)
     UPLOAD_TIMEOUT = (5, 60)
 
@@ -177,9 +177,7 @@ class MessengerClient:
                     attempts: int = 0) -> DeliveryResult:
         """Retry on network errors, saturation and transient HTTP failures.
 
-        `send_image` used to hold a second copy of this loop, with the 3 spelled out
-        three times in its own log strings: changing the retry policy meant editing
-        two places and not forgetting the messages (2026-07-29).
+        Shared by text and image sends so the retry policy lives in a single place.
         """
         attempts = attempts or self.ATTEMPTS
         for attempt in range(1, attempts + 1):
@@ -187,8 +185,8 @@ class MessengerClient:
             try:
                 response = send()
             except requests.ReadTimeout as exc:
-                # La requête a pu être acceptée : la renvoyer risquerait un doublon.
-                # La Send API n'a pas d'idempotence ; le doute vaut livraison.
+                # The request may have been accepted: resending risks a duplicate.
+                # The Send API has no idempotency; doubt counts as delivery.
                 log.error("%s sans réponse après envoi : livraison incertaine (%s)",
                           label, exc)
                 return DeliveryResult.failure(
@@ -232,7 +230,7 @@ class MessengerClient:
         return DeliveryResult.failure(f"{label} indisponible après {attempts} tentatives")
 
     def _personal(self, payload: dict) -> dict:
-        """Le dernier passage avant le téléphone : aucun jeton n'y arrive tel quel."""
+        """The last pass before the phone: no token reaches it as is."""
         message = payload.get("message")
         if not isinstance(message, dict):
             return payload
@@ -316,8 +314,8 @@ class TypingIndicator:
 
     REFRESH_EVERY = 15
     PATIENCE_AFTER = 75
-    # La profondeur de lecture ne justifie pas une notification précoce.
-    # Un seul message d'attente, soumis au même garde-fou de fréquence.
+    # Reading depth does not justify an early notification.
+    # A single waiting message, subject to the same frequency guard.
     BACKGROUND_AFTER = 90
 
     def __init__(self, client: MessengerClient, psid: str, patience: bool = True,
@@ -335,14 +333,13 @@ class TypingIndicator:
         # it consumes the "no two waiting lines in a row" allowance. A coach who says
         # "two secs" every single time has a tic, not a rhythm.
         self._gate = gate
-        # La phrase d'attente est un vrai message du coach : le bot la fait passer par
-        # la livraison durable et la mémoire, pour qu'une réponse ciblée dessus
-        # retrouve son texte.
+        # The waiting line is a real coach message: the bot routes it through durable
+        # delivery and memory so that a reply targeting it finds its text.
         self._deliver = deliver or (lambda text: self._client.send_text(self._psid, text))
         self._stop = threading.Event()
 
     def configure(self, *, deep: bool, holding: str | None) -> None:
-        """Le rang et la phrase d'attente, connus seulement après le triage."""
+        """The rung and the waiting line, known only after the triage."""
         self._deep = deep
         self._holding = holding
 
@@ -374,8 +371,8 @@ class TypingIndicator:
                     except Exception:
                         log.exception("Phrase d'attente non livrée")
             if self._deep and elapsed > self.BACKGROUND_AFTER:
-                # La requête continue ; seule l'animation cesse. Aucun deuxième texto,
-                # même si le garde-fou a refusé le premier. /status et /cancel restent disponibles.
+                # The request continues; only the animation stops. No second text, even
+                # if the guard refused the first. /status and /cancel remain available.
                 return
             if self._stop.wait(self.REFRESH_EVERY):
                 return

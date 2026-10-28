@@ -1,9 +1,9 @@
-"""Frontière sûre entre une pièce jointe Meta et le moteur de coaching.
+"""Safe boundary between a Meta attachment and the coaching engine.
 
-Le webhook ne télécharge rien : il persiste l'URL signée par Meta puis rend la main.
-Le worker télécharge ensuite dans un fichier privé, borné et éphémère. Le contexte
-manager est volontaire : même une exception du modèle passe par ``finally`` et retire
-le brut. Aucun contenu reçu n'est une instruction pour l'agent.
+The webhook downloads nothing: it persists the URL signed by Meta and returns. The
+worker then downloads into a private, bounded, ephemeral file. The context manager is
+deliberate: even a model exception goes through ``finally`` and removes the raw file.
+No received content is an instruction for the agent.
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ REDIRECT_CODES = frozenset({301, 302, 303, 307, 308})
 
 
 class AttachmentError(ExternalError):
-    """Erreur présentable à l'athlète, sans recopier URL ni réponse distante."""
+    """Error presentable to the athlete, without copying the URL or remote response."""
 
 
 @dataclass(frozen=True)
@@ -65,7 +65,7 @@ class MaterializedAttachments:
 
 
 def encode_payload(attachments: list[dict], caption: str = "") -> str:
-    """Réduit la forme Meta à notre contrat durable minimal."""
+    """Reduce the Meta shape to our minimal durable contract."""
     rows = []
     for attachment in attachments[:MAX_ATTACHMENTS]:
         payload = attachment.get("payload") or {}
@@ -142,7 +142,7 @@ def _content_matches(path: Path, media_type: str) -> bool:
 
 
 class AttachmentService:
-    """Télécharge des photos/PDF/texte sous quota et les détruit après lecture."""
+    """Download photos/PDF/text under quota and destroy them after reading."""
 
     def __init__(self, directory: Path, *, max_bytes: int, total_bytes: int,
                  session: requests.Session | None = None) -> None:
@@ -152,7 +152,7 @@ class AttachmentService:
         self._session = session or requests.Session()
 
     def cleanup(self) -> int:
-        """Supprime uniquement notre répertoire d'éphémères, jamais un chemin large."""
+        """Delete only our ephemeral directory, never a broad path."""
         self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
         os.chmod(self.directory, 0o700)
         removed = 0
@@ -199,8 +199,8 @@ class AttachmentService:
             for path in created:
                 with suppress(OSError):
                     path.unlink(missing_ok=True)
-                # Le prochain démarrage nettoiera un résidu ; un unlink momentanément
-                # impossible ne masque jamais la réponse du modèle.
+                # The next startup cleans a leftover; a momentarily failing unlink
+                # never masks the model's answer.
 
     def caption(self, raw: str) -> str:
         _, caption = _remote_rows(raw)

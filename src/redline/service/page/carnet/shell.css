@@ -1,21 +1,18 @@
-/* Le carnet -- même peau que les cards et la page renfo (tokens.css).
+/* The notebook -- same skin as the cards and the strength page (tokens.css).
  *
- * La structure est celle d'une app iOS (carte de navigation validée par l'athlète le
- * 2026-10-08) : une barre du haut et un grand titre dans la police du système, des
- * commandes en verre (liquid glass), une barre d'onglets flottante. Le contenu garde
- * la charte : Barlow pour les chiffres et les titres de section, Inter pour le texte.
+ * The structure is that of an iOS app: a top bar and a large title in the system font,
+ * glass controls (liquid glass), a floating tab bar. The content keeps the design
+ * system: Barlow for figures and section titles, Inter for text.
  *
- * Pas de mot REDLINE en tête (l'athlète, 2026-10-02) : la marque est l'icône de
- * l'écran d'accueil et de l'onglet. Trois rubriques, une question chacune, en bas
- * sous le pouce (maquette validée par l'athlète le 2026-10-08) : Aujourd'hui suit le
- * moment de la journée, Semaine juge le passé et prescrit le reste, Course.
- * Jamais de liseré coloré sur un bord : une alerte ressort par son texte et sa place.
+ * No REDLINE wordmark at the top: the brand is the home-screen and tab icon. Three
+ * sections, one question each, at the bottom under the thumb: Today follows the time
+ * of day, Week judges the past and prescribes the rest, Race.
+ * Never a colored edge stripe: an alert stands out by its text and its place.
  *
- * Les couleurs gardent leur sens (tokens.css) : --data le fait, un pointillé ce qui
- * est prévu, --red aujourd'hui et la marque, --over un plafond franchi. Ni vert ni
- * orange : un état qui n'est pas un franchissement se dit en mots. Deux exceptions, qui ne
- * jugent rien : les pictos de la météo (l'athlète, 2026-10-08) et les pastilles teintées des
- * familles (2026-10-22, en fin de fichier).
+ * Colors keep their meaning (tokens.css): --data is what was done, a dotted line what is
+ * planned, --red today and the brand, --over a crossed cap. Neither green nor orange: a
+ * state that is not a crossing is said in words. Two exceptions, which judge nothing:
+ * the weather pictograms and the tinted family badges (at the end of the file).
  */
 :root { --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 13'%3E%3Cpath d='M1.5 1.5 6.5 6.5 1.5 11.5' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
   --sys: -apple-system, system-ui, "SF Pro Text", "Helvetica Neue", sans-serif; --bar: 52px;
@@ -32,11 +29,11 @@ a { color: inherit; }
 .n-app { max-width: 620px; margin: auto;
   padding: calc(var(--bar) + env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) calc(var(--tabbar) + 100px) max(20px, env(safe-area-inset-left)); }
 
-/* Le verre : un fond translucide flouté, un fil de lumière, une ombre douce. */
+/* Glass: a translucent blurred background, a thread of light, a soft shadow. */
 .n-glass { border: .5px solid var(--edge); background: var(--glass); -webkit-backdrop-filter: blur(20px) saturate(1.6);
   backdrop-filter: blur(20px) saturate(1.6); box-shadow: 0 2px 12px rgb(0 0 0 / .08); color: var(--ink); }
-/* Les boutons ronds de la barre, comme ceux d'iOS : un disque plein légèrement teinté,
- * un reflet fin sur le bord, aucune ombre portée. */
+/* The round bar buttons, as on iOS: a slightly tinted solid disc,
+ * a thin highlight on the edge, no drop shadow. */
 .n-round { width: 40px; height: 40px; border-radius: 50%; padding: 0; display: grid; place-items: center; border: 0;
   background: color-mix(in oklab, var(--ink) 7%, var(--bg)); box-shadow: inset 0 0 0 .5px color-mix(in oklab, var(--ink) 9%, transparent);
   -webkit-backdrop-filter: none; backdrop-filter: none; }
@@ -44,22 +41,22 @@ a { color: inherit; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .n-round { background: color-mix(in oklab, #fff 12%, var(--bg)); box-shadow: inset 0 .5px 0 rgb(255 255 255 / .14); } }
 .n-round svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 
-/* La barre du haut : le retour à gauche, les réglages à droite ; transparente en haut de
- * page, pleine dès qu'on défile, avec le titre replié au centre. */
-/* Le fond plein est sur la barre elle-même, jamais sur un pseudo-élément : iOS 26 cherche
- * une couleur unie sur l'élément fixé en haut de page, et à défaut pose son flou (« scroll
- * edge effect ») qui déborde sous l'heure et brouille le bouton des réglages. */
+/* The top bar: back on the left, settings on the right; transparent at the top of the
+ * page, solid once scrolled, with the collapsed title in the center. */
+/* The solid background is on the bar itself, never on a pseudo-element: iOS 26 looks for
+ * a solid color on the element fixed at the top of the page, and otherwise applies its blur
+ * ("scroll edge effect") which spills under the clock and blurs the settings button. */
 .n-topbar { position: fixed; z-index: 6; top: 0; left: 0; right: 0; padding-top: env(safe-area-inset-top); pointer-events: none;
   background-color: var(--bg); transition: background-color .26s; }
-/* La bande d'état d'iOS 26+ prend la couleur de l'élément le plus haut posé sur le bord
- * supérieur, et seulement s'il est opaque (mesuré dans la PWA, 2026-10-09) ; un élément
- * transparent la fige, et `theme-color` n'y peut plus rien. La barre du haut reste donc
- * seule sur ce bord : la feuille et la visionneuse commencent sous elle, et c'est elle qui
- * prend leur couleur (voilée, noire). La bande suit sans délai ni astuce. */
+/* The iOS 26+ status bar takes the color of the topmost element on the top edge, and
+ * only if it is opaque; a transparent element freezes it, and `theme-color` can do nothing
+ * about it. The top bar therefore stays alone on that edge: the sheet and the viewer start
+ * below it, and it takes their color (veiled, black). The bar follows with no delay or
+ * trick. */
 :root.n-veiled .n-topbar { background-color: color-mix(in srgb, #000 20%, var(--bg)); }
 :root.n-veiled .n-topbar-in { filter: brightness(.8); transition: filter .26s; }
-/* Fond plein, sans flou ni dégradé : la bande d'état d'iOS au-dessus est opaque, la
- * barre la prolonge (l'athlète, 2026-10-08). Un filet la sépare du contenu qui défile. */
+/* Solid background, no blur or gradient: the iOS status bar above is opaque, the bar
+ * extends it. A rule separates it from the scrolling content. */
 .n-topbar::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; border-bottom: 1px solid var(--grid);
   opacity: 0; transition: opacity .2s; }
 .n-topbar.scrolled::before { opacity: 1; }
@@ -70,15 +67,15 @@ a { color: inherit; }
 .n-topbar .c { max-width: 230px; font: 600 17px/1.2 var(--sys); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; transition: opacity .15s; }
 .n-topbar.titled .c { opacity: 1; }
 .n-topbar.instant .c, .n-topbar.instant::before { transition: none; }
-/* La barre de l'écran qu'on quitte, figée par-dessus la nouvelle pendant la transition. */
+/* The bar of the screen being left, frozen over the new one during the transition. */
 .n-barcopy { position: absolute; left: 0; right: 0; bottom: 0; pointer-events: none; }
 .n-barcopy * { pointer-events: none !important; }
-/* Le grand titre : 34 pt, la police du système, comme Réglages ou Santé. */
+/* The large title: 34 pt, the system font, like Settings or Health. */
 .n-lt { margin: 6px 0 4px; min-height: 64px; }
 .n-lt h1 { font: 700 34px/1.12 var(--sys); letter-spacing: .005em; margin: 0; text-wrap: balance; }
 .n-lt p { font: 400 15px/1.35 var(--sys); color: var(--muted); margin: 3px 0 0; min-height: 20px; }
 
-/* Trois rubriques dans une pilule de verre qui flotte au-dessus du contenu (iOS 26). */
+/* Three sections in a glass pill floating above the content (iOS 26). */
 .n-nav { position: fixed; z-index: 5; left: max(20px, env(safe-area-inset-left)); right: max(20px, env(safe-area-inset-right)); bottom: var(--tabbar);
   max-width: 440px; margin: 0 auto; border-radius: 999px; }
 .n-tabs { display: flex; padding: 5px; }
@@ -101,15 +98,15 @@ p { margin: 8px 0; }
 .n-red { color: var(--red); }
 .n-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
-/* Sections : un filet, jamais une boîte. */
-/* Un seul titre de section (2026-10-10) : petites capitales sur un filet, comme les zones
- * d'Aujourd'hui ; ce qui l'accompagne à droite reste à la même taille. */
+/* Sections: a rule, never a box. */
+/* A single section title: small caps on a rule, like the zones of Today; whatever
+ * sits at its right keeps the same size. */
 .n-sec { margin-top: 30px; }
 .n-sec > .n-row { padding-bottom: 9px; border-bottom: 1px solid var(--grid); }
 .n-sec > .n-row h2 { font: 600 12px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .n-sec > .n-row .n-meta { margin: 0; font-size: 12.5px; }
-/* Le chevron : le même trait dans les tuiles, les listes et les dépliants (le masque sert
- * aux pseudo-éléments, qui ne peuvent pas porter de SVG en ligne). */
+/* The chevron: the same stroke in tiles, lists and disclosures (the mask is needed for
+ * pseudo-elements, which cannot carry inline SVG). */
 .n-chevron { display: inline-block; flex: none; width: 7px; height: 12px; margin-left: 6px; vertical-align: -1px; overflow: visible;
   fill: none; stroke: var(--faint); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .n-tlab .n-chevron { margin-left: 0; }
@@ -127,7 +124,7 @@ details[open] > summary::after { transform: rotate(90deg); }
 
 
 
-/* À venir et Repères : un titre en petites capitales sur un filet, jamais une boîte. */
+/* Upcoming and Landmarks: a small-caps title on a rule, never a box. */
 .n-zone { margin-top: 30px; }
 .n-zh { font: 600 12px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; padding-bottom: 9px; border-bottom: 1px solid var(--grid); }
 .n-list { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; background: none; border: 0; border-bottom: 1px solid var(--grid); padding: 13px 0; text-align: left; font-size: 15px; }
@@ -136,29 +133,29 @@ details[open] > summary::after { transform: rotate(90deg); }
 
 .n-offline { color: var(--muted); font-size: 13px; margin: 2px 0 0; }
 
-/* Tirer pour actualiser : la page descend, un anneau tourne au-dessus. */
+/* Pull to refresh: the page moves down, a ring spins above. */
 .n-ptr { position: fixed; z-index: 4; left: 50%; top: calc(env(safe-area-inset-top) + var(--bar) + 4px); width: 26px; height: 26px; margin-left: -13px;
   opacity: 0; pointer-events: none; transform: translateY(-40px); }
 .n-ptr i { display: block; width: 100%; height: 100%; border-radius: 50%; border: 2.4px solid var(--ghost); border-top-color: var(--muted); }
 .n-ptr.spin i { animation: n-spin .8s linear infinite; }
 @keyframes n-spin { to { transform: rotate(360deg); } }
-/* L'écran contient ses marges (`flow-root`) : sinon celle du grand titre le traverse,
- * et sa copie figée pendant une transition, qui ne la laisse pas passer, s'affiche 6 px
- * plus bas que lui ; le texte sautait à la fin de chaque transition (2026-10-09). */
+/* The screen contains its margins (`flow-root`): otherwise the large title's margin leaks
+ * through it, and its frozen copy during a transition, which does not let it through,
+ * shows 6 px lower than the original; the text would jump at the end of each transition. */
 .n-page { display: flow-root; }
 .n-page.settle { transition: transform .25s cubic-bezier(.2, .8, .2, 1); }
-/* L'écran qui bouge pendant une transition : une copie figée sous les deux barres,
- * avec l'ombre légère d'iOS sur son bord gauche ; celui d'en dessous n'en a pas. */
+/* The screen that moves during a transition: a frozen copy under the two bars,
+ * with the light iOS shadow on its left edge; the one beneath has none. */
 .n-move { position: fixed; z-index: 4; inset: 0; overflow: hidden; background: var(--bg); pointer-events: none;
   box-shadow: -2px 0 14px rgb(0 0 0 / .14); will-change: transform; }
 .n-move.under { z-index: 3; box-shadow: none; }
 
-/* Un retour immédiat sous le doigt (le reste du toucher d'app est dans shared/base.css). */
+/* Immediate feedback under the finger (the rest of the app touch handling is in shared/base.css). */
 button, .n-nav, .n-krow, summary { touch-action: manipulation; }
 .n-list:active, .n-krow:active, .n-tile:active, .n-toggle:active, .n-tabs button:active,
 .n-quiet:active, .n-action:active, .n-wrow:active, .n-cell:active, .n-round:active { opacity: .5; transition: none; }
 
-/* Les silhouettes d'une rubrique pas encore reçue, aux proportions de la vraie. */
+/* Silhouettes of a section not yet received, in the proportions of the real one. */
 .n-skel { padding-top: 14px; }
 .n-sk { display: block; border-radius: 6px; background: var(--ghost); margin: 0 0 12px; }
 .n-sk.eyebrow { width: 55%; height: 14px; }
@@ -173,7 +170,7 @@ button, .n-nav, .n-krow, summary { touch-action: manipulation; }
 }
 .n-empty { padding: 28px 0; }
 
-/* Un message passager flotte au-dessus des onglets, il ne pousse jamais la page. */
+/* A transient message floats above the tabs, it never pushes the page. */
 .n-toast { position: fixed; z-index: 6; left: 50%; bottom: calc(var(--tabbar) + 76px); transform: translateX(-50%);
   width: max-content; max-width: min(520px, calc(100vw - 32px)); margin: 0; padding: 11px 16px; border-radius: 12px;
   background: var(--ink); color: var(--bg); font-size: 14.5px; line-height: 1.35; box-shadow: 0 6px 24px rgb(0 0 0 / .18); overflow-wrap: anywhere; }
@@ -184,22 +181,20 @@ button, .n-nav, .n-krow, summary { touch-action: manipulation; }
 }
 
 @media (max-width: 360px) { .n-app { padding-left: 16px; padding-right: 16px; } h1 { font-size: 28px; } .n-lt h1 { font-size: 30px; } }
-/* Sans flou (navigateur ancien), le verre reste lisible : un fond presque plein. */
+/* Without blur (old browser), the glass stays legible: an almost solid background. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { :root { --glass: color-mix(in oklab, var(--bg) 96%, transparent); } }
 @media (prefers-reduced-motion: no-preference) { button { transition: opacity .15s, background .15s; } }
 @media (prefers-reduced-motion: reduce) { summary::after, .n-topbar, .n-page.settle { transition: none; } }
 
-/* Les pastilles teintées (maquette « Carnet en couleur » validée par l'athlète le 2026-10-22).
- * La charte ne bouge pas : une pastille, comme celles de la météo, nomme la famille d'une
- * séance (course, sortie longue, renfo, repos), d'un repère ou d'une capacité, et ne juge
- * rien. Jamais sur un titre d'écran ni de section, ni sur un jalon.
- * Palette « Sable » (l'athlète, 2026-10-26, elle remplace « Bleus ») : le papier et un sable
- * chaud portent les surfaces, la couleur ne vit que dans les pastilles et les données. Un bleu
- * étalé sur une grande carte se battait avec le papier chaud et le rouge du logo. Les teintes
- * de famille sont très désaturées, à même clarté (OKLCH L 0,50 C ≈ 0,045 en clair, L 0,80 en
- * sombre) ; aucune ne frôle le rouge ni l'orange. Une nouvelle famille prend une teinte de
- * la même bande, à la même clarté.
- * Les zones de FC montent vers le rouge, qui reste l'intensité : Z5 est --red. */
+/* Tinted badges. The design system does not change: a badge, like the weather ones, names
+ * the family of a session (run, long run, strength, rest), of a landmark or of a
+ * capability, and judges nothing. Never on a screen or section title, nor on a milestone.
+ * Palette "Sand": paper and a warm sand carry the surfaces, color lives only in the badges
+ * and the data. A blue spread over a large card clashed with the warm paper and the logo
+ * red. Family tints are very desaturated, at equal lightness (OKLCH L 0.50 C ~ 0.045 in
+ * light, L 0.80 in dark); none comes close to red or orange. A new family takes a tint
+ * from the same band, at the same lightness.
+ * HR zones climb toward red, which stays intensity: Z5 is --red. */
 :root { --h-run: #4c677b; --h-tib: #705a75; --h-race: #436b6f; --h-str: #7a5867; --h-rest: #69625a;
   --sand: #f0eae3; --card: #fffdfb; --pas-mix: 20%; --tile-pas-mix: 18%;
   --z1: #c7bbb7; --z2: #bc9392; --z3: #bb6c6f; --z4: #b54245; --z5: var(--red); }
@@ -218,6 +213,6 @@ button, .n-nav, .n-krow, summary { touch-action: manipulation; }
 .n-pas.rest, .n-pas.other { --h: var(--h-rest); }
 .n-pas.tib { --h: var(--h-tib); }
 .n-pas.race { --h: var(--h-race); }
-/* Deux séances le même jour : les pastilles se chevauchent, détourées par le papier. */
+/* Two sessions on the same day: the badges overlap, outlined by the paper. */
 .n-pasg { display: inline-flex; flex: none; }
 .n-pasg .n-pas + .n-pas { margin-left: -7px; box-shadow: 0 0 0 2px var(--bg); }

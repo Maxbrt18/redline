@@ -5,8 +5,8 @@ import {renderSession} from './render.js';
 
 // ------------------------------------------------------------------ actions
 
-/* Le chrono de la séance démarre au premier geste réel -- lancer un
- * isométrique, compter un contact, valider une série -- et jamais avant. */
+/* The session clock starts at the first real gesture -- starting an isometric,
+ * counting a contact, validating a set -- and never before. */
 export function markStarted() {
   if (state.startedAt == null) {
     state.startedAt = Date.now();
@@ -25,8 +25,8 @@ export function validateSlot(value) {
   rememberAction(index);
   progress.slots.push(value == null ? null : clampInt(value, 0, 999, null));
   progress.draft = '';
-  // Le compteur de contacts est celui du BLOC en cours : une fois le bloc
-  // banqué, le suivant repart de zéro.
+  // The contact counter is the current BLOCK's: once the block is banked, the next
+  // one starts from zero.
   progress.count = 0;
   progress.otherCount = false;
   stopTimer();
@@ -35,10 +35,9 @@ export function validateSlot(value) {
   const exercise = session.exercises[index];
   const finished = progress.slots.length >= slots.length;
   const rest = exercise.dose.rest_s || 0;
-  // Le repos sépare les SÉRIES (et les BLOCS), pas les côtés : sur un exercice
-  // par jambe une série est « droite puis gauche », et le repos ne tombe
-  // qu'une fois les deux faites. Après la dernière il reste l'exercice suivant
-  // à rejoindre -- sauf si c'est le dernier de la séance.
+  // Rest separates SETS (and BLOCKS), not sides: on a per-leg exercise a set is
+  // "right then left", and rest only comes once both are done. After the last one
+  // the next exercise is still to be joined -- unless it is the session's last.
   const justDone = slots[progress.slots.length - 1];
   const next = slots[progress.slots.length];
   const sameSet = !!next && next.n === justDone.n;

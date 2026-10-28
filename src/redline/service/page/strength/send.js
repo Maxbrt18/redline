@@ -10,14 +10,13 @@ function say(text) {
   if (status) status.textContent = text;
 }
 
-/* Le compte-rendu ne se perd plus.
+/* The report is never lost.
  *
- * Avant : un POST raté affichait « Réessaie dans un instant » et n'essayait
- * jamais. Or c'est le seul chemin par lequel la séance revient au coach, et il
- * s'emprunte depuis une cave, un vestiaire, ou pendant un redéploiement du VPS.
- * Maintenant l'intention est persistée avec le reste de l'état, et le renvoi part
- * seul au retour du réseau, au retour sur l'onglet, et à la réouverture du lien.
- * Aucun risque de doublon : la route rend une séance rapportable une seule fois. */
+ * This is the only path by which the session returns to the coach, and it is taken
+ * from a basement, a locker room, or during a server redeploy. The intent is
+ * persisted with the rest of the state, and the resend fires on its own when the
+ * network returns, when the tab is revisited, and when the link is reopened.
+ * No duplicate risk: the route accepts a report for a session only once. */
 let sending = false;
 let retryTimer = null;
 let retryDelay = 5000;
@@ -49,10 +48,10 @@ export async function send() {
   const persisted = save();
   say('Envoi…');
   const report = {
-    // Date civile du PREMIER exercice, pas celle du serveur au moment où un
-    // téléphone hors ligne réussira finalement à poster le compte-rendu.
+    // Calendar date of the FIRST exercise, not the server's date at the moment an
+    // offline phone finally manages to post the report.
     performed_on: state.performedOn,
-    // Seules les zones lues partent ; une zone sans chiffre n'est pas un zéro.
+    // Only the zones read are sent; a zone without a figure is not a zero.
     pains: Object.fromEntries(Object.entries(state.pains)
       .filter(([, moments]) => moments.before != null || moments.after != null)
       .map(([slug, moments]) => [slug, {before: moments.before ?? null, after: moments.after ?? null}])),
@@ -69,12 +68,10 @@ export async function send() {
         status: progress.gated ? 'gated' : progress.skipped ? 'skipped'
           : progress.stopped || progress.slots.length < slotsOf(index).length ? 'partial' : 'completed',
         note: progress.note || '',
-        // POSITIONNEL, blancs compris : c'est la position dans la liste des
-        // créneaux qui dit à quelle jambe appartient un compte, et le serveur la
-        // relit sur la séance. Filtrer les blancs ici décalait tout dès qu'une
-        // série était laissée vide, et attribuait les comptes au mauvais côté.
-        // (Les blocs de contacts sont des créneaux comme les autres depuis le
-        // 2026-07-31 : plus de cas particulier.)
+        // POSITIONAL, blanks included: the position in the slot list says which leg a
+        // count belongs to, and the server reads it back from the session. Filtering
+        // blanks here would shift everything as soon as a set was left empty, and
+        // assign counts to the wrong side. (Contact blocks are slots like the others.)
         reps: progress.slots,
       };
     }).filter(Boolean),
@@ -90,7 +87,7 @@ export async function send() {
       body: JSON.stringify({ ...credentials, report: state.outgoingReport }),
     });
     let result = {};
-    try { result = await response.json(); } catch (error) { /* ancien serveur */ }
+    try { result = await response.json(); } catch (error) { /* old server */ }
     if (response.status === 410 || result.status === 'expired') {
       state.pending = false;
       state.outgoingReport = null;

@@ -1,14 +1,13 @@
-/* Les faits ou les consignes d'une séance, en trois ou quatre cases entre deux filets. */
+/* A session's facts or cues, in three or four cells between two rules. */
 .n-facts { display: grid; grid-template-columns: repeat(4, 1fr); margin: 12px 0 0; border-top: 1px solid var(--grid); border-bottom: 1px solid var(--grid); }
 .n-facts.three { grid-template-columns: repeat(3, 1fr); }
 .n-facts div { padding: 10px 0 9px; min-width: 0; }
 .n-facts b { display: block; font: 700 26px/1 var(--display); }
 .n-facts small { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; }
 
-/* Aujourd'hui, le fil du jour (maquette A validée par l'athlète le 2026-10-09) : les étapes
- * du jour reliées par un filet, puis ce qui vient, puis les repères. Le point rouge est
- * l'étape en cours : un disque plein, sans halo ni pulsation (« ça fait très AI
- * generated »). Une étape faite se coche à l'encre ; le repos est un point éteint. */
+/* Today, the day's thread: the day's steps linked by a rule, then what is coming, then the
+ * landmarks. The red dot is the current step: a solid disc, no halo or pulse. A done step
+ * is ticked in ink; rest is a dimmed dot. */
 .n-fil { margin-top: 20px; }
 .n-day { font: 600 12px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--red); margin: 26px 0 14px; }
 .n-day + .n-fil { margin-top: 0; }
@@ -32,7 +31,7 @@
 .n-restline b { color: var(--ink); font-weight: 600; }
 .n-overline { color: var(--over); font-size: 14px; margin: 8px 0 0; }
 
-/* Le renfo : le bouton plein, la liste des exercices dépliée sous lui. */
+/* Strength: the solid button, the exercise list unfolded under it. */
 .n-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; margin: 14px 0 0; }
 .n-acts .n-action { margin: 0; border-radius: 12px; }
 .n-toggle { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0; background: none; border: 0; font-size: 14.5px; font-weight: 500; color: var(--ink); }
@@ -40,7 +39,7 @@
 .n-toggle[aria-expanded="true"]::after { transform: rotate(90deg); }
 .n-acts + .n-exercises { margin-top: 6px; }
 
-/* Une question à la fois dans un panneau : l'échelle entière, son rang, ce qui suit. */
+/* One question at a time in a panel: the whole scale, its rank, what follows. */
 .n-check { background: var(--panel); border-radius: 16px; padding: 14px; margin: 14px 0 0; }
 .n-check-title { margin: 0 0 10px; font-size: 14.5px; }
 .n-check-title small, .n-field > span small { display: block; color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 3px; }
@@ -59,9 +58,9 @@
 .n-chips button { background: var(--bg); border: 0; border-radius: 12px; min-height: 44px; padding: 4px 0; font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; }
 .n-note { color: var(--muted); font-size: 12.5px; margin: 11px 0 0; text-wrap: pretty; }
 
-/* Avant de partir : le ciel, la nuit et la montre en lignes à pastille, sur une même
- * colonne. La météo garde la piste C (validée le 2026-10-08) : pas de bloc, la couleur
- * vient du picto et de sa pastille teintée du ciel ; le texte reste à l'encre. */
+/* Before leaving: the sky, the night and the watch as pill lines on one column. No block
+ * for the weather: the colour comes from the pictogram and its sky-tinted pill; the text
+ * stays in ink. */
 .n-prep { margin: 14px 0 0; }
 .n-wrows { display: grid; gap: 8px; }
 .n-wslot { min-height: 84px; }
@@ -101,8 +100,8 @@
 .n-at small { display: block; margin-top: 3px; font-size: 13px; font-weight: 400; color: var(--muted); }
 .n-at small .n-sky { width: 16px; height: 16px; margin-right: 4px; vertical-align: -3px; }
 .n-av { font-size: 15px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--muted); }
-/* Les repères (maquette « une large, deux demi », 2026-10-10) : la semaine sur toute la
- * largeur, douleur et course dessous ; le bas de chaque demi-tuile s'aligne. */
+/* The landmarks (one wide tile, two half tiles): the week full width, pain and running
+ * below; the bottom of each half tile aligns. */
 .n-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
 .n-tile { display: flex; flex-direction: column; align-items: stretch; min-width: 0; padding: 12px 14px 13px; overflow: hidden;
   border: 0; border-radius: 16px; background: var(--panel); color: var(--ink); text-align: left; font: inherit; }
@@ -115,7 +114,7 @@
 .n-tile small { display: block; margin-top: 4px; font-size: 12.5px; line-height: 1.3; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .n-tile small b { font-weight: 600; color: var(--ink); }
 .n-tfoot { display: block; margin-top: auto; padding-top: 12px; }
-/* Plein = couru, pointillé = prévu (plus marqué pour la sortie longue), filet = repos. */
+/* Solid = run, dashed = planned (bolder for the long run), hairline = rest. */
 .n-mini { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; align-items: end; margin-top: 6px; }
 .n-mini > span { display: flex; flex-direction: column; justify-content: flex-end; height: 70px; min-width: 0; }
 .n-mini i { display: block; align-self: center; box-sizing: border-box; width: 64%; max-width: 18px; border-radius: 3px; background: var(--data); }
@@ -127,7 +126,7 @@
 .n-mini em.plan { font-weight: 500; color: var(--faint); }
 .n-mini small, .n-mini b { display: block; margin-top: 5px; font: 500 10.5px/1 var(--sans); text-align: center; color: var(--faint); }
 .n-mini b { font-weight: 700; color: var(--red); }
-/* Le pic par semaine contre le plafond, au pointillé de l'écran Douleur. */
+/* The peak per week against the ceiling, dashed like the Injury screen. */
 .n-plot { display: block; width: 100%; height: auto; overflow: visible; }
 .n-plot .base { stroke: var(--grid); stroke-width: 1; }
 .n-plot .cap { stroke: var(--over); stroke-width: 1.2; stroke-dasharray: 3 3; }
@@ -141,12 +140,12 @@
 .n-plot .v.out { fill: var(--over); }
 .n-choices button.n-picked, .n-chips button.n-picked { background: var(--ink); color: var(--bg); opacity: 1; }
 @media (max-width: 360px) { .n-facts b { font-size: 22px; } .n-tvalue { font-size: 27px; } .n-tile.wide .n-tvalue { font-size: 32px; } }
-/* Une séance du fil porte la pastille de sa famille devant son titre. */
+/* A session in the thread carries its family pill in front of its title. */
 .n-step h2 { display: flex; align-items: center; gap: 10px; }
 .n-step h2 > .n-pas { margin-top: -2px; }
-/* Les repères sur le sable (palette « Sable », l'athlète, 2026-10-26) : un même fond neutre et
- * chaud pour les trois, l'étiquette à l'encre ; seule la pastille dit la famille. Sans carte
- * teintée, le rouge garde son sens partout : la lettre du jour, le plafond franchi. */
+/* The landmarks on sand (the "Sable" palette): one neutral warm background for all three,
+ * the label in ink; only the pill tells the family. With no tinted card, red keeps its
+ * meaning everywhere: the day's letter, the ceiling crossed. */
 .n-tile.week { --h: var(--h-run); }
 .n-tile.tib { --h: var(--h-tib); }
 .n-tile.race { --h: var(--h-race); }

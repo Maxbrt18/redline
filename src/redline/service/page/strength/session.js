@@ -15,7 +15,7 @@ export const mmss = (seconds) => {
 
 export let session = null;      // resolved from the fragment capability
 export let previousSession = null;
-export let watchedZones = [];   // [{zone, label}] : les zones surveillées, à demander
+export let watchedZones = [];   // [{zone, label}]: the monitored zones, to ask about
 export let credentials = null;  // {token}
 export let state = null;        // progress, persisted
 export let timer = null;        // {kind:'work'|'rest', endsAt|startedAt, paused}
@@ -23,15 +23,12 @@ export let timer = null;        // {kind:'work'|'rest', endsAt|startedAt, paused
 
 /* THE SLOTS ARRIVE WALKED OUT. An exercise carries the list of validations it
  * asks for -- one per set, doubled when the dose is per leg, one per BLOCK for
- * ground contacts -- and this file no longer derives any of it.
+ * ground contacts -- and this file does not derive any of it.
  *
- * Two deletions, same lesson. Until 2026-07-25 the page re-derived
- * measure/sets/side/seconds from the French dose STRING; the vault took the
- * dose back and that parser went. Until 2026-07-31 it still rebuilt the slot
- * list from `sets` and `side`, while the server computed and sent the very
- * same thing (`Dose.slots`) for nobody to read -- and that second copy knew
- * nothing of blocks, so the plyometrics prescribed as "40 contacts, in blocks
- * of 10, 30 s apart" were walked as one flat run of 40.
+ * The page neither parses the dose string nor rebuilds the slot list from `sets` and
+ * `side`: the server computes and sends it (`Dose.slots`), and a client-side copy
+ * would know nothing of blocks, so "40 contacts, in blocks of 10, 30 s apart" would
+ * be walked as one flat run of 40.
  *
  * A slot: {n, of} rank and total (of SETS or BLOCKS, never of slots), `s` the
  * side, `t` what it aims at. */
@@ -82,16 +79,14 @@ export function localDate(timestamp) {
 export function loadProgress() {
   let restored = null;
   try { restored = JSON.parse(localStorage.getItem(storageKey()) || 'null'); } catch (e) { /* ignore */ }
-  // startedAt reste NULL tant que rien n'a été fait : ouvrir le lien n'est pas
-  // commencer la séance. Le lien arrive avec le message du coach et traîne
-  // souvent une heure ou deux dans le téléphone avant le premier exercice --
-  // horodater à l'ouverture gonflait la durée d'autant.
+  // startedAt stays NULL until something has been done: opening the link is not
+  // starting the session. The link often sits on the phone for an hour or two before
+  // the first exercise -- stamping at opening would inflate the duration.
   state = (restored && typeof restored === 'object' && restored.steps) ? restored : {
     startedAt: null, performedOn: null, steps: {}, current: 0, review: false,
-    // `opened` distingue « pas encore répondu » de « répondu 0 » : sans lui, une
-    // douleur parfaitement silencieuse rouvrirait l'écran d'ouverture à chaque
-    // retour sur l'onglet.
-    // `pains` : {zone: {before, after}}, une lecture avant et une après par zone.
+    // `opened` tells "not answered yet" from "answered 0": without it, a perfectly
+    // silent pain would reopen the opening screen on every return to the tab.
+    // `pains`: {zone: {before, after}}, one reading before and one after per zone.
     pains: {}, opened: false,
     note: '', minutes: null, sent: false, pending: false,
   };
@@ -112,14 +107,14 @@ export function adopt(decoded) {
   credentials = { token: decoded.token };
 }
 
-// La lecture d'une zone à un moment (`before` | `after`), et son écriture.
+// Reading a zone at a given moment (`before` | `after`), and writing it.
 export const painOf = (slug, moment) => (state.pains[slug] || {})[moment] ?? null;
 export function setPain(slug, moment, value) {
   state.pains[slug] = {...(state.pains[slug] || {}), [moment]: value};
 }
 
-// Ce qu'une séance commencée a déjà fait sur ce téléphone, lu dans sa sauvegarde :
-// le carnet l'affiche (« 3 exercices sur 7 ») et propose de la reprendre.
+// What a started session has already done on this phone, read from its saved state:
+// the notebook shows it ("3 exercises out of 7") and offers to resume it.
 export function savedProgress(snapshot) {
   if (!snapshot || !snapshot.sid) return null;
   let saved = null;

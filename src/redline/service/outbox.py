@@ -42,7 +42,7 @@ class Outbox:
         self._failed.mkdir(parents=True, exist_ok=True)
 
     def target(self, filename: str) -> Path:
-        """Chemin d'un nouvel artefact, sans laisser son producteur choisir ailleurs."""
+        """Path of a new artifact, without letting its producer choose elsewhere."""
         if not filename or Path(filename).name != filename:
             raise ValueError("nom d'artefact invalide")
         return self._root / filename

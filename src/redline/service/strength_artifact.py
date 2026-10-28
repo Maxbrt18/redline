@@ -1,4 +1,4 @@
-"""Produit la carte de renforcement depuis la prescription typée du plan."""
+"""Produces the strength card from the plan's typed prescription."""
 
 from __future__ import annotations
 

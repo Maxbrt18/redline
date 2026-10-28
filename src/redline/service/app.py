@@ -43,7 +43,7 @@ def require_supported_python(version_info: tuple[int, ...] | None = None) -> Non
 def main() -> None:
     require_supported_python()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    # Les événements structurés sortent en JSON nu, une ligne chacun, pour `jq`.
+    # Structured events are emitted as bare JSON, one line each, for `jq`.
     event_handler = logging.StreamHandler()
     event_handler.setFormatter(logging.Formatter("%(message)s"))
     events_log = logging.getLogger("redline.service.events")
@@ -64,13 +64,13 @@ def main() -> None:
             "PostgreSQL indisponible ou schéma en retard : démarrage refusé sans "
             f"stockage canonique à la révision {expected_revision}")
     operational_store = OperationalStore(database)
-    # Les zones de `[[injuries]]` deviennent la référence des lectures de douleur :
-    # une zone ajoutée s'ouvre, une zone retirée passe inactive avec son historique.
+    # The `[[injuries]]` zones become the reference for pain readings: an added zone
+    # opens, a removed zone turns inactive and keeps its history.
     operational_store.sync_pain_zones(
         [(injury.slug, injury.label) for injury in config.instance.injuries],
         actor="startup")
-    # Au démarrage, où aucun tour n'est en vol : les traces de mécanique périmées
-    # Les marqueurs proactifs périmés s'effacent. Jamais un fait ni une clé d'idempotence.
+    # At startup no turn is in flight: expired mechanical traces and stale proactive
+    # markers are purged. Never a fact nor an idempotency key.
     purged = operational_store.purge_expired()
     if purged:
         log.info("Traces périmées effacées : %s",

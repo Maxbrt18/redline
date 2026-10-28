@@ -15,15 +15,13 @@ export function stepHead(index, exercise, live, done) {
   }
   head.appendChild(el('span', String(index + 1).padStart(2, '0'), 'p-step__index p-num'));
 
-  /* UNE colonne, pas deux (2026-07-31). La dose vivait dans une cellule à droite,
-   * comme sur la carte -- sauf que la carte fait 1080 px de large et que ceci doit
-   * tenir à 375. Résultat : « 3 min » cassait en deux lignes et « 40 contacts, en
-   * blocs de 10 » en prenait trois, face à un nom qui en prenait déjà trois. Deux
-   * colonnes qui se disputent la largeur d'un pouce ne peuvent pas gagner ; sous le
-   * nom, la dose a toute la ligne et aucun arbitrage à rendre. */
+  /* ONE column, not two. A dose in a right-hand cell breaks on a 375 px screen
+   * ("3 min" wraps onto two lines, "40 contacts, in blocks of 10" onto three, next to
+   * a name that already takes three). Two columns competing for a thumb's width cannot
+   * win; under the name, the dose has the whole line and nothing to arbitrate. */
   const main = el('div', null, 'p-step__main');
   main.appendChild(el('p', exercise.name || '—', 'p-step__name'));
-  // La cible est du contexte : elle sert pendant l'exercice, pas dans la liste.
+  // The target is context: it serves during the exercise, not in the list.
   if (live && exercise.target) main.appendChild(el('p', exercise.target, 'p-step__sub'));
   if (!live) {
     // A finished exercise stops showing what was prescribed and shows what was
@@ -32,14 +30,14 @@ export function stepHead(index, exercise, live, done) {
     let dose = exercise.dose.text;
     if (done && progress) {
       const banked = progress.slots.filter((slot) => slot != null);
-      // « Retiré » n'est pas « pas fait » : l'un est une décision du coach que
-      // la page applique, l'autre un choix de l'athlète. Les confondre ferait lire
-      // au coach une inobservance là où sa propre règle a joué.
+      // "Removed" is not "not done": one is a coach decision the page applies, the
+      // other an athlete's choice. Conflating them would make the coach read a
+      // non-adherence where their own rule applied.
       if (progress.gated) dose = 'retiré — garde-fou';
       else if (progress.skipped) dose = 'pas fait';
-      else if (!banked.length) { /* rien de compté : la dose reste */ }
+      else if (!banked.length) { /* nothing counted: the dose stays */ }
       else if (exercise.dose.measure === 'contacts') {
-        // Quatre blocs de dix se lisent « 40 contacts », pas « 10 · 10 · 10 · 10 ».
+        // Four blocks of ten read as "40 contacts", not "10 · 10 · 10 · 10".
         dose = `${banked.reduce((total, value) => total + value, 0)} contacts`;
       } else dose = banked.join(' · ');
       if (progress.stopped) dose = `partiel · ${dose}`;
@@ -119,24 +117,18 @@ function restControl(index) {
   return box;
 }
 
-/* LE GESTE, replié. Les consignes d'exécution vivaient dans le NOM de
- * l'exercice, faute d'un endroit où les mettre -- d'où « Squat unipodal sur
- * marche HAUTE (~30-40 cm), descente 5 s (talon qui touche, pas d'assise) », 90
- * caractères et six lignes de titre sur un petit écran. Elles ont maintenant un
- * champ typé (`how`) et un bouton : rien à l'écran tant qu'on ne demande pas,
- * tout sous le pouce entre deux séries quand on demande.
+/* THE MOVEMENT CUE, folded. Execution cues have a typed field (`how`) and a button:
+ * nothing on screen until asked, everything under the thumb between two sets when asked.
  *
- * Elles arrivent par la PAGE (`window.REDLINE_HOW`, par slug), pas par le lien :
- * mesuré, le fragment ne pouvait pas porter le geste ET « la dernière fois »
- * (103 % du plafond). Voir `redline/page/__init__.py`.
+ * They arrive through the PAGE (`window.REDLINE_HOW`, by slug), not through the link: the
+ * link fragment cannot carry both the cue and the "last time" line within its size
+ * limit. See `redline/service/page/__init__.py`.
  *
- * C'est une DIVULGATION, pas une action : sa place est avec ce que l'exercice
- * dit de lui-même, au-dessus des boutons -- taper en bas pour faire apparaître
- * du texte en haut ne se lit pas. Et l'état est global : qui veut les consignes
- * les veut sur tous les exercices, pas à redemander neuf fois.
+ * It is a DISCLOSURE, not an action: its place is with what the exercise says about
+ * itself, above the buttons -- tapping at the bottom to reveal text at the top does not
+ * read well. The state is global: whoever wants the cues wants them on every exercise.
  *
- * Le POURQUOI n'est pas ici et n'y sera pas : il vit dans le corps de la note,
- * qu'aucun code ne lit -- et on ne relit pas une source en pleine série. */
+ * The WHY is not here: it lives in the note body, which no code reads. */
 const cuesFor = (exercise) => (window.REDLINE_HOW || {})[exercise.slug] || [];
 
 function howBlock(cues) {
@@ -289,17 +281,14 @@ export function control(index) {
   actions.appendChild(btn(progress.slots.length ? 'Arrêter ici — garder les séries faites' : 'Passer l\'exercice', skipStep, 'p-btn--quiet'));
   if (state.undo) actions.appendChild(undoButton());
 
-  /* Ce qui a été fait la dernière fois, juste avant de décider quoi faire
-   * aujourd'hui. C'est le seul chiffre qui manquait : toute la progression du
-   * programme se joue sur « plus que la fois d'avant, ou pas », et la page
-   * rouvrait identique chaque semaine. Une ligne, déjà mise en forme côté
-   * vault -- pas une courbe : le suivi chiffré permanent est ce qui a fait
-   * retirer la montre. */
+  /* What was done last time, right before deciding what to do today. Progression
+   * hinges on "more than last time, or not". One line, already formatted on the
+   * vault side -- not a curve: permanent numeric tracking is not wanted here. */
   const cues = cuesFor(exercise);
   if (cues.length) box.appendChild(howBlock(cues));
 
-  // L'action reste proche du chrono ; le retour sur l'exercice précédent
-  // reste disponible sans repousser le bouton de départ hors de l'écran.
+  // The action stays close to the timer; going back to the previous exercise remains
+  // available without pushing the start button off screen.
   box.appendChild(actions);
   appendLast(box, exercise);
   if (state.feedback != null) {

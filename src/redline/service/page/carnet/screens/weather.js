@@ -1,18 +1,18 @@
-// ------------------------------------------------------------ météo
+// ------------------------------------------------------------ weather
 import {add, el} from '../../shared/dom.js';
 import {flights, skies} from '../state.js';
 import {api} from '../api.js';
 import {hm} from '../format.js';
 
-// La météo arrive après l'écran : elle ne le fait jamais attendre, et son absence ne
-// casse rien. Elle sert deux décisions, et seulement elles (maquette B validée le
-// 2026-10-08) : comment s'habiller, et la nuit tombera-t-elle pendant la séance.
+// Weather arrives after the screen: it never makes the screen wait, and its absence
+// breaks nothing. It serves two decisions, and only those: what to wear, and whether
+// night will fall during the session.
 const rainWord = chance => chance >= 50 ? 'pluie probable' : chance >= 20 ? 'pluie possible' : 'sec';
 const toHours = text => Number(text.slice(0, 2)) + Number(text.slice(3, 5)) / 60;
-// Le ciel en code WMO (Open-Meteo) : une icône et un mot, de jour comme de nuit.
+// The sky as a WMO code (Open-Meteo): an icon and a word, by day and by night.
 function skyOf(hour) {
   const code = hour.code, light = hour.day !== false;
-  // Sans code (prévision ancienne), le mot dit seulement la pluie.
+  // Without a code (old forecast), the word only tells about rain.
   const night = light ? null : 'night';
   if (code == null) return {icon: hour.rain >= 50 ? 'rain' : light ? 'sun' : 'moon', word: rainWord(hour.rain), wet: true, sky: hour.rain >= 50 ? 'rain' : night || 'clear'};
   if (code >= 95) return {icon: 'storm', word: 'orage', wet: true, sky: 'storm'};
@@ -25,9 +25,8 @@ function skyOf(hour) {
   if (code === 2) return {icon: light ? 'partly' : 'cloud', word: 'éclaircies', sky: night || 'partly'};
   return {icon: light ? 'sun' : 'moon', word: code === 1 ? 'peu nuageux' : light ? 'ensoleillé' : 'ciel clair', sky: night || 'clear'};
 }
-// Des pictogrammes en couleur (demande de l'athlète, 2026-10-08 : « plus sympa, moins
-// triste ») : le soleil jaune, la pluie bleue, la lune indigo. La couleur reste dans
-// la météo ; ailleurs elle garde son sens (tokens.css).
+// Colour pictograms: yellow sun, blue rain, indigo moon. Colour stays within the
+// weather; elsewhere it keeps its meaning (tokens.css).
 const CLOUD = d => '<path class="s-cloud" d="' + d + '"/>';
 const SKY_ICONS = {
   sun: '<circle class="s-sun" cx="12" cy="12" r="4.2"/><path class="s-ray" d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.5 1.5M17.2 17.2l1.5 1.5M5.3 18.7l1.5-1.5M17.2 6.8l1.5-1.5"/>',
@@ -38,7 +37,7 @@ const SKY_ICONS = {
   snow: CLOUD('M7 14h10.5a3.6 3.6 0 0 0 0-7.2 5 5 0 0 0-9.6 1.5A2.9 2.9 0 0 0 7 14z') + '<path class="s-snow" d="M9 18h.01M13 19.5h.01M17 18h.01"/>',
   storm: CLOUD('M7 14h10.5a3.6 3.6 0 0 0 0-7.2 5 5 0 0 0-9.6 1.5A2.9 2.9 0 0 0 7 14z') + '<path class="s-bolt" d="M12.5 14.5l-2.2 3.8h3.2l-2.2 3.7"/>',
   fog: '<path class="s-fog" d="M4 9h16M6 13h12M4 17h16"/>',
-  // Pas un ciel : la montre de la ligne « avant de partir », à l'encre.
+  // Not a sky: the watch of the "before leaving" line, in ink.
   watch: '<rect x="6.5" y="6.5" width="11" height="11" rx="3"/><path d="M9 6.5l.6-3h4.8l.6 3M9 17.5l.6 3h4.8l.6-3M12 9.5v2.7l1.6 1"/>'
 };
 function skyIcon(name) {
@@ -47,8 +46,8 @@ function skyIcon(name) {
   icon.innerHTML = SKY_ICONS[name] || SKY_ICONS.cloud;
   return icon;
 }
-// Avant de partir : des lignes à pastille sur une même colonne, le ciel, la nuit, la
-// montre. La pastille prend la teinte du ciel, le texte reste à l'encre.
+// Before leaving: pill lines on one column: the sky, the night, the watch. The pill takes
+// the sky's tint, the text stays in ink.
 function pill(icon, tint) {
   const node = el('span', null, 'n-pill');
   node.dataset.sky = tint;
@@ -56,7 +55,7 @@ function pill(icon, tint) {
   return node;
 }
 const prepRow = (icon, ...text) => add(el('div', null, 'n-prow'), icon, add(el('span'), ...text));
-// La nuit, dite par rapport au départ : avant, pendant ou après la séance.
+// Night, stated relative to the start: before, during or after the session.
 function nightLine(item, data) {
   if (!data.sunset) return null;
   const sunset = toHours(data.sunset), start = item.start_time ? toHours(item.start_time) : null;
@@ -73,8 +72,8 @@ function nightLine(item, data) {
   const left = Math.round((sunset - start) * 60);
   return ['moon', 'Nuit à ' + hm(data.sunset) + ', ' + Math.floor(left / 60) + ' h ' + String(left % 60).padStart(2, '0') + ' après ton départ.'];
 }
-// Trois tailles : la séance en cours (le ciel sur deux lignes, puis la nuit), une ligne
-// quand le point du matin passe devant, quelques mots dans la ligne de demain.
+// Three sizes: the current session (the sky on two lines, then the night), one line when
+// the morning point takes precedence, a few words in tomorrow's line.
 function fillWeather(slot, data, mode, item) {
   if (!data || !data.hours || !data.hours.length) return;
   const first = data.hours[0], last = data.hours[data.hours.length - 1], sky = skyOf(first);
@@ -96,8 +95,8 @@ function fillWeather(slot, data, mode, item) {
   const night = nightLine(item, data);
   if (night) slot.append(prepRow(pill(night[0], night[0] === 'moon' ? 'night' : 'clear'), night[1]));
 }
-// Une prévision déjà reçue se redessine sans réseau : un retour dans l'app ne fait plus
-// clignoter le bloc. La première fois, sa place est réservée pour ne rien pousser.
+// A forecast already received is redrawn without network: coming back to the app does not
+// make the block flicker. The first time, its space is reserved so nothing is pushed.
 function sky(query) {
   const key = String(query), known = skies.get(key);
   if (known && Date.now() - known.at < 15 * 60000) return Promise.resolve(known.data);

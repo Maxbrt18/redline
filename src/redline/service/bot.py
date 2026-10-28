@@ -2,10 +2,10 @@
 proactive), so git writes and agent turns never step on each other, with a short
 debounce that groups texts sent in a burst into a single run.
 
-Un tour réactif, c'est un appel de modèle (plus un triage court) : la réponse du
-modèle part telle quelle. Le service n'y ajoute que ce qu'il sait de façon
-déterministe (bloc de séances, limite précise), il ne la remplace jamais. Toute sortie
-calculée est conservée avant l'envoi : une reprise la renvoie, elle ne la recalcule pas.
+A reactive turn is one model call (plus a short triage): the model's reply is sent as is.
+The service only appends what it knows deterministically (session block, precise limit)
+and never replaces the reply. Every computed output is persisted before sending: a retry
+resends it, it never recomputes it.
 """
 
 from __future__ import annotations
@@ -112,13 +112,13 @@ from .work_queue import (
 
 log = logging.getLogger("redline")
 
-# Les déclencheurs pour lesquels se taire n'est PAS une option éditoriale : ils partent
-# d'une activité qui vient d'arriver, donc il y a toujours matière. Leur silence est une
-# panne de lecture et se reprend une fois. Les autres (mot du matin, prise de
-# nouvelles) ont le droit de n'avoir rien à dire, et c'est même la bonne réponse.
+# Triggers for which staying silent is NOT an editorial option: they start from an activity
+# that just arrived, so there is always something to say. Their silence is a read failure
+# and is retried once. The others (morning note, check-in) may have nothing to say, and
+# that is the right answer.
 SILENCE_IS_A_FAILURE = frozenset({"strava_debrief", "strava_debrief_differe"})
 CONTROL_COMMANDS = frozenset({"/status", "/cancel"})
-# Niveaux dont le paquet métier porte déjà les fils ouverts (`context_packet.py`).
+# Depths whose business packet already carries the open threads (`context_packet.py`).
 PACKET_THREAD_DEPTHS = frozenset({"N2", "N3"})
 
 FAILURE_REPLIES = {
@@ -128,7 +128,7 @@ FAILURE_REPLIES = {
 
 
 def unrecorded_line(kinds: Iterable[str]) -> str:
-    """La phrase qui nomme ce qui n'a pas été enregistré, ou rien si l'athlète n'y perd rien."""
+    """The sentence naming what was not recorded, or nothing if the athlete loses nothing."""
     kinds = tuple(kinds)
     if not kinds:
         return UNRECORDED_GENERIC
@@ -137,7 +137,7 @@ def unrecorded_line(kinds: Iterable[str]) -> str:
     return replies.unrecorded(labels) if labels else ""
 
 
-#: Les initiatives qui demandaient des ressentis que le carnet recueille désormais.
+#: Initiatives that asked for feelings the notebook now collects.
 CARNET_KINDS = frozenset({"strava_debrief", "strava_debrief_differe", "morning"})
 
 
@@ -145,17 +145,17 @@ class CoachBot:
     HEAVY_KINDS = HEAVY_PROACTIVE_KINDS
     PATIENT_DEPTHS = frozenset({"N2", "N3"})
     PATIENCE_MIN_GAP = 10 * 60
-    # Un entrant direct a déjà les replis modèle de sa route et les tentatives réseau
-    # de chaque adaptateur. Ces reprises espacées couvrent ensuite une indisponibilité
-    # plus longue ; au-delà de la troisième, elles continuent toutes les 30 min.
+    # A direct inbound already has its route's model fallbacks and each adapter's network
+    # retries. These spaced retries then cover a longer outage; after the third, they repeat
+    # every 30 min.
     REACTIVE_RETRY_DELAYS: ClassVar[tuple[float, ...]] = (30.0, 300.0, 1800.0)
-    # Environ 24 h de reprises : au-delà, le message reste `pending` et un redémarrage
-    # le reprendra, avec une note d'âge.
+    # About 24 h of retries: beyond that the message stays `pending` and a restart picks it up
+    # again, with an age note.
     REACTIVE_MAX_ATTEMPTS = 48
-    # Une reprise plus lointaine que ça mérite UNE phrase : l'athlète attend.
+    # A retry further out than this deserves ONE sentence: the athlete is waiting.
     OUTAGE_NOTICE_AFTER = 120.0
     OUTAGE_NOTICE_GAP = 2 * 3600
-    # Reprises d'une initiative : même cause ou non, trois réclamations au plus.
+    # Initiative retries: same cause or not, at most three claims.
     PROACTIVE_RETRY_DELAYS: ClassVar[tuple[float, ...]] = (300.0, 900.0, 2700.0)
     PROACTIVE_MAX_ATTEMPTS = 3
     WEEK_REPAIR_CHECK_SECONDS = 15 * 60
@@ -171,8 +171,8 @@ class CoachBot:
         "weekly_repair": 12.0,
         "monthly": 24.0,
         "silence": 24.0,
-        # La cellule sort de sa fenêtre à minuit : une réclamation rejouée le lendemain
-        # ne demande plus un souvenir mais une reconstruction. Elle meurt avec la nuit.
+        # The cell leaves its window at midnight: a claim replayed the next day no longer asks
+        # for a memory but for a reconstruction. It dies with the night.
         "registre_incomplet": 2.0,
         "missed_session": 8.0,
         "daily_signal": 12.0,
@@ -184,7 +184,7 @@ class CoachBot:
         "race_countdown": 168.0,
         "strength_card": 12.0,
         "operator_message": 6.0,
-        # Le carnet ne prend plus la trace après 14 h : `expires_at` borne déjà le job.
+        # The notebook no longer takes the trace after 14:00: `expires_at` already bounds the job.
         "trace_reveil": 3.5,
     }
 
@@ -205,8 +205,8 @@ class CoachBot:
         self._turns = TurnExecutor(agent, repo, state)
         self._queue = WorkQueue(config.debounce_seconds, config.debounce_max_seconds)
         self._thread: threading.Thread | None = None
-        # État du seul worker, relu par le planificateur : une conversation est active
-        # pendant un tour réactif et dans les minutes qui suivent sa réponse.
+        # State of the single worker, read by the scheduler: a conversation is active during a
+        # reactive turn and in the minutes after its reply.
         self._reactive_since: float | None = None
         self._last_reactive_reply = 0.0
         self._outage_notice_at = 0.0
@@ -287,7 +287,7 @@ class CoachBot:
 
     def _run_control_command(self, psid: str, command: str,
                              message_ids: tuple[str, ...]) -> None:
-        """Livre status/cancel pendant que le worker principal attend le modèle."""
+        """Deliver status/cancel while the main worker waits on the model."""
         try:
             processed = self._run_command(psid, command, message_ids=message_ids)
         except Exception:
@@ -297,7 +297,7 @@ class CoachBot:
             self._state.complete_inbound(message_ids)
 
     def submit_attachment(self, psid: str, payload: str, *, message_id: str) -> None:
-        """La lecture se fait dans le worker ; le webhook reste immédiatement libre."""
+        """Reading happens in the worker; the webhook is immediately free again."""
         self._queue.submit_attachment(psid, payload, message_id)
 
     def acknowledge(self, psid: str) -> None:
@@ -308,17 +308,17 @@ class CoachBot:
         self._queue.submit_proactive(job)
 
     def request_maintenance(self) -> None:
-        """Publication Git et synchronisation, quand le worker n'a rien d'autre à faire."""
+        """Git publication and sync, when the worker has nothing else to do."""
         self._queue.submit_maintenance()
 
     def has_pending_inbound(self) -> bool:
         return self._queue.has_pending_inbound()
 
     def conversation_active(self, psid: str) -> bool:
-        """L'athlète converse : message en file, tour en vol, ou échange récent.
+        """The athlete is conversing: queued message, turn in flight, or recent exchange.
 
-        La sortie du coach compte autant que l'entrée de l'athlète : un tour de douze
-        minutes laissait passer une relance juste derrière sa propre réponse.
+        The coach's output counts as much as the athlete's input: a nudge must not land right
+        behind a reply.
         """
         now = time.time()
         return (self.has_pending_inbound() or self._reactive_since is not None
@@ -361,8 +361,8 @@ class CoachBot:
                     except Exception:
                         log.exception("Reprise du proactif %s impossible", job.job_id)
                 else:
-                    # Une panne du worker n'est jamais une action à demander à
-                    # l'athlète. Le message entrant est durable et sera repris.
+                    # A worker failure is never something to ask of the athlete. The inbound message
+                    # is durable and will be retried.
                     self._log_incident("worker", "message entrant non traité")
                     processed = False
             finally:
@@ -375,14 +375,14 @@ class CoachBot:
                 elif isinstance(job, AttachmentRequest):
                     self._state.complete_inbound((job.message_id,))
             except Exception:
-                # L'entrant reste `pending` : sa réponse, elle, est déjà conservée et
-                # ne sera jamais recalculée à la reprise.
+                # The inbound stays `pending`: its reply is already persisted and is never
+                # recomputed on retry.
                 log.exception("Acquittement de l'entrant impossible")
             if self._publish_due:
                 self._after_turn()
 
     def _after_turn(self) -> None:
-        """Git et vues après la livraison : ils ne retardent jamais une réponse."""
+        """Git and views after delivery: they never delay a reply."""
         self._publish_due = False
         try:
             self._repo.publish()
@@ -392,7 +392,7 @@ class CoachBot:
         self._log_vault_alerts()
 
     def _maintain(self) -> None:
-        """Maintenance à l'arrêt : publication, synchronisation, questions périmées."""
+        """Idle-time maintenance: publication, sync, stale questions."""
         self._after_turn()
         psid = self._config.allowed_psid
         if psid:
@@ -414,19 +414,19 @@ class CoachBot:
         return tuple(getattr(job, "message_ids", ()))
 
     def _retry_inbound(self, job) -> None:
-        """Retente un entrant sans le perdre ; dit UNE fois à l'athlète qu'il attend."""
+        """Retry an inbound without losing it; tell the athlete ONCE that it is waiting."""
         attempt = max(1, int(getattr(job, "attempts", 1)))
         hint, self._retry_not_before = self._retry_not_before, None
         ids = self._job_ids(job)
         if attempt >= self.REACTIVE_MAX_ATTEMPTS:
-            # Ne pas acquitter : PostgreSQL le garde ``pending`` et un redémarrage le
-            # reprendra, avec une note d'âge. On évite à la fois la perte et la boucle.
+            # Do not acknowledge: PostgreSQL keeps it ``pending`` and a restart picks it up again,
+            # with an age note. This avoids both loss and looping.
             self._log_incident(
                 "entrant-en-attente", f"message conservé après {attempt} tentatives")
             return
         delay = self.REACTIVE_RETRY_DELAYS[min(attempt, len(self.REACTIVE_RETRY_DELAYS)) - 1]
         if hint:
-            # Le fournisseur sait quand il revient : inutile de frapper avant.
+            # The provider knows when it is back: no point knocking before then.
             delay = min(max(delay, hint - time.time()), 6 * 3600)
         if delay >= self.OUTAGE_NOTICE_AFTER and not isinstance(job, CommandRequest):
             self._notify_outage(job.psid, ids)
@@ -443,7 +443,7 @@ class CoachBot:
                     attempt + 1, delay)
 
     def _notify_outage(self, psid: str, ids: tuple[str, ...]) -> None:
-        """Une seule phrase par épisode de panne, jamais le mécanisme."""
+        """One sentence per outage episode, never the mechanism."""
         if time.time() - self._outage_notice_at < self.OUTAGE_NOTICE_GAP:
             return
         self._outage_notice_at = time.time()
@@ -459,7 +459,7 @@ class CoachBot:
                                      self._delivery.deliver(envelope))
 
     def _respond_attachment(self, request: AttachmentRequest) -> bool:
-        """Lit le brut sans lui donner de chemin d'écriture, puis le détruit."""
+        """Read the raw file without giving it a write path, then destroy it."""
         self._client.action(request.psid, "mark_seen")
         source_key = f"attachment:{request.message_id}"
         resumed = self._resume_reactive(request.psid, source_key)
@@ -496,8 +496,8 @@ class CoachBot:
                 return False
             if result.failure is FailureKind.CANCELLED:
                 return True
-            # Une analyse qui a déjà échoué en cours de route ne se relance pas à
-            # l'aveugle : l'athlète sait quoi renvoyer.
+            # An analysis that already failed midway is not blindly relaunched: the athlete knows
+            # what to resend.
             return self._deliver_attachment_text(request, ATTACHMENT_UNREADABLE)
         answer = result.full_text.strip() or (
             "Je n'arrive pas à extraire quelque chose de fiable de cette pièce jointe.")
@@ -517,12 +517,12 @@ class CoachBot:
         return prompt
 
     def pending_ledger_cells(self, today) -> list:
-        """Ce que le registre attend encore de l'athlète. Lu par le planificateur pour
-        son repli du soir : le chemin normal est la greffe sur un message existant."""
+        """What the ledger still expects from the athlete. Read by the scheduler for its evening
+        fallback: the normal path is grafting onto an existing message."""
         return self._repo.pending_ledger_cells(today)
 
     def _missing_cells_note(self, today, psid: str = "") -> str:
-        """Liste les inconnues sans présumer quelles questions seront posées."""
+        """List the unknowns without presuming which questions will be asked."""
         try:
             pending, lapsed = self._repo.ledger_cells(today)
             pro = self._state.proactive
@@ -536,12 +536,12 @@ class CoachBot:
             pending, asked, carnet=bool(psid) and self._notebook_connected(psid))
 
     def _notebook_connected(self, psid: str) -> bool:
-        """Le carnet recueille les ressentis : Messenger ne les redemande plus."""
+        """The notebook collects the feelings: Messenger no longer asks for them again."""
         notebook = self._delivery.notebook
         return notebook is not None and notebook.connected(psid)
 
     def day_settled(self, day) -> bool:
-        """Lu par le planificateur le dimanche : le bilan peut partir sans attendre 19 h."""
+        """Read by the scheduler on Sunday: the review can go out without waiting for 19:00."""
         try:
             return self._repo.day_settled(day)
         except StorageError:
@@ -549,29 +549,28 @@ class CoachBot:
             return False
 
     def wake_reminder_due(self, psid: str) -> bool:
-        """Lu par le planificateur à 10 h 30 : la trace du réveil manque encore."""
+        """Read by the scheduler at 10:30: the wake trace is still missing."""
         notebook = self._delivery.notebook
         return (notebook is not None and notebook.connected(psid)
                 and notebook.wake_reminder_due())
 
     def _mark_cells_asked(self, keys) -> None:
-        """« Demandé » veut dire qu'un message est parti, pas qu'un prompt a été assemblé."""
+        """A cell is `asked` once a message went out, not once a prompt was assembled."""
         for key in keys:
             self._state.proactive.mark("asked:" + key)
 
     def _reading_notes(self, triage: Triage, week: str, plan_context: str, *,
                        plan_required: bool, handoff: str, psid: str = "") -> str:
-        """Tout ce que le service met DEVANT le message de l'athlète, et rien d'autre.
+        """Everything the service puts BEFORE the athlete's message, and nothing else.
 
-        Cinq blocs invisibles, chacun avec sa propre raison d'être là : le niveau de
-        lecture, l'état d'esprit, le programme canonique (plus sa réparation s'il est
-        périmé), les contrôles datés du jour, les cellules du registre à réclamer, et
-        la passerelle d'un `/deep` précédent.
+        Invisible blocks, each with its own reason to be there: the reading depth, the mindset,
+        the canonical plan (plus its repair if stale), the dated checks of the day, the ledger
+        cells to claim, and the handoff of a previous `/deep`.
 
-        Cette lecture ne marque aucune cellule comme demandée.
+        This read marks no cell as asked.
         """
-        # L'ancre temporelle passe AVANT le niveau de lecture : « aujourd'hui repos »
-        # arrive en N0 comme en N2, et c'est en N0 que le coach lit le moins.
+        # The time anchor comes BEFORE the reading depth: "today is a rest day" applies at N0 as
+        # much as at N2, and N0 is where the coach reads the least.
         notes = today_note(clock.now()) + "\n\n" + DEPTH_NOTES.get(triage.depth, "")
         if triage.emotional:
             notes = EMOTION_NOTE + "\n\n" + notes
@@ -581,8 +580,8 @@ class CoachBot:
             notes += "\n\n" + canonical_plan_note(plan_context)
             if plan_context and self._repo.validate_weekly_plan(week) is PlanStatus.STALE:
                 notes += "\n\n" + stale_plan_note(week)
-        # Un contrôle bloquant voyage à tous les niveaux. Une observation, elle, ne
-        # force pas un échange social ou une clôture à changer de sujet.
+        # A blocking check travels at every depth. An observation does not force a social
+        # exchange or a closing to change subject.
         gates = gate_note(*due_gates_by_kind(
             plan_context, clock.today().isoformat()), closing=triage.depth == "N0")
         if gates:
@@ -598,11 +597,11 @@ class CoachBot:
     def _triage(self, psid: str, text: str, message_ids: tuple[str, ...], *,
                 strength_report: bool) -> Triage:
         if strength_report:
-            # La route a déjà validé et écrit la séance avant de créer ce message.
-            # Son identité rend le classifieur inutile.
+            # The route already validated and wrote the session before creating this message.
+            # Its identity makes the classifier unnecessary.
             return Triage("N2")
-        # Le triage sélectionne le niveau de lecture et le ton. Il ne décide d'aucune
-        # porte : un verdict absent retombe sur le défaut, qui ne verrouille rien.
+        # Triage selects the reading depth and tone. It decides no gate: a missing verdict falls
+        # back to the default, which locks nothing.
         triage = deterministic_triage(text)
         if triage is not None:
             return triage
@@ -646,11 +645,11 @@ class CoachBot:
                 self._settle_absorbed_debrief(absorbed)
 
     def _absorb_debrief(self, psid: str, absorbed: dict) -> str:
-        """Un débrief Strava en attente part avec la réponse au message de l'athlète.
+        """A pending Strava debrief goes out with the reply to the athlete's message.
 
-        Il écrit pendant l'attente : différer le débrief derrière la conversation le
-        retardait de 8 min, et le faire partir à côté doublait le message. Le job est
-        réclamé ici et soldé après livraison ; une capture ratée le rend à sa file.
+        It writes while waiting: deferring the debrief behind the conversation delayed it, and
+        sending it separately duplicated the message. The job is claimed here and settled after
+        delivery; a failed capture returns it to its queue.
         """
         pro = self._state.proactive
         late = ProactiveScheduler.DEBRIEF_MAX_LATE_HOURS * 3600
@@ -689,7 +688,7 @@ class CoachBot:
                     psid="", kind=record["kind"], prompt="", job_id=record["id"],
                     detail=record["detail"]))
             else:
-                # La réponse n'est pas partie : le débrief retrouve sa file, dû.
+                # The reply did not go out: the debrief returns to its queue, due.
                 self._state.proactive.release_job(record["id"], delay=0)
         except Exception:
             log.exception("Débrief absorbé %s non soldé", record["id"])
@@ -705,8 +704,8 @@ class CoachBot:
         outbox_before = self._outbox.snapshot()
         strength_report = any(
             message_id.startswith("strength:") for message_id in message_ids)
-        # Le signe de vie part AVANT le triage : l'athlète ne regarde jamais un « Vu »
-        # muet pendant que le classifieur réfléchit.
+        # The sign of life goes out BEFORE triage: the athlete never stares at a mute "Seen"
+        # while the classifier thinks.
         typing = TypingIndicator(
             self._client, psid, deep=deep_request,
             gate=lambda: self._state.claim_patience(self.PATIENCE_MIN_GAP),
@@ -721,7 +720,7 @@ class CoachBot:
                 triage = replace(triage, depth="N3")
             # An emotional message keeps its rung (it may well be an N2) but loses the
             # fast announcement: "hang on, let me check your data" is the wrong answer
-            # to someone saying he is discouraged.
+            # to someone saying they are discouraged.
             deep = ((deep_request or triage.depth in self.PATIENT_DEPTHS)
                     and not triage.emotional)
             typing.configure(deep=deep, holding=triage.holding)
@@ -731,15 +730,15 @@ class CoachBot:
             vault_changed = self._take_vault_moved()
             self._discard_residue()
             week = self._iso_week(clock.now())
-            # « P » et « D » font relire le programme et valider la semaine après le
-            # tour. Ils n'ouvrent aucune porte sur la prose : seul le bloc de séances
-            # dépend d'un programme valide, et celui-ci se décide sur l'état relu.
+            # "P" and "D" re-read the plan and validate the week after the turn. They open no gate
+            # on the prose: only the sessions block depends on a valid plan, and that is decided on
+            # the re-read state.
             plan_required = triage.plan_change or triage.plan_scope != "none"
-            # Chargé À TOUS LES NIVEAUX, y compris N0 : `show` coûte 0,13 s, et un
-            # contrôle daté est une obligation de la journée, pas un détail de lecture.
+            # Loaded AT EVERY DEPTH, N0 included: `show` costs 0.13 s, and a dated check is an
+            # obligation of the day, not a reading detail.
             plan_context = self._repo.weekly_plan_context(week)
-            # CE QU'IL RESTAIT À FAIRE avant ce tour : c'est cette liste, et non le
-            # numéro de révision, qui dit plus bas si la prescription a bougé.
+            # WHAT REMAINED TO DO before this turn: this list, not the revision number, tells below
+            # whether the prescription moved.
             prescription_before = prescription_state(
                 plan_context, clock.today().isoformat())
             handoff = self._state.handoff(psid)
@@ -747,25 +746,24 @@ class CoachBot:
                 triage, week, plan_context, plan_required=plan_required, handoff=handoff,
                 psid=psid)
             packet = self._repo.coaching_context(triage.depth)
-            # Le paquet N2/N3 porte déjà les fils ouverts : les rendre deux fois faisait
-            # concurrence au fil réel de l'échange.
+            # The N2/N3 packet already carries the open threads: rendering them twice competed with
+            # the real thread of the exchange.
             memory = self._state.relationship_context(
                 psid, threads=triage.depth not in PACKET_THREAD_DEPTHS)
             reply = self._state.reply_context(message_ids)
             timing = self._timing_note(message_ids)
-            # Après le triage, sous l'indicateur de saisie : la capture relit Strava.
+            # After triage, under the typing indicator: the capture re-reads Strava.
             debrief = "" if strength_report else self._absorb_debrief(psid, absorbed)
             corrections = self._state.correction_context(text)
-            # Du plus général au plus proche du message. La relation explicite de
-            # Messenger vient après la mémoire générale : plus précise, elle reste la
-            # note la plus proche du message. La note du rapport renfo aussi : le modèle
-            # ne doit pas confondre son éventuel refus d'outil avec le statut
-            # transactionnel de la route.
+            # From most general to closest to the message. Messenger's explicit relationship comes
+            # after the general memory: more precise, it stays the note closest to the message. The
+            # strength-report note too: the model must not confuse its possible tool refusal with
+            # the route's transactional status.
             prompt = "\n\n".join(part for part in (
                 corrections, memory, packet if isinstance(packet, str) else "",
                 notes, reply, STRENGTH_REPORT_NOTE if strength_report else "", debrief,
                 timing, text) if part)
-            # Un débrief de qualité absorbé garde le rang d'un jugement (N2).
+            # An absorbed quality debrief keeps the rank of a judgment (N2).
             depth = ("N2" if absorbed.get("quality") and triage.depth in {"N0", "N1"}
                      else triage.depth)
             run_plan = self._config.routing.for_depth(depth, deep_request=deep_request)
@@ -800,10 +798,10 @@ class CoachBot:
                 self._retry_not_before = result.retry_at
                 return False
             if result.failure is FailureKind.CANCELLED:
-                # /cancel a déjà répondu ; le travail n'est pas relancé.
+                # /cancel already replied; the work is not relaunched.
                 return True
-            # Le travail a déjà consommé un tour : l'entrant est acquitté pour
-            # interdire une relance silencieuse du même travail.
+            # The work already consumed a turn: the inbound is acknowledged to forbid a silent
+            # relaunch of the same work.
             return self._deliver_limit(
                 psid, "failure", message_ids,
                 FAILURE_REPLIES.get(result.failure or FailureKind.IN_FLIGHT,
@@ -864,10 +862,10 @@ class CoachBot:
                             persisted: PersistenceResult, before_context: str,
                             prescription_before: list, text: str,
                             ) -> tuple[list[str], str, dict | None]:
-        """Ce que le service AJOUTE à la prose, sans jamais la remplacer.
+        """What the service ADDS to the prose, never replacing it.
 
-        Rend (lignes de limite, bloc canonique, révision montrée). Une précaution de
-        sécurité écrite par le coach part toujours : aucune porte ne porte sur la prose.
+        Returns (limit lines, canonical block, shown revision). A safety precaution written by
+        the coach always goes out: no gate applies to the prose.
         """
         lines: list[str] = []
         if not persisted.writes_applied:
@@ -882,9 +880,8 @@ class CoachBot:
         after = self._repo.weekly_plan_context(week)
         revision_after = self._revision_of(after)
         if triage.plan_change and revision_after == self._revision_of(before_context):
-            # Pas une faute en soi : « j'ai mal dormi » déclenche P et ne change souvent
-            # rien. Mais c'est la signature exacte du 25/08 à 21h09, et elle n'était
-            # visible nulle part. Elle l'est maintenant, avec le message qui l'a produite.
+            # Not a fault in itself: "I slept badly" triggers P and often changes nothing. The
+            # warning keeps the message that produced it visible.
             log.warning("Tour marqué plan_change terminé SANS nouvelle révision de %s "
                         "(r%s inchangée). Message : %s", week, revision_after or "?",
                         text[:200])
@@ -900,7 +897,7 @@ class CoachBot:
                 lines.append(PLAN_UNAVAILABLE_LINE)
             return lines, "", None
         if not persisted.writes_applied:
-            # Un tour dont les faits n'ont pas été enregistrés ne prescrit rien.
+            # A turn whose facts were not recorded prescribes nothing.
             return lines, "", None
         prescription_after = prescription_state(after, clock.today().isoformat())
         try:
@@ -912,8 +909,8 @@ class CoachBot:
             log.exception("Bloc canonique de %s impossible à préparer", week)
             canonical = None
         if canonical is None:
-            # Programme valide mais rendu en échec : la prose part seule, la dette de
-            # livraison reste posée pour le tour suivant.
+            # Valid plan but render failed: the prose goes out alone, the delivery debt stays set
+            # for the next turn.
             try:
                 self._state.owe_plan(psid, week, revision_after)
             except Exception:
@@ -923,12 +920,12 @@ class CoachBot:
                                if canonical else None)
 
     def _resume_reactive(self, psid: str, source_key: str) -> bool | None:
-        """Renvoie une réponse déjà calculée pour ces messages, sans nouveau tour."""
+        """Return an already computed reply for these messages, without a new turn."""
         stored = self._delivery.stored(source_key)
         if stored is None:
             return None
         if stored.status in {"prepared", "failed"} and not stored.resendable:
-            # Trace sans contenu (antérieure au stockage des enveloppes) : on recalcule.
+            # Trace without content (predates envelope storage): recompute.
             self._delivery.discard(source_key)
             return None
         log.info("Réponse déjà calculée pour %s : reprise sans nouveau tour (%s)",
@@ -938,7 +935,7 @@ class CoachBot:
 
     def _finish_reactive(self, psid: str, source_key: str, meta: dict,
                          delivery: DeliveryReceipt) -> bool:
-        """Acquitte ce qui a franchi Meta ; la mémoire ne peut plus faire rejouer le tour."""
+        """Acknowledge what crossed Meta; memory can no longer cause the turn to be replayed."""
         self._report_uncertain_delivery(source_key, delivery)
         if not delivery.text_ok and not delivery.delivered_any:
             log.error("Réponse non livrée ; elle sera renvoyée telle quelle (%s)",
@@ -963,8 +960,8 @@ class CoachBot:
             if meta.get("handoff"):
                 self._state.set_handoff(psid, str(meta["handoff"]))
             elif meta.get("clear_handoff"):
-                # La session ordinaire a maintenant lu la passerelle : la garder ferait
-                # payer et répéter le même contexte à chaque tour.
+                # The ordinary session has now read the handoff: keeping it would pay for and repeat
+                # the same context every turn.
                 self._state.clear_handoff(psid)
         except Exception:
             log.exception("Écritures d'après livraison impossibles")
@@ -972,8 +969,8 @@ class CoachBot:
                 f"memoire-apres-livraison:{source_key}",
                 "La réponse est partie, mais sa trace mémoire n'a pas pu être enregistrée.")
         if not delivery.text_ok:
-            # Messenger n'offre aucune idempotence réseau : un fragment accepté suffit
-            # à acquitter, comme pour les proactifs partiellement livrés.
+            # Messenger offers no network idempotence: one accepted fragment is enough to
+            # acknowledge, as for partially delivered proactives.
             self._log_incident(f"reponse-partielle:{source_key}",
                                "La réponse n'a été livrée qu'en partie.")
         if not delivery.attachments_ok:
@@ -991,8 +988,8 @@ class CoachBot:
 
     def _deliver_limit(self, psid: str, prefix: str, message_ids: tuple[str, ...],
                        text: str) -> bool:
-        """Une phrase de limite, livrée et mémorisée ; l'entrant est acquitté quoi qu'il
-        arrive, pour ne jamais relancer un travail qui a déjà échoué en route."""
+        """A limit sentence, delivered and remembered; the inbound is acknowledged whatever
+        happens, so work that already failed midway is never relaunched."""
         source_key = (f"{prefix}:" + ":".join(message_ids)
                       if message_ids else f"{prefix}:{time.time_ns()}")
         try:
@@ -1010,7 +1007,7 @@ class CoachBot:
         return True
 
     def _deliver_holding(self, psid: str, line: str) -> None:
-        """La phrase d'attente est un vrai message : livrée et mémorisée comme les autres."""
+        """The holding sentence is a real message: delivered and remembered like the others."""
         source_key = f"holding:{uuid.uuid4()}"
         delivery = self._delivery.deliver(
             EnvelopeBuilder(psid, source_key).text(line, burst=False).build())
@@ -1021,7 +1018,7 @@ class CoachBot:
 
     @staticmethod
     def _revision_of(context: str) -> int:
-        """Le numéro de la révision active, 0 si le plan est absent ou illisible."""
+        """The active revision number, 0 if the plan is absent or unreadable."""
         try:
             return int(json.loads(context).get("revision", 0))
         except (json.JSONDecodeError, AttributeError, TypeError, ValueError):
@@ -1059,9 +1056,8 @@ class CoachBot:
                 log.info("Programme %s r%s inchangé et déjà reçu : le coach répond "
                          "dessus sans le répéter", week, revision)
             return ""
-        # Le statut est relu au moment d'envoyer, que le triage ait ou non demandé la
-        # validation de la semaine : un contrôle daté ou une péremption retient les
-        # séances, quel que soit le message qui a déclenché l'envoi.
+        # The status is re-read at send time, whether or not triage asked for week validation:
+        # a dated check or staleness holds the sessions back, whatever message triggered the send.
         if week in persisted.awaiting:
             status = PlanStatus.AWAITING
         elif week in persisted.stale:
@@ -1078,9 +1074,9 @@ class CoachBot:
                 log.info("Semaine %s : toutes les séances restantes sont retenues", week)
                 return ""
         if status is PlanStatus.STALE:
-            # Même traitement qu'un contrôle daté, autre remède : le programme ne
-            # décrit plus la semaine, il attend une révision. Le tour suivant la
-            # réclamera au coach, en tête de son prompt.
+            # Same treatment as a dated check, different remedy: the plan no longer describes the
+            # week, it awaits a revision. The next turn will claim it from the coach, at the head of
+            # its prompt.
             log.info("Semaine %s périmée : le coach parle, la prescription attend "
                      "une révision", week)
             return ""
@@ -1094,8 +1090,8 @@ class CoachBot:
                 before_context, context, week, today=clock.today().isoformat(),
                 exclude_ids=excluded)
         else:
-            # Une dette de livraison ne reconstruit pas le delta perdu : elle renvoie
-            # l'état restant, seule vérité encore disponible.
+            # A delivery debt does not rebuild the lost delta: it resends the remaining state, the
+            # only truth still available.
             canonical = render_plan_for_scope(
                 context, week, "remaining", today=clock.today().isoformat(),
                 exclude_ids=excluded)
@@ -1105,28 +1101,28 @@ class CoachBot:
                 f"Programme {week} enregistré et valide, mais son rendu a échoué. "
                 "La prose part seule ; le programme reste dû.")
             return None
-        # La dette se pose AVANT le transport : un texto perdu doit rester dû.
+        # The debt is set BEFORE transport: a lost text must remain owed.
         self._state.owe_plan(psid, week, revision)
         return canonical
 
     def _log_vault_alerts(self) -> None:
-        """Vide les alertes de persistance dans les journaux d'exploitation."""
+        """Drain persistence alerts into the operations logs."""
         for alert in self._repo.drain_alerts():
             self._log_incident(f"vault:{alert.key}", alert.text)
 
     @staticmethod
     def _log_incident(key: str, text: str) -> None:
-        """Journalise un incident interne sans le transformer en état métier."""
+        """Log an internal incident without turning it into business state."""
         log.error("Incident interne « %s » : %s", key, text)
 
     @staticmethod
     def _log_reply_shape(kind: str, prose: str, canonical: str, *, depth: str = "",
                          lines: Sequence[str] = (), turn_id: str | None = None) -> None:
-        """Mesure passive : aucune limite, aucune réécriture, aucune nouvelle inférence.
+        """Passive measurement: no limit, no rewrite, no new inference.
 
-        Ce que l'athlète reçoit est l'enveloppe, pas la prose du modèle : les bulles se
-        comptent avec le découpage du transport, et ce que le service ajoute (limites,
-        bloc de programme) se mesure à part. Des compteurs seulement, jamais le texte.
+        What the athlete receives is the envelope, not the model's prose: bubbles are counted with
+        the transport's splitting, and what the service adds (limits, plan block) is measured
+        apart. Counters only, never the text.
         """
         delivered = strip_links(prose).strip()
         added = [part for part in (*lines, canonical) if part.strip()]
@@ -1137,8 +1133,8 @@ class CoachBot:
                     questions=delivered.count("?"))
 
     def _discard_residue(self) -> None:
-        """Nettoyer avant de travailler. Sans message : un résidu jeté dont le coach se
-        relève tout seul est un non-événement pour l'athlète, et il est déjà au journal."""
+        """Clean up before working. No message: a discarded residue the coach recovers from by
+        itself is a non-event for the athlete, and it is already in the log."""
         discarded = self._repo.ensure_clean()
         if discarded:
             log.error("Tour précédent mort sans persister ; %d fichier(s) abandonné(s)",
@@ -1146,17 +1142,17 @@ class CoachBot:
 
     @staticmethod
     def _iso_week(moment: datetime, offset_days: int = 0) -> str:
-        """La semaine ISO, calculée par le modèle qui la déclare partout ailleurs."""
+        """The ISO week, computed by the model that declares it everywhere else."""
         return weekly_plan_model.current_week(
             moment.date() + timedelta(days=offset_days))
 
     def _logical_moment(self, job: ProactiveJob, observed: datetime) -> datetime:
         """Anchor a periodic retry to the period encoded by its durable key.
 
-        `weekly:2026-W34` désigne la clôture de W34, même si le budget ne laisse le
-        job repartir que le lundi de W35. Recalculer depuis l'heure du retry faisait
-        demander W36, puis déclarer le plan incohérent alors que W35 était valide.
-        Les jobs ad hoc et les anciennes clés non conformes gardent l'heure observée.
+        `weekly:<year>-W<nn>` designates the closing of that week, even if the budget only lets
+        the job restart on the Monday of the next one. Recomputing from the retry time would ask
+        for the week after, then declare the plan inconsistent while the next week was valid.
+        Ad hoc jobs and old non-conforming keys keep the observed time.
         """
         prefix = "weekly:"
         if job.kind != "weekly" or not job.job_id.startswith(prefix):
@@ -1169,7 +1165,7 @@ class CoachBot:
             log.error("Clé de bilan hebdomadaire illisible : %s", job.job_id)
             return observed
         if observed.date() == sunday:
-            # Parti dès que le dimanche est soldé : l'heure réelle, pas celle du repli.
+            # Sent as soon as Sunday is settled: the real time, not the fallback time.
             return observed
         scheduled = self._config.proactive_weekly or observed.timetz().replace(tzinfo=None)
         return clock.combine(sunday, scheduled)
@@ -1182,7 +1178,7 @@ class CoachBot:
 
     def _defer_active_proactive(self, job: ProactiveJob, *,
                                 envelope: OutboundEnvelope | None = None) -> bool:
-        """Le réactif prime, sans détruire : une sortie déjà calculée est conservée."""
+        """Reactive takes priority without destroying anything: a computed output is kept."""
         if not self.conversation_active(job.psid):
             return False
         log.info("Proactive %s delayed: athlete is active", job.kind)
@@ -1192,7 +1188,7 @@ class CoachBot:
         return True
 
     def _respond_proactive(self, job: ProactiveJob) -> None:
-        # Éteindre aussi les anciennes relances déjà en file, sans réveiller l'agent.
+        # Also switch off old nudges already queued, without waking the agent.
         if job.kind == "gear_alert":
             try:
                 detail = json.loads(job.detail)
@@ -1212,7 +1208,7 @@ class CoachBot:
             self._deliver_missing_cells(job)
             return
         if job.kind == "trace_reveil" and not self.wake_reminder_due(job.psid):
-            # Donnée dans le carnet (ou dans le chat) entre la mise en file et l'envoi.
+            # Data entered in the notebook (or in the chat) between queueing and sending.
             self._complete_job(job)
             return
         if job.kind in CLOSED_KINDS:
@@ -1232,12 +1228,12 @@ class CoachBot:
         started = time.monotonic()
         outbox_before = self._outbox.snapshot()
         heavy = job.kind in self.HEAVY_KINDS
-        # Un travail lourd part d'une session vierge. Un proactif léger part d'une COPIE
-        # de la conversation : non livré, il ne laisse aucune trace dans la session
-        # principale, qu'il n'y a donc jamais à effacer.
+        # A heavy job starts from a blank session. A light proactive starts from a COPY of the
+        # conversation: undelivered, it leaves no trace in the main session, so there is never
+        # anything to erase.
         mode = SessionMode.ISOLATED if heavy else SessionMode.FORK
-        # Un débrief de qualité juge la séance (critères, calibration, suite) : le
-        # 15/10, un N1 à effort bas y a inventé un critère de FC et sauté la carte.
+        # A quality debrief judges the session (criteria, calibration, follow-up), so it runs on
+        # the N2 route.
         route = Route.HEAVY if heavy else (Route.N2 if job.quality else Route.N1)
         run_plan = (self._config.routing.plan(route)
                     .with_session_mode(mode).with_structured_reply())
@@ -1245,8 +1241,8 @@ class CoachBot:
                  job.kind, run_plan.primary.model or "défaut",
                  run_plan.primary.effort or "défaut", run_plan.primary.timeout,
                  mode.value, job.attempts)
-        # Aucun indicateur de saisie : l'athlète n'attend rien, et « … » pendant quarante
-        # minutes pour finir silencieux l'incitait seulement à écrire.
+        # No typing indicator: the athlete is waiting for nothing, and "…" for forty minutes
+        # ending in silence only prompted them to write.
         vault_changed = self._take_vault_moved()
         self._discard_residue()
         prompt = job.prompt if heavy else self._with_freshness(
@@ -1283,9 +1279,9 @@ class CoachBot:
         if persisted is None:
             raise RuntimeError("résultat agent réussi sans résultat de persistance")
         if not persisted.writes_applied:
-            # Une INITIATIVE qui échoue ne prend jamais la parole du coach : c'est le
-            # service qui n'a pas pu faire son travail, pas le coach qui a quelque chose
-            # à dire. L'incident reste au journal d'exploitation.
+            # An INITIATIVE that fails never speaks as the coach: it is the service that could not
+            # do its job, not the coach having something to say. The incident stays in the
+            # operations log.
             self._discard_outbox(outbox_before)
             self._log_vault_alerts()
             self._buffer_proactive_retry(
@@ -1304,8 +1300,8 @@ class CoachBot:
             self._discard_outbox(outbox_before)
             self._log_vault_alerts()
             if job.kind in SILENCE_IS_A_FAILURE:
-                # Un débrief n'existe QUE parce qu'une activité vient d'arriver : son
-                # silence veut dire que la sortie n'a pas été lue. Une seule reprise.
+                # A debrief exists ONLY because an activity just arrived: its silence means the
+                # output was not read. One retry only.
                 cause = "débrief automatique muet"
                 if job.attempts >= 2:
                     self._fail_job(job, cause)
@@ -1337,10 +1333,10 @@ class CoachBot:
         log.info("Proactive %s sent in %.0f s", job.kind, time.monotonic() - started)
 
     def _render_workout_card(self, card: dict | None, activity_id: str) -> dict | None:
-        """Rend la carte des répétitions dans l'outbox ; rend la charge utile si elle part.
+        """Render the repetitions card into the outbox; return the payload if it goes out.
 
-        Déterministe, comme la carte de renfo : le 15/10, le premier fractionné avec
-        Redline est parti sans carte parce qu'elle était laissée au choix du modèle.
+        Deterministic, like the strength card: leaving it to the model's choice let a debrief
+        go out without its card.
         """
         if not isinstance(card, dict) or not card.get("reps"):
             return None
@@ -1357,7 +1353,7 @@ class CoachBot:
         return EnvelopeBuilder(job.psid, self._proactive_key(job), messaging_type, tag)
 
     def _revision_check(self, job: ProactiveJob, moment: datetime) -> dict | None:
-        """La révision que le texte préparé montre : une reprise doit la retrouver."""
+        """The revision the prepared text shows: a retry must find it again."""
         week = {"weekly": self._iso_week(moment, offset_days=7),
                 "weekly_repair": job.detail or self._iso_week(moment)}.get(
                     job.kind, self._iso_week(moment))
@@ -1366,9 +1362,8 @@ class CoachBot:
 
     def _proactive_canonical(self, job: ProactiveJob, persisted: PersistenceResult,
                              moment: datetime) -> tuple[str, str]:
-        """(bloc de séances, cause de reprise). Une reprise ne vient que d'un devoir
-        manqué (bilan sans semaine suivante) ; un programme absent n'est jamais une
-        raison de régénérer un mot du matin."""
+        """(sessions block, retry cause). A retry only comes from a missed duty (review without
+        next week); an absent plan is never a reason to regenerate a morning note."""
         today = moment.date().isoformat()
         if job.kind == "morning":
             week = self._iso_week(moment)
@@ -1392,9 +1387,9 @@ class CoachBot:
                 return render_plan_message(
                     context, week, today=today, exclude_ids=blocked), ""
             if week in persisted.stale:
-                # Le mot du matin part quand même — il prend des nouvelles, relance un
-                # fil, pose la question du jour. Seule la ligne de séances attend que le
-                # programme soit remis en face du réalisé.
+                # The morning note goes out anyway: it checks in, revives a thread, asks the
+                # question of the day. Only the sessions line waits for the plan to be put back in
+                # front of what was done.
                 log.info("Mot du matin sans séance : le programme de %s est périmé et "
                          "attend une révision", week)
                 return "", ""
@@ -1432,7 +1427,7 @@ class CoachBot:
     def _strength_card_after(self, job: ProactiveJob, persisted: PersistenceResult,
                              strength_session: dict | None,
                              moment: datetime) -> dict | None:
-        """La carte de renfo du jour, armée seulement si la prescription finale la porte."""
+        """Today's strength card, armed only if the final prescription carries it."""
         if job.kind != "morning" or not strength_session:
             return None
         current_week = self._iso_week(moment)
@@ -1447,7 +1442,7 @@ class CoachBot:
                 "session_id": session["id"], "date": moment.date().isoformat()}
 
     def _send_proactive(self, job: ProactiveJob, envelope: OutboundEnvelope) -> None:
-        """Envoie une initiative prête, ou la garde telle quelle pour plus tard."""
+        """Send a ready initiative, or keep it as is for later."""
         if self._defer_active_proactive(job, envelope=envelope):
             return
         now = clock.now()
@@ -1460,9 +1455,9 @@ class CoachBot:
         self._finish_proactive(job, dict(envelope.meta), self._delivery.deliver(envelope), now)
 
     def _resume_proactive(self, job: ProactiveJob) -> bool:
-        """Livre une initiative déjà rédigée au lieu de relancer son tour de modèle."""
+        """Deliver an already drafted initiative instead of rerunning its model turn."""
         if not job.job_id or job.kind not in PROACTIVE_TRIGGERS:
-            # Les rendus fermés se recalculent gratuitement et à l'identique.
+            # Closed renderings are recomputed for free and identically.
             return False
         source_key = self._proactive_key(job)
         stored = self._delivery.stored(source_key)
@@ -1478,8 +1473,8 @@ class CoachBot:
         check = stored.meta.get("revision_check")
         if check and self._revision_of(
                 self._repo.weekly_plan_context(check["week"])) != check["revision"]:
-            # Le programme a bougé depuis la rédaction : le texte ne décrit plus la
-            # semaine. Seule cette vérification déterministe décide d'une réécriture.
+            # The plan moved since drafting: the text no longer describes the week. Only this
+            # deterministic check decides on a rewrite.
             log.info("Initiative préparée %s périmée : le programme a changé", job.job_id)
             self._delivery.discard(source_key)
             return False
@@ -1525,8 +1520,8 @@ class CoachBot:
                 f"{delivery.detail or 'cause inconnue'}.")
             return
         if not delivery.attachments_ok:
-            # Le texte est déjà chez l'athlète. Rejouer le job le dupliquerait ; la pièce
-            # jointe refusée est en quarantaine et l'incident est explicite.
+            # The text is already with the athlete. Replaying the job would duplicate it; the
+            # refused attachment is quarantined and the incident is explicit.
             self._log_incident(
                 f"piece-jointe-proactive:{job.job_id or job.kind}",
                 f"L'envoi « {job.kind} » est parti sans sa pièce jointe.")
@@ -1539,10 +1534,10 @@ class CoachBot:
 
     def _buffer_proactive_retry(self, job: ProactiveJob, *, cause: str,
                                 retry_at: float | None = None) -> None:
-        """Reprise bornée d'une initiative : délai croissant, trois réclamations au plus.
+        """Bounded retry of an initiative: growing delay, at most three claims.
 
-        L'échéance est ancrée sur la première tentative (`job.expire_at`) pour ne pas
-        dériver. Au-delà, le job passe `failed` avec sa cause : jamais de boucle.
+        The deadline is anchored on the first attempt (`job.expire_at`) so it does not drift.
+        Beyond it, the job becomes `failed` with its cause: never a loop.
         """
         if not job.job_id:
             self._log_incident(f"proactif-sans-identite:{job.kind}", cause)
@@ -1566,7 +1561,7 @@ class CoachBot:
                  clock.fromtimestamp(due).strftime("%Hh%M"))
 
     def _fail_job(self, job: ProactiveJob, cause: str) -> None:
-        """Solde un job non livré en `failed`, avec sa cause, distinct d'un succès."""
+        """Settle an undelivered job as `failed`, with its cause, distinct from a success."""
         if job.job_id:
             self._state.proactive.fail_job(job.job_id, cause[:500])
         self._log_incident(f"proactif-echec:{job.job_id or job.kind}",
@@ -1575,7 +1570,7 @@ class CoachBot:
                     attempt=job.attempts, cause=cause[:200])
 
     def _release_job(self, job: ProactiveJob, delay: float = 60.0) -> None:
-        """Remet un job réclamé en file, toujours avec une échéance."""
+        """Put a claimed job back in the queue, always with a deadline."""
         if not job.job_id:
             return
         budget = self.RETRY_STALENESS_HOURS.get(job.kind, 4.0)
@@ -1591,13 +1586,13 @@ class CoachBot:
             self._state.proactive.complete_job(job.job_id)
 
     def materialize_week_repair(self, moment: datetime) -> bool:
-        """Invariant du tick : la semaine courante a un programme valide, ou un
-        propriétaire qui le répare. Vérifié au plus tous les quarts d'heure."""
+        """Tick invariant: the current week has a valid plan, or an owner repairing it. Checked
+        at most every quarter hour."""
         if moment.timestamp() - self._week_repair_checked < self.WEEK_REPAIR_CHECK_SECONDS:
             return False
         self._week_repair_checked = moment.timestamp()
         if moment.weekday() == 6:
-            # Le dimanche appartient au bilan, qui prépare la semaine suivante.
+            # Sunday belongs to the review, which prepares the next week.
             return False
         week = self._iso_week(moment)
         if self._repo.validate_weekly_plan(week) is not PlanStatus.INVALID:
@@ -1620,7 +1615,7 @@ class CoachBot:
         return inserted
 
     def _schedule_strength_card(self, psid: str, detail: dict) -> None:
-        """Arme une livraison idempotente puis la met immédiatement en file locale."""
+        """Arm an idempotent delivery, then immediately put it in the local queue."""
         identity = (
             f"strength-card:{detail['week']}:r{detail['revision']}:"
             f"{detail['session_id']}:{detail['date']}"
@@ -1635,10 +1630,10 @@ class CoachBot:
                 detail=encoded, priority=True))
 
     def materialize_strength_card(self, psid: str, moment: datetime) -> bool:
-        """Réarme la dette du jour indépendamment du succès du mot du matin.
+        """Re-arm the day's debt regardless of the morning note's success.
 
-        Le scheduler l'appelle à chaque tick. L'identité stable rend l'opération
-        gratuite après livraison et récupère un matin manqué ou un redémarrage.
+        The scheduler calls it on every tick. The stable identity makes it free after delivery
+        and recovers a missed morning or a restart.
         """
         today = moment.date().isoformat()
         week = self._iso_week(moment)
@@ -1663,12 +1658,11 @@ class CoachBot:
     def _strength_card_context(
             self, detail: dict | None = None,
     ) -> tuple[str, str, dict | None]:
-        """Relit la révision active sans confondre absence et indisponibilité.
+        """Re-read the active revision without confusing absence and unavailability.
 
-        ``weekly_plan_context`` est vide aussi bien pour une semaine absente que pour
-        une semaine invalide. Ce vide ne prouve donc jamais qu'il n'y a pas de renfo.
-        La commande utilisateur doit nommer la limite, tandis qu'une dette proactive
-        devenue obsolète peut simplement être soldée.
+        ``weekly_plan_context`` is empty both for an absent week and for an invalid one. That
+        emptiness therefore never proves there is no strength session. The user command must
+        name the limit, whereas an obsolete proactive debt can simply be settled.
         """
         today = str((detail or {}).get("date") or clock.today().isoformat())
         week = str((detail or {}).get("week") or self._iso_week(clock.now()))
@@ -1695,7 +1689,7 @@ class CoachBot:
                 return "obsolete", today, session
         return "ready", today, session
 
-    # Ce que `/renfo` répond quand la carte ne peut pas partir, en mots de coureur.
+    # What `/renfo` answers when the card cannot go out, in plain athlete-facing words.
     STRENGTH_CARD_LIMITS: ClassVar[dict[str, str]] = {
         "unavailable": (
             "Je n'ai pas de programme fiable pour aujourd'hui en ce moment, donc je ne "
@@ -1712,7 +1706,7 @@ class CoachBot:
     def _deliver_strength_card(self, psid: str, source_key: str, *,
                                detail: dict | None = None,
                                job: ProactiveJob | None = None) -> bool:
-        """Rend et livre une carte depuis le plan, sans appel possible à l'agent."""
+        """Render and deliver a card from the plan, with no possible call to the agent."""
         state, today, session = self._strength_card_context(detail)
         if state != "ready":
             if job:
@@ -1787,16 +1781,15 @@ class CoachBot:
             job.psid, f"proactive:{job.job_id}", detail=detail, job=job)
 
     def _deliver_missing_cells(self, job: ProactiveJob) -> None:
-        """Le repli du soir pour une cellule du registre, rendu sans modèle."""
+        """The evening fallback for a ledger cell, rendered without a model."""
         try:
             original = json.loads(job.detail)
         except (TypeError, ValueError):
             original = {}
         if not isinstance(original, dict):
             original = {}
-        # Les anciens jobs peuvent avoir été créés avant le garde-fou du scheduler. On
-        # les expire ici, avant toute livraison, pour qu'une trace de réveil ne soit
-        # jamais demandée le soir en /10.
+        # Old jobs may have been created before the scheduler's guard. They are expired here,
+        # before any delivery, so a wake trace is never asked in the evening as a /10.
         if original.get("type") == session_kinds.WAKE_TRACE:
             self._complete_job(job)
             log.info("Relance de réveil périmée ignorée : %s", job.job_id or job.kind)
@@ -1826,13 +1819,13 @@ class CoachBot:
 
     def _deliver_closed_proactive(self, job: ProactiveJob,
                                   message: ClosedProactive) -> None:
-        """Livre une initiative entièrement déterminée par ses faits typés."""
+        """Deliver an initiative entirely determined by its typed facts."""
         if job.kind == "missed_session" and not self._state.missed_session_is_current(job.job_id):
             self._complete_job(job)
             return
         if message.question and self._question_already_asked(job.psid, message.question):
-            # Encore en attente, ou soldée à l'instant (répondue, refusée) : un gabarit
-            # n'a pas le contexte pour la reprendre, le coach si.
+            # Still pending, or just settled (answered, declined): a template lacks the context to
+            # pick it up again, the coach has it.
             log.info("Relance fermée %s ignorée : question déjà posée", job.kind)
             self._complete_job(job)
             return
@@ -1851,8 +1844,8 @@ class CoachBot:
         try:
             return self._state.question_known(psid, question)
         except Exception:
-            # Une mémoire illisible ne prouve pas que la question est neuve, mais se
-            # taire ferait perdre une collecte : l'envoi garde son comportement d'avant.
+            # An unreadable memory does not prove the question is new, but staying silent would lose
+            # a collection: sending keeps its previous behavior.
             log.exception("Mémoire des questions illisible avant une relance fermée")
             return False
 
@@ -1867,17 +1860,17 @@ class CoachBot:
                                    message: str, turn_id: str = "", *,
                                    platform_messages: tuple[tuple[str, str], ...] = (),
                                    questions: tuple[str, ...] = ()) -> None:
-        """Acquitte ce qui a réellement été livré, jamais ce que le modèle préparait.
+        """Acknowledge what was actually delivered, never what the model was preparing.
 
-        `turn_id` porte l'angle que le tour a déposé (`fact-write.py angle`) : la trace
-        s'écrit après la livraison, longtemps après la frontière de persistance, donc
-        c'est ici qu'on relit ce que le modèle avait choisi. Vide pour un envoi que le
-        service compose lui-même — il n'a pas d'angle à qualifier.
+        `turn_id` carries the angle the turn deposited (`fact-write.py angle`): the trace is
+        written after delivery, well after the persistence boundary, so this is where what the
+        model chose is re-read. Empty for a send the service composes itself: it has no angle
+        to qualify.
         """
         self._state.proactive.finish_delivery(job.job_id, sent_at)
         if not message.strip():
-            # Un fragment accepté sans texte confirmé n'autorise aucune mémoire
-            # inventée. Le job est soldé pour ne pas risquer de le livrer deux fois.
+            # A fragment accepted without confirmed text authorizes no invented memory. The job is
+            # settled so as not to risk delivering it twice.
             return
         try:
             self._state.record_outbound(
@@ -1898,8 +1891,8 @@ class CoachBot:
         current = self._iso_week(moment)
         strength_session: dict | None = None
         required_weeks: tuple[str, ...] = ()
-        # Posée avant le retour anticipé : une initiative part sans message de l'athlète,
-        # elle a donc encore moins de contexte pour deviner le jour qu'un tour réactif.
+        # Set before the early return: an initiative goes out without a message from the athlete,
+        # so it has even less context to guess the day than a reactive turn.
         prompt = today_note(moment) + "\n\n" + prompt
         if job.kind in CARNET_KINDS and self._notebook_connected(job.psid):
             prompt = CARNET_NOTE + "\n\n" + prompt
@@ -1923,13 +1916,13 @@ class CoachBot:
             strength_session = strength_due(context, today)
             required_weeks = (current,)
         else:
-            # Le bilan reçoit ses calculs faits (dossier) et le paquet N2, qui porte le
-            # règlement en vigueur, les échéances et les capacités (audit du 2026-09-27).
+            # The review gets its computations done (dossier) and the N2 packet, which carries the
+            # rules in force, the deadlines and the capabilities.
             for extra in (self._repo.coaching_context("N2"),
                           self._repo.weekly_dossier(current)):
                 if isinstance(extra, str) and extra:
                     prompt = extra + "\n\n" + prompt
-            # Le bilan du dimanche PRÉPARE la semaine suivante : il doit prouver les deux.
+            # The Sunday review PREPARES the next week: it must prove both.
             required_weeks = (current, self._iso_week(moment, offset_days=7))
         return prompt, strength_session, required_weeks
 
@@ -1939,8 +1932,8 @@ class CoachBot:
             return
         recorded = self._repo.activity_recorded(job.detail)
         if recorded is None:
-            # « Je n'ai pas pu regarder » n'est pas « c'est bon ». Ça ne se dit pas à
-            # L'athlète -- il n'y peut rien -- mais ça ne se déguise pas en succès non plus.
+            # "I could not look" is not "it is fine". That is not said to the athlete (they can do
+            # nothing about it) but it is not disguised as success either.
             log.error("Contrôle de consignation non concluant pour l'activité %s : "
                       "le débrief est parti sans qu'on sache s'il a consigné", job.detail)
             return
@@ -1953,7 +1946,7 @@ class CoachBot:
             "doit être rattachée.")
 
     def _discard_outbox(self, before: OutboxSnapshot) -> None:
-        """Archive les artefacts produits par un tour qui ne sera pas livré."""
+        """Archive the artifacts produced by a turn that will not be delivered."""
         for path in self._outbox.collect_new(before):
             log.info("Image écartée (sortie textuelle absente) : %s", path.name)
             self._outbox.archive(path)
@@ -1992,7 +1985,7 @@ class CoachBot:
                     else "Aucun travail en cours à arrêter.")
         elif command == "/deep":
             text = "Ajoute la question dans le même message : /deep <ta question>"
-        else:  # pragma: no cover - WorkQueue filtre les commandes
+        else:  # pragma: no cover - WorkQueue filters the commands
             return True
         delivery = self._delivery.deliver(
             EnvelopeBuilder(psid, source_key).text(text, burst=False).build())

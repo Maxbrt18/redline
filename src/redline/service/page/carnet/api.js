@@ -1,11 +1,11 @@
-// Le seul accès réseau du carnet : /carnet-api, avec le cookie de l'appareil.
+// The only network access of the notebook: /carnet-api, with the device cookie.
 import {app} from './state.js';
 import {lock} from './session.js';
 
 export async function api(path, body) {
-  // Tant que le lien s'échange contre le cookie de l'appareil, rien d'autre ne part :
-  // un premier appel sans cookie revenait en 401 et verrouillait un carnet qui venait de
-  // s'ouvrir (2026-10-26). Un échange raté se dit lui-même : ce qui l'attendait ne part pas.
+  // While the link is being exchanged for the device cookie, nothing else is sent: a first
+  // call without a cookie would return 401 and lock a notebook that has just opened. A
+  // failed exchange reports itself: whatever was waiting on it is not sent.
   if (path !== 'connect' && app.connecting) {
     try { await app.connecting; } catch { throw new Error('Connexion impossible.'); }
   }

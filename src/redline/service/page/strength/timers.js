@@ -70,8 +70,8 @@ export function tickTimer() {
         }
         renderSession(); return;
       }
-      // Les trois derniers secondes s'annoncent. L'intervalle bat à 250 ms : sans
-      // ce garde, chaque seconde sonnerait quatre fois.
+      // The last three seconds are announced. The interval ticks every 250 ms: without
+      // this guard, each second would sound four times.
       const second = Math.ceil(left);
       if (second !== timer.spoken) {
         timer.spoken = second;
@@ -92,11 +92,11 @@ function paintTimer() {
   if (clock && timer) clock.firstChild.textContent = mmss(timerSeconds());
 }
 
-/* L'écran reste allumé de l'ouverture à l'envoi. Une seule demande au chargement
- * ne tenait pas : iOS la refuse hors d'un geste, et le verrou tombe dès que la page
- * passe en arrière-plan. Sur les répétitions on tape l'écran, ce qui repousse la
- * veille ; sur un chrono on ne touche rien, et l'iPhone s'éteignait. D'où : on
- * garde le verrou, et TOUT geste le redemande tant qu'on ne le tient pas. */
+/* The screen stays on from opening to sending. A single request at load is not enough:
+ * iOS refuses it outside a gesture, and the lock drops as soon as the page goes to the
+ * background. On repetitions the screen is tapped, which postpones sleep; on a timer
+ * nothing is touched and the phone would switch off. Hence: hold the lock, and ANY
+ * gesture re-requests it while it is not held. */
 let screenLock = null;
 let screenLockPending = false;
 export async function keepAwake() {
@@ -106,11 +106,11 @@ export async function keepAwake() {
   try {
     screenLock = await navigator.wakeLock.request('screen');
     screenLock.addEventListener('release', () => { screenLock = null; });
-  } catch (e) { screenLock = null; /* refusé : le prochain geste réessaie */ }
+  } catch (e) { screenLock = null; /* refused: the next gesture retries */ }
   screenLockPending = false;
 }
 
-// La séance fermée, l'écran peut de nouveau se mettre en veille.
+// With the session closed, the screen may sleep again.
 export function releaseScreen() {
   screenLock?.release().catch(() => {});
   screenLock = null;

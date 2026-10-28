@@ -3,9 +3,9 @@
 Structural decision: immediate HTTP 200, async processing. Claude may take
 minutes; Meta replays any webhook left without a fast response.
 
-La page humaine est une coquille sans donnée personnelle. Une capacité dans le
-fragment résout une séance immuable (`/s`) ; le secret n'atteint donc ni les logs
-ni le Referer.
+The human page is a shell with no personal data. A capability in the URL fragment
+resolves an immutable session (`/s`), so the secret reaches neither the logs nor the
+Referer.
 """
 
 from __future__ import annotations
@@ -37,29 +37,29 @@ from .notebook import NotebookService
 from .notebook_web import CSP as NOTEBOOK_CSP
 from .notebook_web import register as register_notebook
 
-# /s serves the notebook's own document since the guided session became one of its
-# screens (2026-10-09): same bytes, same policy. Nothing loads from anywhere else;
+# /s serves the notebook's own document, since the guided session is one of its
+# screens: same bytes, same policy. Nothing loads from anywhere else;
 # `connect-src 'self'` is what lets it resolve the link and post its report back.
 PAGE_CSP = NOTEBOOK_CSP
 STRENGTH_REPORT_MAX_BYTES = 32 * 1024
 STRENGTH_SESSION_MAX_BYTES = 1024
-# Plafond par défaut de tout corps de requête. Sans lui, Waitress accepte 1 Gio et
-# `get_data()` le charge en mémoire avant la moindre vérification de signature.
-# Les routes plus étroites (renfo, carnet) abaissent encore ce plafond.
+# Default cap on every request body. Without it Waitress accepts 1 GiB and
+# `get_data()` loads it into memory before any signature check.
+# Narrower routes (strength, notebook) lower this cap further.
 REQUEST_MAX_BYTES = 1024 * 1024
-# Un challenge de handshake est un nombre (Meta) ou une chaîne aléatoire (Strava).
+# A handshake challenge is a number (Meta) or a random string (Strava).
 _CHALLENGE = re.compile(r"[A-Za-z0-9_-]{1,128}")
 
 log = logging.getLogger("redline")
 
 
 def _token_matches(expected: str, given: str | None) -> bool:
-    """Comparaison en temps constant ; un secret absent n'ouvre jamais rien."""
+    """Constant-time comparison; a missing secret never matches anything."""
     return bool(expected) and hmac.compare_digest(expected.encode(), (given or "").encode())
 
 
 def _handshake_challenge(expected_token: str) -> str | None:
-    """Le challenge `hub.*` à renvoyer, ou None si le handshake est refusé."""
+    """The `hub.*` challenge to echo back, or None if the handshake is refused."""
     challenge = request.args.get("hub.challenge", "")
     if (request.args.get("hub.mode") == "subscribe"
             and _token_matches(expected_token, request.args.get("hub.verify_token"))
@@ -84,9 +84,9 @@ def _signature_valid(secret: str, raw_body: bytes, header: str) -> bool:
 def _iter_events(payload: dict):
     """(psid, mid, kind, text, reply_to_mid) for each usable event.
 
-    ``reply_to_mid`` est la relation créée par « Répondre » dans Messenger, et non
-    une heuristique tirée du texte. Elle est vide pour les événements qui n'en ont pas.
-    ``kind`` appartient à {"text", "sticker", "attachment", "postback"}.
+    ``reply_to_mid`` is the relation created by Messenger's reply action, not a
+    heuristic drawn from the text. It is empty for events that have none.
+    ``kind`` is one of {"text", "sticker", "attachment", "postback"}.
 
     Stickers are distinguished from real attachments because a human does not reply
     "I can't read your attachment" to a thumbs-up. A postback carries in its payload
@@ -125,11 +125,11 @@ def _iter_events(payload: dict):
 
 
 def _exercise_cues(vault: Path) -> dict:
-    """{slug: [consignes]} pour la page, lu une fois au démarrage.
+    """{slug: [cues]} for the page, read once at startup.
 
-    Jamais fatal : une note d'exercice cassée doit faire échouer `vault-check.py`
-    et le rendu de la carte, pas le démarrage du service. Sans consignes le bouton
-    « Le geste » n'apparaît simplement pas, et la séance se déroule comme avant.
+    Never fatal: a broken exercise note must fail `vault-check.py` and the card
+    rendering, not the service startup. Without cues the « Le geste » button simply
+    does not appear and the session runs as usual.
     """
     try:
         from redline.model.programme import load
@@ -202,7 +202,7 @@ def create_app(config: Config, bot: CoachBot, state: Any,
                operational_store: OperationalStore | None = None,
                notebook: NotebookService | None = None,
                nudge: Callable[[], None] | None = None) -> Flask:
-    """`nudge` réveille le planificateur proactif sans attendre son prochain tick."""
+    """`nudge` wakes the proactive scheduler without waiting for its next tick."""
     app = Flask(__name__)
     app.config["MAX_CONTENT_LENGTH"] = REQUEST_MAX_BYTES
     vault = Path(config.vault_path)
@@ -213,13 +213,13 @@ def create_app(config: Config, bot: CoachBot, state: Any,
             nudge()
 
     def hasten_debrief(activity_id: int, why: str) -> None:
-        """L'athlète a fini avec sa sortie : son débrief part sans attendre le délai."""
+        """The athlete is done with the run: its debrief goes out without waiting for the delay."""
         if state.proactive.hasten_job(f"strava:{activity_id}", time.time()):
             log.info("Strava activity %s: debrief brought forward (%s)", activity_id, why)
             wake()
     if notebook is not None:
-        # Un ressenti qui franchit un plafond ne reste pas dans le carnet : le coach
-        # le reçoit comme un message, exactement comme un compte rendu de renfo.
+        # A rating that crosses a ceiling does not stay in the notebook: the coach
+        # receives it as a message, exactly like a strength report.
         register_notebook(app, notebook, config.allowed_psid, alert=lambda text, key: (
             bot.submit_event(config.allowed_psid, "postback", text, message_id=key)),
             place=config.instance.place, cues=cues,
@@ -235,8 +235,8 @@ def create_app(config: Config, bot: CoachBot, state: Any,
         challenge = _handshake_challenge(config.verify_token)
         if challenge is None:
             return "forbidden", 403
-        # Du texte, jamais du HTML : le challenge vient de la requête, et cette origine
-        # porte aussi le cookie du carnet.
+        # Plain text, never HTML: the challenge comes from the request, and this origin
+        # also carries the notebook cookie.
         response = app.response_class(challenge, mimetype="text/plain")
         response.headers["X-Content-Type-Options"] = "nosniff"
         return response
@@ -266,9 +266,9 @@ def create_app(config: Config, bot: CoachBot, state: Any,
             bot.submit_event(psid, kind, text, message_id=mid)
         return "ok", 200
 
-    # Strava ne signe pas ses événements et `owner_id` est public (l'URL du profil).
-    # L'authentification est donc le secret porté par l'URL de callback, connue de
-    # Strava seul ; une URL fausse répond 404 comme une route qui n'existe pas.
+    # Strava does not sign its events and `owner_id` is public (the profile URL).
+    # Authentication is therefore the secret carried by the callback URL, known to
+    # Strava alone; a wrong URL answers 404 like a route that does not exist.
     def strava_path_ok(secret: str) -> bool:
         return bool(config.strava_owner_id) and _token_matches(
             config.strava_webhook_secret, secret)
@@ -297,8 +297,8 @@ def create_app(config: Config, bot: CoachBot, state: Any,
         aspect = event.get("aspect_type")
         if event.get("object_type") != "activity" or aspect not in {"create", "update"}:
             return "ok", 200
-        # Le chemin secret authentifie l'émetteur ; ce filtre écarte encore les
-        # événements d'un autre athlète qui aurait autorisé l'application.
+        # The secret path authenticates the sender; this filter still drops events
+        # from another athlete who may have authorized the application.
         owner = str(event.get("owner_id", ""))
         if owner != config.strava_owner_id:
             log.warning("Strava event ignored: unknown owner_id %s", owner or "(absent)")
@@ -308,18 +308,18 @@ def create_app(config: Config, bot: CoachBot, state: Any,
             log.warning("Strava event ignored: invalid object_id %r", activity_id)
             return "ok", 200
         if aspect == "create":
-            # Le délai n'est plus qu'un filet : la sortie est capturée tout de suite,
-            # et son débrief part dès que l'athlète montre qu'il a fini (titre renommé,
-            # ressentis donnés dans le carnet, message au coach).
+            # The delay is only a safety net: the run is captured at once, and its
+            # debrief goes out as soon as the athlete shows they are done (title
+            # renamed, ratings given in the notebook, message to the coach).
             due = time.time() + config.strava_debrief_delay
             state.proactive.record_activity(str(activity_id), due)
             log.info("Strava activity %s received: debrief at the latest in %d s",
                      activity_id, config.strava_debrief_delay)
             wake()
         elif isinstance(event.get("updates"), dict) and "title" in event["updates"]:
-            # Titre et description s'enregistrent ensemble dans Strava : un titre
-            # renommé dit que l'athlète a écrit ce qu'il voulait dire de sa sortie. Sans
-            # débrief en attente (vieille sortie retouchée), il ne se passe rien.
+            # Strava saves title and description together: a renamed title means the
+            # athlete has written what they wanted to say about the run. With no
+            # pending debrief (an old run edited), nothing happens.
             hasten_debrief(activity_id, "titre renommé")
         return "ok", 200
 
@@ -364,8 +364,8 @@ def create_app(config: Config, bot: CoachBot, state: Any,
             previous, zones = None, []
             if operational_store is not None:
                 previous = operational_store.previous_strength_prescription(resolved["session"], clock.today())
-                # Les zones à demander avant et après : celles d'AUJOURD'HUI, pas celles
-                # figées dans le snapshot de la séance livrée.
+                # Zones to ask about before and after: TODAY's, not those frozen in
+                # the delivered session's snapshot.
                 zones = [{"zone": zone["slug"], "label": zone["label"]}
                          for zone in operational_store.pain_zones() if zone["active"]]
             response = jsonify({"status": "ok", "session": resolved["session"],
@@ -384,8 +384,8 @@ def create_app(config: Config, bot: CoachBot, state: Any,
         """
         if not (config.allowed_psid and config.coach_base_url):
             return "not found", 404
-        # Limite locale à cette route : un webhook Meta légitime peut être plus
-        # gros et ne doit pas hériter du plafond minuscule d'un formulaire renfo.
+        # Cap local to this route: a legitimate Meta webhook can be larger and must
+        # not inherit the tiny cap of a strength form.
         request.max_content_length = STRENGTH_REPORT_MAX_BYTES
         try:
             body = json.loads(request.get_data())

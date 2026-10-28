@@ -11,15 +11,11 @@ from redline.model import weekly_plan as weekly_plan_model
 
 DAYS = ("lun", "mar", "mer", "jeu", "ven", "sam", "dim")
 
-#: ⭐ UN JOUR QUI SE VIDE SE NOMME (2026-08-25). Le rendu prescriptif filtrait sur
-#: `remaining()`, qui écarte l'annulé : un jour dont on retirait la seule séance
-#: DISPARAISSAIT de la liste au lieu de s'afficher vide. Le 25/08, le coach a annulé le
-#: renfo B du jeudi sans jamais créer le jogging annoncé dans son propre motif, et « la
-#: suite de la semaine » a rendu mercredi, vendredi, samedi, dimanche -- un trou que ni
-#: L'athlète ni le coach ne pouvaient voir, chacun lisant la même liste amputée. Deux
-#: révisions successives ont reconduit l'oubli. Le rendu affirme « voilà ce qu'il te
-#: reste » : il doit donc parler de CHAQUE jour de la période qu'il annonce, y compris
-#: pour dire qu'il n'y a rien.
+#: A day that empties is named. The prescriptive render filters on `remaining()`,
+#: which drops cancelled sessions: a day whose only session was removed would vanish
+#: from the list instead of showing as empty, leaving a gap neither reader can see.
+#: The render claims "here is what remains", so it must speak of EVERY day in the
+#: period it announces, including to say there is nothing.
 RIEN = "rien de prévu"
 
 
@@ -123,13 +119,13 @@ def _span(first: date, last: date) -> Iterable[date]:
 
 def _covered_lines(shown: list, every: list, span: Iterable[date],
                    excluded: frozenset[str]) -> list[str]:
-    """Une ligne par jour de la période annoncée, `RIEN` compris.
+    """One line per day of the announced period, `RIEN` included.
 
-    Deux jours restent muets, et pour la même raison : le message ne les couvre pas.
-    Celui qu'un contrôle daté RETIENT, parce que la question du contrôle part dans le
-    même tour et dit déjà ce qu'on attend. Celui dont la séance est FAITE, parce qu'un
-    jour derrière nous n'a plus rien à prescrire. Le jour annulé, lui, se nomme : c'est
-    exactement le trou qu'on cherche à rendre visible.
+    Two days stay silent, for the same reason: the message does not cover them. The
+    day a dated check HOLDS, because the check's question goes out in the same turn
+    and already says what is expected. The day whose session is DONE, because a day
+    behind us has nothing left to prescribe. A cancelled day is named: it is exactly
+    the gap the render must make visible.
     """
     par_jour: dict[str, list] = {}
     for session in shown:
@@ -173,7 +169,7 @@ def _signature(session: dict) -> tuple:
 
 def prescription_state(raw: str, since: str, *,
                        exclude_ids: frozenset[str] = frozenset()) -> list[tuple]:
-    """État prescriptif complet, distinct du rendu court envoyé sur Messenger."""
+    """Full prescriptive state, distinct from the short render sent on Messenger."""
     revision = _revision(raw)
     if revision is None:
         return []
@@ -186,7 +182,7 @@ def prescription_state(raw: str, since: str, *,
 
 def render_plan_for_scope(raw: str, week: str, scope: str, *, today: str,
                           exclude_ids: frozenset[str] = frozenset()) -> str:
-    """Rend exactement ce que l'athlète demande, y compris s'il le redemande."""
+    """Render exactly what the athlete asks for, including when they ask again."""
     if scope == "today":
         return render_plan_message(
             raw, week, today=today, exclude_ids=exclude_ids)
@@ -207,14 +203,14 @@ def render_plan_for_scope(raw: str, week: str, scope: str, *, today: str,
         day = date.fromisoformat(first)
         return (f"Prochaine séance, {_label(day)} : "
                 + " ; ".join(_full(session) for session in same_day) + ".")
-    # `remaining` est aussi le repli sûr des anciens clients qui ne portaient qu'un D.
+    # `remaining` is also the safe fallback for old clients that carried only a D.
     return render_plan_message(
         raw, week, since=today, exclude_ids=exclude_ids)
 
 
 def render_plan_delta(before_raw: str, after_raw: str, week: str, *, today: str,
                       exclude_ids: frozenset[str] = frozenset()) -> str:
-    """Une révision réactive annonce ses changements, jamais toute la semaine."""
+    """A reactive revision announces its changes, never the whole week."""
     before, after = _revision(before_raw), _revision(after_raw)
     if after is None:
         return ""
@@ -244,8 +240,7 @@ def render_plan_delta(before_raw: str, after_raw: str, week: str, *, today: str,
         changed.append(f"{_label(date.fromisoformat(session['date']))} : {session['title']} retiré")
     if not changed:
         return ""
-    # Ni numéro de révision ni semaine ISO : l'athlète lit un programme, pas un registre
-    # (audit du 2026-10-15, « Programme 2026-W42 r1 enregistré »).
+    # No revision number nor ISO week: the athlete reads a programme, not a ledger.
     if len(changed) == 1:
         return f"Changement au programme : {changed[0]}."
     return "\n".join(["Changements au programme :", *(f"{line}." for line in changed)])

@@ -1,4 +1,4 @@
-/* Around the exercises: the preparation, the opening shin reading and its gate,
+/* Around the exercises: the preparation, the opening pain reading and its gate,
  * the end-of-session review. */
 import {$, el} from '../shared/dom.js';
 import {MAX_NOTE, clampInt, painOf, previousSession, progressOf, save, session, setPain, state, watchedZones} from './session.js';
@@ -64,7 +64,7 @@ export function scoreScale(read, write, after) {
       write(read() === value ? null : value);
       save();
       paint();
-      if (after) after();   // l'écran d'ouverture se referme sur le choix
+      if (after) after();   // the opening screen closes on the choice
     });
     row.appendChild(step);
   }
@@ -72,21 +72,19 @@ export function scoreScale(read, write, after) {
   return row;
 }
 
-/* Les zones que le garde-fou regarde : la sienne s'il en nomme une, sinon toutes. */
+/* The zones the safeguard looks at: its own if it names one, otherwise all. */
 const gateZones = () => watchedZones.filter(item => !session.gate || !session.gate.zone || item.zone === session.gate.zone);
 
-/* L'OUVERTURE. La douleur se demandait une fois, à la FIN — un chiffre sans
- * référence : « 2/10 après » ne dit rien si on ignore ce qu'il valait avant. Le
- * registre sépare d'ailleurs depuis le 2026-07-29 deux séries qui ne se
- * mélangent pas, le pic à l'effort et la lecture au repos ; la page n'en
- * fournissait qu'une.
+/* THE OPENING. Pain asked once, at the END, is a number without a reference: "2/10
+ * after" says nothing if the value before is unknown. The register also keeps two
+ * series that must not be mixed, the peak under effort and the reading at rest.
  *
- * Et le coach a beau avoir demandé le matin, le lien arrive avec son message et
- * traîne souvent une heure ou deux dans le téléphone : l'état de 8 h n'est pas
- * celui de 18 h. C'est cette lecture-là qui arme le garde-fou.
+ * The link arrives with the coach's message and often sits on the phone for an hour
+ * or two: the state of the morning is not the state of the evening. This reading is
+ * what arms the safeguard.
  *
- * Sautable, comme tout le reste ici : un outil contre lequel il faut lutter est
- * un outil qu'on cesse d'ouvrir. */
+ * Skippable, like everything here: a tool you have to fight is a tool you stop
+ * opening. */
 export function renderOpening() {
   const box = $('open');
   box.hidden = false;
@@ -96,7 +94,7 @@ export function renderOpening() {
   box.appendChild(el('p', '0 = rien du tout, 10 = ça fait mal en marchant. Trois secondes, et le '
     + 'chiffre de la fin devient lisible : sans celui-ci, il n\'a rien à quoi '
     + 'se comparer.', 'p-open__hint'));
-  // Une échelle par zone ; l'ouverture se ferme quand chacune a sa lecture.
+  // One scale per zone; the opening closes when each has its reading.
   asked.forEach(item => {
     if (asked.length > 1) box.appendChild(el('p', item.label, 'p-score__name'));
     box.appendChild(scoreScale(() => painOf(item.zone, 'before'), (value) => {
@@ -114,9 +112,9 @@ export function renderOpening() {
   box.appendChild(actions);
 }
 
-/* Le garde-fou : une DONNÉE écrite par le coach le matin, jamais une règle que
- * la page invente. Elle lit une zone, un seuil, une liste et une phrase, et
- * n'interprète rien : une seule zone regardée au-dessus du seuil suffit. */
+/* The safeguard: DATA written by the coach in the morning, never a rule the page
+ * invents. It reads a zone, a threshold, a list and a phrase, and interprets
+ * nothing: a single watched zone above the threshold is enough. */
 export const gateFired = () => !!(session.gate && gateZones().some(item => {
   const before = painOf(item.zone, 'before');
   return before != null && before > session.gate.pain_max;
@@ -159,8 +157,8 @@ export function renderReview() {
     box.appendChild(pain);
   });
 
-  // Séance entièrement passée : aucun geste, donc aucune durée à proposer. Le
-  // champ reste vide plutôt que d'inventer un chiffre.
+  // Session entirely skipped: no gesture, hence no duration to suggest. The field
+  // stays empty rather than inventing a figure.
   if (state.minutes == null && state.startedAt != null) {
     state.minutes = Math.max(1, Math.round((Date.now() - state.startedAt) / 60000));
     save();

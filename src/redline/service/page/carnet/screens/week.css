@@ -1,11 +1,11 @@
-/* Semaine : un chiffre, une barre, sept lignes ; le détail se déplie, un jour à la fois. */
+/* Week: one figure, one bar, seven lines; the detail unfolds, one day at a time. */
 .n-ksum { margin: 14px 0 0; }
 .n-ksum b { font: 700 56px/0.9 var(--display); }
 .n-ksum span { font-size: 17px; color: var(--muted); margin-left: 6px; }
 .n-kmeter { height: 6px; background: var(--ghost); border-radius: 3px; margin: 14px 0 0; overflow: hidden; }
 .n-kmeter i { display: block; height: 100%; background: var(--data); border-radius: 3px; }
 .n-ksub { color: var(--muted); font-size: 14px; margin: 10px 0 18px; }
-/* Les barres de la semaine : plein = fait, pointillé = prévu, filet = repos. */
+/* The week's bars: solid = done, dashed = planned, hairline = rest. */
 .n-chart { margin: 0 0 22px; }
 .n-strip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 26px; align-items: end; height: 104px; }
 .n-sday { display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
@@ -16,7 +16,7 @@
 .n-bar small { position: absolute; top: -18px; left: -4px; right: -4px; text-align: center; font-size: 11px; color: var(--muted); font-weight: 600; white-space: nowrap; }
 .n-bar.long small { color: var(--ink); }
 .n-letters { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 6px; text-align: center; font-size: 12px; color: var(--muted); }
-/* Aujourd'hui en rouge, comme son numéro dans la liste et sa lettre dans la tuile (2026-10-10). */
+/* Today in red, like its number in the list and its letter in the tile. */
 .n-letters span.today { color: var(--red); font-weight: 700; }
 .n-pending { color: var(--muted); }
 .n-pending small { color: var(--faint); }
@@ -55,7 +55,7 @@
 .n-gv b { font-weight: 600; font-size: 13.5px; }
 .n-gv span { color: var(--muted); margin-left: 5px; font-size: 12px; }
 
-/* Les semaines passées : le nom, les dates, le fait sur la cible. */
+/* Past weeks: the name, the dates, the fact against the target. */
 .n-wrow { display: grid; grid-template-columns: 1fr 100px 14px; gap: 12px; align-items: center; width: 100%; background: none; border: 0;
   border-bottom: 1px solid var(--grid); padding: 13px 0; text-align: left; font-size: 15.5px; }
 .n-wrow:last-child { border-bottom: 0; }
@@ -65,7 +65,7 @@
 .n-wmeter i { display: block; height: 100%; background: var(--data); }
 .n-shortcut { width: 100%; background: none; border: 0; padding: 0; text-align: left; }
 @media (max-width: 360px) { .n-ksum b { font-size: 46px; } }
-/* La pastille de la famille devant la séance ; deux séances, deux pastilles. */
+/* The family pill in front of the session; two sessions, two pills. */
 .n-krow { align-items: center; }
 .n-kt { display: flex; align-items: center; gap: 10px; }
 .n-kt > span:last-child { min-width: 0; }

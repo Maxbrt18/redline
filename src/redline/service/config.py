@@ -19,30 +19,30 @@ from redline.model.instance import Instance
 
 from .routing import RoutingConfig
 
-# `secrets.token_urlsafe(32)` en donne 43 ; aucune valeur d'exemple n'atteint 32.
+# `secrets.token_urlsafe(32)` yields 43; no example value reaches 32.
 SHARED_SECRET_MIN_LENGTH = 32
 
 
-# --------------------------------------------------- environnement du bac à sable
+# --------------------------------------------------------- sandbox environment
 
 # The SDKs copy the service environment into the agent sandbox. Secret-looking names
 # are therefore blanked by default and exceptions are declared explicitly below.
 SECRET_MARKERS = ("TOKEN", "SECRET", "PASSWORD", "PSID", "CREDENTIAL", "API_KEY")
 
-# Sans marqueur dans leur nom, mais à masquer quand même.
+# No marker in their name, but to be masked all the same.
 EXTRA_SECRETS = frozenset({"HEALTHCHECK_PING_URL"})
 
 # Values required by executable tools inside the sandbox:
-#   DATABASE_URL         → fact-read, ledger, week-plan (rôle applicatif sans DDL)
+#   DATABASE_URL         → fact-read, ledger, week-plan (application role, no DDL)
 #   STRAVA_CLIENT_*      → scripts/strava.py
-#   STRAVA_TOKEN_CACHE   → un CHEMIN, pas un secret, mais son nom porte « TOKEN »
-#   REDLINE_TURN_ID      → la frontière transactionnelle du tour
-#   CHROMIUM_PATH        → rendu des cartes
-# COACH_BASE_URL n'est pas secret. Le service frappe désormais le jeton opaque ;
-# aucun secret de séance ne doit traverser le bac à sable.
-# Dette résiduelle explicite : PostgreSQL et Strava restent des capacités directes du
-# coach tant que le courtier sémantique n'existe pas. Elles ne justifient jamais
-# `full_access` ni un bypass des permissions du moteur.
+#   STRAVA_TOKEN_CACHE   → a PATH, not a secret, but its name contains "TOKEN"
+#   REDLINE_TURN_ID      → the turn's transactional boundary
+#   CHROMIUM_PATH        → card rendering
+# COACH_BASE_URL is not secret. The service mints the opaque token itself; no session
+# secret may cross the sandbox.
+# Known residual: PostgreSQL and Strava remain direct capabilities of the coach until
+# a semantic broker exists. They never justify `full_access` or bypassing the
+# engine's permissions.
 SANDBOX_NEEDS = frozenset({
     "DATABASE_URL",
     "STRAVA_CLIENT_ID",
@@ -123,10 +123,11 @@ def _envtime(name: str, default: str) -> dtime | None:
 
 
 def _load_instance(vault_path: str) -> Instance:
-    """`redline.toml` du vault : sans lui, le service ne sait pas à qui il parle.
+    """The vault's `redline.toml`: without it the service does not know who it serves.
 
-    Le règlement se vérifie au même moment : un `rulebook.toml` non conforme arrêterait
-    sinon le premier tour qui le lit, devant l'athlète, au lieu du démarrage.
+    The rulebook is checked at the same time: a non-conforming `rulebook.toml` would
+    otherwise break the first turn that reads it, in front of the athlete, instead of
+    failing at startup.
     """
     try:
         rulebook_model.load(Path(vault_path))
@@ -175,9 +176,9 @@ class Config:
     attachment_dir: str
     attachment_max_bytes: int
     attachment_total_bytes: int
-    #: Ce qui distingue cette instance (`redline.toml` à la racine du vault).
+    #: What distinguishes this instance (`redline.toml` at the vault root).
     instance: Instance
-    #: Segment secret de l'URL de callback Strava : la seule authentification de la route.
+    #: Secret segment of the Strava callback URL: the route's only authentication.
     strava_webhook_secret: str = ""
 
     @classmethod
@@ -206,8 +207,8 @@ class Config:
             vault_path=vault_path,
             agent_provider=provider,
             claude_bin=os.environ.get("CLAUDE_BIN", "claude"),
-            # None laisse le SDK utiliser son runtime épinglé : CODEX_BIN est un
-            # échappatoire explicite, pas le chemin normal.
+            # None lets the SDK use its pinned runtime: CODEX_BIN is an explicit
+            # escape hatch, not the normal path.
             codex_bin=(os.environ.get("CODEX_BIN") or "").strip() or None,
             routing=RoutingConfig.from_env(
                 provider,
@@ -254,11 +255,11 @@ class Config:
         return config
 
     def _validate_shared_secrets(self) -> None:
-        """Les secrets que NOUS choisissons doivent être imprévisibles.
+        """The secrets WE choose must be unpredictable.
 
-        Le 2026-10-08, les deux jetons de handshake de prod étaient encore les valeurs
-        d'exemple de `.env.example` ; celui de Meta ouvrait une réflexion HTML sur
-        l'origine du carnet. Vide reste permis pour Strava (route désactivée).
+        Example values from `.env.example` must never survive into production: the
+        Meta handshake token could open an HTML reflection on the notebook origin.
+        Empty stays allowed for Strava (route disabled).
         """
         secrets = {"MESSENGER_VERIFY_TOKEN": (self.verify_token, True),
                    "STRAVA_VERIFY_TOKEN": (self.strava_verify_token, False),
@@ -305,8 +306,8 @@ class Config:
         self.routing.validate()
         for route in self.routing.plans:
             plan = self.routing.plan(route)
-            # La validation des routes est répétée ici pour les Config construites
-            # directement par les tests ou un appelant Python, sans passer par from_env.
+            # Route validation is repeated here for a Config built directly by tests
+            # or a Python caller, without going through from_env.
             for spec in plan.attempts:
                 if spec.timeout < 1:
                     route_name = getattr(route, "value", route)
@@ -318,10 +319,10 @@ class Config:
         return self.session_ttl_hours * 3600
 
     def in_active_window(self, moment: dtime) -> bool:
-        """Une initiative part à partir de l'heure de début, jusqu'à minuit.
+        """An initiative may go out from the start time until midnight.
 
-        La fin de plage a été retirée volontairement (2026-09-06) : un débrief à 23 h
-        après une sortie tardive reste pertinent. Une initiative prête après minuit
-        n'est pas jetée : elle est conservée préparée jusqu'à l'ouverture suivante.
+        There is deliberately no end of window: a debrief at 23:00 after a late run
+        is still relevant. An initiative ready after midnight is not discarded: it is
+        kept prepared until the next opening.
         """
         return moment >= (self.proactive_active_start or dtime(0, 0))

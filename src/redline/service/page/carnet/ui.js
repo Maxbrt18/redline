@@ -1,10 +1,10 @@
-// Ce que tous les écrans du carnet partagent : la zone de contenu, le message
-// passager, les titres de section.
+// What all notebook screens share: the content area, the transient message,
+// the section titles.
 import {$, add, el} from '../shared/dom.js';
 
 export const content = $('content');
-// Un message passager flotte au-dessus des onglets : il ne pousse jamais la page.
-// `notice` reste dans le flux, pour l'ouverture et l'écran verrouillé.
+// A transient message floats above the tabs: it never pushes the page.
+// `notice` stays in the flow, for the opening and the locked screen.
 let toastTimer = null;
 export function message(text) {
   const toast = $('toast');
@@ -22,11 +22,11 @@ export function section(title, aside) {
 export function zone(title) {
   return add(el('section', null, 'n-zone'), el('h2', title, 'n-zh'));
 }
-// L'installation n'est pas une option : c'est une étape, proposée tant qu'elle n'est
-// pas faite, là où l'on ouvre le carnet chaque jour, puis plus jamais.
+// Installation is not optional: it is a step, offered until done,
+// where the notebook is opened each day, then never again.
 export const installed = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 
-// Un élément SVG, ses attributs, son texte éventuel, accroché à son parent.
+// An SVG element, its attributes, its optional text, attached to its parent.
 export const SVG = 'http://www.w3.org/2000/svg';
 export function shape(tag, attrs, parent, text) {
   const node = document.createElementNS(SVG, tag);
@@ -34,16 +34,15 @@ export function shape(tag, attrs, parent, text) {
   if (text != null) node.textContent = text;
   parent.append(node); return node;
 }
-// Le seul chevron du carnet (2026-10-10) : un trait dessiné, jamais le caractère « › ».
+// The notebook's only chevron: a drawn stroke, never the character « › ».
 export function chevron(cls) {
   const svg = document.createElementNS(SVG, 'svg');
   svg.setAttribute('viewBox', '0 0 8 13'); svg.setAttribute('class', 'n-chevron' + (cls ? ' ' + cls : '')); svg.setAttribute('aria-hidden', 'true');
   shape('path', {d: 'M1.5 1.5 6.5 6.5 1.5 11.5'}, svg);
   return svg;
 }
-// Les pastilles teintées (maquette « Carnet en couleur » validée par l'athlète le
-// 2026-10-22) : un disque léger et son icône nomment la famille d'une séance, d'un
-// repère ou d'une capacité, comme celles de la météo. Elles ne jugent rien.
+// Tinted badges: a light disc and its icon name the family of a session, a
+// landmark or a capability, like the weather ones. They judge nothing.
 const PAS_ICONS = {
   run: '<path d="M3.5 17.5v-6.3c0-.6.5-1 1.1-.9l2.9.7 2.4-3.4 3.6 2.1c.8 1.9 2.6 3.1 4.9 3.3 1.1.1 2.1 1 2.1 2.2v2.3z"/><path d="M9.3 11.2l1.6 1M11.2 9.7l1.5 1"/>',
   long: '<circle cx="6" cy="18.5" r="1.6"/><circle cx="18" cy="5.5" r="1.6"/><path d="M7.6 18.5h8.9a3 3 0 0 0 0-6h-9a3 3 0 0 1 0-6h8.9"/>',
@@ -58,7 +57,7 @@ const PAS_ICONS = {
   night: '<path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z"/>',
   mind: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".6"/>',
 };
-// La teinte suit la famille ; l'icône peut préciser (la sortie longue reste une course).
+// The tint follows the family; the icon may refine it (the long outing remains a run).
 const PAS_HUES = {long: 'run', week: 'run', descent: 'run', food: 'race', night: 'race', mind: 'run'};
 export function pastille(icon, small) {
   const node = el('span', null, 'n-pas ' + (PAS_HUES[icon] || icon) + (small ? ' sm' : ''));
@@ -66,8 +65,8 @@ export function pastille(icon, small) {
   node.innerHTML = '<svg viewBox="0 0 24 24">' + (PAS_ICONS[icon] || PAS_ICONS.other) + '</svg>';
   return node;
 }
-// `kind` est la famille d'une séance du programme (run, strength…) ou le type d'une
-// séance du registre (easy, long…) ; les deux se ramènent à une famille.
+// `kind` is the family of a program session (run, strength…) or the type of a
+// ledger session (easy, long…); both reduce to a family.
 const familyOf = kind => (window.REDLINE_KINDS || {})[kind] ? window.REDLINE_KINDS[kind].family : kind;
 export const kindIcon = (kind, workout) => kind === 'long' || workout === 'long' ? 'long'
   : familyOf(kind) === 'strength' ? 'str' : familyOf(kind) === 'rest' ? 'rest'

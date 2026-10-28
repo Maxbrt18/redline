@@ -6,14 +6,13 @@ output: it is pure syntax, impossible in normal prose. Everything else -- tone,
 dashes, Markdown -- comes from the STYLE_PROMPT. If a tic reappears, tighten the
 prompt; never add a regex here.
 
-⭐ **A paragraph is a bubble** (l'athlète, 2026-08-11). The protocol used to cut on an
-explicit `---` and nothing else, so a three-paragraph answer landed as one wall of
-text with blank lines inside it -- which nobody types on Messenger. A blank line now
-ends a bubble on its own, and `---` survives as the way to force a cut where no blank
-line exists.
+A paragraph is a bubble. Cutting on an explicit `---` alone would deliver a
+three-paragraph answer as one wall of text with blank lines inside it -- which nobody
+types on Messenger. A blank line therefore ends a bubble on its own, and `---`
+remains the way to force a cut where no blank line exists.
 
 Two exceptions, both about lists, because a list is not a new thought:
-  - a paragraph ending in « : » announces what follows, so it stays glued to it;
+  - a paragraph ending in a colon announces what follows, so it stays glued to it;
   - a paragraph that *is* a list item stays with what introduced it -- otherwise a
     five-item list would arrive as five texts.
 """
@@ -27,8 +26,8 @@ _BLANK_LINE = re.compile(r"\n[ \t]*\n")
 _LIST_ITEM = re.compile(r"^[ \t]*(?:[-*•+]\s|\d+[.)]\s)")
 
 # How much of the next paragraph the streaming path needs before it can tell a list
-# item from prose. « - » alone is not yet « - deux fois par semaine » : judging it too
-# early would cut a list into bubbles, one token before the evidence arrived.
+# item from prose. A lone "- " is not yet a full list item: judging it too early
+# would cut a list into bubbles, one token before the evidence arrived.
 _LOOKAHEAD = 3
 
 _LINKED = re.compile(r"\[\[([^\]|]+)(?:\|([^\]]+))?\]\]")

@@ -1,9 +1,9 @@
-"""Composition et livraison des sorties Messenger.
+"""Composition and delivery of Messenger outputs.
 
-Le transport sait envoyer un texto ou une image. Ce module porte l'unité métier :
-une sortie complète, ordonnée, avec un verdict distinct pour son texte et ses
-artefacts. Le bot peut ainsi acquitter un travail à partir de ce qui a réellement
-franchi le transport, sans recoder les succès partiels pour chaque déclencheur.
+The transport knows how to send a text or an image. This module carries the business
+unit: a complete, ordered output, with a distinct verdict for its text and its
+artifacts. The bot can thus acknowledge a job from what actually crossed the
+transport, without re-coding partial successes for each trigger.
 """
 
 from __future__ import annotations
@@ -40,8 +40,8 @@ class ImagePart:
 
 @dataclass(frozen=True)
 class NotebookButtonPart:
-    """Un texte et un bouton vers le carnet. Le lien se frappe à l'envoi : un jeton
-    de connexion ne se stocke ni ne se rejoue."""
+    """A text and a button to the notebook. The link is minted at send time: a login
+    token is neither stored nor replayed."""
     text: str
 
 
@@ -55,14 +55,14 @@ class OutboundEnvelope:
     parts: tuple[OutboundPart, ...]
     messaging_type: str = "RESPONSE"
     tag: str | None = None
-    # Ce que le bot doit savoir pour acquitter l'envoi s'il est rejoué plus tard (tour,
-    # texte à mémoriser, révision montrée). Hors empreinte : ce n'est pas du contenu.
+    # What the bot needs to acknowledge the send if it is replayed later (turn, text to
+    # remember, revision shown). Excluded from the digest: it is not content.
     meta: Mapping[str, Any] = field(default_factory=dict, compare=False)
 
 
 @dataclass(frozen=True)
 class StoredDelivery:
-    """Une enveloppe déjà calculée, telle que PostgreSQL la conserve."""
+    """An already computed envelope, as PostgreSQL stores it."""
 
     source_key: str
     psid: str
@@ -75,16 +75,16 @@ class StoredDelivery:
 
     @property
     def resendable(self) -> bool:
-        """Calculée, jamais acceptée par Meta : on peut la renvoyer telle quelle."""
+        """Computed and never accepted by Meta: it can be resent as is."""
         return self.status in {"prepared", "failed"} and bool(
             (self.payload or {}).get("parts"))
 
 
 def envelope_payload(envelope: OutboundEnvelope) -> dict:
-    """La forme durable d'une enveloppe.
+    """The durable form of an envelope.
 
-    Le carnet conserve les images séparément avant l’envoi. La reprise de transport
-    ne réexpédie que le texte ; les cartes restent accessibles dans le carnet.
+    The notebook keeps the images separately before sending. A transport retry only
+    resends the text; the cards remain available in the notebook.
     """
     parts: list[dict] = []
     for part in envelope.parts:
@@ -130,7 +130,7 @@ class DeliveryReceipt:
 
 @dataclass
 class EnvelopeBuilder:
-    """Petit assembleur mutable ; l'enveloppe produite reste, elle, immuable."""
+    """Small mutable assembler; the envelope it produces stays immutable."""
 
     psid: str
     source_key: str
@@ -159,7 +159,7 @@ class EnvelopeBuilder:
         return self
 
     def image(self, outbox: Outbox, path: Path) -> EnvelopeBuilder:
-        """Ajoute l'artefact explicitement produit par un renderer typé."""
+        """Add the artifact explicitly produced by a typed renderer."""
         self.parts.append(ImagePart(path, outbox.link_for(path)))
         return self
 
@@ -188,7 +188,7 @@ class DeliveryService:
         return StoredDelivery(source_key, row["psid"], row["status"], row["payload"])
 
     def prepare(self, envelope: OutboundEnvelope) -> bool:
-        """Conserve une sortie calculée sans l'envoyer ; False si elle est déjà partie."""
+        """Store a computed output without sending it; False if it already went out."""
         if self.notebook:
             self.notebook.capture(envelope)
         return self.state.prepare_outbound_delivery(
@@ -196,12 +196,12 @@ class DeliveryService:
             envelope_payload(envelope))
 
     def discard(self, source_key: str) -> None:
-        """Oublie une sortie préparée devenue caduque (jamais une sortie livrée)."""
+        """Forget a prepared output that became obsolete (never a delivered one)."""
         self.state.discard_outbound_delivery(source_key)
 
     def redeliver(self, stored: StoredDelivery,
                   images: tuple[ImagePart, ...] = ()) -> DeliveryReceipt:
-        """Renvoie l'enveloppe conservée : aucun calcul, aucun appel de modèle."""
+        """Resend the stored envelope: no computation, no model call."""
         envelope = envelope_from_payload(stored)
         if images:
             envelope = OutboundEnvelope(
@@ -210,9 +210,9 @@ class DeliveryService:
         return self.deliver(envelope)
 
     def resume(self, stored: StoredDelivery) -> DeliveryReceipt:
-        """Reprend une sortie déjà calculée là où elle s'est arrêtée."""
+        """Resume an already computed output where it stopped."""
         if stored.status in {"delivered", "sending"}:
-            # Déjà acceptée par Meta, ou peut-être : jamais renvoyée (at-most-once).
+            # Already accepted by Meta, or possibly so: never resent (at-most-once).
             return DeliveryReceipt(text_ok=True, attachments_ok=True, delivered=1,
                                    replayed=True, uncertain=stored.status == "sending")
         return self.redeliver(stored)
@@ -223,9 +223,9 @@ class DeliveryService:
             envelope.source_key, envelope.psid, self._digest(envelope),
             envelope_payload(envelope))
         if disposition in {"delivered", "uncertain"}:
-            # La Send API n'offre pas de clé d'idempotence. Après un crash au milieu
-            # de l'appel, rejouer créerait sûrement un doublon ; on choisit donc
-            # l'at-most-once et on laisse `uncertain` déclencher une trace interne.
+            # The Send API offers no idempotency key. After a crash in the middle of
+            # the call, replaying would almost surely create a duplicate; we therefore
+            # choose at-most-once and let `uncertain` trigger an internal trace.
             return DeliveryReceipt(
                 text_ok=True, attachments_ok=True, delivered=1, replayed=True,
                 uncertain=disposition == "uncertain")
@@ -238,8 +238,8 @@ class DeliveryService:
         detail = ""
 
         for part in envelope.parts:
-            # Aucun artefact orphelin : si la prose qui lui donne son sens échoue,
-            # tout ce qui reste est archivé sans être expédié.
+            # No orphan artifact: if the prose that gives it meaning fails, everything
+            # left is archived without being sent.
             if isinstance(part, ImagePart) and not text_ok:
                 self._discard_image(part.path)
                 continue
@@ -257,13 +257,13 @@ class DeliveryService:
                 attachments_ok = False
             else:
                 text_ok = False
-                # Un échec de texte arrête les textes suivants. Ils formeraient une
-                # réponse tronquée dans le mauvais ordre ; les images seront jetées
-                # par la branche ci-dessus.
+                # A text failure stops the following texts. They would form a
+                # truncated reply in the wrong order; the images are discarded by
+                # the branch above.
                 break
 
-        # Si la boucle s'est arrêtée sur le texte, les images non visitées doivent
-        # tout de même quitter la racine de l'outbox.
+        # If the loop stopped on a text, the unvisited images must still leave the
+        # outbox root.
         if not text_ok:
             for part in envelope.parts:
                 if isinstance(part, ImagePart) and part.path.exists():
@@ -272,9 +272,9 @@ class DeliveryService:
             text_ok=text_ok, attachments_ok=attachments_ok, delivered=delivered,
             detail=detail, messages=tuple(messages))
         has_text = any(not isinstance(part, ImagePart) for part in envelope.parts)
-        # Une enveloppe sans texte peut quand même avoir expédié sa carte avant
-        # l'échec du bouton de séance. Elle devient alors non rejouable elle aussi :
-        # `failed` doit signifier qu'aucun fragment n'a franchi le transport.
+        # An envelope without text may still have sent its card before the session
+        # button failed. It then becomes non-replayable too: `failed` must mean that
+        # no fragment crossed the transport.
         accepted = ((text_ok or text_delivered > 0) if has_text else delivered > 0)
         self.state.finish_outbound_delivery(
             envelope.source_key, delivered=accepted, error=detail)

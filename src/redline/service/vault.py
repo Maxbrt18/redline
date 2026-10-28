@@ -34,24 +34,20 @@ log = logging.getLogger("redline")
 REGEN_COMMAND = (sys.executable, "-m", "redline.cli.regen_views")
 PROCESS_TIMEOUT = 120
 GIT_TIMEOUT = 60
-# Une commande déjà validée pendant le tour ne se perd pas sur un redémarrage de
-# PostgreSQL : l'application est retentée brièvement avant d'être déclarée refusée.
+# A command already validated during the turn must survive a PostgreSQL restart:
+# applying it is retried briefly before it is declared refused.
 APPLY_RETRY_PAUSES = (1.0, 3.0, 8.0)
-# Une séance soldée ne changera plus le bilan : faite, manquée, annulée ou close.
+# A settled session no longer changes the review: done, missed, cancelled or closed.
 SETTLED_CYCLE_STATES = session_cycle.TERMINAL_STATES | {"completed"}
 
 # A live service may synchronize vault content, never executable/runtime files.
 # Deploying those belongs to the service manager, outside a message transaction.
 #
-# ⭐ « Runtime » veut dire : *le service tourne différemment après ce commit*. Un
-# fichier que rien n'exécute ni ne charge n'en est pas, même s'il vit sous `deploy/`.
-# La liste avait dérivé vers « tout ce qui ressemble à du code » et deux familles y
-# étaient entrées à tort — d'où le blocage du 2026-08-21, causé par quatre fiches
-# d'exercice et un fichier de test, dont aucun ne demande le moindre redémarrage :
-#   - `coaching/exercises/*.md` : des DONNÉES, relues à chaque appel de
-#     `chart-strength.py` dans un sous-processus. Rien ne les charge au démarrage, et
-#     c'est le coach lui-même qui les édite. Les classer runtime, c'est faire geler la
-#     synchronisation du vault par une écriture que le coach a le droit de faire.
+# "Runtime" means: the service behaves differently after this commit. A file that
+# nothing executes or loads is not runtime, even under `deploy/`. For example
+# `coaching/exercises/*.md` is DATA, reread by a subprocess on each `chart-strength.py`
+# call, never loaded at startup, and edited by the coach itself. Classing it as runtime
+# would freeze vault synchronization on a write the coach is allowed to make.
 RUNTIME_PATHS = (
     "deploy/",
     "src/",
@@ -62,11 +58,11 @@ RUNTIME_PATHS = (
     "pyproject.toml",
 )
 
-#: Les arbres dont l'empreinte identifie le code déployé (`/health`, release).
+#: The trees whose fingerprint identifies the deployed code (`/health`, release).
 RUNTIME_TREES = ("deploy", "src", "migrations")
 
-# Causes d'alerte technique. La clé évite de dupliquer une cause pendant un même
-# passage de synchronisation ou de persistance.
+# Technical alert causes. The key avoids duplicating a cause within a single
+# synchronization or persistence pass.
 ALERT_DEPLOY = "deploiement"
 ALERT_HISTORY = "historique"
 ALERT_PUSH = "push"
@@ -84,21 +80,20 @@ CANONICAL_PROJECTIONS = frozenset(str(path) for path in vault_layout.PROJECTIONS
 
 @dataclass(frozen=True)
 class VaultAlert:
-    """Un incident interne et sa cause, journalisés au plus une fois avant drainage.
-    """
+    """An internal incident and its cause, logged at most once before draining."""
     key: str
     text: str
 
 
 class PersistenceFailure(enum.Enum):
-    """Pourquoi les faits d'un tour n'ont pas été enregistrés.
+    """Why the facts of a turn were not recorded.
 
-    Les fichiers interdits (projection éditée à la main, code modifié) ne refusent plus
-    le tour : ils sont restaurés et le reste continue. Seul l'échec d'application des
-    commandes elles-mêmes laisse des faits non enregistrés.
+    Forbidden files (hand-edited projection, modified code) no longer refuse the turn:
+    they are restored and the rest proceeds. Only a failure to apply the commands
+    themselves leaves facts unrecorded.
     """
 
-    #: Les faits n'ont pas pu être appliqués (schéma, immuabilité, conflit, panne).
+    #: The facts could not be applied (schema, immutability, conflict, outage).
     WRITE_REFUSED = "écriture refusée"
 
 
@@ -106,31 +101,31 @@ class PersistenceFailure(enum.Enum):
 class PersistenceResult:
     writes_applied: bool
     detail: str = ""
-    # Semaines enregistrées mais non prescriptibles tant qu'un contrôle daté tient.
+    # Weeks recorded but not prescribable while a dated check holds.
     awaiting: tuple = field(default_factory=tuple)
-    # Semaines enregistrées mais périmées : une séance a bougé depuis leur calcul.
+    # Weeks recorded but stale: a session moved since they were computed.
     stale: tuple = field(default_factory=tuple)
-    # Semaines absentes ou invalides : aucun bloc de séances ne peut partir.
+    # Weeks absent or invalid: no session block may be sent.
     invalid: tuple = field(default_factory=tuple)
-    # La cause typée, quand les écritures sont refusées.
+    # The typed cause, when the writes are refused.
     failure: PersistenceFailure | None = None
     applied_commands: int = 0
     receipts: tuple[dict, ...] = ()
-    # Fichiers interdits que le tour avait touchés et qui ont été remis en état.
+    # Forbidden files the turn had touched, restored to their previous state.
     restored: tuple[str, ...] = ()
-    # Types des commandes qui n'ont pas été enregistrées (écriture refusée).
+    # Kinds of the commands that were not recorded (write refused).
     refused: tuple[str, ...] = ()
 
 
 def _transient(error: StorageError) -> bool:
-    """Une panne de connexion ou de verrou se réessaie ; un refus métier jamais."""
+    """A connection or lock failure is retried; a business refusal never is."""
     cause = error.__cause__
     return isinstance(cause, (sa_exc.OperationalError, sa_exc.InterfaceError)) or bool(
         getattr(cause, "connection_invalidated", False))
 
 
 def forbidden_in_turn(path: str) -> bool:
-    """Ce qu'un tour coach n'a jamais le droit de modifier dans le vault."""
+    """What a coach turn may never modify in the vault."""
     return (path in CANONICAL_PROJECTIONS or path.startswith(f"{vault_layout.CAPABILITIES}/")
             or needs_deployment(path))
 
@@ -148,18 +143,17 @@ class VaultRepo:
         self._branch = branch
         self._alerts: list[VaultAlert] = []
         self._store = operational_store
-        # Un commit local attend son push, des vues attendent leur régénération
-        # (mémoire seulement : un redémarrage retrouve le premier par
-        # `_ahead_of_remote`, le second par l'état des projections PostgreSQL).
+        # A local commit awaits its push, views await regeneration (memory only: a
+        # restart recovers the first through `_ahead_of_remote`, the second through
+        # the PostgreSQL projection state).
         self._push_due = False
         self._views_due = False
 
     def _alert(self, key: str, text: str) -> None:
-        """File un incident, une seule fois par cause tant qu'il n'est pas drainé.
+        """Queue an incident, once per cause until it is drained.
 
-        `_push()` rejoue `sync()` avant de réessayer : sans cette garde, un dépôt qui
-        attend un déploiement produisait DEUX fois le même texto dans le même tour
-        (reçu par l'athlète le 2026-08-21).
+        `_push()` replays `sync()` before retrying: without this guard, a repository
+        awaiting a deployment would raise the same message twice in one turn.
         """
         if any(alert.key == key for alert in self._alerts):
             return
@@ -209,9 +203,11 @@ class VaultRepo:
         return self._head()
 
     def runtime_tree(self, ref: str = "HEAD") -> str:
-        """L'empreinte du CODE du moteur à ``ref`` : elle ne bouge pas quand le coach
-        committe, et elle se lit dans le dépôt du moteur, que le vault en soit un autre
-        ou le même. `deploy/verify-release.sh` recalcule la même depuis le SHA déployé.
+        """Fingerprint of the engine CODE at ``ref``.
+
+        It does not change when the coach commits, and it is read from the engine
+        repository, whether the vault is a different one or the same.
+        `deploy/verify-release.sh` recomputes the same value from the deployed SHA.
         """
         trees = [self._git("rev-parse", f"{ref}:{path}", log_errors=False,
                            cwd=self._engine_root).stdout.strip()
@@ -239,8 +235,8 @@ class VaultRepo:
     def abandon_turn(self, base_head: str = "") -> None:
         """Restore the worktree and HEAD to the state preceding a refused turn."""
         if base_head and self._head() not in ("", base_head):
-            # L'agent committe parfois lui-même ; un tour refusé ne garde pas ce commit
-            # (jamais poussé : le push ne vit que derrière une persistance réussie).
+            # The agent sometimes commits itself; a refused turn does not keep that
+            # commit (never pushed: pushing only happens after a successful persistence).
             log.critical("Tour abandonné après un commit de l'agent : retour à %s",
                          base_head[:8])
             self._git("reset", "--hard", base_head)
@@ -251,7 +247,7 @@ class VaultRepo:
             self._store.discard_turn(turn_id)
 
     def clear_turn_inputs(self, turn_id: str) -> None:
-        """Supprime les JSON remis aux CLI par ce tour (ignorés par Git)."""
+        """Delete the JSON files handed to the CLIs by this turn (ignored by Git)."""
         try:
             agent_input.clear(turn_id, root=Path(self._path))
         except OSError as exc:
@@ -276,8 +272,8 @@ class VaultRepo:
         }, actor="messenger-delivery")
 
     def _reset_worktree(self) -> None:
-        """`clean -fd` sans `-x` : les fichiers ignorés survivent, dont `var/`
-        dont les images sont encore en attente d'archivage."""
+        """`clean -fd` without `-x`: ignored files survive, including `var/`,
+        whose images still await archiving."""
         self._git("reset", "--hard", "HEAD")
         self._git("clean", "-fd")
 
@@ -289,18 +285,18 @@ class VaultRepo:
 
     def persist_turn(self, required_weeks=(), base_head: str = "",
                      turn_id: str = "") -> PersistenceResult:
-        """Enregistre un tour AVANT sa livraison, sans aucun appel réseau.
+        """Record a turn BEFORE its delivery, with no network call.
 
-        1. Un fichier interdit (projection PostgreSQL éditée à la main, code, capacités)
-           est restauré : c'est cet effet-là qui est dangereux, pas le reste du tour.
-        2. Les commandes préparées, déjà validées pendant le tour, sont appliquées dans
-           PostgreSQL, avec une reprise courte sur panne transitoire.
-        3. Les notes éditées par le coach sont committées localement, sans push.
-        4. Les semaines requises et celles que le tour a révisées sont relues.
+        1. A forbidden file (hand-edited PostgreSQL projection, code, capabilities) is
+           restored: that effect is the dangerous one, not the rest of the turn.
+        2. The prepared commands, already validated during the turn, are applied in
+           PostgreSQL, with a short retry on a transient outage.
+        3. The notes edited by the coach are committed locally, without a push.
+        4. The required weeks and those the turn revised are reread.
 
-        Projections, push et synchronisation viennent après la livraison (`publish`).
-        ``required_weeks`` est vide pour un tour social ; une semaine dont un contrôle
-        daté est échu s'enregistre et ressort dans ``awaiting``.
+        Projections, push and synchronization come after delivery (`publish`).
+        ``required_weeks`` is empty for a social turn; a week whose dated check is due
+        is recorded and returned in ``awaiting``.
         """
         if isinstance(required_weeks, str):
             required_weeks = (required_weeks,)
@@ -314,8 +310,8 @@ class VaultRepo:
             return PersistenceResult(False, detail=detail, restored=restored,
                                      failure=PersistenceFailure.WRITE_REFUSED,
                                      refused=self._refused_kinds(turn_id))
-        # Les semaines réellement révisées se contrôlent même si le triage n'a
-        # pas identifié de changement de programme.
+        # Weeks actually revised are checked even if triage did not identify a
+        # program change.
         required_weeks = tuple(dict.fromkeys((*required_weeks, *(
             receipt["payload"]["week"] for receipt in receipts
             if receipt["kind"] == "plan.revise"))))
@@ -324,9 +320,9 @@ class VaultRepo:
         try:
             statuses = {week: self.validate_weekly_plan(week) for week in required_weeks}
         except Exception as exc:
-            # La transaction PostgreSQL est déjà confirmée. Une relecture impossible ne
-            # peut pas la transformer en écriture refusée ; elle retient seulement les
-            # séances, faute de pouvoir les prouver.
+            # The PostgreSQL transaction is already committed. A failed reread cannot
+            # turn it into a refused write; it only withholds the sessions, since they
+            # cannot be proven.
             log.exception("Relecture du programme impossible après le tour %s", turn_id)
             detail = f"faits enregistrés ; relecture interrompue : {type(exc).__name__}"
             self._alert(ALERT_PROJECTION, detail)
@@ -351,11 +347,11 @@ class VaultRepo:
                                  restored=restored)
 
     def _restore_forbidden(self, base_head: str) -> tuple[str, ...]:
-        """Remet les fichiers interdits dans leur état d'avant le tour."""
+        """Put the forbidden files back in their pre-turn state."""
         current = self._head()
         if base_head and current and current != base_head:
-            # L'agent a committé lui-même : ses changements redeviennent du travail en
-            # cours, jugés comme le reste, puis committés par le service.
+            # The agent committed itself: its changes become work in progress again,
+            # judged like the rest, then committed by the service.
             log.warning("Commit de l'agent pendant le tour : repris dans le commit du service")
             self._git("reset", "--soft", base_head)
         forbidden = sorted(path for path in self._changed_paths() if forbidden_in_turn(path))
@@ -404,7 +400,7 @@ class VaultRepo:
             return ()
 
     def _commit_local(self) -> bool:
-        """Committe les notes du coach sans hook ni réseau ; rend True si un commit naît."""
+        """Commit the coach notes with no hook or network; True if a commit is created."""
         paths = self._changed_paths()
         if not paths:
             return False
@@ -414,7 +410,7 @@ class VaultRepo:
             self._alert(ALERT_COMMIT, f"Préparation du commit refusée par git : {detail}")
             return False
         stamp = clock.now().strftime("%Y-%m-%d %H:%M")
-        # Cette frontière scelle et régénère elle-même ; le hook sert aux commits humains.
+        # This boundary seals and regenerates itself; the hook is for human commits.
         committed = self._git("commit", "--no-verify", "-m", f"coach (messenger) - {stamp}")
         if committed.returncode != 0:
             detail = (committed.stderr or committed.stdout).strip()[:200]
@@ -424,10 +420,10 @@ class VaultRepo:
         return True
 
     def publish(self) -> bool:
-        """Après la livraison : vues, commit et push, hors du temps de réponse.
+        """After delivery: views, commit and push, outside the response time.
 
-        Git et les vues sont en cohérence éventuelle ; PostgreSQL a déjà tout. Rend
-        True quand rien ne reste à publier.
+        Git and the views are eventually consistent; PostgreSQL already has everything.
+        Returns True when nothing is left to publish.
         """
         try:
             projection_due = (self._store.projection_pending()
@@ -504,7 +500,7 @@ class VaultRepo:
         return self.ledger_cells(today)[0]
 
     def ledger_cells(self, today) -> tuple[list, list]:
-        """(encore réclamables, sorties de leur fenêtre) sur UNE lecture du registre."""
+        """(still claimable, lapsed out of their window) from ONE ledger read."""
         if self._store is None:
             return [], []
         rows = self._store.observation_rows()
@@ -521,9 +517,9 @@ class VaultRepo:
         return weekly_plan_model.as_json(plan)
 
     def day_settled(self, day) -> bool:
-        """Toutes les séances prévues ce jour-là sont soldées : faites, manquées ou annulées.
+        """All sessions planned that day are settled: done, missed or cancelled.
 
-        Un repos ne s'attend pas. Sans programme lisible, rien n'est soldé.
+        A rest day is not awaited. Without a readable program, nothing is settled.
         """
         if self._store is None:
             return False
@@ -539,16 +535,16 @@ class VaultRepo:
                    for key in keys)
 
     def coaching_context(self, depth: str) -> str:
-        """Faits bornés déjà disponibles, avant que l'agent décide d'élargir."""
+        """Bounded facts already available, before the agent decides to widen."""
         if self._store is None:
             return ""
         return render_context_packet(self._store, depth, clock.today())
 
     def weekly_dossier(self, week: str) -> str:
-        """Le dossier calculé du bilan de `week` ; une panne se dit, elle ne bloque rien.
+        """The computed review dossier of `week`; a failure is reported, never blocking.
 
-        Le bilan doit pouvoir se faire même si un calcul échoue : le modèle relancera
-        alors les CLI lui-même, comme avant le 2026-09-27.
+        The review must still be possible if a computation fails: the model then reruns
+        the CLIs itself.
         """
         if self._store is None:
             return ""
@@ -557,7 +553,7 @@ class VaultRepo:
         from redline.analysis import weekly_dossier
         try:
             return weekly_dossier.render(self._store, Path(self._path), week, clock.today())
-        except Exception:  # le dossier est une aide, jamais une porte
+        except Exception:  # the dossier is an aid, never a gate
             log.exception("Dossier du bilan %s non calculé", week)
             return ("[DOSSIER DU BILAN indisponible : calcul en échec, voir les journaux. "
                     "Relance toi-même ledger.py, signals.py et fact-read.py predictions --due.]")
@@ -597,7 +593,7 @@ class VaultRepo:
         return True
 
     def render_workout_card(self, card: dict, activity_id: str) -> bool:
-        """Rend la carte des répétitions d'une séance de qualité dans l'outbox."""
+        """Render the repetitions card of a quality session into the outbox."""
         outbox = engine_paths.outbox_dir()
         outbox.mkdir(parents=True, exist_ok=True)
         target = str(outbox / f"workout-{activity_id}.png")
@@ -640,12 +636,12 @@ class VaultRepo:
                 "régénération des vues du vault échouée : " + detail)
 
     def _push(self) -> bool:
-        """Pousser, et n'annoncer qu'UN incident : celui qui dit quoi faire.
+        """Push, and announce only ONE incident: the one that says what to do.
 
-        Un push refusé pendant qu'un déploiement est en attente n'est pas un second
-        incident, c'est la CONSÉQUENCE du premier — le distant est en avance de commits
-        que `sync()` a refusé d'intégrer. Les annoncer séparément donnait deux textos
-        dont aucun ne nommait l'action à faire.
+        A push refused while a deployment is pending is not a second incident but the
+        CONSEQUENCE of the first: the remote is ahead by commits that `sync()` refused
+        to integrate. Announcing them separately would give two messages, neither
+        naming the action to take.
         """
         # If the remote moved in the meantime (a push from the Mac), rebase and retry.
         if self._git("push", self._remote, self._branch).returncode == 0:

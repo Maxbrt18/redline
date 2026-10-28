@@ -1,4 +1,4 @@
-// Les chiffres : chargés écran par écran, gardés sur l'appareil, recalculés au retour.
+// The figures: loaded screen by screen, kept on the device, recomputed on return.
 import {$} from '../shared/dom.js';
 import {app, loading} from './state.js';
 import {message} from './ui.js';
@@ -6,7 +6,7 @@ import {api} from './api.js';
 import {dm, isoDate} from './format.js';
 import {render, screen} from './nav.js';
 
-// Charge un écran ; une même requête en vol n'est jamais doublée.
+// Loads a screen; the same request in flight is never duplicated.
 function load(key, path) {
   if (loading.has(key)) return loading.get(key);
   const job = (async () => {
@@ -30,8 +30,8 @@ function load(key, path) {
   return job;
 }
 export const loadToday = () => load('today', 'today');
-// L'écran visible se charge (une carte, immuable, une seule fois) ; la racine de
-// Semaine emmène sa liste des semaines passées.
+// The visible screen loads (a card is immutable, loaded once); the Week root also
+// brings its list of past weeks.
 export function ensure() {
   const view = screen();
   if (view.path && !(view.key.startsWith('entry:') && app.views[view.key])) {
@@ -39,30 +39,29 @@ export function ensure() {
   }
   if (view.root && app.active === 'week') load('weeks', 'weeks').catch(() => {});
 }
-// Les derniers chiffres restent sur l'appareil pour que le carnet s'ouvre sans réseau,
-// en montagne comme dans le métro (accord de l'athlète, 2026-10-08) : les trois racines
-// et la liste des semaines, jamais une carte. Effacés à la déconnexion ou quand
-// l'accès expire, ignorés au-delà de sept jours.
+// The latest figures stay on the device so the notebook opens without a network: the
+// three roots and the list of weeks, never a card. Cleared on sign-out or when access
+// expires, ignored after seven days.
 const STORE = 'carnet-data', STALE = 7 * 24 * 3600 * 1000;
 function keep() {
   if (!app.today || !app.loadedAt) return;
   const kept = {};
   ['today', 'course', 'weeks', 'week:' + app.today.week].forEach(key => { if (app.views[key]) kept[key] = app.views[key]; });
-  try { localStorage.setItem(STORE, JSON.stringify({at: app.loadedAt.getTime(), views: kept})); } catch { /* appareil plein ou privé : on s'en passe */ }
+  try { localStorage.setItem(STORE, JSON.stringify({at: app.loadedAt.getTime(), views: kept})); } catch { /* device full or private: do without */ }
 }
 export function forget() {
   app.stash = null;
-  try { localStorage.removeItem(STORE); } catch { /* rien à effacer */ }
+  try { localStorage.removeItem(STORE); } catch { /* nothing to clear */ }
 }
 export function recall() {
   try {
     const kept = JSON.parse(localStorage.getItem(STORE) || 'null');
     if (kept && kept.views && kept.views.today && Date.now() - kept.at < STALE) return kept;
-  } catch { /* illisible : on repart du réseau */ }
+  } catch { /* unreadable: start again from the network */ }
   return null;
 }
-// Remet en mémoire les chiffres gardés, sans les marquer à jour : le prochain calcul
-// les remplace et ne redessine que ce qui a changé.
+// Restores the kept figures without marking them fresh: the next computation replaces
+// them and redraws only what changed.
 export function hydrate(kept) {
   Object.entries(kept.views).forEach(([key, data]) => {
     if (!app.views[key]) { app.views[key] = data; app.signatures[key] = JSON.stringify(data); }
@@ -70,14 +69,14 @@ export function hydrate(kept) {
   app.today = app.views.today; app.loadedAt = new Date(kept.at); stamp();
 }
 const keptAt = () => (app.loadedAt && isoDate(app.loadedAt) !== isoDate(new Date()) ? 'du ' + dm(isoDate(app.loadedAt)) + ' à ' : 'de ') + clockOf(app.loadedAt);
-// La fraîcheur se lit dans les réglages : les chiffres sont recalculés au retour dans
-// l'app, tirer la page n'est qu'un recours. Elle ne monte en haut que hors ligne.
+// Freshness is shown in the settings: figures are recomputed on return to the app,
+// pulling the page is only a fallback. It scrolls to the top only when offline.
 const clockOf = date => date.toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'});
 export function stamp() {
   $('stamp').textContent = (app.loadedAt ? 'Chiffres à jour à ' + clockOf(app.loadedAt) + '. ' : '') + 'Tire la page vers le bas pour actualiser.';
 }
-// `manual` : tirer la page. Sinon le recalcul est silencieux : pas de message, et une
-// carte d'archive, immuable, n'est pas rechargée.
+// `manual`: pulling the page. Otherwise the recomputation is silent: no message, and an
+// immutable archive card is not reloaded.
 export async function refresh(manual = false) {
   if (app.refreshing) return;
   app.refreshing = true;
@@ -95,7 +94,7 @@ export async function refresh(manual = false) {
   } catch (error) {
     if (!$('connected').hidden) {
       const offline = error instanceof TypeError || !navigator.onLine;
-      // Sans réseau à l'ouverture, les chiffres gardés prennent le relais, datés.
+      // Without a network at launch, the kept figures take over, dated.
       if (offline && !app.views.today && app.stash) { hydrate(app.stash); render(); }
       if (offline && app.loadedAt) { $('offline').textContent = 'Hors ligne · chiffres ' + keptAt(); $('offline').hidden = false; }
       if (manual) message(offline ? 'Pas de réseau. Tes chiffres reviennent avec la connexion.' : error.message);

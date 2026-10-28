@@ -37,7 +37,7 @@ async function resolveToken(token) {
   }
 }
 
-// Le jeton d'un fragment `#t=…` (lien Messenger), ou '' s'il n'en porte pas.
+// The token of a `#t=...` fragment (Messenger link), or '' if it carries none.
 export function linkToken(hash) {
   const raw = decodeURIComponent(hash.replace(/^#/, ''));
   return raw.startsWith('t=') ? raw.slice(2) : '';

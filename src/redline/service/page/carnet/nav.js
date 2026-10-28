@@ -12,10 +12,10 @@ import {renderArchive, renderEntry} from './screens/archives.js';
 import {ensure, refresh} from './data.js';
 
 // ------------------------------------------------------------ navigation
-// Trois racines toujours visibles ; tout le reste se pousse par-dessus et se referme
-// d'un cran vers l'endroit d'où l'on vient (carte validée par l'athlète le 2026-10-08).
-// Chaque écran déjà vu s'affiche depuis la mémoire de la page puis se recalcule
-// derrière ; il n'est redessiné que si un chiffre a changé, et garde sa position.
+// Three roots always visible; everything else is pushed on top and closes one step
+// back toward where the user came from.
+// A screen already seen is shown from page memory, then recomputed behind; it is
+// redrawn only if a figure changed, and keeps its position.
 export const topRoute = () => app.stacks[app.active][app.stacks[app.active].length - 1] || null;
 export function screen() {
   const route = topRoute();
@@ -26,12 +26,12 @@ export function screen() {
   if (route.k === 'week') return {key: 'week:' + route.label, path: 'week/' + route.label, label: route.label};
   if (route.k === 'weeks') return {key: 'weeks', path: 'weeks'};
   if (route.k === 'archive') return {key: 'archive', path: 'entries'};
-  // Une zone surveillée par écran : la clé et la requête la nomment.
+  // One watched area per screen: the key and the request name it.
   if (route.k === 'injury') return {key: 'injury:' + (route.zone || ''), path: 'injury' + (route.zone ? '?zone=' + encodeURIComponent(route.zone) : '')};
   if (route.k === 'session') return {key: 'session:' + route.id, path: 'session/' + encodeURIComponent(route.id), title: route.title};
   return {key: 'entry:' + route.id, path: 'entries/' + encodeURIComponent(route.id), title: route.title};
 }
-// Le titre dit toujours où l'on est ; le sous-titre, de quand.
+// The title always says where we are; the subtitle, from when.
 function heading(view, data) {
   if (view.key === 'today') return ['Aujourd’hui', data ? longDay(data.date) + ' · semaine ' + weekNumber(data.week) : ''];
   if (view.key === 'course') return data && data.race ? [data.race.name, raceFacts(data.race)] : ['Course', ''];
@@ -59,7 +59,7 @@ function skeleton() {
 function failure(text, retry) {
   return add(el('div', null, 'n-empty'), el('p', text, 'n-meta'), button('Réessayer', retry, 'n-action'));
 }
-// `y` : la hauteur où montrer l'écran, posée avant de lire l'état de la barre du haut.
+// `y`: the height at which to show the screen, set before reading the top bar state.
 export function render(y) {
   const view = screen(), data = app.views[view.key];
   const opened = new Set([...content.querySelectorAll('details[open] > summary')].map(node => node.textContent));
@@ -86,32 +86,31 @@ export function render(y) {
   if (y != null) scrollTo(0, y);
   barState(true);
 }
-// Comme UINavigationController, sans rien inventer : l'écran poussé arrive par la
-// droite par-dessus le précédent, qui recule d'un tiers en s'assombrissant ; le retour
-// (bouton, onglet retouché, glissement) fait l'inverse ; la barre d'onglets ne bouge
-// jamais et celle du haut passe d'un écran à l'autre en fondu. L'écran qui bouge est
-// une copie figée : le vrai est déjà dans son état final, sous elle.
-// Les écrans poussés n'entrent pas dans l'historique du navigateur : son geste de
-// retour fait glisser une capture de toute la page, barre d'onglets comprise, ce
-// qu'aucune app iOS ne fait (l'athlète, 2026-10-09).
+// Like UINavigationController, inventing nothing: the pushed screen arrives from the
+// right over the previous one, which recedes by a third while darkening; going back
+// (button, retapped tab, swipe) does the reverse; the tab bar never moves and the top
+// bar cross-fades from one screen to the next. The moving screen is a frozen copy: the
+// real one is already in its final state, underneath.
+// Pushed screens do not enter the browser history: its back gesture slides a snapshot
+// of the whole page, tab bar included, which no iOS app does.
 const topBar = $('bar');
 export const pageNode = $('page');
 const barInner = topBar.querySelector('.n-topbar-in');
 const SHIFT = 0.3, DURATION = 350;
 export const EASE = 'cubic-bezier(.32, .72, 0, 1)';
 export function remember() { app.scrolls[screen().key] = scrollY; }
-// Une copie de l'écran tel qu'on le voit, posée sous les deux barres.
+// A copy of the screen as seen, placed under the two bars.
 export function freeze(under = false) {
   const rect = pageNode.getBoundingClientRect(), copy = pageNode.cloneNode(true);
   copy.removeAttribute('id'); copy.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
   copy.style.cssText = 'position:absolute;margin:0;transform:none;left:' + rect.left + 'px;top:' + rect.top + 'px;width:' + rect.width + 'px';
   const layer = add(el('div', null, under ? 'n-move under' : 'n-move'), copy);
   layer.setAttribute('aria-hidden', 'true');
-  pageNode.after(layer);  // à côté de l'original : mêmes ancêtres, donc mêmes styles
+  pageNode.after(layer);  // next to the original: same ancestors, hence same styles
   return layer;
 }
-// La barre du haut telle qu'on la voit, figée par-dessus la vraie le temps de la
-// transition : l'une s'efface pendant que l'autre paraît, comme sur iOS.
+// The top bar as seen, frozen over the real one for the duration of the transition:
+// one fades out while the other appears, as on iOS.
 export function freezeBar() {
   const copy = barInner.cloneNode(true);
   copy.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
@@ -120,7 +119,7 @@ export function freezeBar() {
   topBar.append(copy);
   return copy;
 }
-// t = 0 : l'écran du dessus couvre tout ; t = 1 : il est sorti à droite.
+// t = 0: the top screen covers everything; t = 1: it has left to the right.
 export function paintMove(t) {
   const width = innerWidth;
   app.move.top.style.transform = 'translateX(' + t * width + 'px)';
@@ -137,7 +136,7 @@ export function animate(to, ms, after) {
   app.move.after = after;
   app.move.timer = setTimeout(land, ms);
 }
-// Termine la transition en cours, tout de suite (un autre geste ne l'attend pas).
+// Ends the current transition at once (another gesture does not wait for it).
 export function land() {
   if (!app.move) return;
   const done = app.move; app.move = null;
@@ -164,15 +163,15 @@ export function push(route) {
   startMove(freeze(), below, false, was, 1);
   animate(0, DURATION);
 }
-// Remplace l'écran du dessus sans l'empiler : passer d'une zone surveillée à l'autre
-// n'est pas un pas de plus dans la navigation.
+// Replaces the top screen without stacking: switching from one watched area to another
+// is not one more step in the navigation.
 export function swap(route) {
   app.generation++;
   const stack = app.stacks[app.active];
   stack[stack.length - 1] = route;
   render(0); ensure();
 }
-// Recule d'un cran, ou jusqu'à la racine ; l'écran retrouve sa position.
+// Steps back one level, or to the root; the screen recovers its position.
 export function leave(toRoot) {
   app.generation++;
   if (toRoot) app.stacks[app.active] = []; else app.stacks[app.active].pop();
@@ -189,7 +188,7 @@ function back(toRoot = false) {
 }
 export function select(tab) {
   if (tab === app.active) {
-    // Retoucher l'onglet actif : d'abord à sa racine, puis tout en haut.
+    // Retapping the active tab: first to its root, then to the very top.
     if (app.stacks[app.active].length) back(true);
     else scrollTo({top: 0, behavior: calm.matches ? 'auto' : 'smooth'});
     return;
@@ -199,9 +198,9 @@ export function select(tab) {
   render(app.scrolls[screen().key] || 0);
   ensure();
 }
-// La barre du haut : son filet paraît dès qu'on défile ; le titre s'y replie quand le
-// grand titre passe dessous. En fondu au défilement, d'un coup quand l'écran change.
-// Pendant la séance guidée, c'est son grand titre qui se replie.
+// The top bar: its rule appears as soon as the page scrolls; the title collapses into it
+// when the large title passes under. Fades on scroll, switches at once on screen change.
+// During the guided session, its large title is the one that collapses.
 export function barState(instant = false) {
   const title = app.seance ? $('title') : $('lt-title');
   topBar.classList.toggle('instant', instant);
