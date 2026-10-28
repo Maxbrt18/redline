@@ -1,17 +1,17 @@
 # Redline Messenger
 
-Service Messenger qui lit Strava, porte ses faits dans PostgreSQL, tient un vault Git
-et s'exprime par un agent Codex ou Claude Code.
+A Messenger service that reads Strava, keeps its facts in PostgreSQL, maintains a Git vault
+and speaks through a Codex or Claude Code agent.
 
-Ce document décrit aussi un déploiement de référence : les chemins, les noms d'unités
-systemd et l'utilisateur `ubuntu` sont ceux d'un VPS réel, à adapter avant d'installer.
-La vue d'ensemble, le chemin d'un message et les invariants décrivent le système tel quel.
+This document also describes a reference deployment: the paths, the systemd unit names
+and the `ubuntu` user are those of a real VPS, to be adapted before installing.
+The overview, the path of a message and the invariants describe the system as it is.
 
-La politique de coaching ne vit pas dans le service. Elle appartient à `CLAUDE.md`,
-aux notes propriétaires du vault et aux schémas de `src/redline/model/`. Le service
-authentifie, ordonnance, persiste et livre.
+Coaching policy does not live in the service. It belongs to `CLAUDE.md`,
+the vault's owner notes and the schemas in `src/redline/model/`. The service
+authenticates, schedules, persists and delivers.
 
-## Vue d'ensemble
+## Overview
 
 ```mermaid
 flowchart LR
@@ -38,176 +38,175 @@ flowchart LR
     Delivery --> Messenger[MessengerClient]
 ```
 
-Les webhooks répondent rapidement. Un worker unique sérialise ensuite les messages,
-commandes et initiatives afin que deux tours ne partagent jamais une session agent,
-un worktree ou une livraison.
+Webhooks answer quickly. A single worker then serializes messages, commands and
+initiatives so that two turns never share an agent session, a worktree or a delivery.
 
-### Chemin d'un message Messenger
+### Path of a Messenger message
 
-1. `web.py` vérifie la signature Meta et le PSID autorisé.
-2. Le message est inséré dans `inbound_messages` avec l'état `pending`.
-3. `CoachBot` regroupe les textos rapprochés. Quelques salutations et remerciements
-   exacts sont triés localement en N0 ; toute autre formulation passe au classifieur
-   (Luna low, 10 s, sans repli : un échec vaut N1). Un paquet borné de faits
-   PostgreSQL est injecté selon le niveau obtenu. Le mot du matin reçoit le même
-   contexte.
-4. `VaultRepo.sync()` intègre uniquement les commits distants qui ne touchent pas le
-   runtime. Un changement de code attend un déploiement.
-5. `TurnExecutor` crée un `turn_id`, lance l'agent (un seul appel de modèle) puis
-   applique toutes les commandes PostgreSQL du tour dans une transaction, avec trois
-   nouvelles tentatives sur une panne transitoire. Un fichier de code ou une projection
-   modifiés pendant le tour sont restaurés sans perdre les notes ni les commandes.
-6. Les semaines requises sont relues et validées ; les notes du vault sont committées
-   localement, sans réseau.
-7. `CoachBot` décide si une prescription canonique accompagne la prose.
-8. `DeliveryService` enregistre l'enveloppe complète (texte, boutons) dans
-   `outbound_deliveries.payload`, puis livre via `MessengerClient`. Une reprise renvoie
-   cette enveloppe, jamais un nouveau tour de modèle.
-9. Le message entrant passe à `done`. Un crash avant cette étape le rend récupérable
-   au démarrage suivant.
-10. Après la livraison seulement, le worker régénère les vues, committe et pousse
-    (`VaultRepo.publish`) puis synchronise le dépôt.
+1. `web.py` verifies the Meta signature and the authorized PSID.
+2. The message is inserted into `inbound_messages` with the `pending` state.
+3. `CoachBot` groups texts sent close together. A few exact greetings and thank-yous
+   are sorted locally as N0; any other phrasing goes to the classifier
+   (Luna low, 10 s, no fallback: a failure counts as N1). A bounded packet of
+   PostgreSQL facts is injected according to the resulting level. The morning message
+   receives the same context.
+4. `VaultRepo.sync()` merges only the remote commits that do not touch the
+   runtime. A code change waits for a deployment.
+5. `TurnExecutor` creates a `turn_id`, launches the agent (a single model call), then
+   applies all the turn's PostgreSQL commands in one transaction, with three
+   retries on a transient failure. A code file or a projection
+   modified during the turn is restored without losing the notes or the commands.
+6. The required weeks are re-read and validated; the vault notes are committed
+   locally, without network.
+7. `CoachBot` decides whether a canonical prescription accompanies the prose.
+8. `DeliveryService` records the complete envelope (text, buttons) in
+   `outbound_deliveries.payload`, then delivers via `MessengerClient`. A retry resends
+   this envelope, never a new model turn.
+9. The inbound message moves to `done`. A crash before this step makes it recoverable
+   at the next startup.
+10. Only after delivery, the worker regenerates the views, commits and pushes
+    (`VaultRepo.publish`), then synchronizes the repository.
 
-Une photo ou un document suit une frontière différente : le webhook ne conserve que
-l'URL Meta le temps de la reprise, le worker télécharge un JPEG/PNG/WebP/PDF/TXT/CSV
-borné dans `var/attachments/` (0600), puis lance un tour agent en lecture seule.
-Le brut est supprimé dans un `finally` et l'URL est vidée de PostgreSQL. Le coach rend
-des observations et d'éventuels faits candidats ; seule la confirmation suivante,
-dans un tour normal, peut les écrire. Vidéo et audio sont refusés sans analyse.
+A photo or a document follows a different boundary: the webhook keeps only the Meta
+URL for the duration of the retry, the worker downloads a bounded JPEG/PNG/WebP/PDF/TXT/CSV
+into `var/attachments/` (0600), then launches a read-only agent turn.
+The raw file is deleted in a `finally` and the URL is cleared from PostgreSQL. The coach returns
+observations and possible candidate facts; only the next confirmation,
+in a normal turn, can write them. Video and audio are refused without analysis.
 
-Une erreur agent ou une persistance refusée abandonne les commandes préparées et
-restaure le worktree. Les faits déjà committés dans PostgreSQL ne sont jamais simulés
-comme annulés parce qu'une projection ou un push Git a échoué.
+An agent error or a refused persistence abandons the prepared commands and
+restores the worktree. Facts already committed in PostgreSQL are never simulated
+as rolled back because a projection or a Git push failed.
 
-## Propriétaires du code
+## Code owners
 
-| Module | Responsabilité |
+| Module | Responsibility |
 |---|---|
-| `app.py` | composition, vérifications de démarrage et cycle de vie |
-| `config.py` | lecture unique du `.env` et de l'environnement au démarrage |
-| `clock.py` | horloge civile, au fuseau de `redline.toml` (`[athlete] timezone`) ; le stockage reste en UTC |
-| `events.py` | événements d'exploitation structurés, une ligne JSON par étape |
-| `web.py` | routes HTTP, authentification et normalisation des entrées |
-| `bot.py` | orchestration conversationnelle et politique de livraison |
-| `work_queue.py` | sérialisation, priorités et debounce des entrées |
-| `turns.py` | transaction d'un tour agent et abandon fail-closed |
-| `plans.py` | lecture et rendu purs du programme hebdomadaire |
-| `vault.py` | accès domaine, projections et frontière Git |
-| `agent.py` | contrats communs des fournisseurs, registre du travail en cours, reprise de session |
-| `agent_factory.py` | choix du moteur au démarrage |
-| `routing.py` | profils N0–N3, triage, deep, proactifs et replis communs |
-| `codex.py` | threads du SDK Codex |
-| `claude.py` | processus Claude Code CLI |
-| `state.py` | contrats du stockage runtime |
-| `postgres_state.py` | sessions, inbox, jobs, quotas et marqueurs durables |
-| `relationship.py` | mémoire relationnelle compacte injectée au tour |
-| `proactive.py` | matérialisation et sélection des initiatives |
-| `proactive_messages.py` | rendu des initiatives fermées, sans agent |
-| `activity_pipeline.py` | capture Strava puis enrichissements D-/WBGT rejouables |
-| `attachments.py` | téléchargement Meta borné, validation et suppression du brut |
-| `race_countdown.py` | compilation d'une date de course en jalons persistants |
-| `triage_rules.py` | triage haute précision local, avant le repli modèle |
-| `delivery.py` | enveloppes ordonnées, journal réseau et succès partiels |
-| `messenger.py` | transport Meta et résultats de livraison |
-| `textutils.py` | découpage en rafale, partagé par l'agent et le transport |
-| `outbox.py` | cycle de vie des images et sidecars |
-| `strength_artifact.py` | carte renfo rendue depuis la prescription typée |
-| `prompts.py` | choix des textes injectés à chaque tour et des workflows proactifs |
-| `src/redline/coach/fr/` | les mots du coach et du service : `prompts/*.md`, `messages.py` (notes), `replies.py` (limites), `initiatives.py`, `notebook.py`, `session_labels.py`, `calendar.py` |
-| `strength.py`, `page/` | capacités opaques et page de renforcement |
-| `src/redline/storage/repository/` | transactions et faits opérationnels, un module par agrégat |
-| `src/redline/storage/projector.py` | vues Obsidian régénérables |
+| `app.py` | composition, startup checks and lifecycle |
+| `config.py` | single read of `.env` and the environment at startup |
+| `clock.py` | civil clock, in the time zone of `redline.toml` (`[athlete] timezone`); storage stays in UTC |
+| `events.py` | structured operational events, one JSON line per step |
+| `web.py` | HTTP routes, authentication and input normalization |
+| `bot.py` | conversational orchestration and delivery policy |
+| `work_queue.py` | serialization, priorities and debounce of inputs |
+| `turns.py` | transaction of an agent turn and fail-closed abort |
+| `plans.py` | pure reading and rendering of the weekly program |
+| `vault.py` | domain access, projections and Git boundary |
+| `agent.py` | common provider contracts, registry of work in progress, session resumption |
+| `agent_factory.py` | engine choice at startup |
+| `routing.py` | N0–N3 profiles, triage, deep, proactives and common fallbacks |
+| `codex.py` | Codex SDK threads |
+| `claude.py` | Claude Code CLI process |
+| `state.py` | runtime storage contracts |
+| `postgres_state.py` | sessions, inbox, jobs, quotas and durable markers |
+| `relationship.py` | compact relational memory injected into the turn |
+| `proactive.py` | materialization and selection of initiatives |
+| `proactive_messages.py` | rendering of closed initiatives, without an agent |
+| `activity_pipeline.py` | Strava capture, then replayable D-/WBGT enrichments |
+| `attachments.py` | bounded Meta download, validation and deletion of the raw file |
+| `race_countdown.py` | compilation of a race date into persistent milestones |
+| `triage_rules.py` | local high-precision triage, before the model fallback |
+| `delivery.py` | ordered envelopes, network journal and partial successes |
+| `messenger.py` | Meta transport and delivery results |
+| `textutils.py` | burst splitting, shared by the agent and the transport |
+| `outbox.py` | lifecycle of images and sidecars |
+| `strength_artifact.py` | strength card rendered from the typed prescription |
+| `prompts.py` | choice of the texts injected at each turn and of the proactive workflows |
+| `src/redline/coach/fr/` | the coach's and the service's words: `prompts/*.md`, `messages.py` (notes), `replies.py` (limits), `initiatives.py`, `notebook.py`, `session_labels.py`, `calendar.py` |
+| `strength.py`, `page/` | opaque capabilities and strength page |
+| `src/redline/storage/repository/` | transactions and operational facts, one module per aggregate |
+| `src/redline/storage/projector.py` | regenerable Obsidian views |
 
-Pour modifier un comportement :
+To change a behavior:
 
-- ton, méthode ou règle de coaching : `CLAUDE.md` ou son propriétaire dans le vault ;
-- texte injecté par le service : `src/redline/coach/fr/` ; quand il est injecté : `prompts.py` ;
-- décision d'envoi : `bot.py` ;
-- forme du programme : `src/redline/model/weekly_plan.py` ;
-- rendu Messenger du programme : `plans.py` ;
-- persistance d'un fait : le module de son agrégat dans `src/redline/storage/repository/` ;
-- calendrier d'une initiative : `proactive.py`.
+- coaching tone, method or rule: `CLAUDE.md` or its owner in the vault;
+- text injected by the service: `src/redline/coach/fr/`; when it is injected: `prompts.py`;
+- send decision: `bot.py`;
+- shape of the program: `src/redline/model/weekly_plan.py`;
+- Messenger rendering of the program: `plans.py`;
+- persistence of a fact: the module of its aggregate in `src/redline/storage/repository/`;
+- schedule of an initiative: `proactive.py`.
 
 ## Invariants
 
-- PostgreSQL est obligatoire et canonique. Markdown et CSV sont des projections.
-- Une commande agent porte toujours `REDLINE_TURN_ID`. Le service applique ou
-  abandonne toutes les commandes de ce tour ensemble.
-- Les faits sont inconditionnels. Un défaut de programme retient la prescription,
-  pas les observations déjà enregistrées.
-- Une semaine absente ou invalide retire toute prescription : le coach est prévenu de
-  n'en donner aucune, aucun bloc canonique ne part, et une demande de programme reçoit
-  une ligne précise. La prose, dont une précaution de sécurité, part toujours.
-- Une semaine périmée laisse parler le coach mais ne prescrit rien.
-- La péremption compare les activités d'effort non rattachées au watermark PostgreSQL
-  de la révision ; elle ne dépend pas d'une égalité entre versions d'empreinte.
-- Une précondition datée retient seulement les séances nommées dans `holds`. Les
-  anciennes révisions sans `holds` retiennent toute la semaine par prudence.
-- Le programme envoyé est rendu depuis la révision persistée, jamais depuis la prose
-  libre du modèle.
-- Une demande explicite rend seulement sa portée (`today`, `next`, `remaining` ou
-  `full`) et peut être répétée ; une révision spontanée ne rend que son delta.
-- Une mesure brute ne porte jamais sa cause. Les expositions volontaires, prescrites
-  ou spontanées vivent séparément et ne comptent qu'une fois confirmées.
-- Le plan porte l'intention (`planned` ou `cancelled`). Le réalisé est projeté depuis
-  `session_cycles` et n'écrit jamais `done` dans une nouvelle révision.
-- Une activité Strava capturée reste durable même si le stream ou la météo échoue.
-  Chaque enrichissement a son propre état et son propre compteur de tentative.
-- La modulation renfo est écrite dans le plan : sa livraison ne la redécide pas.
-- Une tâche proactive n'est acquittée qu'après une livraison textuelle effective.
-  Une livraison partielle n'est pas rejouée, afin de ne pas dupliquer les fragments
-  déjà reçus.
-- Une pièce jointe sortante refusée est mise en quarantaine dans `outbox/failed/`. Elle n'est
-  pas rejouée avec le texte déjà livré.
-- Une pièce jointe entrante n'a jamais de droit d'écriture : URL et brut sont
-  éphémères, son contenu est traité comme donnée non fiable, et toute mémorisation
-  attend une confirmation textuelle ultérieure.
-- Une enveloppe `sending` retrouvée après crash n'est pas rejouée aveuglément : Meta
-  n'offrant pas de clé d'idempotence, le service choisit l'at-most-once et signale
-  l'ambiguïté dans les journaux. Une enveloppe `failed` sans fragment livré peut être
-  retentée. `408`, `425`, `429` et `5xx` sont repris par le transport.
-- Silence, cellules déclaratives, séance manquée, digestion,
-  matériel et message opérateur ne réveillent pas l'agent ; un détail illisible
-  passe le job en `failed` au lieu d'appeler le modèle.
-- Une initiative rendue par l'agent répond au schéma `{send, text}` : `send=false` est un
-  silence voulu, jamais déduit de la prose. Elle ne montre pas d'indicateur de saisie.
-- Les jobs `running` et messages entrants `pending` sont repris au démarrage. Un
-  entrant direct échoué reste `pending` et est retenté après 30 s, 5 min puis toutes les
-  30 min (ou à l'heure de retour annoncée par le fournisseur), 48 fois au plus, puis
-  reste `pending` pour le démarrage suivant. Dès qu'une reprise doit attendre plus de
-  deux minutes, une seule phrase (au plus une toutes les deux heures) prévient l'athlète
-  que la réponse arrive ; une réponse tardive reçoit l'âge du message pour ne pas le
-  traiter comme actuel.
-- Les messages proactifs sont journalisés par le service après livraison. L'agent ne
-  possède pas cette trace.
-- Codex tourne sans sandbox Linux dans le service : bubblewrap n'est pas une
-  dépendance de production. Les garde-fous sont applicatifs et stables : utilisateur
-  Unix non privilégié, approbations interactives refusées, environnement agent purgé,
-  CLI métier root-owned, transactions PostgreSQL par `turn_id`, contrôle des chemins
-  runtime et retour Git en lecture seule. `SANDBOX_NEEDS` contient les seules valeurs
-  d'environnement nécessaires aux CLI métier.
-- Le runtime n'est jamais mis à jour depuis un tour. `VaultRepo.sync()` refuse tout
-  commit entrant touchant `deploy/`, `src/`, `migrations/`, les hooks, la CI, les
-  dépendances ou les assets lus au démarrage.
-- **« Runtime » = le service tourne différemment après ce commit** (choix de design,
-  2026-08-21). Ni `coaching/exercises/*.md` — des données relues à chaque appel de
-  `chart-strength.py`, et que le coach édite lui-même — ni `tests/` n'en sont :
-  aucun ne demande de redémarrage, et un test poussé avec du code est de toute façon
-  retenu par le code. Les y avoir laissés faisait geler la synchronisation du vault sur
-  une écriture parfaitement légitime.
-- **Les diagnostics internes restent dans les journaux d'exploitation.** Aucun texte
-  d'adaptateur (watchdog, tour, moteur) n'est montré à l'athlète : chaque classe d'échec a
-  une phrase à lui, définie une fois dans `bot.py`. Si la persistance d'un tour réactif
-  est refusée, sa prose part avec une ligne qui nomme ce qui n'a pas été enregistré
-  (« ta séance », « ton état du jour »…) ; aucun programme n'accompagne ce tour. Un échec
-  de push après sauvegarde valide reste un incident d'exploitation. Seule une donnée réellement
-  inutilisable ou expirée — typiquement une pièce jointe que Meta ne rend plus — peut
-  demander d'être renvoyée. Un bilan invalide reste ouvert et se reprend automatiquement ;
-  il n'est ni acquitté ni annoncé comme incident.
+- PostgreSQL is mandatory and canonical. Markdown and CSV are projections.
+- An agent command always carries `REDLINE_TURN_ID`. The service applies or
+  abandons all the commands of that turn together.
+- Facts are unconditional. A program defect withholds the prescription,
+  not the observations already recorded.
+- An absent or invalid week removes any prescription: the coach is told to
+  give none, no canonical block is sent, and a program request receives
+  a precise line. Prose, including a safety precaution, is always sent.
+- A stale week lets the coach speak but prescribes nothing.
+- Staleness compares the effort activities not attached to the PostgreSQL watermark
+  of the revision; it does not depend on an equality between fingerprint versions.
+- A dated precondition holds back only the sessions named in `holds`. Older
+  revisions without `holds` hold back the whole week as a precaution.
+- The program sent is rendered from the persisted revision, never from the model's
+  free prose.
+- An explicit request renders only its scope (`today`, `next`, `remaining` or
+  `full`) and can be repeated; a spontaneous revision renders only its delta.
+- A raw measurement never carries its cause. Voluntary, prescribed or spontaneous
+  exposures live separately and count only once confirmed.
+- The plan carries the intention (`planned` or `cancelled`). What was done is projected from
+  `session_cycles` and never writes `done` in a new revision.
+- A captured Strava activity stays durable even if the stream or the weather fails.
+  Each enrichment has its own state and its own attempt counter.
+- Strength modulation is written in the plan: its delivery does not re-decide it.
+- A proactive task is acknowledged only after an effective text delivery.
+  A partial delivery is not replayed, so as not to duplicate the fragments
+  already received.
+- A refused outbound attachment is quarantined in `outbox/failed/`. It is not
+  replayed with the text already delivered.
+- An inbound attachment never has write rights: URL and raw file are
+  ephemeral, its content is treated as untrusted data, and any memorization
+  waits for a later text confirmation.
+- A `sending` envelope found after a crash is not blindly replayed: Meta
+  offers no idempotency key, so the service chooses at-most-once and flags
+  the ambiguity in the logs. A `failed` envelope with no delivered fragment can be
+  retried. `408`, `425`, `429` and `5xx` are retried by the transport.
+- Silence, declarative cells, missed session, digestion,
+  gear and operator message do not wake the agent; an unreadable detail
+  moves the job to `failed` instead of calling the model.
+- An initiative rendered by the agent follows the `{send, text}` schema: `send=false` is a
+  deliberate silence, never deduced from the prose. It shows no typing indicator.
+- `running` jobs and `pending` inbound messages are resumed at startup. A failed direct
+  inbound stays `pending` and is retried after 30 s, 5 min, then every
+  30 min (or at the return time announced by the provider), at most 48 times, then
+  stays `pending` for the next startup. As soon as a retry has to wait more than
+  two minutes, a single sentence (at most one every two hours) tells the athlete
+  that the answer is coming; a late answer receives the age of the message so as not to
+  treat it as current.
+- Proactive messages are journaled by the service after delivery. The agent
+  does not own this trace.
+- Codex runs without a Linux sandbox in the service: bubblewrap is not a
+  production dependency. The safeguards are application-level and stable: unprivileged
+  Unix user, interactive approvals refused, purged agent environment,
+  root-owned business CLIs, PostgreSQL transactions per `turn_id`, runtime
+  path checks and read-only Git return. `SANDBOX_NEEDS` contains only the
+  environment values the business CLIs need.
+- The runtime is never updated from a turn. `VaultRepo.sync()` refuses any incoming
+  commit touching `deploy/`, `src/`, `migrations/`, the hooks, the CI, the
+  dependencies or the assets read at startup.
+- **"Runtime" = the service behaves differently after this commit.** Neither
+  `coaching/exercises/*.md` — data re-read at each call of
+  `chart-strength.py`, and which the coach edits itself — nor `tests/` are runtime:
+  neither requires a restart, and a test pushed with code is held back by the code anyway.
+  Leaving them in would freeze vault synchronization on a perfectly legitimate
+  write.
+- **Internal diagnostics stay in the operational logs.** No adapter text
+  (watchdog, turn, engine) is shown to the athlete: each failure class has
+  a sentence for them, defined once in `bot.py`. If persistence of a reactive turn
+  is refused, its prose is sent with a line naming what was not recorded
+  (« ta séance », « ton état du jour »…); no program accompanies that turn. A push
+  failure after a valid save remains an operational incident. Only data that is really
+  unusable or expired — typically an attachment that Meta no longer serves — can
+  ask to be resent. An invalid review stays open and resumes automatically;
+  it is neither acknowledged nor announced as an incident.
 
-## Installation locale
+## Local installation
 
-Python 3.12 est requis.
+Python 3.12 is required.
 
 ```bash
 python3.12 -m venv .venv
@@ -216,224 +215,224 @@ python3.12 -m venv .venv
 cp deploy/coach-messenger.env.example .env
 ```
 
-Créer ou migrer PostgreSQL avec le rôle de migration, puis lancer depuis la racine :
+Create or migrate PostgreSQL with the migration role, then launch from the root:
 
 ```bash
 DATABASE_URL='postgresql+psycopg://…' alembic upgrade head
 .venv/bin/python -m redline
 ```
 
-Le démarrage refuse :
+Startup refuses:
 
-- Python antérieur à 3.12 ;
-- configuration Messenger incomplète ;
-- fournisseur agent inconnu ;
-- valeur numérique, booléenne, horaire, effort ou route invalide (notamment Sol Max) ;
-- PostgreSQL indisponible.
+- Python older than 3.12;
+- incomplete Messenger configuration;
+- unknown agent provider;
+- invalid numeric, boolean, time, effort or route value (notably Sol Max);
+- unavailable PostgreSQL.
 
-`deploy/coach-messenger.env.example` est la référence exhaustive. En local, `.env` à la racine est toléré ;
-en production, le fichier réel vit hors du checkout dans
-`/etc/redline/runtime/coach-messenger.env`, lisible par le seul utilisateur du service.
-Les variables `AGENT_*` sont les
-seules variables de modèle, effort et timeout. `CLAUDE_CODE_OAUTH_TOKEN` reste propre
-à l'authentification du fournisseur Claude. Le provider Claude exige une CLI 2.1.197+
-et utilise directement `--effort` et `--fork-session`.
+`deploy/coach-messenger.env.example` is the exhaustive reference. Locally, a `.env` at the root is tolerated;
+in production, the real file lives outside the checkout in
+`/etc/redline/runtime/coach-messenger.env`, readable only by the service user.
+The `AGENT_*` variables are the
+only model, effort and timeout variables. `CLAUDE_CODE_OAUTH_TOKEN` remains specific
+to authentication of the Claude provider. The Claude provider requires CLI 2.1.197+
+and uses `--effort` and `--fork-session` directly.
 
 ## Endpoints
 
-| Méthode | Route | Usage |
+| Method | Route | Use |
 |---|---|---|
-| `GET` | `/webhook` | challenge Meta |
-| `POST` | `/webhook` | événements Messenger signés |
-| `GET/POST` | `/strava-webhook/<secret>` | abonnement, créations et titres renommés filtrés |
-| `GET` | `/s` | coquille générique de la page de renforcement |
-| `POST` | `/strength-session` | résolution d'une capacité opaque, sans cache HTTP |
-| `POST` | `/strength-report` | rapport par capacité, claim, quota et faits atomiques |
-| `GET` | `/health` | liveness, commit déployé, empreinte `runtime_tree` et uptime |
-| `GET` | `/ready` | worker actif, PostgreSQL joignable et schéma à la tête Alembic (local seulement) |
+| `GET` | `/webhook` | Meta challenge |
+| `POST` | `/webhook` | signed Messenger events |
+| `GET/POST` | `/strava-webhook/<secret>` | subscription, filtered creations and renamed titles |
+| `GET` | `/s` | generic shell of the strength page |
+| `POST` | `/strength-session` | resolution of an opaque capability, no HTTP cache |
+| `POST` | `/strength-report` | per-capability report, claim, quota and atomic facts |
+| `GET` | `/health` | liveness, deployed commit, `runtime_tree` fingerprint and uptime |
+| `GET` | `/ready` | active worker, reachable PostgreSQL and schema at the Alembic head (local only) |
 
-Tout corps de requête est plafonné à 1 Mo par le service et par Caddy ; les routes du
-carnet et du renfo descendent plus bas. Les handshakes `hub.*` comparent leur jeton en
-temps constant et renvoient le challenge en texte ou en JSON, jamais en HTML.
-`MESSENGER_VERIFY_TOKEN`, `STRAVA_VERIFY_TOKEN` et `STRAVA_WEBHOOK_SECRET` font au
-moins 32 caractères, sinon le service refuse de démarrer. Caddy ajoute HSTS et réserve
-`/ready` au VPS, puisqu'il interroge PostgreSQL à chaque appel.
+Every request body is capped at 1 MB by the service and by Caddy; the notebook and
+strength routes go lower. The `hub.*` handshakes compare their token in
+constant time and return the challenge as text or JSON, never as HTML.
+`MESSENGER_VERIFY_TOKEN`, `STRAVA_VERIFY_TOKEN` and `STRAVA_WEBHOOK_SECRET` are at
+least 32 characters long, otherwise the service refuses to start. Caddy adds HSTS and reserves
+`/ready` for the VPS, since it queries PostgreSQL on every call.
 
-### Abonnement Strava
+### Strava subscription
 
-Strava ne signe pas ses événements et l'id d'athlète est public : la route n'est
-authentifiée que par le segment `STRAVA_WEBHOOK_SECRET` de l'URL de callback. Une URL
-fausse répond 404. Changer ce secret impose de recréer l'abonnement, après le
-redémarrage du service, car Strava valide l'URL immédiatement :
+Strava does not sign its events and the athlete id is public: the route is
+authenticated only by the `STRAVA_WEBHOOK_SECRET` segment of the callback URL. A wrong
+URL answers 404. Changing this secret requires recreating the subscription, after the
+service restarts, because Strava validates the URL immediately:
 
 ```bash
 set -a; . /etc/redline/runtime/coach-messenger.env; set +a
 /home/ubuntu/.venvs/redline-current/bin/python deploy/strava-subscription.py renew
 ```
 
-`status` rend 0 si l'unique abonnement pointe vers l'URL attendue. Aucun des deux
-modes n'affiche l'URL ni un secret.
+`status` returns 0 if the single subscription points to the expected URL. Neither
+mode prints the URL or a secret.
 
-Le fragment ne transporte plus la séance mais un jeton aléatoire de 192 bits. Le
-service n'en stocke que le SHA-256, avec le snapshot exact et immuable livré sous la
-carte, puis le résout sans cache HTTP. Le lien expire après sept jours et peut être
-révoqué irréversiblement. Après une première ouverture réussie, le navigateur garde
-le snapshot dans `localStorage` pour reprendre la séance hors ligne ; une expiration
-ou une révocation confirmée par le serveur prime sur ce cache. Les anciens fragments
-ne sont pas interprétés : un lien doit être une capacité opaque connue de PostgreSQL.
+The fragment no longer carries the session but a random 192-bit token. The
+service stores only its SHA-256, with the exact, immutable snapshot delivered under the
+card, then resolves it without an HTTP cache. The link expires after seven days and can be
+revoked irreversibly. After a first successful opening, the browser keeps
+the snapshot in `localStorage` to resume the session offline; an expiry
+or a revocation confirmed by the server takes precedence over this cache. Old fragments
+are not interpreted: a link must be an opaque capability known to PostgreSQL.
 
-Claim, quota journalier, séance et débrief, message entrant durable, audit et demande
-de projection sont écrits dans une transaction unique. La page conserve la date
-civile du premier exercice et réessaie avec un backoff borné. Une panne de base rend
-`503` sans consommer le claim ; un crash après le commit laisse le message `pending`,
-repris au prochain démarrage. Les réponses distinguent `accepted` (`201`),
-`duplicate` (`200`), `quota` (`429`), lien expiré (`410`) et rapport invalide (`400`).
+Claim, daily quota, session and debrief, durable inbound message, audit and projection
+request are written in a single transaction. The page keeps the civil date
+of the first attempt and retries with a bounded backoff. A database outage returns
+`503` without consuming the claim; a crash after the commit leaves the message `pending`,
+resumed at the next startup. The responses distinguish `accepted` (`201`),
+`duplicate` (`200`), `quota` (`429`), expired link (`410`) and invalid report (`400`).
 
-La page sauvegarde aussi les brouillons, les chronos et la dernière validation
-annulable. Une reprise de temps de travail interrompu demande confirmation ; un
-enchaînement automatique reste limité aux séries de l'exercice courant et ne lance
-aucun travail lorsque la page est masquée. Les signaux de fin de travail et de repos
-ont des motifs distincts, une intensité persistée et un bouton de test.
+The page also saves drafts, timers and the last cancellable validation.
+Resuming interrupted work time asks for confirmation; an automatic
+chain stays limited to the sets of the current exercise and starts
+no work while the page is hidden. The end-of-work and rest signals
+have distinct patterns, a persisted intensity and a test button.
 
-Les séries validées avant un arrêt restent journalisées avec leur position et leur
-côté, un état `partial`, leur nombre et la remarque propre à l'exercice. Les exercices
-retirés par le garde-fou restent consultables sans pouvoir être exécutés ou évalués.
-La prescription exacte est conservée avec le rapport : la préparation compare la
-dernière prescription rapportée du même type, séparément des performances réalisées.
-Les historiques sans snapshot ne donnent lieu à aucune comparaison reconstruite.
-Le rapport est figé dès l'envoi et les reprises réseau réutilisent le même contenu ;
-après réception, une correction se transmet explicitement dans Messenger.
+Sets validated before a stop stay logged with their position and their
+side, a `partial` state, their count and the exercise-specific remark. Exercises
+removed by the guard stay viewable without being executable or evaluable.
+The exact prescription is kept with the report: preparation compares the
+last reported prescription of the same type, separately from the performances achieved.
+Histories without a snapshot give rise to no reconstructed comparison.
+The report is frozen on sending and network retries reuse the same content;
+after receipt, a correction is explicitly sent in Messenger.
 
-Un rapport de renfo complète le cycle prévu lorsqu'une seule séance et un seul rapport
-partagent la date et le type A/B, sans recopier le rapport au registre ni inventer une
-heure de fin. Ce rapprochement est aussi exécuté avant la détection des séances manquées
-pour les rapports historiques. Une correspondance ambiguë ne complète aucun cycle et
-ne justifie aucune relance d'absence. La cause d'une relance est revérifiée à l'envoi.
+A strength report completes the planned cycle when a single session and a single report
+share the date and the A/B type, without copying the report into the ledger or inventing an
+end time. This matching also runs before missed-session detection
+for historical reports. An ambiguous match completes no cycle and
+justifies no absence follow-up. The cause of a follow-up is re-verified when sending.
 
-## Sessions et commandes
+## Sessions and commands
 
-Le triage classe chaque message de N0 à N3. Il choisit le volume de lecture et les
-indicateurs de ton, puis la même décision sélectionne un profil de modèle et d'effort.
-Seules quelques salutations exactes sont reconnues localement ; tout le reste passe au
-classifieur, qui ne dispose ni de shell ni de documentation projet. Un triage en échec
-ou hors délai vaut N1 sans escalade d'effort. Une émotion exprimée n'impose ni phrase
-d'accueil ni question : la dernière demande fixe la posture, et une demande concrète se
-traite avec les contrôles habituels. Le niveau règle ce qui se lit, pas la longueur
-envoyée : une correction vérifiée en N3 peut tenir en une phrase, et un fait simple
-contesté se relit chez son propriétaire, pas dans la littérature. Une clôture sociale
-n'ouvre pas un nouveau sujet ; en N0, une observation du jour ne force ni prescription
-ni question, alors qu'un contrôle bloquant voyage entier à tous les niveaux. Les phrases d'attente statiques ne promettent ni délai
-ni accès à une source ; les phrases contextuelles suivent la même consigne de triage.
-La configuration est commune à Claude et Codex (`redline/routing.py`). Le fournisseur
-par défaut est Codex, avec les identifiants GPT-6 Luna et Sol :
+Triage classifies each message from N0 to N3. It chooses the reading volume and the
+tone indicators, then the same decision selects a model and effort profile.
+Only a few exact greetings are recognized locally; everything else goes to the
+classifier, which has neither a shell nor project documentation. A failed or
+timed-out triage counts as N1 with no effort escalation. An expressed emotion requires neither a
+welcoming sentence nor a question: the latest request sets the posture, and a concrete request is
+handled with the usual checks. The level sets what is read, not the length
+sent: a verified correction at N3 can fit in one sentence, and a contested simple fact
+is re-read at its owner, not in the literature. A social closing
+opens no new topic; at N0, an observation of the day forces neither a prescription
+nor a question, whereas a blocking check travels whole at every level. Static waiting phrases promise neither a delay
+nor access to a source; contextual phrases follow the same triage instruction.
+The configuration is common to Claude and Codex (`redline/routing.py`). The default provider
+is Codex, with the identifiers GPT-6 Luna and Sol:
 
-La réponse produite par le coach part directement après les portes déterministes du
-service : persistance réussie, plan PostgreSQL valide quand une prescription est demandée,
-contrôles datés, péremption et rendu canonique. Il n'existe aucun second appel de modèle
-avant le transport, y compris quand le tour a appliqué des commandes. Une semaine
-illisible n'efface pas la réponse : elle retire seulement la prescription et ajoute une
-ligne précise. Un tour terminé sans texte reçoit une seule relance dans la même session. Ce second jugement retenait des réponses correctes quand il lui
-manquait une preuve ou quand il expirait, ajoutait de la latence et cassait la continuité
-de la conversation sans pouvoir garantir la justesse médicale.
+The answer produced by the coach is sent directly after the service's deterministic
+gates: successful persistence, valid PostgreSQL plan when a prescription is requested,
+dated checks, staleness and canonical rendering. There is no second model call
+before transport, including when the turn applied commands. An
+unreadable week does not erase the answer: it only removes the prescription and adds a
+precise line. A turn that ends without text receives a single retry in the same session. A second judgment would hold back correct answers when it
+lacked evidence or when it timed out, add latency and break the continuity
+of the conversation without being able to guarantee medical accuracy.
 
-Le jugement sémantique probabiliste vit dans le paquet `evaluation/`, hors de `redline/`,
-et n'est appelé que par `evaluate-coaching.py`, banc d'évaluation explicite. Il sert à confronter des cas rouges et à
-améliorer les instructions du coach ; son indisponibilité ou son verdict ne peut jamais
-retenir une conversation Messenger. Les limites de coaching (diagnostic, médicaments,
-tests douloureux, scores inférés et identité) appartiennent aux instructions du coach et
-aux scénarios d'évaluation. Les protections sur les écritures et le programme restent du
-code déterministe.
+Probabilistic semantic judgment lives in the `evaluation/` package, outside `redline/`,
+and is called only by `evaluate-coaching.py`, an explicit evaluation bench. It is used to confront red cases and to
+improve the coach's instructions; its unavailability or its verdict can never
+hold back a Messenger conversation. The coaching limits (diagnosis, medication,
+painful tests, inferred scores and identity) belong to the coach's instructions and
+to the evaluation scenarios. The protections on writes and on the program remain
+deterministic code.
 
-`python -m redline.cli.evaluate_coaching --output /tmp/coaching-evaluation.json` produit des réponses
-fictives avec les profils du fournisseur de `AGENT_PROVIDER` (Claude en production : la
-route du scénario, juge sur le profil N2), sans outil, mémoire persistante ni envoi.
-`ClaudeCodeRunner.one_shot` lance `claude -p` dans un dossier vide, donc sans `CLAUDE.md`,
-comme le banc Codex ; `evaluation/runner.py` borne les modèles payables.
-Les fixtures `tests/fixtures/coaching-scenarios.json` portent 36 scénarios, leur
-contexte, posture, réponse illustrative et critères d'acceptation ; ceux qui naissent d'une
-correction réelle nomment leur origine (`origin`), vérifiée par `test_coaching_scenarios.py`. Le registre `coaching/corrections-replay.json` du vault donne à chaque entrée de
-`coaching/corrections.md` son mode de rejeu ; `vault-check.py` signale celles qui attendent
-encore un scénario (`a-rejouer`). Les routes sont imposées
-par les fixtures et les lectures remplacées par des faits fictifs : ce banc évalue la
-rédaction, pas le routage réel ni les effets des outils. La relecture humaine reste nécessaire ;
-les compteurs de questions et paragraphes ne mesurent pas le naturel. Avec
-`--fixtures tests/fixtures/coaching-review-cases.json`, le même outil teste treize
-verdicts attendus et échoue sur un désaccord. Ces appels explicites sont payants, hors CI ;
-les tests déterministes couvrent séparément mémoire, échecs d'outils et transport.
+`python -m redline.cli.evaluate_coaching --output /tmp/coaching-evaluation.json` produces fictitious
+answers with the profiles of the provider in `AGENT_PROVIDER` (Claude in production: the
+scenario's route, judge on the N2 profile), with no tool, persistent memory or sending.
+`ClaudeCodeRunner.one_shot` launches `claude -p` in an empty folder, hence without `CLAUDE.md`,
+like the Codex bench; `evaluation/runner.py` bounds the billable models.
+The fixtures `tests/fixtures/coaching-scenarios.json` carry 36 scenarios, their
+context, posture, illustrative answer and acceptance criteria; those that originate from a
+real correction name their origin (`origin`), checked by `test_coaching_scenarios.py`. The vault's `coaching/corrections-replay.json` registry gives each entry of
+`coaching/corrections.md` its replay mode; `vault-check.py` flags those still waiting
+for a scenario (`a-rejouer`). The routes are imposed
+by the fixtures and the reads replaced by fictitious facts: this bench evaluates
+the wording, not the real routing nor the effects of the tools. Human review remains necessary;
+the question and paragraph counters do not measure naturalness. With
+`--fixtures tests/fixtures/coaching-review-cases.json`, the same tool tests thirteen
+expected verdicts and fails on a disagreement. These explicit calls are billable, outside CI;
+the deterministic tests separately cover memory, tool failures and transport.
 
-Le banc échoue aussi sur une réponse vide, un dépassement des budgets de forme ou
-un refus du juge sur une réponse générée. Le drapeau `emotional` des fixtures commande
-l'injection émotionnelle ; les bulles suivent le découpage partagé du transport.
+The bench also fails on an empty answer, an overrun of the form budgets or
+a judge refusal on a generated answer. The `emotional` flag of the fixtures controls
+emotional injection; the bubbles follow the transport's shared splitting.
 
-`python -m redline.cli.evaluate_conversation` complète ce banc avec douze situations et vingt et un
-tours. Il réinjecte les réponses produites au tour suivant, propose une variante
-`contextual` limitée à l'évaluation, et compare deux fichiers de résultats hors ligne
-avec une grille de lecture à l'aveugle. `--dry-run` exporte le contenu sans appel de
-modèle ; `--only` et `--repeat` bornent l'expérience. Il n'exécute ni triage réel,
-ni outil métier, ni envoi Messenger. Les compteurs décrivent la forme, sans désigner
-automatiquement une réponse plus naturelle ; la procédure, ses limites et la grille
-de lecture restent dans le code du banc (`evaluation/`) et ses fixtures.
+`python -m redline.cli.evaluate_conversation` complements this bench with twelve situations and twenty-one
+turns. It feeds the produced answers back into the next turn, offers a
+`contextual` variant limited to evaluation, and compares two result files offline
+with a blind reading grid. `--dry-run` exports the content without a model
+call; `--only` and `--repeat` bound the experiment. It runs no real triage,
+no business tool, no Messenger sending. The counters describe form, without
+automatically designating a more natural answer; the procedure, its limits and the reading grid
+remain in the bench code (`evaluation/`) and its fixtures.
 
-| Route | Codex | Repli Codex | Claude | Repli Claude | Session |
+| Route | Codex | Codex fallback | Claude | Claude fallback | Session |
 |---|---|---|---|---|---|
-| triage | GPT-6 Luna / low | — | Haiku 5.5 / low | — | isolée, lecture seule |
-| N0 | GPT-6 Luna / medium | GPT-6 Luna / high | Sonnet / low | Haiku 5.5 / low | continue |
-| N1 | GPT-6 Luna / high | GPT-6 Luna / high | Sonnet / low | Opus / medium | continue |
-| N2 | GPT-6 Sol / medium | GPT-6 Luna / max | Sonnet / high | Opus / high | continue |
-| N3 | GPT-6 Sol / high | GPT-6 Luna / max | Opus / medium | Sonnet / high | continue |
-| `/deep` | GPT-6 Sol / high | GPT-6 Luna / max | Opus / high | Sonnet / high | fork éphémère |
-| proactif lourd | GPT-6 Sol / high | GPT-6 Luna / max | Opus / high | Sonnet / high | isolée |
+| triage | GPT-6 Luna / low | — | Haiku 5.5 / low | — | isolated, read-only |
+| N0 | GPT-6 Luna / medium | GPT-6 Luna / high | Sonnet / low | Haiku 5.5 / low | continuous |
+| N1 | GPT-6 Luna / high | GPT-6 Luna / high | Sonnet / low | Opus / medium | continuous |
+| N2 | GPT-6 Sol / medium | GPT-6 Luna / max | Sonnet / high | Opus / high | continuous |
+| N3 | GPT-6 Sol / high | GPT-6 Luna / max | Opus / medium | Sonnet / high | continuous |
+| `/deep` | GPT-6 Sol / high | GPT-6 Luna / max | Opus / high | Sonnet / high | ephemeral fork |
+| heavy proactive | GPT-6 Sol / high | GPT-6 Luna / max | Opus / high | Sonnet / high | isolated |
 
-Côté Claude, Haiku est épinglé sur `claude-haiku-5-5` : l'alias `haiku` du CLI stable
-résout encore Haiku 4.5. Sonnet et Opus suivent leur alias, que le prévol nocturne affiche.
-N0 à N2 partagent Sonnet pour que la session continue garde son cache, propre à chaque
-modèle, et chaque repli change de modèle pour ne pas retomber sur le même quota.
+On the Claude side, Haiku is pinned to `claude-haiku-5-5`: the stable CLI's `haiku` alias
+still resolves to Haiku 4.5. Sonnet and Opus follow their alias, which the nightly preflight displays.
+N0 to N2 share Sonnet so that the continuous session keeps its cache, which is specific to each
+model, and each fallback changes model so as not to fall back on the same quota.
 
-Le triage n'a aucun repli : un échec ou un dépassement de `TRIAGE_TIMEOUT` (10 s)
-vaut N1. Chaque autre ligne possède un seul fallback explicite, réservé aux échecs de prévol ou de
-quota avant travail utile. Dès qu'un tour a commencé, une panne en vol, `/cancel` ou le
-watchdog est terminal : aucun autre modèle ne recommence le travail et l'entrant n'est
-pas rejoué. Le fallback de prévol reste transactionnel. En N1, il réessaie Luna High une seule
-fois avant tout travail utile, sans augmenter le coût du modèle. Les identifiants Codex par
-défaut sont `gpt-6-luna` et `gpt-6-sol`, y compris pour les surcharges et replis. Ce sont les
-noms de modèle actuellement publiés par OpenAI ; ils ne signifient pas « Luna/Sol, quelle que
-soit la génération » et ne basculeront pas automatiquement vers une future génération. Les efforts
-et watchdogs restent optimisés pour le coût, même au prix de la latence. Sol Max
-(Sol avec effort `max` ou `ultra`) est refusé au démarrage, y compris pour un fallback.
-La fenêtre proactive commence à `PROACTIVE_ACTIVE_START` et court jusqu'à minuit : elle
-n'a pas de fin configurable, et aucune durée de travail n'est confrontée à une fin de
-plage.
-Les variables `AGENT_<ROUTE>_MODEL`, `_EFFORT`, `_FALLBACK_MODEL` et
-`_FALLBACK_EFFORT` permettent de surcharger chaque ligne ; les anciennes variables
-plates `AGENT_MODEL*`/`AGENT_EFFORT*` ne sont plus lues.
+Triage has no fallback: a failure or an overrun of `TRIAGE_TIMEOUT` (10 s)
+counts as N1. Each other row has a single explicit fallback, reserved for preflight or
+quota failures before any useful work. Once a turn has started, an in-flight failure, `/cancel` or the
+watchdog is terminal: no other model restarts the work and the inbound message is not
+replayed. The preflight fallback stays transactional. At N1, it retries Luna High only once
+before any useful work, without raising the model's cost. The default Codex identifiers
+are `gpt-6-luna` and `gpt-6-sol`, including for overrides and fallbacks. These are the
+model names currently published by OpenAI; they do not mean "Luna/Sol, whatever the
+generation" and will not switch automatically to a future generation. Efforts
+and watchdogs stay optimized for cost, even at the price of latency. Sol Max
+(Sol with `max` or `ultra` effort) is refused at startup, including for a fallback.
+The proactive window starts at `PROACTIVE_ACTIVE_START` and runs until midnight: it
+has no configurable end, and no work duration is checked against the end of
+the window.
+The variables `AGENT_<ROUTE>_MODEL`, `_EFFORT`, `_FALLBACK_MODEL` and
+`_FALLBACK_EFFORT` allow overriding each row; the old flat variables
+`AGENT_MODEL*`/`AGENT_EFFORT*` are no longer read.
 
-La session ordinaire expire selon `SESSION_TTL_HOURS` et reste liée à son fournisseur et
-à l'empreinte de ses instructions (`prompts.instruction_digest`) : le prompt de style et
-le contenu des propriétaires lus sur disque, `CLAUDE.md` et `AGENTS.md`. Un changement
-de l'un d'eux abandonne le fil à son prochain tour ; un commit de notes, de journal ou
-de hot-cache ne le fait pas. Changer de route ne change pas cette règle : le modèle et
-l'effort sont transmis à chaque tour, tandis que `/deep` et les bilans lourds gardent
-leur contexte éphémère ou isolé.
+The ordinary session expires according to `SESSION_TTL_HOURS` and stays tied to its provider and
+to the fingerprint of its instructions (`prompts.instruction_digest`): the style prompt and
+the content of the owners read from disk, `CLAUDE.md` and `AGENTS.md`. A change
+to any of them abandons the thread at its next turn; a commit of notes, journal or
+hot-cache does not. Changing route does not change this rule: the model and
+effort are passed on each turn, while `/deep` and the heavy reviews keep
+their ephemeral or isolated context.
 
-Commandes disponibles :
+Available commands:
 
-- `/help` ;
-- `/status` ;
-- `/cancel` ;
-- `/renfo` pour renvoyer la carte prescrite aujourd'hui ;
-- `/clear` ;
-- `/deep <question>` pour un fork lourd ponctuel.
+- `/help`;
+- `/status`;
+- `/cancel`;
+- `/renfo` to resend the card prescribed today;
+- `/clear`;
+- `/deep <question>` for a one-off heavy fork.
 
-`/status` et `/cancel` contournent le worker afin de rester disponibles pendant un tour
-long. Les autres commandes restent sérialisées. `/clear` solde explicitement les
-messages tamponnés qu'il abandonne. L'indicateur de saisie s'allume dès la
-réception, avant le triage. Après 75 secondes, une seule phrase d'attente part, quel que
-soit le niveau ; elle est mémorisée dans la conversation comme un vrai message. Après
-90 secondes, un tour N2/N3 cesse seulement de rafraîchir l'indicateur.
+`/status` and `/cancel` bypass the worker so as to stay available during a long
+turn. The other commands stay serialized. `/clear` explicitly settles the
+buffered messages it abandons. The typing indicator turns on as soon as the message is
+received, before triage. After 75 seconds, a single waiting sentence is sent, whatever the
+level; it is stored in the conversation like a real message. After
+90 seconds, an N2/N3 turn only stops refreshing the indicator.
 
-## Programme hebdomadaire
+## Weekly program
 
-Le programme appartient à PostgreSQL et ses révisions sont append-only.
+The program belongs to PostgreSQL and its revisions are append-only.
 
 ```bash
 python -m redline.cli.week_plan show --week 2026-W33
@@ -441,178 +440,178 @@ python -m redline.cli.week_plan check --week 2026-W33
 python -m redline.cli.week_plan revise --week 2026-W33 < revision.json
 ```
 
-Codes de `check` et `show` :
+Codes of `check` and `show`:
 
-- `0` : prescriptible ;
-- `1` : absent ou invalide ;
-- `2` : valide, mais une précondition datée attend une réponse ;
-- `3` : périmé, à réviser avant de prescrire.
+- `0`: prescribable;
+- `1`: absent or invalid;
+- `2`: valid, but a dated precondition is waiting for an answer;
+- `3`: stale, to be revised before prescribing.
 
-Le bloc canonique est envoyé uniquement si ce qu'il reste à faire a changé, si l'athlète
-le demande, ou si une dette de livraison existe. Le numéro de révision seul ne suffit
-pas : une révision peut ne consigner que du passé.
+The canonical block is sent only if what remains to be done has changed, if the athlete
+asks for it, or if a delivery debt exists. The revision number alone is not
+enough: a revision may record only the past.
 
-La relecture de `revise`, `preview` et d'un changement préparé affiche l'écart de chaque
-course à venir à la plus longue des 30 jours précédents. Elle est informative et ne bloque
-rien : aucun pourcentage fixe ne borne la sortie longue. Les règles en vigueur, une
-ligne chacune, leurs seuils et les natures de transition vivent dans `rulebook.toml` à la
-racine du vault ; sans lui, le moteur applique `rulebook.default.toml`, qu'un vault
-remplace en entier, jamais en partie. `src/redline/model/rulebook.py` le valide (le service
-refuse de démarrer sur un règlement non conforme) et le relit s'il change. Le paquet de
-contexte l'injecte à chaque tour N1+ et au bilan.
+The read-back of `revise`, `preview` and a prepared change displays the gap between each
+upcoming race and the longest run of the previous 30 days. It is informative and blocks
+nothing: no fixed percentage bounds the long run. The rules in force, one
+line each, their thresholds and the kinds of transition live in `rulebook.toml` at the
+root of the vault; without it, the engine applies `rulebook.default.toml`, which a vault
+replaces entirely, never partially. `src/redline/model/rulebook.py` validates it (the service
+refuses to start on a non-conforming rulebook) and re-reads it if it changes. The context
+packet injects it at every N1+ turn and at the review.
 
-Une prescription de renforcement active est résolue contre les vraies fiches de séance
-pendant la validation : variante, retraits et garde-fou inconnus bloquent la révision
-avant activation. Le mot du matin arme ensuite une tâche durable `strength_card`,
-identifiée par semaine, révision, séance et date. Cette tâche et `/renfo` rendent la
-carte directement depuis le plan typé ; elles ne construisent aucun prompt et
-n'appellent jamais l'agent. Chaque tick rematérialise la dette du jour avec la même
-identité, ce qui récupère aussi un mot du matin manqué ou un redémarrage. La livraison
-reprend l'idempotence de l'enveloppe sortante.
+An active strength prescription is resolved against the real session sheets
+during validation: unknown variant, removals and guard block the revision
+before activation. The morning message then arms a durable `strength_card` task,
+identified by week, revision, session and date. This task and `/renfo` render the
+card directly from the typed plan; they build no prompt and
+never call the agent. Each tick rematerializes the day's debt with the same
+identity, which also recovers a missed morning message or a restart. Delivery
+reuses the idempotency of the outbound envelope.
 
-## Proactivité et livraison
+## Proactivity and delivery
 
-Le scheduler matérialise des jobs à identifiant stable : débrief Strava, mot du matin,
-revue hebdomadaire, recul mensuel, reprise après silence et relance de cellule.
-Une séance du plan peut porter un `start_time` local `HH:MM` ; s'il est absent, aucune
-heure n'est inventée. Le jeu de calibration (prédiction de la veille, J+1 en réponses
-rapides) est arrêté depuis le 2026-10-09 ; ses tables restent lisibles.
+The scheduler materializes jobs with a stable identifier: Strava debrief, morning message,
+weekly review, monthly look-back, resumption after silence and cell follow-up.
+A plan session can carry a local `start_time` `HH:MM`; if absent, no
+time is invented. The calibration game (previous day's prediction, D+1 in quick
+replies) is discontinued; its tables remain readable.
 
-Avant le tour du bilan hebdomadaire, le service calcule un dossier
-(`redline.analysis.weekly_dossier`) avec les mêmes fonctions que les CLI : semaine close,
-trajectoire de la sortie longue et stagnation, signaux, prédictions échues,
-échéances échues, capacités. Il l'injecte avec le paquet N2 ; un calcul en
-échec le remplace par une ligne qui renvoie aux CLI, sans retenir le bilan. Le projecteur
-crée le journal de la semaine courante et de la suivante quand un programme existe.
+Before the weekly review turn, the service computes a dossier
+(`redline.analysis.weekly_dossier`) with the same functions as the CLIs: closed week,
+long-run trajectory and stagnation, signals, due predictions,
+due deadlines, capabilities. It injects it with the N2 packet; a failed
+computation replaces it with a line pointing to the CLIs, without holding back the review. The projector
+creates the journal of the current week and of the next one when a program exists.
 
-La période d'un bilan appartient à sa clé durable : `weekly:2026-W34` clôt W34 et
-prépare W35, même si un retry ne repart que le lundi. Une initiative en échec est
-réclamée trois fois au plus (5, 15 puis 45 min d'écart, ou l'heure de retour annoncée
-par le fournisseur), toujours avec une expiration ; au-delà elle passe `failed` avec sa
-cause dans `last_error`, distincte d'un envoi réussi. Un texte déjà rédigé n'est jamais
-régénéré par ces reprises. Du lundi au samedi, une semaine en cours sans programme
-valide arme un job `weekly-repair:<semaine>` isolé, qui doit laisser une révision
-valide. Après une réparation opérateur, un job terminé ou en échec se rouvre sans SQL
-ad hoc, et cette commande reste volontairement hors du sandbox du coach :
+The period of a review belongs to its durable key: `weekly:2026-W34` closes W34 and
+prepares W35, even if a retry only starts on Monday. A failed initiative is
+claimed at most three times (5, 15 then 45 min apart, or the return time announced
+by the provider), always with an expiry; beyond that it goes `failed` with its
+cause in `last_error`, distinct from a successful send. A text already written is never
+regenerated by these retries. From Monday to Saturday, a current week without a valid
+program arms an isolated `weekly-repair:<semaine>` job, which must leave a valid
+revision. After an operator repair, a finished or failed job reopens without ad hoc
+SQL, and this command is deliberately kept outside the coach's sandbox:
 
 ```bash
 python -m redline.cli.proactive_job status --job-key weekly:2026-W34
 python -m redline.cli.proactive_job reopen --job-key weekly:2026-W34
 ```
 
-Les commandes opérateur s'exécutent depuis la racine, avec l'environnement du service
-(`DATABASE_URL` et le python du venv) : sur le déploiement de référence, un wrapper SSH
-du poste local les porte ; cette édition livre les CLIs, pas le wrapper.
+Operator commands run from the root, with the service's environment
+(`DATABASE_URL` and the venv's python): on the reference deployment, an SSH wrapper
+on the local workstation carries them; this edition ships the CLIs, not the wrapper.
 
-Un texte rédigé hors du service (un bilan fait depuis le Mac) part par la même chaîne,
-sans tour de modèle, avec `operator-message.py` : job fermé `operator_message`,
-prioritaire, périmé après 6 h, idempotent par sa clé, tracé en mémoire de conversation.
-Commande opérateur, hors du sandbox du coach :
+A text written outside the service (a review done from the Mac) goes through the same chain,
+without a model turn, with `operator-message.py`: closed `operator_message` job,
+high priority, stale after 6 h, idempotent by its key, traced in conversation memory.
+Operator command, outside the coach's sandbox:
 
 ```bash
 python -m redline.cli.operator_message --key bilan-w39 --text "…"
 ```
 
-`session_cycles` donne à chaque `plan_id + logical_key` une identité stable à travers les
-révisions append-only. Une nouvelle révision resynchronise le cycle et conserve l'état
-si les champs utiles n'ont pas changé ; une séance annulée ou retirée perd son retour
-digestif en attente. `session-cycle.py` enregistre un départ déclaré
-facultatif et un appariement explicite.
-L'observation Strava porte l'heure réelle : elle remplace l'heure effective, conserve
-le départ déclaré comme trace et ferme rétroactivement la séance si « j'y vais » a été
-oublié. Une ambiguïté de date et de type reste non appariée jusqu'au choix de l'athlète.
-Le webhook réveille le scheduler, qui capture aussitôt le distillat et ses tours dans
-`strava_activity_intakes` : la sortie entre au registre et le carnet peut demander ses
-ressentis avant le débrief. Le débrief part au premier signal que l'athlète a fini : titre
-renommé dans Strava (événement `update`, titre et description s'enregistrent ensemble),
-ressentis complets dans le carnet, ou message Messenger, dont la réponse porte alors le
-débrief au lieu de le repousser de huit minutes. Sinon il part après
-`STRAVA_DEBRIEF_DELAY`. Le service injecte au débrief un instantané borné de ce fait
-persistant, titre et description relus juste avant, ressentis déjà donnés compris : le
-modèle ne refait pas l'appel Strava et un redémarrage relit la capture avant tout réseau.
-Une capture ratée se reprend à la minute pendant trois minutes, puis toutes les 5 min.
+`session_cycles` gives each `plan_id + logical_key` a stable identity across the
+append-only revisions. A new revision resynchronizes the cycle and keeps its state
+if the relevant fields have not changed; a cancelled or removed session loses its pending
+digestive follow-up. `session-cycle.py` records an optional declared
+departure and an explicit match.
+The Strava observation carries the real time: it replaces the effective time, keeps
+the declared departure as a trace and retroactively closes the session if "I'm going"
+was forgotten. An ambiguity of date and type stays unmatched until the athlete chooses.
+The webhook wakes the scheduler, which immediately captures the distillate and its laps in
+`strava_activity_intakes`: the outing enters the ledger and the notebook can ask for its
+feelings before the debrief. The debrief goes out at the first sign that the athlete is done: title
+renamed in Strava (`update` event, title and description are recorded together),
+complete feelings in the notebook, or a Messenger message, whose answer then carries the
+debrief instead of pushing it back by eight minutes. Otherwise it goes out after
+`STRAVA_DEBRIEF_DELAY`. The service injects into the debrief a bounded snapshot of this
+persistent fact, title and description re-read just before, feelings already given included: the
+model does not redo the Strava call and a restart re-reads the capture before any network.
+A failed capture is retried every minute for three minutes, then every 5 min.
 
-La même matérialisation transforme les autres faits typés en initiatives idempotentes :
-séance manquée, signal quotidien, pré-mortem de course, suivi digestif, usure du
-matériel, correction spontanée et contradiction d'une hausse de charge. Une correction
-s'annonce dans les 7 jours qui suivent son enregistrement, ou jamais : l'annonce expire
-et `fact-read.py corrections` le dit, avec le nombre de récidives tiré du journal d'audit.
-`fact-write.py correction` exige `--entry`, le titre d'une entrée déjà écrite dans
-`coaching/corrections.md`. Seules les
-échéances `race` déclenchent un scénario ; une `availability` interdit mécaniquement une
-séance exigeante sur sa plage. Rappel pré-séance, repère mental minuté, alerte météo et
-rendez-vous médical ont été retirés le 2026-09-28 (migration `0039`).
+The same materialization turns the other typed facts into idempotent initiatives:
+missed session, daily signal, race pre-mortem, digestive follow-up, gear
+wear, spontaneous correction and contradiction of a load increase. A correction
+is announced within 7 days of being recorded, or never: the announcement expires
+and `fact-read.py corrections` says so, with the number of recurrences drawn from the audit log.
+`fact-write.py correction` requires `--entry`, the title of an entry already written in
+`coaching/corrections.md`. Only
+`race` deadlines trigger a scenario; an `availability` mechanically forbids a
+demanding session in its range. Pre-session reminder, timed mental cue, weather alert and
+medical appointment have been removed (migration `0039`).
 
-Les derniers échanges livrés et les questions ouvertes vivent dans
-`conversation_messages` et `conversation_questions`. Une question n'est ouverte que par
-une commande `question.ask` appliquée dont le texte figure dans le message livré ; la
-prose seule n'en crée aucune. Une question restée ouverte quatorze jours sans examen est
-fermée en `expired` pendant la maintenance. Cette mémoire datée est injectée
-à chaque tour : huit échanges avec leurs identifiants, vingt questions au maximum et
-les sujets conservés. Les lignes de service (attente, panne, limite) restent en base
-mais ne comptent pas parmi les huit. En N2 et N3, le paquet métier porte déjà les fils
-ouverts : le souvenir ne les rend pas une seconde fois. Les douze dernières questions closes restent visibles avec leur
-réponse ou leur limite, pour éviter de les reposer. Les textes longs signalent leur
-abrègement et gardent leur fin. `fact-read.py conversation --query <sujet>` recherche
-les anciens échanges en français et donne le message daté avec ses voisins. Le service
-lie le tour à son PSID dans `turn_scopes` ; la CLI refuse un tour absent ou expiré, sans
-exposer l'identifiant Messenger au shell. `knowledge-search.py --query <sujet>` repère les fiches
-théoriques ; son résultat est un index à ouvrir, pas une preuve déjà lue.
-`fact-read.py questions --limit 1000` permet de retrouver les questions plus anciennes.
-Un mot commun, un chiffre, un oui ou une réponse Messenger ne clôt aucune question.
-Le coach examine explicitement la réponse avec `fact-write.py question`, qui porte les
-identifiants de question et de message, une note et un état : `open` pour une réponse
-partielle, `answered` pour une réponse suffisante, `deferred` pour une reprise ultérieure
-et `expired` pour un sujet fermé. Une date de reprise n'est enregistrée que si convenue.
-La note conserve ce qui a été compris et ce qui manque ; aucune réponse partielle ne
-devient automatiquement une réponse complète. La revue est transactionnelle et exige
-un message ultérieur de la même personne. Une correction
-enregistrée est rapprochée du texte entrant par recouvrement lexical et n'est poussée
-spontanément qu'une fois.
+The latest delivered exchanges and the open questions live in
+`conversation_messages` and `conversation_questions`. A question is opened only by
+an applied `question.ask` command whose text appears in the delivered message; prose
+alone creates none. A question left open for fourteen days without review is
+closed as `expired` during maintenance. This dated memory is injected
+at every turn: eight exchanges with their identifiers, at most twenty questions and
+the retained topics. Service lines (waiting, outage, limit) stay in the database
+but do not count among the eight. At N2 and N3, the business packet already carries the open
+threads: the memory does not render them a second time. The last twelve closed questions stay visible with their
+answer or their limit, to avoid asking them again. Long texts flag their
+shortening and keep their end. `fact-read.py conversation --query <sujet>` searches
+past exchanges in French and gives the dated message with its neighbors. The service
+binds the turn to its PSID in `turn_scopes`; the CLI refuses a missing or expired turn, without
+exposing the Messenger identifier to the shell. `knowledge-search.py --query <sujet>` locates the
+theory sheets; its result is an index to open, not proof already read.
+`fact-read.py questions --limit 1000` makes it possible to find older questions.
+A common word, a number, a yes or a Messenger reply closes no question.
+The coach explicitly reviews the answer with `fact-write.py question`, which carries the
+question and message identifiers, a note and a state: `open` for a partial
+answer, `answered` for a sufficient answer, `deferred` for a later resumption
+and `expired` for a closed topic. A resumption date is recorded only if agreed.
+The note keeps what was understood and what is missing; no partial answer
+automatically becomes a complete answer. The review is transactional and requires
+a later message from the same person. A recorded correction
+is matched to the inbound text by lexical overlap and is spontaneously pushed
+only once.
 
-Les questions du modèle sont déclarées par `fact-write.py ask --text ...`, avec les
-seules clés `--cell` demandées. Leur texte exact doit avoir été livré avant de créer
-la question et ses marqueurs ; une simple réponse ne marque plus tous les ressentis
-comme demandés. Le suivi est réservé à une information attendue : une question sociale
-ou rhétorique ne se déclare pas. Un rendu fermé n'a pas de tour ; il nomme lui-même la
-question qu'il attend (`ClosedProactive.question`), créée après livraison confirmée sous
-la même condition de présence dans le texte parti. Avant l'envoi, le service renonce si
-cette question exacte est encore ouverte ou reportée, ou soldée depuis moins de trois
-jours. La prise de nouvelles après un silence et le message opérateur n'ouvrent aucune
+The model's questions are declared by `fact-write.py ask --text ...`, with only the
+`--cell` keys requested. Their exact text must have been delivered before creating
+the question and its markers; a simple answer no longer marks all feelings
+as asked. Follow-up is reserved for an expected piece of information: a social
+or rhetorical question is not declared. A closed rendering has no turn; it names itself the
+question it expects (`ClosedProactive.question`), created after confirmed delivery under
+the same condition of presence in the text sent. Before sending, the service gives up
+if this exact question is still open or deferred, or was settled less than three
+days ago. Checking in after a silence and the operator message open no
 question.
-Les informations manquantes ne forcent pas un questionnaire et ne sont pas injectées
-dans un tour N0 ou émotionnel. Une relance différée relit les cellules encore inconnues,
-écarte celles déjà demandées et n'en demande qu'une, en priorité la douleur d'effort.
-Le paquet de contexte distingue une section vide d'une lecture PostgreSQL échouée,
-et conserve les autres sections disponibles. Il date la lecture, identifie les états
-quotidiens historiques et signale qu'une nuit ancienne ou de date incohérente ne
-décrit pas la nuit du jour. Mesures objectives et ressenti déclaré restent distincts :
-une contradiction demande une vérification des sources, jamais une fusion implicite.
+Missing information does not force a questionnaire and is not injected
+into an N0 or emotional turn. A deferred follow-up re-reads the still-unknown cells,
+discards those already asked and asks only one, effort pain first.
+The context packet distinguishes an empty section from a failed PostgreSQL read,
+and keeps the other available sections. It dates the read, identifies the historical
+daily states and flags that an old night or one with an inconsistent date does not
+describe tonight. Objective measurements and declared feeling remain distinct:
+a contradiction calls for a check of the sources, never an implicit merge.
 
-Les initiatives revérifient les entrants en attente, le tour réactif en cours et le
-délai de silence de huit minutes avant leur préparation puis avant l'envoi. Une reprise
-de conversation remet le job en attente sans détruire son texte : l'enveloppe préparée
-est conservée et livrée plus tard sans nouveau tour de modèle, sauf si la révision du
-programme a changé entre-temps. Les initiatives légères travaillent dans un fork de la
-conversation, les bilans lourds dans une session isolée ; aucune n'efface la session
-conversationnelle. Les faits déjà validés restent enregistrés. Les cartes automatiques et messages composés localement suivent aussi
-ce contrôle d'activité. Il porte sur les messages reçus, pas sur la saisie d'un brouillon.
-Un envoi partiel ne mémorise que les fragments confirmés, ne marque pas les mesures
-non demandées et n'est pas rejoué intégralement. Un envoi déjà engagé dans la Send API
-ne peut pas être rappelé.
+Initiatives re-verify the pending inbound messages, the reactive turn in progress and the
+eight-minute silence delay before their preparation and then before sending. A resumption
+of the conversation puts the job back on hold without destroying its text: the prepared envelope
+is kept and delivered later without a new model turn, unless the program revision
+changed in between. Light initiatives work in a fork of the
+conversation, heavy reviews in an isolated session; none erases the conversational
+session. Facts already validated stay recorded. Automatic cards and locally composed messages also follow
+this activity check. It applies to received messages, not to typing a draft.
+A partial send stores only the confirmed fragments, does not mark the unrequested
+measurements and is not replayed in full. A send already committed to the Send API
+cannot be recalled.
 
-Un swipe-reply Messenger reste une relation explicite de bout en bout. Le webhook garde
-`message.reply_to.mid`, tandis que chaque texto accepté par la Send API garde son MID et
-son morceau exact dans `messenger_message_refs`. Au tour suivant, le message cité est
-injecté comme contexte ciblé sans modifier le texte brut utilisé par le triage. Une
-référence antérieure à cette rétention est signalée comme inconnue : elle n'est jamais
-reconstruite au jugé.
+A Messenger swipe-reply remains an explicit relationship end to end. The webhook keeps
+`message.reply_to.mid`, while each text accepted by the Send API keeps its MID and
+its exact chunk in `messenger_message_refs`. At the next turn, the quoted message is
+injected as targeted context without modifying the raw text used by triage. A
+reference older than this retention is flagged as unknown: it is never
+reconstructed by guesswork.
 
-Les prédictions de décision ont une probabilité, une échéance, un verdict et un score de
-Brier. Toute hausse concrète d'une cible ou d'un plafond dans une révision ultérieure
-exige une prédiction `direction=increase` déjà challengée ; cette autorisation est
-consommée par une seule révision. Le refus est donc transactionnel, pas une consigne que
-le modèle peut oublier.
+Decision predictions have a probability, a deadline, a verdict and a
+Brier score. Any concrete increase of a target or a cap in a later revision
+requires an already challenged `direction=increase` prediction; this authorization is
+consumed by a single revision. The refusal is therefore transactional, not an instruction
+the model can forget.
 
 ```bash
 python -m redline.cli.session_cycle pending --week 2026-W34
@@ -621,70 +620,70 @@ python -m redline.cli.fact_read predictions
 python -m redline.cli.fact_read gear
 ```
 
-Cycle normal : `pending` -> `running` -> `done`. Une erreur avant livraison remet le
-job en attente avec une expiration bornée. Au démarrage, les jobs restés `running`
-redeviennent `pending`.
+Normal cycle: `pending` -> `running` -> `done`. An error before delivery puts the
+job back on hold with a bounded expiry. At startup, jobs left `running`
+become `pending` again.
 
-La détection et le rythme d'envoi ne journalisent pas un envoi. Il n'existe aucun
-plafond journalier d'initiatives : chaque job garde sa propre pertinence via
-`expires_at`. Après livraison seulement, le service mémorise l'heure du dernier envoi,
-termine le job dans une même transaction, puis ajoute `proactive_messages`.
+Detection and send pacing do not journal a send. There is no daily
+cap on initiatives: each job keeps its own relevance via
+`expires_at`. Only after delivery does the service store the time of the last send,
+finish the job in a single transaction, then add `proactive_messages`.
 
-## Projections et Git
+## Projections and Git
 
-Chaque mutation de fait marque `projection_states` comme sale. Le projecteur régénère
-toutes les vues sous verrou PostgreSQL, exécute les générateurs statiques, puis acquitte
-l'état seulement si l'ensemble a réussi.
+Each fact mutation marks `projection_states` as dirty. The projector regenerates
+all views under a PostgreSQL lock, runs the static generators, then acknowledges
+the state only if everything succeeded.
 
-Git versionne ces vues et les notes du vault. Un tour ne fait qu'un commit local ; la
-régénération des vues, le commit des projections et le push ont lieu après la livraison
-(`VaultRepo.publish`), ou pendant la maintenance du worker toutes les dix minutes. Un push
-impossible laisse un commit local valide, produit une alerte et se retente au passage
-suivant. La synchronisation distante se fait entre les tours et n'intègre que les commits
-sans changement de runtime.
+Git versions these views and the vault notes. A turn makes only a local commit; view
+regeneration, the commit of projections and the push happen after delivery
+(`VaultRepo.publish`), or during worker maintenance every ten minutes. A push
+that cannot go through leaves a valid local commit, raises an alert and is retried on the next
+pass. Remote synchronization happens between turns and merges only commits
+without a runtime change.
 
-## Déploiement
+## Deployment
 
-Le déploiement est externe au service : sauvegarde préalable, mise à jour du dépôt,
-installation des dépendances, migrations, contrôles, redémarrage systemd, vérification
-du commit **effectivement démarré**, puis sauvegarde post-déploiement. La présence d'un
-HTTP 200 seule ne prouve pas que le nouveau code tourne.
+Deployment is external to the service: prior backup, repository update,
+dependency installation, migrations, checks, systemd restart, verification
+of the commit **actually started**, then post-deployment backup. An HTTP 200
+alone does not prove that the new code is running.
 
-`Type=simple` confirme seulement que le processus Python a été lancé : Waitress peut
-encore être en train d'ouvrir le port. L'unité exécute donc `deploy/wait-ready.sh` dans
-`ExecStartPost` et ne termine le démarrage systemd qu'après un `/ready` HTTP 200. Le
-vérificateur de release réutilise le même délai borné de 90 s avant de contrôler le
-commit, le stockage, le schéma et le worker. Il exige aussi que le commit attendu soit
-un ancêtre du checkout sans différence runtime, et compare l'empreinte des arbres
-`deploy/`, `src/` et `migrations/` du moteur à `runtime_tree` de `/health` : un commit du vault
-posé par-dessus ne fait plus échouer la vérification, un code différent si. Un démarrage lent attend ; une readiness
-qui ne revient vraiment pas fait échouer le démarrage avec le dernier code HTTP visible.
+`Type=simple` only confirms that the Python process was launched: Waitress may
+still be opening the port. The unit therefore runs `deploy/wait-ready.sh` in
+`ExecStartPost` and completes the systemd startup only after an HTTP 200 from `/ready`. The
+release verifier reuses the same bounded 90 s delay before checking the
+commit, storage, schema and worker. It also requires the expected commit to be
+an ancestor of the checkout with no runtime difference, and compares the fingerprint of the engine's
+`deploy/`, `src/` and `migrations/` trees to `runtime_tree` from `/health`: a vault commit
+laid on top does not fail the verification, different code does. A slow start waits; a readiness
+that really does not come back fails the startup with the last visible HTTP code.
 
-Le service Python utilise `/home/ubuntu/.venvs/redline-current`, un lien vers le venv
-actif. Le timer `redline-agent-runtime-update.timer` met à jour chaque nuit à 03 h, heure
-de Paris, le runtime du seul fournisseur que lit le service (`AGENT_PROVIDER`, lu comme
-systemd : unité puis fichier d'environnement). `deploy/agent-runtime-update.py` porte une
-transaction unique et deux adaptateurs :
+The Python service uses `/home/ubuntu/.venvs/redline-current`, a link to the active
+venv. The `redline-agent-runtime-update.timer` timer updates every night at 03:00, Paris
+time, the runtime of the only provider the service reads (`AGENT_PROVIDER`, read like
+systemd: unit then environment file). `deploy/agent-runtime-update.py` carries a single
+transaction and two adapters:
 
 | | Codex | Claude |
 |---|---|---|
-| Version cible | dernière stable d'`openai-codex` dans `requirements.txt` | canal npm `stable` d'Anthropic, borné par `deploy/claude-runtime.txt` |
-| Candidat | venv `~/.venvs/redline-codex-<version>-<empreinte>` | préfixe npm `~/.claude-runtimes/claude-code-<version>` |
-| Lien basculé | `~/.venvs/redline-current` | `~/.claude-runtimes/current`, en tête du `PATH` du service |
-| Prévol | `codex-runtime-smoke.py` | `claude-runtime-smoke.py`, avec l'identité et l'environnement exacts du service (`systemd-run`) |
-| Activation | redémarrage, `/health` et `/ready` | aucun redémarrage : chaque tour lance un nouveau `claude` |
+| Target version | latest stable `openai-codex` in `requirements.txt` | Anthropic npm `stable` channel, bounded by `deploy/claude-runtime.txt` |
+| Candidate | venv `~/.venvs/redline-codex-<version>-<empreinte>` | npm prefix `~/.claude-runtimes/claude-code-<version>` |
+| Switched link | `~/.venvs/redline-current` | `~/.claude-runtimes/current`, at the head of the service `PATH` |
+| Preflight | `codex-runtime-smoke.py` | `claude-runtime-smoke.py`, with the service's exact identity and environment (`systemd-run`) |
+| Activation | restart, `/health` and `/ready` | no restart: each turn launches a new `claude` |
 
-Les candidats se construisent en `ubuntu`, jamais en root. Les deux prévols lisent les
-modèles dans `redline.routing.default_models`, la seule liste du dépôt ; le prévol Claude
-affiche l'identifiant que chaque alias résout, reprend avec le candidat une session
-écrite par l'actif, puis exige qu'un appel de CLI du coach (`week-plan.py preview
---input <fichier du tour>`) passe les permissions exactes d'un tour autonome
-(`redline.claude.AUTONOMOUS_PERMISSIONS`). Tout échec après bascule restaure le lien précédent. Une mise à jour
-refusée reste visible dans `journalctl -u redline-agent-runtime-update.service` ; la
-prochaine nuit réessaie. L'auto-update de Claude Code est coupé (`DISABLE_AUTOUPDATER=1`)
-: seule cette transaction promeut une version. Sans lien Claude géré, le `PATH` retombe
-sur l'installation npm globale, qui ne sert plus que d'amorce. Le venv historique
-`redline-3.12` reste conservé comme secours.
+Candidates are built as `ubuntu`, never as root. Both preflights read the
+models from `redline.routing.default_models`, the repository's only list; the Claude preflight
+displays the identifier each alias resolves to, resumes with the candidate a session
+written by the active one, then requires a coach CLI call (`week-plan.py preview
+--input <turn file>`) to pass the exact permissions of an autonomous turn
+(`redline.claude.AUTONOMOUS_PERMISSIONS`). Any failure after the switch restores the previous link. A refused
+update stays visible in `journalctl -u redline-agent-runtime-update.service`; the
+next night retries. Claude Code auto-update is turned off (`DISABLE_AUTOUPDATER=1`)
+: only this transaction promotes a version. Without a managed Claude link, the `PATH` falls back
+to the global npm installation, which then serves only as a seed. The legacy venv
+`redline-3.12` is kept as a fallback.
 
 ```bash
 cd /home/ubuntu/redline
@@ -696,7 +695,7 @@ for unit in redline-codex-runtime-update redline-agent-runtime-update; do
     done
   fi
 done
-# Migration unique : l'ancien timer Codex est remplacé par le timer générique.
+# One-time migration: the old Codex timer is replaced by the generic timer.
 sudo systemctl disable redline-codex-runtime-update.timer 2>/dev/null || true
 sudo rm -f /etc/systemd/system/redline-codex-runtime-update.{service,timer} \
   /usr/local/sbin/redline-codex-runtime-update
@@ -755,24 +754,24 @@ sudo systemctl start redline-backup.service
 sudo systemctl is-failed --quiet redline-backup.service && exit 1
 ```
 
-Les deux sauvegardes doivent produire une archive, un manifeste et un checksum valides.
-Dans le déploiement de référence, la collecte hors VPS est un workflow GitHub Actions
-privé : il récupère l'archive, ne possède pas la clé privée `age` et ne peut donc pas
-prétendre la restaurer. Après une modification de la chaîne de sauvegarde, puis au
-moins une fois par mois, le drill Docker décrit dans `docs/storage-architecture.md`
-restaure la dernière archive pour de vrai. Adapter le checkout au mécanisme de
-déploiement réel. Ne jamais faire porter ces étapes à un message utilisateur ou à un
-processus agent.
+Both backups must produce a valid archive, manifest and checksum.
+In the reference deployment, off-VPS collection is a private GitHub Actions
+workflow: it fetches the archive, does not hold the `age` private key and therefore cannot
+claim to restore it. After a change to the backup chain, then at
+least once a month, the Docker drill described in `docs/storage-architecture.md`
+actually restores the latest archive. Adapt the checkout to the real
+deployment mechanism. Never have these steps carried out by a user message or an
+agent process.
 
-### Ajouter une CLI utilisable par le coach
+### Adding a CLI the coach can use
 
-Un nouveau module sous `src/redline/cli/` est **refusé par défaut** : rendre automatiquement
-exécutable toute future commande transformerait le répertoire entier en capacité implicite.
-S'il est nécessaire dans un tour Messenger, ajouter son nom à
-`deploy/agent-cli-tools.txt` et le référencer dans le prompt concerné. Les tests refusent
-une entrée absente, non triée, inexistante ou une CLI citée par les prompts mais oubliée
-du manifeste. Le déploiement installe ce manifeste hors du vault en `root:root` ; le
-coach ne peut donc pas élargir lui-même ses permissions.
+A new module under `src/redline/cli/` is **refused by default**: automatically making
+every future command executable would turn the whole directory into an implicit capability.
+If it is needed in a Messenger turn, add its name to
+`deploy/agent-cli-tools.txt` and reference it in the relevant prompt. The tests reject
+a missing, unsorted or nonexistent entry, or a CLI cited by the prompts but left out
+of the manifest. Deployment installs this manifest outside the vault as `root:root`; the
+coach therefore cannot widen its own permissions.
 
 ## Validation
 
@@ -784,32 +783,32 @@ coach ne peut donc pas élargir lui-même ses permissions.
 python -m redline.cli.vault_check
 ```
 
-`vulture` lit le code de production sans les tests (configuration dans
-`pyproject.toml`) : une fonction que seul son propre test appelle est du code mort.
-Un faux positif se déclare nommément dans `ignore_names`.
+`vulture` reads the production code without the tests (configuration in
+`pyproject.toml`): a function that only its own test calls is dead code.
+A false positive is declared by name in `ignore_names`.
 
-Les tests PostgreSQL s'exécutent lorsque `TEST_DATABASE_URL` pointe vers une base de
-test migrée avec un rôle d'administration ; sinon ils sont signalés comme ignorés.
+PostgreSQL tests run when `TEST_DATABASE_URL` points to a migrated test
+database with an administration role; otherwise they are reported as skipped.
 
-## Hôte : pare-feu, mises à jour, SSH
+## Host: firewall, updates, SSH
 
-`deploy/host/` porte la configuration de la machine (firewalld, mises à jour
-automatiques, SSH). `sudo deploy/host/install.sh` la valide puis l'installe,
-sans redémarrer aucun service applicatif.
+`deploy/host/` carries the machine's configuration (firewalld, automatic
+updates, SSH). `sudo deploy/host/install.sh` validates then installs it,
+without restarting any application service.
 
-- **Pare-feu** : firewalld, zone `public` (ssh, http, https, dhcpv6-client), seconde
-  couche derrière la Security List Oracle ; les interfaces Docker sont dans la zone
-  `docker`. Lecture : `sudo firewall-cmd --list-all`. `rpcbind` est masqué.
-- **Mises à jour** : `unattended-upgrades` couvre aussi Caddy et Docker. Téléchargement
-  à 03:20, installation à 03:40, redémarrage à 04:00 si un noyau l'exige : c'est le
-  creux d'activité du VPS. Le service, Caddy et Postgres repartent seuls.
-- **SSH** : clé uniquement (image Oracle), `X11Forwarding no`, `MaxAuthTries 3`,
-  fail2ban actif.
+- **Firewall**: firewalld, `public` zone (ssh, http, https, dhcpv6-client), a second
+  layer behind the Oracle Security List; the Docker interfaces are in the
+  `docker` zone. Reading: `sudo firewall-cmd --list-all`. `rpcbind` is masked.
+- **Updates**: `unattended-upgrades` also covers Caddy and Docker. Download
+  at 03:20, installation at 03:40, reboot at 04:00 if a kernel requires it: this is the
+  VPS's activity trough. The service, Caddy and Postgres restart on their own.
+- **SSH**: key only (Oracle image), `X11Forwarding no`, `MaxAuthTries 3`,
+  fail2ban active.
 
-Contrôle : `systemctl list-timers 'apt-daily*'`,
+Check: `systemctl list-timers 'apt-daily*'`,
 `sudo tail /var/log/unattended-upgrades/unattended-upgrades.log`, `last -x reboot`.
 
-## Diagnostic
+## Diagnostics
 
 ```bash
 sudo systemctl status coach-messenger
@@ -818,163 +817,162 @@ curl -s http://127.0.0.1:8000/health
 curl -s http://127.0.0.1:8000/ready
 ```
 
-Ordre de vérification :
+Order of verification:
 
-1. configuration et connexion PostgreSQL au démarrage ;
-2. événements `redline.events` (une ligne JSON par étape, sans texte de message) :
-   `triage`, `model`, `apply`, `shape`, `deliver` partagent le `turn_id` d'un tour ;
-   `shape` mesure l'enveloppe (bulles selon le découpage du transport, caractères de
-   prose, parties et caractères ajoutés par le service, points d'interrogation), sans
-   aucun texte ; les jobs proactifs portent `job_id`, `kind` et `outcome` ;
-3. lignes `Incident interne`, échecs de projection ou de push ;
-4. `week-plan.py check` pour les semaines citées ;
-5. `vault-check.py` ;
-6. `inbound_messages`, `proactive_jobs` (`failed` + `last_error`) et `projection_states`
-   en lecture seule ;
-7. timer et âge de la dernière sauvegarde PostgreSQL chiffrée.
+1. configuration and PostgreSQL connection at startup;
+2. `redline.events` events (one JSON line per step, no message text):
+   `triage`, `model`, `apply`, `shape`, `deliver` share the `turn_id` of a turn;
+   `shape` measures the envelope (bubbles according to the transport's splitting, characters of
+   prose, parts and characters added by the service, question marks), with
+   no text at all; proactive jobs carry `job_id`, `kind` and `outcome`;
+3. `Incident interne` lines, projection or push failures;
+4. `week-plan.py check` for the weeks cited;
+5. `vault-check.py`;
+6. `inbound_messages`, `proactive_jobs` (`failed` + `last_error`) and `projection_states`
+   read-only;
+7. timer and age of the latest encrypted PostgreSQL backup.
 
-Les décisions historiques restent dans Git. Ce document décrit uniquement le système
-actuel.
+Historical decisions stay in Git. This document describes only the current
+system.
 
-Le paquet de contexte conserve séparément jusqu'à huit lectures matinales antérieures
-sur 56 jours, même si les dix dernières observations sont toutes des activités. Ces
-repères datés ne sont pas une mesure du jour. La mémoire
-et les contrôles distinguent une réponse suffisante d'une certitude impossible : les
-réponses partielles se cumulent, une estimation conserve sa réserve et une collecte
-impossible se clôt sans lever automatiquement une condition de sécurité.
+The context packet separately keeps up to eight earlier morning readings
+over 56 days, even if the last ten observations are all activities. These dated
+markers are not a measurement of the day. Memory
+and checks distinguish a sufficient answer from an impossible certainty: partial
+answers accumulate, an estimate keeps its reservation and an impossible collection
+closes without automatically lifting a safety condition.
 
-## Carnet privé
+## Private notebook
 
-`/carnet` est un tableau de bord en trois rubriques, avec la charte des cartes et la
-structure d'une app iOS : une barre d'onglets flottante en verre, une barre du haut
-(retour à gauche, réglages à droite, fond plein comme la bande d'état iOS) et un grand
-titre qui s'y replie au défilement.
-Chaque rubrique est une racine ; tout le reste se pousse par-dessus et recule d'un cran
-comme dans UINavigationController : l'écran poussé arrive par la droite, le précédent
-recule d'un tiers en s'assombrissant, et le retour (bouton rond, onglet retouché, ou
-glisser vers la droite depuis n'importe où, comme sur iOS 26) fait l'inverse ; la barre
-d'onglets reste fixe. Les écrans poussés
-n'entrent pas dans l'historique du navigateur : son geste emportait une capture de
-toute la page, barre d'onglets comprise. Chaque onglet garde sa pile ; retoucher l'onglet actif ramène à sa
-racine, puis en haut. **Aujourd’hui** est un fil (maquette A du 2026-10-09) : les
-étapes du jour dans l'ordre, reliées par un filet, et un seul point rouge sur la première
-qui attend un geste. Le point du matin (trace, sommeil, charge de vie) avant 14 h, les
-ressentis en retard d'un autre jour, la séance faite (fait face aux plafonds, puis ses
-ressentis une question à la fois, et la question d'une FC haute), la séance à venir
-(consigne, puis avant de partir : météo à l'heure prévue, nuit, alerte FC à régler), le
-renfo et son bouton. Un jour de repos tient en une ligne et la fiche de demain suit en
-entier. Puis **À venir** (une ligne par jour, la météo pour demain seulement) et
-**Repères**, trois tuiles qui mènent au détail : la semaine en mini-barres (vers
-Semaine), le pic de douleur face au plafond (écran Douleur, `GET /carnet-api/injury` : un point
-par séance notée et les réveils sur cinq semaines calendaires, l'échelle de l'athlète, le
-pic par semaine, les réveils sans note ; aucun verdict), le compte à rebours (vers Course). La météo dit le ciel et le ressenti au départ, puis la nuit par rapport à la
-séance (avant, pendant, après), avec un picto en couleur dans une pastille teintée du
-ciel du départ (code WMO, jour ou nuit). La bande d'état iOS (26+)
-copie l'élément opaque le plus haut sur le bord supérieur : la barre du haut y reste
-seule et prend elle-même la couleur de l'état (voilée sous la feuille des réglages,
-noire avec fermer et partager sous la visionneuse) ; `theme-color` ne sert plus qu'au
-lancement. **Semaine** s'ouvre toujours sur la semaine en cours :
-un chiffre (km faits sur la cible), une barre, la semaine en barres (plein = fait,
-pointillé = prévu), puis sept lignes, une par jour, avec un
-seul chiffre (le fait à l'encre, le prévu en gris) et un dépassement en une phrase
-rouge ; une sortie faite ouvre son **détail de séance**, le reste (prévu, sauté) se
-déplie au toucher, un jour à la fois. En bas, les semaines passées (`GET /carnet-api/weeks` : le fait du
-registre et la cible de la révision) se poussent comme des écrans, avec leur bilan.
-Le **détail de séance** (`GET /carnet-api/session/<observation>`, aussi depuis la séance
-faite d'Aujourd'hui) est calculé par `redline/session_detail.py` : la tête (distance,
-temps, allure, la séance en une barre), le ressenti (la question en un geste tant qu'il
-en manque), le prévu face au fait, puis les répétitions d'une qualité (lues sur les tours
-comme la carte, `debrief.lap_blocks`) ou les kilomètres d'une autre sortie, la FC sur le
-fond de ses zones, le temps par zone, la séance précédente du même type, la météo, les
-chaussures et la semaine. Les flux allégés et la météo horaire sont relevés chez Strava et
-Open-Meteo au premier affichage, puis gardés dans `strava_activity_intakes.streams` et
-`.weather` ; une panne laisse l'écran sans son graphique. Les zones sont celles de
-Karvonen (`src/redline/model/hr_zones.py`) sur la FC de repos et la FC max de
-`redline.toml`, jamais celles de Strava. Sur une
-qualité, la réserve (garde-fou n°6) se déclare d'un geste tant que la séance est dans sa
-fenêtre de complétude : `reserve:<observation>` écrit la mesure `reps_in_reserve`.
-**Course** : J-N, plus longue sortie, jalons, capacités, archives.
-`redline/notebook_board.py` calcule tout à la lecture : la révision active porte
-l'intention, le registre le fait, `ledger.py` et `signals.py` les comptes.
-Aucun chiffre n'est stocké pour le carnet ; un programme absent ne prescrit rien, un
-contrôle daté échu retient ses séances, une révision à réarbitrer le dit. Le carnet
-compare le fait aux plafonds typés (`hr_cap_bpm`, `rpe_max`, `duration_cap_min`,
-`distance_cap_km`) et affiche `volume_target_km` ; il ne lit jamais `hr_zone` ni les
-contraintes en prose, et d'un changement de révision il ne montre que ce qui a bougé et
-quand (le contexte est écrit pour le coach). La météo vient d'Open-Meteo par
-`GET /carnet-api/weather`, après l'affichage, pour le `location_label` de la séance ou
-`[notebook] place` de `redline.toml`, avec le code WMO du ciel et le jour ou la nuit de
-chaque heure ; une prévision indisponible n'affiche rien.
-Une échéance n'y apparaît que si elle porte `athlete_label`.
+`/carnet` is a dashboard in three sections, with the card style and the
+structure of an iOS app: a floating glass tab bar, a top bar
+(back on the left, settings on the right, solid background like the iOS status bar) and a large
+title that collapses into it on scroll.
+Each section is a root; everything else is pushed on top and steps back one notch
+as in UINavigationController: the pushed screen arrives from the right, the previous one
+steps back by a third while darkening, and going back (round button, re-tapped tab, or
+swipe right from anywhere, as on iOS 26) does the reverse; the tab
+bar stays fixed. Pushed screens
+do not enter the browser history: its gesture used to carry a snapshot of
+the whole page, tab bar included. Each tab keeps its stack; re-tapping the active tab returns to its
+root, then to the top. **Aujourd’hui** is a thread (mockup A): the
+steps of the day in order, linked by a rule, and a single red dot on the first
+one waiting for a gesture. The morning point (trace, sleep, life load) before 14:00, the
+late feelings from another day, the session done (done set against the caps, then its
+feelings one question at a time, and the question about a high HR), the upcoming session
+(instruction, then before leaving: weather at the planned time, night, HR alert to set),
+the strength session and its button. A rest day fits on one line and tomorrow's card follows
+in full. Then **À venir** (one line per day, the weather for tomorrow only) and
+**Repères**, three tiles that lead to the detail: the week as mini-bars (to
+Semaine), the pain peak against the cap (Douleur screen, `GET /carnet-api/injury`: one point
+per rated session and the wake-up readings over five calendar weeks, the athlete's scale, the
+peak per week, wake-ups without a rating; no verdict), the countdown (to Course). The weather gives the sky and the felt temperature at departure, then the night relative to the
+session (before, during, after), with a colored pictogram in a pill tinted with the
+sky at departure (WMO code, day or night). The iOS (26+) status bar
+copies the topmost opaque element at the top edge: the top bar stays alone there
+and takes the state's color itself (veiled under the settings sheet,
+black with close and share under the viewer); `theme-color` is used only at
+launch. **Semaine** always opens on the current week:
+a number (km done against the target), a bar, the week in bars (solid = done,
+dotted = planned), then seven lines, one per day, with a
+single number (what was done in ink, what was planned in grey) and an overrun in one red
+sentence; a completed outing opens its **session detail**, the rest (planned, skipped)
+unfolds on touch, one day at a time. At the bottom, past weeks (`GET /carnet-api/weeks`: the
+ledger's fact and the revision's target) are pushed like screens, with their review.
+The **session detail** (`GET /carnet-api/session/<observation>`, also from the session
+done in Aujourd'hui) is computed by `redline/session_detail.py`: the head (distance,
+time, pace, the session as a bar), the feeling (the question in one gesture while any
+is missing), planned against done, then the repetitions of a quality session (read from the laps
+like the card, `debrief.lap_blocks`) or the kilometers of another outing, HR on the
+background of its zones, time per zone, the previous session of the same type, weather,
+shoes and the week. The light streams and the hourly weather are fetched from Strava and
+Open-Meteo on first display, then kept in `strava_activity_intakes.streams` and
+`.weather`; an outage leaves the screen without its chart. The zones are those of
+Karvonen (`src/redline/model/hr_zones.py`) on the resting HR and max HR of
+`redline.toml`, never Strava's. On a
+quality session, the reserve (guard rail no. 6) is declared in one gesture while the session is in its
+completeness window: `reserve:<observation>` writes the `reps_in_reserve` measurement.
+**Course**: D-N, longest outing, milestones, capabilities, archives.
+`redline/notebook_board.py` computes everything at read time: the active revision carries
+the intention, the ledger the fact, `ledger.py` and `signals.py` the counts.
+No figure is stored for the notebook; an absent program prescribes nothing, an overdue dated
+check holds back its sessions, a revision to re-arbitrate says so. The notebook
+compares the fact to the typed caps (`hr_cap_bpm`, `rpe_max`, `duration_cap_min`,
+`distance_cap_km`) and displays `volume_target_km`; it never reads `hr_zone` nor the
+prose constraints, and on a revision change it shows only what moved and
+when (the context is written for the coach). The weather comes from Open-Meteo through
+`GET /carnet-api/weather`, after display, for the session's `location_label` or
+`[notebook] place` from `redline.toml`, with the sky's WMO code and the day or night of
+each hour; an unavailable forecast shows nothing.
+A deadline appears there only if it carries `athlete_label`.
 
-`POST /carnet-api/answer` écrit en un geste ce que le registre réclame encore : RPE,
-douleur au demi-point et plaisir d'une séance dans sa fenêtre de complétude, et la
-trace au réveil (aucune, légère, nette) avant 14 h le lendemain d'un effort, le
-sommeil et la charge de vie du jour avant 14 h (`daily_checkins`, complétés sans
-effacer la ligne), et l'explication d'une FC haute à allure comparable sur une EF des
-deux derniers jours (`signals.hr_at_pace`) : écrite dans l'état du jour de la sortie,
-« rien de spécial » part au coach. La
-demande est recalculée à l'écriture ; close, elle est refusée (409). La trace passe
-par `complete_measurement` ou une observation `wake-trace` (`carnet:reveil:<date>`). Une
-douleur d'effort au-dessus de 2 ou une trace nette est transmise au coach comme un
-message, pour qu'il réponde ; les autres réponses ne coûtent aucun tour de modèle. Le
-menu
-Messenger « Mon carnet Redline » et la commande `/carnet` donnent un lien de connexion
-à usage unique, valable 24 h. Le fragment est effacé dès l'ouverture ; le navigateur
-reçoit un cookie `__Host-`, Secure, HttpOnly, SameSite Strict, valable un an. La base
-ne conserve que les empreintes des capacités. `/carnet-revoquer` révoque tous les
-appareils et liens ; la déconnexion dans le carnet ne révoque que l'appareil courant.
-Un ancien lien vers une carte reste utilisable sur un appareil déjà connecté.
-Dans le navigateur intégré de Messenger (ou d'Instagram), dont le cookie ne suit pas dans
-Safari, la page ne consomme pas le lien : elle propose de l'ouvrir dans Safari
-(`x-safari-https:`), de le copier, ou de se connecter ici quand même.
+`POST /carnet-api/answer` writes in one gesture what the ledger still asks for: RPE,
+pain to the half point and enjoyment of a session within its completeness window, and the
+wake-up trace (none, light, sharp) before 14:00 the day after an effort, the
+sleep and life load of the day before 14:00 (`daily_checkins`, completed without
+erasing the row), and the explanation of a high HR at a comparable pace on an EF of the
+last two days (`signals.hr_at_pace`): written into the state of the day of the outing,
+« rien de spécial » goes to the coach. The
+request is recomputed on write; once closed, it is refused (409). The trace goes
+through `complete_measurement` or a `wake-trace` observation (`carnet:reveil:<date>`). An
+effort pain above 2 or a sharp trace is passed to the coach as a
+message, so that it answers; the other answers cost no model turn. The Messenger
+menu « Mon carnet Redline » and the `/carnet` command give a single-use login link,
+valid for 24 h. The fragment is erased as soon as it is opened; the browser
+receives a `__Host-` cookie, Secure, HttpOnly, SameSite Strict, valid for one year. The database
+keeps only the fingerprints of the capabilities. `/carnet-revoquer` revokes all
+devices and links; logging out in the notebook revokes only the current device.
+An old link to a card stays usable on an already logged-in device.
+In the Messenger (or Instagram) in-app browser, whose cookie does not carry over to
+Safari, the page does not consume the link: it offers to open it in Safari
+(`x-safari-https:`), to copy it, or to log in here anyway.
 
-Les routes `/carnet-api/*` exigent ce cookie, y compris pour les images. Elles sont
-sans cache HTTP et sans CORS ; les POST refusent une origine étrangère. Le document,
-le manifeste d'installation et les icônes sont publics mais ne contiennent aucune
-donnée personnelle. Un service worker (`/carnet-sw.js`, portée `/carnet`) garde la
-seule coquille `/carnet` sur l'appareil : elle s'ouvre tout de suite, même sans réseau,
-et se revalide derrière ; il ne touche jamais aux routes `/carnet-api`. La page garde
-aussi dans `localStorage` les dernières racines (Aujourd'hui, la semaine en cours,
-Course, la liste des semaines ; jamais une carte) pour les montrer, datées, quand le
-réseau manque : effacées à la déconnexion ou quand l'accès expire, ignorées au-delà de
-sept jours. Les écrans de lancement iOS (`/carnet-launch/<largeur>x<hauteur>-<thème>.png`)
-sont des fonds unis générés à la demande, récupérés par iOS à l'ajout sur l'écran
-d'accueil. L'accès hors ligne de la page de renfo conserve ses propres règles de péremption.
+The `/carnet-api/*` routes require this cookie, including for images. They are
+without HTTP cache and without CORS; POSTs refuse a foreign origin. The document,
+the install manifest and the icons are public but contain no personal
+data. A service worker (`/carnet-sw.js`, scope `/carnet`) keeps only the
+`/carnet` shell on the device: it opens immediately, even offline,
+and revalidates behind; it never touches the `/carnet-api` routes. The page also keeps
+in `localStorage` the latest roots (Aujourd'hui, the current week,
+Course, the list of weeks; never a card) to show them, dated, when the
+network is missing: cleared at logout or when access expires, ignored beyond
+seven days. The iOS launch screens (`/carnet-launch/<largeur>x<hauteur>-<thème>.png`)
+are plain backgrounds generated on demand, fetched by iOS when adding to the home
+screen. Offline access of the strength page keeps its own expiry rules.
 
-Avant de livrer ou différer une enveloppe, `NotebookService.capture` conserve son
-lot d'images exactes, le texte associé et les éventuels snapshots de renfo dans
-`notebook_entries`. Les octets restent dans PostgreSQL et suivent donc les mêmes
-sauvegardes chiffrées. La taille d'une image est bornée à 12 Mio. Une clé de source et
-un emplacement identifient une archive immuable ; un rejeu retrouve l'original.
-L'outbox reste une file de transport limitée à 20 fichiers, elle n'est plus l'archive.
-Les sorties dont la livraison n'a pas été acquittée restent invisibles dans le carnet.
+Before delivering or deferring an envelope, `NotebookService.capture` keeps its
+batch of exact images, the associated text and any strength snapshots in
+`notebook_entries`. The bytes stay in PostgreSQL and therefore follow the same encrypted
+backups. An image's size is bounded to 12 MiB. A source key and a
+slot identify an immutable archive; a replay finds the original.
+The outbox remains a transport queue limited to 20 files, it is no longer the archive.
+Outputs whose delivery was not acknowledged stay invisible in the notebook.
 
-Les générateurs de weekly et monthly écrivent une identité documentaire `.card.json`,
-liée au SHA-256 du PNG : kind, title et period. `period` vaut `YYYY-WNN` ou `YYYY-MM` ;
-la clé durable du bilan proactif prime pour sa période (le monthly déclenché au 1er
-clôt le mois précédent). Une semaine est rangée dans le mois de son dimanche.
-Aucun fait n'est extrait de la prose. Les autres images se rangent dans la semaine de leur date.
-Le dossier d'envoi déplace et purge le descripteur avec son image.
+The weekly and monthly generators write a `.card.json` document identity,
+bound to the PNG's SHA-256: kind, title and period. `period` is `YYYY-WNN` or `YYYY-MM`;
+the durable key of the proactive review takes precedence for its period (the monthly triggered on the 1st
+closes the previous month). A week is filed in the month of its Sunday.
+No fact is extracted from the prose. Other images are filed in the week of their date.
+The send folder moves and purges the descriptor with its image.
 
-Le renfo actuel est résolu depuis le plan valide, ses contrôles datés et les mêmes
-fiches que la carte Messenger. Avant lancement, une empreinte de la révision et du
-snapshot est revérifiée, puis un lien de séance de sept jours est créé. Le carnet ne
-réactive jamais une archive ; les comptes rendus se lisent dans le registre existant.
-Les archives de bilans restent explicitement datées, même lorsqu'elles contiennent
-un ancien programme. Une carte s'agrandit et se télécharge depuis sa page privée.
+The current strength session is resolved from the valid plan, its dated checks and the same
+sheets as the Messenger card. Before launch, a fingerprint of the revision and of the
+snapshot is re-verified, then a seven-day session link is created. The notebook never
+reactivates an archive; the reports are read in the existing ledger.
+Review archives stay explicitly dated, even when they contain
+an old program. A card can be enlarged and downloaded from its private page.
 
-La reprise historique est une commande opérateur, hors sandbox du coach :
+Historical import is an operator command, outside the coach's sandbox:
 
 ```bash
 /home/ubuntu/.venvs/redline-current/bin/python \
-  -m redline.cli.notebook_import --year 2026             # inventaire sans écriture
+  -m redline.cli.notebook_import --year 2026             # inventory, no write
 /home/ubuntu/.venvs/redline-current/bin/python \
-  -m redline.cli.notebook_import --year 2026 --apply     # import idempotent
+  -m redline.cli.notebook_import --year 2026 --apply     # idempotent import
 ```
 
-Elle reprend les bilans textuels effectivement livrés et les images encore présentes
-dans `outbox/sent`. Ces dernières portent « image récupérée » : ce dossier historique
-contenait aussi des cartes écartées. Les images supprimées ne sont pas reconstruites,
-et aucun lien entre une image historique et un texte n'est inventé. L'année explicite
-sert uniquement aux anciens noms de fichiers qui n'en portaient pas.
+It imports the text reviews actually delivered and the images still present
+in `outbox/sent`. The latter carry « image récupérée »: this historical folder
+also contained discarded cards. Deleted images are not reconstructed,
+and no link between a historical image and a text is invented. The explicit year
+is used only for old file names that did not carry one.

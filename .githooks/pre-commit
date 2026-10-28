@@ -1,7 +1,6 @@
 #!/bin/sh
-# Regenerates the generated views before every commit, so a stale block can never
-# be committed in the first place -- vault-check.py only detects the drift after
-# the fact (weekly review), which is one CI-breaking commit too late (2026-07-29).
+# Regenerates the generated views before every commit, so a stale block is never
+# committed in the first place -- vault-check.py only detects the drift afterwards.
 #
 # The hook is a SECOND line of defence, not the guarantee: it only runs where
 # someone typed `git config core.hooksPath .githooks`, which a fresh clone (a
@@ -10,9 +9,9 @@
 set -e
 cd "$(git rev-parse --show-toplevel)"
 
-# Le venv du dépôt est prioritaire sur le Python système du Mac. Sur le VPS, le
-# service place déjà son venv externe en tête du PATH. Le fallback garde les commits
-# de notes non bloquants, mais une modification de code exigera bien Python 3.12.
+# The repository venv takes priority over the system Python. On the VPS the service
+# already puts its external venv first on PATH. The fallback keeps note commits
+# non-blocking, but a code change does require Python 3.12.
 if [ -x .venv/bin/python ]; then
     RUNTIME_PYTHON=.venv/bin/python
 elif command -v python3.12 >/dev/null 2>&1; then
@@ -21,21 +20,15 @@ else
     RUNTIME_PYTHON=python3
 fi
 
-# ⚠ NON BLOQUANT, et c'est une politique, pas une négligence. `redline/vault.py`
-# (`regenerate_views`) dit noir sur blanc qu'un générateur en échec ne doit JAMAIS
-# empêcher un commit — « les notes d'une session perdues parce qu'un générateur a
-# calé sur une ligne de registre mal formée serait une panne bien pire qu'un bloc
-# périmé ». Ce hook faisait exactement l'inverse : deux règles contraires sur le même
-# événement. Le 2026-08-10 le hook a gagné, le débrief Strava du jour est parti à la
-# poubelle, et la ligne fautive — jamais committée — a cassé chaque exécution suivante
-# pendant une heure. Un bloc périmé se rattrape au commit suivant ; `vault-check.py`
-# le voit à la revue hebdo. Une écriture perdue ne se rattrape jamais.
-# Hors VPS, les vues PostgreSQL ne sont pas calculables : les lancer produisait un
-# faux incident à chaque commit alors que le mode statique porte exactement ce cas.
-# Empreinte de chaque fichier déjà modifié AVANT la régénération : seul ce que le
-# générateur a réellement touché est ajouté ensuite. `git add -u` (jusqu'au 2026-09-28)
-# embarquait toute modification non stagée du dépôt dans le commit en cours, ce qui
-# rendait impossibles les commits ciblés que le Mac et le VPS doivent faire.
+# NON-BLOCKING, by policy. `redline/vault.py` (`regenerate_views`) states that a
+# failing generator must NEVER prevent a commit: lost session notes are a far worse
+# outage than a stale block. A stale block is repaired by the next commit, and
+# `vault-check.py` reports it in the weekly review; a lost write is never recovered.
+# Off the VPS the PostgreSQL views cannot be computed: running them would raise a
+# false incident on every commit, while static mode covers exactly that case.
+# Fingerprint of every file already modified BEFORE regeneration: only what the
+# generator actually touched is staged afterwards. A blanket `git add -u` would pull
+# every unstaged change into the current commit and break targeted commits.
 fingerprint() {
     git diff --name-only -z | xargs -0 -I{} sh -c \
         'printf "%s %s\n" "$(git hash-object -- "$1" 2>/dev/null || echo absent)" "$1"' _ {}
@@ -50,8 +43,8 @@ if [ ! -d src/redline ]; then
     fi
     "$RUNTIME_PYTHON" -m redline.cli.regen_views $REGEN_OPTIONS >/dev/null || \
         echo "pre-commit : régénération des vues en échec, commit maintenu (bloc périmé)."
-    # La liste des fichiers produits reste lue sur le disque, jamais recopiée de
-    # GENERATORS : une copie a déjà raté decisions.md (2026-07-29).
+# The list of produced files is read from disk, never copied from GENERATORS: a copy
+# can go stale and miss a generated file.
     fingerprint | while read -r hash path; do
         printf '%s\n' "$BEFORE" | grep -qxF "$hash $path" || git add -- "$path"
     done
