@@ -257,7 +257,7 @@ class ProactiveScheduler:
             # afterwards, and delivery re-checks before sending.
             self._wake_checked_on = today
             if self._bot.wake_reminder_due(psid):
-                pro.enqueue_job(f"trace-reveil:{today}", "trace_reveil", "", now.timestamp(),
+                pro.enqueue_job(f"wake-trace:{today}", "wake_trace", "", now.timestamp(),
                                 expire_at=clock.combine(now.date(), wake_until).timestamp())
 
         if now.hour >= self.CELLS_CLAIM_HOUR and self._bot is not None:
@@ -286,7 +286,7 @@ class ProactiveScheduler:
                     "markers": [ledger_model.cell_key(oldest, column)
                                 for column in oldest["missing"]],
                 }, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-                pro.enqueue_job(f"cells:{today}", "registre_incomplet", detail,
+                pro.enqueue_job(f"cells:{today}", "ledger_incomplete", detail,
                                 now.timestamp())
 
         last_contact = max(self._state.last_inbound(psid), pro.last_activity())
@@ -304,7 +304,7 @@ class ProactiveScheduler:
         """
         if self._bot is None or now.time() < self.WEEKLY_EARLIEST:
             return False
-        if any(job["kind"] in {"strava_debrief", "strava_debrief_differe"}
+        if any(job["kind"] in {"strava_debrief", "strava_debrief_late"}
                for job in self._state.proactive.jobs(active_only=True)):
             return False
         return self._bot.day_settled(now.date())
@@ -318,7 +318,7 @@ class ProactiveScheduler:
             return None
 
         snapshot = None
-        if record["kind"] in {"strava_debrief", "strava_debrief_differe"}:
+        if record["kind"] in {"strava_debrief", "strava_debrief_late"}:
             try:
                 capture = self._state.ingest_strava_activity(
                     int(record["detail"]), fresh_words=True)
@@ -357,7 +357,7 @@ class ProactiveScheduler:
                     return None
                 pro.complete_job(record["id"])
                 deferred_id = record["id"] + ":deferred"
-                pro.enqueue_job(deferred_id, "strava_debrief_differe", record["detail"],
+                pro.enqueue_job(deferred_id, "strava_debrief_late", record["detail"],
                                 now.timestamp(), priority=True)
                 record = pro.claim_due_job(now.timestamp(), allow_ordinary=False)
                 if record is None:

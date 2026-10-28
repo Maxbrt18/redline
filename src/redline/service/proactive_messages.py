@@ -147,12 +147,12 @@ def _operator_message(detail: str) -> ClosedProactive | None:
 
 _COMPOSERS = {
     "silence": _silence,
-    "registre_incomplet": _missing_cells,
+    "ledger_incomplete": _missing_cells,
     "missed_session": _missed_session,
     "gut_review": _gut_review,
     "gear_alert": _gear_alert,
     "operator_message": _operator_message,
-    "trace_reveil": _wake_trace,
+    "wake_trace": _wake_trace,
 }
 
 CLOSED_KINDS = frozenset(_COMPOSERS)

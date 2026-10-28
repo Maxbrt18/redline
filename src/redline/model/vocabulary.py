@@ -119,6 +119,32 @@ class HrReason(StrEnum):
     NONE = "none"
 
 
+class ProactiveKind(StrEnum):
+    """What a proactive job does (`proactive_jobs.kind`)."""
+
+    STRAVA_DEBRIEF = "strava_debrief"
+    STRAVA_DEBRIEF_LATE = "strava_debrief_late"
+    SILENCE = "silence"
+    LEDGER_INCOMPLETE = "ledger_incomplete"
+    MORNING = "morning"
+    WEEKLY = "weekly"
+    WEEKLY_REPAIR = "weekly_repair"
+    MONTHLY = "monthly"
+    SESSION_FOLLOWUP = "session_followup"
+    MISSED_SESSION = "missed_session"
+    DAILY_SIGNAL = "daily_signal"
+    PREMORTEM = "premortem"
+    CORRECTION = "correction"
+    DECISION_CHALLENGE = "decision_challenge"
+    GUT_REVIEW = "gut_review"
+    GEAR_ALERT = "gear_alert"
+    RACE_COUNTDOWN = "race_countdown"
+    STRENGTH_CARD = "strength_card"
+    CALIBRATION_EVE = "calibration_eve"
+    OPERATOR_MESSAGE = "operator_message"
+    WAKE_TRACE = "wake_trace"
+
+
 def sql_values(vocabulary: type[StrEnum]) -> str:
     """`'a','b'`, for a CHECK constraint."""
     return ",".join(f"'{member.value}'" for member in vocabulary)

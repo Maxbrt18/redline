@@ -16,7 +16,7 @@ from redline.service.proactive_messages import (
 
 @pytest.mark.parametrize("kind,detail,fragment", [
     ("silence", "4", "4 jours"),
-    ("registre_incomplet", json.dumps({
+    ("ledger_incomplete", json.dumps({
         "date": "2026-08-22", "type": "easy", "missing": ["RPE", "Dlr"],
         "markers": ["2026-08-22:easy:RPE", "2026-08-22:easy:Dlr"],
     }), "pic de douleur"),
@@ -85,13 +85,13 @@ def test_closed_ledger_claim_marks_exactly_the_cells_that_were_delivered(make_bo
         {"date": "2026-08-22", "type": "easy", "missing": ["RPE"]}]
 
     bot._respond_proactive(ProactiveJob(
-        psid="4242", kind="registre_incomplet", prompt="", detail=detail))
+        psid="4242", kind="ledger_incomplete", prompt="", detail=detail))
 
     assert store.proactive.marked("asked:2026-08-22:easy:RPE")
 
 
 def test_a_closed_claim_asks_one_metric_and_marks_only_that_metric():
-    rendered = compose_closed_proactive("registre_incomplet", json.dumps({
+    rendered = compose_closed_proactive("ledger_incomplete", json.dumps({
         "date": "2026-09-05", "type": "easy", "missing": ["RPE", "Dlr", "Plaisir"],
         "markers": ["rpe", "pain", "enjoyment"],
     }))
@@ -101,7 +101,7 @@ def test_a_closed_claim_asks_one_metric_and_marks_only_that_metric():
 
 
 def test_a_wake_claim_is_never_rendered_as_a_numeric_evening_question():
-    rendered = compose_closed_proactive("registre_incomplet", json.dumps({
+    rendered = compose_closed_proactive("ledger_incomplete", json.dumps({
         "date": "2026-09-14", "type": "wake-trace", "missing": ["Dlr"],
         "markers": ["2026-09-14:wake-trace:Dlr"],
     }))
@@ -116,10 +116,10 @@ def test_a_queued_wake_claim_is_discarded_without_message_or_agent(make_bot, sto
         "markers": ["2026-09-14:wake-trace:Dlr"],
     })
     job_id = "cells:2026-09-15"
-    store.proactive.enqueue_job(job_id, "registre_incomplet", detail, 0)
+    store.proactive.enqueue_job(job_id, "ledger_incomplete", detail, 0)
 
     bot._respond_proactive(ProactiveJob(
-        psid="4242", kind="registre_incomplet", prompt="", detail=detail,
+        psid="4242", kind="ledger_incomplete", prompt="", detail=detail,
         job_id=job_id))
 
     bot._client.send_burst.assert_not_called()
@@ -131,8 +131,8 @@ def test_a_queued_claim_does_not_repeat_a_value_received_since_it_was_queued(mak
     bot = make_bot(proactive_active_start=dtime(0, 0))
     bot._repo.pending_ledger_cells.return_value = []
     detail = json.dumps({"date": "2026-09-05", "type": "easy", "missing": ["RPE"]})
-    store.proactive.enqueue_job("cells:test", "registre_incomplet", detail, 0)
-    bot._respond_proactive(ProactiveJob(psid="4242", kind="registre_incomplet", prompt="",
+    store.proactive.enqueue_job("cells:test", "ledger_incomplete", detail, 0)
+    bot._respond_proactive(ProactiveJob(psid="4242", kind="ledger_incomplete", prompt="",
                                        detail=detail, job_id="cells:test"))
     bot._client.send_burst.assert_not_called()
     assert store.proactive.jobs()[0]["status"] == "done"
@@ -152,7 +152,7 @@ def test_queued_rotation_check_is_discarded_without_message_or_agent(make_bot):
     ("missed_session", '{"title":"EF 7 km"}', True),
     ("gut_review", '{"title":"SL"}', True),
     ("gear_alert", '{"name":"Novablast","km":540,"limit":600}', True),
-    ("registre_incomplet", json.dumps({
+    ("ledger_incomplete", json.dumps({
         "date": "2026-08-22", "type": "easy", "missing": ["RPE"], "markers": ["m"]}), True),
     # Neither debt nor agenda: social check-in, text written outside the service.
     ("silence", "4", False),
@@ -221,7 +221,7 @@ def test_with_a_connected_notebook_the_evening_claim_is_a_button_not_a_question(
         {"date": "2026-10-08", "type": "easy", "missing": ["RPE", "Dlr", "Plaisir"]}]
 
     bot._respond_proactive(ProactiveJob(
-        psid="4242", kind="registre_incomplet", prompt="", detail=json.dumps(
+        psid="4242", kind="ledger_incomplete", prompt="", detail=json.dumps(
             {"date": "2026-10-08", "type": "easy", "missing": ["RPE"]})))
 
     assert agent.calls == []
@@ -243,7 +243,7 @@ def test_without_a_connected_notebook_the_evening_claim_still_asks_in_messenger(
         {"date": "2026-10-08", "type": "easy", "missing": ["RPE"]}]
 
     bot._respond_proactive(ProactiveJob(
-        psid="4242", kind="registre_incomplet", prompt="", detail=json.dumps(
+        psid="4242", kind="ledger_incomplete", prompt="", detail=json.dumps(
             {"date": "2026-10-08", "type": "easy", "missing": ["RPE"]})))
 
     bot._client.send_button.assert_not_called()
@@ -262,7 +262,7 @@ def test_the_carnet_note_reaches_the_turns_that_used_to_ask(make_bot):
     _connected_notebook(bot)
     moment = datetime(2026, 10, 9, 7, 30)
     for kind, expected in (("strava_debrief", True), ("morning", True),
-                           ("strava_debrief_differe", True), ("weekly", False)):
+                           ("strava_debrief_late", True), ("weekly", False)):
         prompt, _, _ = bot._proactive_prompt(
             ProactiveJob(psid="4242", kind=kind, prompt="", detail=""), "", moment)
         assert (NOTEBOOK_NOTE in prompt) is expected, kind
@@ -294,10 +294,10 @@ def test_the_wake_reminder_points_to_the_notebook_and_accepts_a_chat_answer(
     bot = make_bot(agent=agent, proactive_active_start=dtime(0, 0))
     notebook = _connected_notebook(bot)
     notebook.wake_reminder_due.return_value = True
-    store.proactive.enqueue_job("trace-reveil:1", "trace_reveil", "", 0)
+    store.proactive.enqueue_job("wake-trace:1", "wake_trace", "", 0)
 
     bot._respond_proactive(ProactiveJob(
-        psid="4242", kind="trace_reveil", prompt="", detail="", job_id="trace-reveil:1"))
+        psid="4242", kind="wake_trace", prompt="", detail="", job_id="wake-trace:1"))
 
     assert agent.calls == []
     _, text, url, title = bot._client.send_button.call_args.args
@@ -309,10 +309,10 @@ def test_a_wake_trace_given_before_half_past_ten_cancels_the_reminder(make_bot, 
     bot = make_bot(proactive_active_start=dtime(0, 0))
     notebook = _connected_notebook(bot)
     notebook.wake_reminder_due.return_value = False
-    store.proactive.enqueue_job("trace-reveil:1", "trace_reveil", "", 0)
+    store.proactive.enqueue_job("wake-trace:1", "wake_trace", "", 0)
 
     bot._respond_proactive(ProactiveJob(
-        psid="4242", kind="trace_reveil", prompt="", detail="", job_id="trace-reveil:1"))
+        psid="4242", kind="wake_trace", prompt="", detail="", job_id="wake-trace:1"))
 
     bot._client.send_button.assert_not_called()
     bot._client.send_burst.assert_not_called()
