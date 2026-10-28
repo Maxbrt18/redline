@@ -37,7 +37,7 @@ def context(sessions, gates=()):
 
 def renfo(status="planned", date=None):
     return {"id": "w34-mar-a", "title": "Renfo A, séance complète",
-            "date": date or TODAY, "kind": "strength", "workout": "renfo-a",
+            "date": date or TODAY, "kind": "strength", "workout": "strength", "routine": "a",
             "status": status, "demanding": False,
             "strength": {},
             "note": "Séance complète, mollets dynamiques inclus.",
@@ -46,7 +46,7 @@ def renfo(status="planned", date=None):
 
 def ef():
     return {"id": "w34-mar-ef", "title": "EF", "date": TODAY, "kind": "run",
-            "workout": "EF", "status": "planned", "demanding": False,
+            "workout": "easy", "status": "planned", "demanding": False,
             "sources": ["[[current-plan]]"]}
 
 

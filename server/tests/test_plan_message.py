@@ -16,14 +16,14 @@ from redline.vault import VaultRepo
 
 SESSIONS = [
     {"id": "w33-r1-lun-ef", "title": "EF", "date": "2026-08-10", "kind": "run",
-     "workout": "EF", "status": "done", "distance_target_km": 7.0,
+     "workout": "easy", "status": "done", "distance_target_km": 7.0,
      "distance_cap_km": 9.0, "rpe_min": 2, "rpe_max": 3, "hr_zone": "Z2 143-157 bpm",
      "cadence_target": 168, "demanding": False, "note": "EF plat, cadence visée 168"},
     {"id": "w33-r2-mar-repos", "title": "Repos (Renfo A reporté)", "date": "2026-08-11",
-     "kind": "rest", "workout": "repos", "status": "planned", "demanding": False,
+     "kind": "rest", "workout": "rest", "status": "planned", "demanding": False,
      "note": "Renfo A reporté : douleur au repos supérieure à la moyenne habituelle."},
     {"id": "w33-r1-dim-sl", "title": "SL vallonnée", "date": "2026-08-16", "kind": "run",
-     "workout": "SL", "status": "planned", "distance_target_km": 10.0,
+     "workout": "long", "status": "planned", "distance_target_km": 10.0,
      "distance_cap_km": 11.0, "rpe_min": 4, "rpe_max": 4, "hr_zone": "Z2 143-157 bpm",
      "demanding": True, "note": "Premier D+ SL, D+ doux 150-250 m, terrain Hameau."},
 ]

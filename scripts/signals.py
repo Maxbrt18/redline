@@ -38,6 +38,7 @@ from scripts import ledger as gauge  # noqa: E402
 from scripts.model import (  # noqa: E402
     entrypoint,
     paths,
+    session_kinds,
 )
 
 # Une cadence à allure égale qui MONTE mérite un regard. Elle ne porte pas sa cause :
@@ -46,11 +47,11 @@ from scripts.model import (  # noqa: E402
 CADENCE_JUMP = 4.0
 # Les sorties entre lesquelles la cadence est comparable. Ailleurs (côtes, trail, D+,
 # qualité) elle vit sa vie et l'y mesurer reviendrait à lire le terrain, pas le injury.
-EASY_TYPES = {"EF", "SL"}
+EASY_TYPES = session_kinds.EASY_RUNS
 # La plus longue sortie se compte sur tout ce qui est COURU : la plafonner aux seules
 # EF/SL ferait passer une sortie de groupe ou une course pour une semaine calme, et
 # c'est exactement la sortie qui a fait exploser la charge le 29/07.
-RUN_TYPES = EASY_TYPES | {"seuil", "côtes", "lignes", "cadence", "course"}
+RUN_TYPES = session_kinds.RUN
 # Le plaisir n'est plus un signal (2026-10-09, [[decisions]]) : « il chute une à deux
 # sorties avant que la douleur ne soit avouée » avait été écrit le 09/07 sans source, ne
 # s'est jamais vérifié dans le registre, et a produit six messages et une correction.
@@ -163,7 +164,7 @@ def _flat_easy_runs(rows: list) -> list:
     courue sans brassard (audit d'effet du 2026-10-19).
     """
     runs = [row for row in rows
-            if row.type == "EF" and row.km and row.km >= HR_MIN_KM and row.hours
+            if row.type == session_kinds.EASY and row.km and row.km >= HR_MIN_KM and row.hours
             and row.hr_avg and not getattr(row, "hr_doubt", None)
             and row.dplus / row.km <= HR_FLAT_M_PER_KM
             and (row.wbgt is None or row.wbgt < HR_HOT_WBGT_C)]

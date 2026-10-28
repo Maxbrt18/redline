@@ -53,9 +53,9 @@ def test_due_gates_reads_the_context_already_loaded():
     """
     context = json.dumps({"revision": 3, "gates": [
         {"id": "g1", "due": "2026-08-12", "when": "avant", "holds": ["s1"],
-         "question": "la blessure ?", "on_fail": "repos"},
+         "question": "la blessure ?", "on_fail": "rest"},
         {"id": "g2", "due": "2026-08-14", "when": "apres",
-         "question": "plus tard", "on_fail": "repos"},
+         "question": "plus tard", "on_fail": "rest"},
     ]})
     blocking, observing = due_gates_by_kind(context, today="2026-08-12")
     assert [g["id"] for g in blocking] == ["g1"]
@@ -299,7 +299,7 @@ def test_the_two_kinds_reach_the_prompt_as_two_separate_instructions():
 
     context = json.dumps({"revision": 3, "gates": [
         {"id": "g1", "due": "2026-08-18", "when": "avant", "holds": ["s1"],
-         "question": "la blessure au réveil ?", "on_fail": "repos"},
+         "question": "la blessure au réveil ?", "on_fail": "rest"},
         {"id": "g2", "due": "2026-08-18", "when": "apres",
          "question": "la cheville a parlé pendant la pliométrie ?", "on_fail": "on retire"},
     ]})

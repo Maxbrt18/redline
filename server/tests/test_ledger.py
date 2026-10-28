@@ -13,7 +13,8 @@ from conftest import RPE_TARGETS, VAULT_ROOT, ZONE, zoned
 from scripts import ledger
 from scripts.ledger import Instruments, Row
 from scripts.model import ledger as table
-from scripts.model import programme
+from scripts.model import programme, session_kinds
+from scripts.model.notes import NoteError
 
 
 def _etalon_rows():
@@ -24,10 +25,10 @@ def _etalon_rows():
         # rendaient ce qu'elles montaient. Hypothèse explicite depuis que le terme de
         # dénivelé lit le D− (confrontation n°2, volet dénivelé) : elle laisse l'étalon
         # de février à 100, ce que ce test vérifie.
-        Row(dt.date(2026, 2, 17), "seuil", km=11.5, hours=1.10, dplus=50, dminus=50),
-        Row(dt.date(2026, 2, 18), "SL", km=15.6, hours=1.40, dplus=50, dminus=50),
-        Row(dt.date(2026, 2, 19), "seuil", km=15.9, hours=1.50, dplus=50, dminus=50),
-        Row(dt.date(2026, 2, 21), "course", km=4.6, hours=0.40),
+        Row(dt.date(2026, 2, 17), "threshold", km=11.5, hours=1.10, dplus=50, dminus=50),
+        Row(dt.date(2026, 2, 18), "long", km=15.6, hours=1.40, dplus=50, dminus=50),
+        Row(dt.date(2026, 2, 19), "threshold", km=15.9, hours=1.50, dplus=50, dminus=50),
+        Row(dt.date(2026, 2, 21), "race", km=4.6, hours=0.40),
     ]
 
 
@@ -49,8 +50,8 @@ def test_gauge_prints_its_inputs():
 
 def test_rated_session_adds_half_an_hour():
     """Garde-fou n°6: a séance run above its RPE target costs +0.5 h-éq."""
-    on_target = [Row(dt.date(2026, 3, 2), "seuil", km=8, hours=0.75, rpe=6.0)]
-    over = [Row(dt.date(2026, 3, 2), "seuil", km=8, hours=0.75, rpe=8.0)]
+    on_target = [Row(dt.date(2026, 3, 2), "threshold", km=8, hours=0.75, rpe=6.0)]
+    over = [Row(dt.date(2026, 3, 2), "threshold", km=8, hours=0.75, rpe=8.0)]
     assert ledger.equivalent_hours(over, Instruments(), RPE_TARGETS)[0] == \
         ledger.equivalent_hours(on_target, Instruments(), RPE_TARGETS)[0] + 0.5
 
@@ -69,23 +70,24 @@ def test_a_bike_carries_no_elevation_term():
     ÉNERGÉTIQUE du dénivelé, lui, est bien comparable entre les deux — mais ce n'est pas
     ce que la formule facture ([[src-minetti-cout-pente]]).
     """
-    velo = Row(dt.date(2026, 8, 13), "vélo", hours=1.716, dplus=647.5, dminus=648)
+    velo = Row(dt.date(2026, 8, 13), "bike", hours=1.716, dplus=647.5, dminus=648)
     assert ledger.row_weight(velo, RPE_TARGETS)[0] == pytest.approx(0.858, abs=0.01)
 
 
 def test_a_hilly_run_keeps_its_full_elevation_term():
     """Le contrôle négatif : retirer le terme au vélo ne le retire à personne d'autre.
     Sur une boucle (D− = D+), le changement de lecture ne bouge rien — c'est le point."""
-    course = Row(dt.date(2026, 8, 16), "SL", km=10.3, hours=1.152, dplus=600, dminus=600)
-    rando = Row(dt.date(2026, 7, 21), "rando", hours=4.0, dplus=600, dminus=600)
+    course = Row(dt.date(2026, 8, 16), "long", km=10.3, hours=1.152, dplus=600, dminus=600)
+    rando = Row(dt.date(2026, 7, 21), "hike", hours=4.0, dplus=600, dminus=600)
     assert ledger.row_weight(course, RPE_TARGETS)[0] == pytest.approx(2.152, abs=0.01)
     assert ledger.row_weight(rando, RPE_TARGETS)[0] == pytest.approx(2.5, abs=0.01)
 
 
-def test_every_known_session_type_declares_its_elevation_weight():
-    """Un type ajouté demain CHOISIT son coefficient : il ne l'hérite pas d'un `else`.
-    C'est exactement le défaut qui a donné au vélo le poids d'une course."""
-    assert set(table.SESSION_TYPES) <= set(ledger.DESCENT_WEIGHT)
+def test_only_running_and_walking_carry_a_descent_weight():
+    """A descent counts in full on foot, half walked, and not at all on a bike."""
+    weights = {kind: session_kinds.descent_weight(kind) for kind in table.SESSION_TYPES}
+    assert weights["long"] == 1.0 and weights["hike"] == 0.5
+    assert weights["bike"] == weights["strength"] == 0.0
 
 
 # ------------------------------------------------- la cible de RPE, source unique
@@ -99,19 +101,20 @@ def test_the_targets_come_from_the_workout_notes():
     assert programme.rpe_targets(VAULT_ROOT) == RPE_TARGETS
 
 
-def test_every_effort_type_resolves_a_workout_or_says_it_has_none():
-    """Un type d'effort qui ne résout aucune fiche ne se compare à rien, en silence.
-    L'ajouter doit forcer le choix ici, comme pour les familles de douleur."""
-    unresolved = (set(table.EFFORT_TYPES)
-                  - set(programme.WORKOUT_OF_LEDGER_TYPE)
-                  - set(programme.TYPES_WITHOUT_NOTE))
-    assert not unresolved, f"types sans fiche ni dispense : {sorted(unresolved)}"
+def test_a_workout_note_declaring_an_unknown_kind_is_refused(tmp_path):
+    """A note's `kinds:` must name registry kinds, or its RPE target would match nothing."""
+    workouts = tmp_path / "coaching" / "workouts"
+    workouts.mkdir(parents=True)
+    (workouts / "ef.md").write_text("---\ntype: seance-type\nkinds: [EF]\nrpe_cible: 3\n---\n",
+                                    encoding="utf-8")
+    with pytest.raises(NoteError, match=r"ef\.md"):
+        programme.rpe_targets(tmp_path)
 
 
 def test_a_session_above_its_target_is_flagged_whatever_its_type():
     """Le cas qui a tout déclenché : renfo B du 06/08 à RPE 7 pour une cible de 6."""
-    rows = [Row(dt.date(2026, 8, 6), "renfoB", hours=0.73, rpe=7.0),
-            Row(dt.date(2026, 7, 31), "renfoB", hours=0.42, rpe=3.0)]
+    rows = [Row(dt.date(2026, 8, 6), "strength", routine="b", hours=0.73, rpe=7.0),
+            Row(dt.date(2026, 7, 31), "strength", routine="b", hours=0.42, rpe=3.0)]
     flags = ledger.over_target(rows, RPE_TARGETS)
     assert [f.date for f in flags] == [dt.date(2026, 8, 6)]
     assert "RPE 7 déclaré pour une cible de 6" in str(flags[0])
@@ -121,15 +124,15 @@ def test_the_gauge_penalty_stays_restricted_to_quality_sessions():
     """Signaler n'est pas pénaliser. Le +0,5 « séance ratée » a été calibré sur les
     seules qualités ; l'étendre aux renfos re-échelonnerait la jauge, ce qui est une
     décision de coaching et pas un effet de bord de ce correctif."""
-    over = [Row(dt.date(2026, 8, 6), "renfoB", hours=1.0, rpe=9.0)]
-    on_target = [Row(dt.date(2026, 8, 6), "renfoB", hours=1.0, rpe=6.0)]
+    over = [Row(dt.date(2026, 8, 6), "strength", routine="b", hours=1.0, rpe=9.0)]
+    on_target = [Row(dt.date(2026, 8, 6), "strength", routine="b", hours=1.0, rpe=6.0)]
     assert ledger.equivalent_hours(over, Instruments(), RPE_TARGETS)[0] == \
         ledger.equivalent_hours(on_target, Instruments(), RPE_TARGETS)[0]
     assert ledger.over_target(over, RPE_TARGETS)      # mais le signal, lui, part
 
 
 def test_rando_is_half_weighted():
-    rando = [Row(dt.date(2026, 3, 2), "rando", km=20, hours=4.0, dplus=600, dminus=600)]
+    rando = [Row(dt.date(2026, 3, 2), "hike", km=20, hours=4.0, dplus=600, dminus=600)]
     h_eq, _, _ = ledger.equivalent_hours(rando, Instruments(), RPE_TARGETS)
     assert h_eq == 4.0 * 0.5 + (600 / 600) * 0.5     # 2.0 + 0.5 = 2.5
 
@@ -149,7 +152,7 @@ def test_a_typed_strength_report_enters_the_gauge_without_a_second_observation()
     rows = ledger.parse_ledger(Store())
 
     assert rows == [Row(
-        dt.date(2026, 8, 26), "renfoA", hours=1.0, pains=zoned(1.0),
+        dt.date(2026, 8, 26), "strength", routine="a", hours=1.0, pains=zoned(1.0),
         note="Planche unipodale trop dure.")]
     assert ledger.row_weight(rows[0], RPE_TARGETS)[0] == 0.5
 
@@ -158,7 +161,7 @@ def test_an_old_strength_observation_wins_instead_of_being_counted_twice():
     class Store:
         def observation_rows(self):
             return [{
-                "occurred_on": dt.date(2026, 8, 18), "kind": "renfoA",
+                "occurred_on": dt.date(2026, 8, 18), "kind": "strength", "routine": "a",
                 "measurements": {
                     "duration_s": {"state": "known", "value": 3540},
                     "rpe": {"state": "known", "value": 7},
@@ -182,11 +185,11 @@ def test_an_old_strength_observation_wins_instead_of_being_counted_twice():
 
 
 def test_consecutive_hard_days_detected():
-    rows = [Row(dt.date(2026, 2, 20), "SL", hours=6.0),
-            Row(dt.date(2026, 2, 21), "rando", hours=2.5)]
+    rows = [Row(dt.date(2026, 2, 20), "long", hours=6.0),
+            Row(dt.date(2026, 2, 21), "hike", hours=2.5)]
     assert ledger._two_hard_days_in_a_row(rows)
-    spaced = [Row(dt.date(2026, 2, 20), "SL", hours=6.0),
-              Row(dt.date(2026, 2, 23), "rando", hours=2.5)]
+    spaced = [Row(dt.date(2026, 2, 20), "long", hours=6.0),
+              Row(dt.date(2026, 2, 23), "hike", hours=2.5)]
     assert not ledger._two_hard_days_in_a_row(spaced)
 
 
@@ -217,10 +220,10 @@ def test_ratio_ignores_weeks_before_the_ledger_starts():
 def test_pain_trend_reports_the_weekly_peak():
     """A median over a week of zero-pain hikes is 0 by construction: it reported W30 at
     0.0 while the two most recent readings were 1.5 and 1-1.5."""
-    rows = [Row(dt.date(2026, 7, 20), "rando", pains=zoned(0.0)),
-            Row(dt.date(2026, 7, 21), "rando", pains=zoned(0.0)),
-            Row(dt.date(2026, 7, 22), "lecture", pains=zoned(1.5)),
-            Row(dt.date(2026, 7, 23), "EF", pains=zoned(1.5))]
+    rows = [Row(dt.date(2026, 7, 20), "hike", pains=zoned(0.0)),
+            Row(dt.date(2026, 7, 21), "hike", pains=zoned(0.0)),
+            Row(dt.date(2026, 7, 22), "rest-reading", pains=zoned(1.5)),
+            Row(dt.date(2026, 7, 23), "easy", pains=zoned(1.5))]
     week = ledger.pain_trend(rows, 1, ZONE)[0]
     assert week.effort.peak == 1.5
     assert week.effort.median == 0.0        # trois séances : 0, 0, 1.5
@@ -231,9 +234,9 @@ def test_pain_during_effort_and_at_rest_are_two_series():
     """Pooled, then reduced to a weekly max, the two answer neither question: on
     2026-07-29 a 1.5 felt in the climbs and a 0.5 read cold that evening came out as a
     single « pic 1.5 » -- the same number an untouched shin at rest would have given."""
-    rows = [Row(dt.date(2026, 7, 29), "côtes", pains=zoned(1.5)),
-            Row(dt.date(2026, 7, 29), "lecture", pains=zoned(0.5)),
-            Row(dt.date(2026, 7, 30), "reveil", pains=zoned(0.5))]
+    rows = [Row(dt.date(2026, 7, 29), "hills", pains=zoned(1.5)),
+            Row(dt.date(2026, 7, 29), "rest-reading", pains=zoned(0.5)),
+            Row(dt.date(2026, 7, 30), "wake-trace", pains=zoned(0.5))]
     week = ledger.pain_trend(rows, 1, ZONE)[0]
     assert week.effort.peak == 1.5 and week.effort.n == 1
     assert week.rest.peak == 0.5 and week.rest.n == 2      # lecture + reveil
@@ -243,12 +246,12 @@ def test_pain_during_effort_and_at_rest_are_two_series():
 def test_a_peak_is_printed_with_its_count():
     """A max over three readings and a max over seven are not comparable: without n,
     the more diligently Sam declares, the worse his trend looks."""
-    week = ledger.pain_trend([Row(dt.date(2026, 7, 29), "EF", pains=zoned(1.0))], 1, ZONE)[0]
+    week = ledger.pain_trend([Row(dt.date(2026, 7, 29), "easy", pains=zoned(1.0))], 1, ZONE)[0]
     assert "n=1" in str(week)
 
 
 def test_a_rest_reading_never_enters_the_gauge():
-    for kind in ("lecture", "reveil"):
+    for kind in ("rest-reading", "wake-trace"):
         row = Row(dt.date(2026, 7, 29), kind, hours=0.5, pains=zoned(1.0))
         assert ledger.row_weight(row, RPE_TARGETS) == (0.0, False)
 
@@ -258,7 +261,7 @@ def test_a_palpation_enters_neither_pain_series():
     spontanée au repos : c'est une localisation. Les séries étaient définies par
     négation (`not in REST_TYPES`), donc un type nouveau tombait en silence dans la
     série d'effort — celle qui juge la blessure (2026-08-08)."""
-    week = ledger.pain_trend([Row(dt.date(2026, 7, 29), "EF", pains=zoned(1.0)),
+    week = ledger.pain_trend([Row(dt.date(2026, 7, 29), "easy", pains=zoned(1.0)),
                               Row(dt.date(2026, 7, 30), "palpation", pains=zoned(4.0))],
                              1, ZONE)[0]
     assert week.effort.peak == 1.0
@@ -275,7 +278,7 @@ def test_a_palpation_requires_no_cell():
     qui n'existe pas pour elle."""
     assert table.required_columns("palpation") == ()
     assert not table.requires_pain("palpation")
-    assert table.requires_pain("lecture") and table.required_columns("lecture") == ()
+    assert table.requires_pain("rest-reading") and table.required_columns("rest-reading") == ()
 
 
 # ---------------------------------------------------------------------- Esculier
@@ -283,8 +286,8 @@ def test_a_palpation_requires_no_cell():
 def test_a_morning_above_its_own_rest_series_is_flagged():
     """The morning is judged against the rest series, and here there is none to speak of:
     a 2.0 with no history behind it is named once."""
-    rows = [Row(dt.date(2026, 7, 30), "EF", pains=zoned(1.0)),
-            Row(dt.date(2026, 7, 31), "reveil", pains=zoned(2.0))]
+    rows = [Row(dt.date(2026, 7, 30), "easy", pains=zoned(1.0)),
+            Row(dt.date(2026, 7, 31), "wake-trace", pains=zoned(2.0))]
     flags = ledger.esculier_check(rows, ZONE)
     assert [f.kind for f in flags] == ["TRACE AU RÉVEIL"]
     assert "2.0/10 au réveil" in flags[0].detail
@@ -300,21 +303,21 @@ def test_a_morning_inside_its_own_range_no_longer_fires_at_all():
     Sam's /10 scale is written for effort only (2026-08-17), so that subtraction is gone:
     2.0 equals the peak of its own eight weeks, therefore it is not news, therefore silence.
     """
-    rows = [Row(dt.date(2026, 7, 9), "lecture", pains=zoned(2.0)),
-            Row(dt.date(2026, 7, 22), "lecture", pains=zoned(1.5)),
-            Row(dt.date(2026, 7, 29), "lecture", pains=zoned(0.5)),
-            Row(dt.date(2026, 8, 10), "EF", pains=zoned(1.0)),
-            Row(dt.date(2026, 8, 11), "reveil", pains=zoned(2.0))]
+    rows = [Row(dt.date(2026, 7, 9), "rest-reading", pains=zoned(2.0)),
+            Row(dt.date(2026, 7, 22), "rest-reading", pains=zoned(1.5)),
+            Row(dt.date(2026, 7, 29), "rest-reading", pains=zoned(0.5)),
+            Row(dt.date(2026, 8, 10), "easy", pains=zoned(1.0)),
+            Row(dt.date(2026, 8, 11), "wake-trace", pains=zoned(2.0))]
     assert ledger.esculier_check(rows, ZONE) == []
 
 
 def test_a_morning_that_leaves_its_own_range_still_fires_with_its_series():
     """Above the rest peak, it is a signal -- and it goes out with the series that frames
     it, so the reader can see how far out it actually is."""
-    rows = [Row(dt.date(2026, 7, 9), "lecture", pains=zoned(2.0)),
-            Row(dt.date(2026, 7, 22), "lecture", pains=zoned(1.5)),
-            Row(dt.date(2026, 8, 10), "EF", pains=zoned(1.0)),
-            Row(dt.date(2026, 8, 11), "reveil", pains=zoned(2.5))]
+    rows = [Row(dt.date(2026, 7, 9), "rest-reading", pains=zoned(2.0)),
+            Row(dt.date(2026, 7, 22), "rest-reading", pains=zoned(1.5)),
+            Row(dt.date(2026, 8, 10), "easy", pains=zoned(1.0)),
+            Row(dt.date(2026, 8, 11), "wake-trace", pains=zoned(2.5))]
     flags = ledger.esculier_check(rows, ZONE)
     assert [f.kind for f in flags] == ["TRACE AU RÉVEIL"]
     assert "pic 2.0" in flags[0].detail
@@ -324,45 +327,45 @@ def test_a_morning_that_leaves_its_own_range_still_fires_with_its_series():
 def test_a_calm_morning_after_a_painful_session_is_not_a_violation():
     """The session hurt more than the morning: that is the rule being PASSED, and it used
     to be the only way to stay silent."""
-    rows = [Row(dt.date(2026, 8, 10), "EF", pains=zoned(2.0)),
-            Row(dt.date(2026, 8, 11), "reveil", pains=zoned(0.0))]
+    rows = [Row(dt.date(2026, 8, 10), "easy", pains=zoned(2.0)),
+            Row(dt.date(2026, 8, 11), "wake-trace", pains=zoned(0.0))]
     assert ledger.esculier_check(rows, ZONE) == []
 
 
 def test_the_baseline_only_looks_backwards():
     """A reading cannot be its own reference: the morning being judged, and everything
     after it, stay out of the window."""
-    rows = [Row(dt.date(2026, 8, 10), "EF", pains=zoned(1.0)),
-            Row(dt.date(2026, 8, 11), "reveil", pains=zoned(2.0)),
-            Row(dt.date(2026, 8, 12), "lecture", pains=zoned(4.0))]
+    rows = [Row(dt.date(2026, 8, 10), "easy", pains=zoned(1.0)),
+            Row(dt.date(2026, 8, 11), "wake-trace", pains=zoned(2.0)),
+            Row(dt.date(2026, 8, 12), "rest-reading", pains=zoned(4.0))]
     detail = ledger.esculier_check(rows, ZONE)[0].detail
     assert "aucun historique de repos" in detail
 
 
 def test_the_baseline_window_forgets_old_readings():
     """Eight weeks: a rest series from last spring says nothing about this block."""
-    rows = [Row(dt.date(2026, 5, 1), "lecture", pains=zoned(3.0)),
-            Row(dt.date(2026, 8, 10), "EF", pains=zoned(1.0)),
-            Row(dt.date(2026, 8, 11), "reveil", pains=zoned(2.0))]
+    rows = [Row(dt.date(2026, 5, 1), "rest-reading", pains=zoned(3.0)),
+            Row(dt.date(2026, 8, 10), "easy", pains=zoned(1.0)),
+            Row(dt.date(2026, 8, 11), "wake-trace", pains=zoned(2.0))]
     assert "aucun historique de repos" in ledger.esculier_check(rows, ZONE)[0].detail
 
 
 def test_a_session_with_pain_and_no_morning_reading_is_flagged():
     """An untested rule is not a passed rule."""
-    rows = [Row(dt.date(2026, 7, 30), "côtes", pains=zoned(1.5))]
+    rows = [Row(dt.date(2026, 7, 30), "hills", pains=zoned(1.5))]
     assert [f.kind for f in ledger.esculier_check(rows, ZONE)] == ["non vérifié"]
 
 
 def test_the_missing_reading_flag_does_not_judge_the_past():
     """Before `reveil` existed, no morning reading could have been taken. Flagging
     those rows would print six lines nobody can act on, every single run."""
-    rows = [Row(dt.date(2026, 7, 10), "EF", pains=zoned(1.5))]
+    rows = [Row(dt.date(2026, 7, 10), "easy", pains=zoned(1.5))]
     assert ledger.esculier_check(rows, ZONE) == []
 
 
 def test_pain_above_the_cap_is_flagged_whatever_the_next_day_says():
-    rows = [Row(dt.date(2026, 7, 30), "EF", pains=zoned(3.0)),
-            Row(dt.date(2026, 7, 31), "reveil", pains=zoned(0.0))]
+    rows = [Row(dt.date(2026, 7, 30), "easy", pains=zoned(3.0)),
+            Row(dt.date(2026, 7, 31), "wake-trace", pains=zoned(0.0))]
     assert [f.kind for f in ledger.esculier_check(rows, ZONE)] == ["AU-DESSUS DU PLAFOND"]
 
 
@@ -377,7 +380,7 @@ def test_the_descent_of_konigssee_no_longer_weighs_zero():
     Ce que les heures ne captent pas, c'est la descente : on y va plus vite, donc elle
     coûte peu de temps, alors qu'elle coûte le plus en mécanique.
     """
-    rows = [Row(dt.date(2026, 7, 21), "rando", hours=2.5, dplus=20, dminus=1096)]
+    rows = [Row(dt.date(2026, 7, 21), "hike", hours=2.5, dplus=20, dminus=1096)]
     assert ledger.week_descent(rows) == 1096
     assert ledger.equivalent_hours(rows, Instruments(), RPE_TARGETS)[0] == \
         pytest.approx(1.25 + (1096 / 600) * 0.5, abs=0.01)
@@ -386,7 +389,7 @@ def test_the_descent_of_konigssee_no_longer_weighs_zero():
 def test_a_pure_climb_is_no_longer_billed_as_a_descent():
     """Le contrôle symétrique : la montée du 19/07 (1108 m D+, 17 m D−) est payée par
     le temps qu'elle prend, pas par un terme de dénivelé qui la compte deux fois."""
-    rows = [Row(dt.date(2026, 7, 19), "rando", hours=4.0, dplus=1108, dminus=17)]
+    rows = [Row(dt.date(2026, 7, 19), "hike", hours=4.0, dplus=1108, dminus=17)]
     assert ledger.equivalent_hours(rows, Instruments(), RPE_TARGETS)[0] == \
         pytest.approx(2.0 + (17 / 600) * 0.5, abs=0.01)
 
@@ -396,10 +399,10 @@ def test_a_pure_climb_is_no_longer_billed_as_a_descent():
 def _w31_rows():
     """W31 as it really happened -- the week the coach announced as « 22 km »."""
     return [
-        Row(dt.date(2026, 7, 28), "EF", km=7.19, hours=0.756, dplus=44, dminus=41),
-        Row(dt.date(2026, 7, 29), "côtes", km=8.32, hours=0.805, dplus=175, dminus=176),
-        Row(dt.date(2026, 7, 31), "renfoB", hours=0.416),
-        Row(dt.date(2026, 8, 1), "EF", km=9.00, hours=0.969, dplus=87, dminus=87),
+        Row(dt.date(2026, 7, 28), "easy", km=7.19, hours=0.756, dplus=44, dminus=41),
+        Row(dt.date(2026, 7, 29), "hills", km=8.32, hours=0.805, dplus=175, dminus=176),
+        Row(dt.date(2026, 7, 31), "strength", routine="b", hours=0.416),
+        Row(dt.date(2026, 8, 1), "easy", km=9.00, hours=0.969, dplus=87, dminus=87),
     ]
 
 
@@ -409,7 +412,7 @@ def test_week_volume_is_the_sum_of_the_ledger_not_the_plan():
     number, or the only figure at hand stays the planned one."""
     volume = ledger.week_volume(_w31_rows())
     assert volume.km_run == 24.51
-    assert volume.runs == 3                      # renfoB carries no km
+    assert volume.runs == 3                      # strength carries no km
     assert "24.51 km courus (3 sorties)" in str(volume)
 
 
@@ -422,8 +425,8 @@ def test_rounding_does_not_accumulate_over_a_week():
 
 
 def test_walking_km_are_counted_apart_from_running_km():
-    rows = [Row(dt.date(2026, 7, 20), "rando", km=12.0, hours=4.0),
-            Row(dt.date(2026, 7, 22), "EF", km=6.0, hours=0.6)]
+    rows = [Row(dt.date(2026, 7, 20), "hike", km=12.0, hours=4.0),
+            Row(dt.date(2026, 7, 22), "easy", km=6.0, hours=0.6)]
     volume = ledger.week_volume(rows)
     assert (volume.km_run, volume.km_walk) == (6.0, 12.0)
     assert "marchés" in str(volume)
@@ -445,7 +448,7 @@ def test_an_unknown_week_is_refused_never_answered_with_zero():
 
 
 def _week_of_runs(monday: dt.date, kms: list[float]) -> list[Row]:
-    return [Row(monday + dt.timedelta(days=i * 2), "EF", km=km, hours=km / 10)
+    return [Row(monday + dt.timedelta(days=i * 2), "easy", km=km, hours=km / 10)
             for i, km in enumerate(kms)]
 
 
@@ -478,9 +481,9 @@ def test_the_longest_of_thirty_days_is_a_landmark_not_a_ceiling():
     """Aucun pourcentage fixe (décision du 2026-09-27) : le registre donne le repère,
     rien ne le transforme en plafond."""
     today = dt.date(2026, 8, 20)
-    rows = [Row(dt.date(2026, 8, 16), "SL", km=10.31, hours=1.4),
-            Row(dt.date(2026, 8, 19), "EF", km=7.04, hours=0.75),
-            Row(dt.date(2026, 6, 30), "SL", km=22.0, hours=2.5)]   # hors fenêtre
+    rows = [Row(dt.date(2026, 8, 16), "long", km=10.31, hours=1.4),
+            Row(dt.date(2026, 8, 19), "easy", km=7.04, hours=0.75),
+            Row(dt.date(2026, 6, 30), "long", km=22.0, hours=2.5)]   # hors fenêtre
     assert ledger.longest_recent(rows, today) == 10.31
     assert ledger.longest_recent([], today) is None
     assert not hasattr(ledger, "next_long_run_cap")
@@ -493,8 +496,8 @@ def _long_runs(series: dict[str, float]) -> list[Row]:
     rows = []
     for label, km in series.items():
         monday = ledger._week_start(label)
-        rows.append(Row(monday + dt.timedelta(days=1), "EF", km=6.0, hours=0.6))
-        rows.append(Row(monday + dt.timedelta(days=6), "SL", km=km, hours=km / 8))
+        rows.append(Row(monday + dt.timedelta(days=1), "easy", km=6.0, hours=0.6))
+        rows.append(Row(monday + dt.timedelta(days=6), "long", km=km, hours=km / 8))
     return rows
 
 
@@ -614,10 +617,10 @@ ZONES = [ledger.PainZone(ZONE, "Injury")]
 
 
 def _gate_rows(*, peak_before=1.0, peak_now=1.0, wake_now=(1.0,)):
-    rows = [Row(dt.date(2026, 9, 1), "reveil", pains=zoned(1.0)),
-            Row(dt.date(2026, 9, 29), "EF", km=8, hours=0.8, pains=zoned(peak_before)),
-            Row(dt.date(2026, 10, 6), "EF", km=8, hours=0.8, pains=zoned(peak_now))]
-    rows += [Row(dt.date(2026, 10, 7 + i), "reveil", pains=zoned(value))
+    rows = [Row(dt.date(2026, 9, 1), "wake-trace", pains=zoned(1.0)),
+            Row(dt.date(2026, 9, 29), "easy", km=8, hours=0.8, pains=zoned(peak_before)),
+            Row(dt.date(2026, 10, 6), "easy", km=8, hours=0.8, pains=zoned(peak_now))]
+    rows += [Row(dt.date(2026, 10, 7 + i), "wake-trace", pains=zoned(value))
              for i, value in enumerate(wake_now)]
     return rows
 
@@ -652,8 +655,8 @@ def test_an_undeclared_sleep_leaves_the_gate_incomplete_not_green():
 
 def test_two_zones_never_share_a_series():
     """Une hausse au genou ne se lit jamais comme une hausse à la cheville."""
-    rows = [Row(dt.date(2026, 7, 29), "EF", pains={"genou": 3.0, "cheville": 0.5}),
-            Row(dt.date(2026, 7, 30), "reveil", pains={"genou": 2.0, "cheville": 0.0})]
+    rows = [Row(dt.date(2026, 7, 29), "easy", pains={"genou": 3.0, "cheville": 0.5}),
+            Row(dt.date(2026, 7, 30), "wake-trace", pains={"genou": 2.0, "cheville": 0.0})]
     assert ledger.pain_trend(rows, 1, "genou")[0].effort.peak == 3.0
     assert ledger.pain_trend(rows, 1, "cheville")[0].effort.peak == 0.5
     assert [flag.kind for flag in ledger.esculier_check(rows, "cheville")] == []
@@ -662,10 +665,10 @@ def test_two_zones_never_share_a_series():
 
 def test_the_gate_judges_each_zone_and_names_it():
     zones = [ledger.PainZone("genou", "Genou"), ledger.PainZone("cheville", "Cheville")]
-    rows = [Row(dt.date(2026, 9, 1), "reveil", pains={"genou": 1.0, "cheville": 1.0}),
-            Row(dt.date(2026, 9, 29), "EF", km=8, hours=0.8, pains={"genou": 1.0, "cheville": 1.0}),
-            Row(dt.date(2026, 10, 6), "EF", km=8, hours=0.8, pains={"genou": 1.0, "cheville": 1.5}),
-            Row(dt.date(2026, 10, 7), "reveil", pains={"genou": 1.0, "cheville": 1.0})]
+    rows = [Row(dt.date(2026, 9, 1), "wake-trace", pains={"genou": 1.0, "cheville": 1.0}),
+            Row(dt.date(2026, 9, 29), "easy", km=8, hours=0.8, pains={"genou": 1.0, "cheville": 1.0}),
+            Row(dt.date(2026, 10, 6), "easy", km=8, hours=0.8, pains={"genou": 1.0, "cheville": 1.5}),
+            Row(dt.date(2026, 10, 7), "wake-trace", pains={"genou": 1.0, "cheville": 1.0})]
     lines = ledger.gate(rows, "2026-W41", Instruments(sleep="ok"), zones)
     assert lines[0].endswith(": rouge")
     assert "  ✗ Cheville · tendance : 1 → 1.5" in lines
@@ -673,6 +676,6 @@ def test_the_gate_judges_each_zone_and_names_it():
 
 
 def test_without_a_watched_zone_the_gate_has_no_pain_case():
-    rows = [Row(dt.date(2026, 10, 6), "EF", km=8, hours=0.8)]
+    rows = [Row(dt.date(2026, 10, 6), "easy", km=8, hours=0.8)]
     lines = ledger.gate(rows, "2026-W41", Instruments(sleep="ok"), [])
     assert not any("pic d'effort" in line or "réveils" in line for line in lines)

@@ -186,7 +186,7 @@ def test_deferred_debrief_is_about_the_morning_after():
     assert "AU RÉVEIL" in deferred
     assert "AU RÉVEIL DIRECTEMENT" in deferred
     assert "ne se reporte jamais au soir" in deferred
-    assert "`reveil`" in deferred
+    assert "`wake-trace`" in deferred
     assert "capacité n°4" in deferred
 
 
@@ -266,7 +266,7 @@ def test_weekly_closes_the_predictions_that_came_due():
     # Audit du 2026-10-09 : 7 prédictions corps confrontées sur 20. Celles des SL et des
     # hausses se rattachent au réveil du lendemain et se soldent depuis le carnet.
     assert "Chaque SL et chaque hausse de la porte reçoit sa prédiction `corps`" in weekly
-    assert "--resolves reveil" in weekly and "probabilité explicite" in weekly
+    assert "--resolves wake-trace" in weekly and "probabilité explicite" in weekly
 
 
 def test_monthly_includes_mental_work_and_coach_feedback():
@@ -459,7 +459,7 @@ def test_every_turn_names_its_own_input_file():
 
 def test_missing_cells_publish_the_real_one_metric_cli_contract():
     note = prompts.missing_cells_note(
-        [{"date": "2026-08-30", "type": "SL",
+        [{"date": "2026-08-30", "type": "long",
           "missing": ["RPE", "Dlr", "Plaisir"]}], [])
 
     assert (f"{prompts.AGENT_CLI} ledger-complete.py --key <clé> "
@@ -566,8 +566,8 @@ def test_builder_only_replaces_detail_and_preserves_literal_braces(monkeypatch):
     assert "détail 42" in rendered
 
 
-PENDING = [{"date": "2026-08-04", "type": "renfoA", "missing": ["RPE"]}]
-LAPSED = [{"date": "2026-08-01", "type": "EF", "missing": ["Plaisir"]}]
+PENDING = [{"date": "2026-08-04", "type": "strength", "missing": ["RPE"]}]
+LAPSED = [{"date": "2026-08-01", "type": "easy", "missing": ["Plaisir"]}]
 
 
 def test_no_missing_cell_means_no_note():
@@ -575,14 +575,14 @@ def test_no_missing_cell_means_no_note():
 
 
 def test_wake_cells_do_not_enter_the_generic_missing_cells_note():
-    wake = [{"date": "2026-09-14", "type": "reveil", "missing": ["Dlr"]}]
+    wake = [{"date": "2026-09-14", "type": "wake-trace", "missing": ["Dlr"]}]
 
     assert prompts.missing_cells_note(wake, wake) == ""
 
 
 def test_pending_cells_do_not_force_a_questionnaire_or_block_partial_answers():
     note = prompts.missing_cells_note(
-        [{"date": "2026-08-10", "type": "EF",
+        [{"date": "2026-08-10", "type": "easy",
           "missing": ["RPE", "Dlr", "Plaisir"]}], []
     )
     assert "une seule information" in note
@@ -594,7 +594,7 @@ def test_pending_cells_do_not_force_a_questionnaire_or_block_partial_answers():
 
 def test_with_the_notebook_pending_cells_are_left_to_it_except_pain():
     note = prompts.missing_cells_note(
-        [{"date": "2026-10-08", "type": "EF", "missing": ["RPE", "Plaisir"]}], [],
+        [{"date": "2026-10-08", "type": "easy", "missing": ["RPE", "Plaisir"]}], [],
         carnet=True)
     assert "Le carnet les recueille : ne les demande pas" in note
     assert "douleur si le message montre une gêne" in note
@@ -609,7 +609,7 @@ def test_walking_is_never_asked():
     for level in ("N1", "N2"):
         assert "jamais la marche, il signale une gêne" in DEPTH_NOTES[level]
     note = prompts.gate_note([{
-        "id": "injury", "holds": ["seuil"],
+        "id": "injury", "holds": ["threshold"],
         "question": "Trace habituelle et marche inchangée ?",
         "on_fail": "remplacer le seuil",
     }])
@@ -628,11 +628,11 @@ def test_evening_claim_hides_storage_plumbing():
     from redline.proactive_messages import compose_closed_proactive
 
     claim = compose_closed_proactive("registre_incomplet", json.dumps({
-        "date": "2026-09-24", "type": "EF", "missing": ["RPE"],
-        "markers": ["2026-09-24:EF:RPE"]}))
+        "date": "2026-09-24", "type": "easy", "missing": ["RPE"],
+        "markers": ["2026-09-24:easy:RPE"]}))
     assert claim is not None
     assert "registre" not in claim.text and "donnée" not in claim.text
-    assert claim.markers == ("2026-09-24:EF:RPE",)
+    assert claim.markers == ("2026-09-24:easy:RPE",)
 
 
 def test_no_injected_text_types_a_glyph_a_phone_keyboard_does_not_carry():
@@ -672,8 +672,8 @@ def test_no_injected_text_types_a_glyph_a_phone_keyboard_does_not_carry():
         "active_revision_note": prompts.active_revision_note(""),
         "deep_handoff_note": prompts.deep_handoff_note("question puis réponse"),
         "missing_cells_note": prompts.missing_cells_note(
-            [{"date": "2026-08-16", "type": "EF", "missing": ["RPE", "Dlr", "D-"]},
-             {"date": "2026-08-15", "type": "seuil", "missing": ["Plaisir"]}], LAPSED),
+            [{"date": "2026-08-16", "type": "easy", "missing": ["RPE", "Dlr", "D-"]},
+             {"date": "2026-08-15", "type": "threshold", "missing": ["Plaisir"]}], LAPSED),
         **{f"DEPTH_NOTES[{level}]": note for level, note in DEPTH_NOTES.items()},
         **{f"PROACTIVE_TRIGGERS[{kind}]": prompts.build_proactive_prompt(kind, "424242")
            for kind in PROACTIVE_TRIGGERS},
@@ -857,7 +857,7 @@ def test_an_observation_does_not_hijack_a_social_message():
     """Constat 7 : en N0, la branche observation imposait de prescrire la journée et
     de poser la question du soir, contre la note N0 qui demande de respecter une
     clôture. Un contrôle bloquant, lui, reste entier à tous les niveaux."""
-    blocking = [{"id": "b", "holds": ["s1"], "question": "la blessure ?", "on_fail": "repos"}]
+    blocking = [{"id": "b", "holds": ["s1"], "question": "la blessure ?", "on_fail": "rest"}]
     observing = [{"id": "o", "question": "la cheville ?", "on_fail": "on retire"}]
     closing = prompts.gate_note(blocking, observing, closing=True)
     interdiction, observation = closing.split("\n\n")

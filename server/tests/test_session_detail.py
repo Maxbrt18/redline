@@ -172,7 +172,7 @@ def store():
 
 def seed_threshold(store):
     store.append_plan_revision("2026-W44", revision(sessions=[
-        session("w44-lun-seuil", date="2026-10-26", workout="seuil", title="Seuil en côte",
+        session("w44-lun-seuil", date="2026-10-26", workout="threshold", title="Seuil en côte",
                 distance_target_km=None, distance_cap_km=9.5, duration_cap_min=60,
                 rpe_min=6, rpe_max=7),
     ], computed_at="2026-10-25T20:00:00+01:00", volume_target_km=48.0))

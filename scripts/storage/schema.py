@@ -12,7 +12,7 @@ from typing import Any
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
-from scripts.model import commands
+from scripts.model import commands, session_kinds
 
 NAMING_CONVENTION = {
     "pk": "pk_%(table_name)s",
@@ -20,6 +20,14 @@ NAMING_CONVENTION = {
     "uq": "uq_%(table_name)s_%(column_0_N_name)s",
     "ix": "ix_%(table_name)s_%(column_0_N_name)s",
 }
+def _listed(values) -> str:
+    return ",".join(f"'{value}'" for value in values)
+
+
+def _slug(column: str) -> str:
+    return f"{column} ~ '^[a-z0-9][a-z0-9-]{{0,39}}$'"
+
+
 metadata = sa.MetaData(schema="redline", naming_convention=NAMING_CONVENTION)
 
 UUID_PK = UUID(as_uuid=True)
@@ -45,6 +53,7 @@ observations = sa.Table(
     sa.Column("occurred_on", sa.Date, nullable=False),
     sa.Column("started_at", sa.DateTime(timezone=True)),
     sa.Column("kind", sa.Text, nullable=False),
+    sa.Column("routine", sa.Text),
     sa.Column("idempotency_key", sa.Text, nullable=False),
     sa.Column("strava_activity_id", sa.BigInteger),
     sa.Column("gear_id", sa.Text),
@@ -52,10 +61,11 @@ observations = sa.Table(
     sa.Column("source", sa.Text, nullable=False, server_default="application"),
     sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=UTC_NOW),
     sa.Column("supersedes_id", UUID_PK, sa.ForeignKey("redline.observations.id")),
+    sa.CheckConstraint(f"kind IN ({_listed(session_kinds.RECORDED)})",
+                       name="ck_observations_kind"),
     sa.CheckConstraint(
-        "kind IN ('EF','SL','seuil','côtes','lignes','cadence','course','rando','vélo',"
-        "'renfoA','renfoB','instruments','lecture','reveil','palpation')",
-        name="ck_observations_kind"),
+        f"routine IS NULL OR (kind = '{session_kinds.STRENGTH}' AND {_slug('routine')})",
+        name="ck_observations_routine"),
     sa.CheckConstraint("idempotency_key <> ''", name="ck_observations_idempotency_key"),
     sa.CheckConstraint("strava_activity_id IS NULL OR strava_activity_id > 0",
                        name="ck_observations_strava_positive"),
@@ -324,7 +334,7 @@ strength_sessions = sa.Table(
     sa.UniqueConstraint("athlete_id", "session_key", name="uq_strength_sessions_key"),
     sa.CheckConstraint("session_key <> '' AND char_length(session_key) <= 64",
                        name="ck_strength_sessions_key"),
-    sa.CheckConstraint("workout IS NULL OR workout IN ('a','b','assimilation')",
+    sa.CheckConstraint(f"workout IS NULL OR {_slug('workout')}",
                        name="ck_strength_sessions_workout"),
     sa.CheckConstraint("duration_minutes IS NULL OR duration_minutes BETWEEN 0 AND 300",
                        name="ck_strength_sessions_duration"),
@@ -434,6 +444,7 @@ planned_sessions = sa.Table(
     sa.Column("start_time", sa.Time, nullable=True),
     sa.Column("kind", sa.Text, nullable=False),
     sa.Column("workout", sa.Text, nullable=False),
+    sa.Column("routine", sa.Text),
     sa.Column("status", sa.Text, nullable=False),
     sa.Column("distance_target_km", sa.Numeric(7, 2)),
     sa.Column("distance_cap_km", sa.Numeric(7, 2)),
@@ -458,12 +469,14 @@ planned_sessions = sa.Table(
     sa.UniqueConstraint("revision_id", "logical_key", name="uq_planned_sessions_key"),
     sa.CheckConstraint("logical_key ~ '^[a-z0-9][a-z0-9-]*$'",
                        name="ck_planned_sessions_logical_key"),
-    sa.CheckConstraint("kind IN ('run','strength','test','rest','bike','hike')",
-                       name="ck_planned_sessions_kind"),
     sa.CheckConstraint(
-        "workout IN ('EF','SL','seuil','cotes','lignes','cadence','course','renfo-a',"
-        "'renfo-b','test-mollet','repos','velo','rando')",
-        name="ck_planned_sessions_workout"),
+        f"kind IN ({_listed(dict.fromkeys(map(session_kinds.family, session_kinds.PLANNED)))})",
+        name="ck_planned_sessions_kind"),
+    sa.CheckConstraint(f"workout IN ({_listed(session_kinds.PLANNED)})",
+                       name="ck_planned_sessions_workout"),
+    sa.CheckConstraint(
+        f"(workout = '{session_kinds.STRENGTH}') = (routine IS NOT NULL AND {_slug('routine')})",
+        name="ck_planned_sessions_routine"),
     # Le plan porte l'intention. ``done`` appartient exclusivement à
     # ``session_cycles.state`` et n'est ajouté que dans les vues de lecture.
     sa.CheckConstraint("status IN ('planned','cancelled')",
@@ -493,7 +506,7 @@ planned_sessions = sa.Table(
         "strength_spec IS NULL OR jsonb_typeof(strength_spec) = 'object'",
         name="ck_planned_sessions_strength_spec"),
     sa.CheckConstraint(
-        "(workout IN ('renfo-a','renfo-b')) = (strength_spec IS NOT NULL)",
+        f"(workout = '{session_kinds.STRENGTH}') = (strength_spec IS NOT NULL)",
         name="ck_planned_sessions_strength_owner"),
     # Les natures possibles sont celles du règlement de l'instance (`rulebook.toml`),
     # vérifiées à l'écriture du programme : la base n'en garde que la forme.
@@ -814,7 +827,8 @@ coach_predictions = sa.Table(
         name="ck_coach_predictions_resolution"),
     sa.CheckConstraint(
         "(resolves_kind IS NULL AND resolves_on IS NULL AND resolves_zone IS NULL "
-        "AND success_op IS NULL AND success_value IS NULL) OR (resolves_kind IN ('reveil') "
+        "AND success_op IS NULL AND success_value IS NULL) OR "
+        f"(resolves_kind IN ('{session_kinds.WAKE_TRACE}') "
         "AND resolves_on IS NOT NULL AND resolves_zone IS NOT NULL "
         "AND success_op IN ('<=','<','>=','>','=') "
         "AND success_value IS NOT NULL AND resolves_on <= due_on)",

@@ -11,10 +11,10 @@ Claude sur le web. Le seul endroit qui couvre tout le monde est le code qui comm
 import re
 import subprocess
 
-from conftest import ENGINE_ROOT, git, load_script
+from conftest import ENGINE_ROOT, VAULT_ROOT, git, load_script
 
 from redline.vault import VaultRepo
-from scripts.model import hot_cache, strength_tables, views, weekly_plan
+from scripts.model import hot_cache, programme, strength_tables, views, weekly_plan
 
 MARKER = re.compile(r"<!-- ([A-Z_]+)_START -->")
 
@@ -42,7 +42,8 @@ class TestTheEntryPoint:
         ne dépend d'aucune façon d'écrire les générateurs."""
         owned = {hot_cache.BLOCK, hot_cache.STATE_BLOCK, decisions_index.BLOCK,
                  weekly_plan.BLOCK,
-                 strength_tables.LOG_BLOCK, *strength_tables.BLOCKS}
+                 strength_tables.LOG_BLOCK,
+                 *strength_tables.blocks(programme.load(VAULT_ROOT))}
         found = {name for note in ENGINE_ROOT.rglob("*.md")
                  if ".git" not in note.parts
                  for name in MARKER.findall(note.read_text(encoding="utf-8"))}

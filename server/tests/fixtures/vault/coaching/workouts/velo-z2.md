@@ -1,5 +1,6 @@
 ---
 type: seance-type
+kinds: [bike]
 capacite: [durabilite, injury]
 rpe_cible: 3
 duree_min: 75

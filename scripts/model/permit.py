@@ -16,6 +16,8 @@ import datetime as dt
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 
+from . import session_kinds
+
 #: La conduite accompagnée dure autant de semaines ISO, celle du premier choix scellé
 #: comprise ; l'obtention se juge à la fin de la dernière.
 PERMIT_WEEKS = 3
@@ -112,7 +114,7 @@ def evaluate(choices: Iterable[dict], runs: Iterable[Run], traces: dict[dt.date,
     """
     by_day: dict[dt.date, list[Run]] = {}
     for run in runs:
-        if run.type == "EF":
+        if run.type == session_kinds.EASY:
             by_day.setdefault(run.date, []).append(run)
     lines = []
     for choice in sorted(choices, key=lambda row: row["scheduled_on"]):

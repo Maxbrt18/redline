@@ -38,7 +38,7 @@ def plan_digest(session: dict) -> str:
     visible = {key: session.get(key) for key in (
         # `calibration` n'existe plus (2026-10-09) ; sa clé reste dans l'empreinte pour
         # que les cycles déjà stockés gardent la leur et ne paraissent pas révisés.
-        "title", "date", "start_time", "kind", "workout", "status", "calibration",
+        "title", "date", "start_time", "kind", "workout", "routine", "status", "calibration",
         "location_label", "carbs_target_g_h",
         "distance_target_km", "distance_cap_km", "duration_cap_min",
         "rpe_min", "rpe_max", "hr_zone", "cadence_target", "note",

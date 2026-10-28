@@ -1,5 +1,6 @@
 ---
 type: seance-type
+kinds: [easy]
 capacite: [durabilite]
 rpe_cible: 3
 duree_min: 45

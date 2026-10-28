@@ -11,7 +11,7 @@ import re
 from collections.abc import Sequence
 from pathlib import Path
 
-from scripts.model import agent_input, typography
+from scripts.model import agent_input, session_kinds, typography
 from scripts.model import ledger as ledger_model
 
 #: Les caractères qu'un clavier de téléphone ne porte pas, et que le coach ne tape donc
@@ -338,8 +338,8 @@ def missing_cells_note(pending: list, lapsed: list, *, carnet: bool = False) -> 
     # Une trace `reveil` est qualitative et se demande au réveil même. Elle ne
     # peut ni armer le rattrapage du soir ni alimenter cette note, qui décrit des
     # cellules réclamables comme des mesures chiffrées.
-    pending = [entry for entry in pending if entry.get("type") != "reveil"]
-    lapsed = [entry for entry in lapsed if entry.get("type") != "reveil"]
+    pending = [entry for entry in pending if entry.get("type") != session_kinds.WAKE_TRACE]
+    lapsed = [entry for entry in lapsed if entry.get("type") != session_kinds.WAKE_TRACE]
     if not pending and not lapsed:
         return ""
     to_ask, to_fetch = _split_cells(pending)
@@ -841,7 +841,7 @@ NE DEMANDE PAS UNE NOTE SUR 10 (2026-08-17) : demande la trace laissée (aucune,
 légère, légère, nette) ou fais falsifier l'annonce de la veille ("plus, moins ou pile ce que ton 2
 d'hier annonçait ?"), plus les premiers pas et le test du toucher. Son mot va tel quel
 dans `--dlr` (aucune, très légère, légère, nette), et tu ne le narres pas.
-La réponse de ⟨athlète⟩ devient une ligne `reveil`, distincte de la douleur d'effort. Si
+La réponse de ⟨athlète⟩ devient une ligne `wake-trace`, distincte de la douleur d'effort. Si
 c'était une sortie nocturne, questionne aussi vigilance, appuis et moral dans le noir,
 qui alimentent la capacité n°4. Ne parle pas du programme du jour ici.""",
 
@@ -854,7 +854,7 @@ qui alimentent la capacité n°4. Ne parle pas du programme du jour ici.""",
    par la veille : aucune, très légère, légère ou nette. Ne demande jamais un chiffre /10 pour le
    réveil et ne reporte jamais cette question au soir ou au lendemain. Si le débrief
    différé l'a déjà recueillie, ou si ⟨athlète⟩ l'a déjà donnée ce matin, ne la répète pas.
-   Écris sa réponse dans la ligne `reveil` avec `--dlr` et son mot, sans parler de
+   Écris sa réponse dans la ligne `wake-trace` avec `--dlr` et son mot, sans parler de
    cette écriture : sa base est légère ; mieux que d'habitude = très légère. Note CARNET présente : pas de question, une clause rappelle que
    le carnet attend la trace. Puis lis l'état récent du registre et `python3 scripts/session-cycle.py pending`.
    Le service joint lui-même, après ton texte, le bloc "Aujourd'hui :" rendu
@@ -957,7 +957,7 @@ aucune séance ne peut être prescrite tant qu'il ne l'est pas.
    selon `coaching/strength.md`. Une séance dont la nature sort des 30 derniers jours
    porte `transition`, une par semaine ; une hausse facile passe par la porte.
    Chaque SL et chaque hausse de la porte reçoit sa prédiction `corps`, probabilité
-   explicite : `scripts/fact-write.py prediction --domain corps --resolves reveil
+   explicite : `scripts/fact-write.py prediction --domain corps --resolves wake-trace
    --resolves-on <lendemain> --success-if '<=1'`. Elle se solde seule.
    Faisabilité du dossier
    INFAISABLE : présente ses leviers à ⟨athlète⟩, n'en choisis aucun en silence ;

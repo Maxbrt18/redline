@@ -10,7 +10,7 @@ from scripts.model.context_packet import render_context_packet
 class Store:
     def observation_rows(self):
         return [{
-            "occurred_on": dt.date(2026, 8, 22), "kind": "EF",
+            "occurred_on": dt.date(2026, 8, 22), "kind": "easy",
             "idempotency_key": "strava:42", "note": "facile",
             "measurements": {
                 "distance_km": {"state": "known", "value": 7.2},
@@ -156,13 +156,13 @@ def test_morning_history_survives_the_recent_activity_limit_without_mixing_serie
                 'measurements': {}, 'pains': {'injury': {'state': 'known', 'value': value}}}
 
     today = dt.date(2026, 9, 6)
-    rows = [observation(today, 'EF', f'activity:{i}') for i in range(12)]
-    rows += [observation(today - dt.timedelta(days=i), 'reveil', f'morning:{i}')
+    rows = [observation(today, 'easy', f'activity:{i}') for i in range(12)]
+    rows += [observation(today - dt.timedelta(days=i), 'wake-trace', f'morning:{i}')
              for i in range(1, 11)]
-    rows += [observation(today, 'reveil', 'current-morning'),
-             observation(today + dt.timedelta(days=1), 'reveil', 'future-morning'),
-             observation(today - dt.timedelta(days=70), 'reveil', 'old-morning'),
-             observation(today - dt.timedelta(days=2), 'lecture', 'evening-rest')]
+    rows += [observation(today, 'wake-trace', 'current-morning'),
+             observation(today + dt.timedelta(days=1), 'wake-trace', 'future-morning'),
+             observation(today - dt.timedelta(days=70), 'wake-trace', 'old-morning'),
+             observation(today - dt.timedelta(days=2), 'rest-reading', 'evening-rest')]
     store = Store()
     store.observation_rows = MagicMock(return_value=rows)
     packet = render_context_packet(store, 'N1', today)
@@ -177,7 +177,7 @@ def test_morning_history_survives_the_recent_activity_limit_without_mixing_serie
 def test_qualitative_morning_history_is_not_converted_into_a_numeric_score():
     store = Store()
     store.observation_rows = MagicMock(return_value=[{
-        'occurred_on': dt.date(2026, 9, 5), 'kind': 'reveil', 'idempotency_key': 'morning:q',
+        'occurred_on': dt.date(2026, 9, 5), 'kind': 'wake-trace', 'idempotency_key': 'morning:q',
         'note': 'Probablement comme hier, comparaison incertaine.',
         'measurements': {}, 'pains': {'injury': {'state': 'not_applicable'}},
     }])

@@ -190,7 +190,7 @@ def test_exact_renfo_command_is_deterministic_and_idempotent(
         "revision": 4,
         "sessions": [{
             "id": "w36-renfo-a", "title": "Renfo A", "date": today,
-            "kind": "strength", "workout": "renfo-a", "status": "planned",
+            "kind": "strength", "workout": "strength", "routine": "a", "status": "planned",
             "demanding": False, "strength": {}, "sources": ["[[strength]]"],
         }],
         "gates": [],
@@ -239,7 +239,7 @@ def test_renfo_command_names_a_held_session_instead_of_denying_it(make_bot):
         "revision": 4,
         "sessions": [{
             "id": "w36-renfo-a", "title": "Renfo A", "date": today,
-            "kind": "strength", "workout": "renfo-a", "status": "planned",
+            "kind": "strength", "workout": "strength", "routine": "a", "status": "planned",
             "demanding": False, "strength": {}, "sources": ["[[strength]]"],
         }],
         "gates": [{

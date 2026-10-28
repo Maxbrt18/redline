@@ -33,7 +33,7 @@ class Store:
 
 def activity():
     return {
-        "id": 42, "name": "EF", "sport_type": "Run",
+        "id": 42, "name": "easy", "sport_type": "Run",
         "start_date_local": "2026-08-23T08:00:00Z",
         "distance": 7000, "moving_time": 2520, "total_elevation_gain": 120,
         "map": {"summary_polyline": "g|avGsvu[ICGEO"},
@@ -56,7 +56,7 @@ def test_objective_enrichments_are_finished_before_the_packet_is_returned():
     result = pipeline.run(42)
 
     assert result["status"] == "matched"
-    assert result["snapshot"]["activity"]["nom"] == "EF"
+    assert result["snapshot"]["activity"]["nom"] == "easy"
     assert result["snapshot"]["laps"][0]["cadence_pas_min"] == 170
     assert "meteo" not in result["snapshot"]["activity"]
     assert (42, "elevation_loss", {"value": 140}) in store.finished
@@ -180,7 +180,7 @@ def test_an_unreadable_title_keeps_the_captured_words():
         raise RuntimeError("Strava indisponible")
 
     result = ActivityPipeline(captured_store(), activity_fetch=broken).run(42, fresh_words=True)
-    assert result["snapshot"]["activity"]["nom"] == "EF"
+    assert result["snapshot"]["activity"]["nom"] == "easy"
 
 
 def test_the_feelings_already_given_travel_with_the_snapshot():
@@ -211,7 +211,7 @@ def test_computed_gaps_reach_the_snapshot(monkeypatch):
                                   "distance_cap_km": 16.0}]}
 
     monkeypatch.setattr(ledger, "parse_ledger", lambda store: [ledger.Row(
-        date=dt.date(2026, 10, 3), type="SL", idempotency_key="strava:42", km=15.84,
+        date=dt.date(2026, 10, 3), type="long", idempotency_key="strava:42", km=15.84,
         hours=1.72, hr_avg=164, dplus=347)])
     monkeypatch.setattr(weekly_plan, "active", lambda plan: plan)
     result = ActivityPipeline(Linked(), activity_fetch=lambda activity_id: activity(),
@@ -230,7 +230,7 @@ def test_a_gap_failure_never_blocks_the_debrief():
                               stream_fetch=lambda activity_id: [250, 310],
                               weather_fetch=lambda meteo: 20.0).run(42)
     assert "ecarts" not in result["snapshot"]
-    assert result["snapshot"]["activity"]["nom"] == "EF"
+    assert result["snapshot"]["activity"]["nom"] == "easy"
 
 
 def test_a_quality_session_carries_its_reps_into_the_snapshot(monkeypatch):
@@ -245,7 +245,7 @@ def test_a_quality_session_carries_its_reps_into_the_snapshot(monkeypatch):
         {"name": "Lap 3", "distance": 647, "moving_time": 182, "average_heartrate": 178},
         {"name": "Lap 4", "distance": 1621, "moving_time": 597, "average_heartrate": 154},
     ]
-    seuil = {"workout": "seuil", "title": "Seuil doux en côte"}
+    seuil = {"workout": "threshold", "title": "Seuil doux en côte"}
     monkeypatch.setattr(ActivityPipeline, "_gaps",
                         lambda self, a, o: ([], seuil, dt.date(2026, 10, 15)))
     snapshot = ActivityPipeline(Store(), activity_fetch=lambda _: raw,
@@ -260,7 +260,7 @@ def test_a_quality_session_carries_its_reps_into_the_snapshot(monkeypatch):
 
 def test_an_easy_run_has_no_quality_flag(monkeypatch):
     monkeypatch.setattr(ActivityPipeline, "_gaps",
-                        lambda self, a, o: ([], {"workout": "EF"}, None))
+                        lambda self, a, o: ([], {"workout": "easy"}, None))
     snapshot = ActivityPipeline(Store(), activity_fetch=lambda _: activity(),
                                 stream_fetch=lambda _: [1, 2],
                                 weather_fetch=lambda _: None).run(42)["snapshot"]

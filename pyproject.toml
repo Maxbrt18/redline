@@ -55,9 +55,6 @@ ignore_names = [
     # Seuils du règlement que seul le texte d'une règle cite (`{pain_cap}`), lus par
     # `Parameters.spoken` : le code n'en applique pas, le coach si.
     "gate_trend_weeks", "pain_cap",
-    # Types d'effort sans fiche, déclarés plutôt qu'oubliés ; le test de couverture
-    # des fiches les exclut nommément.
-    "TYPES_WITHOUT_NOTE",
     # Réglage Flask lu par Werkzeug.
     "max_content_length",
 ]

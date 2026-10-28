@@ -31,6 +31,7 @@ LINK_TTL_SECONDS = 7 * 24 * 60 * 60
 TOKEN_BYTES = 24             # 192 bits; the URL itself is the capability
 TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{32}$")
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]+")
+ROUTINE = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")
 
 
 class ReportError(InputError):
@@ -128,7 +129,7 @@ def validate_session(session: dict, *, now: int | None = None) -> None:
     expires_at = session.get("expires_at")
     if not isinstance(sid, str) or not sid.strip() or len(sid) > 64:
         raise ReportError("session.sid invalide")
-    if workout not in {"a", "b", "assimilation"}:
+    if not isinstance(workout, str) or not ROUTINE.fullmatch(workout):
         raise ReportError("session.session invalide")
     if not isinstance(exercises, list) or not exercises or len(exercises) > 20:
         raise ReportError("session.exercises invalide")

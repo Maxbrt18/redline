@@ -16,7 +16,12 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts import ledger  # noqa: E402
-from scripts.model import instance, paths, permit  # noqa: E402
+from scripts.model import (  # noqa: E402
+    instance,
+    paths,
+    permit,
+    session_kinds,
+)
 
 
 def _strava_id(key: str) -> int | None:
@@ -62,10 +67,10 @@ def report(store: Any, today: dt.date, week: str | None = None) -> list[str]:
     # elles s'y rejoignent par le maximum, jamais par une moyenne.
     traces: dict[dt.date, float] = {}
     for row in rows:
-        if row.type == "reveil" and row.pains and row.date >= period.start:
+        if row.type == session_kinds.WAKE_TRACE and row.pains and row.date >= period.start:
             traces[row.date] = max(traces.get(row.date, 0), *row.pains.values())
     weeks = {choice["iso_week"] for choice in choices}
-    groups = {run.strava_id: group for run in runs if run.type == "EF" and run.strava_id
+    groups = {run.strava_id: group for run in runs if run.type == session_kinds.EASY and run.strava_id
               for group in [_group(store, run.strava_id)] if group is not None}
     lines = permit.evaluate(choices, runs, traces, _caps(store, weeks), groups, today,
                             hr_cap=hr_cap)

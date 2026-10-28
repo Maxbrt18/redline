@@ -135,7 +135,7 @@ def test_sql_names_follow_one_plural_snake_case_convention():
 
 def observation(strava=90000000008):
     return {
-        "occurred_on": dt.date(2026, 8, 12), "kind": "EF",
+        "occurred_on": dt.date(2026, 8, 12), "kind": "easy",
         "idempotency_key": f"test:{strava or 'manual'}",
         "strava_activity_id": strava, "note": "projection | libre",
         "measurements": {
@@ -412,9 +412,9 @@ def test_partial_strength_report_preserves_unknown_counts_notes_and_exact_prescr
 
 def _strength_plan(store, *, two_sessions=False):
     from test_weekly_plan import revision, session
-    sessions = [session("w33-mar-a", date="2026-08-11", workout="renfo-a")]
+    sessions = [session("w33-mar-a", date="2026-08-11", workout="strength", routine="a")]
     if two_sessions:
-        sessions.append(session("w33-mar-a-bis", date="2026-08-11", workout="renfo-a"))
+        sessions.append(session("w33-mar-a-bis", date="2026-08-11", workout="strength", routine="a"))
     store.append_plan_revision("2026-W33", revision(
         sessions=sessions, computed_at="2026-08-09T19:10:00+02:00"))
 
@@ -535,7 +535,7 @@ def test_plan_revisions_are_contiguous_and_immutable(store):
 
 def test_exposure_is_confirmed_then_can_be_completed_or_corrected_without_duplication(store):
     store.add_observation({
-        "occurred_on": dt.date(2026, 9, 2), "kind": "EF",
+        "occurred_on": dt.date(2026, 9, 2), "kind": "easy",
         "idempotency_key": "messenger:2026-09-02:ef",
         "note": "Cadence travaillée volontairement.", "measurements": {},
     })
@@ -565,7 +565,7 @@ def test_intelligence_ignores_a_confirmed_intentional_cadence_jump(store):
             (dt.date(2026, 8, 24), 160, "cadence:old"),
             (dt.date(2026, 8, 31), 170, "cadence:worked")):
         store.add_observation({
-            "occurred_on": day, "kind": "EF", "idempotency_key": key,
+            "occurred_on": day, "kind": "easy", "idempotency_key": key,
             "note": "EF comparable", "measurements": {
                 "distance_km": {"state": "known", "value": 7},
                 "cadence_spm": {"state": "known", "value": cadence},
@@ -606,7 +606,7 @@ def test_a_removed_gate_requires_an_existing_canonical_observation(store):
         store.append_plan_revision("2026-W33", second)
 
     store.add_observation({
-        "occurred_on": dt.date(2026, 8, 14), "kind": "reveil",
+        "occurred_on": dt.date(2026, 8, 14), "kind": "wake-trace",
         "idempotency_key": "messenger:2026-08-14:reveil",
         "note": "Aucune gêne dans les dix premiers pas.",
         "pains": {"injury": {"state": "unavailable"}},
@@ -729,7 +729,7 @@ def test_a_typed_unavailability_blocks_a_demanding_session(store):
         "blocks": "séances exigeantes", "status": "scheduled", "context": {},
     })
     candidate = build_revision(1, sessions=[session(
-        "w32-mer-sl", "2026-08-05", "SL")])
+        "w32-mer-sl", "2026-08-05", "long")])
     with pytest.raises(StorageError, match="indisponibilité typée examens"):
         store.append_plan_revision("2026-W32", candidate)
 
@@ -739,11 +739,11 @@ def test_a_revision_after_the_run_keeps_its_pending_gut_review(store):
     from test_weekly_plan import revision as build_revision
     from test_weekly_plan import session
 
-    long_run = session("w33-dim-sl", "2026-08-16", "SL", carbs_target_g_h=60)
+    long_run = session("w33-dim-sl", "2026-08-16", "long", carbs_target_g_h=60)
     store.append_plan_revision("2026-W33", build_revision(
         1, sessions=[long_run], computed_at="2026-08-09T19:10:00+02:00"))
     store.add_observation({
-        "occurred_on": dt.date(2026, 8, 16), "kind": "SL",
+        "occurred_on": dt.date(2026, 8, 16), "kind": "long",
         "started_at": dt.datetime(2026, 8, 16, 8, 0, tzinfo=dt.UTC),
         "idempotency_key": "strava:4242", "strava_activity_id": 4242,
         "note": "", "measurements": {},
@@ -793,7 +793,7 @@ def test_historical_capture_links_an_existing_observation_to_its_cycle(store):
         1, sessions=[session("w33-ven-ef", date="2026-08-14")],
         computed_at="2026-08-09T19:10:00+02:00"))
     observation_id = store.add_observation({
-        "occurred_on": dt.date(2026, 8, 14), "kind": "EF",
+        "occurred_on": dt.date(2026, 8, 14), "kind": "easy",
         "idempotency_key": "strava:90000000012", "strava_activity_id": 90000000012,
         "measurements": {},
     })
@@ -818,7 +818,7 @@ def test_a_wbgt_already_logged_by_the_coach_does_not_sink_the_capture(store):
     pipeline calcule une autre valeur, levait, et le débrief expirait après deux
     heures de reprises. La mesure du coach reste, l'écart devient une trace."""
     observation_id = store.add_observation({
-        "occurred_on": dt.date(2026, 9, 26), "kind": "EF",
+        "occurred_on": dt.date(2026, 9, 26), "kind": "easy",
         "idempotency_key": "strava:90000000013", "strava_activity_id": 90000000013,
         "measurements": {"wbgt_c": {"state": "known", "value": 11.0}},
     })
@@ -873,7 +873,7 @@ def test_observed_time_wins_but_keeps_the_optional_declared_clock(store):
         "declared_at": dt.datetime(2026, 8, 14, 7, 55, tzinfo=paris),
     })
     store.add_observation({
-        "occurred_on": dt.date(2026, 8, 14), "kind": "EF",
+        "occurred_on": dt.date(2026, 8, 14), "kind": "easy",
         "started_at": dt.datetime(2026, 8, 14, 8, 2, tzinfo=paris),
         "idempotency_key": "strava:90000000015", "strava_activity_id": 90000000015,
         "measurements": {},
@@ -896,7 +896,7 @@ def test_ambiguous_strava_match_is_left_for_alex_to_decide(store):
             session("w33-ven-ef-b", date="2026-08-14"),
         ], computed_at="2026-08-09T19:10:00+02:00"))
     store.add_observation({
-        "occurred_on": dt.date(2026, 8, 14), "kind": "EF",
+        "occurred_on": dt.date(2026, 8, 14), "kind": "easy",
         "started_at": dt.datetime(2026, 8, 14, 8, 2, tzinfo=paris),
         "idempotency_key": "strava:90000000016", "strava_activity_id": 90000000016,
         "measurements": {},
@@ -930,7 +930,7 @@ def test_a_typed_gate_survives_the_round_trip_through_postgresql(store):
         "gates": [
             {"id": "g-avant", "due": "2026-08-14", "when": "avant",
              "holds": ["w33-jeu-b", "w33-ven-ef"],
-             "question": "la blessure au réveil ?", "on_fail": "repos"},
+             "question": "la blessure au réveil ?", "on_fail": "rest"},
             {"id": "g-apres", "due": "2026-08-15", "when": "apres",
              "question": "la cheville a parlé pendant la pliométrie ?",
              "on_fail": "la pliométrie sort de la séance A"},
@@ -974,7 +974,7 @@ def test_a_stale_plan_projection_is_detected_without_being_repaired(store, tmp_p
         "evidence": ["registre W32"],
         "sessions": [{
             "id": "w33-lun-ef", "title": "EF", "date": "2026-08-10", "kind": "run",
-            "workout": "EF", "status": "planned", "demanding": False,
+            "workout": "easy", "status": "planned", "demanding": False,
             "distance_cap_km": 9.0, "sources": ["[[current-plan]]"]}]})
 
     assert plan_drift(store, tmp_path) == ["athlete/journal/2026-w33.md"]
@@ -1196,12 +1196,12 @@ def test_only_the_exact_delivered_question_marks_its_declared_cell(store, delive
     state = PostgresStateStore(store.database)
     turn_id = str(uuid.uuid4())
     store.stage_command(turn_id, "ask:rpe", commands.QUESTION_ASK,
-                        {"text": "Quel était ton RPE ?", "cells": ["2026-09-05:EF:RPE"]})
+                        {"text": "Quel était ton RPE ?", "cells": ["2026-09-05:easy:RPE"]})
     store.apply_turn_with_receipts(turn_id)[0]
     state.record_outbound("4242", delivered, source_key="out", turn_id=turn_id)
-    assert state.proactive.marked("asked:2026-09-05:EF:RPE") == ("RPE" in delivered)
-    assert not state.proactive.marked("asked:2026-09-05:EF:Dlr")
-    assert not state.proactive.marked("asked:2026-09-05:EF:Plaisir")
+    assert state.proactive.marked("asked:2026-09-05:easy:RPE") == ("RPE" in delivered)
+    assert not state.proactive.marked("asked:2026-09-05:easy:Dlr")
+    assert not state.proactive.marked("asked:2026-09-05:easy:Plaisir")
     state.record_outbound("4242", delivered, source_key="out", turn_id=turn_id)
     assert len(store.question_rows()) == (1 if "RPE" in delivered else 0)
 
@@ -1215,12 +1215,12 @@ def test_a_question_is_tracked_only_from_a_declaration_found_in_the_delivered_te
                           source_key="out:rhetoric")
     turn_id = str(uuid.uuid4())
     store.stage_command(turn_id, "ask:rpe", commands.QUESTION_ASK,
-                        {"text": "Quel était ton RPE ?", "cells": ["2026-09-05:EF:RPE"]})
+                        {"text": "Quel était ton RPE ?", "cells": ["2026-09-05:easy:RPE"]})
     store.apply_turn_with_receipts(turn_id)[0]
     state.record_outbound("4242", "Tu l'as ressenti à combien sur dix ?",
                           source_key="out:rephrase", turn_id=turn_id)
     assert store.question_rows() == []
-    assert not state.proactive.marked("asked:2026-09-05:EF:RPE")
+    assert not state.proactive.marked("asked:2026-09-05:easy:RPE")
 
 
 def test_reasking_an_open_question_does_not_erase_a_partial_answer_or_deferral(store):
@@ -1490,7 +1490,7 @@ def test_a_bad_gate_resolution_is_refused_before_it_can_cancel_same_turn_facts(s
     store.append_plan_revision("2026-W33", first)
     turn_id = "d740e54c-1933-4cbc-ae7f-982a908626db"
     store.stage_command(turn_id, "observation:reveil", "observation.add", {
-        "occurred_on": "2026-08-14", "kind": "reveil",
+        "occurred_on": "2026-08-14", "kind": "wake-trace",
         "idempotency_key": "messenger:reveil", "note": "genou plus calme",
         "pains": {"injury": {"state": "unavailable"}},
     })
@@ -1621,7 +1621,7 @@ def test_repeated_daily_shoes_do_not_open_rotation_check(store):
         store.ingest_strava_activity({
             "id": 9900 + index, "sport": "Run",
             "depart_local": f"2026-08-{day:02d}T08:00:00",
-            "nom": "EF", "distance_km": 7, "materiel_id": "g-mach",
+            "nom": "easy", "distance_km": 7, "materiel_id": "g-mach",
         })
     state = PostgresStateStore(store.database)
     now = dt.datetime(2026, 8, 23, 12, tzinfo=dt.UTC)
@@ -1775,15 +1775,15 @@ def test_rewriting_the_same_correction_verbatim_does_not_reannounce_it(store):
 def test_a_recurring_correction_keeps_its_count_of_recurrences(store):
     # Une récidive remplace le résumé : sans ce compte, la ligne ne disait plus que
     # l'erreur était revenue (audit du 2026-10-09).
-    store.register_correction({"correction_key": "reveil", "summary": "06/09 : oui franc exigé."})
-    store.register_correction({"correction_key": "reveil", "summary": "Récidive le 01/10."})
-    store.register_correction({"correction_key": "reveil", "summary": "Récidive le 08/10."})
+    store.register_correction({"correction_key": "wake-trace", "summary": "06/09 : oui franc exigé."})
+    store.register_correction({"correction_key": "wake-trace", "summary": "Récidive le 01/10."})
+    store.register_correction({"correction_key": "wake-trace", "summary": "Récidive le 08/10."})
     store.register_correction({"correction_key": "autre", "summary": "Une seule fois."})
     rows = {row["correction_key"]: row for row in store.correction_rows()}
-    assert rows["reveil"]["revisions"] == 2
-    assert rows["reveil"]["summary"] == "Récidive le 08/10."
+    assert rows["wake-trace"]["revisions"] == 2
+    assert rows["wake-trace"]["summary"] == "Récidive le 08/10."
     assert rows["autre"]["revisions"] == 0
-    assert rows["reveil"]["first_registered_at"] is not None
+    assert rows["wake-trace"]["first_registered_at"] is not None
 
 
 def test_plan_watermark_includes_facts_staged_earlier_in_the_same_turn(store):
@@ -1814,7 +1814,7 @@ def _plan_revision(number: int, **overrides) -> dict:
     from test_weekly_plan import session
     base = build_revision(
         number,
-        sessions=[session("w33-ven-ef", date="2026-08-14", workout="EF")],
+        sessions=[session("w33-ven-ef", date="2026-08-14", workout="easy")],
         computed_at="2026-08-14T09:00:00+02:00",
     )
     return {**base, **overrides}
@@ -2088,12 +2088,12 @@ def test_a_plan_readback_shows_each_run_gap_to_the_month_without_blocking(
     from test_weekly_plan import frozen_clock, session, written_today
 
     store.add_observation({
-        "occurred_on": dt.date(2026, 7, 26), "kind": "SL", "idempotency_key": "sl-juillet",
+        "occurred_on": dt.date(2026, 7, 26), "kind": "long", "idempotency_key": "sl-juillet",
         "note": "", "measurements": {"distance_km": {"state": "known", "value": 9.0}}})
     cli = load_script("week-plan")
     frozen_clock(monkeypatch, cli)
     monkeypatch.delenv("REDLINE_TURN_ID", raising=False)
-    long_run = session("w32-dim-sl", date="2026-08-09", workout="SL",
+    long_run = session("w32-dim-sl", date="2026-08-09", workout="long",
                        distance_target_km=12.0, distance_cap_km=13.5)
     fresh = written_today(number=1, sessions=[long_run])
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(fresh)))
@@ -2110,7 +2110,7 @@ def test_the_weekly_dossier_is_computed_from_the_same_functions_as_the_clis(stor
     for day, km in ((dt.date(2026, 9, 13), 11.53), (dt.date(2026, 9, 20), 10.8),
                     (dt.date(2026, 9, 27), 13.6)):
         store.add_observation({
-            "occurred_on": day, "kind": "SL", "idempotency_key": f"sl-{day}",
+            "occurred_on": day, "kind": "long", "idempotency_key": f"sl-{day}",
             "note": "", "measurements": {
                 "distance_km": {"state": "known", "value": km},
                 "duration_s": {"state": "known", "value": int(km * 400)}}})
@@ -2142,7 +2142,7 @@ def test_the_weekly_dossier_does_not_flag_cadence_work_that_was_asked_for(store)
     for day, cadence, key in ((dt.date(2026, 9, 14), 160, "cadence:old"),
                               (dt.date(2026, 9, 21), 170, "cadence:worked")):
         store.add_observation({
-            "occurred_on": day, "kind": "EF", "idempotency_key": key,
+            "occurred_on": day, "kind": "easy", "idempotency_key": key,
             "note": "EF comparable", "measurements": {
                 "distance_km": {"state": "known", "value": 7},
                 "cadence_spm": {"state": "known", "value": cadence}}})
@@ -2240,7 +2240,7 @@ def test_a_typed_transition_round_trips_and_opens_no_window(store):
     assert loaded["transition"] == "nocturne"
     assert store.active_plans()["2026-W41"]["sessions"][0]["id"] == "w41-jeu-nuit"
     store.add_observation({
-        "occurred_on": dt.date(2026, 10, 8), "kind": "EF",
+        "occurred_on": dt.date(2026, 10, 8), "kind": "easy",
         "started_at": dt.datetime(2026, 10, 8, 20, 0, tzinfo=dt.UTC),
         "idempotency_key": "strava:4141", "strava_activity_id": 4141,
         "note": "", "measurements": {}, "session_key": "2026-W41:w41-jeu-nuit"})
@@ -2400,7 +2400,7 @@ def test_notebook_current_resolves_the_same_typed_workout_and_rechecks_claims(st
     repo = MagicMock()
     repo.validate_weekly_plan.return_value = PlanStatus.VALID
     repo.weekly_plan_context.return_value = json.dumps({'revision': 1, 'sessions': [{
-        'id':'a', 'date':'2026-10-02', 'kind':'strength', 'workout':'renfo-a',
+        'id':'a', 'date':'2026-10-02', 'kind':'strength', 'workout':'strength', 'routine': 'a',
         'status':'planned', 'strength':{}}], 'gates':[]})
     state = PostgresStateStore(store.database)
     service = NotebookService(NotebookStore(store.database), repo, state, VAULT_ROOT, 'https://coach.test')
@@ -2430,7 +2430,7 @@ def test_notebook_expired_link_cannot_create_a_device(store):
 def _wake(store, day, value, *, state="known"):
     measurement = {"state": state, "value": value} if state == "known" else {"state": state}
     return store.add_observation({
-        "occurred_on": day, "kind": "reveil", "source": "carnet",
+        "occurred_on": day, "kind": "wake-trace", "source": "carnet",
         "idempotency_key": f"carnet:reveil:{day.isoformat()}",
         "pains": {"injury": measurement}})
 
@@ -2439,7 +2439,7 @@ def _bound(store, key, day, success_if="<=1", probability=.8):
     store.upsert_prediction({
         "prediction_key": key, "domain": "corps", "statement": "trace au plus légère",
         "probability": probability, "due_on": day + dt.timedelta(days=2),
-        "resolves_on": {"kind": "reveil", "date": day.isoformat(), "success_if": success_if}})
+        "resolves_on": {"kind": "wake-trace", "date": day.isoformat(), "success_if": success_if}})
 
 
 def test_a_wake_prediction_settles_itself_when_the_notebook_writes_the_trace(store):
@@ -2476,7 +2476,7 @@ def test_a_wake_prediction_is_written_before_its_outcome_and_reads_a_closed_rule
         store.upsert_prediction({
             "prediction_key": "apres", "domain": "corps", "statement": "x",
             "probability": .5, "due_on": day,
-            "resolves_on": {"kind": "reveil", "date": "2026-10-20", "success_if": "<=1"}})
+            "resolves_on": {"kind": "wake-trace", "date": "2026-10-20", "success_if": "<=1"}})
 
 
 def test_a_completed_wake_cell_settles_and_a_missing_wake_voids_never_falsifies(store):
@@ -2506,7 +2506,7 @@ def _second_zone(store):
 def test_each_watched_zone_gets_its_own_reading(store):
     _second_zone(store)
     observation_id = store.add_observation({
-        "occurred_on": dt.date(2026, 10, 12), "kind": "EF", "idempotency_key": "zones:ef",
+        "occurred_on": dt.date(2026, 10, 12), "kind": "easy", "idempotency_key": "zones:ef",
         "measurements": {}, "pains": {"genou": {"state": "known", "value": 2.5}}})
     row = next(row for row in store.observation_rows() if row["id"] == observation_id)
     assert row["pains"] == {"genou": {"state": "known", "value": 2.5},
@@ -2520,14 +2520,14 @@ def test_each_watched_zone_gets_its_own_reading(store):
 
 def test_a_zone_the_instance_no_longer_watches_is_refused_but_its_history_stays(store):
     store.add_observation({
-        "occurred_on": dt.date(2026, 10, 12), "kind": "EF", "idempotency_key": "zones:old",
+        "occurred_on": dt.date(2026, 10, 12), "kind": "easy", "idempotency_key": "zones:old",
         "measurements": {}, "pains": {"injury": {"state": "known", "value": 1.0}}})
     store.sync_pain_zones([("genou", "Genou")])
     assert [(zone["slug"], zone["active"]) for zone in store.pain_zones()] == [
         ("genou", True), ("injury", False)]
     with pytest.raises(StorageError, match="inconnue ou inactive"):
         store.add_observation({
-            "occurred_on": dt.date(2026, 10, 13), "kind": "EF",
+            "occurred_on": dt.date(2026, 10, 13), "kind": "easy",
             "idempotency_key": "zones:new", "measurements": {},
             "pains": {"injury": {"state": "known", "value": 1.0}}})
     old = next(row for row in store.observation_rows()
@@ -2538,7 +2538,7 @@ def test_a_zone_the_instance_no_longer_watches_is_refused_but_its_history_stays(
 def test_without_a_watched_zone_an_effort_claims_no_pain(store):
     store.sync_pain_zones([])
     observation_id = store.add_observation({
-        "occurred_on": dt.date(2026, 10, 12), "kind": "EF", "idempotency_key": "zones:none",
+        "occurred_on": dt.date(2026, 10, 12), "kind": "easy", "idempotency_key": "zones:none",
         "measurements": {}})
     row = next(row for row in store.observation_rows() if row["id"] == observation_id)
     assert row["pains"] == {}
@@ -2552,10 +2552,10 @@ def test_a_wake_prediction_waits_for_the_zone_it_names(store):
     store.upsert_prediction({
         "prediction_key": "genou-calme", "domain": "corps", "statement": "genou calme",
         "probability": .7, "due_on": day + dt.timedelta(days=2),
-        "resolves_on": {"kind": "reveil", "date": day.isoformat(), "success_if": "<=1",
+        "resolves_on": {"kind": "wake-trace", "date": day.isoformat(), "success_if": "<=1",
                         "zone": "genou"}})
     store.add_observation({
-        "occurred_on": day, "kind": "reveil", "idempotency_key": "zones:reveil",
+        "occurred_on": day, "kind": "wake-trace", "idempotency_key": "zones:reveil",
         "measurements": {}, "pains": {"injury": {"state": "known", "value": 2.0},
                                       "genou": {"state": "known", "value": 0.5}}})
     [row] = [row for row in store.prediction_rows() if row["prediction_key"] == "genou-calme"]

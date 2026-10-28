@@ -1,5 +1,7 @@
 ---
 type: seance-type
+min_gap_h: {strength: 48}
+routine: a
 aliases: [renfo A, séance A, renfo unique, séance unique]
 capacite: [injury, descente]
 title: "Renfo, séance unique"

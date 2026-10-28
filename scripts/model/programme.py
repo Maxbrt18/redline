@@ -23,11 +23,13 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+from . import session_kinds
 from .dose import DOSE_SCHEMA, Dose
 from .notes import NoteError, frontmatter, read_all
 from .schema import Schema, field
 
 STATUSES = ("actif", "retire")
+SLUG_PATTERN = r"[a-z0-9][a-z0-9-]{0,39}"
 WEEK = r"W\d{2}"
 
 LOAD_SCHEMA = Schema("charge", [
@@ -87,6 +89,10 @@ SESSION_SCHEMA = Schema("séance", [
     field("variants", dict, required=False,
           note="les variantes déclarées, ex. degraded"),
     field("statut", str, required=False, choices=("actif", "retire")),
+    field("routine", str, pattern=SLUG_PATTERN,
+          note="l'identifiant de la routine, celui que le programme et le registre citent"),
+    field("min_gap_h", dict, required=False,
+          note="écart minimal en heures avec d'autres séances, par type : {long: 48}"),
 ])
 
 # An entry of `exercises:` is a slug, or a slug plus the dose this session
@@ -133,7 +139,7 @@ SELECTION_SCHEMA = Schema("séance du jour", [
     field("loads", list, required=False, maximum=20,
           item=field("charge", dict, schema=PRESCRIBED_LOAD_SCHEMA),
           note="charges prescrites par exercice : {exercise, kg, count}"),
-    field("session", str, note="a | b | assimilation"),
+    field("session", str, note="la routine, telle que sa fiche la déclare (`routine:`)"),
     field("date", str, required=False, note="le sous-titre de la card"),
     field("sid", str, required=False, note="identifiant, défaut = nom du PNG"),
     field("variant", str, required=False, note="une variante DÉCLARÉE par la séance"),
@@ -300,59 +306,82 @@ class Programme:
         }
 
 
-# ------------------------------------------------------ le RPE cible d'un type
+# ------------------------------------------------------ the RPE target of a kind
 
-# Le registre enregistre un TYPE ; la cible de RPE de ce type vit dans la fiche de
-# séance, en `rpe_cible`. `scripts/ledger.py` en portait une COPIE en dur (2026-08-08) :
-# six de ses huit entrées étaient mortes (seuls `seuil` et `côtes` étaient consultés) et
-# quatre fiches n'y figuraient pas du tout — c'est pourquoi un renfo à RPE 7 sur une
-# cible de 6 ne produisait aucun signal. La table de correspondance reste ici, explicite
-# et testée ; les NOMBRES, eux, n'existent qu'une fois, dans les fiches.
-WORKOUT_OF_LEDGER_TYPE = {
-    "EF": "ef",
-    "SL": "sortie-longue",
-    "seuil": "seuil-cote",
-    "côtes": "seuil-cote",
-    "lignes": "lignes-droites",
-    "cadence": "workout-cadence",
-    "vélo": "velo-z2",
-    "renfoA": "renfo-a",
-    "renfoB": "renfo-b",
-}
-
-# Types d'effort qui n'ont volontairement pas de fiche : une course n'est pas une séance
-# prescrite, et une randonnée non plus. Déclarés plutôt qu'oubliés — c'est la différence
-# entre un choix et un trou.
-TYPES_WITHOUT_NOTE = ("course", "rando")
+#: Where the workout notes live, one note per kind of session or strength routine.
+WORKOUTS_DIR = Path("coaching") / "workouts"
+#: The keys a workout note uses to say what it describes. A strength routine declares
+#: `routine:` (its slug); any other note declares the session `kinds:` it covers.
+NOTE_KINDS_SCHEMA = Schema("fiche de séance", [
+    field("kinds", list, required=False, item=field("type", str, choices=session_kinds.RECORDED)),
+    field("routine", str, required=False, pattern=SLUG_PATTERN),
+], extra=True)
 
 
-def rpe_targets(vault: Path) -> dict:
-    """Le RPE cible par type du REGISTRE, lu dans les fiches de séance.
-
-    Un type sans `rpe_cible` déclaré est simplement absent : l'appelant ne compare
-    rien, il n'invente pas de cible.
-    """
-    targets = {}
-    for kind, slug in WORKOUT_OF_LEDGER_TYPE.items():
-        path = vault / "coaching" / "workouts" / f"{slug}.md"
-        if not path.exists():
+def _workout_notes(vault: Path) -> list[tuple[Path, dict]]:
+    """Every workout note with what it declares; raises NoteError on a bad declaration."""
+    notes, problems = [], []
+    for path in sorted((vault / WORKOUTS_DIR).glob("*.md")):
+        data = frontmatter(path)
+        try:
+            NOTE_KINDS_SCHEMA.validate(data, path.name)
+        except Exception as exc:   # SchemaError names the field
+            problems.append(f"{path.name} : {exc}")
             continue
-        target = frontmatter(path).get("rpe_cible")
-        if target is not None:
-            targets[kind] = float(target)
+        if "routine" in data and "kinds" in data:
+            problems.append(f"{path.name} : une routine est un renfo, elle ne déclare pas kinds")
+            continue
+        notes.append((path, data))
+    if problems:
+        raise NoteError("\n".join(problems))
+    return notes
+
+
+def rpe_targets(vault: Path) -> dict[tuple[str, str | None], float]:
+    """The RPE target of each (kind, routine), read from the workout notes.
+
+    A kind without a declared `rpe_cible` is absent: the caller compares nothing
+    rather than inventing a target.
+    """
+    targets: dict[tuple[str, str | None], float] = {}
+    for _, data in _workout_notes(vault):
+        target = data.get("rpe_cible")
+        if target is None:
+            continue
+        if "routine" in data:
+            targets[(session_kinds.STRENGTH, data["routine"])] = float(target)
+        for kind in data.get("kinds") or ():
+            targets[(kind, None)] = float(target)
     return targets
 
 
+def target_for(targets: dict[tuple[str, str | None], float], kind: str,
+               routine: str | None = None) -> float | None:
+    return targets.get((kind, routine if kind == session_kinds.STRENGTH else None))
+
+
 def load(vault: Path) -> Programme:
-    """Every exercise and session note, validated. Raises NoteError listing every
+    """Every exercise and routine note, validated. Raises NoteError listing every
     broken note -- never a partial programme."""
     exercises = read_all(vault / "coaching" / "exercises", EXERCISE_SCHEMA)
     sessions = {}
     problems = []
-    for path in sorted((vault / "coaching" / "workouts").glob("renfo-*.md")):
+    for path, data in _workout_notes(vault):
+        if "routine" not in data:
+            continue
+        routine = data["routine"]
+        if routine in sessions:
+            problems.append(f"{path.name} : routine « {routine} » déjà déclarée")
+            continue
+        gaps = data.get("min_gap_h") or {}
+        bad = [f"{kind}: {hours}" for kind, hours in gaps.items()
+               if kind not in session_kinds.PLANNED or type(hours) is not int or hours < 1]
+        if bad:
+            problems.append(f"{path.name} : min_gap_h attend {{type planifié: heures}} "
+                            f"({', '.join(bad)})")
+            continue
         try:
-            sessions[path.stem.replace("renfo-", "")] = SESSION_SCHEMA.validate(
-                frontmatter(path), path.name)
+            sessions[routine] = SESSION_SCHEMA.validate(data, path.name)
         except NoteError as exc:
             problems.append(str(exc))
         except Exception as exc:   # SchemaError carries every field problem

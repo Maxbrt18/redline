@@ -29,8 +29,8 @@ def test_the_block_carries_the_gauge_of_the_last_week():
     chaque semaine qui passe (W30 devient W31...), pour une raison qui n'a rien
     à voir avec un bug de `render()`. C'est exactement le mode de panne qui a fait
     échouer la CI le 2026-07-29."""
-    rows = [Row(dt.date(2026, 3, 2), "EF", km=10, hours=5.0),
-            Row(dt.date(2026, 3, 4), "EF", km=10, hours=5.0)]
+    rows = [Row(dt.date(2026, 3, 2), "easy", km=10, hours=5.0),
+            Row(dt.date(2026, 3, 4), "easy", km=10, hours=5.0)]
     block = hot_cache.render(ledger, rows, {}, RPE_TARGETS)
     assert "W10" in block
     assert "10 h-éq · 140/100" in block   # h_eq = 5+5 ; level = round(10 * 14)
@@ -41,8 +41,8 @@ def test_a_red_made_of_walking_says_so():
     """Une jauge rouge faite de rando ne se lit pas comme une jauge rouge faite de
     course (objection Sam du 21/07, retenue). Le bloc doit porter la part de
     marche, sinon la lecture se refait de tête chaque semaine — et se perd."""
-    rows = [Row(dt.date(2026, 3, 2), "EF", km=10, hours=2.0),
-            Row(dt.date(2026, 3, 4), "rando", km=15, hours=6.0, dplus=300)]
+    rows = [Row(dt.date(2026, 3, 2), "easy", km=10, hours=2.0),
+            Row(dt.date(2026, 3, 4), "hike", km=15, hours=6.0, dplus=300)]
     assert "% de marche" in hot_cache.render(ledger, rows, {}, RPE_TARGETS)
 
 
@@ -56,15 +56,15 @@ def test_the_walk_share_uses_the_gauge_formula_not_a_copy_of_it():
     Ici : seuil 1 h à RPE 8 (cible 6,5) = 2,0 h-éq · rando 2 h = 1,0 h-éq, donc 33 %
     de marche. Avec la copie fautive le seuil pesait 1,5 et la marche affichait 40 %.
     """
-    rows = [Row(dt.date(2026, 3, 2), "seuil", km=10, hours=1.0, rpe=8.0),
-            Row(dt.date(2026, 3, 4), "rando", km=8, hours=2.0)]
+    rows = [Row(dt.date(2026, 3, 2), "threshold", km=10, hours=1.0, rpe=8.0),
+            Row(dt.date(2026, 3, 4), "hike", km=8, hours=2.0)]
     assert ledger.row_weight(rows[0], RPE_TARGETS) == (2.0, True)
     assert "33 % de marche" in hot_cache.render(ledger, rows, {}, RPE_TARGETS)
 
 
 def test_a_quiet_week_carries_no_red_verdict():
-    rows = [Row(dt.date(2026, 3, 2), "EF", km=8.0, hours=0.8, pains={"injury": 0.0}),
-            Row(dt.date(2026, 3, 4), "EF", km=8.0, hours=0.8, pains={"injury": 0.0})]
+    rows = [Row(dt.date(2026, 3, 2), "easy", km=8.0, hours=0.8, pains={"injury": 0.0}),
+            Row(dt.date(2026, 3, 4), "easy", km=8.0, hours=0.8, pains={"injury": 0.0})]
     block = hot_cache.render(ledger, rows, {"2026-W10": Instruments()}, RPE_TARGETS)
     assert "au rouge" not in block
     assert "% de marche" not in block   # zéro rando : la mention n'a pas lieu d'être
@@ -79,8 +79,8 @@ def test_an_empty_ledger_does_not_crash():
 
 def test_the_week_in_progress_is_never_announced_as_closed():
     """Le samedi 26/09, le bloc annonçait « W39 bouclée — 13 km, ratio 0,3 »."""
-    rows = [Row(dt.date(2026, 9, 22), "EF", km=7.0, hours=0.75),
-            Row(dt.date(2026, 9, 24), "EF", km=6.0, hours=0.65)]
+    rows = [Row(dt.date(2026, 9, 22), "easy", km=7.0, hours=0.75),
+            Row(dt.date(2026, 9, 24), "easy", km=6.0, hours=0.65)]
     saturday = hot_cache.render(ledger, rows, {}, RPE_TARGETS, today=dt.date(2026, 9, 26))
     assert "W39 en cours" in saturday and "bouclée" not in saturday
     monday = hot_cache.render(ledger, rows, {}, RPE_TARGETS, today=dt.date(2026, 9, 28))
@@ -91,7 +91,7 @@ def _state(**overrides):
     rows = []
     for day, km in (("2026-09-06", 10.4), ("2026-09-13", 11.53),
                     ("2026-09-20", 10.8), ("2026-09-27", 11.0)):
-        rows.append(Row(dt.date.fromisoformat(day), "SL", km=km, hours=km / 8))
+        rows.append(Row(dt.date.fromisoformat(day), "long", km=km, hours=km / 8))
     inputs = {
         "deadlines": [
             {"deadline_key": "verdict-cortex", "due_on": dt.date(2026, 9, 6),
@@ -145,7 +145,7 @@ def test_refresh_fills_the_state_block_only_where_it_is_declared(tmp_path):
         def pain_zones(self):
             return [{"slug": "injury", "label": "Injury", "active": True}]
 
-    rows = [Row(dt.date(2026, 9, 20), "SL", km=10.8, hours=1.3)]
+    rows = [Row(dt.date(2026, 9, 20), "long", km=10.8, hours=1.3)]
     assert hot_cache.refresh(tmp_path, ledger, rows, {}, store=Store(),
                              today=dt.date(2026, 9, 27))
     text = cache.read_text(encoding="utf-8")
@@ -155,7 +155,7 @@ def test_refresh_fills_the_state_block_only_where_it_is_declared(tmp_path):
 
 
 def test_each_watched_zone_has_its_own_trend_in_the_form_block():
-    rows = [Row(dt.date(2026, 3, 2), "EF", km=8.0, hours=0.8,
+    rows = [Row(dt.date(2026, 3, 2), "easy", km=8.0, hours=0.8,
                 pains={"genou": 2.0, "cheville": 0.5})]
     zones = [ledger.PainZone("genou", "Genou"), ledger.PainZone("cheville", "Cheville")]
     block = hot_cache.render(ledger, rows, {}, RPE_TARGETS, zones=zones)
@@ -163,5 +163,5 @@ def test_each_watched_zone_has_its_own_trend_in_the_form_block():
 
 
 def test_without_a_watched_zone_the_form_block_says_so():
-    rows = [Row(dt.date(2026, 3, 2), "EF", km=8.0, hours=0.8)]
+    rows = [Row(dt.date(2026, 3, 2), "easy", km=8.0, hours=0.8)]
     assert "aucune zone surveillée" in hot_cache.render(ledger, rows, {}, RPE_TARGETS)

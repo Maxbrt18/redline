@@ -6,7 +6,7 @@ débrief à effort bas. Elle ne dépend plus du modèle.
 
 from scripts.model import debrief
 
-SEUIL = {"workout": "seuil", "title": "Seuil doux en côte, calibration"}
+SEUIL = {"workout": "threshold", "title": "Seuil doux en côte, calibration"}
 
 
 def _laps(*rows):
@@ -41,9 +41,9 @@ def test_auto_laps_of_a_continuous_run_are_not_reps():
 
 
 def test_only_a_quality_session_gets_a_card():
-    assert debrief.quality_card(SEUIL_DU_15, {"workout": "EF"}) is None
+    assert debrief.quality_card(SEUIL_DU_15, {"workout": "easy"}) is None
     assert debrief.quality_card(SEUIL_DU_15, None) is None
-    assert debrief.quality_card(SEUIL_DU_15, {"workout": "SL", "transition": "qualite"})
+    assert debrief.quality_card(SEUIL_DU_15, {"workout": "long", "transition": "qualite"})
 
 
 def test_contiguous_fast_laps_are_one_rep_and_a_standing_recovery_is_slow():

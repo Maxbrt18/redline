@@ -23,7 +23,7 @@ def known(value):
 
 def ef(day: dt.date, hr: int) -> dict:
     """Une EF plate de 8 km en 48 min, complète : rien à réclamer."""
-    return {"id": uuid.uuid4(), "kind": "EF", "occurred_on": day, "note": "",
+    return {"id": uuid.uuid4(), "kind": "easy", "occurred_on": day, "note": "",
             "idempotency_key": f"strava:{day}", "started_at": None,
             "measurements": {"distance_km": known(8.0), "duration_s": known(48 * 60),
                              "hr_avg_bpm": known(hr), "elevation_gain_m": known(20),

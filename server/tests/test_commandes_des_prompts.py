@@ -44,8 +44,8 @@ def _prompts() -> dict[str, str]:
         "canonical_plan_note": prompts.canonical_plan_note(""),
         "active_revision_note": prompts.active_revision_note(""),
         "missing_cells_note": prompts.missing_cells_note(
-            [{"date": "2026-08-18", "type": "EF", "missing": ["RPE", "D-"]}],
-            [{"date": "2026-08-12", "type": "EF", "missing": ["Plaisir"]}]),
+            [{"date": "2026-08-18", "type": "easy", "missing": ["RPE", "D-"]}],
+            [{"date": "2026-08-12", "type": "easy", "missing": ["Plaisir"]}]),
     }
     textes.update({f"DEPTH_NOTES[{k}]": v for k, v in prompts.DEPTH_NOTES.items()})
     textes.update({f"PROACTIVE_TRIGGERS[{k}]": v.replace("{detail}", "42")

@@ -30,7 +30,7 @@ def session(day, **changed) -> dict:
     2026-08-16 : l'envoi ne suit plus un numéro de révision mais ce qu'il reste à
     faire, donc une semaine vide ne fait plus partir de bloc."""
     return {"id": f"w32-r1-{day.isoformat()}-ef", "title": "EF", "date": day.isoformat(),
-            "kind": "run", "workout": "EF", "status": "planned",
+            "kind": "run", "workout": "easy", "status": "planned",
             "distance_cap_km": 9.0, "demanding": False, **changed}
 
 
@@ -189,7 +189,7 @@ def test_the_persisted_plan_leaves_in_its_own_message_after_the_coach(make_bot):
     remaining = date.today() + timedelta(days=1 if date.today().weekday() < 6 else 0)
     repo.weekly_plan_context.side_effect = [
         context(2, [session(yesterday), session(date.today())]),
-        context(3, [session(yesterday), session(remaining, title="SL", workout="SL")])]
+        context(3, [session(yesterday), session(remaining, title="SL", workout="long")])]
     repo.persist_turn.return_value = PersistenceResult(True)
     client = MagicMock()
     bot = make_bot(repo=repo, client=client,
@@ -332,7 +332,7 @@ def test_a_cell_is_marked_asked_only_when_a_message_really_leaves(make_bot):
     sentinelle `?` (« demandé, et perdu ») aurait pu tomber sur une question jamais
     posée, ce que le code s'interdit explicitement.
     """
-    entry = {"date": "2026-08-10", "type": "EF", "missing": ["RPE", "Dlr", "Plaisir"]}
+    entry = {"date": "2026-08-10", "type": "easy", "missing": ["RPE", "Dlr", "Plaisir"]}
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
     repo.sync.return_value = False
@@ -345,6 +345,6 @@ def test_a_cell_is_marked_asked_only_when_a_message_really_leaves(make_bot):
                                    plan_asked=True))
     bot._respond("4242", "j'ai couru 7 km")
     markers = bot._state.proactive
-    assert not any(markers.marked("asked:2026-08-10:EF:" + column)
+    assert not any(markers.marked("asked:2026-08-10:easy:" + column)
                    for column in entry["missing"]), \
         "cellules classées « demandées » alors qu'aucun message n'est parti"

@@ -23,6 +23,7 @@ from typing import ClassVar
 
 from scripts.model import commands as command_model
 from scripts.model import ledger as ledger_model
+from scripts.model import session_kinds
 from scripts.model import weekly_plan as weekly_plan_model
 from scripts.storage import StorageError
 
@@ -1855,7 +1856,7 @@ ne demande pas de confirmation artificielle."""
         # Les anciens jobs peuvent avoir été créés avant le garde-fou du scheduler. On
         # les expire ici, avant toute livraison, pour qu'une trace de réveil ne soit
         # jamais demandée le soir en /10.
-        if original.get("type") == "reveil":
+        if original.get("type") == session_kinds.WAKE_TRACE:
             self._complete_job(job)
             log.info("Relance de réveil périmée ignorée : %s", job.job_id or job.kind)
             return

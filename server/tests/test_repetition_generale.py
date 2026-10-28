@@ -76,7 +76,7 @@ def revision_json(numero: int) -> str:
         "volume_target_km": 30.0,
         "sessions": [{
             "id": "w33-ven-ef", "title": "EF", "date": "2026-08-14", "kind": "run",
-            "workout": "EF", "status": "planned", "distance_target_km": 7.0,
+            "workout": "easy", "status": "planned", "distance_target_km": 7.0,
             "distance_cap_km": 9.0, "rpe_min": 2, "rpe_max": 3,
             "demanding": False, "sources": ["[[current-plan]]"],
         }],
@@ -103,7 +103,7 @@ def test_un_debrief_complet_passe_la_frontiere_du_tour(store):
     poser_le_plan(store)
     tour = str(uuid.uuid4())
 
-    reussit(coach("scripts/ledger-add.py", "--date", "2026-08-14", "--type", "EF",
+    reussit(coach("scripts/ledger-add.py", "--date", "2026-08-14", "--type", "easy",
                   "--km", "6.969", "--temps", "43:05", "--allure", "6:11",
                   "--fcmoy", "151.3", "--cad", "165", "--dplus", "64.6",
                   "--strava", "90000000002", "--depart-local", "2026-08-14T07:15:00",
@@ -122,7 +122,7 @@ def test_donner_un_rpe_ne_casse_jamais_rien(store):
     # La séance préexiste au plan : son filigrane de persistance l'a donc déjà vue.
     # C'est le point de départ du geste qu'on teste.
     tour_seance = str(uuid.uuid4())
-    reussit(coach("scripts/ledger-add.py", "--date", "2026-08-14", "--type", "vélo",
+    reussit(coach("scripts/ledger-add.py", "--date", "2026-08-14", "--type", "bike",
                   "--km", "36.9", "--temps", "1:42:57",
                   "--idempotency-key", "messenger:2026-08-14:velo", turn=tour_seance),
             "ledger-add")
@@ -132,7 +132,7 @@ def test_donner_un_rpe_ne_casse_jamais_rien(store):
 
     # Des heures plus tard, Sam donne son ressenti. RIEN ne doit bouger côté plan.
     tour = str(uuid.uuid4())
-    reussit(coach("scripts/ledger-complete.py", "--date", "2026-08-14", "--type", "vélo",
+    reussit(coach("scripts/ledger-complete.py", "--date", "2026-08-14", "--type", "bike",
                   "--metric", "rpe", "--value", "7.5", turn=tour), "ledger-complete")
     store.apply_turn_with_receipts(tour)[0]
 
@@ -147,7 +147,7 @@ def test_completer_sans_connaitre_la_cle_inventee_hier(store):
     Il a la date ; la date doit suffire. Sinon il devine, et il devine faux."""
     poser_le_plan(store)
     tour_seance = str(uuid.uuid4())
-    reussit(coach("scripts/ledger-add.py", "--date", "2026-08-14", "--type", "vélo",
+    reussit(coach("scripts/ledger-add.py", "--date", "2026-08-14", "--type", "bike",
                   "--km", "36.9", "--temps", "1:42:57",
                   "--idempotency-key", "messenger:2026-08-14:velo-du-padre",
                   turn=tour_seance), "ledger-add sans id Strava")
@@ -167,7 +167,7 @@ def test_completer_sans_connaitre_la_cle_inventee_hier(store):
     assert store.activity_recorded(90000000001) is True
 
     tour = str(uuid.uuid4())
-    reussit(coach("scripts/ledger-complete.py", "--date", "2026-08-14", "--type", "vélo",
+    reussit(coach("scripts/ledger-complete.py", "--date", "2026-08-14", "--type", "bike",
                   "--metric", "pain", "--value", "0", turn=tour), "complétion par date")
     store.apply_turn_with_receipts(tour)[0]
 
@@ -202,7 +202,7 @@ def test_un_programme_perime_reste_lisible_et_le_dit(store):
     programme s'imprime, et le code de sortie nomme le remède."""
     poser_le_plan(store)
     tour = str(uuid.uuid4())
-    reussit(coach("scripts/ledger-add.py", "--date", "2026-08-14", "--type", "EF",
+    reussit(coach("scripts/ledger-add.py", "--date", "2026-08-14", "--type", "easy",
                   "--km", "7", "--temps", "43:00",
                   "--idempotency-key", "messenger:2026-08-14:ef", turn=tour),
             "ledger-add sans révision")
@@ -248,7 +248,7 @@ def test_le_bilan_du_dimanche_joue_toute_sa_sequence(store):
     # registre vide, et la répétition doit jouer une semaine vécue, pas une semaine
     # théorique.
     tour_seance = str(uuid.uuid4())
-    reussit(coach("scripts/ledger-add.py", "--date", "2026-08-14", "--type", "EF",
+    reussit(coach("scripts/ledger-add.py", "--date", "2026-08-14", "--type", "easy",
                   "--km", "7", "--temps", "43:00", "--allure", "6:08",
                   "--rpe", "3", "--dlr", "1", "--plaisir", "7",
                   "--idempotency-key", "messenger:2026-08-14:ef-bilan",
@@ -277,7 +277,7 @@ def test_le_debrief_strava_joue_toute_sa_sequence(store):
     celui qui a été détruit deux fois le 2026-08-14."""
     poser_le_plan(store)
     tour = str(uuid.uuid4())
-    reussit(coach("scripts/ledger-add.py", "--date", "2026-08-14", "--type", "EF",
+    reussit(coach("scripts/ledger-add.py", "--date", "2026-08-14", "--type", "easy",
                   "--km", "6.969", "--temps", "43:05", "--allure", "6:11",
                   "--fcmoy", "151.3", "--cad", "165", "--dplus", "64.6",
                   "--dmoins", "65", "--wbgt", "23", "--strava", "90000000002",

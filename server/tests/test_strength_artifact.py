@@ -28,7 +28,7 @@ def test_strength_artifact_derives_identity_and_session_from_the_plan(monkeypatc
         "redline.strength_artifact.strength_card.snapshot",
         lambda built, root: {"sid": built["sid"], "exercises": [{"slug": "x"}]})
     session = {
-        "id": "jeu-renfo-a", "workout": "renfo-a",
+        "id": "jeu-renfo-a", "workout": "strength", "routine": "a",
         "strength": {"half_dose": True},
     }
 
@@ -50,7 +50,7 @@ def test_morning_card_is_rendered_by_the_service_not_the_agent(
         "revision": 3,
         "sessions": [{
             "id": "renfo-a", "title": "Renfo A", "date": today,
-            "kind": "strength", "workout": "renfo-a", "status": "planned",
+            "kind": "strength", "workout": "strength", "routine": "a", "status": "planned",
             "demanding": False, "strength": {}, "sources": ["strength.md"],
         }],
         "gates": [],

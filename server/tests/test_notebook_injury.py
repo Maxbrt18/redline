@@ -19,15 +19,15 @@ def board(rows, observations=()):
 
 
 def test_injury_counts_each_calendar_week_even_without_a_note():
-    rows = [Row(dt.date(2026, 9, 8), 'EF', pains={'injury': 0.5}), Row(dt.date(2026, 9, 13), 'SL', pains={'injury': 1.0}),
-            Row(dt.date(2026, 9, 18), 'reveil', pains={'injury': 1.0}), Row(dt.date(2026, 10, 3), 'SL', pains={'injury': 1.5}),
-            Row(dt.date(2026, 10, 7), 'EF', pains={'injury': 1.0}), Row(dt.date(2026, 10, 7), 'EF'),
-            Row(dt.date(2026, 8, 30), 'EF', pains={'injury': 2.5})]
-    observations = [{'kind': 'reveil', 'occurred_on': dt.date(2026, 10, 7), 'measurements': {},
+    rows = [Row(dt.date(2026, 9, 8), 'easy', pains={'injury': 0.5}), Row(dt.date(2026, 9, 13), 'long', pains={'injury': 1.0}),
+            Row(dt.date(2026, 9, 18), 'wake-trace', pains={'injury': 1.0}), Row(dt.date(2026, 10, 3), 'long', pains={'injury': 1.5}),
+            Row(dt.date(2026, 10, 7), 'easy', pains={'injury': 1.0}), Row(dt.date(2026, 10, 7), 'easy'),
+            Row(dt.date(2026, 8, 30), 'easy', pains={'injury': 2.5})]
+    observations = [{'kind': 'wake-trace', 'occurred_on': dt.date(2026, 10, 7), 'measurements': {},
                      'pains': {'injury': {'state': 'pending'}}},
-                    {'kind': 'reveil', 'occurred_on': dt.date(2026, 10, 8),
+                    {'kind': 'wake-trace', 'occurred_on': dt.date(2026, 10, 8),
                      'measurements': {}, 'pains': {'injury': {'state': 'known', 'value': 0}}},
-                    {'kind': 'reveil', 'occurred_on': dt.date(2026, 9, 20), 'measurements': {},
+                    {'kind': 'wake-trace', 'occurred_on': dt.date(2026, 9, 20), 'measurements': {},
                      'pains': {'injury': {'state': 'pending'}}}]
     view = board(rows, observations).injury_view()
     assert view['start'] == '2026-09-07' and view['cap'] == 2.0

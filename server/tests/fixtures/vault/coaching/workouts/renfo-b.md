@@ -1,5 +1,7 @@
 ---
 type: seance-type
+min_gap_h: {strength: 48, long: 48}
+routine: b
 aliases: [renfo B, séance B, descente et excentrique]
 capacite: [descente]
 title: "Renfo B, descente & excentrique"

@@ -36,7 +36,7 @@ TOMORROW = TODAY + timedelta(days=1)
 def session(**changed) -> dict:
     """Une séance à faire aujourd'hui, sauf mention contraire."""
     return {"id": "w33-r1-jour-ef", "title": "EF", "date": TODAY.isoformat(),
-            "kind": "run", "workout": "EF", "status": "planned",
+            "kind": "run", "workout": "easy", "status": "planned",
             "distance_target_km": 7.0, "distance_cap_km": 9.0,
             "demanding": False, **changed}
 
@@ -120,7 +120,7 @@ def test_the_reactive_path_never_renders_the_plan_card(repo, client, make_bot):
     """
     due_gate = {"id": "g1", "due": "2000-01-01", "when": "avant",
                 "holds": ["w33-r1-jour-ef"],
-                "question": "La blessure ?", "on_fail": "repos"}
+                "question": "La blessure ?", "on_fail": "rest"}
     repo.weekly_plan_context.side_effect = [context(5), context(
         6, [session(date=TOMORROW.isoformat())], [due_gate])]
     bot = make_bot(repo=repo, client=client,
@@ -286,7 +286,7 @@ def test_a_gate_still_holds_the_prescription_even_on_a_fresh_revision(repo, clie
     """Un contrôle daté échu retient la ligne de séances, révision neuve ou pas."""
     due_gate = {"id": "g1", "due": TODAY.isoformat(), "when": "avant",
                 "holds": ["w33-r1-jour-ef"], "question": "la blessure ?",
-                "on_fail": "repos"}
+                "on_fail": "rest"}
     repo.weekly_plan_context.side_effect = [
         context(5),
         context(6, [session(date=TOMORROW.isoformat())], gates=[due_gate]),

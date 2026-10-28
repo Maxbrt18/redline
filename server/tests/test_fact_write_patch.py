@@ -37,10 +37,10 @@ def test_question_review_cli_preserves_partial_and_deferred_states():
 
 
 def test_ask_cli_names_only_the_measurement_actually_requested():
-    args = parse("ask", "--text", "Quel était ton RPE ?", "--cell", "2026-09-05:EF:RPE")
+    args = parse("ask", "--text", "Quel était ton RPE ?", "--cell", "2026-09-05:easy:RPE")
     _, kind, payload = fact_write._payload(args)
     assert kind == "question.ask"
-    assert payload == {"text": "Quel était ton RPE ?", "cells": ["2026-09-05:EF:RPE"]}
+    assert payload == {"text": "Quel était ton RPE ?", "cells": ["2026-09-05:easy:RPE"]}
 
 
 def parse(*argv: str):
@@ -176,10 +176,10 @@ def test_une_prediction_soldee_se_rectifie_avec_son_motif():
 def test_une_prediction_corps_se_rattache_au_reveil_qui_la_tranche():
     base = ("prediction", "--key", "w42-sl", "--domain", "corps", "--statement", "trace",
             "--probability", "0.75", "--due-on", "2026-10-19")
-    _, _, payload = fact_write._payload(parse(*base, "--resolves", "reveil", "--resolves-on",
+    _, _, payload = fact_write._payload(parse(*base, "--resolves", "wake-trace", "--resolves-on",
                                               "2026-10-19", "--success-if", "<=1"))
-    assert payload["resolves_on"] == {"kind": "reveil", "date": "2026-10-19",
+    assert payload["resolves_on"] == {"kind": "wake-trace", "date": "2026-10-19",
                                       "success_if": "<=1"}
     assert "resolves_on" not in fact_write._payload(parse(*base))[2]
     with pytest.raises(InputError, match="vont ensemble"):
-        fact_write._payload(parse(*base, "--resolves", "reveil"))
+        fact_write._payload(parse(*base, "--resolves", "wake-trace"))

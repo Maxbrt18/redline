@@ -66,27 +66,27 @@ def ef(identifier, date, **overrides):
 
 def seed_week(store):
     sessions = [
-        session("w41-lun-repos", date="2026-10-05", workout="repos", title="Repos"),
+        session("w41-lun-repos", date="2026-10-05", workout="rest", title="Repos"),
         ef("w41-mar-ef", "2026-10-06"),
-        session("w41-mar-renfo", date="2026-10-06", workout="renfo-a",
+        session("w41-mar-renfo", date="2026-10-06", workout="strength", routine="a",
                 title="Renfo, séance unique"),
         ef("w41-mer-ef", "2026-10-07", duration_cap_min=45),
         ef("w41-ven-ef", "2026-10-09"),
         session("w41-sam-footing", date="2026-10-10", title="Footing court",
                 distance_target_km=4.5, distance_cap_km=5.0),
-        session("w41-dim-sl", date="2026-10-11", workout="SL", start_time="09:45",
+        session("w41-dim-sl", date="2026-10-11", workout="long", start_time="09:45",
                 title="Sortie longue au Testathlon", location_label="Vincennes",
                 distance_target_km=16.0, distance_cap_km=16.5),
     ]
     for item in sessions:
-        if item["workout"] == "repos":
+        if item["workout"] == "rest":
             item["kind"] = "rest"
             for key in ("strength", "distance_target_km", "distance_cap_km", "rpe_min", "rpe_max"):
                 item.pop(key, None)
     store.append_plan_revision(WEEK, revision(
         sessions=sessions, computed_at="2026-10-04T20:00:00+02:00", volume_target_km=41.0))
     store.add_observation({
-        "occurred_on": dt.date(2026, 10, 6), "kind": "EF",
+        "occurred_on": dt.date(2026, 10, 6), "kind": "easy",
         "started_at": dt.datetime(2026, 10, 6, 7, 10, tzinfo=PARIS),
         "idempotency_key": "strava:90000000018", "strava_activity_id": 90000000018,
         "measurements": {
@@ -100,7 +100,7 @@ def seed_week(store):
         "pains": {"injury": {"state": "known", "value": 0.5}},
     })
     store.add_observation({
-        "occurred_on": dt.date(2026, 10, 7), "kind": "EF",
+        "occurred_on": dt.date(2026, 10, 7), "kind": "easy",
         "started_at": dt.datetime(2026, 10, 7, 18, 40, tzinfo=PARIS),
         "idempotency_key": "strava:90000000019", "strava_activity_id": 90000000019,
         "measurements": {
@@ -178,7 +178,7 @@ def test_a_very_light_wake_trace_is_half_a_point(store):
     seed_week(store)
     morning = dt.datetime(2026, 10, 7, 8, 0, tzinfo=PARIS)
     assert board(store, morning).answer("wake:2026-10-07:injury", "tres-legere") == {"alert": None}
-    [reveil] = [row for row in store.observation_rows() if row["kind"] == "reveil"]
+    [reveil] = [row for row in store.observation_rows() if row["kind"] == "wake-trace"]
     assert reveil["pains"]["injury"] == {"state": "known", "value": 0.5}
 
 
@@ -195,11 +195,11 @@ def test_the_morning_trace_is_asked_in_the_morning_only_and_in_its_own_words(sto
         "prediction_key": "w41-sl-reveil", "domain": "corps",
         "statement": "trace au plus légère au réveil du lendemain de SL",
         "probability": .75, "due_on": dt.date(2026, 10, 11),
-        "resolves_on": {"kind": "reveil", "date": "2026-10-07", "success_if": "<=1"}})
+        "resolves_on": {"kind": "wake-trace", "date": "2026-10-07", "success_if": "<=1"}})
     assert board(store, morning).answer(wake["id"], "legere") == {"alert": None}
     [prediction] = store.prediction_rows()
     assert (prediction["status"], prediction["outcome"]) == ("resolved", True)
-    reveil = [row for row in store.observation_rows() if row["kind"] == "reveil"]
+    reveil = [row for row in store.observation_rows() if row["kind"] == "wake-trace"]
     assert reveil[0]["pains"]["injury"] == {"state": "known", "value": 1.0}
     assert reveil[0]["source"] == "carnet"
     assert not [ask for ask in board(store, morning).asks() if ask["type"] == "wake"]
@@ -259,7 +259,7 @@ def test_past_weeks_list_the_ledger_fact_and_the_planned_target(store):
         sessions=[ef("w40-mar-ef", "2026-09-29")], computed_at="2026-09-27T20:00:00+02:00",
         volume_target_km=40.0))
     store.add_observation({
-        "occurred_on": dt.date(2026, 9, 29), "kind": "EF", "idempotency_key": "manual:w40",
+        "occurred_on": dt.date(2026, 9, 29), "kind": "easy", "idempotency_key": "manual:w40",
         "measurements": {"distance_km": {"state": "known", "value": 9.5}}})
     [w40] = board(store).weeks_view({"2026-W40": "bilan-40"})
     assert w40 == {"week": "2026-W40", "monday": "2026-09-28", "km_done": 9.5,
@@ -268,7 +268,7 @@ def test_past_weeks_list_the_ledger_fact_and_the_planned_target(store):
 
 def test_without_a_plan_nothing_is_prescribed_but_the_ledger_still_counts(store):
     store.add_observation({
-        "occurred_on": dt.date(2026, 10, 6), "kind": "EF",
+        "occurred_on": dt.date(2026, 10, 6), "kind": "easy",
         "idempotency_key": "manual:ef", "measurements": {
             "distance_km": {"state": "known", "value": 8.0},
             "rpe": {"state": "known", "value": 3},

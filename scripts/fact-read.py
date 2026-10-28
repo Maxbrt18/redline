@@ -19,7 +19,7 @@ if str(ROOT / "server") not in sys.path:
     sys.path.insert(0, str(ROOT / "server"))
 
 from redline.race_countdown import compile_deadline
-from scripts.model import entrypoint, voice
+from scripts.model import entrypoint, session_labels, voice
 from scripts.model import ledger as table
 from scripts.model import predictions as prediction_model
 from scripts.model.errors import ConfigError, InputError
@@ -214,7 +214,8 @@ def predictions(store: Any, *, due: bool = False, today: dt.date | None = None) 
         used = " · consommée" if row.get("used_at") else ""
         score = f" · Brier {float(row['brier_score']):.3f}" if row["brier_score"] is not None else ""
         zone = f" ({row['resolves_zone']})" if row.get("resolves_zone") else ""
-        bound = (f" · se solde au {row['resolves_kind']}{zone} du {row['resolves_on']} "
+        bound = (f" · se solde au {session_labels.short(row['resolves_kind'])}{zone} "
+                 f"du {row['resolves_on']} "
                  f"si {row['success_op']}{float(row['success_value']):g}"
                  if row.get("resolves_kind") else "")
         lines.append(f"{row['prediction_key']} · {row['domain']} · p={float(row['probability']):.0%} "

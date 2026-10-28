@@ -14,7 +14,7 @@ from scripts.ledger import Row
 
 def _row(week_day: str, **kwargs):
     import datetime as dt
-    return Row(date=dt.date.fromisoformat(week_day), type=kwargs.pop("type", "EF"), **kwargs)
+    return Row(date=dt.date.fromisoformat(week_day), type=kwargs.pop("type", "easy"), **kwargs)
 
 
 def _labels(rows):
@@ -48,7 +48,7 @@ def test_hilly_and_quality_sessions_do_not_pollute_the_cadence():
     """In trail, on hills and in quality work the cadence lives its own life: measuring
     it there reads the terrain, not the injury."""
     rows = [_row("2026-08-03", cadence=160),
-            _row("2026-08-10", cadence=190, type="côtes"),
+            _row("2026-08-10", cadence=190, type="hills"),
             _row("2026-08-11", cadence=161)]
     assert signals.signals(rows, _labels(rows), frozenset()) == []
 
@@ -76,12 +76,12 @@ def test_a_longer_long_run_is_no_longer_a_signal():
 def test_a_group_run_counts_as_a_long_run():
     """Capping it to EF/SL would make the 29/07 group session -- the one that blew the
     week's load open -- read as a quiet week."""
-    rows = [_row("2026-08-03", km=8.0), _row("2026-08-10", km=12.0, type="course")]
+    rows = [_row("2026-08-03", km=8.0), _row("2026-08-10", km=12.0, type="race")]
     assert signals.longest_run(rows, _labels(rows))[-1][1] == 12.0
 
 
 def test_walking_and_cycling_never_count_as_a_long_run():
-    rows = [_row("2026-08-03", km=8.0), _row("2026-08-10", km=25.0, type="rando")]
+    rows = [_row("2026-08-03", km=8.0), _row("2026-08-10", km=25.0, type="hike")]
     assert signals.longest_run(rows, _labels(rows))[-1][1] is None
 
 
@@ -168,6 +168,6 @@ def test_the_render_names_a_long_run_stall():
     rows = []
     for day, km in (("2026-09-06", 10.4), ("2026-09-13", 11.53),
                     ("2026-09-20", 10.8), ("2026-09-27", 10.5), ("2026-10-04", 11.0)):
-        rows.append(_row(day, type="SL", km=km, hours=km / 8))
+        rows.append(_row(day, type="long", km=km, hours=km / 8))
     text = signals.render(rows, _labels(rows), frozenset(), today=dt.date(2026, 10, 5))
     assert "sans nouveau record depuis 3 semaine(s)" in text

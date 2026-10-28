@@ -66,8 +66,9 @@ export function pastille(icon, small) {
   node.innerHTML = '<svg viewBox="0 0 24 24">' + (PAS_ICONS[icon] || PAS_ICONS.other) + '</svg>';
   return node;
 }
-// Le programme dit run, strength, test, rest, bike ou hike, et SL dans `workout` ; le
-// registre dit EF, SL, seuil, rando, vélo... Le vélo et la rando restent à la pierre.
-const RUN_KINDS = new Set(['run', 'test', 'EF', 'seuil', 'côtes', 'lignes', 'cadence', 'course']);
-export const kindIcon = (kind, workout) => kind === 'SL' || workout === 'SL' ? 'long' : kind === 'strength' ? 'str'
-  : kind === 'rest' ? 'rest' : RUN_KINDS.has(kind) ? 'run' : 'other';
+// `kind` est la famille d'une séance du programme (run, strength…) ou le type d'une
+// séance du registre (easy, long…) ; les deux se ramènent à une famille.
+const familyOf = kind => (window.REDLINE_KINDS || {})[kind] ? window.REDLINE_KINDS[kind].family : kind;
+export const kindIcon = (kind, workout) => kind === 'long' || workout === 'long' ? 'long'
+  : familyOf(kind) === 'strength' ? 'str' : familyOf(kind) === 'rest' ? 'rest'
+  : familyOf(kind) === 'run' || familyOf(kind) === 'test' ? 'run' : 'other';

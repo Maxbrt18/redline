@@ -120,7 +120,7 @@ def test_pending_ledger_cells_accept_the_iso_date_from_the_read_model(
     sched._bot.conversation_active.return_value = False
     sched._bot.pending_ledger_cells.return_value = [{
         "date": "2026-07-14",
-        "type": "EF",
+        "type": "easy",
         "missing": ["RPE"],
     }]
 
@@ -137,7 +137,7 @@ def test_pending_wake_cells_are_not_claimed_in_the_evening(store, make_config):
     sched._bot.has_pending_inbound.return_value = False
     sched._bot.conversation_active.return_value = False
     sched._bot.pending_ledger_cells.return_value = [{
-        "date": "2026-07-14", "type": "reveil", "missing": ["Dlr"],
+        "date": "2026-07-14", "type": "wake-trace", "missing": ["Dlr"],
     }]
 
     assert due_trigger(sched, TUESDAY_NOON.replace(hour=20)) is None
@@ -152,7 +152,7 @@ def test_objective_only_ledger_cells_never_wake_the_athlete(store, make_config):
     sched._bot.has_pending_inbound.return_value = False
     sched._bot.conversation_active.return_value = False
     sched._bot.pending_ledger_cells.return_value = [{
-        "date": "2026-07-14", "type": "SL", "missing": ["D-"],
+        "date": "2026-07-14", "type": "long", "missing": ["D-"],
     }]
 
     assert due_trigger(sched, TUESDAY_NOON.replace(hour=20)) is None
@@ -167,7 +167,7 @@ def test_ledger_claim_excludes_objective_cells_from_its_question(store, make_con
     sched._bot.has_pending_inbound.return_value = False
     sched._bot.conversation_active.return_value = False
     sched._bot.pending_ledger_cells.return_value = [{
-        "date": "2026-07-14", "type": "SL", "missing": ["RPE", "D-"],
+        "date": "2026-07-14", "type": "long", "missing": ["RPE", "D-"],
     }]
 
     job = due_trigger(sched, TUESDAY_NOON.replace(hour=20))

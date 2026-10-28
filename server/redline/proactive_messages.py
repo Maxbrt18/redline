@@ -11,6 +11,8 @@ import datetime as dt
 import json
 from dataclasses import dataclass
 
+from scripts.model import session_kinds, session_labels
+
 
 @dataclass(frozen=True)
 class ClosedProactive:
@@ -57,7 +59,7 @@ def _missing_cells(detail: str) -> ClosedProactive | None:
     # Le réveil est une trace qualitative recueillie le matin même. Il ne doit
     # jamais retomber dans le filet du soir, qui ne sait formuler que des cellules
     # numériques d'effort (2026-09-15).
-    if data.get("type") == "reveil":
+    if data.get("type") == session_kinds.WAKE_TRACE:
         return None
     labels = {
         "RPE": "ton RPE global",
@@ -99,7 +101,7 @@ def missing_cells_in_notebook(detail: str) -> ClosedProactive | None:
     manque et renvoie au carnet, sans poser de question.
     """
     data = _object(detail)
-    if not data or data.get("type") == "reveil":
+    if not data or data.get("type") == session_kinds.WAKE_TRACE:
         return None
     labels = {"Dlr": "ton pic de douleur", "RPE": "ton RPE", "Plaisir": "ton plaisir"}
     names = [name for wanted in ("Dlr", "RPE", "Plaisir")
@@ -108,7 +110,9 @@ def missing_cells_in_notebook(detail: str) -> ClosedProactive | None:
         return None
     wanted = [_requested(labels, name) for name in names]
     listed = wanted[0] if len(wanted) == 1 else ", ".join(wanted[:-1]) + " et " + wanted[-1]
-    session = " ".join(("Ta séance", str(data.get("type") or "").strip())).strip()
+    kind = str(data.get("type") or "").strip()
+    label = session_labels.short(kind) if kind in session_labels.LABELS else kind
+    session = " ".join(("Ta séance", label)).strip()
     try:
         session += dt.date.fromisoformat(str(data.get("date"))).strftime(" du %d/%m")
     except ValueError:

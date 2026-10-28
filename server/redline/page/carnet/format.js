@@ -11,7 +11,9 @@ export const dm = value => day(value).toLocaleDateString('fr-FR', {day: '2-digit
 export const humanDate = value => day(value).toLocaleDateString('fr-FR', {day: 'numeric', month: 'long', year: 'numeric'});
 export const weekNumber = label => Number(label.slice(-2));
 export const isoDate = date => date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
-export const kindName = {EF: 'EF', SL: 'Sortie longue', seuil: 'Seuil', 'côtes': 'Côtes', lignes: 'Lignes', cadence: 'Cadence', course: 'Course', rando: 'Rando', 'vélo': 'Vélo'};
+// Les types de séance et leurs libellés viennent du service (`window.REDLINE_KINDS`).
+export const kinds = window.REDLINE_KINDS || {};
+export const kindName = Object.fromEntries(Object.entries(kinds).map(([slug, kind]) => [slug, kind.name]));
 export const shortTitle = title => title.split(',')[0].trim();
 // Une heure ne se coupe jamais en fin de ligne : « 19 h 05 » tient d'un bloc.
 export const hm = text => Number(text.slice(0, 2)) + '\u00a0h' + (text.slice(3, 5) === '00' ? '' : '\u00a0' + text.slice(3, 5));

@@ -7,23 +7,16 @@ import re
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
+from . import session_kinds
 from .errors import InputError
 from .schema import Schema, field
 
 UNKNOWN = "?"
 
-SESSION_TYPES = (
-    "EF", "SL", "seuil", "côtes", "lignes", "cadence", "course", "rando",
-    "vélo", "renfoA", "renfoB", "instruments", "lecture", "reveil", "palpation",
-)
-REST_TYPES = ("lecture", "reveil")
-EFFORT_TYPES = (
-    "EF", "SL", "seuil", "côtes", "lignes", "cadence", "course", "rando",
-    "vélo", "renfoA", "renfoB",
-)
-ENJOYMENT_TYPES = (
-    "EF", "SL", "seuil", "côtes", "lignes", "cadence", "course", "rando",
-)
+SESSION_TYPES = session_kinds.RECORDED
+REST_TYPES = session_kinds.READINGS
+EFFORT_TYPES = session_kinds.EFFORT
+ENJOYMENT_TYPES = session_kinds.ENJOYMENT
 
 
 @dataclass(frozen=True)
@@ -44,6 +37,8 @@ STRAVA_ID_PATTERN = r"\d{9,12}"
 INPUTS = (
     ObservationInput("Date", r"\d{4}-\d{2}-\d{2}", required=True),
     ObservationInput("Type", "|".join(SESSION_TYPES), required=True),
+    ObservationInput("Routine", r"[a-z0-9][a-z0-9-]{0,39}",
+                     note="la routine de renfo, telle que sa fiche la déclare"),
     ObservationInput("km", r"\d+(\.\d{1,2})?", metric="distance_km", decimals=2),
     ObservationInput("Temps", r"\d{1,2}:\d{2}(:\d{2})?", metric="duration_s"),
     ObservationInput("Allure", r"\d:\d{2}", metric="pace_s_per_km", note="min/km"),

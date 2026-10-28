@@ -32,6 +32,7 @@ from scripts.model import (  # noqa: E402
     commands,
     entrypoint,
     session_cycle,
+    session_kinds,
 )
 from scripts.model import ledger as table  # noqa: E402
 
@@ -69,7 +70,7 @@ def morning_trace_errors(raw: dict[str, str], pains: dict[str, str],
     « ? » est refusé aussi : un réveil sans réponse n'a pas de ligne, et le rattrapage
     avait converti en `unavailable` des réponses pourtant données (07/09, 12/09, 14/09).
     """
-    if raw.get("Type") != "reveil":
+    if raw.get("Type") != session_kinds.WAKE_TRACE:
         return []
     if not zones:
         return ["réveil sans zone surveillée : il n'y a aucune trace à consigner"]
@@ -115,6 +116,7 @@ def _write_database(url: str, raw: dict[str, str], pains: dict[str, str], key: s
     payload = {
         "occurred_on": dt.date.fromisoformat(raw["Date"]), "kind": kind,
         "idempotency_key": key, "strava_activity_id": raw.get("Strava") or None,
+        "routine": raw.get("Routine") or None,
         "note": raw.get("Note", ""), "source": "ledger-add", "measurements": measurements,
         "pains": {zone: table.pain_reading(value) for zone, value in pains.items()},
     }
@@ -191,7 +193,7 @@ def main() -> int:
 
     database_url = (os.environ.get("DATABASE_URL") or "").strip()
     zones: list[str] = []
-    if args.dlr or raw_values.get("Type") == "reveil":
+    if args.dlr or raw_values.get("Type") == session_kinds.WAKE_TRACE:
         if not database_url:
             print("DATABASE_URL obligatoire : les zones surveillées vivent en base",
                   file=sys.stderr)
@@ -203,6 +205,8 @@ def main() -> int:
         print(f"observation refusée : {exc}", file=sys.stderr)
         return 1
     problems = morning_trace_errors(raw_values, pains, zones)
+    if raw_values.get("Routine") and raw_values.get("Type") != session_kinds.STRENGTH:
+        problems.append(f"--routine ne vaut que pour --type {session_kinds.STRENGTH}")
     problems += table.INPUT_SCHEMA.errors(raw_values, raw_values.get("Date", "observation"))
     for zone, value in pains.items():
         try:

@@ -14,7 +14,15 @@ from . import strength_log
 from .programme import Programme
 from .views import apply, table
 
-BLOCKS = {"RENFO_A": "a", "RENFO_B": "b", "RENFO_ASSIMILATION": "assimilation"}
+#: Each routine's table sits between the markers of its own block in `strength.md`.
+BLOCK_PREFIX = "RENFO_"
+
+
+def blocks(programme: Programme) -> dict[str, str]:
+    """Block name -> routine, one per routine the vault declares."""
+    return {BLOCK_PREFIX + routine.upper().replace("-", "_"): routine
+            for routine in programme.sessions}
+
 
 HEADERS = ["#", "Exercice", "Dose", "Repos", "Depuis"]
 
@@ -88,7 +96,7 @@ def render_log(programme: Programme, path: Path) -> str:
     # Les séries menées À L'ÉCHEC technique : leur score de difficulté n'est pas un
     # instrument. Voir la colonne Score plus bas.
     amrap = set()
-    for key in BLOCKS.values():
+    for key in blocks(programme).values():
         for prescription in programme.prescriptions(key):
             if prescription.slug not in order:
                 order.append(prescription.slug)
@@ -132,7 +140,7 @@ def refresh(vault: Path, programme: Programme, *, check: bool = False) -> list:
     should flag is not a control.
     """
     path = target(vault)
-    drifted = [name for name, key in BLOCKS.items()
+    drifted = [name for name, key in blocks(programme).items()
                if apply(path, name, render(programme, key), check=check)]
     log = render_log(programme, vault / strength_log.PATH)
     if apply(path, LOG_BLOCK, log, check=check):
