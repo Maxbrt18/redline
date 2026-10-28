@@ -19,18 +19,18 @@ instructions are not here: they live in each instance's vault (template:
 | `src/redline/evaluation/` | offline coaching and conversation benches |
 | `migrations/` | Alembic revisions, frozen once merged |
 | `deploy/` | systemd units, Caddy, host scripts, the agent CLI wrapper and its allowlist |
-| `tests/` | the suite, with a fictional vault in `tests/fixtures/vault/` (athlete: Sam) |
+| `tests/` | the suite, with a fictional vault in `tests/fixtures/vault/` |
 
 The engine and the vault are two roots (`redline.model.paths`): code, templates and
 fixtures come from `ENGINE_ROOT`; every note an instance reads or writes comes from
-`vault_root()` (`VAULT_PATH`).
+`vault_root()` (`VAULT_PATH`, required, never the engine checkout).
 
 ## No personal data
 
 The engine is public. No real athlete name, injury, race, place, date of a coaching
-history, Strava data or key. Tests use the fictional athlete Sam. Instance values come
-from `redline.toml`, coaching thresholds from `rulebook.toml`; neither appears as a
-literal in the engine.
+history, Strava data or key. Tests use the fictional athlete of `tests/fixtures/vault/`.
+Instance values come from `redline.toml`, coaching thresholds from `rulebook.toml`;
+neither appears as a literal in the engine.
 
 ## Language
 

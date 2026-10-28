@@ -228,20 +228,21 @@ def test_root_owned_launcher_refuses_a_cli_modified_during_the_turn(tmp_path):
         assert outside.returncode == 2
         assert "aucun tour en cours" in outside.stderr
 
-    clean = subprocess.run(
+    # Without a vault the launcher refuses: the engine checkout is never one.
+    no_vault = subprocess.run(
         [launcher, "ledger.py", "--semaine", "2026-W35"],
         env=environment, text=True, capture_output=True, check=False)
-    assert clean.returncode == 0
-    assert "-m\nredline.cli.ledger" in clean.stdout
+    assert no_vault.returncode == 1
+    assert "VAULT_PATH absent" in no_vault.stderr
 
-    # Separate engine and vault: the script stays the verified engine's, and runs
-    # in the vault, where the turn put its files.
+    # The script stays the verified engine's, and runs in the vault, where the turn put
+    # its files.
     vault = tmp_path / "vault"
     vault.mkdir()
+    environment["VAULT_PATH"] = str(vault)
     split = subprocess.run(
         [launcher, "ledger.py", "--semaine", "2026-W35"],
-        env={**environment, "VAULT_PATH": str(vault)},
-        text=True, capture_output=True, check=False)
+        env=environment, text=True, capture_output=True, check=False)
     assert split.returncode == 0
     assert "-m\nredline.cli.ledger" in split.stdout
     assert f"cwd={vault.resolve()}" in split.stdout

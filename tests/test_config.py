@@ -37,10 +37,11 @@ def env(monkeypatch, tmp_path):
                                   "GRAPH", "STATE", "DATABASE", "ATTACHMENT", "HEALTH"):
             monkeypatch.delenv(name, raising=False)
     monkeypatch.chdir(tmp_path)
-    # The default vault is the current directory: it carries the fictional instance.
+    # The vault is a temporary folder carrying the fictional instance.
     shutil.copy(TEST_VAULT / "redline.toml", tmp_path / "redline.toml")
     for key, value in MINIMAL.items():
         monkeypatch.setenv(key, value)
+    monkeypatch.setenv("VAULT_PATH", str(tmp_path))
     return monkeypatch
 
 

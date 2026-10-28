@@ -40,18 +40,22 @@ fingerprint() {
     git diff --name-only -z | xargs -0 -I{} sh -c \
         'printf "%s %s\n" "$(git hash-object -- "$1" 2>/dev/null || echo absent)" "$1"' _ {}
 }
-BEFORE=$(fingerprint)
-REGEN_OPTIONS=""
-if [ -z "${DATABASE_URL:-}" ]; then
-    REGEN_OPTIONS="--static-only"
+# Views belong to a vault: the engine checkout has none, and VAULT_PATH refuses it.
+if [ ! -d src/redline ]; then
+    export VAULT_PATH="${VAULT_PATH:-$PWD}"
+    BEFORE=$(fingerprint)
+    REGEN_OPTIONS=""
+    if [ -z "${DATABASE_URL:-}" ]; then
+        REGEN_OPTIONS="--static-only"
+    fi
+    "$RUNTIME_PYTHON" -m redline.cli.regen_views $REGEN_OPTIONS >/dev/null || \
+        echo "pre-commit : régénération des vues en échec, commit maintenu (bloc périmé)."
+    # La liste des fichiers produits reste lue sur le disque, jamais recopiée de
+    # GENERATORS : une copie a déjà raté decisions.md (2026-07-29).
+    fingerprint | while read -r hash path; do
+        printf '%s\n' "$BEFORE" | grep -qxF "$hash $path" || git add -- "$path"
+    done
 fi
-"$RUNTIME_PYTHON" -m redline.cli.regen_views $REGEN_OPTIONS >/dev/null || \
-    echo "pre-commit : régénération des vues en échec, commit maintenu (bloc périmé)."
-# La liste des fichiers produits reste lue sur le disque, jamais recopiée de
-# GENERATORS : une copie a déjà raté decisions.md (2026-07-29).
-fingerprint | while read -r hash path; do
-    printf '%s\n' "$BEFORE" | grep -qxF "$hash $path" || git add -- "$path"
-done
 
 # Code touched? Then run the gate the CI runs, here, where the fix is free rather
 # than a red build and a copy-pasted log. Each tool is skipped ALOUD when it is not

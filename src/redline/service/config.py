@@ -15,6 +15,7 @@ from pathlib import Path
 from redline.model import instance as instance_model
 from redline.model import paths
 from redline.model import rulebook as rulebook_model
+from redline.model.errors import ConfigError
 from redline.model.instance import Instance
 
 from .routing import RoutingConfig
@@ -184,7 +185,7 @@ class Config:
     @classmethod
     def from_env(cls) -> Config:
         required = ("MESSENGER_PAGE_TOKEN", "MESSENGER_VERIFY_TOKEN",
-                    "MESSENGER_APP_SECRET", "MESSENGER_ALLOWED_PSID")
+                    "MESSENGER_APP_SECRET", "MESSENGER_ALLOWED_PSID", "VAULT_PATH")
         missing = [key for key in required if not os.environ.get(key)]
         if missing:
             raise SystemExit(f"Incomplete configuration, missing variables: {', '.join(missing)}")
@@ -196,7 +197,10 @@ class Config:
         agent_timeout_deep = _envint("AGENT_TIMEOUT_DEEP", 1800)
         agent_timeout_heavy = _envint("AGENT_TIMEOUT_HEAVY", 5400)
         triage_timeout = _envint("TRIAGE_TIMEOUT", 10)
-        vault_path = os.path.expanduser(os.environ.get("VAULT_PATH", "."))
+        try:
+            vault_path = str(paths.vault_root())
+        except ConfigError as error:
+            raise SystemExit(str(error)) from error
         config = cls(
             page_token=os.environ["MESSENGER_PAGE_TOKEN"],
             verify_token=os.environ["MESSENGER_VERIFY_TOKEN"],
