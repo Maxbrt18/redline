@@ -22,7 +22,7 @@ import uuid
 
 import pytest
 import sqlalchemy as sa
-from conftest import VAULT_ROOT
+from conftest import ENGINE_ROOT
 
 from scripts.storage import Database, OperationalStore
 from scripts.storage.schema import metadata
@@ -55,7 +55,7 @@ def coach(*arguments: str, turn: str = "") -> subprocess.CompletedProcess:
     environment = {**os.environ, "DATABASE_URL": URL}
     if turn:
         environment["REDLINE_TURN_ID"] = turn
-    return subprocess.run([sys.executable, *arguments], cwd=VAULT_ROOT, env=environment,
+    return subprocess.run([sys.executable, *arguments], cwd=ENGINE_ROOT, env=environment,
                           capture_output=True, text=True, check=False)
 
 
@@ -88,7 +88,7 @@ def poser_le_plan(store, numero: int = 1) -> None:
     tour = str(uuid.uuid4())
     process = subprocess.run(
         [sys.executable, "scripts/week-plan.py", "revise", "--week", "2026-W33"],
-        cwd=VAULT_ROOT, env={**os.environ, "DATABASE_URL": URL, "REDLINE_TURN_ID": tour},
+        cwd=ENGINE_ROOT, env={**os.environ, "DATABASE_URL": URL, "REDLINE_TURN_ID": tour},
         input=revision_json(numero), capture_output=True, text=True, check=False)
     reussit(process, "revise")
     store.apply_turn_with_receipts(tour)[0]

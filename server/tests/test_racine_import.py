@@ -23,9 +23,9 @@ from __future__ import annotations
 import ast
 import re
 
-from conftest import VAULT_ROOT
+from conftest import ENGINE_ROOT
 
-SCRIPTS = VAULT_ROOT / "scripts"
+SCRIPTS = ENGINE_ROOT / "scripts"
 
 # Les paquets qui vivent sous `scripts/` : leur nom complet commence par `scripts.`.
 PACKAGES = {"model", "cards", "storage"}
@@ -35,7 +35,7 @@ MODULES = {path.stem for path in SCRIPTS.glob("*.py")
 
 
 def _sources():
-    for folder in (SCRIPTS, VAULT_ROOT / "server" / "redline", VAULT_ROOT / "server" / "tests"):
+    for folder in (SCRIPTS, ENGINE_ROOT / "server" / "redline", ENGINE_ROOT / "server" / "tests"):
         for path in sorted(folder.rglob("*.py")):
             if "__pycache__" not in path.parts:
                 yield path
@@ -51,12 +51,12 @@ def test_personne_nimporte_le_meme_module_sous_deux_noms():
             if isinstance(node, ast.ImportFrom):
                 racine = (node.module or "").split(".")[0]
                 if node.level == 0 and racine in interdits:
-                    fautes.append(f"{path.relative_to(VAULT_ROOT)}:{node.lineno} "
+                    fautes.append(f"{path.relative_to(ENGINE_ROOT)}:{node.lineno} "
                                   f"from {node.module} import ...")
             elif isinstance(node, ast.Import):
                 for alias in node.names:
                     if alias.name.split(".")[0] in interdits:
-                        fautes.append(f"{path.relative_to(VAULT_ROOT)}:{node.lineno} "
+                        fautes.append(f"{path.relative_to(ENGINE_ROOT)}:{node.lineno} "
                                       f"import {alias.name}")
     assert not fautes, (
         "importe sous l'ancienne racine, donc charge une SECONDE copie du module avec "
@@ -80,7 +80,7 @@ def test_chaque_cli_pose_la_racine_avant_dimporter_maison():
         if "from scripts" not in source and "import scripts" not in source:
             continue
         if not boot.search(source):
-            manquants.append(str(path.relative_to(VAULT_ROOT)))
+            manquants.append(str(path.relative_to(ENGINE_ROOT)))
     assert not manquants, (
         "importe `scripts.*` sans poser la racine du dépôt sur sys.path : "
         + ", ".join(manquants))

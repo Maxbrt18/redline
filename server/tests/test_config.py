@@ -14,7 +14,7 @@ import shutil
 from datetime import time as dtime
 
 import pytest
-from conftest import INSTANCE_DIR
+from conftest import TEST_VAULT
 
 from redline.config import Config, _load_dotenv
 from redline.routing import Route
@@ -39,7 +39,7 @@ def env(monkeypatch, tmp_path):
             monkeypatch.delenv(name, raising=False)
     monkeypatch.chdir(tmp_path)
     # Le vault par défaut est le dossier courant : il porte l'instance fictive.
-    shutil.copy(INSTANCE_DIR / "redline.toml", tmp_path / "redline.toml")
+    shutil.copy(TEST_VAULT / "redline.toml", tmp_path / "redline.toml")
     for key, value in MINIMAL.items():
         monkeypatch.setenv(key, value)
     return monkeypatch
@@ -66,7 +66,7 @@ def test_the_instance_is_read_from_the_configured_vault(env, tmp_path):
     vault = tmp_path / "vault"
     vault.mkdir()
     (vault / "redline.toml").write_text(
-        (INSTANCE_DIR / "redline.toml").read_text(encoding="utf-8").replace(
+        (TEST_VAULT / "redline.toml").read_text(encoding="utf-8").replace(
             'place = "Paris"', 'place = "Annecy"'), encoding="utf-8")
     env.setenv("VAULT_PATH", str(vault))
     assert Config.from_env().instance.place == "Annecy"

@@ -18,12 +18,12 @@ import datetime as dt
 import importlib.util
 
 import pytest
-from conftest import VAULT_ROOT
+from conftest import ENGINE_ROOT
 
 
 def _cli():
     spec = importlib.util.spec_from_file_location(
-        "ledger_complete_cli", VAULT_ROOT / "scripts" / "ledger-complete.py")
+        "ledger_complete_cli", ENGINE_ROOT / "scripts" / "ledger-complete.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -92,7 +92,7 @@ def test_the_key_is_published_by_the_reader_that_the_coach_runs():
     import importlib.util as util
 
     spec = util.spec_from_file_location(
-        "fact_read_cli", VAULT_ROOT / "scripts" / "fact-read.py")
+        "fact_read_cli", ENGINE_ROOT / "scripts" / "fact-read.py")
     fact_read = util.module_from_spec(spec)
     spec.loader.exec_module(fact_read)
 

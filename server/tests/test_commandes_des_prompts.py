@@ -19,7 +19,7 @@ import subprocess
 import sys
 
 import pytest
-from conftest import VAULT_ROOT
+from conftest import ENGINE_ROOT
 
 from redline import prompts
 
@@ -90,10 +90,10 @@ def test_les_prompts_citent_bien_des_commandes():
 @pytest.mark.parametrize("origine,script,suite,options", COMMANDES,
                          ids=[f"{o}:{s}" for o, s, _, _ in COMMANDES])
 def test_chaque_commande_citee_est_executable(origine, script, suite, options):
-    chemin = VAULT_ROOT / script
+    chemin = ENGINE_ROOT / script
     assert chemin.exists(), f"{origine} cite {script}, qui n'existe pas"
 
-    aide = subprocess.run([sys.executable, script, "--help"], cwd=VAULT_ROOT,
+    aide = subprocess.run([sys.executable, script, "--help"], cwd=ENGINE_ROOT,
                           capture_output=True, text=True, check=False)
     assert aide.returncode == 0, (
         f"{origine} cite {script}, dont --help échoue : {aide.stderr[:200]}")
@@ -108,7 +108,7 @@ def test_chaque_commande_citee_est_executable(origine, script, suite, options):
 
     for option in options:
         detaillee = subprocess.run(
-            [sys.executable, script, *suite.split(), "--help"], cwd=VAULT_ROOT,
+            [sys.executable, script, *suite.split(), "--help"], cwd=ENGINE_ROOT,
             capture_output=True, text=True, check=False)
         aide_complete = texte_aide + detaillee.stdout + detaillee.stderr
         assert option in aide_complete, (
@@ -138,7 +138,7 @@ def test_toute_commande_passe_par_le_lanceur_autorise():
 
 def test_toute_commande_citee_est_dans_la_politique_du_lanceur():
     autorisees = {
-        line for line in (VAULT_ROOT / "server" / "agent-cli-tools.txt").read_text().splitlines()
+        line for line in (ENGINE_ROOT / "server" / "agent-cli-tools.txt").read_text().splitlines()
         if line and not line.startswith("#")
     }
     citees = {script.removeprefix("scripts/") for _, script, _, _ in COMMANDES}

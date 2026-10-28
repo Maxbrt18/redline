@@ -15,7 +15,7 @@ import subprocess
 import time
 from unittest.mock import MagicMock
 
-from conftest import VAULT_ROOT, FakeAgent, git
+from conftest import ENGINE_ROOT, FakeAgent, git
 
 from redline.agent import FailureKind, RunResult, SessionMode
 from redline.bot import (
@@ -505,7 +505,7 @@ def test_rwf016_the_release_check_and_the_service_fingerprint_the_same_code(git_
         (git_repo / tree / "code.py").write_text(f"# {tree}\n", encoding="utf-8")
     git(git_repo, "add", "-A")
     git(git_repo, "commit", "-m", "code")
-    script = (VAULT_ROOT / "server" / "verify-release.sh").read_text(encoding="utf-8")
+    script = (ENGINE_ROOT / "server" / "verify-release.sh").read_text(encoding="utf-8")
     pipeline = re.search(r"^trees=.*?^expected_tree=[^\n]*", script, re.DOTALL | re.MULTILINE)
     assert pipeline is not None
     shell = subprocess.run(
@@ -671,8 +671,8 @@ def test_rwf017_the_documentation_names_no_removed_mechanism():
     removed = ("finalize_response", "contrôle de réponse", "commit_and_push_if_dirty",
                "silence_verdict", "response_review", "règles locales",
                "contrôle de cohérence", "rédaction en branche éphémère")
-    documents = [*sorted((VAULT_ROOT / "docs").glob("*.md")),
-                 VAULT_ROOT / "server" / "README.md", VAULT_ROOT / "server" / ".env.example"]
+    documents = [*sorted((ENGINE_ROOT / "docs").glob("*.md")),
+                 ENGINE_ROOT / "server" / "README.md", ENGINE_ROOT / "server" / ".env.example"]
     stale = [(path.name, name) for path in documents
              for name in removed if name in path.read_text(encoding="utf-8")]
     assert stale == []

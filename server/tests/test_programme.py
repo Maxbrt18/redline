@@ -1,19 +1,19 @@
-"""The real programme, loaded from the real vault.
+"""A whole programme, loaded from the fictional test vault.
 
-Not a fixture: these tests read `coaching/exercises/` and `coaching/workouts/`
-as they stand. A note broken by hand fails the suite instead of failing on
-Saturday morning -- which is the entire point of having a schema.
+These tests read `coaching/exercises/` and `coaching/workouts/` of the vault the
+suite runs on, as the service would. A note broken by hand fails the suite instead
+of failing on Saturday morning -- which is the entire point of having a schema.
 """
 
 import pytest
+from conftest import VAULT_ROOT
 
-from redline.config import SERVER_DIR
 from scripts.model.dose import Dose
 from scripts.model.notes import NoteError
 from scripts.model.programme import EXERCISE_SCHEMA, SESSION_SCHEMA, Programme, load
 from scripts.model.schema import SchemaError
 
-VAULT = SERVER_DIR.parent
+VAULT = VAULT_ROOT
 
 
 @pytest.fixture(scope="module")

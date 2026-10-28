@@ -19,11 +19,11 @@ import sys
 from pathlib import Path
 
 import pytest
-from conftest import VAULT_ROOT
+from conftest import ENGINE_ROOT
 
 pytest.importorskip("playwright")
 
-SCRIPTS_DIR = VAULT_ROOT / "scripts"
+SCRIPTS_DIR = ENGINE_ROOT / "scripts"
 SAMPLES_DIR = SCRIPTS_DIR / "cards" / "samples"
 
 WORKOUT = {
@@ -325,7 +325,7 @@ def test_the_worst_payload_the_schema_allows_still_gets_a_sidecar(tmp_path):
         "date": "mardi 25 novembre 2026",
         "duration_min": 38,
         "note": "N" * 300,                    # SELECTION_SCHEMA: maximum=300
-        "gate": {"shin_max": 2,
+        "gate": {"zone": "injury", "pain_max": 2,
                  "drop": ["plyometrics", "calf-raise-straight"],
                  "say": "S" * 200},           # GATE_SCHEMA: maximum=200
     }

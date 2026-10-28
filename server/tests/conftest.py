@@ -9,9 +9,13 @@ a test file quietly wiring its own bot differently from the others is a differen
 nobody sees (audit 2026-07-29).
 """
 
+import atexit
 import importlib.util
+import os
+import shutil
 import subprocess
 import sys
+import tempfile
 from datetime import time as dtime
 from pathlib import Path
 from types import SimpleNamespace
@@ -27,9 +31,19 @@ from scripts.model import instance as instance_model
 
 # `SERVER_DIR.parent`, not `parent.parent.parent`: it survives moving `tests/`.
 SERVER_DIR = Path(__file__).resolve().parent.parent
-VAULT_ROOT = SERVER_DIR.parent
-# L'instance fictive des tests (redline.toml) : le seul endroit où son prénom est écrit.
-INSTANCE_DIR = SERVER_DIR / "tests" / "fixtures" / "instance"
+ENGINE_ROOT = SERVER_DIR.parent
+# Le vault fictif des tests : `redline.toml` (le seul endroit où le prénom de l'athlète
+# fictif est écrit), le programme de renfo, les fiches de séance, les capacités et le
+# journal des décisions. Personne de réel : il existe pour que les tests qui lisent du
+# contenu de vault tournent sur ce dépôt, qui ne livre que le moteur.
+TEST_VAULT = SERVER_DIR / "tests" / "fixtures" / "vault"
+# La suite tourne comme le service : le moteur d'un côté, le vault de l'autre, désigné
+# par `VAULT_PATH`. Une COPIE, pour qu'un test qui écrit dans le vault ne salisse pas la
+# fixture versionnée ; elle est faite avant tout import qui lirait `VAULT_PATH`.
+VAULT_ROOT = Path(tempfile.mkdtemp(prefix="redline-vault-")) / "vault"
+shutil.copytree(TEST_VAULT, VAULT_ROOT)
+atexit.register(shutil.rmtree, VAULT_ROOT.parent, ignore_errors=True)
+os.environ["VAULT_PATH"] = str(VAULT_ROOT)
 
 # Les cibles de RPE telles que `coaching/workouts/*.md` les déclare aujourd'hui.
 # LITTÉRALES ici, et déclarées une seule fois pour toute la suite : les tests de jauge
@@ -78,7 +92,7 @@ _DEFAULTS = {
     "attachment_dir": "server/attachments",
     "attachment_max_bytes": 12 * 1024 * 1024,
     "attachment_total_bytes": 20 * 1024 * 1024,
-    "instance": instance_model.load(INSTANCE_DIR),
+    "instance": instance_model.load(TEST_VAULT),
 }
 
 
@@ -288,48 +302,6 @@ def git_clone(tmp_path, git_repo):
     git(clone, "config", "user.email", "t@t")
     git(clone, "config", "user.name", "t")
     return git_repo, clone
-
-
-# Tests that exercise the CONTENT of a populated vault (strength programme, workout notes,
-# decisions log, capability notes...) rather than the engine. This repository ships the
-# engine and templates only, so they are skipped until you provide a vault with matching
-# content (`coaching/workouts/`, `coaching/exercises/`, `coaching/decisions.md`, ...).
-_VAULT_CONTENT_MODULES = {
-    "test_programme.py", "test_carte_renfo.py", "test_charts.py", "test_weekly_plan.py",
-    "test_ledger.py", "test_decisions_index.py",
-    "test_coaching_scenarios.py", "test_capabilities.py",
-}
-_VAULT_CONTENT_TESTS = {
-    "test_active_strength_variant_must_exist_in_the_programme",
-    "test_active_strength_drop_must_name_an_exercise_in_the_programme",
-    "test_every_rule_names_an_owner_that_exists",
-    "test_the_targets_come_from_the_workout_notes",
-    "test_toutes_les_rubriques_du_vault_reel_sont_indexables",
-    "test_a_scenario_born_from_a_correction_names_a_real_owner",
-    "test_the_real_analysis_notes_conform_without_operational_state",
-    "test_the_weekly_dossier_is_computed_from_the_same_functions_as_the_clis",
-    "test_notebook_current_resolves_the_same_typed_workout_and_rechecks_claims",
-}
-
-
-def pytest_collection_modifyitems(config, items):
-    if (VAULT_ROOT / "coaching" / "workouts").is_dir():
-        return
-    skip = pytest.mark.skip(reason="needs a populated vault (coaching/workouts, exercises...)")
-    for item in items:
-        module = Path(str(item.fspath)).name
-        name = item.name.split("[")[0]
-        if name in _VAULT_CONTENT_TESTS or (
-                module in {"test_programme.py", "test_carte_renfo.py"}
-                or (module == "test_charts.py" and _is_strength(item))):
-            item.add_marker(skip)
-
-
-def _is_strength(item) -> bool:
-    return "strength" in item.nodeid or item.name in {
-        "test_no_link_without_configuration", "test_a_derogation_must_carry_a_typed_dose",
-        "test_the_overflow_guard_actually_fires",
-        "test_the_worst_payload_the_schema_allows_still_gets_a_sidecar"}
 
 
 # La zone surveillée de l'instance fictive (`[[injuries]]` de redline.toml) : les tests

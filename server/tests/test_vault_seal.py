@@ -18,7 +18,7 @@ commit local, sans réseau) précède la livraison ; `publish` (vues, commit, pu
 import subprocess
 from unittest.mock import MagicMock
 
-from conftest import VAULT_ROOT, git
+from conftest import ENGINE_ROOT, git
 
 from redline.vault import VaultRepo
 
@@ -139,7 +139,7 @@ class TestTheHookAgreesWithTheCode:
         # qu'on mesurerait, et pas la ligne de régénération.
         git(git_repo, "add", "-A")
         git(git_repo, "commit", "--no-verify", "-m", "générateur cassé")
-        git(git_repo, "config", "core.hooksPath", str(VAULT_ROOT / ".githooks"))
+        git(git_repo, "config", "core.hooksPath", str(ENGINE_ROOT / ".githooks"))
         (git_repo / "notes.md").write_text("le travail d'une session")
         git(git_repo, "add", "-A")
         done = subprocess.run(["git", "commit", "-m", "session"], cwd=git_repo,
@@ -158,7 +158,7 @@ class TestTheHookAgreesWithTheCode:
             (git_repo / name).write_text("avant", encoding="utf-8")
         git(git_repo, "add", "-A")
         git(git_repo, "commit", "--no-verify", "-m", "générateur")
-        git(git_repo, "config", "core.hooksPath", str(VAULT_ROOT / ".githooks"))
+        git(git_repo, "config", "core.hooksPath", str(ENGINE_ROOT / ".githooks"))
         (git_repo / "brouillon.md").write_text("en cours, pas pour ce commit")
         (git_repo / "notes.md").write_text("le travail d'une session")
         git(git_repo, "add", "notes.md")

@@ -12,7 +12,7 @@ un contrôleur dont on ne sait pas s'il sait échouer.
 """
 
 import pytest
-from conftest import VAULT_ROOT, load_script
+from conftest import ENGINE_ROOT, load_script
 
 vault_check = load_script("vault-check")
 
@@ -23,7 +23,7 @@ def report():
 
 
 def vault(files, root=None):
-    return vault_check.Vault(root=root or VAULT_ROOT, files=files)
+    return vault_check.Vault(root=root or ENGINE_ROOT, files=files)
 
 
 # ------------------------------------------------- le rapport lui-même
@@ -249,7 +249,7 @@ def test_the_checker_runs_on_the_real_vault_and_reports(capsys):
     """Le contrôleur tourne et rend un verdict — c'est une garantie de CODE (il
     s'exécute sans planter sur des données réelles), pas une assertion sur le contenu
     du vault, qui bouge plusieurs fois par jour."""
-    files = vault_check.markdown_files(VAULT_ROOT)
+    files = vault_check.markdown_files(ENGINE_ROOT)
     report = vault_check.Report(quiet=True)
     for check in vault_check.CHECKS:
         # La parité des projections dépend d'un PostgreSQL peuplé et possède son test

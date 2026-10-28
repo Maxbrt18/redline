@@ -12,7 +12,7 @@ import os
 
 import pytest
 import sqlalchemy as sa
-from conftest import VAULT_ROOT
+from conftest import ENGINE_ROOT
 from test_notebook_board import Repo
 from test_weekly_plan import revision, session
 
@@ -193,7 +193,7 @@ def observation_of(store, activity_id):
 def test_a_threshold_detail_reads_its_reps_and_asks_for_the_reserve_once(store):
     observation_id = seed_threshold(store)
     when = dt.datetime(2026, 10, 26, 20, 0, tzinfo=PARIS)
-    board = Board(store, Repo(store), VAULT_ROOT, when.date(), when)
+    board = Board(store, Repo(store), ENGINE_ROOT, when.date(), when)
     intake = store.strava_detail(observation_id)
     store.store_strava_detail(intake["activity_id"], streams=stream(seconds=900, hr=176))
     view = board.session_view(str(observation_id), store.strava_detail(observation_id))
@@ -206,7 +206,7 @@ def test_a_threshold_detail_reads_its_reps_and_asks_for_the_reserve_once(store):
     with pytest.raises(AnswerError):
         board.answer(ask, 2)
     assert board.answer(ask, 1) == {"alert": None}
-    again = Board(store, Repo(store), VAULT_ROOT, when.date(), when)
+    again = Board(store, Repo(store), ENGINE_ROOT, when.date(), when)
     view = again.session_view(str(observation_id), store.strava_detail(observation_id))
     assert view["fact"]["reserve"] == 1 and view["reserve_ask"] is None
     with pytest.raises(AnswerError):
@@ -217,7 +217,7 @@ def test_a_threshold_detail_reads_its_reps_and_asks_for_the_reserve_once(store):
 def test_the_reserve_is_not_asked_once_the_session_is_old(store):
     observation_id = seed_threshold(store)
     later = dt.datetime(2026, 10, 29, 9, 0, tzinfo=PARIS)
-    board = Board(store, Repo(store), VAULT_ROOT, later.date(), later)
+    board = Board(store, Repo(store), ENGINE_ROOT, later.date(), later)
     view = board.session_view(str(observation_id), store.strava_detail(observation_id))
     assert view["reserve_ask"] is None and view["series"] is None
 
@@ -239,7 +239,7 @@ def test_the_route_serves_the_detail_and_refuses_what_is_not_an_identifier(
     monkeypatch.setattr(session_detail, "fetch_streams", lambda _: stream(seconds=600))
     config = make_config()
     archive = NotebookStore(store.database)
-    service = NotebookService(archive, Repo(store), MagicMock(), VAULT_ROOT,
+    service = NotebookService(archive, Repo(store), MagicMock(), ENGINE_ROOT,
                               "https://coach.test", operational=store)
     client = create_app(config, MagicMock(), MagicMock(), notebook=service).test_client()
     assert client.get(f"/carnet-api/session/{observation_id}").status_code == 401

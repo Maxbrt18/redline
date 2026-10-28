@@ -11,7 +11,7 @@ import uuid
 
 import pytest
 import sqlalchemy as sa
-from conftest import VAULT_ROOT
+from conftest import ENGINE_ROOT, VAULT_ROOT
 
 from redline import strength
 from redline.attachments import encode_payload
@@ -92,7 +92,7 @@ def service_role_store():
         env = {**os.environ, "DATABASE_URL": test_url.render_as_string(hide_password=False)}
         migrated = subprocess.run(
             [sys.executable, "-m", "alembic", "upgrade", "head"],
-            cwd=VAULT_ROOT, env=env, text=True, capture_output=True, check=False)
+            cwd=ENGINE_ROOT, env=env, text=True, capture_output=True, check=False)
         assert migrated.returncode == 0, migrated.stderr or migrated.stdout
 
         database = Database(test_url.render_as_string(hide_password=False),
@@ -1342,7 +1342,7 @@ def _capability_cli(*extra: str, turn_id: str = "") -> subprocess.CompletedProce
         sys.executable, "scripts/fact-write.py", "capability", "--capability-number", "5",
         "--slug", "cap5-injury", "--need", "Injury intacts", "--score", "3", "--scale", "5",
         "--status", "orange", "--evaluated-on", "2026-10-11", *extra,
-    ], cwd=VAULT_ROOT, env=env, capture_output=True, text=True, check=False)
+    ], cwd=ENGINE_ROOT, env=env, capture_output=True, text=True, check=False)
 
 
 def test_same_capability_same_day_is_refused_not_announced(store):
@@ -1394,7 +1394,7 @@ def test_the_common_cli_stages_directly_in_postgres_then_applies_atomically(stor
         sys.executable, "scripts/fact-write.py", "thread", "--key", "cli-commun",
         "--opened-on", "2026-08-13", "--kind", "suspens", "--status", "ouvert",
         "--body", "même commande pour Claude et Codex",
-    ], cwd=VAULT_ROOT, env={**os.environ, "DATABASE_URL": URL,
+    ], cwd=ENGINE_ROOT, env={**os.environ, "DATABASE_URL": URL,
                             "REDLINE_TURN_ID": turn_id},
        capture_output=True, text=True, check=False)
     assert process.returncode == 0, process.stderr
@@ -1416,11 +1416,11 @@ def test_the_cli_patch_keeps_the_long_text_it_was_not_given(store):
         *common, "--due-on", "2026-08-11", "--item", long_item,
         "--fact-owner", "`coaching/strength.md`", "--blocks", "dose W34",
         "--status", "todo",
-    ], cwd=VAULT_ROOT, env=environment, capture_output=True, text=True, check=False)
+    ], cwd=ENGINE_ROOT, env=environment, capture_output=True, text=True, check=False)
     assert created.returncode == 0, created.stderr
 
     patched = subprocess.run([*common, "--patch", "--due-on", "2026-08-23"],
-                             cwd=VAULT_ROOT, env=environment,
+                             cwd=ENGINE_ROOT, env=environment,
                              capture_output=True, text=True, check=False)
     assert patched.returncode == 0, patched.stderr
 
@@ -1435,7 +1435,7 @@ def test_the_cli_refuses_to_patch_a_key_that_does_not_exist(store):
     refused = subprocess.run([
         sys.executable, "scripts/fact-write.py", "deadline", "--key", "jamais-vue",
         "--patch", "--status", "done",
-    ], cwd=VAULT_ROOT, env={**os.environ, "DATABASE_URL": URL},
+    ], cwd=ENGINE_ROOT, env={**os.environ, "DATABASE_URL": URL},
        capture_output=True, text=True, check=False)
     assert refused.returncode != 0
     assert "clé inexistante" in refused.stderr

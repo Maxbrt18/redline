@@ -4,7 +4,7 @@ import re
 import subprocess
 
 import pytest
-from conftest import VAULT_ROOT
+from conftest import ENGINE_ROOT
 
 from redline import messenger, persona, prompts
 
@@ -56,13 +56,13 @@ def test_nothing_reaches_the_phone_with_the_token(make_config):
 def test_no_name_is_written_in_the_engine():
     """Le garde-fou : un prénom réintroduit en dur dans le code ou les gabarits se voit
     ici. Les tests, eux, nomment l'athlète fictif de leur instance."""
-    tracked = subprocess.run(["git", "ls-files"], cwd=VAULT_ROOT, capture_output=True,
+    tracked = subprocess.run(["git", "ls-files"], cwd=ENGINE_ROOT, capture_output=True,
                              text=True, check=True).stdout.split()
     offenders = []
     for relative in tracked:
         if relative.startswith("server/tests/") or relative == "README.md":
             continue
-        path = VAULT_ROOT / relative
+        path = ENGINE_ROOT / relative
         if path.suffix not in {".py", ".js", ".css", ".html", ".md", ".sh", ".toml"}:
             continue
         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):

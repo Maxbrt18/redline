@@ -748,8 +748,8 @@ def test_the_write_guard_is_wired_into_the_revise_path_not_merely_available():
     contrôle -- c'est exactement le défaut que cet audit a trouvé ailleurs
     (`vault-check.py` certifiait qu'une règle NOMMAIT son porteur, jamais qu'il la
     portait). Celui-ci doit donc se voir sur le chemin d'écriture lui-même."""
-    from conftest import VAULT_ROOT
-    source = (VAULT_ROOT / "scripts" / "week-plan.py").read_text()
+    from conftest import ENGINE_ROOT
+    source = (ENGINE_ROOT / "scripts" / "week-plan.py").read_text()
     assert "written_text_errors(current" in source, (
         "le garde-fou typographique n'est pas appelé sur la révision neuve")
     avant = source.index("written_text_errors(current")

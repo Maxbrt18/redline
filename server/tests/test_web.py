@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 
 import pytest
-from conftest import VAULT_ROOT, RecordingBot
+from conftest import ENGINE_ROOT, RecordingBot
 
 # redline.web imports flask, which is a VPS runtime dependency (requirements.txt), not
 # something a vault checkout on the Mac necessarily has. Without this, collecting this
@@ -102,7 +102,7 @@ def test_valid_signature():
 
 # --------------------------------------------------------- interactive session
 
-VAULT = VAULT_ROOT
+VAULT = ENGINE_ROOT
 SESSION = {
     "sid": "2026-07-25-A", "session": "a", "title": "Renfo A, os & injury",
     "date": "samedi 25 juillet",

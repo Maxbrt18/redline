@@ -10,7 +10,7 @@ l'histoire pour éteindre un voyant.
 import datetime as dt
 
 import pytest
-from conftest import load_script
+from conftest import VAULT_ROOT, load_script
 
 decisions_index = load_script("decisions-index")
 
@@ -86,7 +86,7 @@ def test_une_rubrique_mal_fermee_refuse_au_lieu_de_disparaitre():
 
 def test_toutes_les_rubriques_du_vault_reel_sont_indexables():
     """Garantie de forme, pas verdict calendaire : le contenu change sans le code."""
-    texte = (decisions_index.ROOT / decisions_index.DECISIONS).read_text(encoding="utf-8")
+    texte = (VAULT_ROOT / decisions_index.DECISIONS).read_text(encoding="utf-8")
     decisions = decisions_index.parse(texte)
     assert sum(len(decision.predictions) for decision in decisions) == len(
         decisions_index.PREDICTION_START.findall(texte)
