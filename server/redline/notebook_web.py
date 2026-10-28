@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 from flask import Flask, jsonify, request
 from sqlalchemy.exc import SQLAlchemyError
 
-from scripts.model import session_labels
+from scripts.coach.fr import session_labels
 from scripts.storage.database import StorageError
 from scripts.storage.notebook import DEVICE_SECONDS
 

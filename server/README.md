@@ -113,7 +113,7 @@ comme annulés parce qu'une projection ou un push Git a échoué.
 | `outbox.py` | cycle de vie des images et sidecars |
 | `strength_artifact.py` | carte renfo rendue depuis la prescription typée |
 | `prompts.py` | choix des textes injectés à chaque tour et des workflows proactifs |
-| `scripts/coach/fr/` | les mots de ces textes : `prompts/*.md` et `messages.py` |
+| `scripts/coach/fr/` | les mots du coach et du service : `prompts/*.md`, `messages.py` (notes), `replies.py` (limites), `initiatives.py`, `notebook.py`, `session_labels.py`, `calendar.py` |
 | `strength.py`, `page/` | capacités opaques et page de renforcement |
 | `scripts/storage/repository.py` | transactions et faits opérationnels |
 | `scripts/storage/projector.py` | vues Obsidian régénérables |

@@ -11,7 +11,7 @@ from playwright.sync_api import sync_playwright
 from redline.page import document as session_document
 from redline.page import notebook_document
 from scripts.cards import render
-from scripts.model import session_labels
+from scripts.coach.fr import session_labels
 from scripts.model.dose import Dose
 
 BASE = 'https://redline.test'

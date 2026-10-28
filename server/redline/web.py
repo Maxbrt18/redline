@@ -23,7 +23,8 @@ from typing import Any
 
 from flask import Flask, jsonify, request
 
-from scripts.model import paths, session_labels, strength_log
+from scripts.coach.fr import session_labels
+from scripts.model import paths, strength_log
 from scripts.storage.database import expected_schema_revision
 from scripts.storage.repository import OperationalStore
 

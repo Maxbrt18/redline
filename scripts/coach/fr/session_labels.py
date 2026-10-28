@@ -1,4 +1,4 @@
-"""How the French coach names each session kind: coach-facing text, keyed by slug.
+"""How the coach names each session kind, keyed by slug.
 
 `short` fits a one-letter-wide calendar cell; `name` titles a card or a screen.
 `server/tests/test_session_kinds.py` checks that every kind has both.
@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from . import session_kinds
+from scripts.model import session_kinds
 
 LABELS = {
     "easy": ("EF", "EF"),

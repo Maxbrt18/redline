@@ -7,7 +7,8 @@ import importlib.util
 import sqlalchemy as sa
 from conftest import ENGINE_ROOT
 
-from scripts.model import session_kinds, session_labels
+from scripts.coach.fr import session_labels
+from scripts.model import session_kinds
 from scripts.storage import schema
 
 MIGRATION = ENGINE_ROOT / "migrations" / "versions" / "20261028_0004_session_kinds_in_english.py"
