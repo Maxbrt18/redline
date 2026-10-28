@@ -38,7 +38,7 @@ from redline.model import startup_budget as budget
 # the ledger stays checkable everywhere, which is the point of it being typed.
 try:
     from redline.analysis import (
-        ledger as ledger_gauge,  # scripts/ledger.py : la jauge, pas le format
+        ledger as ledger_gauge,  # the gauge, not the format
     )
     from redline.model import hot_cache, weekly_plan
     from redline.model.capabilities import load as load_capabilities
@@ -66,9 +66,9 @@ WIKILINK = re.compile(r"\[\[([^\]]+)\]\]")
 FENCED_CODE = re.compile(r"^```.*?^```", re.MULTILINE | re.DOTALL)
 INLINE_CODE = re.compile(r"`[^`\n]*`")
 FRONTMATTER = re.compile(r"^---\n(.*?)\n---", re.DOTALL)
-# Le motif appartient au registre typé : le `19\d{9}` codé ici s'éteindra tout seul le
-# jour où Strava passera aux ids en 20…, et ce contrôle rapportera « aucun doublon »
-# parce qu'il n'aura plus rien trouvé du tout (2026-07-29).
+# The pattern belongs to the typed ledger: a `19\d{9}` hard-coded here would silently stop
+# matching once Strava ids move past that range, and the check would report "no duplicate"
+# because it found nothing at all.
 STRAVA_ID = re.compile(rf"\b{ledger.STRAVA_ID_PATTERN}\b")
 DECISION_HEADING = re.compile(r"^## (\d{4}-\d{2}-\d{2})", re.MULTILINE)
 
@@ -106,7 +106,7 @@ class Vault:
     """What every check is given: the tree, and its notes already read.
 
     `files` maps a vault-relative posix path to its text, for every Markdown file
-    outside SKIP_DIRS. Read once, in one place, pour éviter les lectures divergentes.
+    outside SKIP_DIRS. Read once, in one place, so that reads cannot diverge.
     """
 
     root: Path
@@ -166,7 +166,7 @@ def markdown_files(root: Path) -> dict:
 
 
 def check_frontmatter(vault: Vault, report: Report) -> None:
-    """Le YAML documentaire et les gabarits se valident avant d'être copiés."""
+    """Documentation YAML and templates are validated before they are copied."""
     files = dict(vault.files)
     template_dir = vault.root / "templates"
     if template_dir.is_dir():
@@ -200,24 +200,21 @@ def check_frontmatter(vault: Vault, report: Report) -> None:
         report.ok("frontmatter et gabarits valides", f"{parsed} bloc(s) YAML")
 
 
-# ⭐ UNE MÊME ABSENCE SE DIT D'UNE SEULE FAÇON. Huit contrôles lisent PostgreSQL ; six
-# sautaient quand `DATABASE_URL` manque, deux échouaient. Sur le Mac -- où la base ne
-# tourne pas, et où `vault-check.py` est justement l'outil du bilan hebdo -- le rapport
-# était donc rouge en permanence, pour une raison qui n'est pas un défaut du vault.
-# C'est ce que la CI appelle « un contrôle qui crie au loup », et le remède qu'on lui
-# applique ailleurs : on apprend à ignorer le rouge, puis on ignore le vrai.
+# A missing database is reported one way only, by every check that reads PostgreSQL:
+# a skip. Failing on some checks and skipping on others leaves a permanently red report
+# on a machine where the database does not run, and a check that cries wolf teaches
+# readers to ignore red.
 #
-# L'absence de base n'est PAS un mode dégradé pour autant : `redline/app.py` refuse de
-# démarrer sans elle, et `docs/storage-architecture.md` dit qu'aucun repli n'existe.
-# Simplement, ce n'est pas au linter de contenu de le constater.
+# A missing database is not a degraded mode: the app refuses to start without it and no
+# fallback exists. It is simply not for the content linter to enforce.
 NO_DATABASE = "DATABASE_URL absent — lance-le avec la base pour ces contrôles"
 
 
 def _read_postgres(report: Report, label: str, read):
-    """`read(store)`, ou None après avoir rapporté le saut ou l'échec sous `label`.
+    """`read(store)`, or None after reporting the skip or the failure under `label`.
 
-    Une seule ouverture de base pour tous les contrôles opérationnels : l'absence se
-    dit d'une seule façon, et une panne de lecture est un KO, jamais une trace.
+    One database opening for all operational checks: absence is reported one way, and a
+    read failure is a KO, never a traceback.
     """
     url = (os.environ.get("DATABASE_URL") or "").strip()
     if not url:
@@ -274,7 +271,7 @@ def check_postgres_storage(vault: Vault, report: Report) -> None:
 # ------------------------------------------------------------ observations PostgreSQL
 
 def check_observations(vault: Vault, report: Report) -> None:
-    """Complétude métier du registre canonique, sans vue Markdown intermédiaire."""
+    """Business completeness of the canonical ledger, with no intermediate Markdown view."""
     observations = _read_postgres(report, "observations PostgreSQL",
                                   lambda store: store.observation_rows())
     if observations is None:
@@ -298,7 +295,7 @@ def check_observations(vault: Vault, report: Report) -> None:
 # ----------------------------------------------------------------- one fact, one home
 
 def check_no_duplicate_facts(vault: Vault, report: Report) -> None:
-    """Un identifiant Strava canonique ne doit plus survivre dans les notes Git."""
+    """A canonical Strava identifier must not survive in the Git notes."""
     seen: dict[str, list[str]] = {}
     for path, text in vault.files.items():
         if path in CITES_EVIDENCE:
@@ -454,7 +451,7 @@ def check_prediction_debt(vault: Vault, report: Report) -> None:
 
 
 def check_threads(vault: Vault, report: Report) -> None:
-    """Une relance PostgreSQL passée reste visible sans projection Markdown."""
+    """A past follow-up stays visible without a Markdown projection."""
     rows = _read_postgres(report, "fils ouverts", lambda store: store.thread_rows())
     if rows is None:
         return
@@ -469,13 +466,13 @@ def check_threads(vault: Vault, report: Report) -> None:
 
 
 def check_corrections_replay(vault: Vault, report: Report) -> None:
-    """Chaque correction a un mode de rejeu, choisi par un humain (chantier du 2026-10-04).
+    """Every correction has a replay mode, chosen by a human.
 
-    Le contrôle des porteurs constate qu'un porteur est nommé ; celui-ci constate qu'on a
-    décidé comment la règle se rejoue : scénario du banc, code, hors banc, ou dette
-    `a-rejouer`. Une correction nouvelle a deux bilans pour entrer au registre du vault,
-    puis le contrôle passe au rouge. Sans registre, rien n'est vérifié.
-    La dette `a-rejouer` reste visible en ⚠ : elle se résorbe en écrivant des scénarios.
+    The owner check verifies that an owner is named; this one verifies that it was decided
+    how the rule is replayed: bench scenario, code, off-bench, or `a-rejouer` debt. A new
+    correction has two reviews to enter the vault's registry, then the check turns red.
+    Without a registry, nothing is checked. The `a-rejouer` debt stays visible as a
+    warning until scenarios are written.
     """
     text = vault.text(CORRECTIONS)
     if text is None:
@@ -527,7 +524,7 @@ def check_echeances(vault: Vault, report: Report) -> None:
 
 
 def check_capability_notes(vault: Vault, report: Report) -> None:
-    """Les notes d'analyse ont une identité stable et aucun état opérationnel."""
+    """Analysis notes have a stable identity and carry no operational state."""
     if MODEL_UNAVAILABLE:
         report.skip("notes de capacité conformes",
                     f"couche modèle indisponible ({MODEL_UNAVAILABLE})")
@@ -544,7 +541,7 @@ def check_capability_notes(vault: Vault, report: Report) -> None:
 
 
 def check_cockpit_freshness(vault: Vault, report: Report) -> None:
-    """Contrôle la fraîcheur de la source de vérité PostgreSQL."""
+    """Checks the freshness of the PostgreSQL source of truth."""
     capabilities = _read_postgres(report, "cockpit à jour",
                                   lambda store: store.latest_capabilities())
     if capabilities is None:
@@ -566,7 +563,7 @@ def check_cockpit_freshness(vault: Vault, report: Report) -> None:
 
 
 def check_weekly_plans(vault: Vault, report: Report) -> None:
-    """Chaque plan PostgreSQL se valide et la semaine courante ne peut être absente."""
+    """Every PostgreSQL plan validates and the current week cannot be missing."""
     if MODEL_UNAVAILABLE:
         report.skip("programme hebdomadaire transactionnel",
                     f"couche modèle indisponible ({MODEL_UNAVAILABLE})")
@@ -589,9 +586,9 @@ def check_weekly_plans(vault: Vault, report: Report) -> None:
                 continue
             weekly_plan.validate(plan)
             revision = weekly_plan.active(plan)
-            # Une charge saisie tardivement dans une semaine close enrichit l'archive ;
-            # elle ne peut plus rendre sa prescription « à recalculer ». La péremption
-            # n'a de sens que pour la semaine actuellement prescriptible.
+            # A load entered late in a closed week enriches the archive; it cannot make
+            # its prescription "to recompute". Staleness only matters for the week that
+            # is currently prescribable.
             if (week == current
                     and store.plan_needs_arbitration(week, revision["revision"])):
                 problems.append(f"{week} : recalcul obligatoire : données modifiées depuis la révision")
@@ -607,9 +604,9 @@ def check_weekly_plans(vault: Vault, report: Report) -> None:
     if current_plan is None:
         problems.append(f"{current} : programme hebdomadaire absent dans PostgreSQL")
     else:
-        # Un contrôle daté échu n'est pas une avarie du vault : c'est une question en
-        # attente de réponse. La ranger avec les erreurs apprenait à ignorer le rapport
-        # un matin sur trois — et à confondre les deux, ce qui a coûté le 2026-08-12.
+        # A dated check that is due is not a vault defect: it is a question awaiting an
+        # answer. Filing it with the errors teaches readers to ignore the report and to
+        # confuse the two.
         waiting = [f"{current} : {reason}"
                    for reason in weekly_plan.gate_reasons(current_plan)]
     if problems:
@@ -622,27 +619,21 @@ def check_weekly_plans(vault: Vault, report: Report) -> None:
 
 
 def check_generated_views(vault: Vault, report: Report) -> None:
-    """Les vues générées : tables d'exercices de `strength.md`, bloc Forme du
-    hot-cache, table du cockpit, **et les blocs de programme projetés depuis
-    PostgreSQL**. Échoue si l'une a été éditée à la main au lieu d'être régénérée.
-    Ne répare JAMAIS — un contrôle qui répare en silence n'est pas un contrôle.
+    """The generated views: `strength.md` exercise tables, the hot-cache form block, the
+    cockpit table, **and the programme blocks projected from PostgreSQL**. Fails if one
+    was edited by hand instead of regenerated. NEVER repairs: a check that repairs
+    silently is not a check.
 
-    ⭐ Le plan hebdo était **annoncé et pas vérifié** jusqu'au 2026-08-16 : le message
-    de succès disait « + plan hebdo » et rien ne le regardait. Ce jour-là, dix
-    projections attendaient dans l'outbox après des écritures faites en CLI hors tour
-    de coach ; le journal de W33 affichait une révision périmée de deux crans, et le
-    contrôle affichait vert. Un message de contrôle est une promesse : il ne nomme que
-    ce qu'il a réellement ouvert.
+    A check's success message is a promise: it names only what it actually opened.
     """
     if MODEL_UNAVAILABLE:
         report.warn("vues générées à jour",
                     f"couche modèle indisponible ({MODEL_UNAVAILABLE})")
         return
     if not (os.environ.get("DATABASE_URL") or "").strip():
-        # Toutes les vues d'ici se régénèrent DEPUIS PostgreSQL : sans base, il n'y a
-        # rien à comparer. Le contrôle PLANTAIT (RuntimeError non rattrapé par le
-        # `except` ci-dessous), ce qui donnait un `vault-check` en traceback sur le Mac
-        # — et un rapport tronqué qu'on lisait comme « quatre KO » (2026-08-16).
+        # Every view here is regenerated FROM PostgreSQL: without a database there is
+        # nothing to compare. Letting the RuntimeError escape the `except` below would
+        # abort the whole report with a traceback.
         report.skip("vues générées à jour", NO_DATABASE)
         return
     problems = []
@@ -672,11 +663,11 @@ def check_generated_views(vault: Vault, report: Report) -> None:
 
 
 def _plan_view_drift(vault: Vault) -> tuple:
-    """(problèmes, nombre de blocs de programme réellement ouverts).
+    """(problems, number of programme blocks actually opened).
 
-    Le compte est rendu plutôt que deviné : c'est lui que le message de succès cite,
-    pour qu'une couverture annoncée soit une couverture constatée. L'absence de base
-    est traitée par l'appelant, qui saute le contrôle entier.
+    The count is returned rather than guessed: the success message cites it, so that the
+    announced coverage is the observed coverage. A missing database is handled by the
+    caller, which skips the whole check.
     """
     url = (os.environ.get("DATABASE_URL") or "").strip()
     from redline.storage import Database, OperationalStore

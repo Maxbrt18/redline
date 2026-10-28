@@ -1,4 +1,4 @@
-"""Formatage des nombres et allures affichés sur les cartes Redline."""
+"""Formatting of the numbers and paces shown on the Redline cards."""
 
 
 def fmt_num(value: float) -> str:

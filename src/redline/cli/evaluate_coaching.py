@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Évaluation isolée des réponses : aucun outil, état de production ou envoi Messenger.
+"""Isolated evaluation of replies: no tool, no production state, no Messenger delivery.
 
-Le contexte fictif remplace explicitement les lectures. Ce n'est pas un test bout en bout
-ni un juge de naturel : les réponses doivent être relues selon les critères des fixtures.
+The fictional context explicitly replaces the reads. This is neither an end-to-end test
+nor a judge of naturalness: replies must be reviewed against the fixtures' criteria.
 """
 from __future__ import annotations
 
@@ -33,10 +33,10 @@ def main() -> int:
     if not cases:
         parser.error('Aucun scénario sélectionné')
     config = Config.from_env()
-    runner = bench_runner(config)  # aucun chemin de mémoire n'est utilisé
-    # Le juge relit une réponse entière contre des limites de coaching : il prend le
-    # profil des jugements qui engagent (N2), jamais celui du triage, réglé pour la
-    # vitesse sur le plus petit modèle.
+    runner = bench_runner(config)  # no memory path is used
+    # The judge rereads a whole reply against coaching limits: it takes the profile of
+    # judgements that commit (N2), never the triage one, tuned for speed on the smallest
+    # model.
     judge_spec = replace(config.routing.plan('N2').primary, timeout=300)
     results = []
     try:
@@ -71,9 +71,9 @@ def main() -> int:
                 ) + (EMOTION_NOTE if case.get('emotional', False) else '')
                 context = case['context'] + '\n' + render_memory(
                     case.get('history', []), case.get('questions', []))
-                # Comme `CoachBot` : la note du niveau de lecture, puis les contrôles
-                # datés. Sans elle, le banc jugeait un coach privé de PAIN_SCALE_POINTER
-                # et de la consigne N2 « ce qui a changé avant tout mécanisme ».
+                # Same as `CoachBot`: the reading-depth note, then the dated checks.
+                # Without it the bench would judge a coach lacking PAIN_SCALE_POINTER
+                # and the N2 instruction.
                 context += '\n' + DEPTH_NOTES[case['route']]
                 context += '\n' + gate_note(case.get('gates', []))
                 answer = runner.one_shot(json.dumps({

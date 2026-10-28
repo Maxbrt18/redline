@@ -1,28 +1,24 @@
 #!/usr/bin/env python3
-"""Écrit les faits opérationnels hors séances sans toucher aux projections.
+"""Writes the operational facts other than sessions, without touching the projections.
 
-**`--patch` sur `thread` et `deadline` (2026-08-15).** Ces deux upserts exigeaient
-TOUS les champs à chaque écriture. Or leur champ de texte libre est long — l'échéance
-`legacy-deadline:19` faisait 1400 caractères — donc changer une date obligeait à
-renvoyer le texte entier. Le mode d'échec n'est pas la faute de frappe dans la date,
-qu'on relit : c'est le `--item` de 2000 caractères réécrit de mémoire, tronqué sans
-que rien ne le signale, parce qu'un upsert complet ne peut pas distinguer « ce champ
-est inchangé » de « ce champ vaut maintenant ceci ». Le 2026-08-15, recaler cette
-échéance a dû passer par un script de relecture ad hoc plutôt que par ce CLI : le
-signe que l'outil manquait.
+**`--patch` on `thread` and `deadline`.** Both upserts used to require ALL fields on
+every write. Their free-text field can be long, so changing a date meant resending the
+whole text. The failure mode is not a typo in the date, which gets reread: it is a
+2000-character `--item` retyped from memory and silently truncated, because a full
+upsert cannot tell "this field is unchanged" from "this field is now this".
 
-Avec `--patch`, seuls les champs cités sont écrits ; les autres sont relus depuis la
-ligne existante. **Le payload mis en file reste COMPLET** : la fusion a lieu avant le
-hachage d'idempotence, donc `command_key`, `stage_command` et `apply_turn_with_receipts` gardent
-exactement leur contrat. Deux refus explicites, jamais d'interprétation —
-`--patch` sur une clé absente refuse (on ne crée pas une ligne à trous), et sans
-`--patch` un champ obligatoire manquant refuse en le nommant.
+With `--patch`, only the named fields are written; the others are reread from the
+existing row. **The queued payload stays COMPLETE**: the merge happens before the
+idempotence hash, so `command_key`, `stage_command` and `apply_turn_with_receipts` keep
+exactly their contract. Two explicit refusals, never an interpretation: `--patch` on a
+missing key refuses (no partial row is created), and without `--patch` a missing
+required field refuses by naming it.
 
-⚠ **Deux limites assumées.** (1) `--patch` ne remet aucun champ à NULL : passer d'une
-valeur à « rien » demande la forme complète, parce qu'une option absente veut déjà dire
-« inchangé » et qu'on ne va pas lui donner un second sens. (2) Sous `REDLINE_TURN_ID`,
-la relecture a lieu à la mise en file et l'écriture à `apply_turn_with_receipts` : si deux commandes
-du même tour patchent la même clé, la seconde a lu l'état d'AVANT la première.
+Two accepted limits. (1) `--patch` never sets a field back to NULL: going from a value to
+"nothing" takes the full form, because an absent option already means "unchanged" and
+gets no second meaning. (2) Under `REDLINE_TURN_ID`, the reread happens at queue time
+and the write at `apply_turn_with_receipts`: if two commands of the same turn patch the
+same key, the second one read the state from BEFORE the first.
 """
 
 from __future__ import annotations
@@ -51,7 +47,7 @@ if TYPE_CHECKING:
 
 
 class _Unset:
-    """« Option absente », qu'il faut distinguer de « option à None »."""
+    """An absent option, which must be told apart from an option set to None."""
 
     def __repr__(self) -> str:
         return "UNSET"
@@ -59,7 +55,7 @@ class _Unset:
 
 UNSET: Any = _Unset()
 
-# (clé de payload, nom argparse, obligatoire à la création)
+# (payload key, argparse name, required at creation)
 THREAD_FIELDS = (
     ("thread_key", "key", True),
     ("opened_on", "opened_on", True),
@@ -85,11 +81,11 @@ DEADLINE_FIELDS = (
 
 
 def merge(fields: tuple, args: argparse.Namespace, existing: dict | None) -> dict:
-    """Le payload complet : ce qui est fourni, posé sur la ligne existante.
+    """The complete payload: what is supplied, laid over the existing row.
 
-    `existing is None` veut dire création — tout champ obligatoire manquant est un
-    refus nommé, ce que faisait `required=True` avant que `--patch` ne l'interdise
-    au niveau d'argparse.
+    `existing is None` means creation: any missing required field is a named refusal,
+    which is what `required=True` did before `--patch` made it impossible at the
+    argparse level.
     """
     if existing is None:
         missing = ["--" + name.replace("_", "-")
@@ -108,7 +104,7 @@ def merge(fields: tuple, args: argparse.Namespace, existing: dict | None) -> dic
 
 
 def _existing(store: Any, command: str, key: str) -> dict:
-    """La ligne visée par `--patch`, ou un refus. On ne crée pas à trous."""
+    """The row targeted by `--patch`, or a refusal. No partial row is created."""
     rows = (store.thread_rows() if command == "thread" else store.deadline_rows())
     field = "thread_key" if command == "thread" else "deadline_key"
     found = [row for row in rows if row[field] == key]
@@ -190,11 +186,10 @@ def _prediction(args, _) -> dict:
 
 
 def _correction(args, _) -> dict:
-    """Une correction n'entre en base qu'une fois écrite dans `corrections.md`.
+    """A correction enters the database only once written in `corrections.md`.
 
-    Audit du 2026-10-09 : douze corrections n'existaient que dans PostgreSQL. Ni le
-    contrôle des porteurs ni le registre de rejeu (`correction_replay.py`), qui lisent
-    le journal, ne les voyaient : l'erreur était annoncée à l'athlète, jamais apprise.
+    The owner check and the replay registry (`correction_replay.py`) read the journal, so
+    a correction that exists only in PostgreSQL is invisible to both.
     """
     from redline.model import correction_replay
 
@@ -210,7 +205,7 @@ def _correction(args, _) -> dict:
 
 
 def _permit(args, _) -> dict:
-    """Le choix du coach pour une EF du permis, scellé avec sa prédiction (2026-09-27)."""
+    """The coach's choice for a permit easy run, sealed together with its prediction."""
     sunday = dt.date.fromisocalendar(int(args.week[:4]), int(args.week[-2:]), 7)
     statement = (f"SCELLÉ, ne pas révéler à l'athlète avant le bilan {args.week}. Choix du coach "
                  f"pour {args.session_key} du {args.date:%d/%m} : {args.minutes} min. "
@@ -238,21 +233,19 @@ def _exposure(args, _) -> dict:
     }
 
 
-#: Une commande, une ligne : sa clé d'entité, son type de commande de tour, comment
-#: elle assemble sa charge, et la méthode du magasin qui l'écrit hors transaction.
+#: One command, one row: its entity key, its turn command type, how it assembles its
+#: payload, and the store method that writes it outside a transaction.
 #:
-#: ⭐ UNE table, et non deux. Le type de commande était décidé ici et l'écriture directe
-#: dans un second `if/elif` ailleurs, dont la dernière branche était un `else` qui
-#: envoyait TOUT type inconnu vers `upsert_deadline`. La retombée muette avait déjà été
-#: retirée du premier aiguillage (« une commande non reconnue refuse au lieu d'être
-#: écrite comme une échéance ») et laissée intacte dans le second : deux aiguillages
-#: pour le même ensemble, c'est la garantie qu'un jour l'un des deux se corrige seul.
+#: ONE table, not two. A second `if/elif` dispatching the direct write would end in an
+#: `else` sending any unknown type to `upsert_deadline`; two switches over the same set
+#: are bound to drift apart. An unrecognised command refuses instead of being written as
+#: a deadline.
 class Command(NamedTuple):
     prefix: str
     kind: str
     build: Callable[[Any, Any], dict]
-    #: L'écriture hors tour, appelée par son nom pour que mypy vérifie la méthode et sa
-    #: signature ; None quand la commande n'a de sens que dans un tour.
+    #: The write outside a turn, called by name so that mypy checks the method and its
+    #: signature; None when the command only makes sense within a turn.
     write: Callable[[OperationalStore, dict], object] | None
 
 
@@ -274,8 +267,8 @@ COMMANDS: dict[str, Command] = {
         "capability_number", "slug", "need", "score", "scale", "status",
         "evaluated_on", "next_test", "lock_reason")),
         lambda store, row: store.evaluate_capability(row, actor=ACTOR)),
-    # `angle` n'a PAS d'écriture directe : hors d'un tour, il n'y a pas de message
-    # proactif à qualifier. `main()` refuse avant d'arriver à `_direct`.
+    # `angle` has NO direct write: outside a turn there is no proactive message to
+    # qualify. `main()` refuses before reaching `_direct`.
     "angle": Command("angle", commands.PROACTIVE_ANGLE, _angle, None),
     "gear": Command("gear", commands.GEAR_UPSERT, _fields((
         "gear_id", "name", "role", "retire_at_km", "status")),
@@ -290,7 +283,7 @@ COMMANDS: dict[str, Command] = {
                       lambda store, row: store.seal_permit_choice(row, actor=ACTOR)),
 }
 
-#: Ce qui identifie l'entité visée, quand ce n'est pas `--key`.
+#: What identifies the targeted entity, when it is not `--key`.
 ENTITY_KEY = {
     "question": lambda args, payload: args.question_id,
     "ask": lambda args, payload: hashlib.sha256(args.text.encode()).hexdigest()[:16],
@@ -346,9 +339,9 @@ def parser() -> argparse.ArgumentParser:
     capability.add_argument("--next-test")
     capability.add_argument("--lock-reason")
 
-    # `thread` et `deadline` : plus de `required=True` sur les champs, sinon `--patch`
-    # serait rejeté avant d'être lu. L'obligation n'est pas perdue, elle est déplacée
-    # dans `merge()`, qui NOMME les options manquantes au lieu du laconique argparse.
+    # `thread` and `deadline`: no `required=True` on the fields, otherwise `--patch`
+    # would be rejected before being read. The requirement is moved into `merge()`,
+    # which NAMES the missing options instead of argparse's terse error.
     question = commands.add_parser("question", help="Examiner une réponse, sans clôture implicite")
     question.add_argument("--question-id", required=True)
     question.add_argument("--answer-id", required=True)
@@ -391,13 +384,8 @@ def parser() -> argparse.ArgumentParser:
              "dans son carnet ; une chaîne vide la rend au coach seul")
     deadline.add_argument("--patch", action="store_true", help=PATCH_HELP)
 
-    # ⭐ L'angle a un CHAMP, donc il n'a rien à faire dans la prose (2026-08-21). La
-    # colonne `proactive_messages.angle` existait, `fact-read.py proactive` l'affichait,
-    # le déclencheur du débrief exigeait « un angle que tu n'as pas déjà servi » — et
-    # rien ne l'écrivait jamais : `vault.py` posait `angle: None` en dur. Le modèle
-    # devait donc reconstituer les angles servis à partir des résumés bruts, et n'ayant
-    # aucun endroit où déposer ce raisonnement, il l'a déposé dans le message que l'athlète
-    # a reçu. Un garde-fou qui n'ouvre pas de chemin correct fabrique son contournement.
+    # The angle has a FIELD, so it does not belong in prose: without a place to record
+    # it, the reasoning about served angles ends up in the message sent to the athlete.
     angle = commands.add_parser(
         "angle", help="qualifie le message proactif de CE tour (n'a de sens qu'en tour)")
     angle.add_argument("angle", help="deux ou trois mots, ex. « titre Strava, récit libre »")
@@ -481,8 +469,8 @@ def main() -> int:
     from redline.storage import Database, OperationalStore, StorageError
 
     store = OperationalStore(Database(args.database_url, application_name="fact-write"))
-    # La fusion précède le hachage : le payload mis en file reste complet, donc
-    # `command_key` et `apply_turn_with_receipts` gardent le contrat qu'ils avaient avant `--patch`.
+    # The merge precedes the hash: the queued payload stays complete, so `command_key`
+    # and `apply_turn_with_receipts` keep the contract they had before `--patch`.
     existing = _existing(store, args.command, args.key) if getattr(
         args, "patch", False) else None
     if args.command in {"angle", "ask"} and not turn_id:
@@ -495,8 +483,8 @@ def main() -> int:
     command_key = f"{entity_key}:{hashlib.sha256(canonical.encode()).hexdigest()[:16]}"
     if turn_id and args.command in {"ask", "question"}:
         command_key = f"{turn_id}:{command_key}"
-    # Un refus du magasin sort en erreur nommée, jamais en succès : le 2026-10-13,
-    # une évaluation de capacité ignorée par un conflit était annoncée « enregistré ».
+    # A store refusal exits as a named error, never as a success: a write ignored because
+    # of a conflict must not be announced as recorded.
     try:
         if turn_id:
             store.stage_command(turn_id, command_key, kind, payload)
@@ -505,7 +493,7 @@ def main() -> int:
         written = _direct(store, args.command, payload)
     except StorageError as exc:
         raise StorageError(f"fact-write : {entity_key} refusé : {exc}") from exc
-    # False = la même ligne existait déjà ; rien n'a été écrit.
+    # False = the same row already existed; nothing was written.
     print(f"{entity_key} déjà enregistré, rien d'écrit." if written is False
           else f"{entity_key} enregistré.")
     return 0

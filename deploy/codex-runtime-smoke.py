@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prévol réel, sans shell, des modèles Codex requis par Redline."""
+"""Real preflight, without a shell, of the Codex models Redline requires."""
 
 from __future__ import annotations
 

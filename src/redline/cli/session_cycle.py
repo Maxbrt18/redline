@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Pilote le cycle tolérant à l'oubli d'une séance.
+"""Drives the session cycle, tolerant of a forgotten session.
 
-`start` est un raccourci facultatif. Une observation Strava datée reconstruit le
-départ et la fin même si l'athlète n'a rien déclaré avant de partir.
+`start` is an optional shortcut. A dated Strava observation rebuilds the start and
+the end even if the athlete declared nothing before leaving.
 """
 
 from __future__ import annotations

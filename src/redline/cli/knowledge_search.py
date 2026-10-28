@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Repère les fiches pertinentes du corpus pour le coach Messenger."""
+"""Finds the relevant corpus notes for the Messenger coach."""
 
 
 

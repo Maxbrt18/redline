@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""La faisabilité à rebours du plan, lue depuis PostgreSQL : même code pour le bilan et la CLI.
+"""Backward feasibility of the plan, read from PostgreSQL: same code for the review and the CLI.
 
-Le calcul vit dans `src/redline/model/transitions.py` ; ici on réunit les faits : la course
-typée (`fact-write.py deadline --kind race`), les révisions actives, les transitions
-faites, la plus longue des 30 jours. Rien n'est écrit.
+The computation lives in `src/redline/model/transitions.py`; this module gathers the facts:
+the typed race (`fact-write.py deadline --kind race`), the active revisions, the transitions
+done, the longest run of the last 30 days. Nothing is written.
 
-    python3 scripts/feasibility.py                  # depuis aujourd'hui
-    python3 scripts/feasibility.py --libre 2026-W41  # traite W41 comme encore à écrire
+    python3 scripts/feasibility.py                  # from today
+    python3 scripts/feasibility.py --libre 2026-W41  # treat W41 as still to be written
 
-`--libre` sert à explorer une semaine déjà programmée : sans lui, une semaine qui a une
-révision active est figée sur ses nouveautés (transition typée, palier de SL déduit).
-Le verdict est informatif : il ne refuse rien et ne décide rien.
+`--libre` explores an already scheduled week: without it, a week that has an active
+revision is frozen on its novelties (typed transition, deduced long-run step).
+The verdict is informational: it refuses nothing and decides nothing.
 """
 
 from __future__ import annotations
@@ -31,8 +31,8 @@ from redline.model.errors import ConfigError
 
 
 def novelties(sessions: list[dict], rows: list, as_of: dt.date) -> tuple[str, ...]:
-    """Les nouveautés que porte une révision : ses transitions typées, et un palier de
-    SL quand une sortie longue dépasse la plus longue des 30 jours qui la précèdent."""
+    """The novelties a revision carries: its typed transitions, and a long-run step
+    when a long run exceeds the longest of the 30 days before it."""
     found = [transition.kind for transition in transitions.opened(sessions, as_of)]
     for session in sessions:
         if session.get("workout") != session_kinds.LONG or session.get("status") == "cancelled":

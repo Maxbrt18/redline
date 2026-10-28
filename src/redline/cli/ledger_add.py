@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Ajoute une observation typée dans PostgreSQL.
+"""Adds a typed observation to PostgreSQL.
 
-La commande normalise les flottants fournis par Strava, valide chaque option contre
-le contrat de `model/ledger.py`, puis écrit directement l'observation canonique.
+The command normalises the floats supplied by Strava, validates each option against
+the contract of `model/ledger.py`, then writes the canonical observation directly.
 
-    python3 scripts/ledger-add.py --date 2026-08-10 --type EF --km 6.84 \\
+    python3 scripts/ledger-add.py --date YYYY-MM-DD --type EF --km 6.84 \\
         --temps 0:41:56 --allure 6:08 --fcmoy 156.61 --fcmax 168 --cad 168.88 \\
         --dplus 64.7 --dmoins 64 --wbgt 20 --strava 90000000003 --note "…"
 
-La douleur se donne par zone surveillée : `--dlr genou=2 --dlr cheville=?`. Avec une
-seule zone, `--dlr 2` suffit.
+Pain is given per monitored zone: `--dlr genou=2 --dlr cheville=?`. With a single
+zone, `--dlr 2` is enough.
 
-`--dry-run` affiche la charge validée sans écrire.
+`--dry-run` prints the validated payload without writing.
 """
 
 from __future__ import annotations
@@ -55,15 +55,14 @@ def _number(name: str, value: str) -> float | int:
 
 def morning_trace_errors(raw: dict[str, str], pains: dict[str, str],
                          zones: list[str]) -> list[str]:
-    """Une ligne `reveil` porte sa trace, ou elle ne s'écrit pas (audit du 2026-10-11).
+    """A `reveil` row carries its trace, or it is not written.
 
-    Sans `--dlr`, la mesure naissait `pending` sans bruit et la réponse de l'athlète ne
-    vivait que dans la note : 19 réveils sur 40 sans valeur, une porte « incomplète »
-    alors qu'il avait répondu, et une relance du soir sur ce qu'il avait déjà dit. Le mot
-    qu'il emploie s'accepte tel quel et se convertit ici (aucune 0, très légère 0,5,
-    légère 1, nette 2).
-    « ? » est refusé aussi : un réveil sans réponse n'a pas de ligne, et le rattrapage
-    avait converti en `unavailable` des réponses pourtant données (07/09, 12/09, 14/09).
+    Without `--dlr` the measurement would silently be born `pending` and the athlete's
+    answer would live only in the note, leaving the gate "incomplete" and prompting a
+    follow-up on something already answered. The word the athlete uses is accepted as
+    is and converted here (aucune 0, très légère 0.5, légère 1, nette 2).
+    "?" is refused too: a wake-up check without an answer has no row, and the catch-up
+    must not turn answers already given into `unavailable`.
     """
     if raw.get("Type") != session_kinds.WAKE_TRACE:
         return []

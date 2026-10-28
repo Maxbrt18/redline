@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Rattache une observation Messenger existante à son activité Strava.
+"""Links an existing Messenger observation to its Strava activity.
 
-Le fait garde sa clé d'idempotence d'origine ; seul l'identifiant externe manquant
-s'ajoute. La clé se lit avec `scripts/fact-read.py observations`.
+The fact keeps its original idempotency key; only the missing external identifier is
+added. The key is read with `scripts/fact-read.py observations`.
 """
 
 from __future__ import annotations

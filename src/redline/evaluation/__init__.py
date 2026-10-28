@@ -1,5 +1,5 @@
-"""Banc d'évaluation hors production : aucun module de `redline` ne l'importe.
+"""Evaluation bench outside production: no `redline` module imports it.
 
-Un juge probabiliste est un indicateur de qualité sur des scénarios versionnés, jamais
-une porte devant l'envoi d'une réponse à l'athlète.
+A probabilistic judge is a quality indicator over versioned scenarios, never a gate in
+front of sending a reply to the athlete.
 """

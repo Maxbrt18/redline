@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Synchronise le kilométrage de toutes les chaussures Strava vers PostgreSQL."""
+"""Syncs the mileage of every Strava shoe into PostgreSQL."""
 
 
 

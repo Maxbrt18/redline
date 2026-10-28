@@ -23,8 +23,8 @@ target-version = "py312"
 extend-exclude = []
 
 [tool.ruff.lint]
-# UP, PIE et FURB depuis le 2026-09-28 : une syntaxe, pas deux (`X | None` et non
-# `Optional[X]`), et les tournures que la bibliothèque standard fait déjà mieux.
+# UP, PIE and FURB: one syntax, not two (`X | None` rather than `Optional[X]`), and
+# the idioms the standard library already does better.
 select = ["E", "W", "F", "I", "B", "SIM", "C4", "RUF", "UP", "PIE", "FURB"]
 ignore = [
     # Long URLs and regexes in the middle of a rule are not worth a backslash.
@@ -32,10 +32,10 @@ ignore = [
     # RUF001-003 flag French typography (— « » ’ °) as "ambiguous unicode". Every
     # string the athlete reads is French, so this fires ~44 times on correct code.
     "RUF001", "RUF002", "RUF003",
-    # `class X(str, Enum)` -> StrEnum changerait str(x), donc le texte des incidents.
+    # `class X(str, Enum)` -> StrEnum would change str(x), hence the incident text.
     "UP042",
-    # Syntaxe PEP 695 (`type X = ...`, génériques) : aucun gain ici, et mypy la lit
-    # encore moins bien que TypeAlias/TypeVar.
+    # PEP 695 syntax (`type X = ...`, generics): no gain here, and mypy reads it even
+    # less well than TypeAlias/TypeVar.
     "UP040", "UP047",
 ]
 
@@ -47,29 +47,28 @@ known-first-party = ["redline"]
 "tests/*" = ["E741"]
 
 [tool.vulture]
-# Le code de production seul : les tests n'entrent pas dans l'analyse, donc une
-# fonction que seul son propre test appelle est signalée comme morte (2026-09-28 :
-# une quinzaine en vivaient ainsi). Un faux positif se déclare ici, nommé.
+# Production code only: tests are left out of the analysis, so a function only its own
+# test calls is reported as dead. A false positive is declared here, by name.
 paths = ["src", "deploy/codex-runtime-smoke.py", "deploy/claude-runtime-smoke.py",
          "deploy/agent-runtime-update.py"]
 exclude = ["*/tests/*"]
 min_confidence = 60
-# Routes Flask : appelées par le framework, jamais par le code.
+# Flask routes: called by the framework, never by the code.
 ignore_decorators = ["@app.get", "@app.post", "@app.before_request", "@app.after_request", "@app.errorhandler"]
 ignore_names = [
-    # Chargement paresseux du paquet `redline.storage` (PEP 562).
+    # Lazy loading of the `redline.storage` package (PEP 562).
     "__getattr__",
-    # Déclaration des déclencheurs que la base doit porter, vérifiée contre elle.
+    # Declaration of the triggers the database must carry, checked against it.
     "TRIGGERS",
-    # Porteur nommé de chaque règle du règlement compilé (CLAUDE.md, « une règle
-    # générale nomme son porteur ») : une donnée, pas un appel.
+    # Named carrier of each rule of the compiled rulebook (CLAUDE.md, "a general rule
+    # names its carrier"): data, not a call.
     "enforced_by",
-    # Seuils du règlement que seul le texte d'une règle cite (`{pain_cap}`), lus par
-    # `Parameters.spoken` : le code n'en applique pas, le coach si.
+    # Rulebook thresholds only a rule's text cites (`{pain_cap}`), read by
+    # `Parameters.spoken`: the code applies none, the coach does.
     "gate_trend_weeks", "pain_cap",
-    # Réglage Flask lu par Werkzeug.
+    # Flask setting read by Werkzeug.
     "max_content_length",
-    # Champs d'`Activity` que seul `summary()` lit, par `dataclasses.fields`.
+    # `Activity` fields only `summary()` reads, through `dataclasses.fields`.
     "relative_effort", "calories",
 ]
 

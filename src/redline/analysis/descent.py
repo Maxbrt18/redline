@@ -1,33 +1,30 @@
 #!/usr/bin/env python3
-"""Le D− d'une activité, que Strava ne renvoie pas.
+"""The descent (D-) of an activity, which Strava does not return.
 
-L'API donne le dénivelé POSITIF (`elevation_gain`) et rien pour le négatif. Or sur un
-parcours vallonné la descente est une charge à part entière (impact, freinage) : la
-colonne D− du registre doit donc être remplie, pas laissée vide.
+The API gives POSITIVE elevation gain (`elevation_gain`) and nothing for the negative side.
+On hilly terrain descent is a load of its own (impact, braking), so the ledger's D- column
+must be filled, not left empty.
 
-Méthode — l'identité de bilan, pas une seconde estimation :
+Method: the balance identity, not a second estimate.
 
-    D− = D+ + (altitude_départ − altitude_arrivée)
+    D- = D+ + (start_altitude - end_altitude)
 
-Ce que ça achète : le chiffre s'ancre sur le D+ de Strava, donc sur SON lissage, au
-lieu d'en refaire un avec un lissage à nous qui ne collerait pas à la colonne D+ juste
-à côté. Seuls les deux points extrêmes du flux d'altitude entrent dans le calcul.
+The figure is anchored on Strava's D+, hence on ITS smoothing, instead of redoing one with
+our own smoothing that would not match the D+ column next to it. Only the two end points of
+the altitude stream enter the computation.
 
-Calibration du 2026-07-29, sur les 23 activités du registre : recalculer le D+ par
-somme des deltas positifs du flux (résolution 100) retombe à quelques mètres de
-celui de Strava sur les sorties roulantes (176 vs 175,3 · 77 vs 78,8 · 209 vs 212,3)
-mais le sous-estime de ~5 % sur une grosse rando (971 vs 1022,5) : le lissage mange
-les replats. L'identité ci-dessus n'a pas ce défaut. Contrôle indépendant : sur la
-descente du Gotzenalm (2026-07-21), seule ligne dont le D− était déjà connu par
-Strava, elle rend 1101 pour 1096 relevés — 0,5 % d'écart.
+Summing the positive deltas of the stream (resolution 100) lands within a few metres of
+Strava's D+ on rolling runs but underestimates it by ~5 % on a big hike: the smoothing eats
+the flats. The identity above does not have that flaw. On a descent where Strava had
+reported D-, it gives 1101 for 1096 recorded (0.5 % off).
 
-Usage :
+Usage:
     python3 scripts/descent.py --dplus 175.3 --altitude '[262.9, ..., 262.6]'
     python3 scripts/strava.py streams <id> --keys altitude \
         | python3 scripts/descent.py --dplus 175.3
 
-Le flux passe tel quel : soit le JSON rendu par `strava.py streams`
-({"altitude": [...]}), soit la liste seule.
+The stream is passed as is: either the JSON returned by `strava.py streams`
+({"altitude": [...]}), or the bare list.
 """
 
 from __future__ import annotations
@@ -42,7 +39,7 @@ from redline.model.errors import InputError
 
 
 def descent(dplus: float, altitude: list) -> int:
-    """Le D− en mètres, arrondi. Le plat rend 0, jamais rien."""
+    """The D- in metres, rounded. Flat terrain returns 0, never nothing."""
     if len(altitude) < 2:
         raise ValueError("flux d'altitude trop court : deux points au minimum")
     return max(0, round(dplus + altitude[0] - altitude[-1]))

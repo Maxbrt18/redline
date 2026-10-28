@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-"""Prévol réel d'un binaire Claude Code candidat, avec l'identité du service.
+"""Real preflight of a candidate Claude Code binary, with the service identity.
 
-Vérifie la version, fait répondre chaque modèle routé par `redline.routing` et
-affiche l'identifiant que l'alias résout, puis reprend avec le candidat une session
-créée par le binaire actif : le coach reprend ses conversations par `--resume`.
+Checks the version, makes each model routed by `redline.routing` answer and prints
+the identifier its alias resolves to, then resumes with the candidate a session
+created by the active binary: the coach resumes its conversations with `--resume`.
 
-Enfin, le candidat doit laisser passer, avec les permissions exactes d'un tour
-autonome, la forme d'appel de CLI que dicte le prompt (`--input` vers le fichier du
-tour). La 2.1.286 a été promue le 09/10 sans ce contrôle ; la 2.1.287 refusait
-`… < /tmp/x.json`, et le bilan W41 n'a jamais pu écrire W42.
+Finally, the candidate must let through, with the exact permissions of an autonomous
+turn, the CLI call shape the prompt dictates (`--input` pointing to the turn file).
 """
 
 from __future__ import annotations
@@ -42,11 +40,11 @@ def _ask(binary: str, prompt: str, model: str, cwd: str, *, resume: str | None =
 
 
 def _cli_call_allowed(binary: str, model: str, cwd: str) -> None:
-    """Le candidat exécute l'appel de CLI du coach au lieu de le refuser.
+    """The candidate runs the coach's CLI call instead of refusing it.
 
-    Sans `REDLINE_TURN_ID`, le lanceur s'arrête avant tout script (« aucun tour en
-    cours ») : sa réponse prouve que la commande a passé les permissions, sans rien
-    lire ni écrire en base.
+    Without `REDLINE_TURN_ID`, the launcher stops before any script (« aucun tour en
+    cours »): its answer proves the command passed the permissions, without reading
+    or writing anything in the database.
     """
     from redline.model import agent_input
     from redline.service.claude import AUTONOMOUS_PERMISSIONS
@@ -89,7 +87,7 @@ def _cli_call_allowed(binary: str, model: str, cwd: str) -> None:
 
 
 def _resolved(alias: str, payload: dict) -> str:
-    # Claude Code facture aussi ses tâches internes (Haiku) : on garde l'alias demandé.
+    # Claude Code also bills its internal tasks (Haiku): keep the requested alias.
     models = sorted((payload.get("modelUsage") or {}).keys())
     return ", ".join([model for model in models if alias in model] or models) or "inconnu"
 
@@ -117,7 +115,7 @@ def main() -> int:
             for model in models:
                 payload = _ask(args.binary, PROMPT, model, cwd)
                 print(f"prévol Claude {args.version}: {model} → {_resolved(model, payload)}")
-            # Une session écrite par l'actif doit rester reprenable par le candidat.
+            # A session written by the active binary must stay resumable by the candidate.
             origin = _ask(args.previous or args.binary, PROMPT, models[0], cwd)
             _ask(args.binary, PROMPT, models[0], cwd, resume=origin["session_id"])
             print(f"prévol Claude {args.version}: reprise de session acceptée")

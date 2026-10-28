@@ -35,8 +35,8 @@ def instructions(variant: str, constitution: str) -> str:
     if variant not in {"current", "contextual"}:
         raise ValueError("Variante inconnue")
     experiment = EXPERIMENT if variant == "contextual" else ""
-    # Ordre explicite : les règles métier restent entières. L'ajustement expérimental
-    # ne touche qu'à la façon de répondre. Aucun appel à la base ou à Messenger.
+    # Explicit order: the business rules stay whole. The experimental adjustment only
+    # touches the way of answering. No call to the database or Messenger.
     return "\n\n".join((constitution, STYLE_PROMPT, experiment, """ÉVALUATION FICTIVE.
 Les faits fournis remplacent toutes les lectures requises. Aucun outil ni écriture
 n'est disponible. Ne prétends jamais avoir enregistré ou modifié quelque chose.
@@ -59,11 +59,11 @@ def digest(value: str) -> str:
 
 
 def measure(answer: str) -> dict:
-    """Signaux observables, sans prétendre noter le naturel ni la sécurité."""
+    """Observable signals, without claiming to grade naturalness or safety."""
     delivered = strip_links(answer).strip()
     words = re.findall(r"\b[\wÀ-ÿ]+(?:['’][\wÀ-ÿ]+)*\b", delivered)
-    # La coupure à 1900 caractères du transport reste hors de ce compteur : ce sont
-    # les bulles logiques avant limite Meta, pas le nombre garanti d'envois HTTP.
+    # The transport's 1900-character split stays out of this counter: these are the
+    # logical bubbles before the Meta limit, not the guaranteed number of HTTP sends.
     return {
         "words": len(words), "chars": len(delivered),
         "questions": delivered.count("?"),
@@ -83,7 +83,7 @@ def shape_checks(answer: str, turn: dict) -> dict:
 
 
 def compare_runs(left: dict, right: dict) -> dict:
-    """Appariement strict : une erreur ou un cas manquant ne devient pas une victoire."""
+    """Strict pairing: an error or a missing case never becomes a win."""
     def indexed(run):
         rows = run["results"]
         index = {(r["id"], r["repeat"], r["turn"]): r for r in rows}

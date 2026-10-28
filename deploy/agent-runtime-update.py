@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Construit, prévole et promeut le runtime du fournisseur d'agent sélectionné.
+"""Builds, preflights and promotes the runtime of the selected agent provider.
 
-Une seule transaction pour les deux fournisseurs : lire la version cible dans les
-bornes du dépôt, construire un candidat à côté de l'actif, le prévoler réellement,
-basculer un lien symbolique, vérifier, sinon restaurer. Seul le runtime du
-fournisseur que `coach-messenger` utilise (`AGENT_PROVIDER`) est touché.
+One transaction for both providers: read the target version within the repository
+bounds, build a candidate next to the active one, run a real preflight against it,
+switch a symlink, verify, otherwise restore. Only the runtime of the provider that
+`coach-messenger` uses (`AGENT_PROVIDER`) is touched.
 
-Ce fichier est copié dans `/usr/local/sbin` et tourne en root : il n'importe rien
-du dépôt, que l'utilisateur du service peut modifier. Les prévols, eux, tournent en
-`ubuntu` et réutilisent `redline.routing` pour tester les modèles réellement routés.
+This file is copied to `/usr/local/sbin` and runs as root: it imports nothing from
+the repository, which the service user can modify. The preflights run as `ubuntu`
+and reuse `redline.routing` to test the models actually routed.
 """
 
 from __future__ import annotations
@@ -36,8 +36,8 @@ VERSION_PATTERN = re.compile(r"^[0-9]+(?:\.[0-9]+){1,3}$")
 MARKER = ".redline-runtime-ready"
 STARTUP_TIMEOUT = 90
 
-# Codex : un venv Python complet par version. Le lien est le venv du service, pour
-# les deux fournisseurs ; seul Codex y vit en tant que runtime.
+# Codex: one full Python venv per version. The link is the service venv for both
+# providers; only Codex lives there as a runtime.
 VENVS = Path("/home/ubuntu/.venvs")
 SERVICE_VENV = VENVS / "redline-current"
 REQUIREMENTS = REPO / "requirements.txt"
@@ -45,7 +45,7 @@ DEV_REQUIREMENTS = REPO / "requirements-dev.txt"
 CODEX_SMOKE = "/usr/local/libexec/redline-codex-runtime-smoke.py"
 CODEX_CANDIDATE = re.compile(r"^redline-codex-[0-9]+(?:\.[0-9]+){1,3}-[a-f0-9]{10}$")
 
-# Claude : un préfixe npm par version, le service trouve `claude` par son PATH.
+# Claude: one npm prefix per version; the service finds `claude` through its PATH.
 CLAUDE_RUNTIMES = Path("/home/ubuntu/.claude-runtimes")
 CLAUDE_LINK = CLAUDE_RUNTIMES / "current"
 CLAUDE_PACKAGE = "@anthropic-ai/claude-code"
@@ -67,7 +67,7 @@ def _version_key(value: str) -> tuple[int, int, int, int]:
 
 
 def _manifest_bounds(manifest: str, package: str) -> tuple[str, str]:
-    """Lit la seule contrainte `paquet>=min,<max` autorisée pour un runtime."""
+    """Reads the only `package>=min,<max` constraint allowed for a runtime."""
     lines = [
         line.strip()
         for line in manifest.splitlines()
@@ -120,14 +120,14 @@ def _channel_version(dist_tags: str, channel: str) -> str:
 
 
 def _cli_version(output: str) -> str:
-    """`claude --version` répond `2.1.285 (Claude Code)`."""
+    """`claude --version` answers `2.1.285 (Claude Code)`."""
     words = output.split()
     if not words or not VERSION_PATTERN.fullmatch(words[0]):
         raise ValueError(f"version Claude illisible: {output[:80]!r}")
     return words[0]
 
 
-# --- Exécution --------------------------------------------------------------
+# --- Execution --------------------------------------------------------------
 
 def _ubuntu_env() -> dict[str, str]:
     return {
@@ -170,7 +170,7 @@ def _run_as_ubuntu(command: Sequence[str], *, timeout: int = 600) -> str:
 
 
 def _service_settings(unit: Path = SERVICE_UNIT) -> list[str]:
-    """Les directives d'identité et d'environnement du service, telles que systemd les lit."""
+    """The service identity and environment directives, as systemd reads them."""
     keep = ("User", "WorkingDirectory", "Environment", "EnvironmentFile")
     settings = []
     for line in unit.read_text(encoding="utf-8").splitlines():
@@ -189,10 +189,10 @@ def _service_run_command(command: Sequence[str], settings: Sequence[str]) -> lis
 
 
 def _run_in_service_env(command: Sequence[str], *, timeout: int) -> subprocess.CompletedProcess[str]:
-    """Exécute avec l'utilisateur et l'environnement exacts du coach.
+    """Runs with the exact user and environment of the coach.
 
-    systemd compose lui-même `EnvironmentFile=` et `Environment=` : aucun secret ne
-    transite par la ligne de commande et aucune lecture parallèle ne peut diverger.
+    systemd composes `EnvironmentFile=` and `Environment=` itself: no secret goes
+    through the command line and no parallel reading can diverge.
     """
     return subprocess.run(
         _service_run_command(command, _service_settings()),
@@ -254,13 +254,12 @@ def _restart_and_check() -> None:
 
 
 def _agent_provider(unit: Path = SERVICE_UNIT) -> str:
-    """Le fournisseur que le coach utilise réellement, lu comme systemd le lit.
+    """The provider the coach actually uses, read the way systemd reads it.
 
-    Prévoler le runtime d'un fournisseur inutilisé mesure un compte qui ne sert pas :
-    depuis le 2026-10-06, le compte ChatGPT refuse gpt-6-sol et le job Codex échouait
-    toutes les nuits pendant que le coach répondait normalement sous Claude. Comme
-    `Config`, un fournisseur absent vaut codex. Les fichiers de `EnvironmentFile=`
-    priment sur `Environment=`, comme pour systemd.
+    Preflighting the runtime of an unused provider measures an account that is not in
+    use and can fail while the coach answers normally. Like `Config`, an absent
+    provider means codex. `EnvironmentFile=` files take precedence over
+    `Environment=`, as in systemd.
     """
     provider = "codex"
     files: list[str] = []
@@ -286,7 +285,7 @@ def _agent_provider(unit: Path = SERVICE_UNIT) -> str:
     return provider.strip().lower()
 
 
-# --- Liens et candidats -----------------------------------------------------
+# --- Links and candidates -----------------------------------------------------
 
 def _atomic_link(link: Path, target: Path) -> None:
     temp_link = link.with_name(f".{link.name}.{os.getpid()}.new")
@@ -317,7 +316,7 @@ def _build_candidate(
     build: Callable[[], None],
     installed_version: Callable[[], str],
 ) -> Path:
-    """Réutilise un candidat complet, sinon le reconstruit entièrement."""
+    """Reuses a complete candidate, otherwise rebuilds it entirely."""
     marker = candidate / MARKER
     if candidate.exists() or candidate.is_symlink():
         if candidate.is_symlink() or not candidate.is_dir():
@@ -345,8 +344,8 @@ def _build_candidate(
 
 
 def _prune_candidates(root: Path, pattern: re.Pattern[str], keep: set[Path]) -> None:
-    # L'actif et son prédécesseur restent ; les anciens candidats ne sont supprimés
-    # qu'après une promotion vérifiée.
+    # The active runtime and its predecessor stay; older candidates are deleted only
+    # after a verified promotion.
     keep_resolved = {path.resolve() for path in keep}
     for path in root.iterdir():
         if not pattern.fullmatch(path.name):
@@ -368,7 +367,7 @@ class Active:
 
 
 class CodexRuntime:
-    """`openai-codex` dans un venv dédié ; le service redémarre sur le nouveau lien."""
+    """`openai-codex` in a dedicated venv; the service restarts on the new link."""
 
     name = "Codex"
     link = SERVICE_VENV
@@ -387,7 +386,7 @@ class CodexRuntime:
         ], timeout=30)
 
     def active(self) -> Active:
-        # Le venv historique sert de point de départ : Codex a toujours un actif.
+        # The legacy venv is the starting point: Codex always has an active runtime.
         return Active(self._installed_version(str(self.link / "bin/python")),
                       _link_target(self.link))
 
@@ -447,13 +446,13 @@ class CodexRuntime:
 
 
 class ClaudeRuntime:
-    """Claude Code dans un préfixe npm dédié.
+    """Claude Code in a dedicated npm prefix.
 
-    Chaque tour lance un nouveau processus `claude` trouvé par le PATH du service :
-    basculer le lien suffit, sans redémarrage, et un tour en cours garde son binaire.
-    Le canal npm `stable` d'Anthropic sert de délai de mûrissement ; `latest` et `next`
-    ne sont jamais pris. Sans lien géré (amorçage), le PATH retombe sur le Claude
-    global, qui reste le dernier recours.
+    Each turn starts a new `claude` process found through the service PATH: switching
+    the link is enough, without a restart, and a turn in progress keeps its binary.
+    Anthropic's `stable` npm channel acts as a maturation delay; `latest` and `next`
+    are never taken. Without a managed link (bootstrap), PATH falls back to the global
+    Claude, which remains the last resort.
     """
 
     name = "Claude"
@@ -483,8 +482,8 @@ class ClaudeRuntime:
 
     @staticmethod
     def npm_install_command(prefix: Path, version: str) -> list[str]:
-        # Construit en `ubuntu`, comme les venvs Codex : le postinstall npm, qui
-        # copie le binaire natif de la plateforme, ne s'exécute jamais en root.
+        # Built as `ubuntu`, like the Codex venvs: the npm postinstall, which copies the
+        # platform's native binary, never runs as root.
         return [
             "npm", "install", "--prefix", str(prefix), "--no-audit", "--no-fund",
             "--loglevel=error", f"{CLAUDE_PACKAGE}@{version}",
@@ -550,8 +549,8 @@ def promote(runtime: CodexRuntime | ClaudeRuntime) -> None:
     print(f"runtime candidat construit: {runtime.name} {target}", flush=True)
     runtime.preflight(candidate, target, active)
 
-    # Re-vérifier le service juste avant la bascule : le prévol ne doit pas
-    # promouvoir un runtime si un incident indépendant a arrêté le coach.
+    # Re-check the service right before the switch: the preflight must not promote a
+    # runtime if an unrelated incident stopped the coach.
     if not _check_ready():
         raise RuntimeError("coach-messenger a perdu sa readiness avant la promotion")
     _atomic_link(runtime.link, candidate)

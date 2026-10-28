@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-# Configuration de l'hôte : mises à jour automatiques et SSH. Idempotent.
+# Host configuration: automatic updates and SSH. Idempotent.
 #
 #   sudo deploy/host/install.sh
 #
-# Le pare-feu de l'hôte est firewalld (zone public : ssh, http, https, dhcpv6-client),
-# seconde couche derrière la Security List Oracle. Ce script ne le modifie pas.
-# Rien ici ne redémarre de service applicatif : SSH est rechargé, les connexions
-# ouvertes restent en place.
+# The host firewall is firewalld (public zone: ssh, http, https, dhcpv6-client), a
+# second layer behind the Oracle Security List. This script does not modify it.
+# Nothing here restarts an application service: SSH is reloaded, open connections
+# stay in place.
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
 [ "$(id -u)" -eq 0 ] || { echo "install.sh : à lancer avec sudo" >&2; exit 1; }
 [ $# -eq 0 ] || { echo "usage : install.sh" >&2; exit 2; }
 
-# Valider avant d'activer : une configuration refusée est retirée aussitôt.
+# Validate before enabling: a rejected configuration is removed immediately.
 install -o root -g root -m 0644 "$here/sshd-redline.conf" \
     /etc/ssh/sshd_config.d/40-redline.conf
 if ! sshd -t; then
@@ -34,7 +34,7 @@ systemctl daemon-reload
 systemctl restart apt-daily.timer apt-daily-upgrade.timer
 systemctl reload ssh
 
-# rpcbind n'a aucun usage ici (pas de NFS) ; firewalld le bloque déjà, il disparaît.
+# rpcbind has no use here (no NFS); firewalld already blocks it, so it is masked.
 systemctl mask --now rpcbind.service rpcbind.socket >/dev/null
 
 echo "hôte configuré :"

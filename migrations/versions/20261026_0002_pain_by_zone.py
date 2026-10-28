@@ -1,22 +1,21 @@
-"""La douleur se range par zone : une ligne par zone surveillée, jamais une colonne.
+"""Pain is stored per zone: one row per monitored zone, never a column.
 
-`observation_metrics.pain` ne portait qu'UNE série : deux zones y auraient versé leurs
-notes dans la même colonne. La douleur d'une observation vit désormais dans
-`pain_readings` (une ligne par zone, mêmes états et même immuabilité que les autres
-mesures), celle d'une séance de renfo dans `strength_pain_readings` (avant / après),
-et une prédiction tranchée par le réveil nomme la zone qu'elle attend. Les zones
-elles-mêmes (`pain_zones`) sont la référence que `redline.toml` alimente.
+`observation_metrics.pain` held a single series: two zones would have poured their
+scores into the same column. The pain of an observation now lives in `pain_readings`
+(one row per zone, same states and same immutability as the other measurements), that
+of a strength session in `strength_pain_readings` (before / after), and a prediction
+settled by the wake-up check names the zone it expects. The zones themselves
+(`pain_zones`) are the reference fed by `redline.toml`.
 
-Une base qui porte déjà de la douleur la rattache à UNE zone, que l'opérateur nomme :
+A database that already holds pain attaches it to ONE zone, which the operator names:
 
     alembic -x pain_zone=genou -x pain_zone_label=Genou upgrade head
 
-Sans ces arguments, la migration refuse plutôt que d'inventer une zone. Une base
-neuve n'en a pas besoin.
+Without these arguments the migration refuses rather than inventing a zone. A new
+database does not need them.
 
 Revision ID: 20261026_0002
 Revises: 20261026_0001
-Create Date: 2026-10-26
 """
 
 from __future__ import annotations
@@ -196,14 +195,14 @@ def upgrade() -> None:
                           ["athlete_id", "resolves_zone"], ["athlete_id", "slug"],
                           source_schema="redline", referent_schema="redline")
 
-    # La fonction ne doit plus nommer la colonne avant qu'elle disparaisse.
+    # The function must stop naming the column before it disappears.
     _protect_measurements(MEASUREMENTS_AFTER)
     op.drop_column("observation_metrics", "pain", schema="redline")
     op.drop_column("observation_metrics", "pain_state", schema="redline")
     op.drop_column("strength_sessions", "shin_after", schema="redline")
     op.drop_column("strength_sessions", "shin_before", schema="redline")
 
-    # Une lecture de douleur connue est immuable, comme toute mesure connue.
+    # A known pain reading is immutable, like any known measurement.
     op.execute(sa.text("""
         CREATE FUNCTION redline.protect_pain_reading() RETURNS trigger
         LANGUAGE plpgsql AS $$

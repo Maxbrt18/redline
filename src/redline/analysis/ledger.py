@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """The ledger, computed: the load gauge that coaching/protocols.md defines.
 
-The gauge is presented as an ARBITER ("le débat devient un calcul, pas une
-négociation"), so it PRINTS ITS INPUTS. A number nobody can reconstruct is a number
-that drifts -- the exact reason coaching/fitness-status.md was deleted.
+The gauge is presented as an ARBITER ("the debate becomes a computation, not a
+negotiation"), so it PRINTS ITS INPUTS. A number nobody can reconstruct is a number
+that drifts.
 
 Usage:
     python3 scripts/ledger.py                       # the last week
@@ -11,8 +11,8 @@ Usage:
     python3 scripts/ledger.py --tendance-douleur 3  # last 3 weeks
     python3 scripts/ledger.py --csv                 # both tables, normalized, on stdout
 
-Lit les observations, métriques, déclarations quotidiennes et instruments directement
-dans PostgreSQL. Aucun registre Markdown n'est maintenu en parallèle.
+Reads observations, metrics, daily declarations and instruments directly from
+PostgreSQL. No Markdown ledger is kept in parallel.
 
 The French CLI flags and the CSV column names are a contract with the athlete and with
 whatever reads the export: they stay French while the code around them is English.
@@ -42,7 +42,7 @@ from redline.model import (
 from redline.model import ledger as table
 from redline.model.errors import InputError
 
-POINTS_PER_EQ_HOUR = 14.0          # calibrated 2026-07-19, coaching/protocols.md
+POINTS_PER_EQ_HOUR = 14.0          # calibrated, see coaching/protocols.md
 LEVEL_CAP, RATIO_CAP = 85, 1.3
 
 QUALITY_TYPES = session_kinds.QUALITY
@@ -66,14 +66,14 @@ class Row:
     dplus: int = 0
     dminus: int = 0
     rpe: float | None = None
-    #: La douleur connue de chaque zone surveillée : {zone: /10}. Jamais fusionnées :
-    #: une série se lit zone par zone (`pain_at`).
+    #: The known pain of each monitored zone: {zone: /10}. Never merged: a series
+    #: is read zone by zone (`pain_at`).
     pains: dict[str, float] = field(default_factory=dict)
     enjoyment: int | None = None
     note: str = ""
     wbgt: float | None = None
-    #: FC moyenne déclarée douteuse : `sans_brassard` (mesure invalide) ou `contexte`
-    #: (cause déclarée hors fatigue). None = FC valide.
+    #: Average HR declared doubtful: `sans_brassard` (invalid measurement) or `contexte`
+    #: (declared cause unrelated to fatigue). None = valid HR.
     hr_doubt: str | None = None
 
     def pain_at(self, zone: str) -> float | None:
@@ -81,7 +81,7 @@ class Row:
 
     @property
     def hr_valid(self) -> int | None:
-        """La FC moyenne utilisable pour juger un plafond : None sans brassard."""
+        """The average HR usable to judge a cap: None without the armband."""
         return None if self.hr_doubt == "sans_brassard" else self.hr_avg
 
     @property
@@ -99,9 +99,8 @@ class Row:
 class Instruments:
     """The two gauge inputs the ledger cannot know, declared day by day.
 
-    None means NOT DECLARED, never "ok": a silent week used to print « sommeil ok, charge
-    normale », and the W40 review repeated it for a week with no declaration at all
-    (audit of 2026-10-09). An undeclared week adds no multiplier, and says so.
+    None means NOT DECLARED, never "ok": a silent week must not print « sommeil ok, charge
+    normale ». An undeclared week adds no multiplier, and says so.
     """
 
     sleep: str | None = None      # ok | 2_3_mauvaises_nuits | degrade_semaine
@@ -111,7 +110,7 @@ class Instruments:
 # --------------------------------------------------------------------------- parsing
 
 class LedgerStore(Protocol):
-    """Interface minimale du calcul, fournie par PostgreSQL."""
+    """Minimal interface of the computation, provided by PostgreSQL."""
 
     def observation_rows(self) -> list[dict]: ...
 
@@ -135,13 +134,13 @@ class PainZone:
 
 
 def pain_zones(store: LedgerStore) -> list[PainZone]:
-    """Les zones surveillées actives, dans leur ordre de déclaration."""
+    """The active monitored zones, in declaration order."""
     return [PainZone(zone["slug"], zone["label"]) for zone in store.pain_zones()
             if zone["active"]]
 
 
 def zone_prefix(zone: PainZone, zones: list[PainZone]) -> str:
-    """« Genou · » devant une ligne de douleur, seulement s'il y a plusieurs zones."""
+    """A zone label (« Genou · ») before a pain line, only when there are several zones."""
     return f"{zone.label} · " if len(zones) > 1 else ""
 
 
@@ -154,11 +153,10 @@ def open_store() -> LedgerStore:
 
 
 def _known(observation: dict, metric: str) -> float | None:
-    """La valeur d'une mesure, ou None si elle n'est pas CONNUE.
+    """The value of a measurement, or None if it is not KNOWN.
 
-    Les quatre états se réduisent à deux pour un calcul : `known` porte un nombre, tout
-    le reste est absent. `unavailable` (« demandé, puis perdu ») compte comme absent et
-    non comme zéro -- c'est la distinction qui a coûté 29 lignes de D− en 2026-07.
+    The four states reduce to two for a computation: `known` carries a number, everything
+    else is absent. `unavailable` (asked for, then lost) counts as absent, not as zero.
     """
     measurement = observation["measurements"].get(metric)
     if not measurement or measurement["state"] != "known":
@@ -172,11 +170,10 @@ def _known_int(observation: dict, metric: str) -> int | None:
 
 
 def parse_ledger(store: LedgerStore) -> list[Row]:
-    """Les observations PostgreSQL vers les objets de calcul, plus récent d'abord.
+    """PostgreSQL observations to computation objects, most recent first.
 
-    ⭐ LU DIRECTEMENT DEPUIS LES MESURES TYPÉES (2026-08-18). Ce calcul passait par
-    Le store est fourni par l'appelant : un processus ouvre une connexion, pas une par
-    fonction de lecture.
+    Read directly from the typed measurements. The store is provided by the caller: a
+    process opens one connection, not one per read function.
     """
     rows: list[Row] = []
     observations = store.observation_rows()
@@ -187,9 +184,9 @@ def parse_ledger(store: LedgerStore) -> list[Row]:
         if duration_s is not None:
             hours: float | None = duration_s / 3600
         elif pace_s is not None and km is not None:
-            # Neuf lignes migrées portent une allure sans chronomètre. Les écarter
-            # viderait juin de la charge chronique, donc DÉGONFLERAIT le ratio
-            # aigu:chronique — ça masquerait l'alerte qu'il existe pour lever.
+            # Some migrated rows carry a pace without a duration. Dropping them would
+            # empty the chronic load, hence DEFLATE the acute:chronic ratio and hide the
+            # alarm it exists to raise.
             hours = pace_s / 3600 * km
         else:
             hours = None
@@ -212,11 +209,11 @@ def parse_ledger(store: LedgerStore) -> list[Row]:
             wbgt=_known(observation, "wbgt_c"),
             hr_doubt=observation.get("hr_doubt"),
         ))
-    # Les rapports de la page renfo ont leur propriétaire relationnel propre. Les
-    # recopier dans observations violerait l'unicité, mais les ignorer retire leur
-    # durée et leur douleur de la jauge. On les fusionne donc au CALCUL seulement.
-    # Les anciennes séances ont parfois les deux formes : l'observation générale
-    # gagne sur la même date/type, notamment parce qu'elle peut porter un RPE global.
+    # Strength-page reports have their own relational owner. Copying them into
+    # observations would violate uniqueness, but ignoring them drops their duration and
+    # pain from the gauge. So they are merged at COMPUTATION time only.
+    # Older sessions sometimes have both forms: the general observation wins on the
+    # same date/type, notably because it may carry a global RPE.
     strength = session_kinds.STRENGTH
     occupied = {(row.date, row.routine) for row in rows if row.type == strength}
     for session in store.strength_history():
@@ -243,10 +240,10 @@ def parse_ledger(store: LedgerStore) -> list[Row]:
 
 def week_completeness(store: LedgerStore, label: str,
                       today: dt.date | None = None) -> list[str]:
-    """Les cellules exigées et manquantes, pour la semaine affichée seulement.
+    """The required and missing cells, for the displayed week only.
 
-    Lu directement sur les états typés : « non mesuré », « perdu » et zéro sont
-    distincts sans sentinelle textuelle.
+    Read directly from the typed states: "not measured", "lost" and zero are distinct
+    without a textual sentinel.
     """
     observations = [row for row in store.observation_rows()
                     if _week_label(row["occurred_on"]) == label]
@@ -255,14 +252,14 @@ def week_completeness(store: LedgerStore, label: str,
 
 
 def load_instruments(store: LedgerStore) -> dict[str, Instruments]:
-    """Les deux entrées de la jauge que le registre ne peut pas connaître.
+    """The two gauge inputs the ledger cannot know.
 
-    Deux tables et une préséance assumée : `daily_checkins` d'abord,
-    `weekly_instruments` en repli. Le quotidien gagne parce qu'il est déclaré le jour
-    même — le bilan hebdomadaire est renseigné le dimanche, de mémoire, sur sept nuits.
+    Two tables and a deliberate precedence: `daily_checkins` first, `weekly_instruments`
+    as fallback. The daily wins because it is declared the same day; the weekly one is
+    filled in on Sunday, from memory, over seven nights.
 
-    Les semaines historiques sans quotidien gardent donc leur valeur hebdomadaire ;
-    les recalculer fabriquerait de la donnée.
+    Historical weeks without daily data keep their weekly value; recomputing them would
+    fabricate data.
     """
     out = {row["iso_week"]: Instruments(
         sleep=row["sleep"] or None, life_load=row["life_load"] or None)
@@ -289,14 +286,12 @@ def row_weight(row: Row, targets: dict) -> tuple[float, bool]:
     whether it was a MISSED quality session (RPE above target, which costs +0.5).
 
     Exposed rather than inlined because `model/hot_cache.py` needs the same number to
-    work out the walking share, and used to carry its own copy of this formula. That
-    copy had already lost the missed-session term: the same line of the Forme block
-    printed an `h_eq` from here and a walk share from a different arithmetic, which
-    over-states walking and can raise a "red made of hiking" the gauge denies.
+    work out the walking share; a second copy of the formula would drift (a walk share
+    from different arithmetic over-states walking and can raise a "red made of hiking"
+    the gauge denies).
 
-    `targets` est EXIGÉ, sans valeur par défaut (2026-08-08) : un défaut vide rendrait
-    silencieusement une jauge amputée de sa pénalité, exactement la dérive que la
-    suppression de la table en dur devait supprimer. Le calcul dit avec quoi il compare.
+    `targets` is REQUIRED, with no default: an empty default would silently yield a gauge
+    stripped of its penalty. The computation states what it compares against.
     """
     if row.type in table.REST_TYPES or not row.hours:
         return 0.0, False
@@ -314,7 +309,7 @@ def row_weight(row: Row, targets: dict) -> tuple[float, bool]:
 
 @dataclass
 class TargetFlag:
-    """Une séance courue au-dessus de sa cible de RPE, quel que soit son type."""
+    """A session run above its RPE target, whatever its type."""
 
     date: dt.date
     kind: str
@@ -327,12 +322,10 @@ class TargetFlag:
 
 
 def over_target(rows: list[Row], targets: dict) -> list[TargetFlag]:
-    """Toutes les séances au-dessus de leur cible — pas seulement les qualités.
+    """All sessions above their target, not only the quality ones.
 
-    La pénalité de jauge, elle, reste réservée aux QUALITY_TYPES : elle a été calibrée
-    ainsi et l'élargir re-échelonnerait un instrument. Ceci est un SIGNAL, pas un terme
-    de la formule. Motif : le renfo B du 2026-08-06 a été déclaré à RPE 7 pour une cible
-    de 6 et n'a rien déclenché, parce que `rpe_cible` n'était lu par personne.
+    The gauge penalty stays reserved to QUALITY_TYPES: it was calibrated that way and
+    widening it would rescale an instrument. This is a SIGNAL, not a term of the formula.
     """
     flags = []
     for row in sorted(rows, key=lambda r: r.date):
@@ -393,12 +386,11 @@ def _week_label(day: dt.date) -> str:
 
 
 def normalize_week(text: str, known: list[str]) -> str:
-    """« 31 », « W31 », « 2026-w31 » -> « 2026-W31 », en refusant l'inconnu.
+    """« 31 », « W31 », « 2026-w31 » -> « 2026-W31 », rejecting unknown weeks.
 
-    Sans ça, `--semaine 31` ne levait rien : le label ne matchait aucune ligne, la
-    semaine sortait vide, et la jauge s'affichait « 0.00 h-éq (0/100) » — un zéro
-    parfaitement crédible pour une semaine bien remplie. Un lecteur qui rencontre une
-    donnée non conforme REFUSE, il n'interprète pas (CLAUDE.md, anti-POC).
+    Without this, `--semaine 31` would raise nothing: the label would match no row, the
+    week would come out empty and the gauge would print « 0.00 h-éq (0/100) », a perfectly
+    credible zero. A reader that meets non-conforming data REFUSES, it does not interpret.
     """
     raw = text.strip().upper().replace(" ", "")
     match = re.fullmatch(r"(?:(\d{4})-?)?W?(\d{1,2})", raw)
@@ -408,9 +400,9 @@ def normalize_week(text: str, known: list[str]) -> str:
     if year:
         label = f"{year}-W{week:02d}"
     else:
-        # Sans année : celle des semaines du registre qui portent ce numéro. Une seule
-        # en pratique ; s'il y en a plusieurs, la plus récente, et le label imprimé en
-        # tête de sortie dit laquelle a été retenue.
+        # No year: take the ledger weeks that carry this number. Normally only one; if
+        # several, the most recent, and the label printed at the head of the output says
+        # which one was kept.
         candidates = [lab for lab in known if lab.endswith(f"W{week:02d}")]
         if not candidates:
             raise ValueError(f"semaine W{week:02d} absente du registre")
@@ -427,8 +419,8 @@ def acute_chronic_ratio(per_week: dict[str, float], label: str) -> float | None:
     Not the four weeks that happen to have rows. A week with no session at all is a
     real 0: skipping it inflates the chronic load and deflates the ratio, which hides
     the alarm. Weeks before the ledger starts are not counted, because no data is not
-    a zero. (The March 2026 relapse is NOT caught by this ratio: 0.94, its "x2.9" was
-    week over week -- coaching/protocols.md § Calibration, rectified 2026-10-22.)
+    a zero. (This ratio is not a relapse detector: see coaching/protocols.md
+    § Calibration.)
     """
     if label not in per_week:
         return None
@@ -478,9 +470,9 @@ class PainSeries:
 @dataclass
 class PainWeek:
     week: str
-    effort: PainSeries      # le pic ressenti PENDANT la séance
-    rest: PainSeries        # les lectures au repos (types `lecture` et `reveil`)
-    wake: PainSeries        # sous-série des lectures du matin -- le juge d'Esculier
+    effort: PainSeries      # the peak felt DURING the session
+    rest: PainSeries        # resting readings (types `lecture` and `reveil`)
+    wake: PainSeries        # sub-series of morning readings -- the Esculier judge
 
     def __str__(self) -> str:
         return (f"{self.week} : effort {self.effort} · repos {self.rest}"
@@ -489,8 +481,7 @@ class PainWeek:
 
 def _series(values: list[float]) -> PainSeries:
     """The peak leads, and that is not a detail: a median over a week of mostly
-    zero-pain hikes is 0 by construction, and it reported W30 at 0.0 while the two
-    most recent readings were 1.5 and 1-1.5."""
+    zero-pain hikes is 0 by construction and hides the most recent readings."""
     if not values:
         return PainSeries(peak=None, median=None, n=0)
     return PainSeries(peak=max(values), median=round(_median(values), 2), n=len(values))
@@ -500,11 +491,10 @@ def pain_trend(rows: list[Row], weeks_back: int, zone: str) -> list[PainWeek]:
     """Weekly pain of ONE zone over the last `weeks_back` weeks, in TWO series.
 
     Pain during effort and pain at rest answer different questions, and the rule that
-    arbitrates -- Esculier, `coaching/protocols.md` -- needs both: « ≤2-3/10 qui
-    redescend en <1 h ET pas pire le lendemain ». Pooled into one column and reduced to
-    a weekly maximum, the second half of that rule vanished: on 2026-07-29 a 1.5 felt in
-    the climbs and a 0.5 read cold that evening came out as a single « pic 1.5 », the
-    same number an untouched shin at rest would have produced.
+    arbitrates -- Esculier, `coaching/protocols.md` -- needs both: at most 2-3/10,
+    settling within an hour AND no worse the next day. Pooled into one column and reduced to
+    a weekly maximum, the second half of that rule vanishes: a 1.5 felt in the climbs and
+    a 0.5 read cold that evening would come out as a single « pic 1.5 ».
     """
     per_week: dict[str, list[Row]] = {}
     for row in rows:
@@ -515,10 +505,10 @@ def pain_trend(rows: list[Row], weeks_back: int, zone: str) -> list[PainWeek]:
         week = per_week[label]
         out.append(PainWeek(
             week=label,
-            # La série d'effort se définit POSITIVEMENT. Écrite « not in REST_TYPES »,
-            # elle absorbait en silence tout type nouveau : une `palpation` (douleur
-            # provoquée à la pression) aurait compté comme un pic d'effort, c'est-à-dire
-            # dans la série qui juge la blessure (2026-08-08).
+            # The effort series is defined POSITIVELY. Written as "not in REST_TYPES", it
+            # would silently absorb any new type: a `palpation` (pain provoked by
+            # pressure) would count as an effort peak, i.e. in the series that judges
+            # the injury.
             effort=_series([value for r in week if (value := r.pain_at(zone)) is not None
                             and r.type in table.EFFORT_TYPES]),
             rest=_series([value for r in week if (value := r.pain_at(zone)) is not None
@@ -538,17 +528,16 @@ class EsculierFlag:
         return f"{self.date} {self.kind} — {self.detail}"
 
 
-REST_BASELINE_DAYS = 56  # huit semaines : assez pour couvrir un cycle de charge complet
+REST_BASELINE_DAYS = 56  # eight weeks: enough to cover a full load cycle
 
 
 def rest_peak(rows: list[Row], before: dt.date, zone: str) -> float | None:
     """The peak of the rest series preceding `before`, or None without history.
 
-    This is the reference the morning reading is judged against. It is
-    NOT the peak of the previous day's session: the athlete's /10 scale is written for effort
-    (`coaching/protocols.md` § L'échelle d'effort), and the morning reading is a different
-    thing, hard to compare to it. Subtracting the two put two currencies on one ruler, one of which never
-    existed.
+    This is the reference the morning reading is judged against. It is NOT the peak of
+    the previous day's session: the athlete's /10 scale is written for effort
+    (`coaching/protocols.md`), and the morning reading is a different thing, hard to
+    compare to it. Subtracting the two would put two currencies on one ruler.
     """
     window = _rest_window(rows, before, zone)
     return max(window) if window else None
@@ -563,9 +552,9 @@ def _rest_window(rows: list[Row], before: dt.date, zone: str) -> list[float]:
 def rest_baseline(rows: list[Row], before: dt.date, zone: str) -> str:
     """How a rest reading compares to the ones that came before it.
 
-    Exists because a rest reading read as news (a change of category) can in fact equal
-    earlier readings of the same series: the flag was true and its reading wrong, because
-    the flag arrived without its own history.
+    Exists because a rest reading taken as news (a change of category) can in fact equal
+    earlier readings of the same series: a flag arriving without its own history is
+    misread.
 
     So « pire le lendemain » never goes out alone again: it goes out with the median and
     the peak of the rest series that precede it. A number inside its own range cannot be
@@ -582,19 +571,17 @@ def esculier_check(rows: list[Row], zone: str,
                    history: list[Row] | None = None) -> list[EsculierFlag]:
     """Where the Esculier rule is broken, or cannot be applied for want of a reading.
 
-    « Pas pire le lendemain » looks at what a session leaves the NEXT MORNING at rest,
-    which is why `reveil` is a type of its own. A session followed by no morning reading
-    is reported too: an untested rule is not a passed rule, and the shin's failure mode
+    The "no worse the next day" clause looks at what a session leaves the NEXT MORNING at
+    rest, which is why `reveil` is a type of its own. A session followed by no morning reading
+    is reported too: an untested rule is not a passed rule, and the injury's failure mode
     here is silence, not noise.
 
-    ⭐ 2026-08-17 -- what « worse » means changed, and this is a deliberate departure from
-    the published rule, not a bug fix. The morning is compared to the peak of ITS OWN rest
-    series (`rest_peak`), never to the previous day's effort peak: the literal subtraction
-    assumes a single ruler, and the athlete has one scale, written for effort. Side effect that
-    was the point: the qualification added on 2026-08-11 after the false stress-fracture
-    signal moves from the MESSAGE into the TRIGGER -- a reading inside its own range no
-    longer fires at all, instead of firing and then apologising. Hence the name:
-    `TRACE AU RÉVEIL`, not `PIRE LE LENDEMAIN`.
+    What « worse » means is a deliberate departure from the published rule. The morning
+    is compared to the peak of ITS OWN rest series (`rest_peak`), never to the previous
+    day's effort peak: the literal subtraction assumes a single ruler, and the athlete has
+    one scale, written for effort. The qualification therefore lives in the TRIGGER, not
+    the MESSAGE: a reading inside its own range does not fire at all. Hence the flag is
+    named after the morning trace, not after "worse".
 
     That missing-reading flag only looks at rows written since `reveil` exists as a type.
     The two others read a number that was always there, so they apply to the whole ledger.
@@ -608,9 +595,9 @@ def esculier_check(rows: list[Row], zone: str,
             if row.type == session_kinds.WAKE_TRACE and (value := row.pain_at(zone)) is not None}
     flags = []
     for row in sorted(rows, key=lambda r: r.date):
-        # Positif, pas « not in REST_TYPES » : la règle Esculier parle de ce qu'une
-        # SÉANCE laisse le lendemain. Une mesure ou une palpation n'est pas une séance,
-        # et la négation les y faisait entrer dès qu'un type nouveau apparaissait.
+        # Positive test, not "not in REST_TYPES": the Esculier rule is about what a SESSION
+        # leaves the next day. A measurement or a palpation is not a session, and negation
+        # would let them in as soon as a new type appears.
         pain = row.pain_at(zone)
         if row.type not in table.EFFORT_TYPES or pain is None:
             continue
@@ -626,9 +613,9 @@ def esculier_check(rows: list[Row], zone: str,
                                           f"« reveil » le lendemain"))
         else:
             morning = row.date + dt.timedelta(days=1)
-            # Le référentiel est sa propre série de repos, jamais le pic d'effort de la
-            # veille (2026-08-17). Sans historique, un réveil non nul se nomme une fois :
-            # `rest_baseline` dit lui-même qu'il sort sans référentiel.
+            # The reference is its own rest series, never the previous day's effort peak.
+            # Without history, a non-zero wake reading is still flagged once:
+            # `rest_baseline` itself says it comes out without a reference.
             reference = rest_peak(past, morning, zone)
             if after > (reference if reference is not None else 0.0):
                 flags.append(EsculierFlag(row.date, "TRACE AU RÉVEIL",
@@ -679,16 +666,15 @@ def _pain_gate_cases(rows: list[Row], label: str, previous: str,
 
 def gate(rows: list[Row], label: str, instr: Instruments,
          zones: list[PainZone]) -> list[str]:
-    """La porte (règle `po` du règlement), calculée case par case depuis le registre.
+    """The gate (rule `po` of the rulebook), computed box by box from the ledger.
 
-    Elle était jugée de tête au bilan : en W40, « réveils à la base » s'est lu dans la
-    prose alors que la série chiffrée de la semaine était vide (audit du 2026-10-09). Le
-    calcul ne remplace pas la lecture du comportement exigée par la règle : il dit ce que
-    le registre établit, et nomme ce qu'il ne peut pas établir (« ? »). Les cases de
-    douleur se jugent zone par zone : la porte ne s'ouvre que si chacune la passe.
-    Sans zone surveillée, elles n'existent pas.
+    Judging it by eye in the review lets prose claim readings the numeric series does not
+    hold. The computation does not replace the behavioural reading the rule requires: it
+    states what the ledger establishes, and names what it cannot establish (« ? »). The
+    pain boxes are judged zone by zone: the gate opens only if each one passes. Without a
+    monitored zone, they do not exist.
     """
-    from redline.analysis import signals  # signals importe ce module : import différé
+    from redline.analysis import signals  # signals imports this module: deferred import
 
     previous = _week_label(_week_start(label) - dt.timedelta(days=7))
     cases: list[tuple[str, str]] = []
@@ -713,22 +699,20 @@ def gate(rows: list[Row], label: str, instr: Instruments,
                                                            for mark, text in cases]
 
 
-# Les types du registre qui comptent comme « couru », par opposition à la marche et au
-# renfo. La distinction porte la lecture : une jauge rouge faite de rando ne dit pas la
-# même chose qu'une jauge rouge faite de course (objection de l'athlète du 2026-07-21).
+# The ledger types that count as "run", as opposed to walking and strength. The
+# distinction matters for the reading: a red gauge made of hiking does not mean the same
+# as a red gauge made of running.
 RUN_TYPES = session_kinds.RUN
 WALK_TYPES = session_kinds.WALK
 
 
 @dataclass
 class Volume:
-    """Le kilométrage d'une semaine, sommé depuis le registre et depuis lui seul.
+    """A week's mileage, summed from the ledger and from it alone.
 
-    Existe parce que le 2026-08-02 le coach a annoncé « 22 km » pour une semaine qui en
-    portait 24,51 : le 22 était le `Vol. cible` de `coaching/current-plan.md`, cité comme
-    un fait. Le plan porte l'INTENTION, le registre porte le FAIT, et rien ne les
-    distinguait une fois le chiffre sorti de son tableau. Ce calcul est le seul autorisé
-    à produire un volume hebdo : `--semaine` l'imprime et `model/hot_cache.py` le rend.
+    The plan carries the INTENTION, the ledger carries the FACT, and nothing tells them
+    apart once a figure leaves its table. This computation is the only one allowed to
+    produce a weekly volume: `--semaine` prints it and `model/hot_cache.py` renders it.
     """
 
     km_run: float
@@ -742,18 +726,17 @@ class Volume:
         out = f"{self.km_run:.2f} km courus ({self.runs} sortie{'s' if self.runs > 1 else ''})"
         if self.km_walk:
             out += f" + {self.km_walk:.2f} km marchés ({self.walks})"
-        # Le D− n'est pas repris ici : il a sa ligne à lui juste en dessous, qui porte
-        # le fait qu'il ne compte pas dans la jauge. Un fait, un endroit.
+        # D- is not repeated here: it has its own line just below, which states that it
+        # does not count in the gauge. One fact, one place.
         return out + f" · D+ {self.dplus} m"
 
 
 def week_volume(rows: list[Row]) -> Volume:
-    """Somme des distances de la semaine, jamais arrondie avant la somme.
+    """Sum of the week's distances, never rounded before the sum.
 
-    Les cellules du registre portent déjà les mètres de Strava au centième de km : sur
-    W31, 8995,5 + 8316,3 + 7189,9 m = 24 501,7 m contre 24,51 km au registre, soit 8 m
-    d'écart sur la semaine. L'arrondi n'accumule pas, il ne joue qu'une fois, à
-    l'affichage — d'où la somme complète ici et le formatage tout à la fin.
+    Ledger cells already carry Strava's metres to the hundredth of a km. Rounding does
+    not accumulate, it applies once, at display time: hence the full sum here and the
+    formatting at the very end.
     """
     runs = [row for row in rows if row.type in RUN_TYPES and row.km]
     walks = [row for row in rows if row.type in WALK_TYPES and row.km]
@@ -764,21 +747,21 @@ def week_volume(rows: list[Row]) -> Volume:
 
 
 def week_descent(rows: list[Row]) -> int:
-    """Total D- of the week. NOT in the gauge, which counts D+ only -- so the 1096 m
-    descent of 2026-07-21 weighed nothing, while descent is limiter #2 of the race and
-    canary #1 of the shin. Surfacing it is what gives confrontation #2 its argument."""
+    """Total D- of the week, reported next to the gauge: descent is a load of its own
+    (impact, braking) and an early canary for the injury, so it is surfaced even when
+    the gauge does not weigh it."""
     return sum(row.dminus for row in rows)
 
 
-# ------------------------------------------------------------------- la trajectoire
+# ------------------------------------------------------------------ the trajectory
 
-TRAJECTORY_WEEKS = 6      # assez pour contenir une assimilation sans la lire comme un creux
-TRAJECTORY_HALF = 3       # on compare 3 semaines closes aux 3 d'avant
+TRAJECTORY_WEEKS = 6      # enough to hold an assimilation week without reading it as a dip
+TRAJECTORY_HALF = 3       # compare 3 closed weeks to the 3 before
 
 
 @dataclass
 class WeekTrace:
-    """Une semaine de la trajectoire. `elapsed` n'est renseigné que si elle court."""
+    """One week of the trajectory. `elapsed` is set only while the week is running."""
 
     label: str
     km: float
@@ -801,11 +784,11 @@ def _runs(rows: list[Row]) -> list[Row]:
 
 
 def longest_recent(rows: list[Row], before: dt.date) -> float | None:
-    """La plus longue sortie COURUE des 30 jours qui précèdent `before`.
+    """The longest RUN of the 30 days before `before`.
 
-    Un repère, pas un plafond : aucun pourcentage fixe ne borne la sortie suivante
-    (le règlement, `rulebook.py`). Il sert à dire de combien une
-    séance s'écarte du mois écoulé, pour que l'écart soit jugé et non découvert.
+    A reference, not a cap: no fixed percentage bounds the next run (see `rulebook.py`).
+    It tells by how much a session departs from the past month, so the gap is judged
+    rather than discovered.
     """
     days = rulebook.current().parameters.transition_lookback_days
     window = [row for row in _runs(rows) if 0 <= (before - row.date).days < days]
@@ -816,22 +799,17 @@ def longest_recent(rows: list[Row], before: dt.date) -> float | None:
 
 def trajectory(rows: list[Row], today: dt.date,
                weeks: int = TRAJECTORY_WEEKS) -> list[WeekTrace]:
-    """Les N dernières semaines, volume couru et plus longue sortie.
+    """The last N weeks, run volume and longest run.
 
-    L'instrument qui manquait : la jauge lit UNE semaine, le canari UNE séance, le
-    garde-fou n°8 UN écart aux 30 jours. Personne ne lisait la pente. Le 2026-08-20,
-    il a fallu exporter le CSV à la main pour voir que la plus longue sortie n'avait
-    pas bougé de deux mois — neuf semaines pendant lesquelles dix instruments ont
-    tous dit « rien à signaler », chacun sur sa fenêtre.
+    The gauge reads ONE week, the canary ONE session, the guardrail ONE gap to the last
+    30 days. Nobody read the slope; this does.
 
-    ⚠ La semaine en cours est INCOMPLÈTE par construction et se lit comme telle : un
-    jeudi porte quatre jours, pas sept, et la comparer aux semaines closes fabrique un
-    effondrement qui n'existe pas (objection de l'athlète, 2026-08-20).
+    The current week is INCOMPLETE by construction and is read as such: on a Thursday it
+    holds four days, not seven, and comparing it to closed weeks fabricates a collapse.
     """
     current = _week_label(today)
-    # N semaines CLOSES, plus la semaine en cours si elle existe. Compter la semaine
-    # ouverte dans les N laissait N-1 closes, donc un verdict qui ne se calculait
-    # jamais — le défaut se voyait au premier essai contre la base.
+    # N CLOSED weeks, plus the current week if it exists. Counting the open week among
+    # the N would leave N-1 closed ones, so a verdict could never be computed.
     seen = sorted({row.week for row in rows})
     labels = [label for label in seen if label != current][-weeks:]
     if seen and seen[-1] == current:
@@ -848,11 +826,11 @@ def trajectory(rows: list[Row], today: dt.date,
 
 
 def trajectory_verdict(traces: list[WeekTrace]) -> list[str]:
-    """Deux comparaisons, sur les semaines CLOSES seulement.
+    """Two comparisons, on CLOSED weeks only.
 
-    Le volume se compare en MOYENNE (une semaine d'assimilation dans la fenêtre ne
-    doit pas passer pour une chute) ; la plus longue sortie se compare en MAXIMUM,
-    parce que c'est ce qu'elle est — on ne fait pas la moyenne d'un record.
+    Volume is compared as a MEAN (an assimilation week inside the window must not pass
+    for a drop); the longest run is compared as a MAXIMUM, because that is what it is:
+    a record is not averaged.
     """
     closed = [trace for trace in traces if not trace.open]
     if len(closed) < 2 * TRAJECTORY_HALF:
@@ -873,7 +851,7 @@ def trajectory_verdict(traces: list[WeekTrace]) -> list[str]:
 
 @dataclass
 class Stall:
-    """Depuis combien de semaines CLOSES la plus longue n'a plus battu son record."""
+    """For how many CLOSED weeks the longest run has not beaten its record."""
 
     weeks: int
     record_km: float
@@ -897,21 +875,19 @@ class Stall:
 
 
 def long_run_stall(rows: list[Row], today: dt.date) -> Stall | None:
-    """Le fil de détente du scénario 9, CALCULÉ.
+    """The tripwire of pre-mortem scenario 9, COMPUTED: a stalled longest run.
 
-    `goals.md` et le pré-mortem l'écrivaient depuis le 2026-08-20 : « plus longue sans
-    progression sur 3 semaines closes consécutives ». `trajectory_verdict` ne le mesure
-    pas : il compare le maximum de trois semaines au maximum des trois précédentes, donc
-    une plus longue plate depuis trois semaines après un record s'y lit comme une hausse.
-    Ici, un record est le maximum de TOUTES les semaines closes précédentes ; on compte
-    les dernières semaines closes qui ne le battent pas (à `STALL_TOLERANCE_KM` près :
-    11,53 contre 11,5 n'est pas un progrès). La semaine en cours n'est jamais jugée.
+    `trajectory_verdict` does not measure it: it compares the maximum of three weeks to
+    the maximum of the previous three, so a longest run flat for three weeks after a
+    record reads there as a rise. Here, a record is the maximum of ALL earlier closed
+    weeks; we count the latest closed weeks that do not beat it (within the stall
+    tolerance: 11.53 against 11.5 is not progress). The current week is never judged.
     """
     current = _week_label(today)
     closed = sorted({row.week for row in _runs(rows)} - {current})
     if not closed:
         return None
-    # Les semaines sans course comptent aussi : n'avoir rien couru n'est pas progresser.
+    # Weeks without a run count too: not having run is not progressing.
     labels = []
     week = _week_start(closed[0])
     last_closed = _week_start(current) - dt.timedelta(weeks=1)
@@ -932,17 +908,17 @@ def long_run_stall(rows: list[Row], today: dt.date) -> Stall | None:
 
 @dataclass
 class Projection:
-    """Ce qu'il faut à la sortie longue, de maintenant à l'affûtage, pour une cible."""
+    """What the long run needs, from now to the taper, for a target."""
 
     start_km: float
-    weeks: list[str]               # les semaines qui peuvent encore porter une hausse
+    weeks: list[str]               # the weeks that can still carry an increase
     race_on: dt.date
     taper_from: str
 
     def required_growth(self, target_km: float, lost: int = 0) -> float | None:
-        """La hausse hebdomadaire moyenne nécessaire, si `lost` semaines n'en portent pas.
+        """The mean weekly growth needed, if `lost` weeks carry none.
 
-        None quand il ne reste aucune semaine utile ; 1.0 quand la cible est déjà là.
+        None when no useful week remains; 1.0 when the target is already reached.
         """
         usable = len(self.weeks) - lost
         if target_km <= self.start_km:
@@ -954,14 +930,13 @@ class Projection:
 
 def race_projection(rows: list[Row], today: dt.date, race_on: dt.date,
                     taper_weeks: int | None = None) -> Projection | None:
-    """Planificateur à rebours : le rythme qu'exige une cible de sortie longue.
+    """Backward planner: the pace a long-run target demands.
 
-    Point de départ : la plus longue des 30 derniers jours. Les semaines utiles vont de
-    la semaine suivante jusqu'à l'affûtage (qui commence `taper_weeks` semaines avant
-    la semaine de course incluse, W46-W48 pour une course en W48). Aucune règle n'y est
-    appliquée : l'instrument ne dit pas ce qui est permis, il dit ce qu'il FAUDRAIT,
-    semaine d'assimilation ou nouveauté comprises, pour que l'écart à la cible soit
-    visible avant le jalon. La décision appartient à l'athlète et au coach.
+    Starting point: the longest run of the last 30 days. Useful weeks run from the next
+    week up to the taper (which starts `taper_weeks` weeks before the race week,
+    inclusive). No rule is applied: the instrument does not say what is allowed, it says
+    what WOULD BE NEEDED, assimilation weeks and novelties included, so the gap to the
+    target is visible before the milestone. The decision belongs to the athlete and coach.
     """
     longest = longest_recent(rows, today)
     if longest is None or race_on <= today:
@@ -970,8 +945,8 @@ def race_projection(rows: list[Row], today: dt.date, race_on: dt.date,
     if taper_weeks is None:
         taper_weeks = rulebook.current().parameters.taper_weeks
     taper_start = race_week - dt.timedelta(weeks=taper_weeks - 1)
-    # La semaine en cours a peut-être déjà eu sa sortie longue : on part de la
-    # suivante, lecture prudente d'un jour de bilan.
+    # The current week may already have had its long run: start from the next one, a
+    # cautious reading on a review day.
     week = _week_start(_week_label(today)) + dt.timedelta(weeks=1)
     weeks = []
     while week < taper_start:
@@ -982,7 +957,7 @@ def race_projection(rows: list[Row], today: dt.date, race_on: dt.date,
 
 
 def next_race_date(store: LedgerStore, today: dt.date) -> dt.date | None:
-    """La prochaine course TYPÉE (`fact-write.py deadline --kind race`), jamais la prose."""
+    """The next TYPED race (`fact-write.py deadline --kind race`), never prose."""
     dates = []
     for row in store.deadline_rows():
         if row.get("kind") != "race" or row.get("status") == "done":
@@ -996,10 +971,10 @@ def next_race_date(store: LedgerStore, today: dt.date) -> dt.date | None:
 
 
 def transition_notes(rows: list[Row], sessions: list[dict], today: dt.date) -> list[str]:
-    """L'écart de chaque course planifiée à la plus longue des 30 jours précédents.
+    """The gap of each planned run to the longest of the previous 30 days.
 
-    Informatif, jamais bloquant, et sans seuil : aucun pourcentage fixe ne juge la
-    progression (décision du 2026-09-27). L'écart est montré pour être décidé.
+    Informational, never blocking, and without a threshold: no fixed percentage judges
+    progression. The gap is shown so it can be decided.
     """
     notes = []
     for session in sessions:
@@ -1054,11 +1029,11 @@ def _median(values: list[float]) -> float:
 def week_report(store: LedgerStore, rows: list[Row], instruments: dict, targets: dict,
                 label: str, today: dt.date, *, target_km: float | None = None,
                 closing: bool = False) -> list[str]:
-    """Le rapport d'une semaine : volume, jauge, douleur, puis la pente.
+    """A week's report: volume, gauge, pain, then the slope.
 
-    UNE fonction pour la CLI (`ledger.py --semaine`) et pour le dossier que le service
-    calcule avant le bilan du dimanche (`scripts/weekly_dossier.py`) : deux rendus du
-    même calcul divergeraient, et c'est le bilan qui recopierait le mauvais.
+    ONE function for the CLI (`ledger.py --semaine`) and for the dossier the service
+    computes before the Sunday review (`weekly_dossier.py`): two renderings of the same
+    computation would diverge.
     """
     per_week = eq_hours_per_week(rows, instruments, targets)
     week_rows = [row for row in rows if row.week == label]
@@ -1066,8 +1041,8 @@ def week_report(store: LedgerStore, rows: list[Row], instruments: dict, targets:
     h_eq, level, trace = equivalent_hours(week_rows, instr, targets)
     ratio = acute_chronic_ratio(per_week, label)
     lines = [f"Semaine {label}", ""]
-    # Le volume avant la jauge : c'est le chiffre que l'athlète entend le plus souvent, et
-    # le seul qu'il puisse recompter lui-même. Il sort d'ici ou il ne sort pas.
+    # Volume before the gauge: it is the figure the athlete hears most often, and the only
+    # one they can recount themselves. It comes from here or not at all.
     lines.append(f"Volume : {week_volume(week_rows)}")
     lines.append("(le registre, pas le plan — `Vol. cible` de current-plan.md est une "
                  "intention, pas un fait)")
@@ -1097,11 +1072,11 @@ def week_report(store: LedgerStore, rows: list[Row], instruments: dict, targets:
     lines.extend(f"⚠ ligne incomplète — {problem}"
                  for problem in week_completeness(store, label, today))
 
-    # La pente, après la semaine : on ne juge pas une prépa sur sept jours.
+    # The slope comes after the week: a preparation is not judged on seven days.
     reference = min(today, _week_start(label) + dt.timedelta(days=6))
-    # `closing` : le bilan du dimanche soir CLÔT la semaine. Sans ça, elle resterait
-    # « en cours » pour la pente et sa sortie longue ne compterait pour le record qu'à
-    # partir du lundi, c'est-à-dire après le bilan qui en a besoin.
+    # `closing`: the Sunday-evening review CLOSES the week. Otherwise it would stay "in
+    # progress" for the slope and its long run would only count for the record from
+    # Monday, i.e. after the review that needs it.
     slope_day = (_week_start(label) + dt.timedelta(days=7)) if closing else today
     traces = trajectory(rows, slope_day)
     if traces:
@@ -1165,7 +1140,7 @@ def main() -> int:
     except table.LedgerError as exc:
         raise InputError(f"Registre illisible — {exc}") from exc
     instruments = load_instruments(store)
-    # Les cibles viennent des fiches de séance, jamais d'une table en dur.
+    # Targets come from the session sheets, never from a hard-coded table.
     targets = programme.rpe_targets(args.root)
 
     if args.csv:

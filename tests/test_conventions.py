@@ -22,15 +22,6 @@ SLASH_COMMENTED = {".js", ".css", ".html"}
 SKIPPED = ("tests/fixtures/",)
 
 PENDING = (
-    ".github",
-    "deploy",
-    "migrations",
-    "pyproject.toml",
-    "src/redline/analysis",
-    "src/redline/cards",
-    "src/redline/cli",
-    "src/redline/evaluation",
-    "src/redline/integrations",
     "tests",
 )
 

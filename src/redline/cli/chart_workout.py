@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """Workout card -- every rep of a quality session as a ribbon in relief.
 
-Form (l'athlète, 2026-10-01, after a dot plot and a speed bar chart he found
-unreadable): the session in the order it was run, each block as wide as it
+Form: the session in the order it was run, each block as wide as it
 lasted. A rep rises with how much faster than R1 it went -- the shape of the
 session, flat or progressive -- and carries its pace on top and its gap to R1
-inside, signed like a split (−3 s = faster). No verdict: since 2026-10-26 a
-quality is judged on its RPE band and its reserve, which the card does not see,
-and paces only compare within one session. Recoveries are pale slivers with their duration, drawn only when the payload
-carries them (`recovery` on the rep it follows). Under the ribbon, the heart
+inside, signed like a split (−3 s = faster). No verdict: a quality session is
+judged on its RPE band and its reserve, which the card does not see, and paces
+only compare within one session. Recoveries are pale slivers with their duration,
+drawn only when the payload carries them (`recovery` on the rep it follows). Under the ribbon, the heart
 rate of each rep, when all of them carry one: what each acceleration cost.
 The target pace is said in the subtitle.
 

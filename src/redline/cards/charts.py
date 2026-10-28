@@ -7,7 +7,7 @@ the card's own pixel grid (no viewBox scaling), so a stroke of 1 is a hairline.
 Colours come from theme.css through the `plot__*` classes -- never hardcode a hex
 here, or the palette stops being a single source of truth.
 
-One vocabulary for every plot (2026-10-01): a solid bar is what was done, a pale
+One vocabulary for every plot: a solid bar is what was done, a pale
 bar behind or between it is its frame (the plan, the recoveries), and there is no
 line but the gridlines. No reference lines, no dashes, no ticks: a threshold is
 said by the colour of the bar that crossed it, anything else in words.
@@ -145,12 +145,11 @@ def ribbon(segments: list, *, width: int = CONTENT_W) -> str:
     slower) stands at the base height, the session's fastest rises highest, on a
     scale never shorter than RISE_SCALE s/km so that noise stays flat -- so the
     shape of the session (flat, progressive, a final break) reads before a figure.
-    Every rep is logo red: a faster rep is not a fault in itself (guardrail #6,
-    2026-10-26, judges the reserve, not the gap to R1). The pace sits on top, the
+    Every rep is logo red: a faster rep is not a fault in itself (the guardrail judges
+    the reserve, not the gap to R1). The pace sits on top, the
     gap to R1 inside, the label below; a recovery is a pale sliver on the floor
     with its duration. Under the ribbon, when the reps carry one, the heart rate
     as a line across the rep centres: what each acceleration cost.
-    (l'athlète, 2026-10-01: ribbon B + heart-rate band D.)
     """
     if not segments:
         return ""
