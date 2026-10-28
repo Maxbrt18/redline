@@ -102,7 +102,7 @@ def test_rwf002_a_safety_answer_leaves_even_when_the_week_is_unreadable(make_bot
     bot._repo.weekly_plan_context.return_value = ""
     bot._repo.persist_turn.return_value = PersistenceResult(True, invalid=("2026-W39",))
 
-    assert bot._respond(PSID, "j'ai une douleur nette au genou en courant",
+    assert bot._respond(PSID, "j'ai une douleur nette au talon en courant",
                         message_ids=("m3",))
 
     sent = _sent(bot._client)
@@ -483,7 +483,7 @@ def test_rwf016_a_turn_is_traceable_by_structured_events_without_text(make_bot, 
     assert shape["prose_chars"] == len("Réponse privée sur la blessure")
     turn_ids = {event["turn_id"] for event in events if "turn_id" in event}
     assert len(turn_ids) == 1
-    assert all("injury" not in json.dumps(event) and "privée" not in json.dumps(event)
+    assert all("genou" not in json.dumps(event) and "privée" not in json.dumps(event)
                for event in events)
 
 

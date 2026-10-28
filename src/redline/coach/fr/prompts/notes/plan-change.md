@@ -15,7 +15,7 @@ trace est ton travail, pas le sien, et il ne devrait jamais avoir à l'expliquer
 fois. UNE SÉANCE QU'IL ANNONCE SAUTER (aujourd'hui ou plus tard) est un changement
 confirmé : révise-la en `cancelled`, motif `demande` et son message comme fait. Noter
 seulement la charge de vie laisse la séance ouverte, et la relance du soir la lui
-redemande (2026-10-13). POUR UN CHANGEMENT CONFIRMÉ, reprends son message fait par fait,
+redemande. POUR UN CHANGEMENT CONFIRMÉ, reprends son message fait par fait,
 et vérifie que chacun se retrouve dans la révision. Pour chaque séance future modifiée,
 `changes` nomme exactement les champs touchés, recopie comme `trigger` une preuve typée
 de `evidence` (jamais une mesure brute ni une correction seule), précise le `context` ou

@@ -167,7 +167,7 @@ def store():
         connection.execute(sa.text("INSERT INTO redline.athletes(id) VALUES ('sam')"))
         # The watched zone of the fictitious instance, as the service synchronises it.
         connection.execute(sa.text(
-            "INSERT INTO redline.pain_zones(athlete_id, slug, label) VALUES ('sam', 'injury', 'Injury')"))
+            "INSERT INTO redline.pain_zones(athlete_id, slug, label) VALUES ('sam', 'genou', 'Genou')"))
     yield OperationalStore(database)
     database.dispose()
 

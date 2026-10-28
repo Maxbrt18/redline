@@ -9,7 +9,9 @@ from redline.model import instance
 def test_the_fixture_instance_loads():
     loaded = instance.load(TEST_VAULT)
     assert loaded.athlete_name == "Sam"
-    assert loaded.capability_label("cap5-injury") == "Injury"
+    assert loaded.capability_label("cap5-genou") == "Genou"
+    assert loaded.capability_icon("cap5-genou") == "pain"
+    assert loaded.capability_icon("unknown") == "run"
 
 
 def test_an_undeclared_capability_still_gets_a_readable_label():
@@ -59,26 +61,26 @@ def test_unknown_or_broken_input_is_refused(text, expected):
 
 def test_an_athlete_without_injury_declares_none():
     text = (TEST_VAULT / instance.FILENAME).read_text(encoding="utf-8")
-    text = text.replace('[[injuries]]\nslug = "injury"\nlabel = "Injury"\n', "")
+    text = text.replace('[[injuries]]\nslug = "genou"\nlabel = "Genou"\n', "")
     assert instance.parse(text).injuries == ()
 
 
 def test_several_zones_are_kept_in_their_declared_order():
     text = (TEST_VAULT / instance.FILENAME).read_text(encoding="utf-8")
-    text += '\n[[injuries]]\nslug = "genou"\nlabel = "Genou"\n'
-    assert [zone.slug for zone in instance.parse(text).injuries] == ["injury", "genou"]
+    text += '\n[[injuries]]\nslug = "cheville"\nlabel = "Cheville"\n'
+    assert [zone.slug for zone in instance.parse(text).injuries] == ["genou", "cheville"]
 
 
 def test_a_zone_declared_twice_is_refused():
     text = (TEST_VAULT / instance.FILENAME).read_text(encoding="utf-8")
-    text += '\n[[injuries]]\nslug = "injury"\nlabel = "Encore"\n'
+    text += '\n[[injuries]]\nslug = "genou"\nlabel = "Encore"\n'
     with pytest.raises(instance.InstanceError, match="double"):
         instance.parse(text)
 
 
 def test_a_duplicated_capability_is_refused():
     text = (TEST_VAULT / instance.FILENAME).read_text(encoding="utf-8")
-    text += '\n[[capabilities]]\nslug = "cap1-durabilite"\nlabel = "Encore"\n'
+    text += '\n[[capabilities]]\nslug = "cap1-endurance"\nlabel = "Encore"\n'
     with pytest.raises(instance.InstanceError, match="double"):
         instance.parse(text)
 

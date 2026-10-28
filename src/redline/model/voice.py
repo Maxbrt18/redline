@@ -16,9 +16,10 @@ from __future__ import annotations
 import re
 
 EMOJI = re.compile("[\U0001F000-\U0001FAFF☀-➿️‍]")
+# The greeting, and the name after it when punctuation closes it ("Salut Alex, ...").
 OPENING = re.compile(
-    r"^(?:salut|hello|hey|coucou|bonjour|bonsoir|yo)(?:\s+sam)?\s*[,!.]?\s+",
-    re.IGNORECASE)
+    r"^(?i:salut|hello|hey|coucou|bonjour|bonsoir|yo)"
+    r"(?:\s+[A-ZÀ-Þ][\w'’-]*(?=\s*[,!.]))?\s*[,!.]?\s+")
 _SPACES = re.compile(r"[ \t]{2,}")
 
 

@@ -735,7 +735,7 @@ def test_a_page_without_cues_still_runs(browser):
 # ------------------------------------------------------- the opening and the injury
 
 # The watched zone that the page asks for before and after, as the server serves it.
-ZONES = [{"zone": "injury", "label": "Injury"}]
+ZONES = [{"zone": "genou", "label": "Genou"}]
 GATE = {"pain_max": 2, "drop": ["plyometrics"],
         "say": "Douleur au-dessus de 2 : on saute la pliométrie et on garde le reste léger."}
 
@@ -825,7 +825,7 @@ def test_both_readings_reach_the_report(open_session):
     with tab.expect_request("**/strength-report") as caught:
         send(tab)
     body = json.loads(caught.value.post_data)
-    assert body["report"]["pains"] == {"injury": {"before": 1, "after": 3}}
+    assert body["report"]["pains"] == {"genou": {"before": 1, "after": 3}}
 
 
 def test_the_gate_sentence_does_not_eat_the_session_note(open_session):
@@ -967,7 +967,7 @@ def test_gated_exercise_is_consultable_but_has_no_execution_or_rating(open_sessi
     assert 'Bloc 2' not in control(tab)['buttons']
     click(tab, 'Revenir à la séance')
     forward(tab)
-    assert tab.locator('#review .p-score__name').all_text_contents() == ['Mollet', 'Injury, maintenant', 'Durée (min)', 'À dire au coach (facultatif)']
+    assert tab.locator('#review .p-score__name').all_text_contents() == ['Mollet', 'Genou, maintenant', 'Durée (min)', 'À dire au coach (facultatif)']
 
 
 def test_gate_can_remove_first_or_every_exercise(open_session):

@@ -34,7 +34,7 @@ def clean_database():
         connection.execute(sa.text("INSERT INTO redline.athletes(id) VALUES ('sam')"))
         # The monitored zone of the fictitious instance, as the service syncs it.
         connection.execute(sa.text(
-            "INSERT INTO redline.pain_zones(athlete_id, slug, label) VALUES ('sam', 'injury', 'Injury')"))
+            "INSERT INTO redline.pain_zones(athlete_id, slug, label) VALUES ('sam', 'genou', 'Genou')"))
     yield
     database.dispose()
 

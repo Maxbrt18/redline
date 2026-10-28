@@ -53,7 +53,7 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
         field("wake_trace_until", str, pattern=r"([01]\d|2[0-3]):[0-5]\d",
               note="heure locale HH:MM"),
         field("assimilation_weeks", list, item=field("semaine", str, pattern=WEEK,
-                                                     note="semaine ISO, ex. 2026-W35")),
+                                                     note="semaine ISO, ex. 2030-W35")),
     ])),
     field("transitions", list, minimum=1, maximum=12, item=field(
         "transition", dict, schema=Schema("[[transitions]]", [

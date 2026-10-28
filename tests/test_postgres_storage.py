@@ -57,7 +57,7 @@ def clean_database():
         connection.execute(sa.text("INSERT INTO redline.athletes(id) VALUES ('sam')"))
         # The monitored zone of the fictional instance, as the service syncs it.
         connection.execute(sa.text(
-            "INSERT INTO redline.pain_zones(athlete_id, slug, label) VALUES ('sam', 'injury', 'Injury')"))
+            "INSERT INTO redline.pain_zones(athlete_id, slug, label) VALUES ('sam', 'genou', 'Genou')"))
     yield
     database.dispose()
 
@@ -429,7 +429,7 @@ def test_strength_report_completes_cycle_and_cancels_false_missed_job(store, lat
         assert state.missed_session_is_current(job_id)
     assert store.accept_strength_report({
         "session_key": "strength-a", "performed_on": dt.date(2026, 8, 11),
-        "workout": "a", "duration_minutes": 61, "pains": {"injury": {"after": 1}},
+        "workout": "a", "duration_minutes": 61, "pains": {"genou": {"after": 1}},
         "psid": "4242", "message_id": "strength:strength-a", "message": "Renfo A fait",
     }, 8) == "accepted"
     assert store.session_cycle_status()[0]["state"] == "completed"
@@ -588,7 +588,7 @@ def test_a_removed_gate_requires_an_existing_canonical_observation(store):
 
     first = build_revision(
         1, sessions=[], computed_at="2026-08-09T19:10:00+02:00",
-        gates=[{"id": "w33-injury", "due": "2026-08-14", "when": "apres",
+        gates=[{"id": "w33-genou", "due": "2026-08-14", "when": "apres",
                 "question": "Comment est la blessure au réveil ce matin ?",
                 "on_fail": "appliquer le repli prévu"}])
     store.append_plan_revision("2026-W33", first)
@@ -599,7 +599,7 @@ def test_a_removed_gate_requires_an_existing_canonical_observation(store):
         store.append_plan_revision("2026-W33", second)
 
     second["evidence"] = [
-        "gate:w33-injury=observation:messenger:2026-08-14:reveil"]
+        "gate:w33-genou=observation:messenger:2026-08-14:reveil"]
     with pytest.raises(StorageError, match="observation canonique inconnue"):
         store.append_plan_revision("2026-W33", second)
 
@@ -607,7 +607,7 @@ def test_a_removed_gate_requires_an_existing_canonical_observation(store):
         "occurred_on": dt.date(2026, 8, 14), "kind": "wake-trace",
         "idempotency_key": "messenger:2026-08-14:reveil",
         "note": "Aucune gêne dans les dix premiers pas.",
-        "pains": {"injury": {"state": "unavailable"}},
+        "pains": {"genou": {"state": "unavailable"}},
     })
     store.append_plan_revision("2026-W33", second)
     assert store.load_plan("2026-W33")["revisions"][-1]["revision"] == 2
@@ -618,13 +618,13 @@ def test_a_due_gate_can_close_on_its_precommitted_fallback(store):
 
     first = build_revision(
         1, sessions=[], computed_at="2026-08-09T19:10:00+02:00",
-        gates=[{"id": "w33-injury", "due": "2026-08-14", "when": "apres",
+        gates=[{"id": "w33-genou", "due": "2026-08-14", "when": "apres",
                 "question": "Comment est la blessure au réveil ce matin ?",
                 "on_fail": "appliquer le repli prévu"}])
     store.append_plan_revision("2026-W33", first)
     second = build_revision(
         2, sessions=[], computed_at="2026-08-14T09:10:00+02:00", gates=[],
-        evidence=["gate:w33-injury=fallback:repli-applique"])
+        evidence=["gate:w33-genou=fallback:repli-applique"])
     store.append_plan_revision("2026-W33", second)
 
 
@@ -1286,7 +1286,7 @@ def test_conversation_search_returns_dated_message_and_neighbours_for_same_psid(
     state = PostgresStateStore(store.database)
     assert state.claim_inbound("m1", "4242", "text", "La descente hier était facile")
     state.record_outbound("4242", "Et la blessure après ?", source_key="out:1")
-    assert state.claim_inbound("m2", "4242", "text", "Genou calme au réveil")
+    assert state.claim_inbound("m2", "4242", "text", "Talon calme au réveil")
     assert state.claim_inbound("foreign", "9999", "text", "Ma descente était difficile")
     results = store.conversation_search("4242", "descente", limit=4)
     assert len(results) == 1
@@ -1297,15 +1297,15 @@ def test_conversation_search_returns_dated_message_and_neighbours_for_same_psid(
 
 def test_conversation_search_uses_registered_turn_scope(store):
     state = PostgresStateStore(store.database)
-    assert state.claim_inbound("mine", "4242", "text", "Mon genou va mieux")
-    assert state.claim_inbound("other", "9999", "text", "Mon genou reste sensible")
+    assert state.claim_inbound("mine", "4242", "text", "Mon talon va mieux")
+    assert state.claim_inbound("other", "9999", "text", "Mon talon reste sensible")
     turn_id = str(uuid.uuid4())
     state.register_turn(turn_id, "4242")
 
-    results = store.conversation_search_for_turn(turn_id, "genou")
-    assert [row["hit"]["body"] for row in results] == ["Mon genou va mieux"]
+    results = store.conversation_search_for_turn(turn_id, "talon")
+    assert [row["hit"]["body"] for row in results] == ["Mon talon va mieux"]
     with pytest.raises(ValueError, match="absent ou expiré"):
-        store.conversation_search_for_turn(str(uuid.uuid4()), "injury")
+        store.conversation_search_for_turn(str(uuid.uuid4()), "genou")
 
 
 def test_one_transaction_rolls_back_fact_audit_and_projection_request(store):
@@ -1351,7 +1351,7 @@ def _capability_cli(*extra: str, turn_id: str = "") -> subprocess.CompletedProce
         env["REDLINE_TURN_ID"] = turn_id
     return subprocess.run([
         *cli_command("fact-write"), "capability", "--capability-number", "5",
-        "--slug", "cap5-injury", "--need", "Injury intacts", "--score", "3", "--scale", "5",
+        "--slug", "cap5-genou", "--need", "Genou intact", "--score", "3", "--scale", "5",
         "--status", "orange", "--evaluated-on", "2026-10-11", *extra,
     ], cwd=ENGINE_ROOT, env=env, capture_output=True, text=True, check=False)
 
@@ -1493,15 +1493,15 @@ def test_a_bad_gate_resolution_is_refused_before_it_can_cancel_same_turn_facts(s
 
     first = build_revision(
         1, sessions=[], computed_at="2026-08-09T19:10:00+02:00",
-        gates=[{"id": "w33-injury", "due": "2026-08-14", "when": "avant",
+        gates=[{"id": "w33-genou", "due": "2026-08-14", "when": "avant",
                 "question": "Comment est la blessure au réveil ce matin ?",
                 "on_fail": "appliquer le repli prévu"}])
     store.append_plan_revision("2026-W33", first)
     turn_id = "d740e54c-1933-4cbc-ae7f-982a908626db"
     store.stage_command(turn_id, "observation:reveil", "observation.add", {
         "occurred_on": "2026-08-14", "kind": "wake-trace",
-        "idempotency_key": "messenger:reveil", "note": "genou plus calme",
-        "pains": {"injury": {"state": "unavailable"}},
+        "idempotency_key": "messenger:reveil", "note": "talon plus calme",
+        "pains": {"genou": {"state": "unavailable"}},
     })
     second = build_revision(
         2, sessions=[], computed_at="2026-08-14T09:10:00+02:00", gates=[])
@@ -1530,7 +1530,7 @@ def test_a_missing_plan_no_longer_swallows_the_facts_of_the_turn(store):
 
 def test_strength_quota_refuses_without_consuming_an_extra_claim(store):
     payload = {"session_key": "sid-1", "performed_on": dt.date(2026, 8, 20),
-               "workout": "a", "pains": {"injury": {"before": 1, "after": 2}},
+               "workout": "a", "pains": {"genou": {"before": 1, "after": 2}},
                "duration_minutes": 31, "note": "soléaire chargé", "exercises": [],
                "message_id": "strength:sid-1", "psid": "4242", "message": "terminée"}
     assert store.accept_strength_report(payload, 1) == "accepted"
@@ -1636,7 +1636,7 @@ def test_repeated_daily_shoes_do_not_open_rotation_check(store):
 
 def test_race_deadline_materializes_the_complete_surviving_roadmap(store):
     store.upsert_deadline({
-        "deadline_key": "race-test", "due_on": dt.date(2026, 11, 28),
+        "deadline_key": "race-test", "due_on": dt.date(2026, 11, 26),
         "item": "Course test", "fact_owner": "coach", "status": "scheduled",
         "kind": "race", "context": {"distance_km": 45},
     })
@@ -1652,7 +1652,7 @@ def test_race_deadline_materializes_the_complete_surviving_roadmap(store):
 
 def test_moving_a_race_date_cancels_the_old_roadmap(store):
     base = {
-        "deadline_key": "race-moved", "due_on": dt.date(2026, 11, 28),
+        "deadline_key": "race-moved", "due_on": dt.date(2026, 11, 26),
         "item": "Course déplacée", "fact_owner": "coach", "status": "scheduled",
         "kind": "race", "context": {},
     }
@@ -1664,7 +1664,7 @@ def test_moving_a_race_date_cancels_the_old_roadmap(store):
     state.materialize_intelligence(now)
     jobs = [row for row in state.proactive.jobs()
             if row["id"].startswith("race:")]
-    old = [row for row in jobs if ":2026-11-28:" in row["id"]]
+    old = [row for row in jobs if ":2026-11-26:" in row["id"]]
     new = [row for row in jobs if ":2026-12-05:" in row["id"]]
     assert old and all(row["status"] == "done" for row in old)
     assert new and any(row["status"] == "pending" for row in new)
@@ -2122,11 +2122,11 @@ def test_the_weekly_dossier_is_computed_from_the_same_functions_as_the_clis(stor
     assert "verdict-cortex (due le 06/09)" in text and "bloque descente courue" in text
     assert "--reason optimistic" in text and "narrative" not in text
     assert "Faisabilité à rebours : aucune course typée" in text
-    store.upsert_deadline({"deadline_key": "targetrace", "due_on": dt.date(2026, 11, 28),
+    store.upsert_deadline({"deadline_key": "targetrace", "due_on": dt.date(2026, 11, 26),
                            "kind": "race", "item": "TargetRace",
                            "fact_owner": "athlete/goals.md", "status": "scheduled"})
     text = weekly_dossier.render(store, VAULT_ROOT, "2026-W39", dt.date(2026, 9, 27))
-    assert "Faisabilité à rebours (garde-fou n°8, calculée) : course le 28/11" in text
+    assert "Faisabilité à rebours (garde-fou n°8, calculée) : course le 26/11" in text
 
 
 def test_the_weekly_dossier_does_not_flag_cadence_work_that_was_asked_for(store):
@@ -2426,7 +2426,7 @@ def _wake(store, day, value, *, state="known"):
     return store.add_observation({
         "occurred_on": day, "kind": "wake-trace", "source": "carnet",
         "idempotency_key": f"carnet:reveil:{day.isoformat()}",
-        "pains": {"injury": measurement}})
+        "pains": {"genou": measurement}})
 
 
 def _bound(store, key, day, success_if="<=1", probability=.8):
@@ -2493,20 +2493,20 @@ def test_a_completed_wake_cell_settles_and_a_missing_wake_voids_never_falsifies(
 # ------------------------------------------------------------ pain per zone
 
 def _second_zone(store):
-    store.sync_pain_zones([("injury", "Injury"), ("genou", "Genou")])
+    store.sync_pain_zones([("genou", "Genou"), ("talon", "Talon")])
 
 
 def test_each_watched_zone_gets_its_own_reading(store):
     _second_zone(store)
     observation_id = store.add_observation({
         "occurred_on": dt.date(2026, 10, 12), "kind": "easy", "idempotency_key": "zones:ef",
-        "measurements": {}, "pains": {"genou": {"state": "known", "value": 2.5}}})
+        "measurements": {}, "pains": {"talon": {"state": "known", "value": 2.5}}})
     row = next(row for row in store.observation_rows() if row["id"] == observation_id)
-    assert row["pains"] == {"genou": {"state": "known", "value": 2.5},
-                            "injury": {"state": "pending", "value": None}}
-    store.complete_measurement(observation_id, "pain", 1.0, zone="injury")
+    assert row["pains"] == {"talon": {"state": "known", "value": 2.5},
+                            "genou": {"state": "pending", "value": None}}
+    store.complete_measurement(observation_id, "pain", 1.0, zone="genou")
     with pytest.raises(StorageError, match="déjà connue"):
-        store.complete_measurement(observation_id, "pain", 3.0, zone="genou")
+        store.complete_measurement(observation_id, "pain", 3.0, zone="talon")
     with pytest.raises(StorageError, match="nomme la zone"):
         store.complete_measurement(observation_id, "pain", 3.0)
 
@@ -2514,18 +2514,18 @@ def test_each_watched_zone_gets_its_own_reading(store):
 def test_a_zone_the_instance_no_longer_watches_is_refused_but_its_history_stays(store):
     store.add_observation({
         "occurred_on": dt.date(2026, 10, 12), "kind": "easy", "idempotency_key": "zones:old",
-        "measurements": {}, "pains": {"injury": {"state": "known", "value": 1.0}}})
-    store.sync_pain_zones([("genou", "Genou")])
+        "measurements": {}, "pains": {"genou": {"state": "known", "value": 1.0}}})
+    store.sync_pain_zones([("talon", "Talon")])
     assert [(zone["slug"], zone["active"]) for zone in store.pain_zones()] == [
-        ("genou", True), ("injury", False)]
+        ("talon", True), ("genou", False)]
     with pytest.raises(StorageError, match="inconnue ou inactive"):
         store.add_observation({
             "occurred_on": dt.date(2026, 10, 13), "kind": "easy",
             "idempotency_key": "zones:new", "measurements": {},
-            "pains": {"injury": {"state": "known", "value": 1.0}}})
+            "pains": {"genou": {"state": "known", "value": 1.0}}})
     old = next(row for row in store.observation_rows()
                if row["idempotency_key"] == "zones:old")
-    assert old["pains"] == {"injury": {"state": "known", "value": 1.0}}
+    assert old["pains"] == {"genou": {"state": "known", "value": 1.0}}
 
 
 def test_without_a_watched_zone_an_effort_claims_no_pain(store):
@@ -2543,15 +2543,15 @@ def test_a_wake_prediction_waits_for_the_zone_it_names(store):
     with pytest.raises(StorageError, match="nomme sa zone"):
         _bound(store, "sans-zone", day)
     store.upsert_prediction({
-        "prediction_key": "genou-calme", "domain": "corps", "statement": "genou calme",
+        "prediction_key": "talon-calme", "domain": "corps", "statement": "talon calme",
         "probability": .7, "due_on": day + dt.timedelta(days=2),
         "resolves_on": {"kind": "wake-trace", "date": day.isoformat(), "success_if": "<=1",
-                        "zone": "genou"}})
+                        "zone": "talon"}})
     store.add_observation({
         "occurred_on": day, "kind": "wake-trace", "idempotency_key": "zones:reveil",
-        "measurements": {}, "pains": {"injury": {"state": "known", "value": 2.0},
-                                      "genou": {"state": "known", "value": 0.5}}})
-    [row] = [row for row in store.prediction_rows() if row["prediction_key"] == "genou-calme"]
+        "measurements": {}, "pains": {"genou": {"state": "known", "value": 2.0},
+                                      "talon": {"state": "known", "value": 0.5}}})
+    [row] = [row for row in store.prediction_rows() if row["prediction_key"] == "talon-calme"]
     assert (row["status"], row["outcome"]) == ("resolved", True)
 
 
@@ -2559,12 +2559,12 @@ def test_a_strength_report_keeps_each_zone_before_and_after(store):
     _second_zone(store)
     payload = {"session_key": "zones-renfo", "performed_on": dt.date(2026, 10, 12),
                "workout": "a", "duration_minutes": 30, "note": "", "exercises": [],
-               "pains": {"genou": {"before": 1, "after": 3}, "injury": {"after": 0}},
+               "pains": {"talon": {"before": 1, "after": 3}, "genou": {"after": 0}},
                "message_id": "strength:zones-renfo", "psid": "4242", "message": "x"}
     assert store.accept_strength_report(payload, max_per_day=8) == "accepted"
     [session] = [row for row in store.strength_history() if row["session_key"] == "zones-renfo"]
-    assert session["pains"] == {"genou": {"before": 1, "after": 3},
-                                "injury": {"before": None, "after": 0}}
+    assert session["pains"] == {"talon": {"before": 1, "after": 3},
+                                "genou": {"before": None, "after": 0}}
 
 
 def test_corrections_are_matched_on_their_rare_words(store):

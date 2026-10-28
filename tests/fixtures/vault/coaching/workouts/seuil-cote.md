@@ -1,7 +1,7 @@
 ---
 type: seance-type
 kinds: [threshold, hills]
-capacite: [durabilite, injury]
+capacite: [endurance, genou]
 rpe_cible: 6
 duree_min: 50
 phase: [specifique-1, specifique-2]

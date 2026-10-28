@@ -57,7 +57,7 @@ def test_la_carte_accepte_les_modulations_que_le_matin_prescrit(tmp_path):
     # something that has already disappeared from the session.
     selection = {
         "session": "a", "date": "2026-08-14", "half_dose": True,
-        "gate": {"zone": "injury", "pain_max": 2, "drop": ["plyometrics"],
+        "gate": {"zone": "genou", "pain_max": 2, "drop": ["plyometrics"],
                  "say": "si ça tire, on retire les bonds"},
         "note": "demi-dose, blessure surveillée",
     }

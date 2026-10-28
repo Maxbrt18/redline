@@ -42,5 +42,4 @@ Fais le bilan du dimanche et prépare la semaine suivante.
    `scripts/chart-week.py` avec `period` au format YYYY-WNN de la semaine close.
 6. Envoie un bilan court qui fait ressortir ce qui change la semaine. Une question
    seulement si un choix utile reste ouvert, jamais une formule fixe ni un présupposé
-   de défaut. Ne demande à ⟨athlète⟩ aucun engagement pour la semaine : il a retiré ce
-   levier le 2026-09-30.
+   de défaut. Ne demande à ⟨athlète⟩ aucun engagement pour la semaine.

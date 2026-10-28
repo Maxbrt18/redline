@@ -539,7 +539,7 @@ def test_a_week_without_any_run_is_not_progress():
 
 def test_the_projection_says_what_a_target_would_require_not_what_is_allowed():
     rows = _long_runs(SEPTEMBER)
-    projection = ledger.race_projection(rows, dt.date(2026, 9, 27), dt.date(2026, 11, 28))
+    projection = ledger.race_projection(rows, dt.date(2026, 9, 27), dt.date(2026, 11, 26))
     assert projection is not None
     assert projection.start_km == 11.53
     # Six weeks ending before the taper, which starts two weeks before the race.
@@ -553,7 +553,7 @@ def test_the_projection_says_what_a_target_would_require_not_what_is_allowed():
     assert any("+17 %/sem" in line and "+21 %/sem" in line for line in lines)
     assert not any("10 %" in line for line in lines)
     assert "--cible-sl" in ledger.projection_lines(projection)[-1]
-    assert ledger.race_projection(rows, dt.date(2026, 12, 1), dt.date(2026, 11, 28)) is None
+    assert ledger.race_projection(rows, dt.date(2026, 12, 1), dt.date(2026, 11, 26)) is None
 
 
 def test_the_race_date_comes_from_a_typed_race_deadline_only():
@@ -562,10 +562,10 @@ def test_the_race_date_comes_from_a_typed_race_deadline_only():
             return [
                 {"kind": "general", "status": "open", "due_on": dt.date(2026, 10, 4)},
                 {"kind": "race", "status": "done", "due_on": dt.date(2026, 9, 1)},
-                {"kind": "race", "status": "open", "due_on": "2026-11-28"},
+                {"kind": "race", "status": "open", "due_on": "2026-11-26"},
             ]
     today = dt.date(2026, 9, 27)
-    assert ledger.next_race_date(Store(), today) == dt.date(2026, 11, 28)
+    assert ledger.next_race_date(Store(), today) == dt.date(2026, 11, 26)
     Store.deadline_rows = lambda self: []  # type: ignore[method-assign]
     assert ledger.next_race_date(Store(), today) is None
 
@@ -604,7 +604,7 @@ def test_an_undeclared_week_is_neither_ok_nor_multiplied():
                                 RPE_TARGETS)[0]
 
 
-ZONES = [ledger.PainZone(ZONE, "Injury")]
+ZONES = [ledger.PainZone(ZONE, "Genou")]
 
 
 def _gate_rows(*, peak_before=1.0, peak_now=1.0, wake_now=(1.0,)):
@@ -646,24 +646,24 @@ def test_an_undeclared_sleep_leaves_the_gate_incomplete_not_green():
 
 def test_two_zones_never_share_a_series():
     """A rise in one zone is never read as a rise in another."""
-    rows = [Row(dt.date(2026, 7, 29), "easy", pains={"genou": 3.0, "cheville": 0.5}),
-            Row(dt.date(2026, 7, 30), "wake-trace", pains={"genou": 2.0, "cheville": 0.0})]
-    assert ledger.pain_trend(rows, 1, "genou")[0].effort.peak == 3.0
+    rows = [Row(dt.date(2026, 7, 29), "easy", pains={"talon": 3.0, "cheville": 0.5}),
+            Row(dt.date(2026, 7, 30), "wake-trace", pains={"talon": 2.0, "cheville": 0.0})]
+    assert ledger.pain_trend(rows, 1, "talon")[0].effort.peak == 3.0
     assert ledger.pain_trend(rows, 1, "cheville")[0].effort.peak == 0.5
     assert [flag.kind for flag in ledger.esculier_check(rows, "cheville")] == []
-    assert "AU-DESSUS DU PLAFOND" in [flag.kind for flag in ledger.esculier_check(rows, "genou")]
+    assert "AU-DESSUS DU PLAFOND" in [flag.kind for flag in ledger.esculier_check(rows, "talon")]
 
 
 def test_the_gate_judges_each_zone_and_names_it():
-    zones = [ledger.PainZone("genou", "Genou"), ledger.PainZone("cheville", "Cheville")]
-    rows = [Row(dt.date(2026, 9, 1), "wake-trace", pains={"genou": 1.0, "cheville": 1.0}),
-            Row(dt.date(2026, 9, 29), "easy", km=8, hours=0.8, pains={"genou": 1.0, "cheville": 1.0}),
-            Row(dt.date(2026, 10, 6), "easy", km=8, hours=0.8, pains={"genou": 1.0, "cheville": 1.5}),
-            Row(dt.date(2026, 10, 7), "wake-trace", pains={"genou": 1.0, "cheville": 1.0})]
+    zones = [ledger.PainZone("talon", "Talon"), ledger.PainZone("cheville", "Cheville")]
+    rows = [Row(dt.date(2026, 9, 1), "wake-trace", pains={"talon": 1.0, "cheville": 1.0}),
+            Row(dt.date(2026, 9, 29), "easy", km=8, hours=0.8, pains={"talon": 1.0, "cheville": 1.0}),
+            Row(dt.date(2026, 10, 6), "easy", km=8, hours=0.8, pains={"talon": 1.0, "cheville": 1.5}),
+            Row(dt.date(2026, 10, 7), "wake-trace", pains={"talon": 1.0, "cheville": 1.0})]
     lines = ledger.gate(rows, "2026-W41", Instruments(sleep="ok"), zones)
     assert lines[0].endswith(": rouge")
     assert "  ✗ Cheville · tendance : 1 → 1.5" in lines
-    assert "  ✓ Genou · tendance : 1 → 1" in lines
+    assert "  ✓ Talon · tendance : 1 → 1" in lines
 
 
 def test_without_a_watched_zone_the_gate_has_no_pain_case():

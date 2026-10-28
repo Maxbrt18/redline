@@ -3,7 +3,7 @@ import datetime as dt
 from redline.service.race_countdown import STAGES, compile_deadline
 
 
-def race(day="2026-11-28"):
+def race(day="2026-11-26"):
     return {"id": "123", "deadline_key": "targetrace", "due_on": day,
             "item": "TargetRace", "context": {"distance_km": 45}}
 
@@ -11,15 +11,15 @@ def race(day="2026-11-28"):
 def test_a_race_compiles_the_whole_countdown_at_once():
     checkpoints = compile_deadline(race())
     assert len(checkpoints) == len(STAGES)
-    assert checkpoints[0].due_at.date() == dt.date(2026, 7, 31)
-    assert checkpoints[-1].due_at.date() == dt.date(2026, 11, 28)
+    assert checkpoints[0].due_at.date() == dt.date(2026, 7, 29)
+    assert checkpoints[-1].due_at.date() == dt.date(2026, 11, 26)
     assert checkpoints[-1].due_at.hour == 9
     assert all(checkpoint.expires_at >= checkpoint.due_at
                for checkpoint in checkpoints)
 
 
 def test_job_identity_changes_when_the_race_date_moves():
-    before = {row.key for row in compile_deadline(race("2026-11-28"))}
+    before = {row.key for row in compile_deadline(race("2026-11-26"))}
     after = {row.key for row in compile_deadline(race("2026-12-05"))}
     assert before.isdisjoint(after)
 

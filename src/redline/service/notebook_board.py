@@ -208,6 +208,9 @@ class Board:
             return derived_label(slug)
         return self.instance.capability_label(slug)
 
+    def _capability_icon(self, slug: str) -> str:
+        return "run" if self.instance is None else self.instance.capability_icon(slug)
+
     # ------------------------------------------------------------ lectures
     @property
     def observations(self) -> list[dict]:
@@ -859,7 +862,7 @@ class Board:
                                "start_time": race.get("start_time")})
         milestones.sort(key=lambda item: item["date"])
         capabilities = sorted(
-            ({"label": self._capability_label(row["slug"]),
+            ({"label": self._capability_label(row["slug"]), "icon": self._capability_icon(row["slug"]),
               "score": row["score"], "scale": row["scale"], "number": row["capability_number"],
               "evaluated_on": row["evaluated_on"].isoformat()}
              for row in self.ops.latest_capabilities()),

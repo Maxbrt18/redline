@@ -6,7 +6,7 @@ the typed race (`fact-write.py deadline --kind race`), the active revisions, the
 done, the longest run of the last 30 days. Nothing is written.
 
     python3 scripts/feasibility.py                  # from today
-    python3 scripts/feasibility.py --libre 2026-W41  # treat W41 as still to be written
+    python3 scripts/feasibility.py --libre 2030-W41  # treat W41 as still to be written
 
 `--libre` explores an already scheduled week: without it, a week that has an active
 revision is frozen on its novelties (typed transition, deduced long-run step).

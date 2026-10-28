@@ -7,7 +7,7 @@ honest and legible than a radar. Countdown to the race as the closing line.
 
 Input: MONTH_SCHEMA in src/redline/model/cards.py, from --input (stdin outside a turn).
 
-Usage:  python3 scripts/chart-month.py -o month-2026-07.png < data.json
+Usage:  python3 scripts/chart-month.py -o month.png < data.json
 """
 
 from datetime import date

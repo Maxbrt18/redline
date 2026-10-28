@@ -90,7 +90,7 @@ def test_lecrivain_type_refuse_en_nommant_la_colonne(monkeypatch, capsys):
     assert "Type" in capsys.readouterr().err
 
 
-def _zones(monkeypatch, add, zones=("injury",)):
+def _zones(monkeypatch, add, zones=("genou",)):
     """The monitored zones live in the database: the CLI reads them, the test fixes them."""
     monkeypatch.setenv("DATABASE_URL", "postgresql://test")
     monkeypatch.setattr(add, "_active_zones", lambda url: list(zones))
@@ -118,25 +118,25 @@ def test_le_mot_de_alex_devient_la_valeur(monkeypatch, capsys, word, value):
         "ledger-add.py", "--dry-run", "--date", "2026-10-11", "--type", "wake-trace",
         "--dlr", word])
     assert add.main() == 0
-    assert f"'Dlr': {{'injury': '{value}'}}" in capsys.readouterr().out
+    assert f"'Dlr': {{'genou': '{value}'}}" in capsys.readouterr().out
 
 
 def test_avec_plusieurs_zones_chaque_douleur_nomme_la_sienne(monkeypatch, capsys):
     add = _load_writer()
-    _zones(monkeypatch, add, ("genou", "cheville"))
+    _zones(monkeypatch, add, ("talon", "cheville"))
     monkeypatch.setattr(sys, "argv", [
         "ledger-add.py", "--dry-run", "--date", "2026-10-11", "--type", "easy",
-        "--dlr", "genou=2", "--dlr", "cheville=?"])
+        "--dlr", "talon=2", "--dlr", "cheville=?"])
     assert add.main() == 0
-    assert "'Dlr': {'genou': '2', 'cheville': '?'}" in capsys.readouterr().out
+    assert "'Dlr': {'talon': '2', 'cheville': '?'}" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("given, refused", [
     (["2"], "nomme la zone"), (["hanche=1"], "zone inconnue"),
-    (["genou=1", "genou=2"], "deux fois")])
+    (["talon=1", "talon=2"], "deux fois")])
 def test_une_douleur_sans_zone_claire_est_refusee(monkeypatch, capsys, given, refused):
     add = _load_writer()
-    _zones(monkeypatch, add, ("genou", "cheville"))
+    _zones(monkeypatch, add, ("talon", "cheville"))
     argv = ["ledger-add.py", "--dry-run", "--date", "2026-10-11", "--type", "easy"]
     for value in given:
         argv += ["--dlr", value]
@@ -147,10 +147,10 @@ def test_une_douleur_sans_zone_claire_est_refusee(monkeypatch, capsys, given, re
 
 def test_un_reveil_exige_une_trace_par_zone(monkeypatch, capsys):
     add = _load_writer()
-    _zones(monkeypatch, add, ("genou", "cheville"))
+    _zones(monkeypatch, add, ("talon", "cheville"))
     monkeypatch.setattr(sys, "argv", [
         "ledger-add.py", "--dry-run", "--date", "2026-10-11", "--type", "wake-trace",
-        "--dlr", "genou=aucune"])
+        "--dlr", "talon=aucune"])
     assert add.main() == 1
     assert "réveil sans trace pour cheville" in capsys.readouterr().err
 

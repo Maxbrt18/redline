@@ -195,13 +195,13 @@ button, .n-nav, .n-krow, summary { touch-action: manipulation; }
  * light, L 0.80 in dark); none comes close to red or orange. A new family takes a tint
  * from the same band, at the same lightness.
  * HR zones climb toward red, which stays intensity: Z5 is --red. */
-:root { --h-run: #4c677b; --h-tib: #705a75; --h-race: #436b6f; --h-str: #7a5867; --h-rest: #69625a;
+:root { --h-run: #4c677b; --h-pain: #705a75; --h-race: #436b6f; --h-str: #7a5867; --h-rest: #69625a;
   --sand: #f0eae3; --card: #fffdfb; --pas-mix: 20%; --tile-pas-mix: 18%;
   --z1: #c7bbb7; --z2: #bc9392; --z3: #bb6c6f; --z4: #b54245; --z5: var(--red); }
-:root[data-theme="dark"] { --h-run: #a6c2d7; --h-tib: #ccb4d1; --h-race: #9ec6cb; --h-str: #d7b2c2; --h-rest: #c4bcb4;
+:root[data-theme="dark"] { --h-run: #a6c2d7; --h-pain: #ccb4d1; --h-race: #9ec6cb; --h-str: #d7b2c2; --h-rest: #c4bcb4;
   --sand: #231e1b; --card: #1c1817; --pas-mix: 24%; --tile-pas-mix: 28%;
   --z1: #7a6f6b; --z2: #a87877; --z3: #d37b7e; --z4: #f47a79; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --h-run: #a6c2d7; --h-tib: #ccb4d1; --h-race: #9ec6cb;
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --h-run: #a6c2d7; --h-pain: #ccb4d1; --h-race: #9ec6cb;
   --h-str: #d7b2c2; --h-rest: #c4bcb4; --sand: #231e1b; --card: #1c1817; --pas-mix: 24%; --tile-pas-mix: 28%;
   --z1: #7a6f6b; --z2: #a87877; --z3: #d37b7e; --z4: #f47a79; } }
 .n-pas { --h: var(--h-run); display: inline-grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 50%;
@@ -211,7 +211,7 @@ button, .n-nav, .n-krow, summary { touch-action: manipulation; }
 .n-pas.sm svg { width: 14px; height: 14px; }
 .n-pas.str { --h: var(--h-str); }
 .n-pas.rest, .n-pas.other { --h: var(--h-rest); }
-.n-pas.tib { --h: var(--h-tib); }
+.n-pas.pain { --h: var(--h-pain); }
 .n-pas.race { --h: var(--h-race); }
 /* Two sessions on the same day: the badges overlap, outlined by the paper. */
 .n-pasg { display: inline-flex; flex: none; }

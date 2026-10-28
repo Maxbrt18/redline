@@ -4,9 +4,6 @@ import {day, dm, fmt, shortDay} from '../format.js';
 import {push} from '../nav.js';
 
 // ------------------------------------------------------------ Course
-// One pill per capability (by number), in its family's tint: injuries in purple,
-// digestion and night in teal, the rest in running blue.
-const CAPABILITY_ICONS = {1: 'run', 2: 'descent', 3: 'food', 4: 'night', 5: 'tib', 6: 'mind'};
 const archiveLabel = entry => entry.kind === 'monthly' && entry.period
   ? 'Monthly · ' + new Date(entry.period + '-01T12:00:00').toLocaleDateString('fr-FR', {month: 'long', year: 'numeric'})
   : entry.kind === 'weekly' && entry.period ? 'Weekly · W' + entry.period.slice(-2) : entry.title;
@@ -76,7 +73,7 @@ export function renderCourse(data) {
     data.capabilities.forEach(item => {
       const pips = el('div', null, 'n-pips');
       for (let index = 0; index < item.scale; index++) pips.append(el('i', null, index < item.score ? 'f' : null));
-      node.append(add(el('div', null, 'n-cp'), add(el('span'), pastille(CAPABILITY_ICONS[item.number], true), item.label), pips, el('b', String(item.score))));
+      node.append(add(el('div', null, 'n-cp'), add(el('span'), pastille(item.icon, true), item.label), pips, el('b', String(item.score))));
     });
     const latest = data.capabilities.map(item => item.evaluated_on).sort().pop();
     node.append(el('p', 'Évaluées le ' + dm(latest) + ', au bilan.', 'n-meta'));

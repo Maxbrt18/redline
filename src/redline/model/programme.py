@@ -58,9 +58,8 @@ EXERCISE_SCHEMA = Schema("exercice", [
                "Une consigne doit INTERDIRE la mauvaise lecture, pas seulement décrire "
                "la bonne : le test est « quelqu'un qui ne connaît pas l'exercice "
                "peut-il en tirer un AUTRE mouvement ? ». Un mot abstrait (« zigzag », "
-               "« raide », « explosif ») échoue à ce test par construction — « en "
-               "zigzag » a été exécuté en bonds amples d'une jambe sur l'autre, et a "
-               "probablement causé la gêne de cheville du 2026-08-04"),
+               "« raide », « explosif ») échoue à ce test par construction : « en "
+               "zigzag » peut se lire comme des bonds amples d'une jambe sur l'autre"),
     field("dose", dict, schema=DOSE_SCHEMA),
     field("since", str, required=False, pattern=WEEK,
           note="semaine ISO d'entrée au programme, ex. W32"),

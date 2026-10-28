@@ -435,9 +435,9 @@ level; it is stored in the conversation like a real message. After
 The program belongs to PostgreSQL and its revisions are append-only.
 
 ```bash
-python -m redline.cli.week_plan show --week 2026-W33
-python -m redline.cli.week_plan check --week 2026-W33
-python -m redline.cli.week_plan revise --week 2026-W33 < revision.json
+python -m redline.cli.week_plan show --week 2030-W33
+python -m redline.cli.week_plan check --week 2030-W33
+python -m redline.cli.week_plan revise --week 2030-W33 < revision.json
 ```
 
 Codes of `check` and `show`:
@@ -484,7 +484,7 @@ due deadlines, capabilities. It injects it with the N2 packet; a failed
 computation replaces it with a line pointing to the CLIs, without holding back the review. The projector
 creates the journal of the current week and of the next one when a program exists.
 
-The period of a review belongs to its durable key: `weekly:2026-W34` closes W34 and
+The period of a review belongs to its durable key: `weekly:2030-W34` closes W34 and
 prepares W35, even if a retry only starts on Monday. A failed initiative is
 claimed at most three times (5, 15 then 45 min apart, or the return time announced
 by the provider), always with an expiry; beyond that it goes `failed` with its
@@ -495,8 +495,8 @@ revision. After an operator repair, a finished or failed job reopens without ad 
 SQL, and this command is deliberately kept outside the coach's sandbox:
 
 ```bash
-python -m redline.cli.proactive_job status --job-key weekly:2026-W34
-python -m redline.cli.proactive_job reopen --job-key weekly:2026-W34
+python -m redline.cli.proactive_job status --job-key weekly:2030-W34
+python -m redline.cli.proactive_job reopen --job-key weekly:2030-W34
 ```
 
 Operator commands run from the root, with the service's environment
@@ -614,7 +614,7 @@ consumed by a single revision. The refusal is therefore transactional, not an in
 the model can forget.
 
 ```bash
-python -m redline.cli.session_cycle pending --week 2026-W34
+python -m redline.cli.session_cycle pending --week 2030-W34
 python -m redline.cli.session_cycle reconcile-strava --days 30
 python -m redline.cli.fact_read predictions
 python -m redline.cli.fact_read gear

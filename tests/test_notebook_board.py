@@ -38,7 +38,7 @@ def store():
         connection.execute(sa.text("INSERT INTO redline.athletes(id) VALUES ('sam')"))
         # The watched zone of the fictitious instance, as the service synchronises it.
         connection.execute(sa.text(
-            "INSERT INTO redline.pain_zones(athlete_id, slug, label) VALUES ('sam', 'injury', 'Injury')"))
+            "INSERT INTO redline.pain_zones(athlete_id, slug, label) VALUES ('sam', 'genou', 'Genou')"))
     yield OperationalStore(database)
     database.dispose()
 
@@ -98,7 +98,7 @@ def seed_week(store):
             "enjoyment": {"state": "known", "value": 8},
             "elevation_gain_m": {"state": "known", "value": 20},
             "elevation_loss_m": {"state": "known", "value": 20}},
-        "pains": {"injury": {"state": "known", "value": 0.5}},
+        "pains": {"genou": {"state": "known", "value": 0.5}},
     })
     store.add_observation({
         "occurred_on": dt.date(2026, 10, 7), "kind": "easy",
@@ -111,7 +111,7 @@ def seed_week(store):
             "enjoyment": {"state": "pending"},
             "elevation_gain_m": {"state": "known", "value": 7},
             "elevation_loss_m": {"state": "known", "value": 7}},
-        "pains": {"injury": {"state": "pending"}},
+        "pains": {"genou": {"state": "pending"}},
     })
 
 
@@ -152,42 +152,42 @@ def test_the_coach_waits_only_for_what_the_ledger_claims(store):
     asks = board(store).asks()
     [cells] = [ask for ask in asks if ask["type"] == "cells"]
     assert cells["date"] == "2026-10-07"
-    assert cells["fields"] == ["pain:injury", "rpe", "enjoyment"]
+    assert cells["fields"] == ["pain:genou", "rpe", "enjoyment"]
     result = board(store).answer(cells["id"] + ":rpe", 2)
     assert result["alert"] is None
     with pytest.raises(AnswerError):
         board(store).answer(cells["id"] + ":rpe", 3)
     with pytest.raises(AnswerError):
-        board(store).answer(cells["id"] + ":pain:injury", 1.25)
-    result = board(store).answer(cells["id"] + ":pain:injury", 2.5)
+        board(store).answer(cells["id"] + ":pain:genou", 1.25)
+    result = board(store).answer(cells["id"] + ":pain:genou", 2.5)
     assert "au-dessus du plafond" in result["alert"]
     rows = {row["idempotency_key"]: row for row in store.observation_rows()}
     measures = rows["strava:90000000019"]["measurements"]
     assert measures["rpe"] == {"state": "known", "value": 2.0}
-    assert rows["strava:90000000019"]["pains"]["injury"] == {"state": "known", "value": 2.5}
+    assert rows["strava:90000000019"]["pains"]["genou"] == {"state": "known", "value": 2.5}
 
 
 def test_a_net_wake_trace_alerts_the_coach_with_the_session_condition(store):
     """The condition lives in the session, the alert triggers it."""
     seed_week(store)
     morning = dt.datetime(2026, 10, 7, 8, 0, tzinfo=PARIS)
-    alert = board(store, morning).answer("wake:2026-10-07:injury", "nette")["alert"]
+    alert = board(store, morning).answer("wake:2026-10-07:genou", "nette")["alert"]
     assert "trace nette" in alert and "condition écrite dans la séance" in alert
 
 
 def test_a_very_light_wake_trace_is_half_a_point(store):
     seed_week(store)
     morning = dt.datetime(2026, 10, 7, 8, 0, tzinfo=PARIS)
-    assert board(store, morning).answer("wake:2026-10-07:injury", "tres-legere") == {"alert": None}
+    assert board(store, morning).answer("wake:2026-10-07:genou", "tres-legere") == {"alert": None}
     [reveil] = [row for row in store.observation_rows() if row["kind"] == "wake-trace"]
-    assert reveil["pains"]["injury"] == {"state": "known", "value": 0.5}
+    assert reveil["pains"]["genou"] == {"state": "known", "value": 0.5}
 
 
 def test_the_morning_trace_is_asked_in_the_morning_only_and_in_its_own_words(store):
     seed_week(store)
     morning = dt.datetime(2026, 10, 7, 8, 0, tzinfo=PARIS)
     [wake] = [ask for ask in board(store, morning).asks() if ask["type"] == "wake"]
-    assert (wake["id"], wake["after_effort"]) == ("wake:2026-10-07:injury", True)
+    assert (wake["id"], wake["after_effort"]) == ("wake:2026-10-07:genou", True)
     afternoon = dt.datetime(2026, 10, 7, 15, 0, tzinfo=PARIS)
     assert not [ask for ask in board(store, afternoon).asks() if ask["type"] == "wake"]
     with pytest.raises(AnswerError):
@@ -201,7 +201,7 @@ def test_the_morning_trace_is_asked_in_the_morning_only_and_in_its_own_words(sto
     [prediction] = store.prediction_rows()
     assert (prediction["status"], prediction["outcome"]) == ("resolved", True)
     reveil = [row for row in store.observation_rows() if row["kind"] == "wake-trace"]
-    assert reveil[0]["pains"]["injury"] == {"state": "known", "value": 1.0}
+    assert reveil[0]["pains"]["genou"] == {"state": "known", "value": 1.0}
     assert reveil[0]["source"] == "carnet"
     assert not [ask for ask in board(store, morning).asks() if ask["type"] == "wake"]
 
@@ -210,16 +210,16 @@ def test_the_morning_trace_is_asked_after_a_rest_day_too(store):
     seed_week(store)
     morning = dt.datetime(2026, 10, 6, 8, 0, tzinfo=PARIS)
     [wake] = [ask for ask in board(store, morning).asks() if ask["type"] == "wake"]
-    assert (wake["id"], wake["after_effort"]) == ("wake:2026-10-06:injury", False)
+    assert (wake["id"], wake["after_effort"]) == ("wake:2026-10-06:genou", False)
 
 
 def test_the_race_and_only_alex_s_deadlines_reach_the_course_tab(store):
     seed_week(store)
     store.upsert_deadline({
-        "deadline_key": "race-targetrace-2026", "due_on": dt.date(2026, 11, 28),
+        "deadline_key": "race-targetrace-2026", "due_on": dt.date(2026, 11, 26),
         "item": "TargetRace 45 km — course objectif", "fact_owner": "coaching/race.md",
         "status": "scheduled", "kind": "race", "athlete_label": "TargetRace",
-        "context": {"start_time": "23:00", "distance_km": 45, "target": "<4 h 30"}})
+        "context": {"start_time": "09:00", "distance_km": 42.2, "target": "<4 h 30"}})
     store.upsert_deadline({
         "deadline_key": "frontale", "due_on": dt.date(2026, 10, 14),
         "item": "Frontale achetée avant la première sortie de nuit, 400 lumens réels",
@@ -230,10 +230,10 @@ def test_the_race_and_only_alex_s_deadlines_reach_the_course_tab(store):
         "item": "Revue de la prédiction du 05/08", "fact_owner": "coaching/decisions.md",
         "status": "todo"})
     store.evaluate_capability({
-        "capability_number": 5, "slug": "cap5-injury", "need": "Injury intacts",
+        "capability_number": 5, "slug": "cap5-genou", "need": "Genou intact",
         "score": 3, "scale": 5, "status": "orange", "evaluated_on": dt.date(2026, 10, 4)})
     store.evaluate_capability({
-        "capability_number": 3, "slug": "cap3-digestion", "need": "Digérer",
+        "capability_number": 3, "slug": "cap3-ravitaillement", "need": "Digérer",
         "score": 0, "scale": 5, "status": "rouge", "evaluated_on": dt.date(2026, 10, 4)})
     archives = [
         {"id": "a", "kind": "monthly", "period": "2026-09", "origin": "recovered"},
@@ -242,16 +242,16 @@ def test_the_race_and_only_alex_s_deadlines_reach_the_course_tab(store):
           for n in (37, 38, 39, 40))]
     view = board(store).race_view(archives)
     assert [entry["id"] for entry in view["archives"]] == ["b", "w40", "w39", "w38"]
-    assert view["race"]["days"] == 52 and view["race"]["name"] == "TargetRace"
+    assert view["race"]["days"] == 50 and view["race"]["name"] == "TargetRace"
     assert view["race"]["target"] == "<4 h 30"
     labels = [item["label"] for item in view["milestones"]]
     assert labels == ["Sortie longue au Testathlon", "Frontale ≥400 lm, 5 h d’autonomie", "Départ"]
-    assert [item["label"] for item in view["capabilities"]] == ["Injury", "Digestion"]
+    assert [item["label"] for item in view["capabilities"]] == ["Genou", "Ravitaillement"]
     assert view["longest"]["km"] == 8.35 and view["longest"]["planned_km"] == 16.0
     assert view["longest"]["planned_on"] == "2026-10-11"
     current = view["longest"]["weeks"][-1]
     assert current["open"] and current["target"] == 41.0 and current["volume"] >= current["km"] == 8.35
-    assert board(store).today_view()["race"]["days"] == 52
+    assert board(store).today_view()["race"]["days"] == 50
 
 
 def test_past_weeks_list_the_ledger_fact_and_the_planned_target(store):
@@ -274,7 +274,7 @@ def test_without_a_plan_nothing_is_prescribed_but_the_ledger_still_counts(store)
             "distance_km": {"state": "known", "value": 8.0},
             "rpe": {"state": "known", "value": 3},
             "enjoyment": {"state": "known", "value": 8}},
-        "pains": {"injury": {"state": "known", "value": 0}}})
+        "pains": {"genou": {"state": "known", "value": 0}}})
     view = board(store).today_view()
     assert view["plan"]["status"] == "invalid" and view["sessions"] == []
     assert view["totals"]["km_done"] == 8.0 and view["totals"]["km_target"] is None
@@ -317,12 +317,12 @@ def test_routes_serve_the_three_screens_and_hand_a_crossing_to_the_coach(
     assert client.get("/carnet-api/weeks").json == {"weeks": []}
     [ask] = today["asks"]
     assert client.post("/carnet-api/answer", json={"ask": "drop table", "value": 1}).status_code == 400
-    assert client.post("/carnet-api/answer", json={"ask": ask["id"] + ":pain:injury", "value": 1},
+    assert client.post("/carnet-api/answer", json={"ask": ask["id"] + ":pain:genou", "value": 1},
                        headers={"Origin": "https://evil.test"}).status_code == 403
-    response = client.post("/carnet-api/answer", json={"ask": ask["id"] + ":pain:injury", "value": 3})
+    response = client.post("/carnet-api/answer", json={"ask": ask["id"] + ":pain:genou", "value": 3})
     assert response.json == {"status": "ok", "alert": True}
     assert bot.inbound and "3/10" in bot.inbound[0][1]
-    again = client.post("/carnet-api/answer", json={"ask": ask["id"] + ":pain:injury", "value": 1})
+    again = client.post("/carnet-api/answer", json={"ask": ask["id"] + ":pain:genou", "value": 1})
     assert again.status_code == 409
     calm = client.post("/carnet-api/answer", json={"ask": ask["id"] + ":rpe", "value": 2})
     assert calm.json == {"status": "ok", "alert": False} and len(bot.inbound) == 1
@@ -354,7 +354,7 @@ def test_the_last_feeling_of_a_strava_run_brings_its_debrief_forward(
                         nudge=nudge).test_client()
     client.post("/carnet-api/connect", json={"token": archive.issue(config.allowed_psid)})
     [ask] = client.get("/carnet-api/today").json["asks"]
-    for metric, value in (("pain:injury", 1), ("rpe", 3)):
+    for metric, value in (("pain:genou", 1), ("rpe", 3)):
         client.post("/carnet-api/answer", json={"ask": f"{ask['id']}:{metric}", "value": value})
     state.proactive.hasten_job.assert_not_called()
     client.post("/carnet-api/answer", json={"ask": ask["id"] + ":enjoyment", "value": 7})
@@ -363,7 +363,7 @@ def test_the_last_feeling_of_a_strava_run_brings_its_debrief_forward(
     nudge.assert_called_once()
     observation_id = ask["id"].split(":", 1)[1]
     assert store.observation_feelings(observation_id) == {
-        "rpe": 3.0, "enjoyment": 7.0, "pains": {"injury": 1.0}}
+        "rpe": 3.0, "enjoyment": 7.0, "pains": {"genou": 1.0}}
     assert store.strava_activity_for_observation(observation_id) == 90000000019
 
 

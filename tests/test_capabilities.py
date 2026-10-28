@@ -22,7 +22,7 @@ Le pourquoi, avec ses [[liens]].
 """
 
 
-def capability(tmp_path, text=FRONTMATTER, name="cap1-durabilite.md"):
+def capability(tmp_path, text=FRONTMATTER, name="cap1-endurance.md"):
     folder = tmp_path / "coaching" / "capabilities"
     folder.mkdir(parents=True, exist_ok=True)
     (folder / name).write_text(text, encoding="utf-8")
@@ -30,7 +30,7 @@ def capability(tmp_path, text=FRONTMATTER, name="cap1-durabilite.md"):
 
 
 def test_a_real_note_loads_with_its_identity(tmp_path):
-    loaded = load(capability(tmp_path))["cap1-durabilite"]
+    loaded = load(capability(tmp_path))["cap1-endurance"]
     assert loaded["capacite_num"] == 1
     assert loaded["aliases"] == ["durabilité"]
 
@@ -56,11 +56,11 @@ def test_every_broken_note_is_reported_not_just_the_first(tmp_path):
     """Fixing a folder blind, one file per run, is how a validator gets abandoned."""
     root = capability(tmp_path, FRONTMATTER.replace("capacite_num: 1", "capacite_num: nope"))
     capability(root, FRONTMATTER.replace("capacite_num: 1", "capacite_num: 99"),
-               "cap2-descente.md")
+               "cap2-vitesse.md")
     with pytest.raises(NoteError) as caught:
         load(root)
-    assert "cap1-durabilite.md" in str(caught.value)
-    assert "cap2-descente.md" in str(caught.value)
+    assert "cap1-endurance.md" in str(caught.value)
+    assert "cap2-vitesse.md" in str(caught.value)
 
 
 def test_the_real_analysis_notes_conform_without_operational_state():

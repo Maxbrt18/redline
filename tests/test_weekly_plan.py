@@ -287,7 +287,7 @@ def test_a_gate_is_lifted_only_by_a_new_revision_without_it():
     assert weekly_plan.gate_reasons(current, today=dt.date(2026, 8, 8))
     current["revisions"].append(revision(
         2, [session(status="done")], computed_at="2026-08-08T08:30:00+02:00",
-        reason="genou calme au réveil du 08/08, contrôle levé"))
+        reason="talon calme au réveil du 08/08, contrôle levé"))
     assert weekly_plan.gate_reasons(current, today=dt.date(2026, 8, 8)) == []
 
 

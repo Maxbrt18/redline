@@ -123,7 +123,7 @@ def test_the_reprimand_stays_inside_the_perimeter_the_vault_gave_it():
     style = " ".join(STYLE_PROMPT.split())
     assert "SÉANCE DE QUALITÉ" in style
     assert "n'est PAS une séance ratée" in style
-    assert "2026-08-05" in style
+    assert "mandat de réprimande limité" in style
     debrief = " ".join(PROACTIVE_TRIGGERS["strava_debrief"].split())
     assert "Une EF un peu rapide n'entre pas dans ce mandat" in debrief
 
@@ -575,7 +575,7 @@ def test_walking_is_never_asked():
     for level in ("N1", "N2"):
         assert "jamais la marche, il signale une gêne" in DEPTH_NOTES[level]
     note = prompts.gate_note([{
-        "id": "injury", "holds": ["threshold"],
+        "id": "genou", "holds": ["threshold"],
         "question": "Trace habituelle et marche inchangée ?",
         "on_fail": "remplacer le seuil",
     }])

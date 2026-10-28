@@ -225,7 +225,7 @@ def initiative(instructions: str, ending: str) -> str:
         "Lis d'abord `scripts/fact-read.py proactive` pour éviter répétition et "
         "harcèlement. L'angle que tu choisis se dépose avec `scripts/fact-write.py "
         "angle \"<deux ou trois mots>\"` : il a un champ, il n'a rien à faire dans le "
-        "texte, et le nommer à ⟨athlète⟩ est l'erreur du 2026-08-21. "
+        "texte, et ne le nomme jamais à ⟨athlète⟩. "
         "Fais toutes les lectures et écritures avant la réponse. "
         "La trace d'envoi appartient au service après livraison. "
         "Ta réponse finale suit le schéma fourni : `send` dit si un message part, "
