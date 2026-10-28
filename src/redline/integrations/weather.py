@@ -47,6 +47,7 @@ import urllib.parse
 import urllib.request
 from datetime import UTC, datetime, timedelta, timezone
 
+from redline.coach.fr.weather import FLAGS
 from redline.model.errors import ExternalError, InputError
 
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
@@ -118,8 +119,8 @@ NORMSOLAR_MAX = 0.85
 # Not to be confused with the ACSM extreme-heat policy categories
 # (<=22.2 / 22.3-25.6 / 25.7-27.8 / >=27.9), a different split. The flags below are
 # the ones a runner meets at a race, and they also cover cold.
-ACSM_BANDS = ((10.0, "blanc"), (18.0, "vert"), (23.0, "jaune"),
-              (28.0, "rouge"), (float("inf"), "noir"))
+ACSM_BANDS = ((10.0, "white"), (18.0, "green"), (23.0, "yellow"),
+              (28.0, "red"), (float("inf"), "black"))
 
 
 def acsm_band(wbgt):
@@ -127,7 +128,7 @@ def acsm_band(wbgt):
     for limit, name in ACSM_BANDS:
         if wbgt < limit:
             return name
-    return "noir"
+    return "black"
 
 
 def esat(tk):
@@ -312,10 +313,10 @@ def wbgt_outdoor(temp_c, rh_pct, pressure_hpa, wind_kmh, solar, lat, lon, when):
         "wbgt": wbgt,
         "tnwb": tnwb - 273.15,
         "tg": tg - 273.15,
-        "bande": acsm_band(wbgt),
-        "solaire_recale": solar,
+        "band": acsm_band(wbgt),
+        "solar_adjusted": solar,
         "cos_zenith": cza,
-        "fraction_directe": fdir,
+        "direct_fraction": fdir,
     }
 
 
@@ -481,15 +482,15 @@ def get_weather(lat, lon, when):
         return seq[idx] if idx < len(seq) else None
 
     out = {
-        "heure_utc": times[idx],
+        "time_utc": times[idx],
         "temp": at("temperature_2m"),
-        "ressenti": at("apparent_temperature"),
-        "humidite": at("relative_humidity_2m"),
-        "vent": at("wind_speed_10m"),
+        "feels_like": at("apparent_temperature"),
+        "humidity": at("relative_humidity_2m"),
+        "wind": at("wind_speed_10m"),
         "precip": at("precipitation"),
-        "pression": at("surface_pressure"),
-        "rayonnement": at("shortwave_radiation"),
-        "rayonnement_direct": at("direct_radiation"),
+        "pressure": at("surface_pressure"),
+        "radiation": at("shortwave_radiation"),
+        "direct_radiation": at("direct_radiation"),
         "conditions": WMO.get(at("weather_code"), "conditions inconnues"),
     }
 
@@ -497,13 +498,13 @@ def get_weather(lat, lon, when):
     # energy balance does not converge, return the weather without it rather than
     # deprive the coach of everything. A missing key can be read; an invented figure
     # cannot.
-    needed = (out["temp"], out["humidite"], out["pression"], out["vent"],
-              out["rayonnement"])
+    needed = (out["temp"], out["humidity"], out["pressure"], out["wind"],
+              out["radiation"])
     if all(v is not None for v in needed):
         with contextlib.suppress(WBGTError, ValueError, ZeroDivisionError,
                                  OverflowError):
-            out.update(wbgt_outdoor(out["temp"], out["humidite"], out["pression"],
-                                    out["vent"], out["rayonnement"],
+            out.update(wbgt_outdoor(out["temp"], out["humidity"], out["pressure"],
+                                    out["wind"], out["radiation"],
                                     lat, lon, when))
     return out
 
@@ -512,17 +513,17 @@ def format_summary(w, when, milieu=None):
     parts = [f"{w['conditions']}"]
     if w["temp"] is not None:
         s = f"{w['temp']:.0f} °C"
-        if w["ressenti"] is not None and abs(w["ressenti"] - w["temp"]) >= 1:
-            s += f" (ressenti {w['ressenti']:.0f} °C)"
+        if w["feels_like"] is not None and abs(w["feels_like"] - w["temp"]) >= 1:
+            s += f" (ressenti {w['feels_like']:.0f} °C)"
         parts.append(s)
-    if w["humidite"] is not None:
-        parts.append(f"humidité {w['humidite']:.0f} %")
-    if w["vent"] is not None:
-        parts.append(f"vent {w['vent']:.0f} km/h")
+    if w["humidity"] is not None:
+        parts.append(f"humidité {w['humidity']:.0f} %")
+    if w["wind"] is not None:
+        parts.append(f"vent {w['wind']:.0f} km/h")
     if w["precip"] is not None and w["precip"] > 0:
         parts.append(f"précip {w['precip']:.1f} mm")
     if w.get("wbgt") is not None:
-        parts.append(f"**WBGT {w['wbgt']:.0f} °C** ({w['bande']})")
+        parts.append(f"**WBGT {w['wbgt']:.0f} °C** ({FLAGS[w["band"]]})")
     local = when.strftime("%Y-%m-%d %H:%M %Z")
     out = f"Météo au départ ({local}) : " + ", ".join(parts) + "."
 
@@ -598,9 +599,9 @@ def main():
             milieu = None
 
     if args.json:
-        payload = {"lat": lat, "lon": lon, "fuseau": fuseau, **w}
+        payload = {"lat": lat, "lon": lon, "timezone": fuseau, **w}
         if milieu:
-            payload["milieu"] = {"lat": milieu_pt[0], "lon": milieu_pt[1], **milieu}
+            payload["midpoint"] = {"lat": milieu_pt[0], "lon": milieu_pt[1], **milieu}
         print(json.dumps(payload, ensure_ascii=False))
     else:
         print(format_summary(w, when, milieu))

@@ -77,7 +77,7 @@ def render(store: OperationalStore, root: Path, week: str, today: dt.date) -> st
     permit_lines = permit_report.report(store, today, week)
     if permit_lines:
         lines += ["", "Permis EF de la semaine close (choix scellés du coach face au "
-                      "couru) : solde chaque prédiction permis-ef-* avec ces écarts, "
+                      "couru) : solde chaque prédiction easy-permit-* avec ces écarts, "
                       "puis scelle les EF de la semaine suivante avec "
                       "`fact-write.py permit` AVANT d'écrire la révision. L'EF ne "
                       "porte que son enveloppe (`duration_cap_min`), jamais ta durée, "

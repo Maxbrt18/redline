@@ -213,7 +213,7 @@ def _permit(args, _) -> dict:
                  f"Prédiction : la durée courue par l'athlète tombe à ±10 min de ce choix.")
     return {"iso_week": args.week, "session_key": args.session_key,
             "scheduled_on": args.date, "coach_minutes": args.minutes,
-            "prediction_key": f"permis-ef-{args.session_key}", "statement": statement,
+            "prediction_key": f"easy-permit-{args.session_key}", "statement": statement,
             "probability": args.probability, "due_on": sunday}
 
 

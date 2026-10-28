@@ -420,7 +420,7 @@ function sdPrevious(data) {
 function sdConditions(data) {
   const grid = el('div', null, 'n-dtiles two'), meteo = data.weather;
   if (meteo && meteo.temp != null) {
-    const sub = [meteo.conditions, meteo.ressenti != null ? 'ressenti ' + fmt(meteo.ressenti, 0) + ' °C' : null, meteo.wbgt != null ? 'WBGT ' + fmt(meteo.wbgt, 0) : null].filter(Boolean).join(' · ');
+    const sub = [meteo.conditions, meteo.feels_like != null ? 'ressenti ' + fmt(meteo.feels_like, 0) + ' °C' : null, meteo.wbgt != null ? 'WBGT ' + fmt(meteo.wbgt, 0) : null].filter(Boolean).join(' · ');
     grid.append(sdTile('Météo au départ', 'cloud', fmt(meteo.temp, 0), '°C', el('small', sub)));
   } else if (meteo && meteo.wbgt != null) grid.append(sdTile('Météo au départ', 'cloud', fmt(meteo.wbgt, 0), '°C WBGT', el('small', 'température au thermomètre-globe')));
   else grid.append(sdTile('Météo au départ', 'cloud', '—', null, el('small', 'non relevée'), 'todo'));
