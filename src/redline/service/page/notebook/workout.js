@@ -15,12 +15,12 @@ import {EASE, barState, freeze, land, pageNode, remember, render, screen} from '
 import {loadToday} from './data.js';
 import {dismiss, present} from './sheet.js';
 
-const KEPT = 'carnet-seance';  // the open session, found again if iOS reloads the page
+const KEPT = 'notebook-workout';  // the open session, found again if iOS reloads the page
 const RISE = 420;  // ms, a bit longer than a pushed screen: the session comes from further
-const cover = $('seance');
+const cover = $('workout');
 
 // The link of today's session: requested from the service, kept to reopen it offline.
-export async function launchSeance(strength) {
+export async function launchWorkout(strength) {
   const key = 'redline:strength:lien:' + strength.session.sid;
   try {
     const result = await api('launch', {signature: strength.signature});
@@ -36,13 +36,13 @@ export async function launchSeance(strength) {
 }
 
 // The screen being left stays visible underneath while the session rises.
-export function openSeance(token, motion = true) {
+export function openWorkout(token, motion = true) {
   land(); remember();
   const under = motion && !calm.matches ? freeze(true) : null;
   if (under) under.append(document.querySelector('.n-nav').cloneNode(true));
-  app.seance = token;
+  app.workout = token;
   if (!app.standalone) { try { sessionStorage.setItem(KEPT, token); } catch { /* no storage: no resume on reload */ } }
-  document.documentElement.classList.add('n-seance');
+  document.documentElement.classList.add('n-workout');
   cover.hidden = false;
   $('bar-title').textContent = '';
   scrollTo(0, 0);
@@ -57,7 +57,7 @@ export function openSeance(token, motion = true) {
 }
 
 function closeSeance() {
-  if (!app.seance) return;
+  if (!app.workout) return;
   if (app.standalone) { stopSession(); location.replace('/carnet'); return; }
   // The descending session is a frozen copy; the notebook is already in place beneath.
   let leaving = null;
@@ -69,7 +69,7 @@ function closeSeance() {
     leaving.setAttribute('aria-hidden', 'true');
     leaving.append(copy);
   }
-  dropSeance();
+  dropWorkout();
   render(app.scrolls[screen().key] || 0);
   if (leaving) {
     pageNode.after(leaving);
@@ -80,35 +80,35 @@ function closeSeance() {
 }
 
 // No animation, no return to the notebook: the session is removed (also on sign-out).
-export function dropSeance() {
-  if (!app.seance) return;
+export function dropWorkout() {
+  if (!app.workout) return;
   stopSession();
-  app.seance = null;
+  app.workout = null;
   try { sessionStorage.removeItem(KEPT); } catch { /* nothing to forget */ }
-  document.documentElement.classList.remove('n-seance');
+  document.documentElement.classList.remove('n-workout');
   cover.hidden = true;
   document.title = 'Mon carnet — Redline';
 }
 
 // After iOS reloads the page, the open session comes back as it was.
-export function resumeSeance() {
+export function resumeWorkout() {
   let kept = null;
   try { kept = sessionStorage.getItem(KEPT); } catch { return; }
-  if (kept) openSeance(kept, false);
+  if (kept) openWorkout(kept, false);
 }
 
 // The Messenger link: the session alone, without going through the notebook sign-in.
 export function openLink() {
   app.standalone = true;
   $('notice').hidden = true; $('connected').hidden = false;
-  openSeance(linkToken(location.hash), false);
+  openWorkout(linkToken(location.hash), false);
 }
 // Re-tapping the button in Messenger only changes the fragment: the session reopens.
 addEventListener('hashchange', () => { if (app.standalone) startSession(linkToken(location.hash)); });
 
-$('seance-close').addEventListener('click', () => {
+$('workout-close').addEventListener('click', () => {
   if (sessionUnfinished()) present($('leave-sheet'), '#leave-stay');
   else closeSeance();
 });
 $('leave-confirm').addEventListener('click', () => { dismiss(true); closeSeance(); });
-$('seance-sound').addEventListener('click', () => { renderSoundSettings(); present($('sound-sheet')); });
+$('workout-sound').addEventListener('click', () => { renderSoundSettings(); present($('sound-sheet')); });

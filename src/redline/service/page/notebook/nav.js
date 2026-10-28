@@ -202,7 +202,7 @@ export function select(tab) {
 // when the large title passes under. Fades on scroll, switches at once on screen change.
 // During the guided session, its large title is the one that collapses.
 export function barState(instant = false) {
-  const title = app.seance ? $('title') : $('lt-title');
+  const title = app.workout ? $('title') : $('lt-title');
   topBar.classList.toggle('instant', instant);
   topBar.classList.toggle('scrolled', scrollY > 2);
   topBar.classList.toggle('titled', title.getBoundingClientRect().bottom < topBar.getBoundingClientRect().bottom);

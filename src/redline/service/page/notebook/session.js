@@ -8,10 +8,10 @@ import {closeViewer} from './viewer.js';
 import {land, render} from './nav.js';
 import {ensure, forget, hydrate, recall, refresh} from './data.js';
 import {closeSheet} from './sheet.js';
-import {dropSeance, resumeSeance} from './seance.js';
+import {dropWorkout, resumeWorkout} from './workout.js';
 
 export function lock(text) {
-  dropSeance(); land(); app.generation++; app.today = null; app.openDay = null; app.stacks = {today: [], week: [], course: []};
+  dropWorkout(); land(); app.generation++; app.today = null; app.openDay = null; app.stacks = {today: [], week: [], course: []};
   app.views = {}; app.signatures = {}; app.failures = {}; app.scrolls = {}; skies.clear();
   closeSheet(true); closeViewer(); forget(); $('offline').hidden = true;
   content.replaceChildren(); $('connected').hidden = true; $('locked').hidden = false;
@@ -43,7 +43,7 @@ export async function connect(token) {
   if (token) app.connecting = api('connect', {token});
   // The app structure is there at once; the figures take their place.
   notice(''); $('locked').hidden = true; $('connected').hidden = false; render(); ensure();
-  resumeSeance();
+  resumeWorkout();
   if (token) {
     try { await app.connecting; } catch (error) { lock(error.message); return; } finally { app.connecting = null; }
   }

@@ -71,13 +71,13 @@ from .proactive_messages import (
 )
 from .prompts import (
     BATTERY_NOTE,
-    CARNET_NOTE,
     CELLS_UNREADABLE_NOTE,
     CLASSIFY_PREAMBLE,
     DEPTH_NOTES,
     EMOTION_NOTE,
     HELP_TEXT,
     MUST_SPEAK_KINDS,
+    NOTEBOOK_NOTE,
     PROACTIVE_TRIGGERS,
     STALE_VAULT_NOTE,
     STRENGTH_REPORT_NOTE,
@@ -138,7 +138,7 @@ def unrecorded_line(kinds: Iterable[str]) -> str:
 
 
 #: Initiatives that asked for feelings the notebook now collects.
-CARNET_KINDS = frozenset({"strava_debrief", "strava_debrief_differe", "morning"})
+NOTEBOOK_KINDS = frozenset({"strava_debrief", "strava_debrief_differe", "morning"})
 
 
 class CoachBot:
@@ -533,7 +533,7 @@ class CoachBot:
             log.warning("Lecture des ressentis manquants indisponible")
             return CELLS_UNREADABLE_NOTE
         return missing_cells_note(
-            pending, asked, carnet=bool(psid) and self._notebook_connected(psid))
+            pending, asked, notebook=bool(psid) and self._notebook_connected(psid))
 
     def _notebook_connected(self, psid: str) -> bool:
         """The notebook collects the feelings: Messenger no longer asks for them again."""
@@ -676,7 +676,7 @@ class CoachBot:
             absorbed["quality"] = bool(snapshot.get("quality"))
             log.info("Strava activity %s: debrief folded into the reply", record["detail"])
             return (strava_snapshot_note(snapshot) + "\n\n" + debrief_in_reply(
-                record["detail"], carnet=self._notebook_connected(psid)))
+                record["detail"], notebook=self._notebook_connected(psid)))
         return ""
 
     def _settle_absorbed_debrief(self, absorbed: dict) -> None:
@@ -1340,7 +1340,7 @@ class CoachBot:
         """
         if not isinstance(card, dict) or not card.get("reps"):
             return None
-        if not self._repo.render_workout_card(card, activity_id or "seance"):
+        if not self._repo.render_workout_card(card, activity_id or "workout"):
             self._log_incident(f"carte-seance:{activity_id}",
                                "Le débrief d'une séance de qualité part sans sa carte.")
             return None
@@ -1894,8 +1894,8 @@ class CoachBot:
         # Set before the early return: an initiative goes out without a message from the athlete,
         # so it has even less context to guess the day than a reactive turn.
         prompt = today_note(moment) + "\n\n" + prompt
-        if job.kind in CARNET_KINDS and self._notebook_connected(job.psid):
-            prompt = CARNET_NOTE + "\n\n" + prompt
+        if job.kind in NOTEBOOK_KINDS and self._notebook_connected(job.psid):
+            prompt = NOTEBOOK_NOTE + "\n\n" + prompt
         if job.kind == "weekly_repair":
             week = job.detail or current
             return prompt, None, (week,)

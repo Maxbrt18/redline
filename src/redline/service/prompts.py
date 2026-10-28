@@ -108,7 +108,7 @@ LABELS = messages.LABELS
 
 #: Set when a notebook is connected: it collects RPE, pain and enjoyment in one tap,
 #: so Messenger does not ask for them.
-CARNET_NOTE = note("carnet")
+NOTEBOOK_NOTE = note("notebook")
 
 #: Cells computed from Strava: fetched by the coach, never asked of the athlete.
 DERIVABLE_COLUMNS = ("D+", "D-")
@@ -135,7 +135,7 @@ def _label(column: str) -> str:
     return f"{base} ({zone})" if zone else base
 
 
-def missing_cells_note(pending: list, lapsed: list, *, carnet: bool = False) -> str:
+def missing_cells_note(pending: list, lapsed: list, *, notebook: bool = False) -> str:
     """Build the invisible instruction for declarative ledger cells."""
     # A wake trace is qualitative and asked on waking; it is not a figure to chase.
     pending = [entry for entry in pending if entry.get("type") != session_kinds.WAKE_TRACE]
@@ -149,7 +149,7 @@ def missing_cells_note(pending: list, lapsed: list, *, carnet: bool = False) -> 
                      for entry in to_ask for column in entry["missing"])
     return agent_cli(messages.missing_cells(
         messages.cell_listing(to_ask, _label), keys, messages.cell_listing(to_fetch),
-        messages.cell_listing(lapsed_ask), carnet=carnet))
+        messages.cell_listing(lapsed_ask), notebook=notebook))
 
 
 def _held_sessions(gates: Sequence) -> str:
@@ -265,13 +265,13 @@ PROACTIVE_TRIGGERS = {
 MUST_SPEAK_KINDS = frozenset({"weekly", "weekly_repair"})
 
 
-def debrief_in_reply(detail: str, *, carnet: bool) -> str:
+def debrief_in_reply(detail: str, *, notebook: bool) -> str:
     """The debrief of an arrived activity, absorbed by the reply to the athlete's message.
 
     Two messages (the reply, then the debrief) would repeat each other.
     """
     instructions = PROACTIVE_TRIGGERS["strava_debrief"].replace("{detail}", detail)
-    return agent_cli(messages.debrief_in_reply(detail, CARNET_NOTE if carnet else "",
+    return agent_cli(messages.debrief_in_reply(detail, NOTEBOOK_NOTE if notebook else "",
                                                instructions))
 
 

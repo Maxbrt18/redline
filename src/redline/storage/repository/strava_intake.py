@@ -291,7 +291,7 @@ class StravaIntake(StoreBase):
 
     def store_strava_detail(self, activity_id: int, *, streams: dict | None = None,
                             weather: dict | None = None,
-                            actor: str = "carnet") -> None:
+                            actor: str = "notebook") -> None:
         """Keep the lightened streams and the weather recorded for the session detail."""
         values: dict[str, Any] = {}
         if streams is not None:

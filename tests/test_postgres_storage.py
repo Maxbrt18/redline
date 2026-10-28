@@ -2334,18 +2334,18 @@ def test_notebook_routes_protect_both_metadata_and_images(make_config, store):
     assert client.get('/carnet', headers={'Accept-Encoding': 'gzip',
                                           'If-None-Match': shell.headers['ETag']}).status_code == 304
     for path in ('entries', f'entries/{identity}', f'entries/{identity}/image', 'current'):
-        assert client.get('/carnet-api/' + path).status_code == 401
+        assert client.get('/notebook-api/' + path).status_code == 401
     link = archive.issue('4242')
-    assert client.post('/carnet-api/connect', json={'token':link}, headers={'Origin':'https://evil.test'}).status_code == 403
-    response = client.post('/carnet-api/connect', json={'token':link})
+    assert client.post('/notebook-api/connect', json={'token':link}, headers={'Origin':'https://evil.test'}).status_code == 403
+    response = client.post('/notebook-api/connect', json={'token':link})
     assert response.status_code == 200
     cookie = response.headers['Set-Cookie']
     assert COOKIE in cookie and 'Secure' in cookie and 'HttpOnly' in cookie and 'SameSite=Strict' in cookie
-    assert client.get(f'/carnet-api/entries/{identity}').json['body'] == 'Jamais public'
-    image = client.get(f'/carnet-api/entries/{identity}/image')
+    assert client.get(f'/notebook-api/entries/{identity}').json['body'] == 'Jamais public'
+    image = client.get(f'/notebook-api/entries/{identity}/image')
     assert image.data == b'PNG' and image.headers['Cache-Control'] == 'no-store'
-    assert client.post('/carnet-api/logout', json={}).status_code == 200
-    assert client.get('/carnet-api/entries').status_code == 401
+    assert client.post('/notebook-api/logout', json={}).status_code == 200
+    assert client.get('/notebook-api/entries').status_code == 401
 
 
 def test_notebook_replay_preserves_the_card_after_a_text_failure(store, tmp_path):
@@ -2424,8 +2424,8 @@ def test_notebook_expired_link_cannot_create_a_device(store):
 def _wake(store, day, value, *, state="known"):
     measurement = {"state": state, "value": value} if state == "known" else {"state": state}
     return store.add_observation({
-        "occurred_on": day, "kind": "wake-trace", "source": "carnet",
-        "idempotency_key": f"carnet:reveil:{day.isoformat()}",
+        "occurred_on": day, "kind": "wake-trace", "source": "notebook",
+        "idempotency_key": f"notebook:wake-trace:{day.isoformat()}",
         "pains": {"genou": measurement}})
 
 

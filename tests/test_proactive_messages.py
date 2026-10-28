@@ -256,7 +256,7 @@ def test_the_notebook_reminder_never_carries_a_wake_trace():
 
 
 def test_the_carnet_note_reaches_the_turns_that_used_to_ask(make_bot):
-    from redline.service.prompts import CARNET_NOTE
+    from redline.service.prompts import NOTEBOOK_NOTE
 
     bot = make_bot()
     _connected_notebook(bot)
@@ -265,11 +265,11 @@ def test_the_carnet_note_reaches_the_turns_that_used_to_ask(make_bot):
                            ("strava_debrief_differe", True), ("weekly", False)):
         prompt, _, _ = bot._proactive_prompt(
             ProactiveJob(psid="4242", kind=kind, prompt="", detail=""), "", moment)
-        assert (CARNET_NOTE in prompt) is expected, kind
+        assert (NOTEBOOK_NOTE in prompt) is expected, kind
     _connected_notebook(bot, connected=False)
     prompt, _, _ = bot._proactive_prompt(
         ProactiveJob(psid="4242", kind="morning", prompt="", detail=""), "", moment)
-    assert CARNET_NOTE not in prompt
+    assert NOTEBOOK_NOTE not in prompt
 
 
 def test_a_stored_notebook_button_never_keeps_its_one_time_link():

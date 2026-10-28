@@ -639,7 +639,7 @@ def test_a_permanent_refusal_is_not_retried_as_a_network_failure(open_session):
 def open_sound(tab):
     """Sound is set in a sheet, opened from the bar icon, like the notebook settings (one
     style for the whole app)."""
-    tab.locator("#seance-sound").click()
+    tab.locator("#workout-sound").click()
     tab.locator("#sound-sheet.open").wait_for()
 
 
@@ -653,7 +653,7 @@ def test_the_sound_can_be_silenced_and_stays_silenced(open_session):
     """A beep during a 45 s isometric is the only way not to watch the screen; it must also be
     mutable, and remember it. The bar icon says so: crossed-out speaker."""
     tab = open_session(session(exercise("A", measure="time", seconds=45), sid="son-test"))
-    icon = tab.locator("#seance-sound")
+    icon = tab.locator("#workout-sound")
     assert icon.get_attribute("aria-label") == "Son" and "muted" not in icon.get_attribute("class")
     open_sound(tab)
     assert tab.locator("#sound-panel").get_by_role("button", name="Oui").get_attribute("aria-pressed") == "true"
@@ -662,7 +662,7 @@ def test_the_sound_can_be_silenced_and_stays_silenced(open_session):
 
     tab.reload()
     tab.wait_for_selector(".p-step--live")
-    assert tab.locator("#seance-sound").get_attribute("aria-label") == "Son coupé"
+    assert tab.locator("#workout-sound").get_attribute("aria-label") == "Son coupé"
     open_sound(tab)
     assert tab.locator("#sound-panel").get_by_role("button", name="Non").get_attribute("aria-pressed") == "true"
 

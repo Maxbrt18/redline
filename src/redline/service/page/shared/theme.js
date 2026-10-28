@@ -5,7 +5,7 @@ import {remembered} from './storage.js';
 
 const KEY = 'carnet-theme';
 const themeColors = {light: '#f7f5f2', dark: '#110e0d'};
-// On iOS 26+, the strip under the clock follows the top bar (see carnet/shell.css);
+// On iOS 26+, the strip under the clock follows the top bar (see notebook/shell.css);
 // `theme-color` stays up to date for the launch screen and older iOS versions.
 const veiled = {light: '#c6c4c2', dark: '#0e0b0a'};  // --bg under the 20% black veil
 let barTint = null;

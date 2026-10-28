@@ -9,7 +9,7 @@ export const app = {
   // Page memory; the latest roots are also kept on the device
   // (see `keep`), to open without a network.
   views: {}, signatures: {}, failures: {}, scrolls: {},
-  seance: null,   // token of the guided session open over the notebook, else null
+  workout: null,   // token of the guided session open over the notebook, else null
   standalone: false,  // opened from a session link (/s): the session alone, without the notebook
   stash: null,    // figures kept on the device, read back at opening
   connecting: null,  // the sign-in link exchange in progress, which other calls wait for

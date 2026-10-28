@@ -1,4 +1,4 @@
-// The only network access of the notebook: /carnet-api, with the device cookie.
+// The only network access of the notebook: /notebook-api, with the device cookie.
 import {app} from './state.js';
 import {lock} from './session.js';
 
@@ -9,7 +9,7 @@ export async function api(path, body) {
   if (path !== 'connect' && app.connecting) {
     try { await app.connecting; } catch { throw new Error('Connexion impossible.'); }
   }
-  const response = await fetch('/carnet-api/' + path, {
+  const response = await fetch('/notebook-api/' + path, {
     method: body === undefined ? 'GET' : 'POST', credentials: 'same-origin', cache: 'no-store',
     headers: body === undefined ? {} : {'Content-Type': 'application/json'},
     body: body === undefined ? undefined : JSON.stringify(body)

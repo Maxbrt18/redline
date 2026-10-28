@@ -246,14 +246,14 @@ def test_the_route_serves_the_detail_and_refuses_what_is_not_an_identifier(
     service = NotebookService(archive, Repo(store), MagicMock(), ENGINE_ROOT,
                               "https://coach.test", operational=store)
     client = create_app(config, MagicMock(), MagicMock(), notebook=service).test_client()
-    assert client.get(f"/carnet-api/session/{observation_id}").status_code == 401
-    client.post("/carnet-api/connect", json={"token": archive.issue(config.allowed_psid)})
-    assert client.get("/carnet-api/session/drop-table").status_code == 400
-    assert client.get("/carnet-api/session/00000000-0000-0000-0000-000000000000").status_code == 404
-    view = client.get(f"/carnet-api/session/{observation_id}").json
+    assert client.get(f"/notebook-api/session/{observation_id}").status_code == 401
+    client.post("/notebook-api/connect", json={"token": archive.issue(config.allowed_psid)})
+    assert client.get("/notebook-api/session/drop-table").status_code == 400
+    assert client.get("/notebook-api/session/00000000-0000-0000-0000-000000000000").status_code == 404
+    view = client.get(f"/notebook-api/session/{observation_id}").json
     assert view["series"]["hr"] and view["reps"]
     # The streams fetched on first display are kept: the second one does not ask for them again.
     monkeypatch.setattr(session_detail, "fetch_streams", lambda _: pytest.fail("relevé deux fois"))
-    assert client.get(f"/carnet-api/session/{observation_id}").status_code == 200
-    answer = client.post("/carnet-api/answer", json={"ask": view["reserve_ask"], "value": 0})
+    assert client.get(f"/notebook-api/session/{observation_id}").status_code == 200
+    answer = client.post("/notebook-api/answer", json={"ask": view["reserve_ask"], "value": 0})
     assert answer.json == {"status": "ok", "alert": False}

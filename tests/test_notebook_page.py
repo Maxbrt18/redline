@@ -98,7 +98,7 @@ def serve(tab, answers=None):
     tab.route(BASE + '/carnet', lambda route: route.fulfill(
         content_type='text/html', body=notebook_document(render.CARDS_DIR, kinds=session_labels.for_page())))
     def respond(route):
-        path = route.request.url.split('/carnet-api/')[1]
+        path = route.request.url.split('/notebook-api/')[1]
         if path == 'today':
             data = TODAY
         elif path.startswith('week/'):
@@ -124,7 +124,7 @@ def serve(tab, answers=None):
         else:
             data = {'status': 'ok'}
         route.fulfill(content_type='application/json', body=json.dumps(data))
-    tab.route(BASE + '/carnet-api/**', respond)
+    tab.route(BASE + '/notebook-api/**', respond)
 
 
 @pytest.mark.parametrize('width', [320, 390, 760])
@@ -198,7 +198,7 @@ def test_expired_access_clears_private_content(browser):
     serve(tab)
     tab.goto(BASE + '/carnet')
     tab.get_by_role('heading', name='EF, permis accompagné', exact=True).wait_for()
-    tab.route(BASE + '/carnet-api/today', lambda route: route.fulfill(
+    tab.route(BASE + '/notebook-api/today', lambda route: route.fulfill(
         status=401, content_type='application/json', body=json.dumps({'error':'Reconnecte-toi.'})))
     pull(tab)
     tab.get_by_role('heading', name='Ton carnet privé').wait_for()
@@ -217,7 +217,7 @@ def test_a_first_connection_waits_for_its_cookie_before_asking_for_figures(brows
     order = []
 
     def gate(route):
-        path = route.request.url.split('/carnet-api/')[1]
+        path = route.request.url.split('/notebook-api/')[1]
         order.append(path.split('?')[0])
         if path == 'connect':
             time.sleep(0.3)
@@ -228,7 +228,7 @@ def test_a_first_connection_waits_for_its_cookie_before_asking_for_figures(brows
                           body=json.dumps({'error': 'Ouvre un nouveau lien avec /carnet dans Messenger.'}))
         else:
             route.fallback()
-    tab.route(BASE + '/carnet-api/**', gate)
+    tab.route(BASE + '/notebook-api/**', gate)
     tab.goto(BASE + '/carnet#t=' + 'x' * 43)
     tab.get_by_role('heading', name='EF, permis accompagné', exact=True).wait_for()
     assert tab.locator('#connected').is_visible() and not tab.locator('#locked').is_visible()
@@ -242,11 +242,11 @@ def test_an_expired_link_says_so_and_nothing_else_leaves(browser):
     calls = []
 
     def expired(route):
-        path = route.request.url.split('/carnet-api/')[1]
+        path = route.request.url.split('/notebook-api/')[1]
         calls.append(path)
         route.fulfill(status=401, content_type='application/json',
                       body=json.dumps({'error': 'Ce lien a expiré ou a déjà servi. Tape /carnet dans Messenger.'}))
-    tab.route(BASE + '/carnet-api/**', expired)
+    tab.route(BASE + '/notebook-api/**', expired)
     tab.goto(BASE + '/carnet#t=' + 'x' * 43)
     tab.get_by_text('Ce lien a expiré ou a déjà servi.', exact=False).wait_for()
     tab.wait_for_timeout(300)
@@ -259,7 +259,7 @@ def test_messenger_browser_keeps_link_for_safari(browser):
     context = browser.new_context(user_agent='Mozilla/5.0 (iPhone) Mobile/15E148 [FBAN/MessengerForiOS;FBAV/480.0]')
     tab = context.new_page()
     calls = []
-    tab.on('request', lambda request: calls.append(request.url) if '/carnet-api/' in request.url else None)
+    tab.on('request', lambda request: calls.append(request.url) if '/notebook-api/' in request.url else None)
     serve(tab)
     tab.goto(BASE + '/carnet#t=' + 'x' * 43)
     tab.get_by_role('heading', name='Ouvre ton carnet dans Safari').wait_for()
@@ -303,7 +303,7 @@ def test_settings_live_in_a_sheet_and_pulling_refreshes(browser):
     tab.keyboard.press('Escape')
     tab.locator('#sheet').wait_for(state='hidden')
     requested = []
-    tab.on('request', lambda request: requested.append(request.url.split('/carnet-api/')[-1]))
+    tab.on('request', lambda request: requested.append(request.url.split('/notebook-api/')[-1]))
     pull(tab, 60)
     tab.wait_for_timeout(150)
     assert 'today' not in requested
@@ -334,13 +334,13 @@ def test_tabs_are_prepared_while_today_is_read_and_shown_without_waiting(browser
     context = browser.new_context(viewport={'width': 390, 'height': 844})
     tab = context.new_page()
     requested = []
-    tab.on('request', lambda request: requested.append(request.url.split('/carnet-api/')[-1]))
+    tab.on('request', lambda request: requested.append(request.url.split('/notebook-api/')[-1]))
     serve(tab)
     tab.goto(BASE + '/carnet')
     tab.get_by_role('heading', name='EF, permis accompagné', exact=True).wait_for()
     tab.wait_for_timeout(200)
     assert 'week/2026-W41' in requested and 'race' in requested
-    tab.route(BASE + '/carnet-api/**', lambda route: route.abort())
+    tab.route(BASE + '/notebook-api/**', lambda route: route.abort())
     tab.get_by_role('button', name='Semaine', exact=True).click()
     tab.get_by_role('heading', name='Semaine 41').wait_for(timeout=1000)
     tab.get_by_role('button', name='Course', exact=True).click()
@@ -359,7 +359,7 @@ def test_the_morning_comes_first_and_a_high_heart_rate_asks_why(browser):
     tab = browser.new_page(viewport={'width': 390, 'height': 844})
     answers = []
     serve(tab, answers)
-    tab.route(BASE + '/carnet-api/today', lambda route: route.fulfill(
+    tab.route(BASE + '/notebook-api/today', lambda route: route.fulfill(
         content_type='application/json', body=json.dumps(morning)))
     tab.goto(BASE + '/carnet')
     tab.get_by_role('heading', name='Comment tu te réveilles ?').wait_for()
@@ -415,9 +415,9 @@ def test_the_weather_answers_what_to_wear_and_whether_night_falls_during_the_run
     sky = {**SKY, 'sunrise': '07:55', 'hours': [
         {'hour': 17, 'temp': 16, 'feels': 15, 'rain': 0, 'wind': 12, 'code': 2, 'day': True},
         {'hour': 18, 'temp': 15, 'feels': 13, 'rain': 10, 'wind': 14, 'code': 3, 'day': True}]}
-    tab.route(BASE + '/carnet-api/today', lambda route: route.fulfill(
+    tab.route(BASE + '/notebook-api/today', lambda route: route.fulfill(
         content_type='application/json', body=json.dumps(start)))
-    tab.route(BASE + '/carnet-api/weather*', lambda route: route.fulfill(
+    tab.route(BASE + '/notebook-api/weather*', lambda route: route.fulfill(
         content_type='application/json', body=json.dumps(sky)))
     tab.goto(BASE + '/carnet')
     tab.get_by_text('Nuit à 19 h 05 : tu rentres plus d’une heure avant.').wait_for()
@@ -437,10 +437,10 @@ def test_returning_to_the_app_keeps_the_page_still(browser):
     change, without asking the weather again, and the page stays where it was left."""
     tab = browser.new_page(viewport={'width': 390, 'height': 600})
     requested = []
-    tab.on('request', lambda request: requested.append(request.url.split('/carnet-api/')[-1].split('?')[0]))
+    tab.on('request', lambda request: requested.append(request.url.split('/notebook-api/')[-1].split('?')[0]))
     tab.clock.install(time='2026-10-09T10:00:00')
     serve(tab)
-    tab.route(BASE + '/carnet-api/weather*', lambda route: route.fulfill(
+    tab.route(BASE + '/notebook-api/weather*', lambda route: route.fulfill(
         content_type='application/json', body=json.dumps(SKY)))
     tab.goto(BASE + '/carnet')
     tab.get_by_text('Nuit à 19 h 05.').wait_for()
@@ -485,7 +485,7 @@ def test_a_tab_never_seen_shows_its_outline_until_its_numbers_arrive(browser):
     tab = browser.new_page(viewport={'width': 390, 'height': 844})
     serve(tab)
     pending = []
-    tab.route(BASE + '/carnet-api/race', lambda route: pending.append(route))
+    tab.route(BASE + '/notebook-api/race', lambda route: pending.append(route))
     tab.goto(BASE + '/carnet')
     tab.get_by_role('heading', name='EF, permis accompagné', exact=True).wait_for()
     tab.get_by_role('button', name='Course', exact=True).click()
@@ -595,8 +595,8 @@ def guided(tab, today=None):
     """The notebook with a strength session ready: `Séance guidée` gets a link."""
     serve(tab)
     data = today or {**TODAY, 'strength': {**TODAY['strength'], 'session': SESSION}}
-    tab.route(BASE + '/carnet-api/today', lambda route: route.fulfill(content_type='application/json', body=json.dumps(data)))
-    tab.route(BASE + '/carnet-api/launch', lambda route: route.fulfill(
+    tab.route(BASE + '/notebook-api/today', lambda route: route.fulfill(content_type='application/json', body=json.dumps(data)))
+    tab.route(BASE + '/notebook-api/launch', lambda route: route.fulfill(
         content_type='application/json', body=json.dumps({'url': '/s#t=' + 'A' * 32})))
     tab.route('**/strength-session', lambda route: route.fulfill(
         content_type='application/json', body=json.dumps({'status': 'ok', 'session': SESSION})))
@@ -605,7 +605,7 @@ def guided(tab, today=None):
 
 
 def in_session(tab):
-    return tab.evaluate("document.documentElement.classList.contains('n-seance') && !document.getElementById('seance').hidden")
+    return tab.evaluate("document.documentElement.classList.contains('n-workout') && !document.getElementById('workout').hidden")
 
 
 def test_the_guided_session_opens_over_the_notebook_and_closes_back_to_it(browser):
@@ -623,7 +623,7 @@ def test_the_guided_session_opens_over_the_notebook_and_closes_back_to_it(browse
     assert not tab.locator('#connected > .n-nav').is_visible() and not tab.locator('#settings').is_visible()
     assert tab.get_by_role('button', name='Fermer la séance').is_visible() and tab.get_by_role('button', name='Son').is_visible()
     tab.get_by_role('button', name='Fermer la séance').click()
-    tab.wait_for_function("!document.documentElement.classList.contains('n-seance')")
+    tab.wait_for_function("!document.documentElement.classList.contains('n-workout')")
     assert tab.locator('#leave-sheet').is_hidden() and tab.locator('#connected > .n-nav').is_visible()
     assert title(tab) == 'Aujourd’hui' and tab.evaluate('history.length') == entries
     tab.close()
@@ -647,7 +647,7 @@ def test_leaving_a_started_session_asks_and_loses_nothing(browser):
     assert in_session(tab)
     tab.get_by_role('button', name='Fermer la séance').click()
     tab.get_by_role('button', name='Quitter', exact=True).click()
-    tab.wait_for_function("!document.documentElement.classList.contains('n-seance')")
+    tab.wait_for_function("!document.documentElement.classList.contains('n-workout')")
     step = tab.locator('.n-step', has_text='Renfo')
     assert 'EN COURS · COMMENCÉE À' in step.inner_text().upper() and '1 exercice sur 3' in step.inner_text()
     step.get_by_role('button', name='Reprendre la séance →').click()
@@ -733,7 +733,7 @@ def test_every_value_of_a_scale_is_visible_without_scrolling(browser):
         tab = browser.new_page(viewport={'width': 320, 'height': 700})
         serve(tab)
         data = {**TODAY, 'asks': [{**TODAY['asks'][0], 'fields': fields}]}
-        tab.route(BASE + '/carnet-api/today', replying(data))
+        tab.route(BASE + '/notebook-api/today', replying(data))
         tab.goto(BASE + '/carnet')
         tab.locator('.n-chips').wait_for()
         rows = tab.evaluate("""[...document.querySelectorAll('.n-chips')].map(row => [
@@ -803,9 +803,9 @@ def test_a_card_opens_in_the_app_and_closes_like_a_screen(browser):
     tab = browser.new_page(viewport={'width': 393, 'height': 852}, accept_downloads=True)
     serve(tab)
     entry = {**ENTRY, 'body': 'Texte', 'image_hash': 'abc', 'snapshot': None, 'report': None, 'related': []}
-    tab.route(BASE + '/carnet-api/entries/one', lambda route: route.fulfill(
+    tab.route(BASE + '/notebook-api/entries/one', lambda route: route.fulfill(
         content_type='application/json', body=json.dumps(entry)))
-    tab.route(BASE + '/carnet-api/entries/one/image', lambda route: route.fulfill(
+    tab.route(BASE + '/notebook-api/entries/one/image', lambda route: route.fulfill(
         content_type='image/png', body=PNG))
     tab.goto(BASE + '/carnet#entry=one')
     tab.get_by_role('button', name='Agrandir la carte').click()
@@ -834,7 +834,7 @@ def test_the_last_numbers_open_without_network_and_say_when_they_date_from(brows
     tab.wait_for_timeout(300)
     kept = tab.evaluate("JSON.parse(localStorage.getItem('carnet-data'))")
     assert set(kept['views']) == {'today', 'course', 'weeks', 'week:2026-W41'}
-    tab.route(BASE + '/carnet-api/**', lambda route: route.abort())
+    tab.route(BASE + '/notebook-api/**', lambda route: route.abort())
     tab.reload()
     tab.get_by_role('heading', name='EF, permis accompagné', exact=True).wait_for()
     assert tab.locator('#offline').inner_text().startswith('Hors ligne · chiffres de ')
@@ -849,9 +849,9 @@ def test_a_rest_day_shows_tomorrow_whole_with_its_weather(browser):
     rest = {**TODAY, 'sessions': [], 'asks': [], 'tomorrow': {
         'date': '2026-10-10', 'plan': 'valid', 'next': [],
         'sessions': [{**TODAY['sessions'][0], 'id': 'w41-sam-ef', 'date': '2026-10-10', 'start_time': '09:30'}]}}
-    tab.route(BASE + '/carnet-api/today', lambda route: route.fulfill(
+    tab.route(BASE + '/notebook-api/today', lambda route: route.fulfill(
         content_type='application/json', body=json.dumps(rest)))
-    tab.route(BASE + '/carnet-api/weather*', lambda route: route.fulfill(
+    tab.route(BASE + '/notebook-api/weather*', lambda route: route.fulfill(
         content_type='application/json', body=json.dumps({**SKY, 'hours': [
             {'hour': 9, 'temp': 11, 'feels': 9, 'rain': 0, 'wind': 8, 'code': 0, 'day': True}]})))
     tab.goto(BASE + '/carnet')
@@ -874,7 +874,7 @@ def test_the_red_point_moves_from_the_run_to_the_strength_once_done(browser):
     tab = browser.new_page(viewport={'width': 393, 'height': 852})
     answers = []
     serve(tab, answers)
-    tab.route(BASE + '/carnet-api/today', lambda route: route.fulfill(
+    tab.route(BASE + '/notebook-api/today', lambda route: route.fulfill(
         content_type='application/json', body=json.dumps(after)))
     tab.goto(BASE + '/carnet')
     tab.locator('.n-step.done').wait_for()
@@ -941,8 +941,8 @@ def test_two_watched_zones_get_two_tiles_and_two_morning_traces(browser):
     tab = browser.new_page(viewport={'width': 390, 'height': 844})
     answers = []
     serve(tab, answers)
-    tab.route(BASE + '/carnet-api/today', replying(two))
-    tab.route(BASE + '/carnet-api/injury?zone=*', lambda route: route.fulfill(
+    tab.route(BASE + '/notebook-api/today', replying(two))
+    tab.route(BASE + '/notebook-api/injury?zone=*', lambda route: route.fulfill(
         content_type='application/json',
         body=json.dumps(screens[route.request.url.rsplit('=', 1)[1]])))
     tab.goto(BASE + '/carnet')

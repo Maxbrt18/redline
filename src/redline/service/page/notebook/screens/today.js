@@ -8,7 +8,7 @@ import {capital, day, dayNumber, fmt, hm, isoDate, kindName, paceOf, plannedValu
 import {prep, weatherSlot} from './weather.js';
 import {push, render, select} from '../nav.js';
 import {loadToday} from '../data.js';
-import {launchSeance, openSeance} from '../seance.js';
+import {launchWorkout, openWorkout} from '../workout.js';
 
 // ------------------------------------------------------------ Today
 // The day's thread: what is done today, in order, then what is coming, then the landmarks.
@@ -62,7 +62,7 @@ function launcher(strength) {
   const progress = savedProgress(strength.session);
   const go = button(progress ? 'Reprendre la séance →' : 'Séance guidée →', async node => {
     node.disabled = true;
-    try { openSeance(await launchSeance(strength)); }
+    try { openWorkout(await launchWorkout(strength)); }
     catch (error) { message(error.message); }
     node.disabled = false;
   }, 'n-action');

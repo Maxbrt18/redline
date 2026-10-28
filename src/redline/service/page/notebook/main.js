@@ -6,10 +6,10 @@ import {isoDate} from './format.js';
 import {render} from './nav.js';
 import {refresh} from './data.js';
 import {showTheme} from './sheet.js';
-import {openLink} from './seance.js';
+import {openLink} from './workout.js';
 
 // The notebook: three sections computed by the service at each opening
-// (/carnet-api/today, /week/<W>, /race). The page formats, it computes nothing:
+// (/notebook-api/today, /week/<W>, /race). The page formats, it computes nothing:
 // the figures come from the ledger and the plan, not from here.
 showTheme(applyTheme());
 window.addEventListener('beforeinstallprompt', event => {

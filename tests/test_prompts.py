@@ -561,7 +561,7 @@ def test_pending_cells_do_not_force_a_questionnaire_or_block_partial_answers():
 def test_with_the_notebook_pending_cells_are_left_to_it_except_pain():
     note = prompts.missing_cells_note(
         [{"date": "2026-10-08", "type": "easy", "missing": ["RPE", "Plaisir"]}], [],
-        carnet=True)
+        notebook=True)
     assert "Le carnet les recueille : ne les demande pas" in note
     assert "douleur si le message montre une gêne" in note
     assert "une seule information" not in note

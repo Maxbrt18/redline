@@ -29,7 +29,7 @@ export function renderArchive(data) {
 export function renderEntry(item) {
   const id = item.id;
   if (item.image_hash) {
-    const card = {src: '/carnet-api/entries/' + encodeURIComponent(id) + '/image', name: 'redline-' + id + '.png', alt: item.title};
+    const card = {src: '/notebook-api/entries/' + encodeURIComponent(id) + '/image', name: 'redline-' + id + '.png', alt: item.title};
     const open = button('', () => openViewer(card), 'n-imagebtn');
     open.setAttribute('aria-label', 'Agrandir la carte');
     const image = el('img', null, 'n-image'); image.src = card.src; image.alt = item.title;
