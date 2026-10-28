@@ -14,7 +14,6 @@ import datetime as dt
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from . import decisions as decision_log
 from . import programme, vault_layout
 from .views import apply
 
@@ -131,7 +130,7 @@ def _as_date(value: Any) -> dt.date:
 
 
 def render_state(ledger, rows: list, *, deadlines: list[dict], capabilities: list[dict],
-                 typed_due: int, narrative_due: int, race_on: dt.date | None,
+                 typed_due: int, race_on: dt.date | None,
                  today: dt.date) -> str:
     """Le bloc ÉTAT : ce qui décide des prochaines semaines, calculé et daté."""
     # Aucune date du jour dans le rendu : il ne change qu'avec les faits ou la semaine.
@@ -162,9 +161,8 @@ def render_state(ledger, rows: list, *, deadlines: list[dict], capabilities: lis
     if capabilities:
         lines.append("- **Capacités** : " + " · ".join(
             f"{row['slug']} {row['score']}/{row['scale']}" for row in capabilities) + ".")
-    if typed_due or narrative_due:
-        lines.append(f"- **Prédictions à solder** : {narrative_due} narrative(s) "
-                     f"(`decisions-index.py --due`) · {typed_due} typée(s) "
+    if typed_due:
+        lines.append(f"- **Prédictions à solder** : {typed_due} "
                      "(`fact-read.py predictions --due`).")
     return "\n".join(lines)
 
@@ -174,17 +172,12 @@ def state_inputs(store: OperationalStore, vault: Path, today: dt.date) -> dict:
     predictions = store.prediction_rows()
     typed_due = sum(1 for row in predictions if row.get("status") == "open"
                     and _as_date(row["due_on"]) <= today)
-    decisions_path = vault / vault_layout.DECISIONS
-    narrative_due = 0
-    if decisions_path.exists():
-        narrative_due = sum(1 for entry in decision_log.parse(
-            decisions_path.read_text(encoding="utf-8")) if entry.is_due(today))
     deadlines = store.deadline_rows()
     races = [_as_date(row["due_on"]) for row in deadlines
              if row.get("kind") == "race" and row.get("status") != "done"
              and _as_date(row["due_on"]) > today]
     return {"deadlines": deadlines, "capabilities": store.latest_capabilities(),
-            "typed_due": typed_due, "narrative_due": narrative_due,
+            "typed_due": typed_due,
             "race_on": min(races) if races else None}
 
 

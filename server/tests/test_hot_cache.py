@@ -101,7 +101,7 @@ def _state(**overrides):
         ],
         "capabilities": [{"slug": "durabilite", "score": 2, "scale": 5},
                          {"slug": "descente", "score": 1, "scale": 5}],
-        "typed_due": 0, "narrative_due": 33,
+        "typed_due": 0,
         "race_on": dt.date(2026, 11, 28), "today": dt.date(2026, 10, 5),
     }
     inputs.update(overrides)
@@ -116,7 +116,6 @@ def test_the_state_block_carries_what_decides_the_next_weeks():
     assert "verdict-cortex (06/09), bloque descente courue" in block
     assert "targetrace" not in block.split("Échéances échues")[1].split("\n")[0]
     assert "durabilite 2/5 · descente 1/5" in block
-    assert "33 narrative(s)" in block
 
 
 def test_the_state_block_does_not_change_from_one_day_to_the_next():
@@ -149,7 +148,7 @@ def test_refresh_fills_the_state_block_only_where_it_is_declared(tmp_path):
     assert hot_cache.refresh(tmp_path, ledger, rows, {}, store=Store(),
                              today=dt.date(2026, 9, 27))
     text = cache.read_text(encoding="utf-8")
-    assert "injury 3/5" in text and "1 typée(s)" in text
+    assert "injury 3/5" in text and "Prédictions à solder** : 1" in text
     assert not hot_cache.refresh(tmp_path, ledger, rows, {}, store=Store(),
                                  today=dt.date(2026, 9, 27), check=True)
 

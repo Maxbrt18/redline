@@ -4,10 +4,10 @@ processus : pour chaque capacité, a-t-elle bougé ce mois-ci, et la trajectoire
 sortie longue (`scripts/ledger.py --semaine <W> --cible-sl <km visés avant l'affûtage>`)
 mène-t-elle à la course ? Une capacité immobile deux mois de suite est un point du
 recul, même si chaque semaine était défendable. Lis aussi
-`scripts/decisions-index.py --calibration` : des réfutées surtout optimistes font
-attaquer en premier, au prochain rituel de confrontation, la décision active du même
-type ; une part de non testable au-dessus du plafond fait relire comment les dernières
-prédictions ont été écrites. Ce score ne se raconte pas à ⟨athlète⟩ sans objet concret.
+la calibration de `scripts/fact-read.py predictions` : des réfutées surtout optimistes
+font attaquer en premier, au prochain rituel de confrontation, la décision active du
+même type ; plus d'un cinquième de void fait relire comment les dernières prédictions
+ont été écrites. Ce score ne se raconte pas à ⟨athlète⟩ sans objet concret.
 Envoie un ou deux textos sur la
 tendance et le point de vigilance du mois à venir. TRAVAIL MENTAL : la capacité
 n°6 ne se nourrit d'AUCUNE séance, donc personne ne la nourrit. S'il existe un objet

@@ -1,13 +1,8 @@
 """Le dossier du bilan du dimanche, calculé par le service AVANT le tour du modèle.
 
-Audit du 2026-09-27 (constat RWF-009 resté partiel) : le bilan était un seul tour lourd
-qui refaisait lui-même, CLI après CLI, des calculs déterministes — volume, jauge,
-douleur, trajectoire, signaux, prédictions échues, échéances. Il lisait les prédictions
-typées de PostgreSQL et pas celles de `decisions.md` (43 restées sans verdict), et il
-pouvait sauter une étape sans que rien ne le voie.
-
-Ici, tout ce qui se calcule est calculé une fois, par le même code que les CLI
-(`ledger.week_report`, `signals.signals`, `model.decisions`), et remis au modèle comme
+Volume, jauge, douleur, trajectoire, signaux, prédictions échues et échéances se
+calculent une fois, par le même code que les CLI (`ledger.week_report`,
+`signals.signals`, `model.predictions`), et sont remis au modèle comme
 une donnée. Le modèle garde ce qui est à lui : juger, décider, écrire. Il relance une
 CLI seulement pour vérifier un point précis.
 
@@ -26,9 +21,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts import feasibility, ledger, permit_report, signals  # noqa: E402
-from scripts.model import decisions as decision_log  # noqa: E402
 from scripts.model import predictions as prediction_model  # noqa: E402
-from scripts.model import programme, vault_layout  # noqa: E402
+from scripts.model import programme  # noqa: E402
 
 if TYPE_CHECKING:
     from scripts.storage import OperationalStore
@@ -64,36 +58,19 @@ def render(store: OperationalStore, root: Path, week: str, today: dt.date) -> st
     every = store.prediction_rows()
     typed = [row for row in every
              if row.get("status") == "open" and _as_date(row["due_on"]) <= today]
-    lines += ["", f"Prédictions typées échues ({len(typed)}), ferme chacune avec "
-                  "`fact-write.py prediction --key <clé> --outcome true|false|void` :"]
+    lines += ["", f"Prédictions échues ({len(typed)}), ferme chacune avec "
+                  "`fact-write.py prediction --key <clé> --outcome true|false|void`. Un "
+                  "verdict s'adosse à un fait lu ; void est un verdict, l'invention n'en "
+                  "est pas un. Une réfutée porte `--reason optimistic` (moins bien que "
+                  "prédit) ou `cautious` (mieux) ; une void `--reason instrument` (la "
+                  "mesure n'existait pas), `exposure` (la situation n'a pas eu lieu), "
+                  "`scope` (le critère exigeait un inventaire exhaustif) ou `superseded` "
+                  "(retirée avant sa revue) :"]
     lines.extend(f"- {row['prediction_key']} (échue le {_as_date(row['due_on']):%d/%m}) : "
                  f"{str(row.get('statement', ''))[:160]}" for row in typed[:MAX_LISTED])
     calibration = prediction_model.calibration_lines(every, today)
     lines += ["", "Calibration des prédictions typées par domaine (cite-la dans le bilan) :"]
     lines.extend(calibration or ["aucune prédiction typée"])
-
-    decisions_path = root / vault_layout.DECISIONS
-    if decisions_path.exists():
-        entries = decision_log.parse(decisions_path.read_text(encoding="utf-8"))
-        due = sorted((entry for entry in entries if entry.is_due(today)),
-                     key=lambda entry: -decision_log.overdue_days(entry, today))
-        lines += ["", f"Prédictions narratives échues dans decisions.md ({len(due)}), la plus "
-                      "en retard d'abord. Ferme-les dans le corps de leur décision, sans "
-                      "toucher à la prédiction, avec : "
-                      f"`{decision_log.verdict_template(today)}`. Un verdict s'adosse à un "
-                      "fait lu ; non testable est un verdict, l'invention n'en est pas un. "
-                      "Réfutée : optimiste si la décision a fait moins bien que prédit, "
-                      "prudente si mieux. Non testable : instrument (la mesure n'existait "
-                      "pas), exposition (la situation n'a pas eu lieu), portée (le critère "
-                      "exigeait un inventaire exhaustif), remplacée (retirée avant sa revue). "
-                      "Plusieurs volets : réfutée si un volet testable l'est, tenue si "
-                      "tous les volets testables tiennent ; détail après le tiret."]
-        lines.extend(f"- {entry.date} (revue W{entry.review_week}, +"
-                     f"{decision_log.overdue_days(entry, today)} j) : {entry.title}"
-                     for entry in due[:MAX_LISTED])
-        if len(due) > MAX_LISTED:
-            lines.append(f"- et {len(due) - MAX_LISTED} autre(s) "
-                         "(`decisions-index.py --due`)")
 
     overdue = [row for row in store.deadline_rows()
                if row.get("status") != "done" and _as_date(row["due_on"]) < today]

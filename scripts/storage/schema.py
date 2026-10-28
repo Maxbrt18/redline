@@ -13,6 +13,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 from scripts.model import commands, session_kinds
+from scripts.model import predictions as prediction_model
 
 NAMING_CONVENTION = {
     "pk": "pk_%(table_name)s",
@@ -813,6 +814,8 @@ coach_predictions = sa.Table(
     sa.Column("resolves_zone", sa.Text),
     sa.Column("success_op", sa.Text),
     sa.Column("success_value", sa.Numeric(4, 1)),
+    # Why a prediction failed or could not be tested; the calibration counts each reason.
+    sa.Column("outcome_reason", sa.Text),
     sa.UniqueConstraint("athlete_id", "prediction_key", name="uq_coach_predictions_key"),
     sa.CheckConstraint("probability BETWEEN 0 AND 1", name="ck_coach_predictions_probability"),
     sa.CheckConstraint("direction IN ('increase','decrease','neutral')",
@@ -833,6 +836,8 @@ coach_predictions = sa.Table(
         "AND success_op IN ('<=','<','>=','>','=') "
         "AND success_value IS NOT NULL AND resolves_on <= due_on)",
         name="ck_coach_predictions_resolves"),
+    sa.CheckConstraint(prediction_model.OUTCOME_REASON_RULE,
+                       name="ck_coach_predictions_outcome_reason"),
     sa.ForeignKeyConstraint(["athlete_id", "resolves_zone"],
                             ["redline.pain_zones.athlete_id", "redline.pain_zones.slug"],
                             name="fk_coach_predictions_zone"),

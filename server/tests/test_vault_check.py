@@ -150,10 +150,6 @@ def test_decisions_newest_first_pass(report):
     assert report.failed == 0
 
 
-# ------------------------------------------------------- fichiers retirés
-
-# ------------------------------------------ règles de méta portées
-
 def correction(date, correctif):
     return {"coaching/corrections.md":
             f"| {date} | affirmé | vrai | à lire | {correctif} |\n"}
@@ -186,35 +182,33 @@ def test_every_check_is_in_the_registry():
 
 # ------------------------------------------------- dette de prédictions
 
-_DECISION = """## 2026-08-20 — Une décision datée
-
-**Prédiction** : quelque chose de falsifiable. Revue : W35.
-"""
-
-
-def _frozen(monkeypatch, day):
+def _predictions(monkeypatch, day, rows):
     class FrozenDate(vault_check.dt.date):
         @classmethod
         def today(cls):
             return cls.fromisoformat(day)
     monkeypatch.setattr(vault_check.dt, "date", FrozenDate)
+    monkeypatch.setattr(vault_check, "_read_postgres", lambda report, label, read: rows)
+
+
+_DUE = {"prediction_key": "sl-20", "status": "open", "due_on": vault_check.dt.date(2026, 8, 30)}
 
 
 def test_a_prediction_due_within_the_grace_period_is_only_a_warning(report, monkeypatch):
-    _frozen(monkeypatch, "2026-09-05")                   # W35 close le 30/08 : +6 j
-    vault_check.check_prediction_debt(vault({"coaching/decisions.md": _DECISION}), report)
+    _predictions(monkeypatch, "2026-09-05", [_DUE])
+    vault_check.check_prediction_debt(vault({}), report)
     assert report.failed == 0 and report.warned == 1
 
 
 def test_a_prediction_left_without_verdict_past_the_grace_fails(report, monkeypatch):
-    """Réponse pré-engagée de la décision du 2026-08-16 : un contrôle rouge."""
-    _frozen(monkeypatch, "2026-09-27")                   # +28 j
-    vault_check.check_prediction_debt(vault({"coaching/decisions.md": _DECISION}), report)
+    _predictions(monkeypatch, "2026-09-27", [_DUE])
+    vault_check.check_prediction_debt(vault({}), report)
     assert report.failed == 1
 
 
-def test_a_dated_verdict_closes_the_debt(report, monkeypatch):
-    _frozen(monkeypatch, "2026-09-27")
-    closed = _DECISION + "\n**Verdict** (2026-09-27) : tenue — le fait qui tranche.\n"
-    vault_check.check_prediction_debt(vault({"coaching/decisions.md": closed}), report)
+def test_a_settled_prediction_is_no_debt(report, monkeypatch):
+    _predictions(monkeypatch, "2026-09-27", [{**_DUE, "status": "resolved"}])
+    vault_check.check_prediction_debt(vault({}), report)
     assert report.failed == 0 and report.warned == 0
+
+

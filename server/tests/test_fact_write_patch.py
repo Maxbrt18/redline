@@ -183,3 +183,15 @@ def test_une_prediction_corps_se_rattache_au_reveil_qui_la_tranche():
     assert "resolves_on" not in fact_write._payload(parse(*base))[2]
     with pytest.raises(InputError, match="vont ensemble"):
         fact_write._payload(parse(*base, "--resolves", "wake-trace"))
+
+
+def test_a_prediction_reason_must_fit_its_outcome():
+    payload = fact_write._prediction(
+        parse("prediction", "--key", "k", "--outcome", "false", "--reason", "optimistic"), None)
+    assert payload["reason"] == "optimistic"
+    with pytest.raises(InputError, match="ne va pas avec --outcome void"):
+        fact_write._prediction(
+            parse("prediction", "--key", "k", "--outcome", "void", "--reason", "cautious"), None)
+    with pytest.raises(InputError, match="ne va pas avec --outcome true"):
+        fact_write._prediction(
+            parse("prediction", "--key", "k", "--outcome", "true", "--reason", "scope"), None)

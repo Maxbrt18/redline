@@ -479,8 +479,8 @@ rapides) est arrêté depuis le 2026-10-09 ; ses tables restent lisibles.
 
 Avant le tour du bilan hebdomadaire, le service calcule un dossier
 (`scripts/weekly_dossier.py`) avec les mêmes fonctions que les CLI : semaine close,
-trajectoire de la sortie longue et stagnation, signaux, prédictions échues typées et
-narratives, échéances échues, capacités. Il l'injecte avec le paquet N2 ; un calcul en
+trajectoire de la sortie longue et stagnation, signaux, prédictions échues,
+échéances échues, capacités. Il l'injecte avec le paquet N2 ; un calcul en
 échec le remplace par une ligne qui renvoie aux CLI, sans retenir le bilan. Le projecteur
 crée le journal de la semaine courante et de la suivante quand un programme existe.
 

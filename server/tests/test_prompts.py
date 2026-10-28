@@ -776,13 +776,11 @@ def test_a_restriction_names_its_rule_and_fact_wherever_the_plan_is_revised():
     assert "`motif`" in PROACTIVE_TRIGGERS["weekly_repair"]
 
 
-def test_weekly_uses_the_dossier_and_closes_both_prediction_families():
-    """Audit du 2026-09-27 : 43 prédictions narratives sans verdict pendant que le bilan
-    écrivait « Prédictions échues : aucune » ; et un bilan qui refaisait ses calculs."""
+def test_weekly_uses_the_dossier_and_closes_every_due_prediction():
     weekly = " ".join(PROACTIVE_TRIGGERS["weekly"].split())
     assert "DOSSIER DU BILAN" in weekly and "ne le recalcule pas" in weekly
-    assert "decisions-index.py --due" in weekly
-    assert "ligne de verdict datée" in weekly
+    assert "fact-read.py predictions --due" in weekly
+    assert "--reason" in weekly and "decisions-index" not in weekly
     assert "protocole d'instruction des baisses" in weekly
     assert "action prête à faire" in weekly and "repli daté" in weekly
     assert "Le service crée le journal" in weekly

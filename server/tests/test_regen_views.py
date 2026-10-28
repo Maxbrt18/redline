@@ -19,8 +19,6 @@ from scripts.model import hot_cache, programme, strength_tables, views, weekly_p
 MARKER = re.compile(r"<!-- ([A-Z_]+)_START -->")
 
 
-decisions_index = load_script("decisions-index")
-
 
 class TestTheEntryPoint:
     def test_every_generator_it_names_exists(self):
@@ -40,7 +38,7 @@ class TestTheEntryPoint:
         `<!-- X_START -->` présent dans une note doit avoir un générateur qui le
         revendique. C'est l'invariant qu'on veut (aucun bloc sans propriétaire), et il
         ne dépend d'aucune façon d'écrire les générateurs."""
-        owned = {hot_cache.BLOCK, hot_cache.STATE_BLOCK, decisions_index.BLOCK,
+        owned = {hot_cache.BLOCK, hot_cache.STATE_BLOCK,
                  weekly_plan.BLOCK,
                  strength_tables.LOG_BLOCK,
                  *strength_tables.blocks(programme.load(VAULT_ROOT))}

@@ -11,6 +11,13 @@ from collections.abc import Sequence
 
 from .calendar import DAYS, MONTHS
 
+#: The reasons a prediction failed or could not be tested, as the coach reads them.
+PREDICTION_REASONS = {
+    "optimistic": "réfutée optimiste", "cautious": "réfutée prudente",
+    "instrument": "void instrument", "exposure": "void exposition",
+    "scope": "void portée", "superseded": "void remplacée",
+}
+
 #: How a missing ledger cell is asked for: the unit asked, not the unit stored.
 LABELS = {
     "RPE": "l'effort ressenti sur la séance ENTIÈRE (RPE, un entier)",

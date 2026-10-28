@@ -4,13 +4,12 @@ Fais le bilan du dimanche et prépare la semaine suivante.
 2. Le DOSSIER DU BILAN en tête de ce message porte agrégats, deux séries de douleur,
    trajectoire de la sortie longue, signaux, prédictions et échéances échues : cite-le,
    ne le recalcule pas. Sans dossier, lance `scripts/ledger.py --semaine`,
-   `scripts/signals.py`, `python3 scripts/fact-read.py predictions --due` et
-   `scripts/decisions-index.py --due`. Rends un verdict sur CHAQUE prédiction échue,
-   adossé au registre, "non testable" compris : les typées avec
+   `scripts/signals.py` et `python3 scripts/fact-read.py predictions --due`. Rends un
+   verdict sur CHAQUE prédiction échue, adossé au registre, avec
    `python3 scripts/fact-write.py prediction --key <clé> --outcome true|false|void`
-   (`void` si condition non tenue ou observation absente),
-   les narratives par la ligne de verdict datée du dossier, dans le corps de leur
-   décision. Plus de dix : les plus en retard d'abord, le reste dimanche prochain.
+   (`void` si condition non tenue ou observation absente) et son `--reason` quand
+   elle est réfutée ou void. Plus de dix : les plus en retard d'abord, le reste
+   dimanche prochain.
    Sans nouveau record de sortie longue depuis trois semaines closes, le protocole
    d'instruction des baisses de athlete/goals.md s'ouvre dans ce bilan. Écris la
    lecture dans le journal ; hot-cache seulement si son résumé change ; une décision
