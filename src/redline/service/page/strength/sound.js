@@ -95,7 +95,7 @@ function setMuted(value) {
 
 // The bar icon: a speaker, crossed out when sound is off.
 export function paintSound() {
-  const node = $('seance-sound');
+  const node = $('workout-sound');
   node.classList.toggle('muted', muted);
   node.setAttribute('aria-label', muted ? 'Son coupé' : 'Son');
 }

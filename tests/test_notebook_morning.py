@@ -42,7 +42,7 @@ class Ops:
         return self.daily
 
     def put_daily(self, row, *, actor):
-        assert actor == "carnet"
+        assert actor == "notebook"
         self.daily = [item for item in self.daily if item["checked_on"] != row["day"]]
         self.daily.append({"checked_on": row["day"], **{key: row.get(key) for key in (
             "sleep", "life_load", "desire", "note")}})

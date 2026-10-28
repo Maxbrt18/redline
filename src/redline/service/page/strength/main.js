@@ -8,7 +8,7 @@ import {cancelRetry, retry} from './send.js';
 
 /* The interactive strength session.
  *
- * A screen of the notebook (carnet/seance.js opens and closes
+ * A screen of the notebook (notebook/workout.js opens and closes
  * it). Resolves an opaque capability into its immutable session snapshot, runs it
  * down one exercise at a time, and posts a report back with the same capability.
  *

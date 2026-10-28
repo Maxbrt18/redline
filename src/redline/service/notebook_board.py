@@ -46,7 +46,7 @@ from redline.model.vocabulary import HrDoubt, HrReason, LifeLoad, MorningTrace, 
 from . import session_detail
 from .plans import PlanStatus, blocked_session_ids
 
-ACTOR = "carnet"
+ACTOR = "notebook"
 MOVING_TYPES = session_kinds.MOVING
 #: The morning check-in: the declarative daily state, with the values of `redline fact-write daily`.
 DAILY_FIELDS = {"sleep": tuple(Sleep), "life_load": tuple(LifeLoad)}
@@ -545,7 +545,7 @@ class Board:
                 # `pending` there and are completed afterwards, one zone per tap.
                 self.ops.add_observation({
                     "occurred_on": self.today, "kind": session_kinds.WAKE_TRACE,
-                    "idempotency_key": f"carnet:reveil:{self.today.isoformat()}",
+                    "idempotency_key": f"notebook:wake-trace:{self.today.isoformat()}",
                     "note": "trace au réveil déclarée dans le carnet", "source": ACTOR,
                     "measurements": {},
                     "pains": {ask["zone"]: {"state": "known", "value": trace}},

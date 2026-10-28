@@ -9,7 +9,7 @@ import {ensure, loadToday} from '../data.js';
 // ------------------------------------------------------------ Completed session detail
 // Sand palette: cards instead of rules, a head that states the session as a big figure and
 // a bar, HR zone colours wherever an HR is shown, red for repetitions (intensity).
-// Everything is computed by the service (/carnet-api/session/<id>); here we only format.
+// Everything is computed by the service (/notebook-api/session/<id>); here we only format.
 const SD_CHART_W = 340, SD_LABEL_W = 22, SD_PLOT_W = SD_CHART_W - SD_LABEL_W, SD_HR_H = 112, SD_ALT_H = 52;
 const SD_HR_LOW = 100, SD_HR_HIGH = 200;
 const SD_ICONS = {

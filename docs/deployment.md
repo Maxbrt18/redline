@@ -891,7 +891,7 @@ feelings one question at a time, and the question about a high HR), the upcoming
 the strength session and its button. A rest day fits on one line and tomorrow's card follows
 in full. Then **À venir** (one line per day, the weather for tomorrow only) and
 **Repères**, three tiles that lead to the detail: the week as mini-bars (to
-Semaine), the pain peak against the cap (Douleur screen, `GET /carnet-api/injury`: one point
+Semaine), the pain peak against the cap (Douleur screen, `GET /notebook-api/injury`: one point
 per rated session and the wake-up readings over five calendar weeks, the athlete's scale, the
 peak per week, wake-ups without a rating; no verdict), the countdown (to Course). The weather gives the sky and the felt temperature at departure, then the night relative to the
 session (before, during, after), with a colored pictogram in a pill tinted with the
@@ -904,9 +904,9 @@ a number (km done against the target), a bar, the week in bars (solid = done,
 dotted = planned), then seven lines, one per day, with a
 single number (what was done in ink, what was planned in grey) and an overrun in one red
 sentence; a completed outing opens its **session detail**, the rest (planned, skipped)
-unfolds on touch, one day at a time. At the bottom, past weeks (`GET /carnet-api/weeks`: the
+unfolds on touch, one day at a time. At the bottom, past weeks (`GET /notebook-api/weeks`: the
 ledger's fact and the revision's target) are pushed like screens, with their review.
-The **session detail** (`GET /carnet-api/session/<observation>`, also from the session
+The **session detail** (`GET /notebook-api/session/<observation>`, also from the session
 done in Aujourd'hui) is computed by `redline/session_detail.py`: the head (distance,
 time, pace, the session as a bar), the feeling (the question in one gesture while any
 is missing), planned against done, then the repetitions of a quality session (read from the laps
@@ -928,12 +928,12 @@ compares the fact to the typed caps (`hr_cap_bpm`, `rpe_max`, `duration_cap_min`
 `distance_cap_km`) and displays `volume_target_km`; it never reads `hr_zone` nor the
 prose constraints, and on a revision change it shows only what moved and
 when (the context is written for the coach). The weather comes from Open-Meteo through
-`GET /carnet-api/weather`, after display, for the session's `location_label` or
+`GET /notebook-api/weather`, after display, for the session's `location_label` or
 `[notebook] place` from `redline.toml`, with the sky's WMO code and the day or night of
 each hour; an unavailable forecast shows nothing.
 A deadline appears there only if it carries `athlete_label`.
 
-`POST /carnet-api/answer` writes in one gesture what the ledger still asks for: RPE,
+`POST /notebook-api/answer` writes in one gesture what the ledger still asks for: RPE,
 pain to the half point and enjoyment of a session within its completeness window, and the
 wake-up trace (none, light, sharp) before 14:00 the day after an effort, the
 sleep and life load of the day before 14:00 (`daily_checkins`, completed without
@@ -954,12 +954,12 @@ In the Messenger (or Instagram) in-app browser, whose cookie does not carry over
 Safari, the page does not consume the link: it offers to open it in Safari
 (`x-safari-https:`), to copy it, or to log in here anyway.
 
-The `/carnet-api/*` routes require this cookie, including for images. They are
+The `/notebook-api/*` routes require this cookie, including for images. They are
 without HTTP cache and without CORS; POSTs refuse a foreign origin. The document,
 the install manifest and the icons are public but contain no personal
 data. A service worker (`/carnet-sw.js`, scope `/carnet`) keeps only the
 `/carnet` shell on the device: it opens immediately, even offline,
-and revalidates behind; it never touches the `/carnet-api` routes. The page also keeps
+and revalidates behind; it never touches the `/notebook-api` routes. The page also keeps
 in `localStorage` the latest roots (Aujourd'hui, the current week,
 Course, the list of weeks; never a card) to show them, dated, when the
 network is missing: cleared at logout or when access expires, ignored beyond

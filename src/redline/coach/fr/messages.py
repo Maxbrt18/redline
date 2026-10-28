@@ -100,14 +100,14 @@ def cell_listing(entries: list, label=None) -> str:
 
 
 def missing_cells(to_ask: str, cell_keys: str, to_fetch: str, lapsed: str, *,
-                  carnet: bool) -> str:
+                  notebook: bool) -> str:
     """The note on ledger cells; each listing is empty when nothing falls in it."""
     parts = ["[NOTE SYSTÈME, invisible pour ⟨athlète⟩ : cellules du registre à traiter."]
     if to_ask:
         asking = (
             "Le carnet les recueille : ne les demande pas, sauf une question sur la "
             "douleur si le message montre une gêne. "
-            if carnet else
+            if notebook else
             "Ce n'est pas une obligation de questionner maintenant. Exploite d'abord le "
             "message et ce qui est déjà connu. Si une réponse change la décision présente, "
             "demande une seule information, explique brièvement pourquoi ; sinon avance "
@@ -196,13 +196,13 @@ def deep_handoff(handoff: str) -> str:
             + "\nFIN DE LA PASSERELLE]")
 
 
-def debrief_in_reply(detail: str, carnet_note: str, instructions: str) -> str:
-    """`carnet_note` is empty when the notebook is not connected."""
+def debrief_in_reply(detail: str, notebook_note: str, instructions: str) -> str:
+    """`notebook_note` is empty when the notebook is not connected."""
     return ("[DÉBRIEF DANS CETTE RÉPONSE, invisible pour ⟨athlète⟩] L'activité Strava "
             f"{detail} est arrivée et son débrief n'est pas encore parti : ⟨athlète⟩ t'écrit "
             "avant. Ta réponse à son message EST ce débrief, en un seul envoi : réponds "
             "d'abord à ce qu'il dit, avec la sortie lue. Les consignes du débrief "
-            "s'appliquent :\n" + (carnet_note + "\n" if carnet_note else "") + instructions
+            "s'appliquent :\n" + (notebook_note + "\n" if notebook_note else "") + instructions
             + "\n[/DÉBRIEF]")
 
 

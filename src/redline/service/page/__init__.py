@@ -51,26 +51,26 @@ FONT_FACES = (
 
 # The page's modules, in evaluation order. A module only declares at its top level
 # (functions, constants, listeners): it never calls an import there, so the order
-# matters for listener registration only. `carnet/main.js` comes last and starts the
+# matters for listener registration only. `notebook/main.js` comes last and starts the
 # page. The guided strength session is a screen of the notebook: its modules ship in
 # the same script, and /s serves the same document.
-CARNET_SCRIPT = (
+NOTEBOOK_SCRIPT = (
     "shared/dom.js", "shared/storage.js", "shared/theme.js",
     "strength/session.js", "strength/link.js", "strength/timers.js", "strength/sound.js",
     "strength/actions.js", "strength/control.js", "strength/review.js", "strength/render.js",
     "strength/send.js", "strength/main.js",
-    "carnet/state.js", "carnet/ui.js", "carnet/session.js", "carnet/api.js", "carnet/format.js",
-    "carnet/screens/weather.js", "carnet/screens/today.js", "carnet/screens/week.js",
-    "carnet/screens/course.js", "carnet/screens/injury.js", "carnet/screens/archives.js",
-    "carnet/screens/detail.js",
-    "carnet/viewer.js", "carnet/nav.js", "carnet/data.js", "carnet/sheet.js", "carnet/seance.js",
-    "carnet/gestures.js", "carnet/main.js",
+    "notebook/state.js", "notebook/ui.js", "notebook/session.js", "notebook/api.js", "notebook/format.js",
+    "notebook/screens/weather.js", "notebook/screens/today.js", "notebook/screens/week.js",
+    "notebook/screens/course.js", "notebook/screens/injury.js", "notebook/screens/archives.js",
+    "notebook/screens/detail.js",
+    "notebook/viewer.js", "notebook/nav.js", "notebook/data.js", "notebook/sheet.js", "notebook/workout.js",
+    "notebook/gestures.js", "notebook/main.js",
 )
 # Stylesheets after tokens.css, in cascade order: a later file may override an earlier one.
-CARNET_STYLE = (
-    "shared/base.css", "carnet/shell.css", "carnet/screens/today.css", "carnet/screens/week.css",
-    "carnet/screens/course.css", "carnet/screens/injury.css", "carnet/screens/archives.css",
-    "carnet/screens/detail.css", "carnet/sheet.css", "carnet/viewer.css", "strength/strength.css", "carnet/seance.css",
+NOTEBOOK_STYLE = (
+    "shared/base.css", "notebook/shell.css", "notebook/screens/today.css", "notebook/screens/week.css",
+    "notebook/screens/course.css", "notebook/screens/injury.css", "notebook/screens/archives.css",
+    "notebook/screens/detail.css", "notebook/sheet.css", "notebook/viewer.css", "strength/strength.css", "notebook/workout.css",
 )
 
 _IMPORT = re.compile(r"^import \{([^}]*)\} from '([^']+)';\n", re.MULTILINE)
@@ -254,7 +254,7 @@ def _launch_links() -> str:
 def notebook_document(cards_dir: Path, cues=None, kinds=None) -> str:
     """The notebook shell, with no personal data or secret; the exercises' execution
     cues (`cues`) travel in it for the guided session."""
-    css = _read(cards_dir / "tokens.css", "tokens.css") + _styles(CARNET_STYLE)
+    css = _read(cards_dir / "tokens.css", "tokens.css") + _styles(NOTEBOOK_STYLE)
     return (
         '<!doctype html><html lang="fr"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">'
@@ -271,9 +271,9 @@ def notebook_document(cards_dir: Path, cues=None, kinds=None) -> str:
         '<link rel="icon" href="/carnet-icon.png">'
         '<title>Mon carnet — Redline</title>'
         f"<style>{_font_css(cards_dir / 'fonts', 'block')}{css}</style></head><body>"
-        f"{_read(PAGE_DIR / 'carnet' / 'carnet.html', 'carnet.html')}"
+        f"{_read(PAGE_DIR / 'notebook' / 'notebook.html', 'notebook.html')}"
         f"{_cue_script(cues)}"
         f"{_kinds_script(kinds)}"
-        f"<script>{bundle(CARNET_SCRIPT)}</script>"
+        f"<script>{bundle(NOTEBOOK_SCRIPT)}</script>"
         '</body></html>'
     )

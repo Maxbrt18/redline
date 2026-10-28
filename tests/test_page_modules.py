@@ -140,7 +140,7 @@ def declared_at_top(toks) -> list[str]:
 
 
 IMPORT = re.compile(r"^import \{([^}]*)\} from '([^']+)';\n", re.MULTILINE)
-BUNDLES = {"carnet": page.CARNET_SCRIPT}
+BUNDLES = {"notebook": page.NOTEBOOK_SCRIPT}
 
 
 def modules(names):
@@ -202,10 +202,10 @@ def test_an_exported_declaration_declares_one_name(bundle):
 
 
 def test_every_module_and_stylesheet_is_assembled():
-    listed = {*page.CARNET_SCRIPT, *page.CARNET_STYLE}
-    on_disk = {str(path.relative_to(page.PAGE_DIR)) for folder in ("shared", "carnet", "strength")
+    listed = {*page.NOTEBOOK_SCRIPT, *page.NOTEBOOK_STYLE}
+    on_disk = {str(path.relative_to(page.PAGE_DIR)) for folder in ("shared", "notebook", "strength")
                for pattern in ("*.js", "*.css") for path in (page.PAGE_DIR / folder).rglob(pattern)}
-    on_disk.discard("carnet/sw.js")  # the service worker, served as is by its route
+    on_disk.discard("notebook/sw.js")  # the service worker, served as is by its route
     assert on_disk == listed
 
 

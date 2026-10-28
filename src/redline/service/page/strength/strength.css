@@ -1,7 +1,7 @@
 /* The interactive strength session -- phone first, one thumb, at arm's length.
  *
  * A screen of the notebook: the notebook's bar, title and sheets
- * frame it (carnet/seance.css), this file styles what runs inside #seance. Every
+ * frame it (notebook/workout.css), this file styles what runs inside #workout. Every
  * element rule is scoped there with :where(), so it never reaches the notebook and
  * keeps the specificity of a bare element. Class names are prefixed `p-`.
  *
@@ -15,18 +15,18 @@
  * The theme is the notebook's: the phone's, or the one pinned in its settings.
  */
 
-:where(#seance) *, :where(#seance) *::before, :where(#seance) *::after { box-sizing: border-box; }
+:where(#workout) *, :where(#workout) *::before, :where(#workout) *::after { box-sizing: border-box; }
 
-:where(#seance) :is(p, h1, h2, ol, ul, figure) { margin: 0; padding: 0; list-style: none; }
+:where(#workout) :is(p, h1, h2, ol, ul, figure) { margin: 0; padding: 0; list-style: none; }
 
-:where(#seance) :is(button, input, textarea) {
+:where(#workout) :is(button, input, textarea) {
   font: inherit;
   color: inherit;
   background: none;
   border: none;
   border-radius: var(--radius);
 }
-:where(#seance) button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+:where(#workout) button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .p-num { font-variant-numeric: tabular-nums; }
 
 /* ------------------------------------------------------------------- header */
@@ -281,8 +281,8 @@ textarea.p-input { max-width: none; min-height: 96px; resize: vertical; line-hei
 .p-prep[open] > summary::after, .p-feedback-disclosure[open] > summary::after { transform: rotate(90deg); }
 @media (prefers-reduced-motion: reduce) { .p-prep summary::after, .p-feedback-disclosure summary::after { transition: none; } }
 .p-exercise-note { min-height: 58px !important; font-size: 15px; }
-:where(#seance) button:disabled { cursor: default; opacity: .65; }
-:where(#seance) :is(button, summary):focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
+:where(#workout) button:disabled { cursor: default; opacity: .65; }
+:where(#workout) :is(button, summary):focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
 
 /* --------------------------------------------------------------------- boot */
 .p-boot { padding: 40px 4px; }

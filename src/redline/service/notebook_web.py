@@ -60,7 +60,7 @@ def register(app: Flask, notebook: NotebookService, psid: str,
 
     @app.after_request
     def notebook_headers(response):
-        if request.path.startswith("/carnet"):
+        if request.path.startswith(("/carnet", "/notebook-api/")):
             response.headers.update({"Cache-Control": "no-cache" if request.path == "/carnet"
                                      else response.headers.get("Cache-Control", "no-store")
                                      if request.path.startswith("/carnet-launch/") else "no-store",
@@ -71,7 +71,7 @@ def register(app: Flask, notebook: NotebookService, psid: str,
 
     @app.before_request
     def notebook_access():
-        if not request.path.startswith("/carnet-api/"):
+        if not request.path.startswith("/notebook-api/"):
             return None
         request.max_content_length = 2048
         if request.method == "POST":
@@ -79,7 +79,7 @@ def register(app: Flask, notebook: NotebookService, psid: str,
                 return jsonify(error="Accès refusé."), 403
             if request.headers.get("Sec-Fetch-Site") == "cross-site":
                 return jsonify(error="Accès refusé."), 403
-        if request.path == "/carnet-api/connect":
+        if request.path == "/notebook-api/connect":
             return None
         try:
             authenticated = notebook.store.authenticate(psid, request.cookies.get(COOKIE, ""))
@@ -114,10 +114,10 @@ def register(app: Flask, notebook: NotebookService, psid: str,
                        icons=[{"src": "/carnet-install-icon.png", "sizes": "512x512", "type": "image/png"}])
 
     # The shell kept on the device: the service worker only keeps `/carnet`, which
-    # carries no data; it never touches the /carnet-api routes.
+    # carries no data; it never touches the /notebook-api routes.
     @app.get("/carnet-sw.js")
     def notebook_worker():
-        return app.response_class((page.PAGE_DIR / "carnet" / "sw.js").read_bytes(),
+        return app.response_class((page.PAGE_DIR / "notebook" / "sw.js").read_bytes(),
                                   mimetype="text/javascript")
 
     @app.get("/carnet-launch/<name>.png")
@@ -137,7 +137,7 @@ def register(app: Flask, notebook: NotebookService, psid: str,
     def notebook_icon():
         return app.response_class((page.PAGE_DIR / "icon.png").read_bytes(), mimetype="image/png")
 
-    @app.post("/carnet-api/connect")
+    @app.post("/notebook-api/connect")
     def notebook_connect():
         body = request.get_json(silent=True)
         if not isinstance(body, dict) or set(body) != {"token"} or not isinstance(body["token"], str):
@@ -153,14 +153,14 @@ def register(app: Flask, notebook: NotebookService, psid: str,
                             max_age=DEVICE_SECONDS, path="/")
         return response
 
-    @app.post("/carnet-api/logout")
+    @app.post("/notebook-api/logout")
     def notebook_logout():
         notebook.store.revoke(psid, request.cookies.get(COOKIE, ""))
         response = jsonify(status="ok")
         response.delete_cookie(COOKIE, path="/", secure=True, httponly=True, samesite="Strict")
         return response
 
-    @app.get("/carnet-api/entries")
+    @app.get("/notebook-api/entries")
     def notebook_entries():
         try:
             offset = int(request.args.get("offset", "0"))
@@ -173,25 +173,25 @@ def register(app: Flask, notebook: NotebookService, psid: str,
                        latest=[item for kind in ("weekly", "monthly")
                                for item in notebook.store.list_entries(psid, kind=kind, limit=1)])
 
-    @app.get("/carnet-api/current")
+    @app.get("/notebook-api/current")
     def notebook_current():
         return jsonify(notebook.current())
 
-    @app.get("/carnet-api/today")
+    @app.get("/notebook-api/today")
     def notebook_today():
         return jsonify(notebook.today())
 
-    @app.get("/carnet-api/week/<label>")
+    @app.get("/notebook-api/week/<label>")
     def notebook_week(label):
         if not WEEK.fullmatch(label):
             return jsonify(error="Semaine invalide."), 400
         return jsonify(notebook.week(psid, label))
 
-    @app.get("/carnet-api/weeks")
+    @app.get("/notebook-api/weeks")
     def notebook_weeks():
         return jsonify(weeks=notebook.weeks(psid))
 
-    @app.get("/carnet-api/injury")
+    @app.get("/notebook-api/injury")
     def notebook_injury():
         zone = request.args.get("zone") or None
         if zone is not None and not ZONE.fullmatch(zone):
@@ -201,7 +201,7 @@ def register(app: Flask, notebook: NotebookService, psid: str,
             return jsonify(error="Aucune zone surveillée."), 404
         return jsonify(view)
 
-    @app.get("/carnet-api/session/<observation_id>")
+    @app.get("/notebook-api/session/<observation_id>")
     def notebook_session(observation_id):
         if not UUID.fullmatch(observation_id):
             return jsonify(error="Séance invalide."), 400
@@ -210,11 +210,11 @@ def register(app: Flask, notebook: NotebookService, psid: str,
             return jsonify(error="Séance introuvable."), 404
         return jsonify(view)
 
-    @app.get("/carnet-api/race")
+    @app.get("/notebook-api/race")
     def notebook_race():
         return jsonify(notebook.race(psid))
 
-    @app.get("/carnet-api/weather")
+    @app.get("/notebook-api/weather")
     def notebook_weather():
         day, start = request.args.get("date", ""), request.args.get("time") or None
         where = (request.args.get("place") or "").strip() or place
@@ -227,7 +227,7 @@ def register(app: Flask, notebook: NotebookService, psid: str,
             return jsonify(error="Date invalide."), 400
         return jsonify(weather.forecast(where, when, start, clock.now()) or {})
 
-    @app.post("/carnet-api/answer")
+    @app.post("/notebook-api/answer")
     def notebook_answer():
         body = request.get_json(silent=True)
         if (not isinstance(body, dict) or set(body) != {"ask", "value"}
@@ -239,7 +239,7 @@ def register(app: Flask, notebook: NotebookService, psid: str,
             return jsonify(error=str(error)), 409
         if result["alert"] and alert is not None:
             try:
-                alert(result["alert"], "carnet:" + body["ask"])
+                alert(result["alert"], "notebook:" + body["ask"])
             except Exception:
                 app.logger.exception("Alerte du carnet non transmise au coach")
         if result.get("activity") and settled is not None:
@@ -249,7 +249,7 @@ def register(app: Flask, notebook: NotebookService, psid: str,
                 app.logger.exception("Débrief de la sortie non avancé")
         return jsonify(status="ok", alert=bool(result["alert"]))
 
-    @app.post("/carnet-api/launch")
+    @app.post("/notebook-api/launch")
     def notebook_launch():
         body = request.get_json(silent=True)
         if not isinstance(body, dict) or set(body) != {"signature"} or not isinstance(body["signature"], str):
@@ -259,7 +259,7 @@ def register(app: Flask, notebook: NotebookService, psid: str,
             return jsonify(error="La séance a changé ou n’est plus disponible. Actualise le carnet."), 409
         return jsonify(url=url)
 
-    @app.get("/carnet-api/entries/<entry_id>")
+    @app.get("/notebook-api/entries/<entry_id>")
     def notebook_entry(entry_id):
         entry = notebook.store.get(psid, entry_id)
         if entry is None:
@@ -272,7 +272,7 @@ def register(app: Flask, notebook: NotebookService, psid: str,
             entry["report"] = notebook.store.strength_report(snapshot["sid"])
         return jsonify(entry)
 
-    @app.get("/carnet-api/entries/<entry_id>/image")
+    @app.get("/notebook-api/entries/<entry_id>/image")
     def notebook_image(entry_id):
         entry = notebook.store.get(psid, entry_id, image=True)
         if entry is None or entry["image"] is None:

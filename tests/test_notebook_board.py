@@ -202,7 +202,7 @@ def test_the_morning_trace_is_asked_in_the_morning_only_and_in_its_own_words(sto
     assert (prediction["status"], prediction["outcome"]) == ("resolved", True)
     reveil = [row for row in store.observation_rows() if row["kind"] == "wake-trace"]
     assert reveil[0]["pains"]["genou"] == {"state": "known", "value": 1.0}
-    assert reveil[0]["source"] == "carnet"
+    assert reveil[0]["source"] == "notebook"
     assert not [ask for ask in board(store, morning).asks() if ask["type"] == "wake"]
 
 
@@ -306,25 +306,25 @@ def test_routes_serve_the_three_screens_and_hand_a_crossing_to_the_coach(
     bot = RecordingBot()
     client = create_app(config, bot, MagicMock(), notebook=service).test_client()
     for path in ("today", f"week/{WEEK}", "race"):
-        assert client.get("/carnet-api/" + path).status_code == 401
-    assert client.post("/carnet-api/connect", json={
+        assert client.get("/notebook-api/" + path).status_code == 401
+    assert client.post("/notebook-api/connect", json={
         "token": archive.issue(config.allowed_psid)}).status_code == 200
-    today = client.get("/carnet-api/today").json
+    today = client.get("/notebook-api/today").json
     assert today["totals"]["km_target"] == 41.0 and today["strength"] == {"status": "none"}
-    assert client.get(f"/carnet-api/week/{WEEK}").json["week"] == WEEK
-    assert client.get("/carnet-api/week/2026-W99").status_code == 400
-    assert client.get("/carnet-api/race").json["race"] is None
-    assert client.get("/carnet-api/weeks").json == {"weeks": []}
+    assert client.get(f"/notebook-api/week/{WEEK}").json["week"] == WEEK
+    assert client.get("/notebook-api/week/2026-W99").status_code == 400
+    assert client.get("/notebook-api/race").json["race"] is None
+    assert client.get("/notebook-api/weeks").json == {"weeks": []}
     [ask] = today["asks"]
-    assert client.post("/carnet-api/answer", json={"ask": "drop table", "value": 1}).status_code == 400
-    assert client.post("/carnet-api/answer", json={"ask": ask["id"] + ":pain:genou", "value": 1},
+    assert client.post("/notebook-api/answer", json={"ask": "drop table", "value": 1}).status_code == 400
+    assert client.post("/notebook-api/answer", json={"ask": ask["id"] + ":pain:genou", "value": 1},
                        headers={"Origin": "https://evil.test"}).status_code == 403
-    response = client.post("/carnet-api/answer", json={"ask": ask["id"] + ":pain:genou", "value": 3})
+    response = client.post("/notebook-api/answer", json={"ask": ask["id"] + ":pain:genou", "value": 3})
     assert response.json == {"status": "ok", "alert": True}
     assert bot.inbound and "3/10" in bot.inbound[0][1]
-    again = client.post("/carnet-api/answer", json={"ask": ask["id"] + ":pain:genou", "value": 1})
+    again = client.post("/notebook-api/answer", json={"ask": ask["id"] + ":pain:genou", "value": 1})
     assert again.status_code == 409
-    calm = client.post("/carnet-api/answer", json={"ask": ask["id"] + ":rpe", "value": 2})
+    calm = client.post("/notebook-api/answer", json={"ask": ask["id"] + ":rpe", "value": 2})
     assert calm.json == {"status": "ok", "alert": False} and len(bot.inbound) == 1
 
 
@@ -352,12 +352,12 @@ def test_the_last_feeling_of_a_strava_run_brings_its_debrief_forward(
     state, nudge = MagicMock(), MagicMock()
     client = create_app(config, MagicMock(), state, notebook=service,
                         nudge=nudge).test_client()
-    client.post("/carnet-api/connect", json={"token": archive.issue(config.allowed_psid)})
-    [ask] = client.get("/carnet-api/today").json["asks"]
+    client.post("/notebook-api/connect", json={"token": archive.issue(config.allowed_psid)})
+    [ask] = client.get("/notebook-api/today").json["asks"]
     for metric, value in (("pain:genou", 1), ("rpe", 3)):
-        client.post("/carnet-api/answer", json={"ask": f"{ask['id']}:{metric}", "value": value})
+        client.post("/notebook-api/answer", json={"ask": f"{ask['id']}:{metric}", "value": value})
     state.proactive.hasten_job.assert_not_called()
-    client.post("/carnet-api/answer", json={"ask": ask["id"] + ":enjoyment", "value": 7})
+    client.post("/notebook-api/answer", json={"ask": ask["id"] + ":enjoyment", "value": 7})
     state.proactive.hasten_job.assert_called_once()
     assert state.proactive.hasten_job.call_args.args[0] == "strava:90000000019"
     nudge.assert_called_once()

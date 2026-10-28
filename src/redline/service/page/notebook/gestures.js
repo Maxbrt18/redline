@@ -18,7 +18,7 @@ function pulled(distance, spinning = false) {
   pageNode.classList.toggle('settle', !pull);
 }
 window.addEventListener('touchstart', event => {
-  if (scrollY > 0 || app.refreshing || app.seance || sheetShown() || $('connected').hidden || event.touches.length !== 1) return;
+  if (scrollY > 0 || app.refreshing || app.workout || sheetShown() || $('connected').hidden || event.touches.length !== 1) return;
   pull = {y: event.touches[0].clientY, d: 0};
 }, {passive: true});
 window.addEventListener('touchmove', event => {
@@ -53,7 +53,7 @@ function sideways(node) {
 // under the finger and detaches it, but iOS keeps sending the rest of the gesture to it alone.
 window.addEventListener('touchstart', event => {
   if (event.touches.length !== 1 || !app.stacks[app.active].length || app.move || swipe
-      || app.seance || sheetShown() || !viewer.hidden || $('connected').hidden || sideways(event.target)) return;
+      || app.workout || sheetShown() || !viewer.hidden || $('connected').hidden || sideways(event.target)) return;
   const touch = event.touches[0], node = event.target;
   swipe = {node, x: touch.clientX, y: touch.clientY, lastX: touch.clientX, lastT: event.timeStamp, prevX: touch.clientX, prevT: event.timeStamp};
   node.addEventListener('touchmove', swipeMove, {passive: false});
