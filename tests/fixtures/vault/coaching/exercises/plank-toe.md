@@ -1,5 +1,5 @@
 ---
-type: exercice
+type: exercise
 aliases: [planche gros orteils, planche enrichie]
 name: "Planche sur les gros orteils"
 cue: "Bassin dans l’axe, appui sur les gros orteils seuls."
@@ -14,7 +14,7 @@ dose:
   sets: 2
   seconds: 30
   rest_s: 30
-status: actif
+status: active
 tags: [renfo, pied, bassin, controle-moteur]
 ---
 

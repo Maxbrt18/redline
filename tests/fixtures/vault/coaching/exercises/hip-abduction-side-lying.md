@@ -1,5 +1,5 @@
 ---
-type: exercice
+type: exercise
 aliases: [abduction de hanche au sol, abduction latérale couchée]
 name: "Abduction de hanche couchée sur le côté"
 cue: "ALLONGÉ SUR LE CÔTÉ, bassin empilé, jambe du dessus tendue."
@@ -16,7 +16,7 @@ dose:
   reps: [12, 20]
   side: each
   rest_s: 45
-status: actif
+status: active
 tags: [renfo, fessier]
 ---
 

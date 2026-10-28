@@ -7,15 +7,15 @@ from redline.model.capabilities import CAPABILITY_SCHEMA, load
 from redline.model.notes import NoteError
 
 VALID = {
-    "type": "capacite",
-    "capacite_num": 1,
+    "type": "capability",
+    "capability_number": 1,
     "aliases": ["durabilité"],
 }
 
 FRONTMATTER = """---
-type: capacite
+type: capability
 aliases: [durabilité]
-capacite_num: 1
+capability_number: 1
 ---
 
 Le pourquoi, avec ses [[liens]].
@@ -31,7 +31,7 @@ def capability(tmp_path, text=FRONTMATTER, name="cap1-endurance.md"):
 
 def test_a_real_note_loads_with_its_identity(tmp_path):
     loaded = load(capability(tmp_path))["cap1-endurance"]
-    assert loaded["capacite_num"] == 1
+    assert loaded["capability_number"] == 1
     assert loaded["aliases"] == ["durabilité"]
 
 
@@ -47,15 +47,15 @@ def test_an_unknown_field_is_an_error_not_a_shrug():
 
 
 def test_a_missing_field_is_named(tmp_path):
-    text = FRONTMATTER.replace("capacite_num: 1\n", "")
-    with pytest.raises(NoteError, match="capacite_num"):
+    text = FRONTMATTER.replace("capability_number: 1\n", "")
+    with pytest.raises(NoteError, match="capability_number"):
         load(capability(tmp_path, text))
 
 
 def test_every_broken_note_is_reported_not_just_the_first(tmp_path):
     """Fixing a folder blind, one file per run, is how a validator gets abandoned."""
-    root = capability(tmp_path, FRONTMATTER.replace("capacite_num: 1", "capacite_num: nope"))
-    capability(root, FRONTMATTER.replace("capacite_num: 1", "capacite_num: 99"),
+    root = capability(tmp_path, FRONTMATTER.replace("capability_number: 1", "capability_number: nope"))
+    capability(root, FRONTMATTER.replace("capability_number: 1", "capability_number: 99"),
                "cap2-vitesse.md")
     with pytest.raises(NoteError) as caught:
         load(root)

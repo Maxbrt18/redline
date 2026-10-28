@@ -1,5 +1,5 @@
 ---
-type: exercice
+type: exercise
 aliases: [short foot, intrinsèques du pied]
 name: "Short-foot (intrinsèques du pied)"
 cue: "Creuser la voûte sans griffer les orteils."
@@ -10,7 +10,7 @@ how:
 dose:
   measure: time
   seconds: [120, 180]
-status: actif
+status: active
 tags: [renfo, pied]
 ---
 

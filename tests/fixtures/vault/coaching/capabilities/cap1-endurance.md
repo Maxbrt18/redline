@@ -1,8 +1,8 @@
 ---
-type: capacite
+type: capability
 aliases: [endurance]
-capacite_num: 1
-tags: [capacite]
+capability_number: 1
+tags: [capability]
 ---
 
 # Endurance

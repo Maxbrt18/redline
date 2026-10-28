@@ -1,5 +1,5 @@
 ---
-type: exercice
+type: exercise
 name: "Box drop unipodal"
 target: "absorption unipodale"
 how:
@@ -11,7 +11,7 @@ dose:
   reps: 4
   side: each
   rest_s: 60
-status: actif
+status: active
 tags: [renfo, pliometrie, descente]
 ---
 

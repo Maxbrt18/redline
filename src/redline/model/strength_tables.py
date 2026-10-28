@@ -57,9 +57,9 @@ def render(programme: Programme, key: str) -> str:
 
 def _totals(row: dict) -> tuple:
     """(right, left, sideless) totals for one session and one exercise."""
-    return (sum(strength_log.series(row.get("droite"))),
-            sum(strength_log.series(row.get("gauche"))),
-            sum(strength_log.series(row.get("valeurs"))))
+    return (sum(strength_log.series(row.get("right"))),
+            sum(strength_log.series(row.get("left"))),
+            sum(strength_log.series(row.get("both"))))
 
 
 def _gap(row: dict) -> str:
@@ -112,7 +112,7 @@ def render_log(programme: Programme, path: Path) -> str:
         for session in recent:
             right, left, plain = _totals(session)
             total = right + left + plain
-            totals.append("—" if session.get("passe") else (str(total) if total else "fait"))
+            totals.append("—" if session.get("skipped") else (str(total) if total else "fait"))
         note = programme.exercises.get(slug)
         # The pipe is written plain: table() escapes it once, which Obsidian needs to
         # read a wikilink alias inside a cell.

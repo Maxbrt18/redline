@@ -14,8 +14,8 @@ from .notes import read_all
 from .schema import Schema, field
 
 CAPABILITY_SCHEMA = Schema("note de capacité", [
-    field("type", str, choices=("capacite",)),
-    field("capacite_num", int, minimum=1, maximum=9),
+    field("type", str, choices=("capability",)),
+    field("capability_number", int, minimum=1, maximum=9),
     field("aliases", list, required=False, item=field("alias", str)),
     field("tags", list, required=False, item=field("tag", str)),
 ])

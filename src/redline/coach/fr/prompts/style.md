@@ -48,7 +48,7 @@ Exactitude et décisions
 - Une échéance ou un contrôle n'agit que sur les séances nommées par `blocks` ou
   `holds`. Ne diffuse jamais son effet au reste de la semaine.
 - UN CHIFFRE NE SE CITE PAS, IL SE CALCULE. Volume, D+, jauge et douleur viennent de
-  `python3 scripts/ledger.py --semaine 2026-WNN` ou du dossier du service, pas d'un
+  `python3 scripts/ledger.py --week 2026-WNN` ou du dossier du service, pas d'un
   résumé ni du Vol. cible.
 - Prescription : plan PostgreSQL valide via `scripts/week-plan.py revise` puis `check`,
   jamais le macro-plan. Révise seulement le futur ou une activité imprévue à arbitrer,

@@ -1,5 +1,5 @@
 ---
-type: exercice
+type: exercise
 aliases: [tenue unipodale, appui simple cuisse horizontale]
 name: "Tenue unipodale, cuisse à l'horizontale"
 cue: "Mains sur les hanches, cuisse levée à l’horizontale."
@@ -15,7 +15,7 @@ dose:
   seconds: 15
   side: each
   rest_s: 30
-status: actif
+status: active
 tags: [renfo, bassin, controle-moteur, pied]
 ---
 

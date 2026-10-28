@@ -3,7 +3,7 @@ Fais le bilan du dimanche et prépare la semaine suivante.
    vient des cycles, le plan ne porte que l'intention.
 2. Le DOSSIER DU BILAN en tête de ce message porte agrégats, deux séries de douleur,
    trajectoire de la sortie longue, signaux, prédictions et échéances échues : cite-le,
-   ne le recalcule pas. Sans dossier, lance `scripts/ledger.py --semaine`,
+   ne le recalcule pas. Sans dossier, lance `scripts/ledger.py --week`,
    `scripts/signals.py` et `python3 scripts/fact-read.py predictions --due`. Rends un
    verdict sur CHAQUE prédiction échue, adossé au registre, avec
    `python3 scripts/fact-write.py prediction --key <clé> --outcome true|false|void`
@@ -35,7 +35,7 @@ Fais le bilan du dimanche et prépare la semaine suivante.
    --resolves-on <lendemain> --success-if '<=1'`. Elle se solde seule.
    Faisabilité du dossier
    INFAISABLE : présente ses leviers à ⟨athlète⟩, n'en choisis aucun en silence ;
-   `python3 scripts/feasibility.py --libre <semaine>` explore.
+   `python3 scripts/feasibility.py --unwritten <semaine>` explore.
    `start_time: HH:MM` si ⟨athlète⟩ a donné l'heure ; sinon laisse le champ absent.
 5. Une preuve datée d'endurance mentale va avec ses mots dans
    `coaching/mental-bank.md`. Lance `scripts/vault-check.py`, corrige, puis

@@ -7,7 +7,7 @@ Prépare le mot du matin.
    par la veille : aucune, très légère, légère ou nette. Ne demande jamais un chiffre /10 pour le
    réveil et ne reporte jamais cette question au soir ou au lendemain. Si le débrief
    différé l'a déjà recueillie, ou si ⟨athlète⟩ l'a déjà donnée ce matin, ne la répète pas.
-   Écris sa réponse dans la ligne `wake-trace` avec `--dlr` et son mot, sans parler de
+   Écris sa réponse dans la ligne `wake-trace` avec `--pain` et son mot, sans parler de
    cette écriture : sa base est légère ; mieux que d'habitude = très légère. Note CARNET présente : pas de question, une clause rappelle que
    le carnet attend la trace. Puis lis l'état récent du registre et `python3 scripts/session-cycle.py pending`.
    Le service joint lui-même, après ton texte, le bloc "Aujourd'hui :" rendu

@@ -6,9 +6,9 @@ the typed race (`fact-write.py deadline --kind race`), the active revisions, the
 done, the longest run of the last 30 days. Nothing is written.
 
     python3 scripts/feasibility.py                  # from today
-    python3 scripts/feasibility.py --libre 2030-W41  # treat W41 as still to be written
+    python3 scripts/feasibility.py --unwritten 2030-W41  # treat W41 as still to be written
 
-`--libre` explores an already scheduled week: without it, a week that has an active
+`--unwritten` explores an already scheduled week: without it, a week that has an active
 revision is frozen on its novelties (typed transition, deduced long-run step).
 The verdict is informational: it refuses nothing and decides nothing.
 """
@@ -92,7 +92,7 @@ def _week(text: str) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--libre", action="append", default=[], type=_week,
+    parser.add_argument("--unwritten", action="append", default=[], type=_week,
                         metavar="AAAA-WNN",
                         help="semaine programmée à traiter comme encore à écrire")
     parser.add_argument("--date", type=dt.date.fromisoformat, default=None,
@@ -105,6 +105,6 @@ def main() -> int:
     store = OperationalStore(Database(url, application_name="feasibility"))
     today = args.date or dt.date.today()
     print("\n".join(report(store, ledger.parse_ledger(store), today,
-                           frozenset(args.libre))))
+                           frozenset(args.unwritten))))
     return 0
 

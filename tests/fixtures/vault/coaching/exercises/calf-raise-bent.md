@@ -1,5 +1,5 @@
 ---
-type: exercice
+type: exercise
 aliases: [mollet genou fléchi, soléaire]
 name: "Mollet unipodal, genou FLÉCHI"
 cue: "Genou FLÉCHI, haltère côté qui travaille ; arrête 2 répétitions avant l'échec."
@@ -17,7 +17,7 @@ dose:
   reps: [12, 15]
   side: each
   rest_s: 75
-status: actif
+status: active
 tags: [renfo, mollet]
 ---
 

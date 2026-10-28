@@ -1,11 +1,11 @@
 ---
-type: seance-type
+type: workout
 kinds: [bike]
-capacite: [endurance, genou]
-rpe_cible: 3
-duree_min: 75
+capabilities: [endurance, genou]
+target_rpe: 3
+duration_min: 75
 phase: [base, general, specifique-1, specifique-2]
-statut: actif
+status: active
 ---
 
 # velo-z2

@@ -1,5 +1,5 @@
 ---
-type: exercice
+type: exercise
 aliases: [fente bulgare]
 name: "Fente bulgare, support arrière haut"
 cue: "Descente en 3-5 s, remontée normale."
@@ -14,7 +14,7 @@ dose:
   reps: 8
   side: each
   rest_s: 60
-status: actif
+status: active
 tags: [renfo, excentrique, descente]
 ---
 

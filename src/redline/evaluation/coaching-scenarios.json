@@ -575,7 +575,7 @@
     "origin": "coaching/corrections.md",
     "route": "N1",
     "message": "C'est quoi le kilométrage de la semaine dernière ?",
-    "context": "Sortie de ledger.py --semaine 2030-W31 lue pendant ce tour : Volume 30,18 km courus en 4 sorties. Le volume cible du macro-plan pour W32 était ~28 km.",
+    "context": "Sortie de ledger.py --week 2030-W31 lue pendant ce tour : Volume 30,18 km courus en 4 sorties. Le volume cible du macro-plan pour W32 était ~28 km.",
     "understanding": "Question factuelle sur un chiffre calculable.",
     "ask": "Rien.",
     "avoid": "Dire que le chiffre ne peut pas être confirmé ; citer le volume cible du plan comme un fait.",

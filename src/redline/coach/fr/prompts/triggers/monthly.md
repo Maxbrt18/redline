@@ -1,7 +1,7 @@
 Fais le recul du mois terminé : calcule km, D+, séances et évolution
 des six capacités, puis génère `scripts/chart-month.py` avec `period` au format YYYY-MM du mois terminé. Juge le RÉSULTAT, pas le
 processus : pour chaque capacité, a-t-elle bougé ce mois-ci, et la trajectoire de la
-sortie longue (`scripts/ledger.py --semaine <W> --cible-sl <km visés avant l'affûtage>`)
+sortie longue (`scripts/ledger.py --week <W> --long-run-target <km visés avant l'affûtage>`)
 mène-t-elle à la course ? Une capacité immobile deux mois de suite est un point du
 recul, même si chaque semaine était défendable. Lis aussi
 la calibration de `scripts/fact-read.py predictions` : des réfutées surtout optimistes

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Completes a pending measurement by stable identity, without editing a projection.
 
-`--fc-douteuse no_sensor|context --cause "<their words>"` flags an already known
+`--hr-doubt no_sensor|context --cause "<their words>"` flags an already known
 average HR as doubtful: without an armband it counts nowhere; with a context (meal,
 illness) it leaves the pace-matched HR comparisons, hence the gate.
 
@@ -63,7 +63,7 @@ def main() -> int:
     parser.add_argument("--metric", choices=METRICS)
     parser.add_argument("--zone", default=None,
                         help="la zone surveillée, pour --metric pain")
-    parser.add_argument("--fc-douteuse", dest="hr_doubt", choices=tuple(HrDoubt),
+    parser.add_argument("--hr-doubt", dest="hr_doubt", choices=tuple(HrDoubt),
                         help="déclare douteuse la FC moyenne connue de l'observation")
     parser.add_argument("--cause", default="", help="la cause déclarée par l'athlète, ses mots")
     values = parser.add_mutually_exclusive_group()
@@ -80,9 +80,9 @@ def main() -> int:
         parser.error("--key ou --date obligatoire (cf. `fact-read.py observations`)")
     if args.hr_doubt:
         if args.metric or args.value is not None or args.unavailable:
-            parser.error("--fc-douteuse se passe seul, sans --metric ni valeur")
+            parser.error("--hr-doubt se passe seul, sans --metric ni valeur")
         if not args.cause.strip():
-            parser.error("--fc-douteuse exige --cause : la raison donnée par l'athlète")
+            parser.error("--hr-doubt exige --cause : la raison donnée par l'athlète")
     elif not args.metric or (args.value is None and not args.unavailable):
         parser.error("--metric et (--value ou --unavailable) obligatoires")
     if args.zone is not None and args.metric != "pain":

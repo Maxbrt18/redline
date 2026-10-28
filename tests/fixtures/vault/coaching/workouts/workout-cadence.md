@@ -1,11 +1,11 @@
 ---
-type: seance-type
+type: workout
 kinds: [cadence]
-capacite: [genou]
-rpe_cible: 3
-duree_min: 45
+capabilities: [genou]
+target_rpe: 3
+duration_min: 45
 phase: [base, general, specifique-1]
-statut: actif
+status: active
 ---
 
 # workout-cadence

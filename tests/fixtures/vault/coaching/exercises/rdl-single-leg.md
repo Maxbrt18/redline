@@ -1,5 +1,5 @@
 ---
-type: exercice
+type: exercise
 aliases: [RDL, soulevé de terre roumain]
 name: "Soulevé de terre roumain unijambiste"
 cue: "Dos plat, bascule par la hanche, jambe libre dans l’axe."
@@ -16,7 +16,7 @@ dose:
   reps: [8, 10]
   side: each
   rest_s: 60
-status: actif
+status: active
 tags: [renfo, chaine-posterieure]
 ---
 

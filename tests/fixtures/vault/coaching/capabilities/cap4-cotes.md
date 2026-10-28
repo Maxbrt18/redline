@@ -1,8 +1,8 @@
 ---
-type: capacite
+type: capability
 aliases: [cotes]
-capacite_num: 4
-tags: [capacite]
+capability_number: 4
+tags: [capability]
 ---
 
 # Côtes

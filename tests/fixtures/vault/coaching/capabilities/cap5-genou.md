@@ -1,8 +1,8 @@
 ---
-type: capacite
+type: capability
 aliases: [genou]
-capacite_num: 5
-tags: [capacite]
+capability_number: 5
+tags: [capability]
 ---
 
 # Genou

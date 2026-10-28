@@ -1,5 +1,5 @@
 ---
-type: exercice
+type: exercise
 name: "Échauffement : marche rapide, montées de genoux"
 cue: "Marche rapide et montées de genoux, progressivement."
 equipment: []
@@ -9,7 +9,7 @@ how:
 dose:
   measure: time
   seconds: 180
-status: actif
+status: active
 tags: [renfo, echauffement]
 ---
 

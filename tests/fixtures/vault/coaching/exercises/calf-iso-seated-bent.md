@@ -1,5 +1,5 @@
 ---
-type: exercice
+type: exercise
 aliases: [mollet assis genou fléchi, tenue de mollet assise]
 name: "Mollet assis, genou fléchi, tenue"
 cue: "ASSIS, talon soulevé, genou immobile à angle droit."
@@ -15,7 +15,7 @@ dose:
   seconds: 30
   side: each
   rest_s: 45
-status: actif
+status: active
 tags: [renfo, isometrique, mollet]
 ---
 

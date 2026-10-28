@@ -45,22 +45,18 @@ def _csv(path: Path, columns, rows) -> None:
 
 def project_daily(store: OperationalStore, root: Path) -> None:
     _csv(root / vault_layout.DAILY_CSV,
-         ("date", "sommeil", "charge_vie", "envie", "note"),
+         ("date", "sleep", "life_load", "desire", "note"),
          [[row["checked_on"].isoformat(), row["sleep"] or "", row["life_load"] or "",
            row["desire"] or "", row["note"] or ""] for row in store.daily_rows()])
 
 
 def project_instruments(store: OperationalStore, root: Path) -> None:
     path = root / vault_layout.INSTRUMENTS_CSV
-    columns = ("semaine", "date_bilan", "cmj_cm", "mollet_d_tendu", "mollet_g_tendu",
-               "mollet_d_flechi", "mollet_g_flechi", "plaisir", "canari_dlr",
-               "calib_ecart_dlr", "calib_ecart_fc", "sommeil",
-               "charge_vie", "note")
     fields = ("iso_week", "reviewed_on", "cmj_cm", "calf_right_straight",
               "calf_left_straight", "calf_right_bent", "calf_left_bent", "enjoyment",
               "canary_pain", "pain_calibration_gap", "hr_calibration_gap", "sleep",
               "life_load", "note")
-    _csv(path, columns,
+    _csv(path, ("week", *fields[1:]),
          [[row[field] if row[field] is not None else "" for field in fields]
           for row in store.weekly_instrument_rows()])
 
@@ -71,11 +67,11 @@ def _strength_row(session: dict, exercise: dict) -> list:
         sides[series["side"]].append(str(series["repetitions"]))
     values = {
         "date": session["performed_on"].isoformat(), "sid": session["session_key"],
-        "seance": session["workout"] or "", "slug": exercise["exercise_slug"],
-        "valeurs": "|".join(sides["both"]), "droite": "|".join(sides["right"]),
-        "gauche": "|".join(sides["left"]),
+        "workout": session["workout"] or "", "slug": exercise["exercise_slug"],
+        "both": "|".join(sides["both"]), "right": "|".join(sides["right"]),
+        "left": "|".join(sides["left"]),
         "score": "" if exercise["difficulty"] is None else str(exercise["difficulty"]),
-        "passe": strength_log.YES if exercise["skipped"] else "",
+        "skipped": strength_log.YES if exercise["skipped"] else "",
         "status": exercise.get("status") or "",
         "completed_slots": exercise.get("completed_slots") if exercise.get("completed_slots") is not None else "",
         "note": exercise.get("note", ""),

@@ -241,14 +241,14 @@ def test_le_bilan_du_dimanche_joue_toute_sa_sequence(store):
     tour_seance = str(uuid.uuid4())
     reussit(coach("scripts/ledger-add.py", "--date", "2026-08-14", "--type", "easy",
                   "--km", "7", "--temps", "43:00", "--allure", "6:08",
-                  "--rpe", "3", "--dlr", "1", "--plaisir", "7",
+                  "--rpe", "3", "--pain", "1", "--plaisir", "7",
                   "--idempotency-key", "messenger:2026-08-14:ef-bilan",
                   turn=tour_seance), "séance de la semaine")
     store.apply_turn_with_receipts(tour_seance)[0]
     poser_le_plan(store)
     sequence(
-        ("agrégats", ["scripts/ledger.py", "--semaine", "2026-W33"]),
-        ("tendance douleur", ["scripts/ledger.py", "--tendance-douleur", "3"]),
+        ("agrégats", ["scripts/ledger.py", "--week", "2026-W33"]),
+        ("tendance douleur", ["scripts/ledger.py", "--pain-trend", "3"]),
         ("signaux faibles", ["scripts/signals.py"]),
         ("adhérence du plan", ["scripts/week-plan.py", "check", "--week", "2026-W33"]),
         ("cockpit", ["scripts/fact-read.py", "capabilities"]),

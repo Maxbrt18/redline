@@ -139,7 +139,7 @@ def column_zone(column: str) -> str | None:
 
 
 def parse_pains(values: list[str], zones: list[str]) -> dict[str, str]:
-    """`--dlr genou=2 --dlr cheville=?` -> {zone: raw value}.
+    """`--pain genou=2 --pain cheville=?` -> {zone: raw value}.
 
     A value without a zone is allowed only when a single zone is watched: guessing which
     of several would file the pain of one zone under another. An unknown zone, a zone
@@ -151,15 +151,15 @@ def parse_pains(values: list[str], zones: list[str]) -> dict[str, str]:
         if not sep:
             if len(zones) != 1:
                 raise LedgerError(
-                    "--dlr : nomme la zone, ex. --dlr genou=2 (zones : "
+                    "--pain : nomme la zone, ex. --pain genou=2 (zones : "
                     + (", ".join(zones) or "aucune zone surveillée") + ")")
             zone, value = zones[0], raw
         zone, value = zone.strip(), value.strip()
         if zone not in zones:
-            raise LedgerError(f"--dlr : zone inconnue « {zone} » (zones : "
+            raise LedgerError(f"--pain : zone inconnue « {zone} » (zones : "
                               + (", ".join(zones) or "aucune zone surveillée") + ")")
         if zone in readings:
-            raise LedgerError(f"--dlr : zone « {zone} » donnée deux fois")
+            raise LedgerError(f"--pain : zone « {zone} » donnée deux fois")
         readings[zone] = value
     return readings
 

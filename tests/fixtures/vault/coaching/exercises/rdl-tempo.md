@@ -1,5 +1,5 @@
 ---
-type: exercice
+type: exercise
 aliases: [RDL tempo]
 name: "RDL unijambiste au tempo"
 cue: "Dos plat, descente en 4 s, au poids du corps."
@@ -14,7 +14,7 @@ dose:
   reps: 6
   side: each
   rest_s: 90
-status: actif
+status: active
 tags: [renfo, excentrique, descente]
 ---
 

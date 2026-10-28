@@ -1,5 +1,5 @@
 ---
-type: exercice
+type: exercise
 name: "Abduction de hanche légère, élastique"
 cue: "Élastique aux chevilles, bassin stable, résistance légère."
 equipment: ["Élastique aux chevilles"]
@@ -12,7 +12,7 @@ dose:
   sets: 2
   reps: 15
   rest_s: 30
-status: actif
+status: active
 tags: [renfo, fessier]
 ---
 

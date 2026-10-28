@@ -237,14 +237,14 @@ def test_root_owned_launcher_refuses_a_cli_modified_during_the_turn(tmp_path):
     vault = tmp_path / "vault"
     vault.mkdir()
     writable = subprocess.run(
-        [launcher, "ledger.py", "--semaine", "2030-W35"],
+        [launcher, "ledger.py", "--week", "2030-W35"],
         env={**environment, "VAULT_PATH": str(vault)},
         text=True, capture_output=True, check=False)
     assert writable.returncode == 1
     assert "code du moteur modifiable" in writable.stderr
     read_only(script_dir, script_dir.parent, repo / "src")
     venv_open = subprocess.run(
-        [launcher, "ledger.py", "--semaine", "2030-W35"],
+        [launcher, "ledger.py", "--week", "2030-W35"],
         env={**environment, "VAULT_PATH": str(vault)},
         text=True, capture_output=True, check=False)
     assert venv_open.returncode == 1
@@ -254,7 +254,7 @@ def test_root_owned_launcher_refuses_a_cli_modified_during_the_turn(tmp_path):
 
     # Without a vault the launcher refuses: the engine checkout is never one.
     no_vault = subprocess.run(
-        [launcher, "ledger.py", "--semaine", "2026-W35"],
+        [launcher, "ledger.py", "--week", "2026-W35"],
         env=environment, text=True, capture_output=True, check=False)
     assert no_vault.returncode == 1
     assert "VAULT_PATH absent" in no_vault.stderr
@@ -263,7 +263,7 @@ def test_root_owned_launcher_refuses_a_cli_modified_during_the_turn(tmp_path):
     # its files.
     environment["VAULT_PATH"] = str(vault)
     split = subprocess.run(
-        [launcher, "ledger.py", "--semaine", "2026-W35"],
+        [launcher, "ledger.py", "--week", "2026-W35"],
         env=environment, text=True, capture_output=True, check=False)
     assert split.returncode == 0
     assert "-m\nredline.cli.ledger" in split.stdout
@@ -273,7 +273,7 @@ def test_root_owned_launcher_refuses_a_cli_modified_during_the_turn(tmp_path):
     target.write_text("print('code injecté')\n", encoding="utf-8")
     read_only(script_dir)
     dirty = subprocess.run(
-        [launcher, "ledger.py", "--semaine", "2026-W35"],
+        [launcher, "ledger.py", "--week", "2026-W35"],
         env=environment, text=True, capture_output=True, check=False)
     for folder in (script_dir, script_dir.parent, repo / "src", fake_bin, site,
                    fake_bin.parent):

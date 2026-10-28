@@ -10,7 +10,7 @@ from redline.model import notes, views
 from redline.model.schema import Schema, field
 
 EXERCISE = Schema("exercice", [
-    field("type", str, choices=("exercice",)),
+    field("type", str, choices=("exercise",)),
     field("name", str),
     field("sets", int, required=False, minimum=1),
 ])
@@ -25,14 +25,14 @@ def note(tmp_path, text, name="calf-bent.md"):
 # ------------------------------------------------------------------- reading
 
 def test_a_conforming_note_is_read(tmp_path):
-    path = note(tmp_path, "---\ntype: exercice\nname: Mollet\nsets: 3\n---\n\nLe pourquoi.\n")
-    assert notes.read(path, EXERCISE) == {"type": "exercice", "name": "Mollet", "sets": 3}
+    path = note(tmp_path, "---\ntype: exercise\nname: Mollet\nsets: 3\n---\n\nLe pourquoi.\n")
+    assert notes.read(path, EXERCISE) == {"type": "exercise", "name": "Mollet", "sets": 3}
 
 
 def test_the_body_is_never_part_of_the_fact(tmp_path):
     """The body holds prose and wikilinks; no code extracts a fact from it."""
-    path = note(tmp_path, "---\ntype: exercice\nname: Mollet\n---\n\nsets: 99\n[[injury]]\n")
-    assert notes.read(path, EXERCISE) == {"type": "exercice", "name": "Mollet"}
+    path = note(tmp_path, "---\ntype: exercise\nname: Mollet\n---\n\nsets: 99\n[[injury]]\n")
+    assert notes.read(path, EXERCISE) == {"type": "exercise", "name": "Mollet"}
     assert "[[injury]]" in notes.split(path.read_text(encoding="utf-8"))[1]
 
 
@@ -44,7 +44,7 @@ def test_a_list_is_a_list_and_not_a_string(tmp_path):
 
 
 def test_a_nonconforming_note_names_the_file_and_every_problem(tmp_path):
-    path = note(tmp_path, "---\ntype: exercice\nsets: 0\noops: 1\n---\n")
+    path = note(tmp_path, "---\ntype: exercise\nsets: 0\noops: 1\n---\n")
     with pytest.raises(notes.NoteError) as caught:
         notes.read(path, EXERCISE)
     message = str(caught.value)
@@ -73,16 +73,16 @@ def test_a_missing_file_is_refused_by_name(tmp_path):
 
 
 def test_read_all_keys_on_the_file_name(tmp_path):
-    note(tmp_path, "---\ntype: exercice\nname: Mollet\n---\n", "calf-bent.md")
-    note(tmp_path, "---\ntype: exercice\nname: Step-up\n---\n", "step-up.md")
+    note(tmp_path, "---\ntype: exercise\nname: Mollet\n---\n", "calf-bent.md")
+    note(tmp_path, "---\ntype: exercise\nname: Step-up\n---\n", "step-up.md")
     loaded = notes.read_all(tmp_path, EXERCISE)
     assert sorted(loaded) == ["calf-bent", "step-up"]
     assert loaded["step-up"]["slug"] == "step-up"
 
 
 def test_read_all_reports_every_broken_note_not_the_first(tmp_path):
-    note(tmp_path, "---\ntype: exercice\n---\n", "a.md")
-    note(tmp_path, "---\ntype: exercice\nname: Bon\n---\n", "b.md")
+    note(tmp_path, "---\ntype: exercise\n---\n", "a.md")
+    note(tmp_path, "---\ntype: exercise\nname: Bon\n---\n", "b.md")
     note(tmp_path, "---\ntype: nope\nname: X\n---\n", "c.md")
     with pytest.raises(notes.NoteError) as caught:
         notes.read_all(tmp_path, EXERCISE)

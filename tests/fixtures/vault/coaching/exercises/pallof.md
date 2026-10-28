@@ -1,5 +1,5 @@
 ---
-type: exercice
+type: exercise
 aliases: [Pallof]
 name: "Pallof press, élastique"
 cue: "Élastique de côté, bras tendus devant. Rien ne tourne."
@@ -13,7 +13,7 @@ dose:
   sets: 2
   seconds: 30
   rest_s: 30
-status: actif
+status: active
 tags: [renfo, gainage, isometrique]
 ---
 

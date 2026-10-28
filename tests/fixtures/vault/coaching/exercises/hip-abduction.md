@@ -1,5 +1,5 @@
 ---
-type: exercice
+type: exercise
 aliases: [abduction de hanche, fessier moyen]
 name: "Abduction de hanche sur balance pad"
 target: "fessier moyen"
@@ -11,7 +11,7 @@ dose:
   sets: 2
   side: each
   rest_s: 45
-status: retire
+status: retired
 tags: [renfo, fessier]
 ---
 

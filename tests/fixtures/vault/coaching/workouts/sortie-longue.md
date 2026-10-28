@@ -1,11 +1,11 @@
 ---
-type: seance-type
+type: workout
 kinds: [long]
-capacite: [endurance, cotes, ravitaillement]
-rpe_cible: 4.5
-duree_min: 90
+capabilities: [endurance, cotes, ravitaillement]
+target_rpe: 4.5
+duration_min: 90
 phase: [general, specifique-1, specifique-2]
-statut: actif
+status: active
 ---
 
 # sortie-longue
