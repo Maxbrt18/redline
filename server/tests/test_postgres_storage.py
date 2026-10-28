@@ -19,12 +19,14 @@ from redline.postgres_state import PostgresStateStore
 from scripts.model import predictions as prediction_model
 from scripts.model.activity import Activity
 from scripts.storage import Database, OperationalStore, StorageError
+from scripts.storage.repository import ATHLETE
 from scripts.storage.schema import (
     TRIGGERS,
     audit_events,
     coach_predictions,
     conversation_messages,
     conversation_questions,
+    correction_deliveries,
     metadata,
     observation_metrics,
     observations,
@@ -2562,3 +2564,22 @@ def test_a_strength_report_keeps_each_zone_before_and_after(store):
     [session] = [row for row in store.strength_history() if row["session_key"] == "zones-renfo"]
     assert session["pains"] == {"genou": {"before": 1, "after": 3},
                                 "injury": {"before": None, "after": 0}}
+
+
+def test_corrections_are_matched_on_their_rare_words(store):
+    """A word every correction uses matches nothing; a word few share does."""
+    summaries = {
+        "c1": "La descente du dimanche se court plus lentement pour les mollets",
+        "c2": "La cadence se mesure sur les tours faciles pour la comparer",
+        "c3": "La sortie longue garde son plafond pour la semaine suivante",
+    }
+    with store.database.engine.begin() as connection:
+        connection.execute(sa.insert(correction_deliveries), [
+            {"id": uuid.uuid4(), "athlete_id": ATHLETE, "correction_key": key,
+             "summary": summary}
+            for key, summary in summaries.items()])
+    state = PostgresStateStore(store.database)
+    assert state.correction_context("pour la suite") == ""
+    context = state.correction_context("et la descente de demain ?")
+    assert summaries["c1"] in context
+    assert summaries["c2"] not in context and summaries["c3"] not in context

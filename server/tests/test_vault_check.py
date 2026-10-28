@@ -12,7 +12,9 @@ un contrôleur dont on ne sait pas s'il sait échouer.
 """
 
 import pytest
-from conftest import ENGINE_ROOT, load_script
+from conftest import ENGINE_ROOT, TEST_VAULT, load_script
+
+from scripts.model import instance
 
 vault_check = load_script("vault-check")
 
@@ -22,8 +24,8 @@ def report():
     return vault_check.Report(quiet=True)
 
 
-def vault(files, root=None):
-    return vault_check.Vault(root=root or ENGINE_ROOT, files=files)
+def vault(files, root=None, loaded=None):
+    return vault_check.Vault(root=root or ENGINE_ROOT, files=files, instance=loaded)
 
 
 # ------------------------------------------------- le rapport lui-même
@@ -104,43 +106,33 @@ def test_an_alias_resolves_a_link(report):
 
 # ------------------------------------------------- vie privée (régression)
 
-def test_a_known_leak_pattern_fails(report):
-    """Liste noire de fuites DÉJÀ trouvées et nettoyées, pas une garantie : elle ne
-    peut pas attraper une nouvelle, et son libellé le dit."""
-    vault_check.check_privacy(vault({"athlete/athlete.md": "diagnostic de gastrite"}),
-                              report)
+def test_a_note_type_the_instance_does_not_declare_fails(report):
+    vault_check.check_frontmatter(
+        vault({"episodes/source.md": "---\ntype: episode\n---\n"},
+              loaded=instance.load(TEST_VAULT)), report)
     assert report.failed == 1
 
 
-def test_the_blocklist_is_word_bounded(report):
-    """`SECRET` ne doit pas matcher « secrètement » — un contrôle qui crie au loup est un
-    contrôle qu'on finit par ignorer."""
-    vault_check.check_privacy(vault({"athlete/ledger.md": "rando, il en parle secrètement"}),
-                              report)
+def test_without_declared_types_only_the_yaml_is_checked(report):
+    vault_check.check_frontmatter(vault({"episodes/source.md": "---\ntype: episode\n---\n"}),
+                                  report)
     assert report.failed == 0
 
 
-def test_a_companion_name_in_a_projected_journal_fails(report):
-    vault_check.check_operational_privacy(
-        vault({"athlete/journal/2026-w34.md": "Rando faite avec Alexis."}), report)
-    assert report.failed == 1
+def test_an_alias_with_a_comma_resolves_a_link(report):
+    files = {"concepts/a.md": '---\naliases: ["b, c"]\n---\n', "x.md": "[[b, c]]"}
+    vault_check.check_links(vault(files), report)
+    assert report.failed == 0
 
 
-def test_a_numeric_wake_reconstructed_in_the_current_journal_fails(report, monkeypatch):
-    class FrozenDate(vault_check.dt.date):
-        @classmethod
-        def today(cls):
-            return cls(2026, 8, 24)
-
-    monkeypatch.setattr(vault_check.dt, "date", FrozenDate)
-    vault_check.check_active_safety_rules(
-        vault({"athlete/journal/2026-w35.md": "reveil 0/10, donc feu vert"}), report)
-    assert report.failed == 1
+def test_the_budget_is_skipped_without_declared_tiers(report):
+    vault_check.check_startup_budget(vault({}), report)
+    assert (report.failed, report.skipped) == (0, 1)
 
 
-def test_frontmatter_rejects_a_noncanonical_episode_type(report):
-    vault_check.check_frontmatter(
-        vault({"episodes/source.md": "---\ntype: episode\naliases: [source]\n---\n"}), report)
+def test_the_declared_budget_names_the_file_over_its_ceiling(report):
+    vault_check.check_startup_budget(
+        vault({"CLAUDE.md": "mot " * 3000}, loaded=instance.load(TEST_VAULT)), report)
     assert report.failed == 1
 
 
@@ -160,87 +152,11 @@ def test_decisions_newest_first_pass(report):
 
 # ------------------------------------------------------- fichiers retirés
 
-def test_a_retired_file_coming_back_fails(report, tmp_path):
-    """`fitness-status.md` a été supprimé parce qu'il était un second cache du même
-    état, et il avait effectivement dérivé. Le voir revenir veut dire qu'une règle a
-    été oubliée. Ce contrôle-là lit le DISQUE : un fichier ressuscité mais jamais
-    indexé compterait quand même."""
-    (tmp_path / "coaching").mkdir()
-    (tmp_path / "coaching" / "fitness-status.md").write_text("état de forme")
-    vault_check.check_retired(vault({}, root=tmp_path), report)
-    assert report.failed == 1
-
-
-def test_a_clean_tree_passes_the_retired_check(report, tmp_path):
-    vault_check.check_retired(vault({}, root=tmp_path), report)
-    assert report.failed == 0
-
-
 # ------------------------------------------ règles de méta portées
 
 def correction(date, correctif):
     return {"coaching/corrections.md":
             f"| {date} | affirmé | vrai | à lire | {correctif} |\n"}
-
-
-def test_a_star_rule_naming_no_carrier_fails(report):
-    """Une règle générale qui n'existe que dans `corrections.md` ne tournera jamais :
-    le fichier n'est lu par aucun niveau de l'échelle et par aucun prompt."""
-    vault_check.check_corrections_carriers(
-        vault(correction("2026-08-09", "⭐ **Règle** : y penser le matin.")), report)
-    assert report.failed == 1
-
-
-def test_a_star_rule_naming_a_carrier_passes(report):
-    vault_check.check_corrections_carriers(
-        vault(correction("2026-08-09",
-                         "⭐ **Règle** portée par `scripts/model/weekly_plan.py`.")), report)
-    assert report.failed == 0
-
-
-def test_a_retired_threads_file_is_not_a_carrier(report):
-    vault_check.check_corrections_carriers(
-        vault(correction("2026-08-09",
-                         "⭐ **Règle** portée par l'ancien `ai/threads.md`.")), report)
-    assert report.failed == 1
-
-
-def test_a_retired_deadlines_file_is_not_a_carrier(report):
-    vault_check.check_corrections_carriers(
-        vault(correction("2026-08-09",
-                         "⭐ **Règle** portée par `coaching/echeances.md`.")), report)
-    assert report.failed == 1
-
-
-def test_citing_a_note_is_not_citing_a_carrier(report):
-    """Le piège exact : `decisions.md` et les fiches ne se lisent qu'à la demande en
-    N2/N3. Y renvoyer une règle générale, c'est la rendormir."""
-    vault_check.check_corrections_carriers(
-        vault(correction("2026-08-09", "⭐ **Règle** : cf. [[decisions]] et la fiche.")), report)
-    assert report.failed == 1
-
-
-def test_a_content_fix_without_a_star_is_none_of_this_checks_business(report):
-    """Corriger ce que dit une fiche n'appelle aucun porteur, et ces lignes-là ne
-    portent pas de ⭐ : le contrôle ne doit pas inventer une dette."""
-    vault_check.check_corrections_carriers(
-        vault(correction("2026-08-09", "Fiche corrigée : le talon touche.")), report)
-    assert report.failed == 0
-
-
-def test_mentioning_the_marker_is_not_announcing_a_rule(report):
-    """Le contrôle tirait sur sa propre documentation : la convention est
-    `⭐ **libellé**`, pas le caractère nu."""
-    vault_check.check_corrections_carriers(
-        vault(correction("2026-08-09",
-                         "Le ⭐ a été retiré : c'était une observation datée.")), report)
-    assert (report.failed, report.warned) == (0, 0)
-
-
-def test_older_entries_are_visible_debt_not_a_failure(report):
-    vault_check.check_corrections_carriers(
-        vault(correction("2026-07-31", "⭐ **Règle** : y penser le matin.")), report)
-    assert (report.failed, report.warned) == (0, 1)
 
 
 # ------------------------------------------------------------- bout en bout

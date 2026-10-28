@@ -11,7 +11,6 @@ from pathlib import Path
 #: The coach's entry point, regenerated from the plan.
 HOT_CACHE = Path("ai/hot-cache.md")
 
-ATHLETE_PROFILE = Path("athlete/athlete.md")
 #: One note per ISO week, holding the rendered plan.
 JOURNAL = Path("athlete/journal")
 #: Projections of PostgreSQL facts, never edited by hand.
@@ -22,8 +21,8 @@ PROJECTIONS = (DAILY_CSV, INSTRUMENTS_CSV, STRENGTH_LOG_CSV)
 
 DECISIONS = Path("coaching/decisions.md")
 CORRECTIONS = Path("coaching/corrections.md")
-CURRENT_PLAN = Path("coaching/current-plan.md")
-PROTOCOLS = Path("coaching/protocols.md")
+#: How each correction is replayed: a scenario of the bench, code, or nothing.
+CORRECTIONS_REPLAY = Path("coaching/corrections-replay.json")
 STRENGTH = Path("coaching/strength.md")
 #: One note per kind of session or strength routine.
 WORKOUTS = Path("coaching/workouts")

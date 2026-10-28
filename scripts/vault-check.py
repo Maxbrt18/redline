@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-"""Vault invariants -- turns "the audit" from a session into a command.
+"""Vault invariants: the structure the engine relies on, checked in one command.
 
-Ran at every weekly review (and on demand). The point is that structural drift gets
-caught the week it appears, when it costs two minutes, instead of accumulating until
-someone notices the vault has 7 copies of the same workout.
-
-Each check maps to something that actually went wrong on 2026-07-17 or 2026-07-21:
-duplication, stale caches, lying `maj` dates, private data, resurrected files.
+Run at the weekly review and on demand. Every check reads structure (YAML headers,
+links, file names, PostgreSQL state, generated views), never prose. What a vault holds
+its notes to (note types, reading budget) is declared in `redline.toml` under
+`[vault]`; a vault's own editorial conventions belong in a script of its own.
 
 Usage:  python3 scripts/vault-check.py            # from the vault root
         python3 scripts/vault-check.py --quiet    # only failures
@@ -32,14 +30,14 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.model import (  # noqa: E402
-    claims,
     correction_replay,
     entrypoint,
-    instance,
     ledger,
     vault_layout,
 )
 from scripts.model import decisions as decision_log  # noqa: E402
+from scripts.model import instance as instance_model  # noqa: E402
+from scripts.model import startup_budget as budget  # noqa: E402
 
 # The programme layer needs PyYAML to read a note's frontmatter, which a bare vault
 # checkout on the Mac may not have. `model.ledger` above has no dependency at all:
@@ -47,7 +45,6 @@ from scripts.model import decisions as decision_log  # noqa: E402
 try:
     from scripts import ledger as ledger_gauge  # scripts/ledger.py : la jauge, pas le format
     from scripts.model import hot_cache, weekly_plan
-    from scripts.model import startup_budget as budget
     from scripts.model.capabilities import load as load_capabilities
     from scripts.model.notes import NoteError
     from scripts.model.programme import load as load_programme
@@ -65,89 +62,36 @@ CAPABILITIES_DIR = "coaching/capabilities"
 CAPABILITY_STALE_DAYS = 14     # a capability score not re-read in two weeks is stale
 DECISIONS = str(vault_layout.DECISIONS)
 CORRECTIONS = str(vault_layout.CORRECTIONS)
-# What counts as a CARRIER for a ⭐ meta-rule: something that runs, or something the
-# coach reads without choosing to. A fiche, a concept or `decisions.md` are read on
-# demand at N2/N3 only -- citing one is how a rule goes back to sleep.
-# `docs/vault-maintenance.md` counts because CLAUDE.md binds it to a TRIGGER ("à ne lire
-# qu'au moment d'écrire une note, d'ingérer une source, de coder ou de commiter") -- which
-# is exactly when a rule about HOW TO WRITE has to fire. It is not a general escape hatch:
-# a rule that governs how the coach ANSWERS has no business there.
-CARRIER = re.compile(r"scripts/|server/|prompts\.py|STYLE_PROMPT|vault-check|"
-                     r"CLAUDE\.md|vault-maintenance|`gates`")
-# The convention is `⭐ **libellé**`, not the bare character: a line that MENTIONS the
-# marker ("le ⭐ a été retiré, c'était une observation") announces no rule at all, and
-# matching on the character alone made the check fire on its own documentation.
-STAR_RULE = re.compile(r"⭐\s*\*\*")
-CARRIER_RULE_START = dt.date(2026, 8, 8)
-# Le budget de lecture au démarrage (fichiers, plafonds, total) est déclaré une fois,
-# dans model/startup_budget.py -- il n'a pas de seconde copie ici.
-
-# Files retired by the 2026-07-21 restructure. If one comes back, a rule was forgotten.
-RETIRED = ["athlete/journal/pain-log.md", "coaching/fitness-status.md",
-           "coaching/load-gauge.md", "coaching/routines.md", "athlete/ledger.md",
-           "ai/threads.md", "ai/proactive-log.md", "coaching/echeances.md",
-           "coaching/race-capabilities.md"]
-
 # A decision quotes the data that justified it, and decisions are append-only: a
 # citation frozen in time is not a second owner.
 CITES_EVIDENCE = {"coaching/decisions.md"}
 
-# A REGRESSION GUARD on leaks already found and cleaned, not a privacy guarantee: a
-# blocklist cannot catch a NEW one, and the report label says so. Word-boundary
-# matched, because "SECRET" must not hit "secrètement".
-FORBIDDEN = [r"\bSECRET\b", r"diagnostic de [a-zé]+ite\b"]
-
-# Chiffres qui ont été ÉCRITS COMME DES FAITS sans avoir jamais été mesurés, retirés
-# après correction de l'athlète. Distinct de FORBIDDEN (fuites de vie privée) : ici le
-# risque n'est pas la divulgation, c'est la RÉAPPARITION — une valeur inventée qui a
-# essaimé dans cinq fichiers reviendra par copie si rien ne la retient.
-#   (no entry yet: add the regex of any number that was invented rather than measured)
-UNMEASURED: list[str] = []
-
-# Bounded to the ledger's Note column, the one place where a capitalised word is
-# never a cited author: anywhere else this would fire on every cited researcher
-# and a check that cries wolf gets ignored. The alternation is spelled in
-# both cases rather than re.I, so the NAME still has to be capitalised.
-COMPANION = re.compile(
-    r"\b(?:[Aa]vec|[Pp]our|[Cc]hez|[Ee]t)\s+([A-ZÉÈÀÂÎÔÛ][\wÉÈÊÀÂÎÔÛéèêàâîôûç-]*)")
-NOT_A_PERSON = {
-    "Strava", "Paris", "SL", "EF", "FC", "RE", "D", "J1", "J2", "J3", "TargetRace",
-    "Récup", "Sac", "Test", "Plafond", "Terrain", "Descente", "Dont", "Zéro", "Très",
-    "Lièvre", "Canari", "Note", "GPX", "CMJ", "VMA",
-    "RDL", "D-", "PAR",
-}
-
-CANONICAL_TYPES = {
-    "ai", "bilan", "capacite", "concept", "decision", "exercice", "gabarit",
-    "index", "profil", "seance", "seance-type", "épisode",
-}
-OPERATIONAL_SURFACES = ("ai/hot-cache.md", "coaching/current-plan.md")
-OLD_PAIN_CEILING = re.compile(
-    r"(?:douleur[^\n]{0,100}(?:≤|<=)\s*2\s*-\s*3\s*/\s*10|"
-    r"(?:≤|<=)\s*2\s*-\s*3\s*/\s*10[^\n]{0,100}douleur)", re.IGNORECASE)
-NUMERIC_WAKE = re.compile(
-    r"\b(?:réveil|reveil)[^.!?;\n]{0,40}\b\d(?:[,.]\d)?\s*/\s*10", re.IGNORECASE)
-
 WIKILINK = re.compile(r"\[\[([^\]]+)\]\]")
 FENCED_CODE = re.compile(r"^```.*?^```", re.MULTILINE | re.DOTALL)
 INLINE_CODE = re.compile(r"`[^`\n]*`")
-# A copied external fact carries its date + shelf life: "2026-07-08 · TTL 90 j" (R13).
-TTL = re.compile(r"(\d{4}-\d{2}-\d{2})\s*·\s*TTL\s*(\d+)\s*j")
-ALIASES = re.compile(r"^aliases:\s*\[(.*?)\]", re.MULTILINE)
 FRONTMATTER = re.compile(r"^---\n(.*?)\n---", re.DOTALL)
-MAJ = re.compile(r"^maj:\s*(\d{4}-\d{2}-\d{2})", re.MULTILINE)
 # Le motif appartient au registre typé : le `19\d{9}` codé ici s'éteindra tout seul le
 # jour où Strava passera aux ids en 20…, et ce contrôle rapportera « aucun doublon »
 # parce qu'il n'aura plus rien trouvé du tout (2026-07-29).
 STRAVA_ID = re.compile(rf"\b{ledger.STRAVA_ID_PATTERN}\b")
 DECISION_HEADING = re.compile(r"^## (\d{4}-\d{2}-\d{2})", re.MULTILINE)
-# Documentation placeholders, not real links. Matched EXACTLY: matching a PREFIX
-# like `ep-` would silently excuse every broken link to the 78 notes of episodes/.
-PLACEHOLDERS = {"Seuil", "Lactate", "Travail au seuil", "concepts", "Concept", "note"}
 
 
 def _is_placeholder(name: str) -> bool:
-    return name in PLACEHOLDERS or "…" in name or "<" in name or name == "..."
+    """A link written as an example in documentation: `[[<note>]]`, `[[…]]`."""
+    return "…" in name or "<" in name or name == "..."
+
+
+def _frontmatter(text: str) -> dict | None:
+    """The note's YAML header; None without one or when it is not a mapping."""
+    match = FRONTMATTER.search(text)
+    if not match:
+        return None
+    try:
+        metadata = yaml.safe_load(match.group(1))
+    except yaml.YAMLError:
+        return None
+    return metadata if isinstance(metadata, dict) else None
 
 
 def _without_code(text: str) -> str:
@@ -171,6 +115,8 @@ class Vault:
 
     root: Path
     files: dict
+    #: The vault's `redline.toml`; None when it cannot be read.
+    instance: instance_model.Instance | None = None
 
     def text(self, relative: str):
         return self.files.get(relative)
@@ -245,9 +191,10 @@ def check_frontmatter(vault: Vault, report: Report) -> None:
         if not isinstance(metadata, dict):
             problems.append(f"{path} : frontmatter attendu comme objet YAML")
             continue
-        note_type = metadata.get("type")
-        if note_type not in CANONICAL_TYPES:
-            problems.append(f"{path} : type non canonique {note_type!r}")
+        note_types = vault.instance.note_types if vault.instance else None
+        if note_types is not None and metadata.get("type") not in note_types:
+            problems.append(f"{path} : type {metadata.get('type')!r} non déclaré "
+                            "dans [vault] note_types")
         aliases = metadata.get("aliases")
         if aliases is not None and not isinstance(aliases, list):
             problems.append(f"{path} : aliases doit être une liste YAML")
@@ -255,46 +202,6 @@ def check_frontmatter(vault: Vault, report: Report) -> None:
         report.fail("frontmatter et gabarits valides", problems)
     else:
         report.ok("frontmatter et gabarits valides", f"{parsed} bloc(s) YAML")
-
-
-def check_operational_privacy(vault: Vault, report: Report) -> None:
-    """Les surfaces envoyées ou relues chaque jour ne nomment aucun accompagnant."""
-    paths = [path for path in vault.files if path.startswith("athlete/journal/")]
-    paths.extend(OPERATIONAL_SURFACES)
-    hits = []
-    for path in sorted(set(paths)):
-        text = vault.text(path) or ""
-        for match in COMPANION.finditer(text):
-            name = match.group(1)
-            if (name not in NOT_A_PERSON and name not in instance.own_names(vault.root)
-                    and not re.fullmatch(r"W\d{2}", name) and len(name) > 1):
-                line = text[:match.start()].count("\n") + 1
-                hits.append(f"{path}:{line} — nom de tiers {name!r}")
-    if hits:
-        report.fail("pas de nom de tiers dans les surfaces opérationnelles", hits)
-    else:
-        report.ok("pas de nom de tiers dans les surfaces opérationnelles")
-
-
-def check_active_safety_rules(vault: Vault, report: Report) -> None:
-    """Les règles actives ne peuvent ressusciter les formulations corrigées."""
-    paths = [*OPERATIONAL_SURFACES, "coaching/strength.md"]
-    current = dt.date.today().isocalendar()
-    paths.append(f"athlete/journal/{current.year}-w{current.week:02d}.md")
-    problems = []
-    for path in paths:
-        text = vault.text(path)
-        if text is None:
-            continue
-        for label, pattern in (("ancien plafond douleur 2-3/10", OLD_PAIN_CEILING),
-                               ("note /10 reconstruite au réveil", NUMERIC_WAKE)):
-            for match in pattern.finditer(text):
-                line = text[:match.start()].count("\n") + 1
-                problems.append(f"{path}:{line} — {label}")
-    if problems:
-        report.fail("règles de sécurité actives propagées", problems)
-    else:
-        report.ok("règles de sécurité actives propagées")
 
 
 # ⭐ UNE MÊME ABSENCE SE DIT D'UNE SEULE FAÇON. Huit contrôles lisent PostgreSQL ; six
@@ -410,45 +317,13 @@ def check_no_duplicate_facts(vault: Vault, report: Report) -> None:
         report.ok("aucun fait PostgreSQL recopié dans Git")
 
 
-def check_claim_propagation(vault: Vault, report: Report) -> None:
-    """Un énoncé scientifique fragile ne voyage jamais nu (audit du 2026-08-07).
-
-    Les sentinelles vivent dans `model/claims.py` : un motif d'énoncé + le grade
-    compact exigé dans le MÊME paragraphe des fichiers aval. Fil de détente sur les
-    formulations canoniques — les paraphrases libres relèvent de la passe de
-    propagation du rituel de confrontation, pas de ce contrôle.
-    """
-    problems = []
-    scanned = 0
-    for path in claims.DOWNSTREAM:
-        text = vault.text(path)
-        if text is None:
-            problems.append(f"{path} introuvable — la liste DOWNSTREAM a dérivé")
-            continue
-        scanned += 1
-        for paragraph in _without_code(text).split("\n\n"):
-            for sentinel in claims.SENTINELS:
-                hit = sentinel.claim.search(paragraph)
-                if hit and not sentinel.marker.search(paragraph):
-                    excerpt = paragraph[hit.start():hit.start() + 70].replace("\n", " ")
-                    problems.append(f"{path} : « {sentinel.name} » sans son grade "
-                                    f"(propriétaire : {sentinel.owner}) — {excerpt}…")
-    if problems:
-        report.fail("propagation des grades", problems)
-    else:
-        report.ok("propagation des grades",
-                  f"{len(claims.SENTINELS)} sentinelles × {scanned} fichiers aval")
-
-
 def check_links(vault: Vault, report: Report) -> None:
     targets = set()
     for path, text in vault.files.items():
         targets.add(path.rsplit("/", 1)[-1][:-3])
-        head = FRONTMATTER.search(text)
-        if head:
-            found = ALIASES.search(head.group(1))
-            if found:
-                targets.update(a.strip().strip("\"'") for a in found.group(1).split(","))
+        aliases = (_frontmatter(text) or {}).get("aliases")
+        if isinstance(aliases, list):
+            targets.update(str(alias) for alias in aliases)
     # Skipped directories are not scanned for links, but notes living there are still
     # legitimate link targets in Obsidian (e.g. sources/koopcast-selection-notes).
     for skipped in SKIP_DIRS:
@@ -490,19 +365,13 @@ def check_unique_basenames(vault: Vault, report: Report) -> None:
 
 
 def check_startup_budget(vault: Vault, report: Report) -> None:
-    """Le coût de lecture du coach : un plafond par fichier, dans un étage de lecture.
-
-    La ventilation n'est pas cosmétique. Un total nu (« 8042 > 8000 ») oblige à
-    rouvrir tous les fichiers pour décider où couper, et cette relecture coûte plus
-    cher que la coupe. Le détail nomme la cible en une ligne. Et depuis le 2026-08-06
-    l'étage dit si le dépassement se paie à **chaque message** (`par tour`) ou
-    seulement quand un jugement s'engage (`N2`) — ce n'est pas la même urgence.
-    Règles dans `model/startup_budget.py`.
-    """
-    if MODEL_UNAVAILABLE:
-        report.warn("budget de lecture", f"couche modèle indisponible ({MODEL_UNAVAILABLE})")
+    """The agent's reading cost, per file and per tier, as `[[vault.budget]]` declares."""
+    tiers = vault.instance.read_budget if vault.instance else ()
+    if not tiers:
+        report.skip("budget de lecture", "aucun [[vault.budget]] dans redline.toml")
         return
-    result = budget.audit({name: vault.text(name) for name in budget.FILES})
+    result = budget.audit(tiers, {path: vault.text(path) for tier in tiers
+                                  for path, _ in tier.files})
     if result.over or result.over_total:
         report.fail("budget de lecture", [*result.problems(), result.detail])
     elif result.near_total:
@@ -516,8 +385,8 @@ def check_maj_dates(vault: Vault, report: Report) -> None:
     is how a stale file passes for current."""
     stale = []
     for path, text in vault.files.items():
-        found = MAJ.search(text)
-        if not found:
+        updated = (_frontmatter(text) or {}).get("maj")
+        if not isinstance(updated, dt.date):
             continue
         try:
             committed = subprocess.run(
@@ -528,8 +397,8 @@ def check_maj_dates(vault: Vault, report: Report) -> None:
             return
         if not committed:
             continue  # never committed yet
-        if found.group(1) > committed and _is_clean(vault.root, path):
-            stale.append(f"{path} : maj {found.group(1)} > dernier commit {committed}")
+        if updated.isoformat() > committed and _is_clean(vault.root, path):
+            stale.append(f"{path} : maj {updated} > dernier commit {committed}")
     if stale:
         report.fail("dates `maj` honnêtes", stale)
     else:
@@ -540,66 +409,6 @@ def _is_clean(root: Path, path: str) -> bool:
     out = subprocess.run(["git", "status", "--porcelain", "--", path],
                          cwd=root, capture_output=True, text=True).stdout
     return not out.strip()
-
-
-# ----------------------------------------------------------------------- privacy
-
-def check_privacy(vault: Vault, report: Report) -> None:
-    """Regression guard, and labelled as one: a blocklist cannot certify that no NEW
-    private fact entered a repo a bot writes to continuously."""
-    hits = []
-    for path, text in vault.files.items():
-        if path in ("coaching/decisions.md", "coaching/corrections.md"):
-            continue  # these two document the rule itself
-        for pattern in FORBIDDEN:
-            for match in re.finditer(pattern, text, re.IGNORECASE):
-                line = text[:match.start()].count("\n") + 1
-                hits.append(f"{path}:{line} — {match.group(0)!r}")
-    if hits:
-        report.fail("fuites connues (liste noire)", hits)
-    else:
-        report.ok("fuites connues (liste noire)", f"{len(FORBIDDEN)} motifs, aucun présent")
-
-
-def check_unmeasured_values(vault: Vault, report: Report) -> None:
-    """A number written as fact that was never measured is worse than a missing one:
-    it prescribes. This guard is a REGRESSION guard on values already found and
-    removed -- it cannot catch a new invention, only the return of an old one."""
-    hits = []
-    for path, text in vault.files.items():
-        if path in ("coaching/decisions.md", "coaching/corrections.md",
-                    "scripts/vault-check.py"):
-            continue  # ces trois documentent la règle elle-même
-        for pattern in UNMEASURED:
-            for match in re.finditer(pattern, text, re.IGNORECASE):
-                line = text[:match.start()].count("\n") + 1
-                context = text.splitlines()[line - 1]
-                if re.search(r"invent|jamais (?:mesur|calcul)|retir", context, re.IGNORECASE):
-                    continue          # la ligne qui DIT que le chiffre est faux
-                hits.append(f"{path}:{line} -- {match.group(0)!r}")
-    if hits:
-        report.fail("valeurs jamais mesurées", hits)
-    else:
-        report.ok("valeurs jamais mesurées", f"{len(UNMEASURED)} motif(s), aucun présent")
-
-
-def check_companions(vault: Vault, report: Report) -> None:
-    """"Les noms des gens qu'il croise : non" (CLAUDE.md). A name changes no
-    prescription, and the vault is a git repo."""
-    observations = _read_postgres(report, "pas de nom de tiers au registre",
-                                  lambda store: store.observation_rows())
-    if observations is None:
-        return
-    hits = []
-    for row in observations:
-        note = row["note"] or ""
-        for name in COMPANION.findall(note):
-            if name not in NOT_A_PERSON and len(name) > 1:
-                hits.append(f"{row['occurred_on']} {row['kind']} — {name!r} dans la note")
-    if hits:
-        report.fail("pas de nom de tiers au registre", hits)
-    else:
-        report.ok("pas de nom de tiers au registre")
 
 
 # -------------------------------------------------------------- structure and dates
@@ -658,33 +467,6 @@ def check_prediction_debt(vault: Vault, report: Report) -> None:
         report.ok("prédictions soldées")
 
 
-def check_retired(vault: Vault, report: Report) -> None:
-    back = [p for p in RETIRED if (vault.root / p).exists()]
-    if back:
-        report.fail("fichiers retirés non ressuscités",
-                    [f"{p} est revenu — son contenu a un autre propriétaire" for p in back])
-    else:
-        report.ok("fichiers retirés non ressuscités")
-
-
-def check_ttl(vault: Vault, report: Report) -> None:
-    """A copied external fact carries its date and shelf life ('2026-07-08 · TTL
-    90 j'); expired ones surface at the weekly review."""
-    today = dt.date.today()
-    expired = []
-    for path, text in vault.files.items():
-        for match in TTL.finditer(text):
-            due = dt.date.fromisoformat(match.group(1)) + dt.timedelta(days=int(match.group(2)))
-            if due < today:
-                line = text[:match.start()].count("\n") + 1
-                expired.append(f"{path}:{line} — daté {match.group(1)}, TTL {match.group(2)} j, "
-                               f"périmé depuis {due}")
-    if expired:
-        report.fail("faits datés non périmés", expired)
-    else:
-        report.ok("faits datés non périmés")
-
-
 def check_threads(vault: Vault, report: Report) -> None:
     """Une relance PostgreSQL passée reste visible sans projection Markdown."""
     rows = _read_postgres(report, "fils ouverts", lambda store: store.thread_rows())
@@ -700,79 +482,22 @@ def check_threads(vault: Vault, report: Report) -> None:
         report.ok("relances tenues")
 
 
-def check_corrections_carriers(vault: Vault, report: Report) -> None:
-    """Une ⭐ règle de méta doit nommer le mécanisme qui la fera tourner.
-
-    `corrections.md` est en **écriture seule** : `prompts.py` le cite six fois, six
-    fois comme cible d'écriture ; l'échelle de lecture de CLAUDE.md ne l'ouvre à aucun
-    niveau. Une règle générale qui n'existe que dans ce fichier n'a donc aucune chance
-    d'être appliquée demain — c'est ce qui a fait rejouer, deux jours plus tard, la
-    dette « pas encore écrit en règle » du 2026-08-02, puis le contrôle daté du 08/08.
-
-    Le correctif N'EST PAS d'ajouter ce fichier à l'échelle de lecture : ce serait
-    payer du contexte à chaque message pour une relecture humaine incertaine. C'est
-    que la règle **émigre** vers un endroit déjà lu ou déjà exécuté. D'où ce contrôle :
-    quand un correctif porte un ⭐ (la convention maison pour « règle générale »), il
-    cite un PORTEUR — un schéma, un contrôle, un script, une ligne de prompt, CLAUDE.md,
-    ou un objet daté typé.
-
-    ⚠ CE QUE CE CONTRÔLE NE VÉRIFIE PAS, et qu'il ne faut pas lui prêter : il constate
-    qu'un porteur est NOMMÉ, jamais qu'il porte. L'audit du 2026-08-19 l'a montré à ses
-    dépens : la règle du 2026-08-06 (« ne jamais attribuer à l'exécution de l'athlète un
-    effet dont la cause peut être une prescription du coach ») désignait `STYLE_PROMPT`,
-    en avait disparu au ménage du 11/08, et cette ligne affichait OK depuis huit jours.
-    Vérifier qu'un texte français vit toujours dans un prompt n'est pas greppable ; la
-    contrepartie réelle est un test par règle, du côté de `server/tests/`, là où la
-    formulation exacte peut être figée.
-
-    Corriger le contenu d'une fiche n'appelle aucun porteur, et ces lignes-là ne portent
-    pas de ⭐ : le contrôle ne les regarde pas. Les entrées antérieures à la règle sont
-    de la dette **visible** (⚠), pas un échec : elles ont été écrites sous l'ancien
-    régime et les repeindre après coup ne ferait pas tourner leurs règles.
-    """
-    text = vault.text(CORRECTIONS)
-    if text is None:
-        report.skip("règles de méta portées", f"{CORRECTIONS} est introuvable")
-        return
-    late, debt = [], []
-    for line in text.splitlines():
-        if not line.startswith("| 20"):
-            continue
-        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
-        correctif = cells[-1] if cells else ""
-        if not STAR_RULE.search(correctif) or CARRIER.search(correctif):
-            continue
-        found = re.match(r"(\d{4}-\d{2}-\d{2})", cells[0])
-        if not found:
-            continue
-        entry = f"{cells[0]} — règle de méta sans porteur nommé"
-        if dt.date.fromisoformat(found.group(1)) >= CARRIER_RULE_START:
-            late.append(entry + " (schéma, contrôle, script, prompt, CLAUDE.md ou objet daté typé)")
-        else:
-            debt.append(entry)
-    if late:
-        report.fail("règles de méta portées", late)
-        return
-    if debt:
-        report.warn("règles de méta portées",
-                    f"{len(debt)} règle(s) d'avant le {CARRIER_RULE_START} sans porteur — "
-                    f"dette, à reprendre en assimilation ({debt[0]})")
-        return
-    report.ok("règles de méta portées")
-
-
 def check_corrections_replay(vault: Vault, report: Report) -> None:
     """Chaque correction a un mode de rejeu, choisi par un humain (chantier du 2026-10-04).
 
     Le contrôle des porteurs constate qu'un porteur est nommé ; celui-ci constate qu'on a
     décidé comment la règle se rejoue : scénario du banc, code, hors banc, ou dette
-    `a-rejouer`. Une correction nouvelle a deux bilans pour entrer au registre
-    `server/tests/fixtures/corrections-replay.json`, puis le contrôle passe au rouge.
+    `a-rejouer`. Une correction nouvelle a deux bilans pour entrer au registre du vault,
+    puis le contrôle passe au rouge. Sans registre, rien n'est vérifié.
     La dette `a-rejouer` reste visible en ⚠ : elle se résorbe en écrivant des scénarios.
     """
     text = vault.text(CORRECTIONS)
     if text is None:
         report.skip("corrections rejouables", f"{CORRECTIONS} est introuvable")
+        return
+    if not (vault.root / vault_layout.CORRECTIONS_REPLAY).is_file():
+        report.skip("corrections rejouables",
+                    f"pas de registre {vault_layout.CORRECTIONS_REPLAY}")
         return
     try:
         found = correction_replay.audit(vault.root, text, dt.date.today())
@@ -786,7 +511,7 @@ def check_corrections_replay(vault: Vault, report: Report) -> None:
                 + found.broken)
     if problems:
         report.fail("corrections rejouables",
-                    [f"registre : {correction_replay.LEDGER}", *problems])
+                    [f"registre : {vault_layout.CORRECTIONS_REPLAY}", *problems])
         return
     pending = [c.key for c in found.unregistered]
     if pending or found.owed:
@@ -989,24 +714,15 @@ CHECKS = (
     check_postgres_storage,
     check_observations,
     check_no_duplicate_facts,
-    check_claim_propagation,
     check_links,
     check_unique_basenames,
     check_startup_budget,
     check_maj_dates,
-    check_unmeasured_values,
-    check_privacy,
-    check_operational_privacy,
-    check_active_safety_rules,
-    check_companions,
     check_decisions_order,
     check_prediction_debt,
-    check_retired,
-    check_ttl,
     check_capability_notes,
     check_cockpit_freshness,
     check_weekly_plans,
-    check_corrections_carriers,
     check_corrections_replay,
     check_echeances,
     check_threads,
@@ -1014,7 +730,7 @@ CHECKS = (
 )
 
 OPERATIONAL_CHECKS = frozenset({
-    check_postgres_storage, check_observations, check_companions,
+    check_postgres_storage, check_observations,
     check_cockpit_freshness, check_weekly_plans, check_echeances, check_threads,
     check_generated_views,
 })
@@ -1032,8 +748,15 @@ def main() -> int:
     root = args.root.resolve()
 
     print(f"\n  Contrôle du vault — {root}\n")
-    vault = Vault(root, markdown_files(root))
     report = Report(args.quiet)
+    try:
+        loaded = instance_model.load(root)
+    except instance_model.InstanceError as exc:
+        report.fail("redline.toml lisible", str(exc).splitlines())
+        loaded = None
+    else:
+        report.ok("redline.toml lisible")
+    vault = Vault(root, markdown_files(root), loaded)
     selected = [check for check in CHECKS
                 if not args.static_only or check not in OPERATIONAL_CHECKS]
     for check in selected:

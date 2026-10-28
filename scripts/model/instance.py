@@ -23,6 +23,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from . import hr_zones
 from .errors import ConfigError
 from .schema import Schema, SchemaError, field
+from .startup_budget import Tier, ceiling_errors
 
 FILENAME = "redline.toml"
 EXAMPLE = "redline.example.toml"
@@ -58,6 +59,23 @@ INSTANCE_SCHEMA = Schema("redline.toml", [
             field("slug", str, pattern=SLUG),
             field("label", str, minimum=1, maximum=30),
         ]))),
+    # What `vault-check.py` holds the vault to; without it, nothing is checked for it.
+    field("vault", dict, required=False, schema=Schema("[vault]", [
+        field("note_types", list, required=False, item=field(
+            "type", str, minimum=1, maximum=40),
+              note="les valeurs admises du champ `type` d'une note"),
+        field("budget", list, required=False, item=field(
+            "étage", dict, schema=Schema("[[vault.budget]]", [
+                field("tier", str, minimum=1, maximum=40,
+                      note="quand ces fichiers se paient, ex. « par tour »"),
+                field("total", int, minimum=1, maximum=100_000),
+                field("files", list, minimum=1, item=field(
+                    "fichier", dict, schema=Schema("files", [
+                        field("path", str, minimum=1, maximum=200),
+                        field("words", int, minimum=1, maximum=100_000),
+                    ]))),
+            ]))),
+    ])),
 ])
 
 
@@ -86,6 +104,9 @@ class Instance:
     hr_rest: int
     hr_max: int
     timezone: ZoneInfo
+    #: None when the instance declares no note types.
+    note_types: frozenset[str] | None = None
+    read_budget: tuple[Tier, ...] = ()
 
     @property
     def hr_bounds(self) -> tuple[int, ...]:
@@ -148,6 +169,14 @@ def parse(text: str) -> Instance:
     zones = [entry["slug"] for entry in injuries]
     if len(set(zones)) != len(zones):
         raise InstanceError(f"{FILENAME} : zone surveillée en double ({', '.join(zones)})")
+    vault = payload.get("vault", {})
+    budget = tuple(Tier(tier["tier"], tier["total"],
+                        tuple((entry["path"], entry["words"]) for entry in tier["files"]))
+                   for tier in vault.get("budget", []))
+    problems = ceiling_errors(budget)
+    if problems:
+        raise InstanceError("\n  - ".join([f"{FILENAME} : budget de lecture incohérent :",
+                                             *problems]))
     return Instance(
         athlete_name=athlete["name"],
         place=payload["notebook"]["place"],
@@ -157,20 +186,9 @@ def parse(text: str) -> Instance:
         hr_rest=athlete["hr_rest"],
         hr_max=athlete["hr_max"],
         timezone=_timezone(athlete["timezone"]),
+        note_types=frozenset(vault["note_types"]) if "note_types" in vault else None,
+        read_budget=budget,
     )
-
-
-def own_names(vault: Path) -> frozenset[str]:
-    """Les noms propres de l'instance qui ne désignent aucun tiers : prénom et lieu.
-
-    Sans `redline.toml` lisible, aucun : un contrôle de vie privée ne s'assouplit pas
-    sur une configuration qu'il ne peut pas lire.
-    """
-    try:
-        loaded = load(vault)
-    except InstanceError:
-        return frozenset()
-    return frozenset({loaded.athlete_name, loaded.place})
 
 
 def load(vault: Path) -> Instance:
