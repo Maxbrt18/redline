@@ -3,9 +3,6 @@
 History belongs in commit messages; a date in a comment is a journal entry that rots.
 Athlete-facing French lives in string literals under `src/redline/coach/fr/`, never in
 comments or docstrings.
-
-The cleanup goes directory by directory. `PENDING` lists what is not done yet; an entry
-leaves the list as soon as it is clean, and the test says so.
 """
 
 import ast
@@ -21,12 +18,8 @@ HASH_COMMENTED = {".sh", ".toml", ".yml", ".yaml", ".ini", ".txt", ".example", "
 SLASH_COMMENTED = {".js", ".css", ".html"}
 SKIPPED = ("tests/fixtures/",)
 
-PENDING = (
-    "tests",
-)
-
 DATE = re.compile(r"\b20\d\d-\d\d-\d\d\b")
-EMOJI = re.compile("[☀-➿\U0001f300-\U0001faff]")
+EMOJI = re.compile("[\u2600-\u27bf\U0001f300-\U0001faff]")
 # French function words that English never uses as words. Two distinct ones make a
 # French sentence; one alone is usually a quoted label or a proper noun.
 FRENCH = re.compile(
@@ -84,20 +77,9 @@ def _violations():
                     yield relative, line, rule
 
 
-def _pending(relative: str) -> str | None:
-    return next((entry for entry in PENDING
-                 if relative == entry or relative.startswith(entry + "/")), None)
-
-
 def test_comments_follow_the_conventions():
-    offenders = [f"{relative}:{line} {rule}" for relative, line, rule in _violations()
-                 if _pending(relative) is None]
+    offenders = [f"{relative}:{line} {rule}" for relative, line, rule in _violations()]
     assert offenders == []
-
-
-def test_every_pending_entry_still_has_work():
-    dirty = {_pending(relative) for relative, _, _ in _violations()}
-    assert sorted(set(PENDING) - dirty) == []
 
 
 def test_the_french_detector_needs_a_sentence():

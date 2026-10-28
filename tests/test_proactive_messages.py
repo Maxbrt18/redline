@@ -35,7 +35,7 @@ def test_closed_proactives_are_rendered_from_their_typed_detail(kind, detail, fr
 def test_only_explicitly_closed_kinds_skip_judgement():
     assert compose_closed_proactive("morning", "{}") is None
     assert "morning" not in CLOSED_KINDS
-    assert compose_closed_proactive("calibration_eve", '{"title":"SL"}') is None  # retiré
+    assert compose_closed_proactive("calibration_eve", '{"title":"SL"}') is None  # removed
     assert compose_closed_proactive("operator_message", '{"text":"  "}') is None
 
 
@@ -154,20 +154,20 @@ def test_queued_rotation_check_is_discarded_without_message_or_agent(make_bot):
     ("gear_alert", '{"name":"Novablast","km":540,"limit":600}', True),
     ("registre_incomplet", json.dumps({
         "date": "2026-08-22", "type": "easy", "missing": ["RPE"], "markers": ["m"]}), True),
-    # Ni dette ni agenda : prise de nouvelles sociale, texte écrit hors du service.
+    # Neither debt nor agenda: social check-in, text written outside the service.
     ("silence", "4", False),
     ("operator_message", '{"text":"Bilan W39 : semaine tenue."}', False),
 ])
 def test_a_closed_render_names_the_information_it_expects(kind, detail, tracked):
     rendered = compose_closed_proactive(kind, detail)
     assert bool(rendered.question) is tracked
-    # Le rapprochement après livraison exige une sous-chaîne exacte du texte parti.
+    # Matching after delivery requires an exact substring of the text that was sent.
     assert rendered.question in rendered.text
 
 
 def test_a_delivered_closed_question_is_tracked_and_never_asked_twice(make_bot, store):
-    """Audit du 2026-09-30, constat 4 : sans `turn_id`, la question d'un rendu fermé
-    n'entrait jamais dans la mémoire des questions, donc rien n'empêchait de la reposer."""
+    """Without `turn_id`, the question of a closed rendering never entered the
+        question memory, so nothing prevented asking it again."""
     bot = make_bot(proactive_active_start=dtime(0, 0))
     detail = '{"title":"SL","target_g_h":60}'
     expected = compose_closed_proactive("gut_review", detail).question
@@ -212,8 +212,8 @@ def _connected_notebook(bot, connected=True):
 
 def test_with_a_connected_notebook_the_evening_claim_is_a_button_not_a_question(
         make_bot, store):
-    """2026-10-09 : la réponse dans Messenger coûtait un tour de coach pour un
-    chiffre que le carnet prend d'un tap. Le rappel liste tout et renvoie au carnet."""
+    """The reply in Messenger cost a coach turn for a figure the logbook takes in one
+        tap. The reminder lists everything and points to the logbook."""
     agent = FakeAgent()
     bot = make_bot(agent=agent, proactive_active_start=dtime(0, 0))
     _connected_notebook(bot)
@@ -230,7 +230,7 @@ def test_with_a_connected_notebook_the_evening_claim_is_a_button_not_a_question(
     assert text == ("Ta séance EF du 08/10 attend encore ton pic de douleur, ton RPE et "
                     "ton plaisir : un tap dans le carnet.")
     assert url.endswith("#t=jeton") and title == "Ouvrir mon carnet"
-    # Un rappel par cellule : le lendemain, le filet ne la redemande pas.
+    # One reminder per cell: the next day, the safety net does not ask for it again.
     assert store.proactive.marked("asked:2026-10-08:easy:RPE")
     assert store.proactive.marked("asked:2026-10-08:easy:Plaisir")
 

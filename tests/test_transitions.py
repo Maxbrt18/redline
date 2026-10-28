@@ -1,4 +1,4 @@
-"""Garde-fou n°8 typé : transitions et faisabilité à rebours, sans fenêtre (2026-10-04)."""
+"""Typed guardrail no. 8: transitions and backward feasibility, without a window."""
 
 import datetime as dt
 from types import SimpleNamespace
@@ -47,7 +47,7 @@ def test_a_missed_transition_opens_nothing_but_a_done_or_future_one_does():
 
 
 def test_a_turn_command_carries_dates_not_text():
-    """Le chemin `stage_command` rend des `date` : la révision du 01/10 a planté dessus."""
+    """The `stage_command` path returns `date` values: a revision once crashed on them."""
     sessions = [_session("a-venir", dt.date(2026, 10, 3), "qualite")]
     assert [t.day for t in transitions.opened(sessions, dt.date(2026, 10, 1))] == [
         dt.date(2026, 10, 3)]
@@ -73,16 +73,16 @@ def test_the_plan_schema_types_the_transition():
         weekly_plan.validate(plan(two))
 
 
-# ------------------------------------------------------------------ solveur
+# ------------------------------------------------------------------ solver
 
 def test_the_three_race_firsts_fit_once_windows_are_gone():
-    """Le cas réel : W40 porte l'allongement, W43 est en assimilation."""
+    """The real case: W40 carries the extension, W43 is in assimilation."""
     verdict = transitions.diagnose(_problem())
     assert verdict.feasible is True
     schedule = verdict.options[0].schedule
     assert schedule.novelties["2026-W40"] == (LONG_RUN_STEP,)
     assert schedule.novelties["2026-W43"] == ()
-    # Un palier de SL se cumule avec une transition : W41, W42, W44, W45 en portent un.
+    # A long-run step stacks with a transition: W41, W42, W44, W45 carry one.
     assert schedule.long_run_steps == 5
     for week in ("2026-W41", "2026-W42", "2026-W44", "2026-W45"):
         assert len([i for i in schedule.novelties[week] if i != LONG_RUN_STEP]) <= 1
@@ -120,7 +120,7 @@ def test_rendered_text_avoids_banned_glyphs():
     assert [glyph for glyph in typography.BANNED_GLYPHS if glyph in text] == []
 
 
-# ------------------------------------------------------------------ lecture des faits
+# ------------------------------------------------------------------ reading the facts
 
 class FakeStore(SimpleNamespace):
     def deadline_rows(self):

@@ -1,11 +1,10 @@
 """The waiting line: what it says, and how often it is allowed to say it.
 
-Sam's complaint (2026-07-31) was not that the coach takes time, it is that
-announcing it sounded canned: four static strings, drawn at random, fired after 5 s on
-every single N2 or N3 -- while the triage is instructed to round UP when it hesitates.
-Three things are locked here: the contextual line wins over the canned one, the canned
-one never repeats twice running, and a refused allowance costs a message rather than a
-retry loop.
+Announcing the wait must not sound canned: four static strings drawn at random and fired
+after 5 s on every single N2 or N3 -- while the triage is instructed to round UP when it
+hesitates. Three things are locked here: the contextual line wins over the canned one, the
+canned one never repeats twice running, and a refused allowance costs a message rather than
+a retry loop.
 """
 
 import time
@@ -91,7 +90,7 @@ def test_the_allowance_is_asked_once_not_on_every_tick():
 
 
 def test_the_deep_delay_leaves_time_to_answer():
-    """La lecture approfondie ne déclenche plus une attente dès les premières secondes."""
+    """A deep read no longer triggers a wait notice within the first seconds."""
     assert TypingIndicator.PATIENCE_AFTER >= 75
 
 
@@ -113,7 +112,7 @@ def test_background_does_not_bypass_a_refused_waiting_allowance():
 
 
 class VirtualClock:
-    """Avance le temps sans thread ni attente réelle."""
+    """Advance time without a thread or a real wait."""
 
     def __init__(self):
         self.now = 0.0

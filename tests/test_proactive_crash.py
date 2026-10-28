@@ -57,9 +57,9 @@ def test_a_queued_proactive_waits_if_the_athlete_has_started_talking(make_bot):
 
 def test_message_arriving_during_generation_keeps_the_text_and_the_session(
         make_bot, store):
-    """RWF-008 : la génération terminée n'est ni jetée ni effacée de la conversation
-    (le proactif léger tourne sur une copie) ; elle attend, préparée, que Sam ait
-    fini d'écrire."""
+    """RWF-008: the finished generation is neither thrown away nor erased from the
+    conversation (the light proactive runs on a copy); it waits, prepared, until the
+    athlete has finished writing."""
     agent = FakeAgent()
     bot = make_bot(agent=agent)
     original = agent.run

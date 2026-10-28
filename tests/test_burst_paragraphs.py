@@ -1,12 +1,11 @@
-"""Un paragraphe = un texto (Sam, 2026-08-11).
+"""One paragraph = one text message.
 
-Le protocole ne coupait que sur un `---` explicite, donc une réponse de trois
-paragraphes arrivait en un seul pavé avec des lignes vides dedans — ce que personne
-ne tape sur Messenger. Le cas qui l'a établi est celui de la conversation du 11/08,
-repris ici verbatim comme jeu d'essai.
+The protocol used to split only on an explicit `---`, so a three-paragraph reply arrived
+as a single block with blank lines inside -- something nobody types on Messenger. The
+reference case is reused here verbatim as a test sample.
 
-Le modèle est bufferisé jusqu'au résultat terminal, puis `textutils` produit les
-bulles envoyées par le transport.
+The model is buffered until the terminal result, then `textutils` produces the bubbles
+sent by the transport.
 """
 
 from test_claude_stream import assistant, consume, text

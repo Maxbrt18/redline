@@ -140,7 +140,7 @@ def test_table_escapes_the_one_character_that_breaks_the_grid():
 
 
 def test_a_modified_note_is_reread_and_a_copy_never_leaks_into_the_cache(tmp_path):
-    """Le frontmatter se garde en mémoire tant que le fichier ne change pas sur disque."""
+    """The frontmatter is kept in memory as long as the file does not change on disk."""
     path = tmp_path / "note.md"
     path.write_text("---\nslug: a\ntags: [x]\n---\ncorps\n", encoding="utf-8")
     first = notes.frontmatter(path)

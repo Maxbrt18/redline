@@ -1,4 +1,4 @@
-"""La file opérationnelle des prédictions vient de PostgreSQL, pas du journal Markdown."""
+"""The operational queue of predictions comes from PostgreSQL, not from the Markdown journal."""
 
 import datetime as dt
 

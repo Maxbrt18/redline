@@ -1,4 +1,4 @@
-"""L'état du jour, et ce qu'il change à la jauge.
+"""The state of the day, and what it changes in the gauge.
 
 Sleep and life load are two gauge multipliers (x1.1 to x1.2) and two documented
 co-factors of both injuries -- and they only ever existed as ONE line written on

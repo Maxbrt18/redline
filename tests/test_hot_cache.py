@@ -1,18 +1,15 @@
-"""model/hot_cache.py : le bloc Forme du hot-cache, généré depuis le registre.
+"""model/hot_cache.py: the hot-cache Form block, generated from the ledger.
 
-Ce que ces tests protègent : que le hot-cache ne puisse plus porter un chiffre FAUX
-en silence. Avant, ces valeurs étaient tapées à la main — une ligne ajoutée au
-registre les périmait jusqu'à ce que quelqu'un relance le script ET pense à rééditer
-le cache. C'est le mode de panne qui a tué `coaching/fitness-status.md`, figé au
-12/07 pendant que le hot-cache disait autre chose.
+What these tests protect: the hot-cache can no longer carry a WRONG figure silently.
+Values typed by hand go stale as soon as a ledger line is added, until someone reruns
+the script AND remembers to re-edit the cache.
 
-Ce que ces tests ne protègent PAS, et volontairement : que le bloc VERSIONNÉ soit à
-jour. C'est du contenu de vault, pas du code — ça vit dans `vault-check.py`
-(`check_generated_views`), comme le dit déjà l'en-tête de `code-checks.yml`. Le test
-a existé ici du 25 au 29/07 et il a rougi la CI deux fois de suite pour une ligne
-ajoutée au registre : un gate qui crie au loup sur une note qui bouge finit ignoré.
-La dérive est désormais rendue impossible en amont — `redline/vault.py` régénère
-avant de committer, `.githooks/pre-commit` couvre les clones humains.
+What these tests deliberately do NOT protect: that the VERSIONED block is up to date.
+That is vault content, not code, and it is checked by `vault-check.py`
+(`check_generated_views`), as stated in the header of `code-checks.yml`. A gate that
+cries wolf on a note that moves ends up ignored. Drift is prevented upstream:
+`redline/vault.py` regenerates before committing, `.githooks/pre-commit` covers
+human clones.
 """
 
 import datetime as dt
@@ -25,10 +22,8 @@ from redline.model import hot_cache
 
 
 def test_the_block_carries_the_gauge_of_the_last_week():
-    """Chiffres synthétiques, pas ceux du vrai registre : sinon ce test casse à
-    chaque semaine qui passe (W30 devient W31...), pour une raison qui n'a rien
-    à voir avec un bug de `render()`. C'est exactement le mode de panne qui a fait
-    échouer la CI le 2026-07-29."""
+    """Synthetic figures, not the real ledger's: otherwise this test breaks every week
+        that passes (W30 becomes W31...), for a reason unrelated to a bug in `render()`."""
     rows = [Row(dt.date(2026, 3, 2), "easy", km=10, hours=5.0),
             Row(dt.date(2026, 3, 4), "easy", km=10, hours=5.0)]
     block = hot_cache.render(ledger, rows, {}, RPE_TARGETS)
@@ -38,23 +33,23 @@ def test_the_block_carries_the_gauge_of_the_last_week():
 
 
 def test_a_red_made_of_walking_says_so():
-    """Une jauge rouge faite de rando ne se lit pas comme une jauge rouge faite de
-    course (objection Sam du 21/07, retenue). Le bloc doit porter la part de
-    marche, sinon la lecture se refait de tête chaque semaine — et se perd."""
+    """A red gauge made of hiking does not read like a red gauge made of running.
+        The block must carry the walking share, otherwise the reading is redone by
+        hand every week -- and lost."""
     rows = [Row(dt.date(2026, 3, 2), "easy", km=10, hours=2.0),
             Row(dt.date(2026, 3, 4), "hike", km=15, hours=6.0, dplus=300)]
     assert "% de marche" in hot_cache.render(ledger, rows, {}, RPE_TARGETS)
 
 
 def test_the_walk_share_uses_the_gauge_formula_not_a_copy_of_it():
-    """NON-RÉGRESSION (2026-07-29) : `hot_cache` portait sa propre copie de la
-    pondération et cette copie avait perdu le +0,5 de la séance de qualité RATÉE.
-    Même ligne du bloc, deux arithmétiques : le h-éq d'un côté, la part de marche de
-    l'autre — qui s'en trouvait gonflée et pouvait annoncer un rouge de blessure que la
-    jauge dément.
+    """REGRESSION: `hot_cache` carried its own copy of the weighting and that copy had
+        lost the +0.5 of the MISSED quality session. Same block line, two arithmetics: the
+        eq-hours on one side, the walking share on the other -- which came out inflated and
+        could announce an injury red that the gauge denies.
 
-    Ici : seuil 1 h à RPE 8 (cible 6,5) = 2,0 h-éq · rando 2 h = 1,0 h-éq, donc 33 %
-    de marche. Avec la copie fautive le seuil pesait 1,5 et la marche affichait 40 %.
+        Here: threshold 1 h at RPE 8 (target 6.5) = 2.0 eq-h; hike 2 h = 1.0 eq-h, so 33 %
+        walking. With the faulty copy the threshold weighed 1.5 and walking showed 40 %.
+
     """
     rows = [Row(dt.date(2026, 3, 2), "threshold", km=10, hours=1.0, rpe=8.0),
             Row(dt.date(2026, 3, 4), "hike", km=8, hours=2.0)]
@@ -67,7 +62,7 @@ def test_a_quiet_week_carries_no_red_verdict():
             Row(dt.date(2026, 3, 4), "easy", km=8.0, hours=0.8, pains={"injury": 0.0})]
     block = hot_cache.render(ledger, rows, {"2026-W10": Instruments()}, RPE_TARGETS)
     assert "au rouge" not in block
-    assert "% de marche" not in block   # zéro rando : la mention n'a pas lieu d'être
+    assert "% de marche" not in block   # zero hiking: the mention has no reason to appear
     assert "2 sorties" in block
 
 
@@ -75,10 +70,10 @@ def test_an_empty_ledger_does_not_crash():
     assert "vide" in hot_cache.render(ledger, [], {}, RPE_TARGETS)
 
 
-# ------------------------------------------- semaine ouverte et bloc État (2026-09-27)
+# ------------------------------------------- open week and State block
 
 def test_the_week_in_progress_is_never_announced_as_closed():
-    """Le samedi 26/09, le bloc annonçait « W39 bouclée — 13 km, ratio 0,3 »."""
+    """On a Saturday, the block announced «W39 closed -- 13 km, ratio 0.3»."""
     rows = [Row(dt.date(2026, 9, 22), "easy", km=7.0, hours=0.75),
             Row(dt.date(2026, 9, 24), "easy", km=6.0, hours=0.65)]
     saturday = hot_cache.render(ledger, rows, {}, RPE_TARGETS, today=dt.date(2026, 9, 26))
@@ -119,8 +114,8 @@ def test_the_state_block_carries_what_decides_the_next_weeks():
 
 
 def test_the_state_block_does_not_change_from_one_day_to_the_next():
-    """Contrôlé contre sa régénération : une date du jour le ferait dériver chaque
-    matin. Mardi et mercredi de la même semaine, sans fait nouveau, même rendu."""
+    """Checked against its regeneration: a date of the day would make it drift every
+        morning. Tuesday and Wednesday of the same week, no new fact, same rendering."""
     assert _state(today=dt.date(2026, 10, 6)) == _state(today=dt.date(2026, 10, 7))
 
 

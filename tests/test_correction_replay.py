@@ -1,8 +1,8 @@
-"""Chaque correction de Sam a un mode de rejeu (chantier du 2026-10-04).
+"""Every correction has a replay mode.
 
-Le registre `corrections-replay.json` dit comment une règle corrigée se rejoue : un
-scénario du banc, du code, rien (hors banc), ou une dette `a-rejouer`. Le contenu réel
-du registre se juge dans `vault-check.py` ; ici, seulement ce que le code garantit.
+The `corrections-replay.json` registry says how a corrected rule is replayed: a bench
+scenario, code, nothing (outside the bench), or an `a-rejouer` debt. The real content of
+the registry is judged in `vault-check.py`; here, only what the code guarantees.
 """
 
 import datetime as dt

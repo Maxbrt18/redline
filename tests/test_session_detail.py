@@ -1,8 +1,8 @@
-"""Le détail d'une séance faite : les calculs sur les flux, puis la vue du carnet.
+"""Session detail for a completed run: stream computations, then the notebook view.
 
-Les tours sont ceux du seuil en côte du 2026-10-26 (4 × 3 min, maquette v2) : la lecture
-doit retrouver quatre répétitions de 28 à 30 m de montée, la dernière à 4:54 dans l'écart
-des précédentes, et un retour au calme qui englobe la dernière récupération.
+The laps are those of a hill threshold session (4 x 3 min): the reading must find four
+repetitions of 28 to 30 m of climb, the last one at 4:54 within the spread of the previous
+ones, and a cool-down that includes the last recovery.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from redline.service import session_detail
 from redline.service.notebook_board import AnswerError, Board
 
 URL = os.environ.get("TEST_DATABASE_URL", "")
-SAM = instance.load(TEST_VAULT)          # FC de repos 55, FC max 190
+SAM = instance.load(TEST_VAULT)          # resting HR 55, max HR 190
 PARIS = dt.timezone(dt.timedelta(hours=1))
 
 
@@ -43,7 +43,7 @@ SEUIL_LAPS = [
 
 
 def stream(seconds=760, stop_at=None, stop_s=30, speed=3.0, hr=150, climb=0.0):
-    """Un flux à 1 Hz : vitesse et FC constantes, un arrêt éventuel, une pente douce."""
+    """A 1 Hz stream: constant speed and HR, an optional stop, a gentle slope."""
     time, distance, altitude, clock, metres = [], [], [], 0, 0.0
     for k in range(seconds):
         if k and k == stop_at:
@@ -89,14 +89,14 @@ def test_a_last_rep_faster_than_all_the_others_is_a_final_acceleration():
 def test_the_stream_gives_kilometres_moving_time_zones_and_stops():
     flow = stream(seconds=760, stop_at=300, stop_s=45)
     splits = session_detail.km_splits(flow)
-    # 2 274 m : le dernier kilomètre entamé (274 m) rejoint le précédent.
+    # 2,274 m: the last started kilometre (274 m) is merged into the previous one.
     assert [split["dist_m"] for split in splits] == [1000, 1274]
     assert splits[0]["pace_s"] == 333 and splits[0]["hr"] == 150 and splits[0]["cadence"] == 164
     assert session_detail.zone_seconds(flow, SAM.hr_bounds) == [0, 0, 759 - 1, 0, 0]
     assert session_detail.stops(flow) == [[299, 344]]
     summary = session_detail.stop_summary(flow)
     assert summary["count"] == 1 and summary["total_s"] == 45 and summary["longest_km"] == 1
-    assert session_detail.drift(flow) is None  # trop courte pour lire une dérive
+    assert session_detail.drift(flow) is None  # too short to read a drift
 
 
 def test_the_chart_series_breaks_its_line_during_a_stop():
@@ -107,9 +107,8 @@ def test_the_chart_series_breaks_its_line_during_a_stop():
 
 
 def test_reps_sit_on_the_lap_timestamps_not_on_strava_s_stream_indices():
-    """Seuil du 2026-10-26 : les `start_index` de Strava (0-765, 766-946…) plaçaient la
-    première répétition 168 s trop tôt ; l'heure de départ de chaque tour la pose sur sa
-    côte, de 935 à 1116 s."""
+    """Strava `start_index` values (0-765, 766-946...) placed the first repetition 168 s too
+    early; the start time of each lap places it on its own climb, from 935 to 1116 s."""
     starts = [0, 935, 1116, 1337, 1518, 1744, 1925, 2142, 2329, 2561]
     elapsed = [936, 181, 221, 181, 226, 181, 217, 187, 232, 543]
     laps = [{"start_date": (dt.datetime(2026, 10, 26, 9, 19, 53, tzinfo=dt.UTC)
@@ -152,7 +151,7 @@ def test_a_provider_failure_leaves_the_detail_without_its_chart(monkeypatch):
     assert intake["streams"] is None and kept == {}
 
 
-# ------------------------------------------------------------ la vue du carnet
+# ------------------------------------------------------------ the notebook view
 pytestmark_db = pytest.mark.skipif(not URL, reason="TEST_DATABASE_URL absent")
 
 
@@ -166,7 +165,7 @@ def store():
         names = ", ".join(f"redline.{table.name}" for table in metadata.sorted_tables)
         connection.execute(sa.text(f"TRUNCATE TABLE {names} RESTART IDENTITY CASCADE"))
         connection.execute(sa.text("INSERT INTO redline.athletes(id) VALUES ('sam')"))
-        # La zone surveillée de l'instance fictive, comme le service la synchronise.
+        # The watched zone of the fictitious instance, as the service synchronises it.
         connection.execute(sa.text(
             "INSERT INTO redline.pain_zones(athlete_id, slug, label) VALUES ('sam', 'injury', 'Injury')"))
     yield OperationalStore(database)
@@ -253,7 +252,7 @@ def test_the_route_serves_the_detail_and_refuses_what_is_not_an_identifier(
     assert client.get("/carnet-api/session/00000000-0000-0000-0000-000000000000").status_code == 404
     view = client.get(f"/carnet-api/session/{observation_id}").json
     assert view["series"]["hr"] and view["reps"]
-    # Les flux relevés au premier affichage sont gardés : le second ne les redemande pas.
+    # The streams fetched on first display are kept: the second one does not ask for them again.
     monkeypatch.setattr(session_detail, "fetch_streams", lambda _: pytest.fail("relevé deux fois"))
     assert client.get(f"/carnet-api/session/{observation_id}").status_code == 200
     answer = client.post("/carnet-api/answer", json={"ask": view["reserve_ask"], "value": 0})

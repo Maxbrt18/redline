@@ -48,7 +48,7 @@ MONTH = {
     "race_name": "TargetRace", "race_date": "2026-11-28",
 }
 # A SELECTION of the programme, not a session: the exercises and their doses
-# live in coaching/exercises/ and coaching/workouts/ (2026-07-25).
+# live in coaching/exercises/ and coaching/workouts/.
 STRENGTH = {
     "session": "a", "date": "mardi 22 juillet", "duration_min": 30,
     "note": "Douleur à 0/10 : version complète.",
@@ -134,10 +134,10 @@ STRESS = [
         id="strength-long-strings"),
     pytest.param(
         "chart-strength.py",
-        # QUINZE, pas « treize + six » : le nombre testé est le total, et la
-        # séance A a gagné 4 exercices de contrôle moteur le 2026-08-21 (9 -> 13).
-        # L'ajout suit donc la séance au lieu d'être un 6 figé, sinon ce cas dérive
-        # vers des totaux que le programme ne peut pas produire.
+        # FIFTEEN, not «thirteen + six»: the tested number is the total, and session
+        # A gained 4 motor-control exercises (9 -> 13).
+        # The addition thus follows the session instead of being a frozen 6, otherwise this case
+        # drifts toward totals the program cannot produce.
         {"session": "a", "add": [{"name": f"Exercice {i}",
                                   "dose": {"measure": "reps", "sets": 3, "reps": 10}}
                                  for i in range(15 - 13)]},
@@ -301,8 +301,8 @@ def test_strength_card_writes_its_exact_session_snapshot(tmp_path):
     assert len(session["sid"].rsplit("-", 1)[1]) == 10       # prescription digest
     assert session["title"] == "Renfo, séance unique"      # from the session note
     # The page gets the slots WALKED OUT, plus the already-rendered label.
-    # L'exercice est visé par son NOM, pas par sa position : une position n'est pas
-    # une identité.
+    # The exercise is targeted by its NAME, not by its position: a position is not
+    # an identity.
     split = next(e for e in session["exercises"] if e["name"].startswith("Fente bulgare"))
     first = split["dose"]
     assert first["text"] == "2 × 8 / jambe"
@@ -319,7 +319,7 @@ def test_the_worst_payload_the_schema_allows_still_gets_a_sidecar(tmp_path):
     from redline.service import strength
 
     worst = {
-        "session": "a",                       # la séance la plus lourde
+        "session": "a",                       # the heaviest session
         "date": "mardi 25 novembre 2026",
         "duration_min": 38,
         "note": "N" * 300,                    # SELECTION_SCHEMA: maximum=300

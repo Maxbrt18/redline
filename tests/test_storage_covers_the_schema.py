@@ -1,27 +1,24 @@
-"""Ce que le modèle déclare, la table doit savoir le ranger.
+"""Every field the model declares must have a column to be stored in.
 
-⭐ 2026-08-18, et la panne la plus chère de la journée. Le schéma applicatif a gagné
-`gates[].when` et `gates[].holds` le matin même ; `redline.plan_gates`, non. Un store
-relationnel qui n'a pas de colonne ne se plaint pas : il insère les champs qu'il
-connaît et jette le reste sans un mot. La révision W34 r4 est partie valide et typée,
-et elle est revenue de PostgreSQL sans son typage, donc invalide au contrat 2 -- qui
-exige précisément `when`. Le programme de la semaine est devenu inprescriptible en une
-écriture, et l'erreur affichée décrivait la RELECTURE, pas l'écriture : elle a fait
-croire à un refus alors que la ligne était déjà committée.
+A relational store with no column for a field does not complain: it inserts the fields
+it knows and silently drops the rest. A revision written valid and typed would then come
+back from PostgreSQL without its typing, hence invalid under the contract that requires
+it, and the week's program would become unprescribable in a single write. The error
+would describe the read, not the write, although the row was already committed.
 
-Les tests du modèle étaient verts, ceux du store aussi : aucun ne regardait la
-frontière entre les deux. Celui-ci ne tient aucune liste et n'a besoin d'aucune base --
-il compare deux déclarations, donc il tombe le jour où l'une prend de l'avance.
+Model tests and store tests can both pass while nothing checks the boundary between
+them. This one keeps no list and needs no database: it compares two declarations, so it
+fails as soon as one gets ahead of the other.
 """
 
 from redline.model.weekly_plan import GATE_SCHEMA, REVISION_SCHEMA, SESSION_SCHEMA
 from redline.storage.schema import plan_gates, plan_revisions, planned_sessions
 
-# Les renommages assumés, et leur raison. Tout le reste doit correspondre au nom près.
+# Deliberate renames, with their reason. Everything else must match by name.
 GATE_COLUMNS = {
-    "id": "logical_key",        # `id` est la clé technique de la ligne, pas la nôtre
+    "id": "logical_key",        # `id` is the row's technical key, not the schema's
     "due": "due_on",
-    "when": "applies_when",     # `when` est un mot réservé SQL
+    "when": "applies_when",     # `when` is a reserved SQL word
 }
 SESSION_COLUMNS = {
     "id": "logical_key",
@@ -30,9 +27,9 @@ SESSION_COLUMNS = {
     "weather": "weather_policy",
 }
 REVISION_COLUMNS = {
-    "revision": "revision",     # le NUMÉRO ; `id` reste la clé technique
+    "revision": "revision",     # the NUMBER; `id` stays the technical key
 }
-# `sessions` et `gates` vivent dans leurs propres tables.
+# `sessions` and `gates` live in their own tables.
 REVISION_ELSEWHERE = {"sessions", "gates"}
 
 
@@ -52,19 +49,18 @@ def test_every_gate_field_has_a_column():
 
 
 def test_every_session_field_has_a_column():
-    """La même frontière, sur l'objet d'à côté : `sources` vit dans sa propre table."""
+    """Same boundary on the neighbouring object: `sources` lives in its own table."""
     missing = set(_missing(SESSION_SCHEMA, planned_sessions, SESSION_COLUMNS))
     assert missing <= {"sources"}, sorted(missing)
 
 
 def test_every_revision_field_has_a_column():
-    """L'ÉTAGE AU-DESSUS, et il était resté ouvert.
+    """The revision level, one floor above the gates and sessions.
 
-    `append_plan_revision_in` énumère les champs de révision à la main, exactement comme
-    il énumérait ceux du contrôle daté le matin du 2026-08-18. Un champ ajouté à
-    `REVISION_SCHEMA` repartirait donc de PostgreSQL sans lui, et la révision serait
-    invalide au contrat qu'elle déclare -- la semaine inprescriptible en une écriture.
-    Le correctif du 18/08 fermait la porte du bas ; celle-ci était restée entrouverte.
+    `append_plan_revision_in` lists the revision fields by hand, exactly as it lists the
+    dated-check fields. A field added to `REVISION_SCHEMA` would come back from
+    PostgreSQL without it, and the revision would be invalid under the contract it
+    declares -- the week unprescribable in a single write.
     """
     missing = set(_missing(REVISION_SCHEMA, plan_revisions, REVISION_COLUMNS))
     assert missing <= REVISION_ELSEWHERE, (
@@ -75,7 +71,7 @@ def test_every_revision_field_has_a_column():
 
 
 def test_the_comparison_is_not_vacuous():
-    """Une table renommée rendrait les tests précédents verts sans rien vérifier."""
+    """A renamed table would turn the previous tests green without checking anything."""
     assert "applies_when" in plan_gates.c
     assert "holds" in plan_gates.c
     assert {field.name for field in GATE_SCHEMA.fields} >= {"when", "holds", "due"}

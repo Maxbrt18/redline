@@ -11,8 +11,7 @@ from conftest import ENGINE_ROOT, RecordingBot
 
 # redline.service.web imports flask, which is a VPS runtime dependency (requirements.txt), not
 # something a vault checkout on the Mac necessarily has. Without this, collecting this
-# one module aborts the WHOLE run -- so `pytest` at the weekly review reported an error
-# instead of the 116 tests that do pass.
+# one module aborts the WHOLE run instead of reporting the tests that do pass.
 pytest.importorskip("flask", reason="dépendance runtime du VPS (requirements.txt)")
 
 from redline.model.dose import Dose
@@ -116,11 +115,10 @@ SESSION = {
 def app_bot(make_config, store, tmp_path):
     """The vault defaults to a THROWAWAY directory.
 
-    It used to be the real one, which was harmless while the report route only
-    forwarded a message -- and stopped being harmless the day it started writing
-    `athlete/strength-log.csv` (2026-07-31): the suite would have appended rows to
-    Sam's own log on every run. The two page tests below still ask for the real
-    vault, because the page borrows its skin from `src/redline/cards/`.
+    The real one would be harmless while the report route only forwarded a message, but not
+    once it writes `athlete/strength-log.csv`: the suite would append rows to the athlete's
+    own log on every run. The two page tests below still ask for the real vault, because the
+    page borrows its skin from `src/redline/cards/`.
     """
     class RecordingOperationalStore:
         def __init__(self):
@@ -273,7 +271,7 @@ def test_report_body_is_bounded_before_json_decoding(app_bot):
 
 
 def test_a_session_can_only_be_reported_once(app_bot, store):
-    """Rejouer le même lien coûte une réponse, jamais un second tour agent."""
+    """Replaying the same link costs one reply, never a second agent turn."""
     client, bot, _ = app_bot()
     _, body = token_body(store, report={"pains": {"injury": {"after": 1}}})
     assert post(client, body).status_code == 201
@@ -305,7 +303,7 @@ def test_report_route_is_absent_without_an_owner(app_bot, store):
 
 
 def test_the_report_lands_in_the_typed_log_too(app_bot, store):
-    """La route transmet une structure relationnelle au repository PostgreSQL."""
+    """The route passes a relational structure to the PostgreSQL repository."""
     client, bot, _ = app_bot()
     _, body = token_body(store, report={"pains": {"injury": {"after": 1}}, "exercises": [
         {"i": 0, "score": 6, "reps": [14, 12, 11, 10]}]})

@@ -86,10 +86,10 @@ def test_unrelated_remote_head_is_refused(tmp_path, monkeypatch):
 
 
 def test_exercise_sheets_are_vault_content_not_runtime(tmp_path, monkeypatch):
-    """Une fiche d'exercice est une donnée relue à chaque appel, pas du code.
+    """An exercise sheet is data re-read on every call, not code.
+        The coach edits these sheets itself: classifying them as runtime froze the vault
+        synchronisation on a write it is allowed to make.
 
-    Le coach édite lui-même ces fiches : les classer runtime faisait geler la
-    synchronisation du vault sur une écriture qu'il a le droit de faire (2026-08-21).
     """
     repo, calls = _repo(
         tmp_path, monkeypatch,
@@ -126,7 +126,7 @@ def test_the_same_cause_is_queued_once(tmp_path, monkeypatch):
 
 
 def test_a_push_blocked_by_a_pending_deployment_is_one_incident(tmp_path, monkeypatch):
-    """Le push refusé est la CONSÉQUENCE du déploiement en attente, pas un 2e incident."""
+    """The refused push is the CONSEQUENCE of the pending deployment, not a 2nd incident."""
     repo = VaultRepo(str(tmp_path), "origin", "main")
     heads = iter(("local", "remote", "local", "remote"))
 
@@ -149,7 +149,7 @@ def test_a_push_blocked_by_a_pending_deployment_is_one_incident(tmp_path, monkey
     alerts = repo.drain_alerts()
     assert len(alerts) == 1
     assert "déploiement" in alerts[0].text.lower()
-    # et il dit ce que ça coûte, sinon il n'appelle aucune action
+    # and it says what that costs, otherwise it calls for no action
     assert "local" in alerts[0].text.lower()
 
 

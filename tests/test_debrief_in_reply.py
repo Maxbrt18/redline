@@ -1,8 +1,8 @@
-"""Sam écrit pendant que le débrief de sa sortie attend : la réponse le porte.
+"""The athlete writes while the debrief of their run is waiting: the reply carries it.
 
-Avant, son message repoussait le débrief de 8 min (conversation active) ; le faire
-partir à côté de la réponse aurait doublé le message. Le tour réactif réclame donc le
-job, lit la sortie capturée et solde le job seulement si la réponse est partie.
+Their message used to push the debrief back by 8 min (active conversation); sending it
+alongside the reply would have doubled the message. The reactive turn therefore claims
+the job, reads the captured run and settles the job only if the reply went out.
 """
 
 import time

@@ -172,23 +172,22 @@ def test_a_failed_button_revokes_its_exact_capability(make_bot, store):
     assert store.resolve_strength_link("4242", token)["status"] == "revoked"
 
 
-# ------------------------------------------------ le résidu d'un tour mort (18/08)
+# ------------------------------------------------ residue of a dead turn
 
 def test_leftovers_sees_what_no_snapshot_will_ever_collect(tmp_path):
-    """⭐ 2026-08-18. `collect_new` compare à un instantané pris au DÉBUT du tour :
-    une image laissée par un tour mort figure dans tous les instantanés suivants, donc
-    aucun ne la collecte. `strength-2026-08-13.png` et son lien dormaient dans l'outbox
-    de prod depuis le 2026-08-14 08 h 24 — une carte de renfo entièrement générée que
-    Sam n'a jamais reçue et dont rien n'a jamais parlé."""
+    """`collect_new` compares against a snapshot taken at the START of the turn: an
+        image left by a dead turn appears in every following snapshot, so none collects
+        it. A fully generated strength card would sit in the outbox, never delivered and
+        never reported."""
     root = tmp_path / "outbox"
     outbox = Outbox(root)
     orphan = root / "strength-2026-08-13.png"
     orphan.write_bytes(b"png")
     strength.write_sidecar(orphan, "Renfo A", SESSION)
 
-    # Le tour suivant ne la voit pas : elle est déjà dans son instantané de départ.
+    # The next turn does not see it: it is already in its starting snapshot.
     assert outbox.collect_new(outbox.snapshot()) == []
-    # Au démarrage, si : aucun tour n'est en vol, donc tout ce qui traîne est un résidu.
+    # At startup it does: no turn is in flight, so everything lying around is residue.
     assert outbox.leftovers() == [orphan]
 
 
@@ -197,8 +196,8 @@ def test_leftovers_is_empty_on_a_clean_outbox(tmp_path):
 
 
 def test_the_bot_archives_the_residue_without_waking_the_athlete(make_bot, caplog):
-    """Une carte de séance qui arrive quatre jours plus tard est pire qu'absente : elle
-    s'archive et l'omission reste dans le journal d'exploitation."""
+    """A session card that arrives four days later is worse than absent: it is
+        archived and the omission stays in the operations log."""
     from unittest.mock import MagicMock
 
     residue = MagicMock()

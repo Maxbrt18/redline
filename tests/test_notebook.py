@@ -1,4 +1,4 @@
-"""Le carnet classe les artefacts sans lire leur prose et relit le plan avant action."""
+"""The notebook classifies artifacts without reading their prose and re-reads the plan first."""
 
 import datetime as dt
 import json
@@ -78,8 +78,8 @@ def test_launch_checks_the_exact_version_shown_to_the_user(monkeypatch):
 
 
 def test_the_shell_keeps_itself_and_launches_on_the_theme_background(make_config):
-    """Le service worker et les écrans de lancement sont publics et sans donnée : le
-    worker ne garde que la coquille, l'écran de lancement n'est qu'un fond uni."""
+    """The service worker and the launch screens are public and carry no data: the
+    worker only keeps the shell, the launch screen is a plain background."""
     from conftest import RecordingBot
 
     from redline.service import page

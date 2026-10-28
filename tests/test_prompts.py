@@ -17,7 +17,7 @@ from redline.service.prompts import (
 
 
 def _flat(text: str) -> str:
-    """Le sens d'une consigne ne dépend pas de l'endroit où elle revient à la ligne."""
+    """The meaning of an instruction does not depend on where it wraps."""
     return " ".join(text.split())
 
 
@@ -44,9 +44,9 @@ def test_triage_covers_depth_emotion_waiting_and_plan_change():
 
 
 def test_triage_separates_a_plan_that_moves_from_a_plan_that_is_asked_for():
-    """Les deux drapeaux répondent à deux questions, et les confondre a fait répéter
-    le programme à chaque message (2026-08-12). Le format de sortie porte les six
-    champs, sinon le parseur lit une colonne qui n'existe pas."""
+    """The two flags answer two different questions; conflating them makes the coach
+    repeat the plan on every message. The output format carries all six fields,
+    otherwise the parser reads a column that does not exist."""
     assert TRIAGE_PROMPT.splitlines()[1] == (
         "NIVEAU | E ou - | phrase d'attente | P ou - | D ou - | plan_scope")
     assert "D (champ `plan_asked`) si ⟨athlète⟩ DEMANDE son programme" in TRIAGE_PROMPT
@@ -54,13 +54,12 @@ def test_triage_separates_a_plan_that_moves_from_a_plan_that_is_asked_for():
 
 
 def test_the_shared_rules_name_the_json_fields_not_only_the_text_tokens():
-    """⭐ `TRIAGE_RULES` est payé par les DEUX moteurs, et ne parlait que du protocole
-    texte : « E », « P », « D » sont les jetons d'une ligne à cinq colonnes que Codex
-    n'a pas le droit de produire. Son schéma attend `emotional`, `plan_change`,
-    `plan_asked`, `holding`, et la correspondance n'était écrite nulle part -- pour la
-    paire P/D précisément, dont la confusion a fait répéter le programme à chaque
-    message le 2026-08-12. La prod tourne `AGENT_PROVIDER=claude`, donc c'était une
-    faute dormante : elle se serait réveillée à la bascule, sans rien pour la nommer.
+    """`TRIAGE_RULES` is paid by BOTH engines but only described the text protocol:
+    "E", "P", "D" are the tokens of a five-column line that the structured engine must
+    not produce. Its schema expects `emotional`, `plan_change`, `plan_asked`, `holding`,
+    and the mapping must be written somewhere -- notably for the P/D pair, whose
+    confusion makes the coach repeat the plan on every message. A shared rule that only
+    names the text tokens leaves the structured engine guessing.
     """
     for field in ("emotional", "plan_change", "plan_asked", "holding"):
         assert f"`{field}`" in TRIAGE_RULES, (
@@ -69,27 +68,26 @@ def test_the_shared_rules_name_the_json_fields_not_only_the_text_tokens():
 
 
 def test_a_familiar_question_about_a_run_never_lands_on_the_social_rung():
-    """2026-08-14 : « T'as vu ma sortie de ce matin ? » classé N0, donc « le hot-cache
-    suffit », donc une réponse sans données. Les deux moteurs partagent ces règles."""
+    """A casual question about a run ("did you see my run this morning?") classified N0
+    would mean "the hot-cache is enough" and an answer without data. Both engines share
+    these rules."""
     assert "PRENDS LE PLUS ÉLEVÉ" in TRIAGE_RULES
     assert "N1 AU MINIMUM" in TRIAGE_RULES
     assert "est un débrief, jamais un message social" in TRIAGE_RULES
 
 
 def test_worked_examples_belong_to_the_text_protocol_only():
-    """Le format à une ligne n'existe que pour le moteur texte : montrer ces exemples à
-    Codex lui décrirait une sortie que son schéma JSON interdit."""
+    """The one-line format exists only for the text engine; showing these examples to
+    the structured engine would describe an output its JSON schema forbids."""
     assert "Je suis encore sur ta réponse." in TRIAGE_PROMPT
     assert "Exemples de sortie" not in TRIAGE_STRUCTURED_PROMPT
     assert " | " not in TRIAGE_STRUCTURED_PROMPT
 
 
 def test_the_coach_names_its_ai_identity_when_asked_and_never_signs():
-    """Le nom, perdu dans le ménage du 2026-08-11, est d'autant plus exposé que le
-    moteur en production n'est plus Claude. La SIGNATURE, elle, est une autre affaire :
-    « c'est sous ce nom que tu signes » a produit un « — Redline » collé à la fin de
-    presque chaque texto, jusqu'à « il faut que tu arrêtes de signer tous tes messages »
-    (2026-08-16). Le nom se porte, il ne se répète pas."""
+    """The name is more exposed when the production engine is not the one that defines
+    it. The SIGNATURE is a different matter: telling the coach to sign under that name
+    appends a signature to nearly every text message. The name is worn, not repeated."""
     style = " ".join(STYLE_PROMPT.split())
     assert "Redline" in style
     assert "dis clairement que tu es un coach IA" in style
@@ -99,7 +97,7 @@ def test_the_coach_names_its_ai_identity_when_asked_and_never_signs():
 
 
 def test_overshooting_a_target_is_scolded_not_nuanced():
-    """Mandat explicite de Sam, que le ménage du 2026-08-11 avait effacé du style."""
+    """An explicit mandate the style must keep: overshooting a target is a reprimand."""
     assert "SÉANCE RATÉE" in STYLE_PROMPT
     assert "réprimande" in STYLE_PROMPT
     debrief = " ".join(PROACTIVE_TRIGGERS["strava_debrief"].split())
@@ -108,9 +106,9 @@ def test_overshooting_a_target_is_scolded_not_nuanced():
 
 
 def test_a_slightly_faster_last_rep_is_not_scolded():
-    """Décision du 2026-10-26 : la comparaison de la dernière répétition à la première
-    est retirée. Le coach ne gronde plus 5 s/km de mieux sur la dernière quand il en
-    restait deux ; seule une fin qui dépense la réserve rate la séance."""
+    """Comparing the last repetition with the first is not a criterion. The coach does
+    not scold a last rep a few s/km faster when reserve remained; only a finish that
+    spends the reserve fails the session."""
     debrief = " ".join(PROACTIVE_TRIGGERS["strava_debrief"].split())
     assert "dernier intervalle plus rapide que le premier" not in debrief
     assert "Une dernière un peu plus rapide n'est PAS une faute" in debrief
@@ -118,11 +116,10 @@ def test_a_slightly_faster_last_rep_is_not_scolded():
 
 
 def test_the_reprimand_stays_inside_the_perimeter_the_vault_gave_it():
-    """La décision du 2026-08-05 (`coaching/current-plan.md`) a RESTREINT le mandat aux
-    séances de qualité : étendu aux footings il sonnerait à chaque journée chaude, et un
-    garde-fou qui crie sur des faux positifs finit ignoré. Restaurer la formule large
-    d'avant le ménage aurait remis le prompt en contradiction avec son fichier
-    propriétaire — le prompt ne tranche pas contre le vault, il l'applique."""
+    """The mandate is restricted to quality sessions (`coaching/current-plan.md`):
+    extended to easy runs it would fire on every hot day, and a guard that shouts at
+    false positives ends up ignored. The prompt applies the vault, it does not rule
+    against it."""
     style = " ".join(STYLE_PROMPT.split())
     assert "SÉANCE DE QUALITÉ" in style
     assert "n'est PAS une séance ratée" in style
@@ -132,9 +129,8 @@ def test_the_reprimand_stays_inside_the_perimeter_the_vault_gave_it():
 
 
 def test_emotional_turn_follows_the_request_without_a_mandatory_preamble():
-    """Audit du 2026-09-30, constat 2 : « reconnais », puis l'aide « après cet
-    accueil » imposait le schéma émotion, validation, conseil, y compris devant
-    « je suis déçu, donne-moi juste le total »."""
+    """The emotion note must not impose an emotion, validation, advice sequence, even
+    when the request is "I'm disappointed, just give me the total"."""
     assert "prends l'émotion exprimée en compte" in EMOTION_NOTE
     assert "la reformuler n'est pas obligatoire" in EMOTION_NOTE
     assert "après cet accueil" not in EMOTION_NOTE
@@ -166,14 +162,12 @@ def test_debrief_reads_the_activity_and_varies_its_question():
     assert "Batterie" in debrief
     assert "fact-read.py proactive" in debrief
     assert "non servi" in debrief
-    # La consigne sépare désormais ce qui se LIT de ce qui s'ÉCRIT : le coach a
-    # annoncé « je pose la batterie sans ouvrir directement par la douleur »
-    # le 2026-08-19, en paraphrasant un « n'ouvre pas » qui parlait du message.
+    # The instruction separates what is READ from what is WRITTEN: paraphrasing a
+    # "do not open with" rule meant for the message made the coach announce its method.
     assert "AVANT D'ÉCRIRE" in debrief and "DANS LE MESSAGE" in debrief
-    # ⭐ Et l'angle a un ENDROIT, sans quoi la séparation ci-dessus ne tient pas : le
-    # 2026-08-21 le coach a ouvert par « Angle non répété jusqu'ici [...] Ici je vais
-    # partir du titre Strava ». Deux durcissements de prompt avaient déjà échoué, parce
-    # qu'ils fermaient la seule sortie que ce raisonnement avait.
+    # The angle also needs a PLACE to go, otherwise the separation above does not hold:
+    # a reasoning given no field ends up in the prose, and hardening the prompt alone
+    # closes the only exit it had.
     assert "fact-write.py angle" in debrief
     assert "ledger-add.py" in debrief
     assert "DÉJÀ capturé" in debrief
@@ -218,13 +212,13 @@ def test_weekly_closes_the_loop_and_prepares_next_week():
     assert "adherence.md" in weekly
     assert "changement de levier" in weekly
     assert "mental-bank.md" in weekly
-    # Audit du 2026-09-30, constat 3 : le bilan garde ses opérations, plus ses formules.
+    # The review keeps its operations, no longer its stock phrases.
     assert "tu t'engages sur quoi" not in weekly
     assert "minimisé" not in weekly
     assert "ce qui change la semaine" in weekly
     assert "Une question seulement si un choix utile reste ouvert" in weekly
     assert "Une condition du jour va dans la `note` de sa séance" in _flat(weekly)
-    # Le jeu de calibration est arrêté le 2026-10-09 : plus de tendance à rendre.
+    # The calibration game is stopped: no trend to report.
     assert "session-cycle.py report" not in weekly
 
 
@@ -248,9 +242,8 @@ def test_session_cycle_survives_a_forgotten_departure_message():
 
 
 def test_weekly_reads_the_strava_only_checks_without_treating_silence_as_data():
-    """Les 4 contrôles du § D n'ont pas de colonne au registre : ils se lisent chez
-    Strava ou nulle part. Un silence de notes n'est pas une donnée : la batterie dit
-    qu'il ne prouve rien."""
+    """The Strava-only checks have no register column: they are read from Strava or
+    nowhere. Silence in the notes is not data: the battery says it proves nothing."""
     weekly = " ".join(PROACTIVE_TRIGGERS["weekly"].split())
     assert "§ D" in weekly
     assert "son silence ne rassure ni n'alarme" in weekly
@@ -258,14 +251,14 @@ def test_weekly_reads_the_strava_only_checks_without_treating_silence_as_data():
 
 
 def test_weekly_closes_the_predictions_that_came_due():
-    """Une prédiction qu'aucun bilan ne ferme n'a jamais été falsifiable : au bilan du
-    2026-08-16, trois traînaient ouvertes depuis W30 et W32 faute de lecteur."""
+    """A prediction that no review closes is never falsifiable: every due one gets a
+    verdict at the review."""
     weekly = " ".join(PROACTIVE_TRIGGERS["weekly"].split())
     assert "fact-read.py predictions --due" in weekly
     assert "fact-write.py prediction --key <clé> --outcome true|false|void" in weekly
     assert "verdict sur CHAQUE prédiction échue" in weekly
-    # Audit du 2026-10-09 : 7 prédictions corps confrontées sur 20. Celles des SL et des
-    # hausses se rattachent au réveil du lendemain et se soldent depuis le carnet.
+    # Body predictions for long runs and increases attach to the next-morning wake
+    # reading and are settled from the notebook.
     assert "Chaque SL et chaque hausse de la porte reçoit sa prédiction `corps`" in weekly
     assert "--resolves wake-trace" in weekly and "probabilité explicite" in weekly
 
@@ -282,8 +275,8 @@ def test_monthly_includes_mental_work_and_coach_feedback():
 
 def test_style_keeps_channel_and_decision_guardrails():
     assert "droit de contredire" in STYLE_PROMPT
-    # Audit du 2026-09-30, constat 10 : une objection peut révéler une inférence
-    # fausse sans apporter de fait nouveau (récidive des 27-28 août).
+    # An objection makes the coach re-examine its premises: it can reveal a wrong
+    # inference without bringing any new fact.
     assert "S'IL INSISTE" not in _flat(STYLE_PROMPT)
     assert "UNE OBJECTION fait réexaminer tes prémisses" in _flat(STYLE_PROMPT)
     assert "Un désaccord n'est pas un feu vert" in _flat(STYLE_PROMPT)
@@ -299,44 +292,41 @@ def test_style_keeps_channel_and_decision_guardrails():
 
 
 def test_the_rating_scales_ride_with_the_levels_where_numbers_are_given():
-    """⭐ 2026-08-17 — le porteur des barèmes, et il ne peut pas être la fiche.
+    """The rating scales' carrier cannot be the vault card.
 
-    `coaching/protocols.md` ne s'ouvre qu'en N2, or Sam déclare ses douleurs en N1 :
-    une règle qui n'existerait que dans la fiche se rendormirait. Elle n'est pas non plus
-    dans `STYLE_PROMPT` — cuit au niveau de la session, donc invisible d'une conversation
-    déjà ouverte, et son budget était plein. Ce test est là pour que la suppression du
-    pointeur soit un choix, pas un effet de bord.
+    `coaching/protocols.md` opens only at N2, but the athlete reports pain at N1: a
+    rule that lives only in the card would go dormant. It is not in `STYLE_PROMPT`
+    either: baked at session level it is invisible to an already open conversation, and
+    its budget is full. This test makes removing the pointer a choice, not a side effect.
     """
     for level in ("N1", "N2"):
         assert prompts.PAIN_SCALE_POINTER in DEPTH_NOTES[level]
     assert "plafond douleur d'effort = 2" in prompts.PAIN_SCALE_POINTER
     assert "pas de note /10" in prompts.PAIN_SCALE_POINTER
     assert "séance entière" in prompts.PAIN_SCALE_POINTER
-    # La tolérance « 2-3 » n'est citée QUE comme interdiction, et nulle part ailleurs.
+    # The "2-3" tolerance is quoted ONLY as a prohibition, nowhere else.
     assert sum('"2-3 acceptable"' in text for text in DEPTH_NOTES.values()) == 2
     assert "2-3" not in prompts.STYLE_PROMPT
 
 
 def test_the_morning_debrief_never_asks_for_a_mark_out_of_ten():
-    """Son constat du 2026-08-17 : le réveil est « complètement différent et difficile à
-    évaluer ». Le trigger porte la formulation, pas seulement l'interdiction."""
+    """The morning-after wake reading is "completely different and hard to rate". The
+    trigger carries the wording, not only the prohibition."""
     differe = PROACTIVE_TRIGGERS["strava_debrief_differe"]
     assert "NE DEMANDE PAS UNE NOTE SUR 10" in differe
     assert "(aucune, très légère, légère, nette)" in _flat(differe)
 
 
 def test_the_two_examples_differ_only_by_naming_the_machinery():
-    """⭐ Un contre-exemple n'enseigne que ce qui le SÉPARE de son pendant.
+    """A counter-example teaches only what SEPARATES it from its counterpart.
 
-    Le premier OUI écrit ici était « Alors, cette EF ? Elle t'a fait quoi ? » : deux
-    fois plus court que le NON, et sans aucun angle. Deux défauts que Sam a relevés
-    tout de suite. Le contraste enseignait « sois bref » -- pas la règle -- et montrait
-    un coach qui demande dans le vide, ce qui est un moins bon coaching que le message
-    fautif. Il avait en plus été INVENTÉ, alors que `coaching/protocols.md` déclare la
-    batterie : le OUI porte maintenant son révélateur n°9, le comparatif forcé.
+    The pair must have comparable length: otherwise the contrast teaches "be brief"
+    instead of the rule, and a bare question asked in a vacuum is worse coaching than
+    the faulty message. The good example must be grounded in `coaching/protocols.md`,
+    which declares the battery, not invented.
 
-    Ce test garde la seule chose qui fait marcher la paire : à longueur comparable, la
-    seule différence visible est qu'un des deux nomme sa mécanique.
+    This test keeps the one thing that makes the pair work: at comparable length, the
+    only visible difference is that one of the two names its machinery.
     """
     lignes = {debut: ligne.split(":", 1)[1].strip()
               for ligne in STYLE_PROMPT.splitlines()
@@ -353,48 +343,26 @@ def test_the_two_examples_differ_only_by_naming_the_machinery():
 def test_runtime_prompts_stay_within_explicit_context_budgets():
     """These strings are paid in addition to CLAUDE.md; the vault-file budget cannot see them.
 
-    Le triage porte DEUX budgets parce qu'il a deux clients. `TRIAGE_RULES` est la
-    doctrine, payée par les deux moteurs : c'est là que la dérive coûte, donc c'est là
-    que le plafond serre. Les deux prompts qui l'enveloppent n'ajoutent que leur
-    protocole de sortie — le schéma JSON pour Codex, quatre exemples écrits pour le
-    moteur texte, qui n'a rien d'autre pour apprendre le format. Un plafond unique sur
-    le tout facturait cet échafaudage au prix de la doctrine, et poussait à couper les
-    exemples : ceux qui manquaient le 2026-08-14.
+    Triage carries TWO budgets because it has two clients. `TRIAGE_RULES` is the
+    doctrine, paid by both engines: drift costs there, so the ceiling is tight. The two
+    prompts that wrap it only add their output protocol: the JSON schema for the
+    structured engine, four worked examples for the text engine, which has nothing else
+    to learn the format from. A single ceiling over the whole would bill that scaffolding
+    at doctrine price and push to cut the examples.
 
-    Le plafond du style est passé de 700 à 800 le 2026-08-17 pour loger
-    `TYPOGRAPHY_RULE`, et pour une raison qui vaut d'être nommée : une centaine de mots
-    payés une fois par SESSION valent mieux qu'une consigne d'une ligne que le coach
-    enfreint à chaque message. Le budget mesure un coût, pas une vertu.
+    The style ceiling pays for `TYPOGRAPHY_RULE` and a counter-example: words paid once
+    per SESSION are worth more than a one-line instruction the coach breaks at every
+    message, and a model imitates its own turns before obeying an instruction. The budget
+    measures a cost, not a virtue.
 
-    De 800 à 840 le 2026-08-19, même raison et même forme. Le coach a écrit à Sam
-    « Maintenant je pose la batterie sans ouvrir directement par la douleur » : il a
-    annoncé sa consigne au lieu de l'appliquer. La règle qui l'interdisait existait,
-    abstraite (« ne raconte jamais ta machinerie »), et n'a pas tenu -- « la batterie »
-    ne ressemble pas à de la machinerie, ça ressemble à du vocabulaire de coach.
-    Ce qui a été acheté avec ces mots est un EXEMPLE, pas une reformulation : le
-    2026-08-16 a montré qu'un modèle imite ses propres tours avant d'obéir à une
-    consigne, donc un contre-exemple daté vaut plus qu'un adjectif de plus.
-
-    Trois échanges ont été cherchés avant de relever : la consigne de carte de renfo a
-    été remise (la retirer rejouerait le 18/08), et la règle a été fondue avec celle
-    qu'elle remplace plutôt qu'ajoutée à côté.
-
-    Les déclencheurs proactifs passent de 500 à 520 le 2026-08-21, et pour la
-    TROISIÈME fois sur la même faute -- le coach a ouvert son débrief par « Angle non
-    répété jusqu'ici [...] Ici je vais partir du titre Strava ». Ce qui est acheté ici
-    n'est ni un exemple ni un adjectif : c'est une COMMANDE. `fact-write.py angle`
-    donne enfin à l'angle un endroit où aller, parce qu'il n'en avait aucun -- la
-    colonne `proactive_messages.angle` n'a jamais été écrite, et un raisonnement à qui
-    on ne donne pas de champ finit dans la prose. Les deux durcissements de prompt
-    précédents ne pouvaient pas tenir : ils interdisaient la seule sortie disponible.
+    The proactive-trigger ceiling pays for a COMMAND, `fact-write.py angle`, which gives
+    the angle a place to go: a reasoning given no field ends up in the prose.
     """
-    # Le lanceur explicite ajoute un mot aux anciennes mentions nues de CLI. Ce coût
-    # achète l'alignement matériel avec `dontAsk` après l'incident du 26/08.
-    # De 860 à 890 le 30/08 : Redline a reçu les trois ressentis d'une SL, sa CLI a
-    # échoué, puis il a répondu comme si l'écriture avait réussi et les a redemandés.
-    # Le coût est le contrôle explicite d'exit_code, pas une nouvelle règle éditoriale.
-    # Ce plafond borne le CONTEXTE statique en CI. Il ne juge jamais une réponse,
-    # ne déclenche aucune régénération et ne peut donc pas faire boucler le coach.
+    # The explicit launcher adds a word to the former bare CLI mentions. That cost buys
+    # exact alignment with `dontAsk`.
+    # The extra headroom is the explicit exit_code check, not a new editorial rule.
+    # This ceiling bounds the static CONTEXT in CI. It never judges an answer and
+    # triggers no regeneration, so it cannot make the coach loop.
     assert len(STYLE_PROMPT.split()) <= 1040
     assert len(TRIAGE_RULES.split()) <= 300
     assert len(TRIAGE_PROMPT.split()) <= 430
@@ -415,7 +383,7 @@ def test_weekly_cannot_use_the_generic_silence_escape_hatch():
 
 
 def test_silence_is_a_typed_decision_never_a_sentinel_word():
-    """RWF-023 : aucun code ne cherche plus « SILENCE » dans la prose d'une initiative."""
+    """No code searches for the word "SILENCE" in the prose of an initiative."""
     for kind in PROACTIVE_TRIGGERS:
         prompt = prompts.build_proactive_prompt(kind, "42")
         assert "SILENCE" not in prompt, kind
@@ -423,7 +391,7 @@ def test_silence_is_a_typed_decision_never_a_sentinel_word():
 
 
 def test_closed_initiatives_have_no_agent_prompt_left():
-    """RWF-025 : un type rendu sans modèle ne garde pas un prompt contradictoire."""
+    """A kind rendered without a model keeps no contradictory prompt."""
     from redline.service.proactive_messages import CLOSED_KINDS
 
     assert not CLOSED_KINDS & set(PROACTIVE_TRIGGERS)
@@ -440,8 +408,8 @@ def test_style_never_treats_a_failed_cli_as_a_persisted_fact():
 
 
 def test_style_names_the_shell_forms_the_tool_refuses():
-    """Audit du 2026-10-11 : 23 appels sur 206 refusés, dont les réveils du 09/10 et du
-    11/10, parce que le coach ajoutait `; echo "exit=$?"` pour lire le code de sortie."""
+    """The coach must not append `; echo "exit=$?"` to read the exit code: the tool
+    refuses such shell forms."""
     flat = _flat(STYLE_PROMPT)
     assert "Une CLI par appel, sans `$`, boucle ni heredoc" in flat
     assert "JSON via `--input` (FICHIER DU TOUR)" in flat
@@ -449,8 +417,8 @@ def test_style_names_the_shell_forms_the_tool_refuses():
 
 
 def test_every_turn_names_its_own_input_file():
-    """11/10 : `< /tmp/x.json` refusé par Claude Code 2.1.287, W42 jamais écrite. Le
-    tour reçoit un chemin à lui, dans le vault, que la CLI lit par `--input`."""
+    """A `< /tmp/x.json` redirect is refused by the tool. The turn gets its own path in
+    the vault, which the CLI reads through `--input`."""
     note = prompts.turn_input_note("11111111-2222-3333-4444-555555555555")
     path = ".agent-tmp/11111111-2222-3333-4444-555555555555.json"
     assert f"Write dans `{path}`" in note
@@ -485,11 +453,9 @@ def test_conversation_knows_the_strength_card_exists():
 
 
 def test_strava_is_declared_on_every_path_the_coach_can_take():
-    """Une capacité déclarée sur un seul chemin n'existe pas sur les autres. Strava ne
-    vivait que dans un MCP de `~/.claude.json` : sous Codex, le coach a cherché un accès
-    pendant cinq appels avant de rendre SILENCE (2026-08-14). Elle se nomme donc là où
-    tous les tours passent — le style, la marche de lecture d'un débrief, et les deux
-    déclencheurs qui partent d'une activité."""
+    """A capability declared on a single path does not exist on the others. Strava is
+    therefore named where every turn passes: the style, the debrief reading walk, and
+    the two triggers that start from an activity."""
     assert f"{prompts.AGENT_CLI} strava.py" in STYLE_PROMPT
     assert "TU AS ACCÈS À STRAVA" in STYLE_PROMPT
     assert f"{prompts.AGENT_CLI} strava.py" in DEPTH_NOTES["N1"]
@@ -499,15 +465,15 @@ def test_strava_is_declared_on_every_path_the_coach_can_take():
 
 
 def test_a_debrief_uses_the_captured_snapshot_instead_of_refetching_strava():
-    """La capture déterministe précède le modèle : un second appel ne peut que
-    réintroduire une panne après que la donnée est déjà acquise."""
+    """Deterministic capture precedes the model: a second call can only reintroduce an
+    outage after the data is already acquired."""
     debrief = PROACTIVE_TRIGGERS["strava_debrief"]
     assert "INSTANTANÉ STRAVA" in debrief
     assert "Ne refais pas l'appel fournisseur" in debrief
 
 
 def test_every_command_the_prompts_hand_out_is_runnable_as_written():
-    """Le prompt ne peut citer que le lanceur effectivement autorisé par Claude."""
+    """The prompt may only cite the launcher that Claude actually allows."""
     for text in (STYLE_PROMPT, *DEPTH_NOTES.values(), *PROACTIVE_TRIGGERS.values()):
         flat = " ".join(text.split())
         assert "python3 scripts/" not in flat
@@ -518,7 +484,7 @@ def test_every_command_the_prompts_hand_out_is_runnable_as_written():
 
 
 def test_logging_a_session_never_rewrites_the_plan_execution_state():
-    """Le réalisé appartient au cycle ; seule une prescription future justifie rN+1."""
+    """What was done belongs to the cycle; only a future prescription justifies rN+1."""
     style = " ".join(STYLE_PROMPT.split())
     assert "jamais pour marquer `done`" in style
     assert "le réalisé appartient au cycle" in style
@@ -528,9 +494,8 @@ def test_logging_a_session_never_rewrites_the_plan_execution_state():
 
 
 def test_a_stale_plan_asks_for_a_revision_before_the_turn_not_after():
-    """Le contrôle qui détectait la péremption tournait APRÈS la réponse : il ne pouvait
-    que détruire du travail déjà fait. La même information, servie en tête du tour,
-    devient actionnable."""
+    """A staleness check that ran AFTER the answer could only destroy finished work.
+    The same information, served at the head of the turn, becomes actionable."""
     note = prompts.stale_plan_note("2026-W33")
     assert "invisible pour ⟨athlète⟩" in note
     assert "2026-W33" in note
@@ -541,13 +506,13 @@ def test_a_stale_plan_asks_for_a_revision_before_the_turn_not_after():
 
 
 def test_the_cadence_is_never_doubled_twice():
-    """Le ×2 est passé dans scripts/strava.py, qui sait distinguer un pas d'un tour de
-    pédalier. Le prompt doit donc dire de NE PAS le refaire, sinon 168 devient 336."""
+    """The x2 is applied in scripts/strava.py, which tells a stride from a pedal turn.
+    The prompt must say NOT to redo it, otherwise 168 becomes 336."""
     assert "ne la multiplie pas une deuxième fois" in PROACTIVE_TRIGGERS["strava_debrief"]
 
 
 def test_the_daily_question_stays_subjective():
-    """La question d'état reste une question de coach, jamais un relevé."""
+    """The state question stays a coach question, never a readout."""
     morning = PROACTIVE_TRIGGERS["morning"]
     assert "ni score, ni courbe, ni moyenne" in morning
     assert "signal de CHARGE" in morning
@@ -600,13 +565,13 @@ def test_with_the_notebook_pending_cells_are_left_to_it_except_pain():
     assert "Le carnet les recueille : ne les demande pas" in note
     assert "douleur si le message montre une gêne" in note
     assert "une seule information" not in note
-    # Une valeur donnée spontanément s'écrit toujours par le même contrat.
+    # A spontaneously given value is always written through the same contract.
     assert "--metric rpe" in note
 
 
 def test_walking_is_never_asked():
-    """Décision de Sam du 2026-10-11 : la marche ne se demande jamais, même quand un
-    contrôle daté ancien la nomme encore ; il signale lui-même une gêne."""
+    """Walking is never asked, even when an old dated check still names it; the athlete
+    reports discomfort unprompted."""
     for level in ("N1", "N2"):
         assert "jamais la marche, il signale une gêne" in DEPTH_NOTES[level]
     note = prompts.gate_note([{
@@ -637,17 +602,15 @@ def test_evening_claim_hides_storage_plumbing():
 
 
 def test_no_injected_text_types_a_glyph_a_phone_keyboard_does_not_carry():
-    """⭐ LE PORTEUR DE LA RÈGLE TYPOGRAPHIQUE. « Pas de tiret cadratin » vivait depuis
-    des semaines dans le style, et le coach en mettait quand même (Sam, 2026-08-17 :
-    « tu utilises encore des tirets quadratins et autres symboles pas naturels »). La
-    consigne n'était pas fausse, elle était CONTREDITE PAR SON PROPRE CONTEXTE : les
-    notes de niveau, les déclencheurs proactifs et les instructions invisibles étaient
-    truffés de « — », de « · » et de guillemets français. Un modèle imite ce qu'il lit
-    avant d'obéir à ce qu'on lui dit, et une règle démontrée à l'envers ne tient pas un
-    tour. Ce test tient l'autre bout : le prompt ne peut plus taper ce qu'il interdit.
+    """No injected text may type a glyph a phone keyboard does not carry.
 
-    Seule `TYPOGRAPHY_RULE` y échappe, parce qu'elle doit NOMMER les signes pour les
-    interdire; elle est retranchée avant le scan.
+    The typography rule alone is not enough: level notes, proactive triggers and hidden
+    instructions that contain such glyphs contradict it by example, and a model imitates
+    what it reads before obeying what it is told. This test holds the other end: the
+    prompt cannot type what it forbids.
+
+    Only `TYPOGRAPHY_RULE` escapes, because it must NAME the signs to forbid them; it
+    is cut out before the scan.
     """
     injected = {
         "STYLE_PROMPT": STYLE_PROMPT.replace(prompts.TYPOGRAPHY_RULE, ""),
@@ -662,13 +625,12 @@ def test_no_injected_text_types_a_glyph_a_phone_keyboard_does_not_carry():
             [{"due": "2026-08-17", "holds": ["w34-dim-sl"],
               "question": "La blessure a tenu la sortie longue ?",
               "on_fail": "on retire les côtes de jeudi"}]),
-        # Les deux moitiés se scannent séparément : la note d'observation est un texte
-        # injecté à part entière, et elle est arrivée après ce test (2026-08-18).
+        # Both halves are scanned separately: the observation note is a full injected
+        # text of its own.
         "gate_note[observation]": prompts.gate_note(
             [], [{"due": "2026-08-18", "question": "La cheville a parlé pendant la "
                   "pliométrie ?", "on_fail": "elle sort de la séance A"}]),
-        # Les quatre textes rapatriés de `bot.py` (2026-08-19) : ils étaient injectés
-        # à chaque tour sans qu'aucun contrôle puisse les prendre en faute.
+        # Texts moved out of `bot.py`: injected at every turn, so each must be scanned.
         "canonical_plan_note": prompts.canonical_plan_note(""),
         "active_revision_note": prompts.active_revision_note(""),
         "deep_handoff_note": prompts.deep_handoff_note("question puis réponse"),
@@ -690,23 +652,18 @@ def test_no_injected_text_types_a_glyph_a_phone_keyboard_does_not_carry():
 
 
 def test_the_glyph_rule_reaches_the_data_channel_not_only_the_written_prompts():
-    """⭐ LA MOITIÉ QUI MANQUAIT AU PORTEUR DU 2026-08-17.
+    """The glyph rule also reaches the data channel, not only the written prompts.
 
-    Le test au-dessus scanne les chaînes écrites dans le code. Or le plus gros bloc
-    injecté à chaque tour prescriptif est le programme lui-même
-    (`weekly_plan.as_json()`), et ce sont des textes que le COACH a écrits la veille :
-    `reason`, `constraints`, les `question`/`on_fail` des contrôles datés, les
-    `title`/`note` des séances. `prompts.gate_note()` en interpole deux VERBATIM dans
-    l'instruction invisible.
+    The test above scans strings written in the code. But the largest block injected at
+    every prescriptive turn is the plan itself (`weekly_plan.as_json()`), made of texts
+    the COACH wrote the day before: `reason`, `constraints`, the `question`/`on_fail`
+    of dated checks, the `title`/`note` of sessions. `prompts.gate_note()` interpolates
+    two of them VERBATIM into the hidden instruction, and a note goes out to the
+    athlete's phone.
 
-    Au 2026-08-19 le programme W34 en portait quatre, dont un tiret cadratin dans la
-    question du contrôle du 23/08 et un signe moins dans une `note`, qui part sur le
-    téléphone de Sam. La consigne se faisait donc démentir par son propre contexte,
-    exactement comme avant le 17/08, mais par le canal des données.
-
-    Le refus est posé à l'ÉCRITURE (`week-plan.py revise`) et pas dans `validate` :
-    l'historique est append-only et `revise` valide le plan entier, donc la règle
-    appliquée à la lecture refuserait la révision du jour à cause du texte de la veille.
+    The refusal is applied at WRITE time (`week-plan.py revise`), not in `validate`:
+    history is append-only and `revise` validates the whole plan, so a rule applied at
+    read time would refuse today's revision because of yesterday's text.
     """
     from redline.model import weekly_plan
 
@@ -723,8 +680,8 @@ def test_the_glyph_rule_reaches_the_data_channel_not_only_the_written_prompts():
     for champ in champs:
         assert any(champ in faute for faute in fautes), (
             f"{champ} n'est pas jugé : ce texte est réinjecté au coach à chaque tour")
-    # Le message ouvre le chemin correct, il ne se contente pas de fermer le mauvais
-    # (⭐ 2026-08-06 : un garde-fou sans chemin correct fabrique son contournement).
+    # The message opens the correct path, it does not merely close the wrong one: a
+    # guard without a correct path breeds its own workaround.
     assert any("À la place :" in faute for faute in fautes)
 
     propre = {
@@ -739,16 +696,14 @@ def test_the_glyph_rule_reaches_the_data_channel_not_only_the_written_prompts():
 
 
 def test_both_guards_read_the_same_list_of_glyphs():
-    """Deux listes qui dérivent, c'est une règle appliquée à un canal sur deux."""
+    """Two drifting lists mean a rule applied to one channel out of two."""
     from redline.model import typography
     assert prompts.BANNED_GLYPHS is typography.BANNED_GLYPHS
 
 
 def test_the_write_guard_is_wired_into_the_revise_path_not_merely_available():
-    """Une fonction de contrôle que personne n'appelle est une intention, pas un
-    contrôle -- c'est exactement le défaut que cet audit a trouvé ailleurs
-    (`vault-check.py` certifiait qu'une règle NOMMAIT son porteur, jamais qu'il la
-    portait). Celui-ci doit donc se voir sur le chemin d'écriture lui-même."""
+    """A guard function nobody calls is an intention, not a guard. It must be visible
+    on the write path itself."""
     from conftest import ENGINE_ROOT
     source = (ENGINE_ROOT / "src" / "redline" / "cli" / "week_plan.py").read_text()
     assert "written_text_errors(current" in source, (
@@ -770,7 +725,7 @@ def test_tentative_logistics_does_not_inherit_a_plan_change_obligation():
 
 
 def test_a_restriction_names_its_rule_and_fact_wherever_the_plan_is_revised():
-    """Audit du 2026-10-09 : la restriction sans prémisse, faute n°1 sur une prescription."""
+    """A restriction without a premise is the first fault on a prescription."""
     assert "`motif`" in prompts.plan_change_note()
     assert "`demande`" in prompts.plan_change_note()
     assert "`motif`" in DEPTH_NOTES["N2"]
@@ -788,9 +743,8 @@ def test_weekly_uses_the_dossier_and_closes_every_due_prediction():
 
 
 def test_the_weekly_commitment_is_gone():
-    """Six bilans de suite sans engagement (W33-W38), puis Sam le 2026-09-30 : « de
-    toute façon j'ai pas envie de répondre à ça ». Le levier est retiré, pas allégé :
-    ni question, ni champ dans le journal de la semaine."""
+    """The weekly commitment lever is removed, not softened: no question, and no field
+    in the week's journal."""
     from redline.model import weekly_plan
 
     weekly = " ".join(PROACTIVE_TRIGGERS["weekly"].split())
@@ -812,9 +766,9 @@ def test_monthly_judges_outcomes_not_only_the_process():
 
 
 def test_a_session_is_bound_to_the_instruction_files_it_actually_read(tmp_path):
-    """Audit du 2026-09-30, constat 12 : le contrat ne portait que le NOM de la
-    constitution. Une règle corrigée dans CLAUDE.md laissait vivre le fil qui avait lu
-    l'ancienne ; un commit de notes, lui, ne doit faire repartir personne de zéro."""
+    """The contract carries the instruction files the session actually read, not only
+    the constitution's NAME. A rule fixed in CLAUDE.md must not leave alive a thread
+    that read the old one; a notes commit must not restart anyone from zero."""
     assert prompts.instruction_digest(tmp_path) == prompts.STYLE_DIGEST
     (tmp_path / "CLAUDE.md").write_text("règle A", encoding="utf-8")
     first = prompts.instruction_digest(tmp_path)
@@ -831,8 +785,8 @@ def test_a_session_is_bound_to_the_instruction_files_it_actually_read(tmp_path):
 
 
 def test_a_contested_simple_fact_does_not_become_a_literature_review():
-    """Constats 1 et 8 : le triage place toute correction en N3. La profondeur de
-    lecture ne dicte ni les sources à ouvrir ni la longueur envoyée."""
+    """Triage places every correction at N3. Reading depth dictates neither the sources
+    to open nor the length sent."""
     note = " ".join(DEPTH_NOTES["N3"].split())
     assert "relis son propriétaire, pas la littérature" in note
     assert "réponds en une phrase si elle suffit" in note
@@ -844,8 +798,7 @@ def test_a_contested_simple_fact_does_not_become_a_literature_review():
 
 
 def test_tracking_is_reserved_for_expected_information():
-    """Constats 6 et 9 : toute question n'est pas une dette, toute inférence n'ouvre
-    pas une question."""
+    """Not every question is a debt, and not every inference opens a question."""
     style = _flat(STYLE_PROMPT)
     assert "Déclare toute question" not in style
     assert "Information attendue seulement, jamais une question sociale" in style
@@ -853,9 +806,9 @@ def test_tracking_is_reserved_for_expected_information():
 
 
 def test_an_observation_does_not_hijack_a_social_message():
-    """Constat 7 : en N0, la branche observation imposait de prescrire la journée et
-    de poser la question du soir, contre la note N0 qui demande de respecter une
-    clôture. Un contrôle bloquant, lui, reste entier à tous les niveaux."""
+    """At N0 the observation branch must not force prescribing the day and asking the
+    evening question, against the N0 note that asks to respect a closure. A blocking
+    check stays whole at every level."""
     blocking = [{"id": "b", "holds": ["s1"], "question": "la blessure ?", "on_fail": "rest"}]
     observing = [{"id": "o", "question": "la cheville ?", "on_fail": "on retire"}]
     closing = prompts.gate_note(blocking, observing, closing=True)
@@ -868,7 +821,7 @@ def test_an_observation_does_not_hijack_a_social_message():
 
 
 def test_the_debrief_opens_on_a_computed_gap_not_on_the_watch():
-    """Audit du 2026-10-11 : 13 débriefs sur 26 ouvraient sur trois chiffres de Strava."""
+    """A debrief must not open on three raw watch figures in a row."""
     debrief = _flat(PROACTIVE_TRIGGERS["strava_debrief"])
     assert "Ta première phrase porte l'écart de `ecarts` qui compte" in debrief
     assert "jamais trois chiffres de la montre à la suite" in debrief
@@ -876,16 +829,16 @@ def test_the_debrief_opens_on_a_computed_gap_not_on_the_watch():
 
 
 def test_a_skipped_session_is_cancelled_in_the_same_turn():
-    """13/10 : renfo annoncé sauté à 19 h, la charge de vie seule notée, et la relance
-    de 22 h l'a redemandé. La relance est un rendu fermé : c'est la révision qui doit
-    arriver avant elle (`coaching/corrections.md`)."""
+    """A skipped session announced by the athlete is cancelled in the same turn: the
+    follow-up is a closed rendering, so the revision must come before it
+    (`coaching/corrections.md`)."""
     note = " ".join(prompts.plan_change_note().split())
     assert "QU'IL ANNONCE SAUTER" in note
     assert "`cancelled`, motif `demande`" in note
 
 
 def test_a_quality_session_is_judged_on_its_written_criteria_only():
-    """15/10 : « sans cible de FC » prescrit, puis un doute fondé sur la FC 178."""
+    """A prescribed "no HR target" must not be followed by a doubt based on the HR."""
     debrief = _flat(PROACTIVE_TRIGGERS["strava_debrief"])
     assert "SEULS critères écrits dans sa séance" in debrief
     assert "la FC n'est ni doute ni reproche" in debrief

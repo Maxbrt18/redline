@@ -65,8 +65,8 @@ def test_a_failed_delivery_can_retry_a_revised_payload(tmp_path, store):
 
 
 def test_a_delivered_envelope_is_never_sent_twice_even_if_recomputed(tmp_path, store):
-    """RWF-005 : une reprise qui recalculerait sa réponse retrouve l'entrant déjà servi
-    et l'acquitte, au lieu de boucler sur une collision à chaque tentative."""
+    """RWF-005: a resume that would recompute its reply finds the inbound already served
+    and acknowledges it, instead of looping on a collision at every attempt."""
     delivery = service(tmp_path, store)
     first = EnvelopeBuilder("4242", "proactive:delivered-collision").text(
         "Version initiale").build()
@@ -80,7 +80,7 @@ def test_a_delivered_envelope_is_never_sent_twice_even_if_recomputed(tmp_path, s
 
 
 def test_a_computed_envelope_is_stored_and_resent_as_is(tmp_path, store):
-    """Calculer une fois, livrer plusieurs fois : le texte stocké repart sans le modèle."""
+    """Compute once, deliver several times: the stored text goes out again without the model."""
     from redline.service.messenger import DeliveryResult
 
     delivery = service(tmp_path, store)
@@ -108,4 +108,4 @@ def test_a_prepared_envelope_waits_without_being_sent(tmp_path, store):
     assert delivery.stored("proactive:morning:1").status == "prepared"
     delivery.client.send_burst.assert_not_called()
     assert delivery.resume(delivery.stored("proactive:morning:1")).text_ok
-    assert not delivery.prepare(envelope)      # déjà parti : plus rien à préparer
+    assert not delivery.prepare(envelope)      # already sent: nothing left to prepare

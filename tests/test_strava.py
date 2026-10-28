@@ -147,11 +147,11 @@ def test_laps_come_from_the_endpoint_only_when_the_field_is_absent(monkeypatch):
     assert calls == ["/activities/2"]
 
 
-# ------------------------------------------------------------------ flux
+# ------------------------------------------------------------------ streams
 
 def test_streams_are_flattened_into_what_descent_already_eats(monkeypatch):
-    """descent.py accepte {"altitude": [...]} depuis toujours. Strava emballe la liste
-    dans un objet : l'aplatir ici évite de toucher à descent.py."""
+    """descent.py has always accepted {"altitude": [...]}. Strava wraps the list in an
+    object: flattening it here avoids touching descent.py."""
     monkeypatch.setattr(strava, "call", lambda *a, **k: {
         "altitude": {"data": [262.9, 300.0, 262.6], "series_type": "distance"}})
     out = strava.cmd_streams(type("Args", (), {"id": "1", "keys": "altitude"})())
@@ -164,9 +164,9 @@ def test_streams_are_flattened_into_what_descent_already_eats(monkeypatch):
 # ------------------------------------------------------------------ interface
 
 def test_the_json_flag_works_on_both_sides_of_the_subcommand():
-    """`strava.py activity 42 --json` est l'ordre qu'on tape naturellement, et argparse
-    le refusait : « unrecognized arguments » ne dit pas où mettre le drapeau. Ce script
-    existe pour qu'un agent n'ait pas à deviner la syntaxe."""
+    """`strava.py activity 42 --json` is the order one naturally types, and argparse
+    refused it: "unrecognized arguments" does not say where to put the flag. This
+    script exists so that an agent need not guess the syntax."""
     parser = strava.build_parser()
     assert parser.parse_args(["activity", "42", "--json"]).json
     assert parser.parse_args(["--json", "activity", "42"]).json
@@ -174,13 +174,13 @@ def test_the_json_flag_works_on_both_sides_of_the_subcommand():
 
 
 def test_every_subcommand_has_a_handler():
-    """Une sous-commande sans fonction planterait en KeyError au pire moment."""
+    """A subcommand without a function would crash with a KeyError at the worst moment."""
     parser = strava.build_parser()
     declared = set(parser._subparsers._group_actions[0].choices)
     assert declared == set(strava.COMMANDS)
 
 
-# ------------------------------------------------------------------ jetons
+# ------------------------------------------------------------------ tokens
 
 def test_a_missing_client_is_named_not_guessed(monkeypatch):
     for name in ("STRAVA_CLIENT_ID", "STRAVA_CLIENT_SECRET", "STRAVA_REFRESH_TOKEN"):
@@ -205,7 +205,7 @@ def test_a_valid_cached_token_is_reused_without_calling_strava(monkeypatch):
 
 
 def test_a_token_about_to_expire_is_refreshed_before_the_call(monkeypatch):
-    """Un jeton valide 40 s ne survit pas à l'appel qu'on s'apprête à faire."""
+    """A token valid for 40 s does not survive the call about to be made."""
     monkeypatch.setenv("STRAVA_CLIENT_ID", "1")
     monkeypatch.setenv("STRAVA_CLIENT_SECRET", "2")
     monkeypatch.setattr(strava.time, "time", lambda: 1000.0)
@@ -221,8 +221,8 @@ def test_a_token_about_to_expire_is_refreshed_before_the_call(monkeypatch):
 
 
 def test_a_rotated_refresh_token_is_persisted(monkeypatch):
-    """Strava peut faire tourner le jeton de rafraîchissement. Ne pas écrire le nouveau,
-    c'est perdre l'accès à la rotation suivante — en silence, des heures plus tard."""
+    """Strava may rotate the refresh token. Not writing the new one loses access at the
+    next rotation -- silently, hours later."""
     monkeypatch.setenv("STRAVA_CLIENT_ID", "1")
     monkeypatch.setenv("STRAVA_CLIENT_SECRET", "2")
     monkeypatch.setattr(strava, "_read_cache", lambda path: {"refresh_token": "ancien"})
@@ -235,9 +235,9 @@ def test_a_rotated_refresh_token_is_persisted(monkeypatch):
 
 
 def test_the_environment_is_never_a_second_owner_of_the_token(monkeypatch):
-    """Le cache est le SEUL propriétaire des jetons. Une amorce dans .env deviendrait
-    fausse à la première rotation, en silence, et on diagnostiquerait un accès vivant
-    en lisant une valeur morte. Sans cache : pas de repli, une consigne d'amorçage."""
+    """The cache is the ONLY owner of the tokens. A seed in .env would go stale at the
+    first rotation, silently, and a live access would be diagnosed by reading a dead
+    value. Without a cache: no fallback, a bootstrap instruction."""
     monkeypatch.setenv("STRAVA_CLIENT_ID", "1")
     monkeypatch.setenv("STRAVA_CLIENT_SECRET", "2")
     monkeypatch.setenv("STRAVA_REFRESH_TOKEN", "amorce-qui-ne-doit-plus-servir")
@@ -262,15 +262,15 @@ def test_the_token_cache_is_written_private_and_atomically(tmp_path):
     assert not path.with_suffix(".tmp").exists()
 
 
-# ------------------------------------------------------------------ amorçage
+# ------------------------------------------------------------------ bootstrap
 
 def _login_args():
     return type("Args", (), {"json": False})()
 
 
 def test_login_reads_the_code_from_stdin_never_from_the_command_line(monkeypatch, capsys):
-    """Un secret passé en argument atterrit dans ~/.bash_history : c'est comme ça que
-    les identifiants Strava se sont retrouvés en clair dans cinq fichiers."""
+    """A secret passed as an argument lands in ~/.bash_history: that is how credentials
+    end up in clear text in shell history."""
     monkeypatch.setenv("STRAVA_CLIENT_ID", "42")
     monkeypatch.setenv("STRAVA_CLIENT_SECRET", "secret")
     monkeypatch.setattr("builtins.input", lambda _: "abc123")
@@ -301,18 +301,18 @@ def test_login_reads_the_code_from_stdin_never_from_the_command_line(monkeypatch
     assert "code=abc123" in exchanged["body"]
     assert exchanged["refresh_token"] == "r"
     assert out["autorisation"] == "enregistrée"
-    # L'URL d'autorisation est affichée, et ne porte jamais le secret.
+    # The authorisation URL is printed, and never carries the secret.
     printed = capsys.readouterr().out
     assert "strava.com/oauth/authorize" in printed
-    # `activity:read_all` et pas `activity:read` : sans lui, les sorties privées sont
-    # invisibles et le coach conclurait qu'une séance n'existe pas.
+    # `activity:read_all` and not `activity:read`: without it, private activities are
+    # invisible and the coach would conclude that a session does not exist.
     assert "activity:read_all" in urllib.parse.unquote(printed)
     assert "secret" not in printed
 
 
 def test_login_accepts_the_whole_redirect_url_pasted_as_is(monkeypatch):
-    """Ce que l'utilisateur a réellement sous la main, c'est sa barre d'adresse.
-    Exiger qu'il en extraie le code lui-même, c'est inviter l'erreur de copie."""
+    """What the user actually has at hand is the address bar. Requiring them to extract
+    the code themselves invites a copy error."""
     monkeypatch.setenv("STRAVA_CLIENT_ID", "42")
     monkeypatch.setenv("STRAVA_CLIENT_SECRET", "secret")
     monkeypatch.setattr(
@@ -340,8 +340,8 @@ def test_login_accepts_the_whole_redirect_url_pasted_as_is(monkeypatch):
 
 
 def test_a_reused_authorisation_code_says_to_start_over(monkeypatch):
-    """Un code d'autorisation ne sert qu'une fois : sans ce message, on retente le même
-    et on conclut que les identifiants sont mauvais."""
+    """An authorisation code is single-use: without this message, the same one is
+    retried and the credentials are wrongly judged bad."""
     import urllib.error
 
     monkeypatch.setenv("STRAVA_CLIENT_ID", "42")
@@ -356,7 +356,7 @@ def test_a_reused_authorisation_code_says_to_start_over(monkeypatch):
         strava.cmd_login(_login_args())
 
 
-# ------------------------------------------------------------------ pannes
+# ------------------------------------------------------------------ failures
 
 def test_a_revoked_authorisation_says_what_to_do(monkeypatch):
     import urllib.error
@@ -370,8 +370,8 @@ def test_a_revoked_authorisation_says_what_to_do(monkeypatch):
 
 
 def test_a_rate_limit_is_not_an_absent_activity(monkeypatch):
-    """« Quota atteint » et « la sortie n'existe pas » appellent deux réponses
-    opposées du coach : les confondre lui ferait nier une séance réelle."""
+    """"Quota reached" and "the activity does not exist" call for opposite coach
+    responses: confusing them would make it deny a real session."""
     import urllib.error
 
     monkeypatch.setattr(strava, "access_token", lambda **k: "t")
@@ -385,8 +385,8 @@ def test_a_rate_limit_is_not_an_absent_activity(monkeypatch):
 
 
 def test_an_expired_token_is_retried_once_then_given_up(monkeypatch):
-    """Un 401 se répare tout seul une fois. Deux 401 de suite sont une vraie panne, et
-    boucler dessus brûlerait le quota au lieu de le dire."""
+    """A 401 repairs itself once. Two 401s in a row are a real outage, and looping on
+    them would burn the quota instead of reporting it."""
     import urllib.error
 
     tokens = []

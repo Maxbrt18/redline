@@ -1,4 +1,4 @@
-"""Profils de modèle et isolation des sessions dans ClaudeCodeRunner."""
+"""Model profiles and session isolation in ClaudeCodeRunner."""
 
 import json
 from dataclasses import replace
@@ -14,8 +14,8 @@ from redline.service.routing import Route, RoutingConfig
 
 @pytest.fixture
 def make_config(make_config):
-    """Ces tests portent sur l'adaptateur Claude : ils déclarent son fournisseur, la
-    production (et le défaut des autres tests) étant Codex."""
+    """These tests target the Claude adapter: they declare its provider explicitly
+        instead of relying on the default of the other tests."""
     return partial(make_config, agent_provider="claude")
 
 
@@ -65,16 +65,16 @@ def test_command_carries_effort(make_config):
 
 
 def test_every_turn_carries_the_style_prompt(make_config):
-    """Le câblage, pas le texte. `STYLE_PROMPT` est le seul texte injecté à CHAQUE
-    tour : une règle de comportement qui n'y est pas n'est pas appliquée, elle est
-    archivée dans le vault. Or rien ne testait ce `--append-system-prompt` — on
-    pouvait supprimer la ligne de claude.py et voir 305 tests rester verts pendant
-    que le mandat de contradiction disparaissait de Messenger (audit 2026-07-29).
+    """The wiring, not the text. `STYLE_PROMPT` is the only text injected on EVERY
+        turn: a behaviour rule that is not in it is not applied, it is merely archived in
+        the vault. Nothing else tested this `--append-system-prompt`: the line could be
+        deleted from claude.py with the whole suite staying green while the mandate to
+        contradict disappeared from Messenger.
+        The two pinned excerpts are the pair that must never be split: the right to
+        contradict, and the firmness backed by READING. The second alone would be lukewarm;
+        the first alone builds an obstructive and wrong coach, the failure mode the rest of
+        the architecture fights.
 
-    Les deux extraits pincés sont le couple qui ne doit jamais se dissocier : le
-    droit de contredire, et la fermeté adossée à la LECTURE. Le second seul serait
-    tiède ; le premier seul fabrique un coach obstructif et faux, c'est-à-dire le
-    mode d'échec que tout le reste de l'architecture combat.
     """
     runner = ClaudeCodeRunner(make_config(), state=None)
     cmd = runner._command("je fais un fractionné ce soir", None)
@@ -223,7 +223,7 @@ def test_final_response_has_no_execution_or_write_tools(make_config):
     assert "--fork-session" in cmd
 
 
-# ---- one_shot : le banc d'évaluation tourne sur Claude depuis l'abandon de Codex
+# ---- one_shot: the evaluation bench runs on Claude
 
 def _completed(stdout, returncode=0):
     import subprocess
@@ -248,7 +248,7 @@ def test_one_shot_runs_without_tools_session_or_vault_constitution(make_config, 
     assert cmd[cmd.index("--system-prompt") + 1] == "Consignes du banc"
     assert "--resume" not in cmd and "--append-system-prompt" not in cmd
     assert cmd[cmd.index("--model") + 1] == "sonnet"
-    # Un dossier vide : le CLAUDE.md du vault ne se charge pas.
+    # An empty directory: the vault CLAUDE.md is not loaded.
     assert seen["cwd"] != str(config.vault_path)
 
 

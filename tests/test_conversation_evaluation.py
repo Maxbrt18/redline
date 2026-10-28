@@ -1,4 +1,4 @@
-"""Le banc refuse les comparaisons trompeuses et compte la forme réellement rendue."""
+"""The bench refuses misleading comparisons and counts the form actually rendered."""
 import json
 
 import pytest
@@ -93,6 +93,6 @@ def test_historical_bench_fails_on_shape_or_review_failure(
                                     '--output', str(tmp_path / 'result.json')])
     assert main() == expected
     assert '[ÉTAT D\'ESPRIT' not in runner.one_shot.call_args.kwargs['instructions']
-    # Le niveau de lecture voyage avec le contexte, comme devant un message réel.
+    # The reading level travels with the context, as in front of a real message.
     from redline.service.prompts import DEPTH_NOTES
     assert DEPTH_NOTES['N1'] in json.loads(runner.one_shot.call_args.args[0])['context']

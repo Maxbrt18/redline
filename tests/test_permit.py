@@ -1,11 +1,11 @@
-"""Permis EF : l'état se calcule depuis les choix scellés et le registre."""
+"""Easy-run permit: the state is computed from the sealed choices and the ledger."""
 
 import datetime as dt
 
 from redline.model import permit
 
 MON = dt.date(2026, 9, 28)
-#: Le haut de la Z2 de l'athlète du test : ce que `Instance.hr_bounds[1]` fournit.
+#: Top of Z2 for the test athlete: what `Instance.hr_bounds[1]` provides.
 HR_CAP = 157
 PERIOD = permit.Window(MON, "2026-W42")
 
@@ -84,8 +84,8 @@ def test_before_w42_the_counter_is_shown_and_nothing_is_granted():
 
 
 def test_the_window_starts_with_the_first_sealed_choice():
-    """Aucune date dans le code : le permis s'ouvre le lundi du premier choix scellé et
-    se juge au bout de `PERMIT_WEEKS` semaines, celle-ci comprise."""
+    """No date in the code: the permit opens on the Monday of the first sealed choice and
+    is judged after `PERMIT_WEEKS` weeks, that one included."""
     choices = [_choice("w41-jeu-ef", MON + dt.timedelta(days=10), 40),
                _choice("w40-mer-ef", MON + dt.timedelta(days=2), 40)]
     assert permit.window(choices) == PERIOD

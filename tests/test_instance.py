@@ -1,4 +1,4 @@
-"""`redline.toml` : ce qui distingue une instance, typé et fermé par défaut."""
+"""`redline.toml`: what distinguishes an instance, typed and closed by default."""
 
 import pytest
 from conftest import ENGINE_ROOT, TEST_VAULT
@@ -17,7 +17,7 @@ def test_an_undeclared_capability_still_gets_a_readable_label():
 
 
 def test_the_shipped_example_is_refused_until_filled():
-    """Le gabarit livré doit être conforme au schéma, et refusé pour ses seuls `[…]`."""
+    """The shipped template must match the schema, and be rejected only for its `[…]`."""
     with pytest.raises(instance.InstanceError) as refused:
         instance.parse((ENGINE_ROOT / instance.EXAMPLE).read_text(encoding="utf-8"))
     message = str(refused.value)
@@ -84,8 +84,8 @@ def test_a_duplicated_capability_is_refused():
 
 
 def test_heart_rates_give_the_karvonen_bounds():
-    """Les zones de FC se calculent sur les FC de l'instance, jamais sur des valeurs du
-    moteur : le haut de la Z2 (`hr_bounds[1]`) plafonne les EF."""
+    """Heart-rate zones are computed from the instance's HR values, never from engine
+    values: the top of Z2 (`hr_bounds[1]`) caps easy runs."""
     sam = instance.load(TEST_VAULT)
     assert (sam.hr_rest, sam.hr_max) == (55, 190)
     assert sam.hr_bounds == (136, 149, 163, 176)

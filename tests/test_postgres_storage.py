@@ -1,4 +1,4 @@
-"""Garanties exécutées par un vrai PostgreSQL, pas par un mock SQL."""
+"""Guarantees exercised by a real PostgreSQL, not by a SQL mock."""
 
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ pytestmark = pytest.mark.skipif(not URL, reason="TEST_DATABASE_URL absent")
 
 
 def _add_strength_session(store, payload: dict) -> bool:
-    """Le cœur de /strength-report, sans son quota : False si la clé est déjà prise."""
+    """The core of /strength-report, without its quota: False if the key is already taken."""
     with store.database.transaction() as connection:
         return store._add_strength_session_in(connection, payload, actor="test")
 
@@ -55,7 +55,7 @@ def clean_database():
         names = ", ".join(f"redline.{table.name}" for table in metadata.sorted_tables)
         connection.execute(sa.text(f"TRUNCATE TABLE {names} RESTART IDENTITY CASCADE"))
         connection.execute(sa.text("INSERT INTO redline.athletes(id) VALUES ('sam')"))
-        # La zone surveillée de l'instance fictive, comme le service la synchronise.
+        # The monitored zone of the fictional instance, as the service syncs it.
         connection.execute(sa.text(
             "INSERT INTO redline.pain_zones(athlete_id, slug, label) VALUES ('sam', 'injury', 'Injury')"))
     yield
@@ -69,11 +69,11 @@ def store():
 
 @pytest.fixture(scope="module")
 def service_role_store():
-    """Une base migrée après création des vrais rôles, puis utilisée en redline_app.
+    """A database migrated after the real roles exist, then used as redline_app.
 
-    La base ordinaire de pytest est migrée avant le lancement de la suite et ses tests
-    tournent sous `postgres`. Cette base isolée rejoue donc la séquence de production :
-    rôles présents, migration qui accorde les droits, opération sous le rôle applicatif.
+    The ordinary pytest database is migrated before the suite starts and its tests run as
+    `postgres`. This isolated database replays the production sequence: roles present,
+    migration that grants the rights, operation under the application role.
     """
     base_url = sa.engine.make_url(URL)
     maintenance_url = base_url.set(database="postgres")
@@ -105,8 +105,8 @@ def service_role_store():
         def use_service_role(dbapi_connection, _):
             with dbapi_connection.cursor() as cursor:
                 cursor.execute("SET ROLE redline_app")
-            # SET ROLE est transactionnel : le rollback de la première lecture
-            # ne doit pas rendre les connexions suivantes superutilisatrices.
+            # SET ROLE is transactional: rolling back the first read must not leave
+            # later connections running as superuser.
             dbapi_connection.commit()
 
         yield OperationalStore(database)
@@ -209,7 +209,7 @@ def test_a_known_measurement_cannot_be_rewritten(store):
 
 
 def test_a_known_heart_rate_is_doubted_once_with_its_cause(store):
-    """La mesure reste immuable ; seule l'annotation dit ce qu'elle vaut (2026-10-20)."""
+    """The measurement stays immutable; only the annotation says what it is worth."""
     payload = observation()
     payload["measurements"]["hr_avg_bpm"] = {"state": "known", "value": 157}
     oid = store.add_observation(payload)
@@ -232,26 +232,22 @@ def test_an_unknown_heart_rate_cannot_be_doubted(store):
 
 
 def test_a_metric_never_recorded_can_still_be_filled_later(store):
-    """⭐ Seul `known` est immuable. `not_applicable` est le DÉFAUT de toute colonne
-    absente à la création, pas une donnée — le bloquer rendait définitivement
-    incomplétable une séance consignée sans ses chiffres.
-
-    Le vélo du 2026-08-13 : consigné à la main après un débrief qui n'avait pas pu lire
-    Strava, donc sans durée ni D+, donc pesant ZÉRO dans la jauge de la semaine. Trois
-    jours plus tard, ses chiffres étaient toujours chez Strava et toujours irrattrapables.
+    """Only `known` is immutable. `not_applicable` is the DEFAULT of any column absent at
+    creation, not data: blocking it would make a session recorded without its numbers
+    permanently incompletable (and weigh ZERO in the weekly gauge).
     """
     oid = store.add_observation(observation())
     store.complete_measurement(oid, "duration_s", 6177)
     rows = {row["idempotency_key"]: row for row in store.observation_rows()}
     measured = rows[observation()["idempotency_key"]]["measurements"]["duration_s"]
     assert measured["state"] == "known" and float(measured["value"]) == 6177
-    # Et une fois remplie, elle redevient immuable comme les autres.
+    # Once filled, it becomes immutable like the others.
     with pytest.raises(StorageError):
         store.complete_measurement(oid, "duration_s", 7000)
 
 
 def test_the_purge_only_targets_tables_the_service_may_delete_from(service_role_store):
-    """La purge ne vise que des traces explicitement expirables."""
+    """The purge only targets traces that are explicitly expirable."""
     with service_role_store.database.engine.connect() as connection:
         assert connection.execute(sa.text("SELECT current_user")).scalar_one() == "redline_app"
         for table in OperationalStore.EXPIRY_DAYS:
@@ -263,12 +259,12 @@ def test_the_purge_only_targets_tables_the_service_may_delete_from(service_role_
 
 
 def test_the_purge_removes_markers_but_keeps_command_idempotence(store):
-    """⭐ Une commande appliquée reste la barrière contre tout replay tardif.
+    """An applied command stays the barrier against any late replay.
 
-    La supprimer après 30 jours ne répétait pas forcément l'effet métier : le plan a
-    aussi sa contiguïté et l'observation sa propre identité. Mais la vieille commande
-    pouvait revenir pending et faire tomber le nouveau tour. La clé ne doit donc jamais
-    disparaître, appliquée ou non.
+    Deleting it after 30 days would not necessarily repeat the business effect: the plan
+    has its own contiguity and the observation its own identity. But the old command could
+    come back as pending and break the new turn. The key must therefore never disappear,
+    applied or not.
     """
     turn_id = "7f1c25a0-6f4d-4a51-9b6a-1f2c3d4e5f60"
     store.stage_command(turn_id, "observation:vieille", "observation.add",
@@ -283,7 +279,7 @@ def test_the_purge_removes_markers_but_keeps_command_idempotence(store):
             "VALUES ('tech:vieux:2026-01-01', now() - interval '200 days')"))
         connection.execute(sa.text(
             "INSERT INTO redline.proactive_markers(marker_key) VALUES ('tech:frais')"))
-        # Les traces déjà écrites par les commandes ci-dessus sont vieillies d'un coup.
+        # Age the traces already written by the commands above all at once.
         connection.execute(sa.text(
             "UPDATE redline.turn_commands SET applied_at = now() - interval '90 days' "
             "WHERE applied_at IS NOT NULL"))
@@ -296,9 +292,9 @@ def test_the_purge_removes_markers_but_keeps_command_idempotence(store):
             "SELECT 'markers', count(*) FROM redline.proactive_markers "
             "UNION ALL SELECT 'commandes', count(*) FROM redline.turn_commands "
             "UNION ALL SELECT 'observations', count(*) FROM redline.observations")).all())
-    assert restant["markers"] == 1        # le frais reste
-    assert restant["commandes"] == 2      # appliquée ou pending : les deux clés restent
-    assert restant["observations"] == 1   # aucun FAIT n'est touché
+    assert restant["markers"] == 1        # the fresh one stays
+    assert restant["commandes"] == 2      # applied or pending: both keys stay
+    assert restant["observations"] == 1   # no FACT is touched
     with pytest.raises(StorageError, match="collision d'idempotence"):
         store.stage_command(
             "8f0f98df-a68c-44bd-9dc3-80e240775fa8", "observation:vieille",
@@ -307,14 +303,13 @@ def test_the_purge_removes_markers_but_keeps_command_idempotence(store):
 
 
 def test_the_declared_triggers_are_exactly_those_the_database_carries(store):
-    """⭐ Les garanties qui regardent l'ANCIENNE ligne ne vivaient que dans leurs
-    migrations. `alembic check` compare des métadonnées : il ne voit aucun trigger, donc
-    la disparition de l'un d'eux -- un `DROP` à la main, une restauration partielle --
-    n'aurait été signalée par rien, jamais.
+    """Guarantees that look at the OLD row would otherwise live only in migrations.
 
-    Les deux sens comptent. Un trigger déclaré et absent, c'est une immuabilité qu'on
-    croit avoir. Un trigger présent et non déclaré, c'est une règle que personne ne
-    peut lire dans `schema.py`.
+    `alembic check` compares metadata: it sees no trigger, so the loss of one -- a manual
+    `DROP`, a partial restore -- would never be reported.
+
+    Both directions matter. A declared but absent trigger is an immutability one believes
+    one has. A present but undeclared trigger is a rule nobody can read in `schema.py`.
     """
     with store.database.engine.connect() as connection:
         present = dict(connection.execute(sa.text(
@@ -476,7 +471,7 @@ def test_other_strength_date_or_workout_does_not_complete_the_plan(store, day, w
 
 @pytest.mark.parametrize("two_sessions", [False, True])
 def test_ambiguous_strength_match_neither_assigns_nor_claims_absence(store, two_sessions):
-    # Rapports antérieurs au plan : un seul rapport pour deux séances, ou l'inverse.
+    # Reports that predate the plan: one report for two sessions, or the reverse.
     for index in range(1 if two_sessions else 2):
         _add_strength_session(store, {
             "session_key": f"report-{index}", "day": dt.date(2026, 8, 11), "workout": "a"})
@@ -682,8 +677,8 @@ def test_a_load_increase_waits_for_and_consumes_one_challenge(store):
 
 
 def test_a_prediction_resolved_without_its_observation_is_rectified_to_void(store):
-    # Audit du 2026-10-09 : la seule prédiction « charge » avait été soldée fausse alors
-    # que sa condition n'avait pas été tenue et que la question du réveil restait ouverte.
+    # A prediction settled false while its condition was not met and its wake-up question
+    # was still open must be rectifiable to void.
     store.upsert_prediction({
         "prediction_key": "w40-dim", "domain": "charge", "statement": "trace à la base",
         "probability": .65, "due_on": dt.date(2026, 10, 5)})
@@ -736,7 +731,7 @@ def test_a_sealed_permit_choice_creates_its_prediction_and_cannot_be_rewritten(s
               "statement": "Choix scellé : 40 min.", "probability": .6,
               "due_on": dt.date(2026, 10, 4)}
     store.seal_permit_choice(choice)
-    store.seal_permit_choice(choice)  # rejouée à l'identique : idempotente
+    store.seal_permit_choice(choice)  # replayed identically: idempotent
     assert [row["coach_minutes"] for row in store.permit_choice_rows()] == [40]
     prediction = next(row for row in store.prediction_rows()
                       if row["prediction_key"] == "permis-ef-w40-mar-ef")
@@ -762,7 +757,7 @@ def test_a_typed_unavailability_blocks_a_demanding_session(store):
 
 
 def test_a_revision_after_the_run_keeps_its_pending_gut_review(store):
-    """Toute révision annulait le retour digestif en attente d'une séance courue."""
+    """A revision must not cancel the pending gut review of a session already run."""
     from test_weekly_plan import revision as build_revision
     from test_weekly_plan import session
 
@@ -821,7 +816,7 @@ def test_historical_capture_links_an_existing_observation_to_its_cycle(store):
         "idempotency_key": "strava:90000000012", "strava_activity_id": 90000000012,
         "measurements": {},
     })
-    # L'observation précède la colonne started_at : le distillat doit la compléter.
+    # The observation predates the started_at column: the distillate must complete it.
     result = store.ingest_strava_activity(Activity(
         id=90000000012, sport="Run", name="EF historique",
         start_local="2026-08-14T08:03:00", distance_m=7000.0, moving_s=2520))
@@ -935,13 +930,13 @@ def test_ambiguous_strava_match_is_left_for_alex_to_decide(store):
 
 
 def test_a_typed_gate_survives_the_round_trip_through_postgresql(store):
-    """⭐ 2026-08-18. `plan_gates` n'avait pas de colonne pour `when` ni `holds` : la
-    révision partait typée et revenait nue, donc invalide au contrat 2 qui exige
-    `when`. Un store relationnel qui ne connaît pas un champ ne proteste pas, il
-    l'oublie -- et l'erreur remontée décrivait la relecture, pas l'écriture.
+    """`plan_gates` must have columns for `when` and `holds`: otherwise the revision is
+    written typed and comes back bare, hence invalid under the contract that requires
+    `when`. A relational store that does not know a field does not complain, it forgets
+    it.
 
-    L'aller-retour est le SEUL endroit où ça se voit : le modèle validait, le store
-    écrivait, et personne ne relisait ce qui était ressorti."""
+    The round trip is the ONLY place where this shows: the model validates, the store
+    writes, and nobody reads back what came out."""
     store.append_plan_revision("2026-W33", {
         "revision": 1, "computed_at": "2026-08-09T19:10:00+02:00", "reason": "test",
         "sessions": [],
@@ -958,8 +953,8 @@ def test_a_typed_gate_survives_the_round_trip_through_postgresql(store):
     assert gates["g-avant"]["when"] == "avant"
     assert gates["g-avant"]["holds"] == ["w33-jeu-b", "w33-ven-ef"]
     assert gates["g-apres"]["when"] == "apres"
-    # Absent, et non None : le schéma lit « when manquant » comme « écrit avant le
-    # typage », ce qu'un None explicite ne dirait pas.
+    # Absent, not None: the schema reads a missing `when` as "written before typing",
+    # which an explicit None would not say.
     assert "holds" not in gates["g-apres"]
 
 
@@ -973,11 +968,10 @@ def test_a_revision_round_trip_has_no_schema_version(store):
 
 
 def test_a_stale_plan_projection_is_detected_without_being_repaired(store, tmp_path):
-    """⭐ Le contrôle `vues générées à jour` ANNONÇAIT couvrir le plan hebdo sans jamais
-    l'ouvrir. Le 2026-08-16, dix projections attendaient dans l'outbox après des
-    écritures faites en CLI hors tour : le journal de W33 affichait une révision périmée
-    de deux crans et le contrôle affichait vert. Il compare désormais vraiment — et,
-    comme les autres, il ne répare pas : un contrôle qui répare en silence n'en est pas un.
+    """The `generated views up to date` check must really open the weekly plan view and
+    compare it, even when projections are still waiting in the outbox after CLI writes
+    made outside a turn. Like the other checks, it does not repair: a check that
+    repairs silently is not a check.
     """
     from redline.storage.projector import plan_drift, plan_view_count, project_plans
 
@@ -1001,9 +995,8 @@ def test_a_stale_plan_projection_is_detected_without_being_repaired(store, tmp_p
     project_plans(store, tmp_path)
     assert plan_drift(store, tmp_path) == []
 
-    # Le hot-cache n'existe pas dans ce vault : le contrôle le saute au lieu de
-    # planter dessus. Il a planté en CI le 2026-08-16, et un contrôle qui plante ne
-    # dit rien sur la dérive qu'il était censé voir.
+    # The hot-cache does not exist in this vault: the check skips it instead of crashing
+    # on it, since a crashing check says nothing about the drift it was meant to see.
     assert not (tmp_path / "ai" / "hot-cache.md").exists()
     assert plan_view_count(store, tmp_path) == 1
 
@@ -1034,8 +1027,8 @@ def test_state_claims_are_persisted_and_jobs_use_the_same_database():
 
 
 def test_a_waiting_debrief_is_brought_forward_or_taken_by_a_reply():
-    """Un signal de Sam avance le débrief sans jamais le reculer ; un tour
-    réactif le réclame avant son échéance, une seule fois."""
+    """A signal from the athlete brings the debrief forward and never pushes it back; a
+    reactive turn claims it before its due time, only once."""
     database = Database(URL, application_name="pytest-hasten")
     state = PostgresStateStore(database)
     now = dt.datetime.now(dt.UTC).timestamp()
@@ -1099,7 +1092,7 @@ def test_messenger_reply_to_an_existing_inbound_is_backed_by_the_same_relation()
 
 
 def _ask(store, state, questions, source_key, *, body=None, platform_messages=()):
-    """Un tour qui DÉCLARE ses questions (`fact-write.py ask`), puis la livraison."""
+    """A turn that DECLARES its questions (`fact-write.py ask`), then the delivery."""
     from redline.model import commands
     questions = (questions,) if isinstance(questions, str) else tuple(questions)
     turn_id = str(uuid.uuid4())
@@ -1225,8 +1218,8 @@ def test_only_the_exact_delivered_question_marks_its_declared_cell(store, delive
 
 
 def test_a_question_is_tracked_only_from_a_declaration_found_in_the_delivered_text(store):
-    """Aucun « ? » de prose ne devient un agenda ; une déclaration absente du texte livré
-    non plus : ni question ouverte, ni cellule marquée comme demandée."""
+    """No prose "?" becomes an agenda; neither does a declaration missing from the
+    delivered text: no open question, no cell marked as asked."""
     from redline.model import commands
     state = PostgresStateStore(store.database)
     state.record_outbound("4242", "Belle sortie, non ? Tu vois où je veux en venir ?",
@@ -1258,8 +1251,8 @@ def test_reasking_an_open_question_does_not_erase_a_partial_answer_or_deferral(s
 
 
 def test_a_question_asked_again_after_its_answer_is_a_new_open_question(store):
-    """« Comment tu te sens ce matin ? » se repose chaque jour : une réponse d'hier ne
-    rend pas la question d'aujourd'hui « déjà traitée »."""
+    """A daily question ("How do you feel this morning?") is asked again every day:
+    yesterday's answer does not make today's question "already handled"."""
     state = PostgresStateStore(store.database)
     question = "Comment tu te sens ce matin ?"
     _ask(store, state, question, "ask:first")
@@ -1364,8 +1357,8 @@ def _capability_cli(*extra: str, turn_id: str = "") -> subprocess.CompletedProce
 
 
 def test_same_capability_same_day_is_refused_not_announced(store):
-    """Le 2026-10-13, un `--next-test` corrigé pour le 2026-10-11 a été ignoré par la
-    contrainte journalière pendant que la CLI répondait « enregistré »."""
+    """A corrected `--next-test` for the same day must not be silently ignored by the daily
+    constraint while the CLI answers "enregistré"."""
     first = _capability_cli("--next-test", "W42")
     assert first.returncode == 0, first.stderr
     assert "capability:5:2026-10-11 enregistré." in first.stdout
@@ -1404,10 +1397,8 @@ def test_turn_commands_are_invisible_until_applied_and_idempotent(store):
 
 def test_the_common_cli_stages_directly_in_postgres_then_applies_atomically(store):
     turn_id = "14c37ce1-172d-4b98-b658-f58918efb47b"
-    # `sys.executable`, jamais `"python3"` : sur le runner CI les deux désignent le même
-    # binaire, sur le Mac `python3` est celui du système -- sans SQLAlchemy. Ce test
-    # échouait donc en local depuis toujours, ce qui rendait toute vérification locale
-    # de la couche PostgreSQL impossible à lire (2026-08-18).
+    # `sys.executable`, never `"python3"`: on a developer machine the bare `python3` may be
+    # the system one, without SQLAlchemy.
     process = subprocess.run([
         *cli_command("fact-write"), "thread", "--key", "cli-commun",
         "--opened-on", "2026-08-13", "--kind", "suspens", "--status", "ouvert",
@@ -1422,10 +1413,10 @@ def test_the_common_cli_stages_directly_in_postgres_then_applies_atomically(stor
 
 
 def test_the_cli_patch_keeps_the_long_text_it_was_not_given(store):
-    """La garantie qui compte : un `--patch` ne peut pas tronquer ce qu'il ignore.
+    """The guarantee that matters: a `--patch` cannot truncate what it ignores.
 
-    `sys.executable` et pas `python3` : l'interpréteur nu vaut 3.9 sur le Mac de
-    Sam, où les scripts demandent 3.10+ (`docs/vault-maintenance.md`).
+    `sys.executable` and not `python3`: the bare interpreter may be older than the
+    version the scripts require.
     """
     long_item = "texte de 1400 caractères " * 56
     common = [*cli_command("fact-write"), "deadline", "--key", "cli-patch"]
@@ -1489,15 +1480,15 @@ def test_a_broken_staged_command_rolls_back_the_whole_turn(store):
                 "idempotency_key": "turn-broken", "metric": "rpe", "value": -1,
                 "unavailable": False,
             })
-    # La commande fautive n'entre pas dans le tour ; le fait valide qui la
-    # précédait reste applicable au lieu d'être détruit avec elle après la réponse.
+    # The faulty command does not enter the turn; the valid fact before it stays
+    # applicable instead of being destroyed with it after the reply.
     assert store.counts()["turn_commands"] == 1
     assert store.apply_turn_with_receipts(turn_id)[0] == 1
     assert store.counts()["observations"] == 1
 
 
 def test_a_bad_gate_resolution_is_refused_before_it_can_cancel_same_turn_facts(store):
-    """Reproduction du 31/08 : fait correct, puis retrait de gate sans preuve."""
+    """Reproduction: a correct fact, then a gate removal without proof."""
     from test_weekly_plan import revision as build_revision
 
     first = build_revision(
@@ -1524,16 +1515,11 @@ def test_a_bad_gate_resolution_is_refused_before_it_can_cancel_same_turn_facts(s
 
 
 def test_a_missing_plan_no_longer_swallows_the_facts_of_the_turn(store):
-    """CONTRAT INVERSÉ LE 2026-08-14, volontairement.
+    """Facts of a turn are kept even when the week has no program.
 
-    Ce test exigeait l'inverse : sans programme pour la semaine, les faits du tour
-    étaient annulés. C'est ce qui faisait perdre une séance parce qu'un artefact
-    dérivé manquait — et le jour où le coach a enfin pu lire Strava, deux débriefs
-    complets sont partis à la poubelle pour cette raison.
-
-    Une séance reste vraie même sans programme. L'absence de programme est un défaut
-    de PRESCRIPTIBILITÉ, rendu par `VaultRepo.validate_weekly_plan` : elle retient la
-    prescription, et c'est le seul cas qui fasse encore taire le coach."""
+    A session stays true without a program. A missing program is a PRESCRIBABILITY
+    defect, reported by `VaultRepo.validate_weekly_plan`: it withholds the prescription,
+    and it is the only case that still silences the coach."""
     turn_id = "69e645ed-bde6-403a-900f-020362da6fc8"
     store.stage_command(turn_id, "observation:without-plan", "observation.add", {
         **observation(strava=None), "idempotency_key": "without-plan"})
@@ -1721,9 +1707,9 @@ def test_proactive_messages_are_typed_append_only_and_idempotent(store):
 
 
 def test_a_false_correction_is_revised_under_the_same_key_and_reannounced(store):
-    """Une correction n'est pas un fait immuable : le 28/08, une correction erronée
-    déjà livrée a survécu au correctif du prompt et a fait réinterdire l'EF. La même
-    occurrence doit avoir une mémoire unique, révisable et de nouveau annonçable.
+    """A correction is not an immutable fact: an erroneous correction already delivered
+    can be wrong again. The same occurrence must have a single memory, revisable and
+    announceable again.
     """
     key = "2026-08-27-ef-intermittente"
     store.register_correction({"correction_key": key,
@@ -1753,14 +1739,14 @@ def test_a_false_correction_is_revised_under_the_same_key_and_reannounced(store)
 
 
 def test_a_correction_not_announced_within_its_week_expires(store):
-    # Audit du 2026-10-09 : sept excuses livrées 23 à 26 jours après l'erreur.
+    # A stale correction must not be delivered long after the error.
     store.register_correction({"correction_key": "ancienne", "summary": "Erreur ancienne."})
     store.register_correction({"correction_key": "recente", "summary": "Erreur récente."})
     with store.database.transaction() as connection:
         connection.execute(sa.text(
             "UPDATE redline.correction_deliveries SET registered_at = now() - interval '10 days'"
             " WHERE correction_key = 'ancienne'"))
-        # Une annonce déjà en file avant la règle, sans échéance.
+        # An announcement already queued before the rule, with no expiry.
         connection.execute(sa.text(
             "INSERT INTO redline.proactive_jobs (job_key, kind, detail, due_at, priority) "
             "VALUES ('correction:ancienne', 'correction', 'Erreur ancienne.', now(), true)"))
@@ -1789,8 +1775,8 @@ def test_rewriting_the_same_correction_verbatim_does_not_reannounce_it(store):
 
 
 def test_a_recurring_correction_keeps_its_count_of_recurrences(store):
-    # Une récidive remplace le résumé : sans ce compte, la ligne ne disait plus que
-    # l'erreur était revenue (audit du 2026-10-09).
+    # A recurrence replaces the summary: without this count, the row would no longer say
+    # that the error came back.
     store.register_correction({"correction_key": "wake-trace", "summary": "06/09 : oui franc exigé."})
     store.register_correction({"correction_key": "wake-trace", "summary": "Récidive le 01/10."})
     store.register_correction({"correction_key": "wake-trace", "summary": "Récidive le 08/10."})
@@ -1803,9 +1789,8 @@ def test_a_recurring_correction_keeps_its_count_of_recurrences(store):
 
 
 def test_plan_watermark_includes_facts_staged_earlier_in_the_same_turn(store):
-    # La révision doit être VALIDE : depuis le 2026-08-14, `apply_turn_with_receipts` relit ce qu'il
-    # vient d'écrire, et un programme invalide est refusé à l'écriture. Ce payload
-    # passait avant parce que la validation ne se déclenchait qu'avec `required_weeks`.
+    # The revision must be VALID: `apply_turn_with_receipts` reads back what it just wrote,
+    # and an invalid program is refused at write time.
     turn_id = "f65cf6e3-797e-4af4-a999-bff20dad09cb"
     store.stage_command(turn_id, "observation:same-turn", "observation.add", {
         **observation(strava=None), "idempotency_key": "same-turn"})
@@ -1818,13 +1803,12 @@ def test_plan_watermark_includes_facts_staged_earlier_in_the_same_turn(store):
 
 
 def _plan_revision(number: int, **overrides) -> dict:
-    """Une révision VALIDE de 2026-W33.
+    """A VALID revision of 2026-W33.
 
-    On réutilise les fabriques de `test_weekly_plan` plutôt que d en réinventer une
-    approximative : le schéma exige au moins une séance et un `evidence`, et refuse
-    une séance datée hors de sa semaine. Une révision invalide échouerait sur la
-    validation AVANT d atteindre le contrôle de péremption, et ces tests passeraient
-    au vert en ne vérifiant rien de ce qu ils prétendent vérifier.
+    Reuses the factories of `test_weekly_plan` rather than an approximate one: the schema
+    requires at least one session and an `evidence`, and refuses a session dated outside
+    its week. An invalid revision would fail validation BEFORE reaching the staleness
+    check, and the tests would pass while verifying nothing of what they claim.
     """
     from test_weekly_plan import revision as build_revision
     from test_weekly_plan import session
@@ -1837,15 +1821,11 @@ def _plan_revision(number: int, **overrides) -> dict:
 
 
 def test_a_fact_is_never_rolled_back_because_a_derived_plan_went_stale(store):
-    """LE test de l'inversion réparée le 2026-08-14.
+    """A session is ground truth; the weekly program is a computation derived from it.
 
-    Une séance est de la vérité terrain ; le programme hebdomadaire en est un calcul.
-    Le dépôt annulait le fait quand le calcul devenait périmé — il jetait la séance
-    pour protéger ce qui s'en déduit. Ce jour-là, un débrief complet et correct a été
-    détruit deux fois, et la sortie de Sam est restée non consignée.
-
-    Désormais le fait entre, et la péremption devient un verdict de prescriptibilité
-    que `VaultRepo.validate_weekly_plan` rend séparément."""
+    The store must not cancel the fact when the computation becomes stale. The fact is
+    written, and staleness becomes a prescribability verdict that
+    `VaultRepo.validate_weekly_plan` renders separately."""
     store.append_plan_revision("2026-W33", _plan_revision(1), actor="test")
 
     turn_id = "3f0d9d3a-6a0f-4a2f-9b0f-6a1f2c3d4e5f"
@@ -1854,15 +1834,14 @@ def test_a_fact_is_never_rolled_back_because_a_derived_plan_went_stale(store):
 
     assert store.apply_turn_with_receipts(turn_id)[0] == 1
     assert store.counts()["observations"] == 1
-    # Le plan est bien périmé — mais c'est une lecture, pas une erreur d'écriture.
+    # The plan is indeed stale -- but that is a read, not a write error.
     assert store.plan_needs_arbitration("2026-W33", 1) is True
 
 
 def test_completing_a_declarative_cell_never_makes_the_plan_stale(store):
-    """« Effort ressenti 7-8/10 et pic de douleur 0/10 » a détruit un tour le 2026-08-14 :
-    l'empreinte hachait la VALEUR des mesures, donc déclarer un RPE périmait le plan
-    au même titre qu'une séance surgie de nulle part. Un chiffre déclaré appelle un
-    jugement de coach, pas une révision de programme."""
+    """The fingerprint must not hash the VALUE of measurements: declaring an RPE would
+    otherwise stale the plan like a session coming from nowhere. A declared number calls
+    for a coach judgment, not a program revision."""
     oid = store.add_observation({**observation(strava=None),
                                  "idempotency_key": "sortie-a-completer"})
     store.append_plan_revision("2026-W33", _plan_revision(1), actor="test")
@@ -1871,8 +1850,8 @@ def test_completing_a_declarative_cell_never_makes_the_plan_stale(store):
 
 
 def test_the_daily_state_never_makes_the_plan_stale(store):
-    """Même raison : dire qu'on a mal dormi nourrit la jauge, ça ne rend pas le
-    programme faux. C'était la troisième des quatre portes qui cassaient un tour."""
+    """Same reason: saying one slept badly feeds the gauge, it does not make the program
+    wrong."""
     store.append_plan_revision("2026-W33", _plan_revision(1), actor="test")
     store.put_daily({"day": dt.date(2026, 8, 14), "sleep": "mauvaise",
                      "life_load": "elevee", "desire": "normale"})
@@ -1880,17 +1859,17 @@ def test_the_daily_state_never_makes_the_plan_stale(store):
 
 
 def test_a_new_session_still_makes_the_plan_stale(store):
-    """Le resserrement ne désarme pas le contrôle : ce qu'il protège vraiment, c'est
-    « le plan connaît-il tout ce qui a eu lieu ? », et une séance de plus le périme."""
+    """The check still protects what matters: "does the plan know everything that took
+    place?" -- one more session makes it stale."""
     store.append_plan_revision("2026-W33", _plan_revision(1), actor="test")
     store.add_observation({**observation(strava=None), "idempotency_key": "nouvelle"})
     assert store.plan_needs_arbitration("2026-W33", 1) is True
 
 
 def test_arbitration_uses_the_persistence_watermark(store):
-    """L'observation présente avant la révision a déjà été vue par l'arbitrage. Seule
-    une observation d'effort entrée ensuite et toujours sans cycle doit fermer la
-    prescription.
+    """An observation present before the revision was already seen by the arbitration.
+    Only an effort observation entered afterwards and still without a cycle must close
+    the prescription.
     """
     store.add_observation({**observation(strava=None),
                            "idempotency_key": "connue-avant-revision"})
@@ -1905,7 +1884,7 @@ def test_arbitration_uses_the_persistence_watermark(store):
 
 
 def test_a_planned_activity_linked_after_the_revision_needs_no_arbitration(store):
-    """L'exécution normale fait avancer le cycle, pas l'intention du plan."""
+    """Normal execution advances the cycle, not the plan's intent."""
     store.append_plan_revision("2026-W33", _plan_revision(1), actor="test")
     store.add_observation({
         **observation(strava=90000000017),
@@ -1918,8 +1897,8 @@ def test_a_planned_activity_linked_after_the_revision_needs_no_arbitration(store
 
 
 def test_an_invalid_revision_is_still_refused_at_write_time(store):
-    """Les faits sont inconditionnels, PAS les plans : écrire un programme invalide
-    reste une faute d'écriture, désormais rendue avant la réponse du coach."""
+    """Facts are unconditional, plans are NOT: writing an invalid program remains a write
+    fault, reported before the coach's reply."""
     turn_id = "5b2f9d4c-8c2e-4d3b-9e3f-8c3f4d5e6f71"
     with pytest.raises(StorageError, match="invalide"):
         store.stage_command(turn_id, "plan:2026-W33:r1", "plan.revise", {
@@ -1933,9 +1912,8 @@ def test_an_invalid_revision_is_still_refused_at_write_time(store):
 
 
 def test_logging_a_session_and_revising_in_the_same_turn_is_accepted(store):
-    """Le chemin correct, celui que le prompt doit faire prendre au coach : la
-    révision pose son watermark APRÈS que la séance a été appliquée, donc le tour
-    passe. Un garde-fou qui n'ouvre pas de chemin correct en fabrique un faux."""
+    """The correct path: the revision sets its watermark AFTER the session was applied, so
+    the turn passes. A guard that opens no correct path fabricates a false one."""
     store.append_plan_revision("2026-W33", _plan_revision(1), actor="test")
 
     turn_id = "4a1e8c2b-7b1f-4c3a-8d2e-7b2f3c4d5e60"
@@ -1951,10 +1929,11 @@ def test_logging_a_session_and_revising_in_the_same_turn_is_accepted(store):
 
 
 def test_the_angle_a_turn_deposits_is_read_back_at_delivery(store):
-    """L'angle a un ENDROIT, sinon il finit dans le message (2026-08-21).
+    """The angle needs a PLACE to live, otherwise it ends up in the message.
 
-    La trace d'un proactif s'écrit APRÈS la livraison Messenger, donc bien après
-    `apply_turn_with_receipts` : la commande de tour sert de dépôt et `turn_angle` la relit.
+    A proactive message's trace is written AFTER the Messenger delivery, hence well after
+    `apply_turn_with_receipts`: the turn command serves as the deposit and `turn_angle`
+    reads it back.
     """
     turn_id = str(uuid.uuid4())
     store.stage_command(turn_id, "angle:titre Strava, récit libre", "proactive.angle",
@@ -2058,7 +2037,7 @@ def test_real_plan_preview_leaves_no_revision_and_revise_still_applies(store, mo
 
 def test_a_revision_that_cancels_a_session_without_a_typed_motif_is_refused(
         store, monkeypatch, capsys):
-    """Audit du 2026-10-09 : une restriction sans prémisse ne s'écrit plus."""
+    """A restriction without a premise can no longer be written."""
     import io
     import json
 
@@ -2095,8 +2074,8 @@ def test_a_revision_that_cancels_a_session_without_a_typed_motif_is_refused(
 
 def test_a_plan_readback_shows_each_run_gap_to_the_month_without_blocking(
         store, monkeypatch, capsys):
-    """Aucun pourcentage fixe (2026-09-27) : la relecture montre l'écart de chaque
-    course à la plus longue des 30 jours, et la révision passe quel que soit l'écart."""
+    """No fixed percentage: the readback shows each run's gap to the longest run of the
+    last 30 days, and the revision passes whatever the gap."""
     import io
     import json
 
@@ -2136,7 +2115,7 @@ def test_the_weekly_dossier_is_computed_from_the_same_functions_as_the_clis(stor
     text = weekly_dossier.render(store, VAULT_ROOT, "2026-W39", dt.date(2026, 9, 27))
     assert text.startswith("[DOSSIER DU BILAN") and text.endswith("[/DOSSIER]")
     assert "Semaine 2026-W39" in text and "13.60 km courus (1 sortie)" in text
-    # Le bilan du dimanche clôt la semaine : son record compte déjà.
+    # The Sunday review closes the week: its record already counts.
     assert "record de 13.6 km battu en 2026-W39" in text
     assert "en cours" not in text.split("Trajectoire")[1].split("Plus longue des")[0]
     assert "Plus longue des 30 j : 13.6 km" in text
@@ -2151,7 +2130,7 @@ def test_the_weekly_dossier_is_computed_from_the_same_functions_as_the_clis(stor
 
 
 def test_the_weekly_dossier_does_not_flag_cadence_work_that_was_asked_for(store):
-    """Le dossier du bilan lisait les signaux sans les cadences travaillées exprès."""
+    """The review dossier must not flag cadences that were deliberately worked."""
     from redline.analysis import weekly_dossier
 
     for day, cadence, key in ((dt.date(2026, 9, 14), 160, "cadence:old"),
@@ -2175,8 +2154,8 @@ def test_the_weekly_dossier_does_not_flag_cadence_work_that_was_asked_for(store)
 
 
 def test_a_service_declared_question_is_tracked_only_if_it_was_delivered(store):
-    """Un rendu fermé n'a pas de tour : le service nomme la question qu'il attend, et
-    elle n'existe que si son texte exact est parti (audit du 2026-09-30, constat 4)."""
+    """A closed render has no turn: the service names the question it expects, and it
+    exists only if its exact text was sent."""
     state = PostgresStateStore(store.database)
     question = "Tu l’as faite, reportée ou laissée de côté ?"
     state.record_outbound("4242", "Je n’ai pas de retour sur EF.", source_key="proactive:cut",
@@ -2193,7 +2172,7 @@ def test_a_service_declared_question_is_tracked_only_if_it_was_delivered(store):
     assert state.question_known("4242", question)
     assert not state.question_known("9999", question)
 
-    # Une reprise d'envoi rejoue la même clé : ni second message, ni seconde question.
+    # A resend replays the same key: no second message, no second question.
     state.record_outbound("4242", body, source_key="proactive:full", proactive=True,
                           questions=(question,))
     assert len(store.question_rows()) == 1
@@ -2209,7 +2188,7 @@ def test_a_settled_question_blocks_its_template_only_for_the_same_fact(store):
     assert store.question_rows() == []
     assert state.question_known("4242", question)
 
-    # Le même gabarit une semaine plus tard désigne une autre séance.
+    # The same template a week later designates another session.
     with store.database.transaction() as connection:
         connection.execute(conversation_questions.update().values(
             resolved_at=dt.datetime.now(dt.UTC) - dt.timedelta(days=7)))
@@ -2217,7 +2196,7 @@ def test_a_settled_question_blocks_its_template_only_for_the_same_fact(store):
 
 
 def test_service_lines_do_not_push_the_real_exchange_out_of_memory(store):
-    """Constat 5 : les phrases d'attente occupaient les huit places du souvenir."""
+    """Holding sentences must not occupy the eight slots of the memory."""
     state = PostgresStateStore(store.database)
     state.claim_inbound("sujet", "4242", "text", "On reprend la séance de vendredi ?")
     for index in range(9):
@@ -2244,7 +2223,7 @@ def test_memory_leaves_threads_to_the_packet_when_asked(store):
 
 
 def test_a_typed_transition_round_trips_and_opens_no_window(store):
-    """Garde-fou n°8 porté par la base ; sans fenêtre +3/+4 depuis le 2026-10-04."""
+    """Guardrail 8 is carried by the database; a transition opens no +3/+4 window."""
     from test_weekly_plan import revision as build_revision
     from test_weekly_plan import session
 
@@ -2261,7 +2240,7 @@ def test_a_typed_transition_round_trips_and_opens_no_window(store):
         "note": "", "measurements": {}, "session_key": "2026-W41:w41-jeu-nuit"})
     assert store.active_plans()["2026-W41"]["sessions"][0]["status"] == "done"
 
-    # Trois semaines plus tard, une nouvelle transition s'écrit : la porte juge, pas le calendrier.
+    # Weeks later, a new transition can be written: the gate decides, not the calendar.
     descent = session("w44-mar-desc", "2026-10-27", transition="descente")
     store.append_plan_revision("2026-W44", build_revision(
         1, sessions=[descent], computed_at="2026-10-25T19:00:00+02:00"))
@@ -2269,7 +2248,7 @@ def test_a_typed_transition_round_trips_and_opens_no_window(store):
 
 
 def test_a_staged_revision_with_a_transition_is_applied(store):
-    """La commande de tour porte des `date` : la 1re révision typée a planté dessus."""
+    """The turn command carries `date` values: the first typed revision must not crash on them."""
     from test_weekly_plan import revision as build_revision
     from test_weekly_plan import session
 
@@ -2282,7 +2261,7 @@ def test_a_staged_revision_with_a_transition_is_applied(store):
     assert store.load_plan("2026-W41")["revisions"][0]["sessions"][0]["transition"] == "nocturne"
 
 
-# ---- Carnet : vrais droits SQL, vraie révocation, véritables frontières HTTP.
+# ---- Notebook: real SQL rights, real revocation, real HTTP boundaries.
 
 def test_notebook_archives_survive_outbox_and_are_isolated_by_owner(store):
     from redline.storage.notebook import NotebookStore
@@ -2458,8 +2437,7 @@ def _bound(store, key, day, success_if="<=1", probability=.8):
 
 
 def test_a_wake_prediction_settles_itself_when_the_notebook_writes_the_trace(store):
-    # Audit du 2026-10-09 : 7 prédictions « corps » confrontées sur 20. Rattachée au
-    # réveil, la prédiction se solde à la saisie, sans verdict rédigé.
+    # Bound to the wake-up trace, the prediction settles on entry, without a written verdict.
     day = dt.date(2026, 10, 12)
     _bound(store, "w42-sl-reveil", day)
     _bound(store, "w42-sl-net", day, success_if="=0", probability=.3)
@@ -2512,7 +2490,7 @@ def test_a_completed_wake_cell_settles_and_a_missing_wake_voids_never_falsifies(
     assert (rows["indisponible"]["status"], rows["indisponible"]["outcome"]) == ("void", None)
 
 
-# ------------------------------------------------------------ douleur par zone
+# ------------------------------------------------------------ pain per zone
 
 def _second_zone(store):
     store.sync_pain_zones([("injury", "Injury"), ("genou", "Genou")])

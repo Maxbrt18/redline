@@ -122,8 +122,8 @@ def test_a_burst_stops_after_the_first_failed_part(make_config, monkeypatch):
     client = MessengerClient(make_config())
     results = iter([DeliveryResult.success(), DeliveryResult.failure("non livré")])
     client.send_text = lambda *a, **k: next(results)
-    # Le rythme entre deux textos passe par une vraie action Meta : un test unitaire
-    # ne l'envoie pas sur le réseau (il y tentait trois connexions, sept secondes).
+    # The pacing between two texts goes through a real Meta action: a unit test must
+    # not send it over the network.
     client.action = lambda *a, **k: DeliveryResult.success()
     monkeypatch.setattr("redline.service.messenger.time.sleep", lambda _seconds: None)
     result = client.send_burst("4242", "un\n---\ndeux\n---\ntrois")

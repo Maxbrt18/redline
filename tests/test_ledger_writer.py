@@ -1,16 +1,14 @@
-"""L'écrivain typé du registre — les tests de la panne du 2026-08-10.
+"""The typed ledger writer.
 
-Ce jour-là : Strava rend `average_heartrate: 156.61`, la colonne `FCmoy` veut
-`\\d{2,3}`, et l'arrondi était délégué au jugement du modèle à chaque écriture. Il a
-écrit `156.6`. Une cellule a rendu le registre ENTIER illisible — donc `hot-cache.py`,
-donc `regen-views.py`, donc (par `set -e` du hook) le commit, donc le débrief Strava
-déjà rédigé, jeté sans un mot.
+A source returns `average_heartrate: 156.61`, the `FCmoy` column wants `\\d{2,3}`, and rounding
+used to be left to the model's judgement on every write. One malformed cell made the WHOLE
+ledger unreadable, and everything downstream with it.
 
-Le registre Markdown n'existe plus : PostgreSQL contraint chaque mesure par colonne, et
-une valeur hors type est refusée par la base, pas par une relecture. Ce qui reste de
-cette panne, et que ces tests figent, c'est la FRONTIÈRE D'ENTRÉE : `ledger-add.py`
-arrondit ce que la source rend en flottant, refuse en nommant la colonne ce qu'aucun
-arrondi ne rattrape, et ne retouche jamais une cellule déjà conforme.
+The Markdown ledger no longer exists: PostgreSQL constrains each measure per column, and an
+out-of-type value is refused by the database, not by a re-read. What remains, and what these
+tests freeze, is the INPUT BOUNDARY: `ledger-add.py` rounds what the source returns as a
+float, refuses by naming the column what no rounding can fix, and never touches a cell that
+is already conforming.
 """
 
 import sys
@@ -19,18 +17,18 @@ import pytest
 
 from redline.model import ledger as table
 
-# --------------------------------------------------------------- l'arrondi
+# --------------------------------------------------------------- rounding
 
 @pytest.mark.parametrize("column, source, written", [
     ("FCmoy", "156.61", "157"),      # average_heartrate
     ("Cad", "168.884", "169"),       # average_cadence x2
     ("D+", "64.7", "65"),            # elevation_gain
-    ("WBGT", "-3.4", "-3"),          # une nuit d'hiver, et le signe compte
+    ("WBGT", "-3.4", "-3"),          # a winter night, and the sign matters
     ("km", "6.8396", "6.84"),
-    ("FCmoy", "156,61", "157"),      # la virgule décimale vient de la même prose
+    ("FCmoy", "156,61", "157"),      # a decimal comma comes from the same prose
 ])
 def test_strava_rend_des_flottants_et_la_colonne_les_veut_entiers(column, source, written):
-    """LE test de la panne : la source ment sur le type, l'arrondi vit ici."""
+    """The source lies about the type, and the rounding lives here."""
     assert table.canonical_value(column, source) == written
 
 
@@ -42,11 +40,10 @@ def test_la_douleur_d_une_zone_s_arrondit_au_dixieme():
 
 
 def test_une_cellule_deja_conforme_nest_jamais_retouchee():
-    """L'invariant qui autorise à passer cette fonction sur toute la ligne.
+    """The invariant that allows running this function over the whole row.
 
-    « Une mesure connue est immuable » (règle du registre, aujourd'hui tenue par un
-    trigger PostgreSQL) commence ici : ce qui est corrigé n'a jamais été une donnée,
-    c'était un refus de lecture.
+    "A known measure is immutable" (a ledger rule, now enforced by a PostgreSQL trigger)
+    starts here: what gets corrected was never data, it was a refusal to read.
     """
     for item in table.INPUTS:
         for value in ("", table.UNKNOWN):
@@ -62,15 +59,15 @@ def test_une_cellule_deja_conforme_nest_jamais_retouchee():
 
 
 def test_ce_qui_nest_pas_un_nombre_nest_pas_inventé():
-    """Une plage (« 1-2 ») n'a pas d'arrondi : on ne fabrique pas de la donnée."""
+    """A range ("1-2") has no rounding: data is not fabricated."""
     assert table.canonical_value("RPE", "1-2") == "1-2"
     assert table.canonical_value("Type", "footing") == "footing"
 
 
-# --------------------------------------------------------------- l'écrivain typé
+# --------------------------------------------------------------- the typed writer
 
 def test_lecrivain_type_arrondit_ce_que_strava_rend(monkeypatch, capsys):
-    """La voie propre : des valeurs BRUTES entrent, une ligne conforme sort."""
+    """The clean path: RAW values go in, a conforming row comes out."""
     add = _load_writer()
     monkeypatch.setattr(sys, "argv", [
         "ledger-add.py", "--dry-run",
@@ -81,11 +78,11 @@ def test_lecrivain_type_arrondit_ce_que_strava_rend(monkeypatch, capsys):
     assert add.main() == 0
     captured = capsys.readouterr()
     assert "'FCmoy': '157'" in captured.out and "'km': '6.84'" in captured.out
-    assert "EF | du jour" in captured.out  # PostgreSQL conserve le texte, pipe compris.
+    assert "EF | du jour" in captured.out  # PostgreSQL keeps the text, pipe included.
 
 
 def test_lecrivain_type_refuse_en_nommant_la_colonne(monkeypatch, capsys):
-    """Ce qu'aucun arrondi ne rattrape est refusé AVANT toute écriture."""
+    """What no rounding can fix is refused BEFORE any write."""
     add = _load_writer()
     monkeypatch.setattr(sys, "argv", [
         "ledger-add.py", "--date", "2026-08-10", "--type", "footing", "--km", "6.84"])
@@ -94,15 +91,15 @@ def test_lecrivain_type_refuse_en_nommant_la_colonne(monkeypatch, capsys):
 
 
 def _zones(monkeypatch, add, zones=("injury",)):
-    """Les zones surveillées vivent en base : la CLI les lit, le test les fixe."""
+    """The monitored zones live in the database: the CLI reads them, the test fixes them."""
     monkeypatch.setenv("DATABASE_URL", "postgresql://test")
     monkeypatch.setattr(add, "_active_zones", lambda url: list(zones))
 
 
 @pytest.mark.parametrize("trace", ["", "?"])
 def test_un_reveil_sans_trace_ne_sécrit_pas(monkeypatch, capsys, trace):
-    """Audit du 2026-10-11 : sans `--dlr`, la mesure naissait `pending` sans bruit et la
-    réponse de Sam ne vivait que dans la note. La porte ne la lisait jamais."""
+    """Without `--dlr`, the measure used to be born `pending` silently and the athlete's
+    answer lived only in the note. The gate never read it."""
     add = _load_writer()
     _zones(monkeypatch, add)
     argv = ["ledger-add.py", "--dry-run", "--date", "2026-10-11", "--type", "wake-trace",

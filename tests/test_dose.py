@@ -17,15 +17,13 @@ def dose(**data) -> Dose:
 
 # ------------------------------------------------------------------- rendering
 
-# Left: the frontmatter. Right: what Sam reads on the card and on the page.
+# Left: the frontmatter. Right: what the athlete reads on the card and on the page.
 #
-# Every entry was transcribed FROM coaching/strength.md, not from memory. That
-# distinction is not pedantic: the first version of this list was written from
-# memory, every case passed, and it hid the fact that the programme prescribes
-# RANGES OF SETS ("2-3× jusqu'à échec technique", exercice 3) which the algebra
-# could not express at all. A contract test written from memory tests the memory.
+# Every entry is transcribed FROM coaching/strength.md, not from memory: the programme
+# prescribes RANGES OF SETS ("2-3× jusqu'à échec technique") which the algebra must
+# express, and a contract test written from memory tests the memory.
 @pytest.mark.parametrize("data,text", [
-    # séance A
+    # session A
     ({"measure": "time", "seconds": 180}, "3 min"),
     ({"measure": "reps", "sets": 3, "reps": 8, "side": "each"}, "3 × 8 / jambe"),
     ({"measure": "amrap", "sets": 3, "side": "each"},
@@ -38,12 +36,12 @@ def dose(**data) -> Dose:
     ({"measure": "contacts", "contacts": 40, "block": 10}, "40 contacts, en blocs de 10"),
     ({"measure": "reps", "sets": 2, "reps": 15}, "2 × 15"),
     ({"measure": "time", "seconds": [120, 180]}, "2-3 min"),
-    # séance B
+    # session B
     ({"measure": "time", "seconds": 240}, "4 min"),
     ({"measure": "reps", "sets": 3, "reps": 6, "side": "each"}, "3 × 6 / jambe"),
     ({"measure": "reps", "sets": 3, "reps": 5}, "3 × 5"),
     ({"measure": "reps", "sets": 2, "reps": 4, "side": "each"}, "2 × 4 / jambe"),
-    # version dégradée et assimilation
+    # degraded version and assimilation
     ({"measure": "time", "sets": 3, "seconds": [30, 45], "side": "each"},
      "3 × 30-45 s / jambe"),
     ({"measure": "time", "sets": 3, "seconds": 30}, "3 × 30 s"),
@@ -96,7 +94,7 @@ def test_a_span_aims_at_the_top_of_its_range():
 
 def test_the_payload_carries_the_walked_out_slots_and_the_rendered_label():
     """`sets`, `side` and `seconds` are deliberately absent: they existed only so
-    the page could rebuild the slot list, which it is now handed (2026-07-31)."""
+    the page could rebuild the slot list, which it is now handed."""
     payload = dose(measure="time", sets=3, seconds=[30, 45], side="each",
                    rest_s=45).payload()
     assert payload == {
@@ -113,8 +111,7 @@ def test_contacts_are_walked_one_block_at_a_time():
     its whole mechanism is the INTERVAL: bone mechanosensitivity collapses after
     ~20 consecutive cycles (src-warden-bone-workload) and spacing the jumps
     raises the osseous gain at equal contact count (src-umemura-jump-interval).
-    Walked as one flat run of 40 -- which is what the page did until 2026-07-31 --
-    the exercise delivers none of that."""
+    Walked as one flat run of 40, the exercise delivers none of that."""
     assert dose(measure="contacts", contacts=40, block=10, rest_s=30).payload() == {
         "measure": "contacts", "text": "40 contacts, en blocs de 10", "rest_s": 30,
         "current_text": "10 contacts",
@@ -200,7 +197,7 @@ def test_an_unknown_measure_lists_the_known_ones():
 ])
 def test_a_malformed_span_is_refused_with_its_reason(value, problem):
     """The string form is the one that must never come back: it is exactly the
-    parser this whole refactor deleted."""
+    parser that was deleted."""
     assert DOSE_SCHEMA.errors({"measure": "reps", "reps": value}) == [problem]
 
 

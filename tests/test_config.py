@@ -1,13 +1,12 @@
-"""`Config.from_env` : le démarrage s'arrête net sur une valeur illisible.
+"""`Config.from_env`: startup stops dead on an unreadable value.
 
-C'est le contrat annoncé par la docstring du module (« any unreadable value stops
-startup with a clear message ») et il n'était vérifié par rien. Or l'alternative
-silencieuse est la pire : un `PROACTIVE_MORNING=7h45` retombant sur un défaut donne un
-service qui tourne, qui a l'air sain, et dont un déclencheur ne sonnera jamais — sans
-une ligne de log pour le dire (audit 2026-07-29).
+This is the contract announced by the module docstring ("any unreadable value stops
+startup with a clear message"). The silent alternative is the worst: a
+`PROACTIVE_MORNING=7h45` falling back to a default gives a service that runs, looks healthy,
+and whose trigger will never fire -- without a single log line to say so.
 
-Chaque test travaille sur un environnement isolé : `monkeypatch.setenv` restaure
-l'état après coup, et `from_env` lit `os.environ`.
+Each test works on an isolated environment: `monkeypatch.setenv` restores the state
+afterwards, and `from_env` reads `os.environ`.
 """
 
 import shutil
@@ -29,7 +28,7 @@ MINIMAL = {
 
 @pytest.fixture
 def env(monkeypatch, tmp_path):
-    """Un environnement nu : aucune variable du .env de la machine ne fuit ici."""
+    """A bare environment: no variable from the machine's .env leaks in here."""
     for name in list(__import__("os").environ):
         if name.split("_")[0] in ("MESSENGER", "AGENT", "CLAUDE", "CODEX",
                                   "PROACTIVE", "STRAVA",
@@ -38,7 +37,7 @@ def env(monkeypatch, tmp_path):
                                   "GRAPH", "STATE", "DATABASE", "ATTACHMENT", "HEALTH"):
             monkeypatch.delenv(name, raising=False)
     monkeypatch.chdir(tmp_path)
-    # Le vault par défaut est le dossier courant : il porte l'instance fictive.
+    # The default vault is the current directory: it carries the fictional instance.
     shutil.copy(TEST_VAULT / "redline.toml", tmp_path / "redline.toml")
     for key, value in MINIMAL.items():
         monkeypatch.setenv(key, value)
@@ -136,14 +135,14 @@ def test_a_missing_ingress_lock_stops_startup(env, name):
     ("STRAVA_WEBHOOK_SECRET", "court"),
 ])
 def test_a_guessable_shared_secret_stops_startup(env, name, raw):
-    """Le 2026-10-08, la prod tournait encore avec les jetons d'exemple de Git."""
+    """Production must not run with the example tokens shipped in Git."""
     env.setenv(name, raw)
     with pytest.raises(SystemExit, match=name):
         Config.from_env()
 
 
 def test_strava_secrets_may_stay_empty(env):
-    """Vide = route Strava désactivée, pas un secret faible."""
+    """Empty = Strava route disabled, not a weak secret."""
     config = Config.from_env()
     assert config.strava_verify_token == "" and config.strava_webhook_secret == ""
     env.setenv("STRAVA_WEBHOOK_SECRET", "s" * 43)
@@ -194,8 +193,8 @@ def test_an_unreadable_number_stops_startup(env):
 
 @pytest.mark.parametrize("raw", ["7h45", "midi", "25:00", "07:60"])
 def test_an_unreadable_hour_stops_startup(env, raw):
-    """Le cas le plus vicieux : `7h45` est ce qu'on écrit naturellement en français,
-    et retomber en silence sur le défaut désactiverait le mot du matin."""
+    """The trickiest case: `7h45` is what one naturally writes in French, and silently
+    falling back to the default would disable the morning message."""
     env.setenv("PROACTIVE_MORNING", raw)
     with pytest.raises(SystemExit) as exit_info:
         Config.from_env()
@@ -203,8 +202,8 @@ def test_an_unreadable_hour_stops_startup(env, raw):
 
 
 def test_an_empty_hour_disables_its_trigger(env):
-    """Chaîne vide EXPLICITE = déclencheur désactivé, documenté ainsi dans
-    .env.example. C'est le mécanisme d'extinction, pas une erreur."""
+    """An EXPLICIT empty string = trigger disabled, as documented in
+    .env.example. It is the switch-off mechanism, not an error."""
     env.setenv("PROACTIVE_MORNING", "")
     assert Config.from_env().proactive_morning is None
 
@@ -254,7 +253,7 @@ def test_attachment_total_must_cover_one_allowed_file(env):
 
 
 def test_a_legacy_daily_proactive_cap_has_no_effect(env):
-    """Une vieille variable de déploiement ne doit pas ressusciter un plafond retiré."""
+    """An old deployment variable must not resurrect a removed cap."""
     env.setenv("PROACTIVE_MAX_PER_DAY", "0")
     assert not hasattr(Config.from_env(), "proactive_max_per_day")
 
@@ -262,8 +261,8 @@ def test_a_legacy_daily_proactive_cap_has_no_effect(env):
 # ------------------------------------------------------------------- .env
 
 def test_dotenv_fills_only_what_the_environment_lacks(env, tmp_path):
-    """`setdefault` et pas `set` : sur le VPS, une variable passée par systemd doit
-    l'emporter sur le fichier, sinon on ne peut plus rien surcharger au lancement."""
+    """`setdefault` and not `set`: on the VPS, a variable passed by systemd must win
+    over the file, otherwise nothing can be overridden at launch."""
     env.setenv("CLAUDE_BIN", "/usr/local/bin/claude")
     (tmp_path / ".env").write_text("CLAUDE_BIN=/autre/claude\nGIT_BRANCH=prod\n")
     _load_dotenv(tmp_path / ".env")

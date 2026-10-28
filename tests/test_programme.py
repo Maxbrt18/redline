@@ -51,25 +51,22 @@ def test_load_override_refuses_absent_or_duplicate_exercise(programme):
 
 def test_every_exercise_note_renders_its_dose(programme):
     """If the programme ever gains a shape the algebra cannot say, it fails
-    here -- not in front of Sam."""
+    here -- not in front of the athlete."""
     for slug, note in programme.exercises.items():
         assert Dose.read(note["dose"], slug).human()
 
 
 @pytest.mark.parametrize("key,first,last,count", [
-    # 13 depuis le 2026-08-21 : les 7 min de contrôle moteur entrent en séance A
-    # (decisions.md) — pont fessier et tenue unipodale juste après l'échauffement,
-    # jambier postérieur et planche gros orteils dans le bloc accessoire. Les bornes
-    # ne bougent pas : warmup-a ouvre toujours, short-foot ferme toujours.
+    # Motor-control work enters session A right after the warm-up and in the accessory
+    # block. The bounds do not move: warmup-a always opens, short-foot always closes.
     ("a", "warmup-a", "plyometrics", 9),
-    # Box drops suspendus le 2026-08-06 (séance B = transition `injury`, fenêtre
-    # W35-W36 — decisions.md) : la séance se termine sur calf-drop. Réouverture
-    # arbitrée au bilan W33 ; ce jour-là cette ligne redevient box-drop-single/7.
+    # Box drops are suspended: the session ends on calf-drop. When reinstated, this line
+    # becomes box-drop-single/7.
     ("b", "warmup-b", "calf-drop", 5),
     ("assimilation", "calf-iso-seated-bent", "hip-abduction-light", 4),
 ])
 def test_each_session_resolves_in_its_prescribed_order(programme, key, first, last, count):
-    """The order is declared non-negotiable in strength.md: fessier first, before
+    """The order is declared non-negotiable in strength.md: glutes first, before
     fatigue spoils posture; abduction last; plyometrics at the end when
     everything is warm."""
     slugs = [p.slug for p in programme.prescriptions(key)]
@@ -78,8 +75,8 @@ def test_each_session_resolves_in_its_prescribed_order(programme, key, first, la
 
 
 def test_the_single_session_never_goes_to_failure(programme):
-    """Décision du 2026-10-04 : la traction du mollet est la première charge de la blessure,
-    et l'échec ralentit la récupération ; les mollets s'arrêtent 2 répétitions avant."""
+    """Calf loading is the first load on the injury, and going to failure slows
+    recovery; calves stop 2 repetitions short."""
     assert [p.dose.measure for p in programme.prescriptions("a")].count("amrap") == 0
     for slug in ("calf-raise-straight", "calf-raise-bent"):
         assert programme.exercises[slug]["dose"]["measure"] == "reps"
@@ -88,7 +85,7 @@ def test_the_single_session_never_goes_to_failure(programme):
 
 
 def test_every_unilateral_dose_says_so(programme):
-    """The 25/07 bug: "unipodal" in the name, nothing in the dose, and the page
+    """"unipodal" in the name, nothing in the dose, and the page
     offered three sets instead of six -- losing the left/right gap that flags
     the calf test."""
     for slug, note in programme.exercises.items():
@@ -99,8 +96,7 @@ def test_every_unilateral_dose_says_so(programme):
 
 def test_a_session_may_override_a_dose_and_only_that_session_sees_it(programme):
     """Assimilation holds the mid-range calf 30 s with 30 s rest, where the
-    exercise note itself asks 45 s of rest. (The soleus lunge that carried this
-    test was replaced by the seated calf hold on 2026-09-25.)"""
+    exercise note itself asks 45 s of rest."""
     held = {p.slug: p.dose for p in programme.prescriptions("assimilation")}
     assert held["calf-iso"].human() == "3 × 30 s"
     assert held["calf-iso"].rest_s == 30
@@ -109,9 +105,9 @@ def test_a_session_may_override_a_dose_and_only_that_session_sees_it(programme):
 
 
 def test_the_card_titles_and_rules_come_from_the_notes(programme):
-    """They used to live in a TYPES dict in chart-strength.py -- where session B
-    stayed "force & économie" for three days after being converted, and where
-    session A's footer contradicted the dose printed above it."""
+    """They used to live in a TYPES dict in chart-strength.py -- where a converted
+    session kept a stale title, and where session A's footer contradicted the dose
+    printed above it."""
     assert programme.session("a")["title"] == "Renfo, séance unique"
     assert "descente & excentrique" in programme.session("b")["title"]
     assert "avant l'échec" in programme.session("a")["rule"]

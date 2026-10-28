@@ -1,21 +1,12 @@
-"""La carte de renfo a un porteur, comme le plan hebdomadaire en a un.
+"""The strength card has an owner, as the weekly plan has one.
 
-La conversation du 2026-08-18, 07h45, que ces tests existent pour rendre impossible :
-
-    Redline — C'est renfo A aujourd'hui. Sur la pliométrie, tu gardes bien le geste
-              corrigé [...] Dis-le-moi ce soir.
-    Sam  — Ok je ferai ça
-    Redline — Nickel, tu me dis ça après la séance de renfo.
-    Sam  — Tu ne m'as pas envoyé la séance de renfo, comment tu veux que je la
-              fasse...
-    Redline — Ah pardon, je pensais te l'avoir envoyée, la voilà.
-
-Trois défauts empilés, un test par étage :
-  1. la carte est rendue par le service depuis la prescription typée, sans déléguer
-     sa génération au modèle ;
-  2. rien ne constatait qu'un jour de renfo s'était terminé sans elle ;
-  3. et le contrôle daté du jour, une observation typée comme une pré-condition,
-     interdisait de prescrire dans le message même qui devait la livrer.
+A reply must never tell the athlete to do a strength session that was never delivered.
+Three stacked defects, one test per layer:
+  1. the card is rendered by the service from the typed prescription, without delegating
+     its generation to the model;
+  2. nothing noticed that a strength day had ended without it;
+  3. and the dated check of the day, a typed observation treated as a precondition,
+     forbade prescribing in the very message that had to deliver it.
 """
 
 import datetime as dt
@@ -50,7 +41,7 @@ def ef():
             "sources": ["[[current-plan]]"]}
 
 
-# --------------------------------------------------- 1. reconnaître le jour de renfo
+# --------------------------------------------------- 1. recognise the strength day
 
 def test_a_strength_session_due_today_is_recognised():
     assert strength_due(context([ef(), renfo()]), TODAY)["id"] == "w34-mar-a"
@@ -67,7 +58,7 @@ def test_a_strength_session_on_another_day_asks_for_nothing():
     assert strength_due("pas du json", TODAY) is None
 
 
-# ------------------------------------- 2. l'instruction arrive en tête, pas en clause
+# ------------------------------------- 2. the instruction comes first, not as a clause
 
 def _morning(make_bot, sessions, gates=(), reply="Bonne séance ce matin.",
              produced=()):
@@ -124,7 +115,7 @@ def test_the_scheduler_materializes_a_typed_due_session_without_an_agent(make_bo
     assert agent.calls == []
 
 
-# ------------------------------------------ 3. et le service vérifie derrière l'agent
+# ------------------------------------------ 3. and the service checks behind the agent
 
 def test_a_morning_arms_the_card_without_technical_text(make_bot):
     agent, client = _morning(make_bot, [renfo()], produced=[])
@@ -139,7 +130,7 @@ def test_a_morning_that_produced_its_card_says_nothing(make_bot):
 
 
 def test_another_card_is_not_reused_as_the_strength_card(make_bot):
-    """La dette est typée ; aucun préfixe de fichier ne la déclenche."""
+    """The debt is typed; no file prefix triggers it."""
     _, client = _morning(make_bot, [renfo()], produced=["week-34.png"])
     client.send_text.assert_not_called()
     assert client.send_burst.called

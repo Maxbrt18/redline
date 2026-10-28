@@ -1,4 +1,4 @@
-"""Le juge probabiliste appartient au banc d'évaluation, jamais au transport."""
+"""The probabilistic judge belongs to the evaluation bench, never to the transport."""
 
 import ast
 import json
@@ -71,7 +71,7 @@ def test_an_unavailable_judge_is_reported_as_such():
 
 
 def test_no_production_module_imports_the_offline_judge():
-    """Retirer un contrôleur de la prose, c'est aussi retirer son chemin d'import."""
+    """Removing a controller from the prose also removes its import path."""
     for path in (ENGINE_ROOT / "src" / "redline" / "service").glob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         modules = {node.module or "" for node in ast.walk(tree)
@@ -89,7 +89,7 @@ def test_the_agent_port_has_no_review_capability():
 
 
 def test_a_reactive_turn_with_writes_costs_exactly_one_model_call(make_bot):
-    """Aucune seconde rédaction ne relit ni ne remplace une réponse terminée."""
+    """No second rewrite rereads or replaces a finished reply."""
     from redline.service.vault import PersistenceResult
 
     answer = "Noté pour ton RPE 5 et ta douleur 1. Tu te sens comment ce matin ?"

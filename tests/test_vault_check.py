@@ -1,14 +1,12 @@
-"""`scripts/vault-check.py` : 632 lignes qui n'avaient aucun test.
+"""Tests for `scripts/vault-check.py`, the vault consistency checker.
 
-C'était le seul module non couvert du dépôt, et il a GAGNÉ des responsabilités le
-2026-07-29 : trois assertions sur le contenu du vault ont été retirées de pytest vers
-ce script, parce qu'un contenu que le bot réécrit plusieurs fois par jour n'a rien à
-faire dans un gate de code. Le contrôleur porte donc plus qu'avant tout en n'étant
-lui-même contrôlé par rien.
+The checker carries more than plain structure checks: assertions about vault content live
+here instead of in pytest, because content the bot rewrites several times a day has no place
+in a code gate. The checker therefore bears more weight while being checked by nothing else.
 
-On teste les checks un par un sur des `Vault` fabriqués, pas le vrai vault : c'est ce
-qui permet d'exercer les cas ROUGES. Un contrôleur dont on n'a jamais vu l'échec est
-un contrôleur dont on ne sait pas s'il sait échouer.
+The checks are tested one by one on fabricated `Vault` objects, not the real vault: this
+is what allows the RED cases to be exercised. A checker whose failure has never been seen
+is a checker that may not know how to fail.
 """
 
 import pytest
@@ -28,11 +26,11 @@ def vault(files, root=None, loaded=None):
     return vault_check.Vault(root=root or ENGINE_ROOT, files=files, instance=loaded)
 
 
-# ------------------------------------------------- le rapport lui-même
+# ------------------------------------------------- the report itself
 
 def test_a_long_failure_says_how_much_it_hid(report, capsys):
-    """`model/schema.py` existe contre le cycle « corrige, relance, il en reste » :
-    tronquer à 8 sans le dire recrée exactement ce cycle (audit 2026-07-29)."""
+    """`model/schema.py` exists against the "fix, rerun, some are left" cycle:
+    truncating at 8 without saying so recreates exactly that cycle."""
     report.fail("un contrôle", [f"problème {i}" for i in range(20)])
     out = capsys.readouterr().out
     assert "problème 7" in out
@@ -46,13 +44,13 @@ def test_a_short_failure_adds_no_footer(report, capsys):
 
 
 def test_a_skip_is_printed_even_when_quiet(report, capsys):
-    """Un contrôle qui disparaît faute de cible se lit comme un contrôle qui passe :
-    il doit parler même en `--quiet`, où seuls les échecs sortent."""
+    """A check that vanishes for lack of a target reads like a check that passes:
+    it must speak even with `--quiet`, where only failures are printed."""
     report.skip("un contrôle", "cible absente")
     assert "un contrôle" in capsys.readouterr().out
 
 
-# --------------------------------------------- doublons de faits Strava
+# --------------------------------------------- duplicated Strava facts
 
 def test_a_strava_fact_copied_into_git_fails(report):
     check = vault_check.check_no_duplicate_facts
@@ -61,8 +59,8 @@ def test_a_strava_fact_copied_into_git_fails(report):
 
 
 def test_a_decision_may_quote_the_evidence_it_rests_on(report):
-    """`decisions.md` est en append-only : une citation figée dans le temps n'est pas
-    un second propriétaire."""
+    """`decisions.md` is append-only: a quotation frozen in time is not
+    a second owner."""
     check = vault_check.check_no_duplicate_facts
     check(vault({"coaching/decisions.md": "justifiée par 90000000007"}), report)
     assert report.failed == 0
@@ -74,13 +72,13 @@ def test_finding_no_id_in_git_is_the_expected_state(report):
 
 
 def test_the_id_pattern_follows_the_typed_ledger(report):
-    """Le motif est cité au registre typé, pas recopié : un id plus long doit être vu."""
+    """The pattern is cited from the typed ledger, not copied: a longer id must be seen."""
     check = vault_check.check_no_duplicate_facts
     check(vault({"concepts/seuil.md": "209876543210"}), report)
     assert report.failed == 1
 
 
-# ------------------------------------------------------------ le graphe
+# ------------------------------------------------------------ the graph
 
 def test_a_link_to_nowhere_fails(report):
     vault_check.check_links(vault({"concepts/seuil.md": "voir [[note-qui-nexiste-pas]]"}),
@@ -89,22 +87,22 @@ def test_a_link_to_nowhere_fails(report):
 
 
 def test_a_link_inside_backticks_is_not_a_link(report):
-    """Le bilan hebdo écrit `[[note-retirée]]` précisément pour ACTER un retrait :
-    le signaler serait le contrôleur qui aboie sur sa propre trace d'audit."""
+    """The weekly review writes `[[note-retirée]]` precisely to RECORD a removal:
+    flagging it would be the checker barking at its own audit trail."""
     vault_check.check_links(vault({"athlete/journal/2026-w30.md":
                                    "lien supprimé : `[[note-retirée]]`"}), report)
     assert report.failed == 0
 
 
 def test_an_alias_resolves_a_link(report):
-    """Un nœud, plusieurs surfaces : c'est ce qui permet de linker en français."""
+    """One node, several surfaces: this is what allows linking in French."""
     files = {"concepts/threshold.md": "---\naliases: [seuil, travail au seuil]\n---\n",
              "coaching/current-plan.md": "séance de [[seuil]]"}
     vault_check.check_links(vault(files), report)
     assert report.failed == 0
 
 
-# ------------------------------------------------- vie privée (régression)
+# ------------------------------------------------- privacy (regression)
 
 def test_a_note_type_the_instance_does_not_declare_fails(report):
     vault_check.check_frontmatter(
@@ -136,7 +134,7 @@ def test_the_declared_budget_names_the_file_over_its_ceiling(report):
     assert report.failed == 1
 
 
-# ------------------------------------------------------ ordre des décisions
+# ------------------------------------------------------ decisions order
 
 def test_decisions_out_of_order_fail(report):
     files = {"coaching/decisions.md": "## 2026-07-10 — vieille\n## 2026-07-25 — récente\n"}
@@ -155,17 +153,17 @@ def correction(date, correctif):
             f"| {date} | affirmé | vrai | à lire | {correctif} |\n"}
 
 
-# ------------------------------------------------------------- bout en bout
+# ------------------------------------------------------------- end to end
 
 def test_the_checker_runs_on_the_real_vault_and_reports(capsys):
-    """Le contrôleur tourne et rend un verdict — c'est une garantie de CODE (il
-    s'exécute sans planter sur des données réelles), pas une assertion sur le contenu
-    du vault, qui bouge plusieurs fois par jour."""
+    """The checker runs and returns a verdict -- this is a guarantee about CODE (it
+    runs without crashing on real data), not an assertion about vault content, which
+    changes several times a day."""
     files = vault_check.markdown_files(ENGINE_ROOT)
     report = vault_check.Report(quiet=True)
     for check in vault_check.CHECKS:
-        # La parité des projections dépend d'un PostgreSQL peuplé et possède son test
-        # d'intégration dans test_postgres_storage.py. Ici on teste les contrôles du vault.
+        # Projection parity depends on a populated PostgreSQL and has its own
+        # integration test in test_postgres_storage.py. Here the vault checks are tested.
         if check is vault_check.check_generated_views:
             continue
         check(vault(files), report)
@@ -173,14 +171,14 @@ def test_the_checker_runs_on_the_real_vault_and_reports(capsys):
 
 
 def test_every_check_is_in_the_registry():
-    """L'ordre du registre EST l'ordre de lecture du rapport, et il n'y a pas de
-    seconde liste : un contrôle écrit mais jamais enregistré ne tourne jamais."""
+    """The registry order IS the report reading order, and there is no
+    second list: a check that is written but never registered never runs."""
     defined = {name for name in dir(vault_check) if name.startswith("check_")}
     registered = {check.__name__ for check in vault_check.CHECKS}
     assert defined == registered, f"jamais lancé : {sorted(defined - registered)}"
 
 
-# ------------------------------------------------- dette de prédictions
+# ------------------------------------------------- prediction debt
 
 def _predictions(monkeypatch, day, rows):
     class FrozenDate(vault_check.dt.date):

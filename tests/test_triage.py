@@ -102,7 +102,7 @@ def test_an_overlong_holding_line_is_dropped():
 
 def test_the_holding_line_cannot_move_the_rung():
     """Depth is read from the FIRST field only: a waiting line that happens to quote a
-    level ("je regarde si c'est du N3") must not reclassify the message."""
+    level must not reclassify the message."""
     assert ClaudeCodeRunner._parse_triage("N1 | - | je regarde si c'est du N3").depth == "N1"
 
 
@@ -110,8 +110,8 @@ def test_the_holding_line_cannot_move_the_rung():
     ("N2 | - | Deux secondes. | P | -", True, False),
     ("N1 | - | Je regarde. | - | D", False, True),
     ("N2 | - | Deux secondes. | P | D", True, True),
-    # Une ligne au format d'avant les cinq champs ne réclame rien : le pire défaut
-    # serait qu'un parseur trop souple envoie un programme sur un champ absent.
+    # A line in the old format, before the five fields, claims nothing: the worst failure
+    # would be a too-lenient parser sending a program on a missing field.
     ("N2 | - | Deux secondes. | P", True, False),
     ("N1", False, False),
 ])
@@ -137,8 +137,8 @@ def test_triage_carries_the_low_effort_guardrail(make_config, store):
 
 
 def test_triage_has_no_fallback_profile(make_config, store):
-    """Un seul classifieur rapide : un échec retombe sur le défaut, sans second appel
-    qui ajoutait jusqu'à une minute de « Vu » muet."""
+    """A single fast classifier: a failure falls back to the default, with no second call
+    that used to add up to a minute of silent "seen" status."""
     runner = _runner(make_config, store)
     with patch("subprocess.run", return_value=_completed("", returncode=1)) as run:
         assert runner.classify("salut") == Triage()
@@ -175,7 +175,7 @@ def test_depth_selects_the_declared_profile(make_bot, depth, model, effort):
 
 
 def test_the_reactive_path_passes_a_route_plan_instead_of_raw_settings():
-    """Le bot transmet l'abstraction commune, jamais des paramètres épars."""
+    """The bot passes the common abstraction, never scattered parameters."""
     reactif = (CoachBot._respond_turn, CoachBot._run_proactive_agent)
     for fonction in reactif:
         tree = ast.parse(textwrap.dedent(inspect.getsource(fonction)))
@@ -195,8 +195,9 @@ def test_depth_note_is_prepended_to_the_prompt(make_bot, depth):
 
 @pytest.mark.parametrize("depth", ["N0", "N1", "N2", "N3"])
 def test_la_date_du_jour_ouvre_le_prompt_a_tous_les_niveaux(make_bot, depth):
-    """« aujourd'hui repos, demain le renfo » arrive en N0 comme en N2, et c'est en N0
-    que le coach lit le moins. L'ancre passe donc avant le niveau de lecture."""
+    """A message about today's rest and tomorrow's strength work arrives at N0 as at N2,
+    and N0 is where the coach reads the least. The anchor therefore comes before the
+    reading level."""
     bot, agent = _bot(make_bot, depth)
     bot._respond("4242", "un message")
 
@@ -204,7 +205,7 @@ def test_la_date_du_jour_ouvre_le_prompt_a_tous_les_niveaux(make_bot, depth):
 
 
 def _typing_kwargs(make_bot, depth, text, **triage):
-    """Le signe de vie démarre avant le triage ; il reçoit ensuite rang et attente."""
+    """The typing indicator starts before triage; it then receives rank and wait."""
     bot, _ = _bot(make_bot, depth, **triage)
     with patch("redline.service.bot.TypingIndicator") as typing:
         typing.return_value.__enter__ = lambda self: self
@@ -222,11 +223,10 @@ def test_deep_question_arms_the_immediate_patience_line(make_bot):
 
 
 def test_an_engaging_judgement_arms_it_too(make_bot):
-    """N2 is where being wrong costs the most -- "je fais du vélo à la place demain ?"
+    """N2 is where being wrong costs the most -- swapping a run for a bike ride
     changes the week's load -- and it used to be answered at the speed of a debrief.
     The patience line is what lets the coach go and read instead of answering on
-    reflex: it is the cheap half of the model upgrade, and the half the diagnosis in
-    corrections.md actually supports (2026-07-29)."""
+    reflex."""
     assert _armed(make_bot, "N2", "je décale ma séance à jeudi ?") is True
 
 
@@ -243,7 +243,7 @@ def test_the_holding_line_reaches_the_typing_indicator(make_bot):
 # ----------------------------------------------------------- emotional route
 
 def test_an_emotional_message_gets_its_note(make_bot):
-    """L'accueil précède les lectures sans remplacer la demande concrète."""
+    """The welcome comes before the readings without replacing the concrete request."""
     bot, agent = _bot(make_bot, "N2", emotional=True)
     bot._respond("4242", "je me demande si je vais y arriver")
     sent = agent.calls[0]["message"]
@@ -282,21 +282,21 @@ def test_a_factual_message_mentioning_pain_is_not_emotional(make_bot):
 
 
 def test_the_n2_note_covers_any_change_of_plan_not_only_an_increase():
-    """Le cas d'usage de Sam (« je fais un fractionné pas prévu ce soir ») est une
-    séance AJOUTÉE : le protocole du 17/07 la liste, mais la note N2 ne déclenchait la
-    charge de la preuve que « si c'est une hausse qu'il propose ». Substituer, déplacer
-    ou allonger changent la charge de la semaine autant qu'une hausse assumée."""
+    """An unplanned interval session is an ADDED session: the protocol lists it, but the
+    N2 note used to trigger the burden of proof only "if it is an increase he proposes".
+    Substituting, moving or lengthening change the week's load as much as an explicit
+    increase."""
     assert "Toute modification du plan" in DEPTH_NOTES["N2"]
     assert "charge de la preuve inversée" in DEPTH_NOTES["N2"]
 
 
 def test_un_message_qui_touche_au_programme_le_dit_au_coach(make_bot):
-    """Le 25/08, « P » était calculé à chaque message et n'atteignait jamais le coach.
+    """The "plan change" flag was computed on every message and never reached the coach.
 
-    Il ne servait qu'à charger le programme, ce que N1 et N2 font déjà, et le seul texte
-    du dépôt qui parlait de P était le prompt du classifieur. Résultat : Sam annonce
-    trois changements, le tour se termine sur « ok », et la révision n'existe que deux
-    tours plus tard, quand il demande lui-même si c'est consigné.
+    It was only used to load the program, which N1 and N2 already do, and the only text
+    in the repository mentioning it was the classifier prompt. Result: the athlete
+    announces several changes, the turn ends on "ok", and the revision only exists two
+    turns later, when they ask whether it is recorded.
     """
     bot, agent = _bot(make_bot, "N2")
     agent._plan_change = True
@@ -315,7 +315,7 @@ def test_un_message_ordinaire_ne_porte_pas_lobligation(make_bot):
 
 
 def test_un_tour_plan_change_sans_revision_laisse_une_trace(make_bot, caplog):
-    """La signature exacte du 21h09 : le service la voit passer, il le dit."""
+    """The service sees the signature of a plan-change turn without a revision, and says so."""
     bot, agent = _bot(make_bot, "N2")
     agent._plan_change = True
 

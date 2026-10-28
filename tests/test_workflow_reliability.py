@@ -1,8 +1,8 @@
-"""Non-régression de l'audit du workflow Messenger (audit/redline-workflow-audit.md).
+"""Non-regression tests for the Messenger workflow audit.
 
-Chaque constat reproduit par l'audit a changé de sens : ces tests décrivent ce que
-Sam observe désormais. Ils comptent des effets (appels de modèle, messages envoyés,
-acquittements, jobs), jamais des formulations de prompt.
+Each finding reproduced by the audit changed meaning: these tests describe what the
+athlete now observes. They count effects (model calls, messages sent, acknowledgements,
+jobs), never prompt wordings.
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ PSID = "4242"
 
 
 class ScriptedAgent(FakeAgent):
-    """FakeAgent dont chaque appel `run` consomme le résultat suivant d'une liste."""
+    """FakeAgent whose every `run` call consumes the next result of a list."""
 
     def __init__(self, results, **triage):
         super().__init__(**triage)
@@ -60,7 +60,6 @@ def _claim(store, key, kind, detail="", *, expire_at=0.0):
                         attempts=record["attempts"])
 
 
-# --------------------------------------------------------------------------- RWF-001
 
 
 def test_rwf001_an_applied_command_never_costs_a_second_model_call(make_bot):
@@ -93,7 +92,6 @@ def test_rwf001_a_finished_answer_is_delivered_as_written(make_bot):
     assert len(agent.calls) == 1
 
 
-# --------------------------------------------------------------------------- RWF-002
 
 
 def test_rwf002_a_safety_answer_leaves_even_when_the_week_is_unreadable(make_bot):
@@ -123,7 +121,6 @@ def test_rwf002_a_programme_request_without_a_valid_week_gets_one_precise_line(m
     bot._repo.weekly_plan_message.assert_not_called()
 
 
-# --------------------------------------------------------------------------- RWF-004
 
 
 def test_rwf004_no_adapter_text_ever_reaches_alex(make_bot):
@@ -238,7 +235,6 @@ def test_rwf023_claude_initiatives_return_their_typed_decision(
     assert "--json-schema" in launched[0]
 
 
-# --------------------------------------------------------------------------- RWF-005
 
 
 def test_rwf005_a_reply_delivered_before_a_memory_failure_is_never_recomputed(make_bot):
@@ -274,7 +270,6 @@ def test_rwf005_a_transport_failure_resends_the_stored_answer_without_the_model(
     assert bot._state._conversation[-1]["text"] == "Réponse A"
 
 
-# --------------------------------------------------------------------------- RWF-006
 
 
 def test_rwf006_a_long_outage_is_announced_once_and_never_leaves_silence(make_bot,
@@ -341,7 +336,6 @@ def test_b20_a_message_overtaken_by_the_previous_reply_is_flagged(make_bot):
     assert "partie après lui" in agent.calls[0]["message"]
 
 
-# --------------------------------------------------------------------------- RWF-007
 
 
 def test_rwf007_an_invalid_morning_is_not_regenerated(make_bot, store):
@@ -391,7 +385,6 @@ def test_rwf007_a_released_job_always_carries_an_expiry(make_bot, store):
     assert row["status"] == "pending" and row["expire_at"] > time.time()
 
 
-# --------------------------------------------------------------------------- RWF-009
 
 
 def test_rwf009_a_week_without_a_valid_plan_gets_one_repair_job(make_bot, store):
@@ -439,7 +432,6 @@ def test_rwf009_the_repair_job_must_leave_a_valid_week_behind(make_bot, store):
     assert "Programme 2026-W39" in _sent(bot._client)
 
 
-# --------------------------------------------------------------------------- RWF-013
 
 
 def test_rwf013_the_window_starts_in_the_morning_and_runs_to_midnight(make_config):
@@ -460,7 +452,6 @@ def test_rwf013_a_recent_reactive_reply_keeps_initiatives_quiet(make_bot):
     assert bot.conversation_active(PSID)
 
 
-# --------------------------------------------------------------------------- RWF-014
 
 
 def test_rwf014_the_holding_line_is_a_real_remembered_message(make_bot):
@@ -474,7 +465,6 @@ def test_rwf014_the_holding_line_is_a_real_remembered_message(make_bot):
     assert row["source_key"].startswith("holding:")
 
 
-# --------------------------------------------------------------------------- RWF-016
 
 
 def test_rwf016_a_turn_is_traceable_by_structured_events_without_text(make_bot, caplog):
@@ -498,8 +488,8 @@ def test_rwf016_a_turn_is_traceable_by_structured_events_without_text(make_bot, 
 
 
 def test_rwf016_the_release_check_and_the_service_fingerprint_the_same_code(git_repo):
-    """`verify-release.sh` et `/health` doivent calculer la même empreinte, et un commit
-    de notes du coach ne doit pas la faire bouger."""
+    """`verify-release.sh` and `/health` must compute the same fingerprint, and a commit
+        of coach notes must not move it."""
     for tree in ("deploy", "src", "migrations"):
         (git_repo / tree).mkdir()
         (git_repo / tree / "code.py").write_text(f"# {tree}\n", encoding="utf-8")
@@ -531,7 +521,6 @@ def test_rwf016_an_event_cannot_carry_free_text():
         events.emit("turn.stage", message="texte de Sam")
 
 
-# --------------------------------------------------------------------------- RWF-021
 
 
 def test_rwf021_an_attachment_that_failed_in_flight_is_not_reanalysed(make_bot):
@@ -555,7 +544,6 @@ def test_rwf021_an_attachment_that_failed_in_flight_is_not_reanalysed(make_bot):
     assert ATTACHMENT_UNREADABLE in _sent(bot._client)
 
 
-# --------------------------------------------------------------------------- RWF-022
 
 
 def test_rwf022_an_initiative_shows_no_typing_while_it_is_written(make_bot):
@@ -567,7 +555,6 @@ def test_rwf022_an_initiative_shows_no_typing_while_it_is_written(make_bot):
     assert all(call.args[1] != "typing_on" for call in bot._client.action.call_args_list)
 
 
-# --------------------------------------------------------------------------- RWF-024
 
 
 def test_rwf024_a_turn_reads_the_declarative_ledger_once(make_bot):
@@ -579,7 +566,6 @@ def test_rwf024_a_turn_reads_the_declarative_ledger_once(make_bot):
     bot._repo.pending_ledger_cells.assert_not_called()
 
 
-# --------------------------------------------------------------------------- RWF-025
 
 
 def test_rwf025_a_closed_initiative_with_an_unreadable_detail_never_wakes_the_agent(
@@ -594,7 +580,6 @@ def test_rwf025_a_closed_initiative_with_an_unreadable_detail_never_wakes_the_ag
     assert store.proactive.jobs()[0]["status"] == "failed"
 
 
-# --------------------------------------------------------------------------- RWF-026
 
 
 def test_rwf026_a_read_timeout_is_never_resent(make_config, monkeypatch):
@@ -615,7 +600,7 @@ def test_rwf026_a_read_timeout_is_never_resent(make_config, monkeypatch):
     assert not result.ok and result.delivered == 1
 
 
-# ----------------------------------------------------------- appels par parcours
+# ----------------------------------------------------------- calls per journey
 
 
 def test_every_reactive_route_is_one_model_call(make_bot):
@@ -663,11 +648,10 @@ def test_retry_delays_are_declared_where_they_are_used():
     assert CoachBot.REACTIVE_RETRY_DELAYS[0] == 30.0
 
 
-# --------------------------------------------------------------------------- RWF-017
 
 
 def test_rwf017_the_documentation_names_no_removed_mechanism():
-    """Une doc qui décrit une architecture disparue fait prendre de mauvaises décisions."""
+    """A doc describing a vanished architecture leads to bad decisions."""
     removed = ("finalize_response", "contrôle de réponse", "commit_and_push_if_dirty",
                "silence_verdict", "response_review", "règles locales",
                "contrôle de cohérence", "rédaction en branche éphémère")

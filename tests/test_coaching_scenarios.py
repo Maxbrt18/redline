@@ -1,8 +1,8 @@
-"""Les scénarios d'évaluation : forme vérifiée, et chaque correction réelle y laisse une trace.
+"""Evaluation scenarios: verified shape, and every real correction leaves a trace.
 
-Le banc `redline.cli.evaluate_coaching` est payant et hors CI ; ses fixtures, elles, se
-vérifient gratuitement. Depuis le 2026-09-27, une erreur corrigée par Sam peut devenir
-un scénario rejouable : le champ `origin` nomme la correction ou la décision d'où il vient.
+The `redline.cli.evaluate_coaching` bench is paid and out of CI; its fixtures, though,
+are checked for free. An error corrected by the athlete can become a replayable
+scenario: the `origin` field names the correction or the decision it comes from.
 """
 
 import json
@@ -15,8 +15,8 @@ SCENARIOS = ENGINE_ROOT / correction_replay.SCENARIOS
 REQUIRED = {"id", "route", "message", "context", "understanding", "ask", "avoid",
             "posture", "ideal", "acceptance", "max_questions", "max_messages"}
 ROUTES = {"N0", "N1", "N2", "N3"}
-# Un cas de relecture juge une réponse déjà écrite (`evaluate-coaching.py`, branche
-# `candidate`) : il n'a ni route ni idéal.
+# A review case judges an already written answer (`evaluate-coaching.py`, branch
+# `candidate`): it has neither route nor ideal.
 REVIEW_REQUIRED = {"id", "message", "candidate", "expected_approved"}
 
 
@@ -50,6 +50,6 @@ def test_a_scenario_born_from_a_correction_names_a_real_owner():
 
 
 def test_the_long_run_scenario_forbids_any_fixed_percentage():
-    """Décision de Sam du 2026-09-27 : l'idéal lui-même ne doit citer aucun pourcentage."""
+    """The ideal itself must cite no percentage."""
     (case,) = [case for case in _cases() if case["id"] == "long-run-without-fixed-percentage"]
     assert "%" not in case["ideal"]
