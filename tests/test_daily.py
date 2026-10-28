@@ -14,16 +14,16 @@ from redline.model import daily
 
 def _days(**counts):
     out = []
-    for index, value in enumerate(["mauvaise"] * counts.get("bad", 0)
-                                  + ["bonne"] * counts.get("good", 0)):
-        out.append({"date": f"2026-08-{index + 3:02d}", "sommeil": value})
+    for index, value in enumerate(["poor"] * counts.get("bad", 0)
+                                  + ["good"] * counts.get("good", 0)):
+        out.append({"date": f"2026-08-{index + 3:02d}", "sleep": value})
     return out
 
 
 def test_two_bad_nights_raise_the_alert(_=None):
     """Guard n°4, word for word. The gauge vocabulary already had the two steps; all
     that was missing was something to feed them before Sunday."""
-    assert daily.sleep_of(_days(bad=2, good=3)) == "2_3_mauvaises_nuits"
+    assert daily.sleep_of(_days(bad=2, good=3)) == "bad_nights"
 
 
 def test_one_bad_night_does_not():
@@ -31,7 +31,7 @@ def test_one_bad_night_does_not():
 
 
 def test_four_bad_nights_downgrade_the_whole_week():
-    assert daily.sleep_of(_days(bad=4)) == "degrade_semaine"
+    assert daily.sleep_of(_days(bad=4)) == "bad_week"
 
 
 def test_an_undeclared_week_says_nothing_rather_than_ok():
@@ -44,11 +44,11 @@ def test_an_undeclared_week_says_nothing_rather_than_ok():
 def test_one_heavy_day_is_not_a_heavy_week():
     """The x1.1 aims at the "stress bucket" of a PERIOD (a move, exam season), not at
     one rough Tuesday."""
-    days = [{"date": "2026-08-03", "charge_vie": "elevee"},
-            {"date": "2026-08-04", "charge_vie": "normale"}]
-    assert daily.life_load_of(days) == "normale"
+    days = [{"date": "2026-08-03", "life_load": "high"},
+            {"date": "2026-08-04", "life_load": "normal"}]
+    assert daily.life_load_of(days) == "normal"
 
 
 def test_three_heavy_days_are():
-    days = [{"date": f"2026-08-{d:02d}", "charge_vie": "elevee"} for d in (3, 4, 5)]
-    assert daily.life_load_of(days) == "elevee"
+    days = [{"date": f"2026-08-{d:02d}", "life_load": "high"} for d in (3, 4, 5)]
+    assert daily.life_load_of(days) == "high"

@@ -82,8 +82,8 @@ Mémoire
   suffit.
   Information attendue seulement, jamais une question sociale : `scripts/fact-write.py
   ask --text 'Question exacte ?'`, recopiée telle quelle.
-- Les fils relationnels passent uniquement par `scripts/fact-write.py thread` (`ouvert`
-  ou `clos`, ces deux mots exactement). `coaching/adherence.md` porte le sort factuel
+- Les fils relationnels passent uniquement par `scripts/fact-write.py thread` (`open`
+  ou `closed`, ces deux mots exactement). `coaching/adherence.md` porte le sort factuel
   des consignes; `coaching/corrections.md` est réservé à TES erreurs.
 - Ancien échange : `scripts/fact-read.py conversation --query <sujet>` ; il ne
   décrit pas aujourd'hui.

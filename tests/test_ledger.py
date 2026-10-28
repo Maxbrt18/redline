@@ -32,14 +32,14 @@ def _etalon_rows():
 
 def test_calibration_week_is_100():
     h_eq, level, _ = ledger.equivalent_hours(
-        _etalon_rows(), Instruments(sleep="2_3_mauvaises_nuits"), RPE_TARGETS)
+        _etalon_rows(), Instruments(sleep="bad_nights"), RPE_TARGETS)
     assert abs(h_eq - 7.15) < 0.1, h_eq
     assert abs(level - 100) <= 2, level
 
 
 def test_gauge_prints_its_inputs():
     _, _, detail = ledger.equivalent_hours(_etalon_rows(),
-                                           Instruments(sleep="2_3_mauvaises_nuits"),
+                                           Instruments(sleep="bad_nights"),
                                            RPE_TARGETS)
     assert any("×1.15" in d for d in detail)     # three consecutive demanding days
     assert any("×1.10" in d for d in detail)     # poor sleep
@@ -592,7 +592,7 @@ def test_an_undeclared_week_is_neither_ok_nor_multiplied():
             return [{"iso_week": "2026-W39", "sleep": None, "life_load": None}]
 
         def daily_rows(self):
-            return [{"checked_on": dt.date(2026, 10, 8), "sleep": "bonne",
+            return [{"checked_on": dt.date(2026, 10, 8), "sleep": "good",
                      "life_load": None, "desire": None}]
 
     loaded = ledger.load_instruments(Store())
@@ -600,7 +600,7 @@ def test_an_undeclared_week_is_neither_ok_nor_multiplied():
     assert loaded["2026-W41"] == Instruments(sleep="ok", life_load=None)
     rows = _etalon_rows()
     assert ledger.equivalent_hours(rows, Instruments(), RPE_TARGETS)[0] == \
-        ledger.equivalent_hours(rows, Instruments(sleep="ok", life_load="normale"),
+        ledger.equivalent_hours(rows, Instruments(sleep="ok", life_load="normal"),
                                 RPE_TARGETS)[0]
 
 

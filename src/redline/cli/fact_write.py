@@ -40,6 +40,7 @@ from redline.model import (
     vault_layout,
 )
 from redline.model import predictions as prediction_model
+from redline.model import vocabulary as voc
 from redline.model.errors import ConfigError, InputError
 
 if TYPE_CHECKING:
@@ -323,9 +324,9 @@ def parser() -> argparse.ArgumentParser:
 
     daily = commands.add_parser("daily")
     daily.add_argument("--date", type=day, required=True)
-    daily.add_argument("--sleep", choices=("bonne", "moyenne", "mauvaise"))
-    daily.add_argument("--life-load", choices=("legere", "normale", "elevee"))
-    daily.add_argument("--desire", choices=("forte", "normale", "basse"))
+    daily.add_argument("--sleep", choices=tuple(voc.Sleep))
+    daily.add_argument("--life-load", choices=tuple(voc.LifeLoad))
+    daily.add_argument("--desire", choices=tuple(voc.Desire))
     daily.add_argument("--note", default="")
 
     capability = commands.add_parser("capability")
@@ -334,7 +335,7 @@ def parser() -> argparse.ArgumentParser:
     capability.add_argument("--need", required=True)
     capability.add_argument("--score", type=int, required=True)
     capability.add_argument("--scale", type=int, required=True)
-    capability.add_argument("--status", choices=("rouge", "orange", "vert"), required=True)
+    capability.add_argument("--status", choices=tuple(voc.CapabilityStatus), required=True)
     capability.add_argument("--evaluated-on", type=day, required=True)
     capability.add_argument("--next-test")
     capability.add_argument("--lock-reason")
@@ -356,11 +357,11 @@ def parser() -> argparse.ArgumentParser:
     thread = commands.add_parser("thread", help=PATCH_HELP)
     thread.add_argument("--key", required=True)
     thread.add_argument("--opened-on", type=day, default=UNSET)
-    thread.add_argument("--kind", choices=("promesse", "ressenti", "suspens"),
+    thread.add_argument("--kind", choices=tuple(voc.ThreadKind),
                         default=UNSET)
     thread.add_argument("--body", default=UNSET)
     thread.add_argument("--follow-up-on", type=day, default=UNSET)
-    thread.add_argument("--status", choices=("ouvert", "clos"), default=UNSET)
+    thread.add_argument("--status", choices=tuple(voc.ThreadStatus), default=UNSET)
     thread.add_argument("--patch", action="store_true", help=PATCH_HELP)
 
     deadline = commands.add_parser("deadline", help=PATCH_HELP)
@@ -445,7 +446,7 @@ def parser() -> argparse.ArgumentParser:
     exposure.add_argument("--observation-key", required=True)
     exposure.add_argument(
         "--exposure-type",
-        choices=("cadence", "descente", "lignes", "nutrition", "equipement", "autre"),
+        choices=tuple(voc.Exposure),
         required=True)
     exposure.add_argument(
         "--origin", choices=("prescribed", "voluntary", "spontaneous"), required=True)

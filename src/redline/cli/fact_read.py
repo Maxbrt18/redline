@@ -15,6 +15,7 @@ from redline.model import entrypoint, voice
 from redline.model import ledger as table
 from redline.model import predictions as prediction_model
 from redline.model.errors import ConfigError, InputError
+from redline.model.vocabulary import ThreadStatus
 from redline.service.race_countdown import compile_deadline
 
 
@@ -107,7 +108,7 @@ def strength(store: Any, limit: int) -> list[str]:
 
 
 def threads(store: Any, include_closed: bool) -> list[str]:
-    rows = [row for row in store.thread_rows() if include_closed or row["status"] == "ouvert"]
+    rows = [row for row in store.thread_rows() if include_closed or row["status"] == ThreadStatus.OPEN]
     lines = [f"Fils {'tous' if include_closed else 'ouverts'} ({len(rows)})"]
     for row in rows:
         follow_up = row["follow_up_on"].isoformat() if row["follow_up_on"] else "sans relance"

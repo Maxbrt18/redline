@@ -20,13 +20,13 @@ class Store:
 
     def daily_rows(self):
         return [{
-            "checked_on": dt.date(2026, 8, 22), "sleep": "bonne",
-            "life_load": "normale", "desire": "forte", "note": "",
+            "checked_on": dt.date(2026, 8, 22), "sleep": "good",
+            "life_load": "normal", "desire": "high", "note": "",
         }]
 
     def thread_rows(self):
         return [{
-            "thread_key": "t1", "body": "reparler du noir", "status": "ouvert",
+            "thread_key": "t1", "body": "reparler du noir", "status": "open",
             "follow_up_on": None,
         }]
 
@@ -39,7 +39,7 @@ class Store:
     def latest_capabilities(self):
         return [{
             "capability_number": 4, "slug": "nuit", "score": 2,
-            "scale": 5, "status": "orange",
+            "scale": 5, "status": "amber",
         }]
 
     def exposure_rows(self, confirmed_only=False):
@@ -73,7 +73,7 @@ def test_n2_packet_adds_bounded_decision_context():
 
     assert "Fils ouverts" in packet
     assert "Échéances actives" in packet
-    assert "4 nuit | 2/5 orange" in packet
+    assert "4 nuit | 2/5 amber" in packet
 
 
 def test_n0_pays_no_context_packet():
@@ -127,7 +127,7 @@ def test_failed_section_is_unknown_without_losing_other_known_sections():
     assert "Observations : lecture échouée, état inconnu" in packet
     assert "private connection detail" not in packet
     assert "douleur genou 0->1/10" in packet
-    assert "4 nuit | 2/5 orange" in packet
+    assert "4 nuit | 2/5 amber" in packet
     assert "Aucun état déclaré pour aujourd'hui" in packet
 
 

@@ -51,7 +51,9 @@ known-first-party = ["redline"]
 # test calls is reported as dead. A false positive is declared here, by name.
 paths = ["src", "deploy/codex-runtime-smoke.py", "deploy/claude-runtime-smoke.py",
          "deploy/agent-runtime-update.py"]
-exclude = ["*/tests/*"]
+# The stored vocabularies are reached by iterating their enums (CLI choices, CHECK
+# constraints, the notebook's answers), never member by member.
+exclude = ["*/tests/*", "*/model/vocabulary.py"]
 min_confidence = 60
 # Flask routes: called by the framework, never by the code.
 ignore_decorators = ["@app.get", "@app.post", "@app.before_request", "@app.after_request", "@app.errorhandler"]

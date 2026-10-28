@@ -13,6 +13,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 from redline.model import commands, session_kinds
 from redline.model import predictions as prediction_model
+from redline.model import vocabulary as voc
 
 NAMING_CONVENTION = {
     "pk": "pk_%(table_name)s",
@@ -177,14 +178,13 @@ observation_metrics = sa.Table(
     sa.Column("recorded_at", sa.DateTime(timezone=True), nullable=False, server_default=UTC_NOW),
     *_measurement_columns(),
     # Declared average HR flagged as doubtful: the measure stays immutable, the annotation
-    # says what it is worth. `sans_brassard` invalidates it everywhere, `contexte` (declared
-    # meal, illness) removes it from pace-HR comparisons.
+    # says what it is worth (`vocabulary.HrDoubt`).
     sa.Column("hr_doubt", sa.Text),
     sa.CheckConstraint(
         "hr_avg_bpm_state <> 'known' OR hr_max_bpm_state <> 'known' "
         "OR hr_avg_bpm <= hr_max_bpm", name="ck_observation_metrics_hr_order"),
     sa.CheckConstraint(
-        "hr_doubt IS NULL OR (hr_doubt IN ('sans_brassard','contexte') "
+        f"hr_doubt IS NULL OR (hr_doubt IN ({voc.sql_values(voc.HrDoubt)}) "
         "AND hr_avg_bpm_state = 'known')", name="ck_observation_metrics_hr_doubt"),
 )
 
@@ -245,7 +245,7 @@ session_exposures = sa.Table(
     sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=UTC_NOW),
     sa.UniqueConstraint("athlete_id", "exposure_key", name="uq_session_exposures_key"),
     sa.CheckConstraint(
-        "exposure_type IN ('cadence','descente','lignes','nutrition','equipement','autre')",
+        f"exposure_type IN ({voc.sql_values(voc.Exposure)})",
         name="ck_session_exposures_type"),
     sa.CheckConstraint("origin IN ('prescribed','voluntary','spontaneous')",
                        name="ck_session_exposures_origin"),
@@ -271,11 +271,11 @@ daily_checkins = sa.Table(
     sa.Column("desire", sa.Text),
     sa.Column("note", sa.Text, nullable=False, server_default=""),
     sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=UTC_NOW),
-    sa.CheckConstraint("sleep IS NULL OR sleep IN ('bonne','moyenne','mauvaise')",
+    sa.CheckConstraint(f"sleep IS NULL OR sleep IN ({voc.sql_values(voc.Sleep)})",
                        name="ck_daily_checkins_sleep"),
-    sa.CheckConstraint("life_load IS NULL OR life_load IN ('legere','normale','elevee')",
+    sa.CheckConstraint(f"life_load IS NULL OR life_load IN ({voc.sql_values(voc.LifeLoad)})",
                        name="ck_daily_checkins_life_load"),
-    sa.CheckConstraint("desire IS NULL OR desire IN ('forte','normale','basse')",
+    sa.CheckConstraint(f"desire IS NULL OR desire IN ({voc.sql_values(voc.Desire)})",
                        name="ck_daily_checkins_desire"),
 )
 
@@ -299,9 +299,9 @@ weekly_instruments = sa.Table(
     sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=UTC_NOW),
     sa.CheckConstraint("iso_week ~ '^20[0-9]{2}-W(0[1-9]|[1-4][0-9]|5[0-3])$'",
                        name="ck_weekly_instruments_week"),
-    sa.CheckConstraint("sleep IS NULL OR sleep IN ('ok','2_3_mauvaises_nuits','degrade_semaine')",
+    sa.CheckConstraint(f"sleep IS NULL OR sleep IN ({voc.sql_values(voc.WeekSleep)})",
                        name="ck_weekly_instruments_sleep"),
-    sa.CheckConstraint("life_load IS NULL OR life_load IN ('normale','elevee')",
+    sa.CheckConstraint(f"life_load IS NULL OR life_load IN ({voc.sql_values(voc.WeekLifeLoad)})",
                        name="ck_weekly_instruments_life_load"),
     sa.CheckConstraint("cmj_cm IS NULL OR cmj_cm BETWEEN 0 AND 100",
                        name="ck_weekly_instruments_cmj"),
@@ -560,7 +560,7 @@ session_predictions = sa.Table(
                        name="ck_session_predictions_pain"),
     sa.CheckConstraint("predicted_hr BETWEEN 20 AND 250",
                        name="ck_session_predictions_hr"),
-    sa.CheckConstraint("predicted_morning_trace IN ('aucune','legere','nette')",
+    sa.CheckConstraint("predicted_morning_trace IN ('none','light','clear')",
                        name="ck_session_predictions_morning_trace"),
     sa.CheckConstraint("validity IN ('pending','valid','late')",
                        name="ck_session_predictions_validity"),
@@ -648,7 +648,7 @@ capability_evaluations = sa.Table(
     sa.CheckConstraint("capability_number BETWEEN 1 AND 9",
                        name="ck_capability_evaluations_number"),
     sa.CheckConstraint("scale BETWEEN 1 AND 9", name="ck_capability_evaluations_scale"),
-    sa.CheckConstraint("status IN ('rouge','orange','vert')",
+    sa.CheckConstraint(f"status IN ({voc.sql_values(voc.CapabilityStatus)})",
                        name="ck_capability_evaluations_status"),
 )
 
@@ -663,10 +663,11 @@ conversation_threads = sa.Table(
     sa.Column("follow_up_on", sa.Date),
     sa.Column("status", sa.Text, nullable=False),
     sa.Column("closed_at", sa.DateTime(timezone=True)),
-    sa.CheckConstraint("kind IN ('promesse','ressenti','suspens')",
+    sa.CheckConstraint(f"kind IN ({voc.sql_values(voc.ThreadKind)})",
                        name="ck_conversation_threads_kind"),
-    sa.CheckConstraint("status IN ('ouvert','clos')", name="ck_conversation_threads_status"),
-    sa.CheckConstraint("(status = 'clos') = (closed_at IS NOT NULL)",
+    sa.CheckConstraint(f"status IN ({voc.sql_values(voc.ThreadStatus)})",
+                       name="ck_conversation_threads_status"),
+    sa.CheckConstraint("(status = 'closed') = (closed_at IS NOT NULL)",
                        name="ck_conversation_threads_closed_at"),
     sa.UniqueConstraint("athlete_id", "thread_key", name="uq_conversation_threads_key"),
 )
@@ -844,7 +845,7 @@ permit_choices = sa.Table(
     "permit_choices", metadata,
     _id(),
     sa.Column("athlete_id", sa.Text, sa.ForeignKey("redline.athletes.id"), nullable=False),
-    sa.Column("domain", sa.Text, nullable=False, server_default="ef"),
+    sa.Column("domain", sa.Text, nullable=False, server_default="easy"),
     sa.Column("iso_week", sa.Text, nullable=False),
     sa.Column("session_key", sa.Text, nullable=False),
     sa.Column("scheduled_on", sa.Date, nullable=False),
@@ -852,7 +853,7 @@ permit_choices = sa.Table(
     sa.Column("prediction_key", sa.Text, nullable=False),
     sa.Column("sealed_at", sa.DateTime(timezone=True), nullable=False, server_default=UTC_NOW),
     sa.UniqueConstraint("athlete_id", "iso_week", "session_key", name="uq_permit_choices_session"),
-    sa.CheckConstraint("domain IN ('ef')", name="ck_permit_choices_domain"),
+    sa.CheckConstraint("domain IN ('easy')", name="ck_permit_choices_domain"),
     sa.CheckConstraint("iso_week ~ '^20[0-9]{2}-W[0-9]{2}$'", name="ck_permit_choices_week"),
     sa.CheckConstraint("session_key ~ '^[a-z0-9][a-z0-9-]*$'", name="ck_permit_choices_key"),
     sa.CheckConstraint("coach_minutes BETWEEN 10 AND 180", name="ck_permit_choices_minutes"),

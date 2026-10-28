@@ -41,6 +41,7 @@ from redline.model import ledger as ledger_model
 from redline.model.activity import Activity
 from redline.model.errors import InputError
 from redline.model.instance import Instance, derived_label
+from redline.model.vocabulary import HrDoubt, HrReason, LifeLoad, MorningTrace, Sleep
 
 from . import session_detail
 from .plans import PlanStatus, blocked_session_ids
@@ -48,8 +49,7 @@ from .plans import PlanStatus, blocked_session_ids
 ACTOR = "carnet"
 MOVING_TYPES = session_kinds.MOVING
 #: The morning check-in: the declarative daily state, with the values of `fact-write.py daily`.
-DAILY_FIELDS = {"sleep": ("bonne", "moyenne", "mauvaise"),
-                "life_load": ("legere", "normale", "elevee")}
+DAILY_FIELDS = {"sleep": tuple(Sleep), "life_load": tuple(LifeLoad)}
 #: A high heart rate at comparable pace asks its question for two days; the answer goes
 #: to the daily state of the run's day.
 HR_ASK_DAYS = 2
@@ -100,7 +100,7 @@ def observation_fact(observation: dict, session: dict | None = None,
         "km": _known(observation, "distance_km"),
         "duration_min": round(duration / 60) if duration is not None else None,
         # Without the armband, the average heart rate is worthless: neither shown nor compared.
-        "hr_avg": (None if observation.get("hr_doubt") == "sans_brassard"
+        "hr_avg": (None if observation.get("hr_doubt") == HrDoubt.NO_SENSOR
                    else _known(observation, "hr_avg_bpm")),
         "rpe": _known(observation, "rpe"),
         "pains": known_pains(observation, labels or {}),
@@ -522,12 +522,12 @@ class Board:
                 raise AnswerError("Réponse inattendue. Actualise le carnet.")
             day = dt.date.fromisoformat(ask["date"])
             note = f"{self._hr_marker(day)} {HR_REASONS[value]}"
-            if value == "sommeil":
-                self._put_daily(day, sleep="mauvaise", note=note)
+            if value == HrReason.SLEEP:
+                self._put_daily(day, sleep=Sleep.POOR, note=note)
             else:
                 self._put_daily(day, note=note)
             alert = None
-            if value == "rien":
+            if value == HrReason.NONE:
                 alert = (f"Carnet : FC haute à allure comparable le {day:%d/%m} "
                          f"({ask['hr']} contre {ask['reference']}), sans explication "
                          "de sommeil, de maladie ni de chaleur.")
@@ -551,7 +551,7 @@ class Board:
                     "pains": {ask["zone"]: {"state": "known", "value": trace}},
                 }, actor=ACTOR)
             alert = None
-            if value == "nette":
+            if value == MorningTrace.CLEAR:
                 where = f" ({ask['label']})" if len(self.zones) > 1 else ""
                 alert = (f"Carnet : trace nette au réveil ce matin{where} "
                          f"({self.today:%d/%m}). La condition écrite dans la séance du jour "
@@ -617,7 +617,7 @@ class Board:
             return None
         out: dict[str, Any] = {
             "date": earlier["occurred_on"].isoformat(), "km": _known(earlier, "distance_km"),
-            "hr_avg": None if earlier.get("hr_doubt") == "sans_brassard"
+            "hr_avg": None if earlier.get("hr_doubt") == HrDoubt.NO_SENSOR
             else _known(earlier, "hr_avg_bpm"),
             "rpe": _known(earlier, "rpe"), "pains": known_pains(earlier, self.zone_labels),
             "enjoyment": _known(earlier, "enjoyment"), "rep_dplus": None, "rep_hr": None}
@@ -678,7 +678,7 @@ class Board:
         day = observation["occurred_on"]
         activity = _activity(intake)
         streams = (intake or {}).get("streams")
-        hr_valid = observation.get("hr_doubt") != "sans_brassard"
+        hr_valid = observation.get("hr_doubt") != HrDoubt.NO_SENSOR
         s = None if not streams else {**streams, "hr": streams.get("hr") if hr_valid else None}
         quality = debrief.is_quality(session)
         reps = (session_detail.quality(activity.laps if activity else (), s)

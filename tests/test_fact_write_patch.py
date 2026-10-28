@@ -75,13 +75,13 @@ def test_le_payload_reste_complet_donc_la_mise_en_file_garde_son_contrat():
 
 def test_patch_sur_un_fil_preserve_le_corps():
     existing = {"thread_key": "t-1", "opened_on": dt.date(2026, 8, 11),
-                "kind": "promesse", "body": "corps très long", "status": "ouvert",
+                "kind": "promise", "body": "corps très long", "status": "open",
                 "follow_up_on": dt.date(2026, 8, 12)}
-    args = parse("thread", "--key", "t-1", "--patch", "--status", "clos")
+    args = parse("thread", "--key", "t-1", "--patch", "--status", "closed")
     _, _, payload = fact_write._payload(args, existing)
-    assert payload["status"] == "clos"
+    assert payload["status"] == "closed"
     assert payload["body"] == "corps très long"
-    assert payload["kind"] == "promesse"
+    assert payload["kind"] == "promise"
     assert payload["follow_up_on"] == dt.date(2026, 8, 12)
 
 

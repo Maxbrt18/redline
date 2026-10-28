@@ -41,6 +41,7 @@ from redline.model import (
 )
 from redline.model import ledger as table
 from redline.model.errors import InputError
+from redline.model.vocabulary import HrDoubt, WeekLifeLoad, WeekSleep
 
 POINTS_PER_EQ_HOUR = 14.0          # calibrated, see coaching/protocols.md
 LEVEL_CAP, RATIO_CAP = 85, 1.3
@@ -72,8 +73,7 @@ class Row:
     enjoyment: int | None = None
     note: str = ""
     wbgt: float | None = None
-    #: Average HR declared doubtful: `sans_brassard` (invalid measurement) or `contexte`
-    #: (declared cause unrelated to fatigue). None = valid HR.
+    #: Average HR declared doubtful (`vocabulary.HrDoubt`). None = valid HR.
     hr_doubt: str | None = None
 
     def pain_at(self, zone: str) -> float | None:
@@ -82,7 +82,7 @@ class Row:
     @property
     def hr_valid(self) -> int | None:
         """The average HR usable to judge a cap: None without the armband."""
-        return None if self.hr_doubt == "sans_brassard" else self.hr_avg
+        return None if self.hr_doubt == HrDoubt.NO_SENSOR else self.hr_avg
 
     @property
     def week(self) -> str:
@@ -103,8 +103,8 @@ class Instruments:
     normale ». An undeclared week adds no multiplier, and says so.
     """
 
-    sleep: str | None = None      # ok | 2_3_mauvaises_nuits | degrade_semaine
-    life_load: str | None = None  # normale | elevee
+    sleep: str | None = None      # vocabulary.WeekSleep
+    life_load: str | None = None  # vocabulary.WeekLifeLoad
 
 
 # --------------------------------------------------------------------------- parsing
@@ -268,8 +268,8 @@ def load_instruments(store: LedgerStore) -> dict[str, Instruments]:
     for row in store.daily_rows():
         label = row["checked_on"].strftime("%G-W%V")
         grouped.setdefault(label, []).append({
-            "date": row["checked_on"].isoformat(), "sommeil": row["sleep"],
-            "charge_vie": row["life_load"], "envie": row["desire"]})
+            "date": row["checked_on"].isoformat(), "sleep": row["sleep"],
+            "life_load": row["life_load"], "desire": row["desire"]})
     for label, days in grouped.items():
         days = [{key: value for key, value in row.items() if value} for row in days]
         current = out.get(label, Instruments())
@@ -356,13 +356,13 @@ def equivalent_hours(rows: list[Row], instr: Instruments,
     if _two_hard_days_in_a_row(rows):
         multiplier *= 1.15
         trace.append("×1.15 deux jours exigeants consécutifs")
-    if instr.sleep == "degrade_semaine":
+    if instr.sleep == WeekSleep.BAD_WEEK:
         multiplier *= 1.20
         trace.append("×1.20 sommeil dégradé toute la semaine")
-    elif instr.sleep == "2_3_mauvaises_nuits":
+    elif instr.sleep == WeekSleep.BAD_NIGHTS:
         multiplier *= 1.10
         trace.append("×1.10 2-3 mauvaises nuits")
-    if instr.life_load == "elevee":
+    if instr.life_load == WeekLifeLoad.HIGH:
         multiplier *= 1.10
         trace.append("×1.10 grosse charge de vie")
 
@@ -692,7 +692,7 @@ def gate(rows: list[Row], label: str, instr: Instruments,
     if instr.sleep is None:
         cases.append(("?", "sommeil non déclaré"))
     else:
-        cases.append(("✗" if instr.sleep != "ok" else "✓", f"sommeil {instr.sleep}"))
+        cases.append(("✗" if instr.sleep != WeekSleep.OK else "✓", f"sommeil {instr.sleep}"))
     marks = {mark for mark, _ in cases}
     verdict = "rouge" if "✗" in marks else "incomplète" if "?" in marks else "verte"
     return [f"Porte (règle po, calculée) : {verdict}"] + [f"  {mark} {text}"

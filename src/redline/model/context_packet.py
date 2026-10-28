@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 from redline.model import ledger as ledger_model
 from redline.model import rulebook, session_kinds
+from redline.model.vocabulary import ThreadStatus
 from redline.storage import StorageError
 
 if TYPE_CHECKING:
@@ -133,7 +134,7 @@ def render_context_packet(store: OperationalStore, depth: str, today: dt.date) -
             + (f" | note={row['note'][:120]}" if row.get("note") else "")
             for row in daily)
     if depth in {"N2", "N3"}:
-        threads = [row for row in read(store.thread_rows, "Fils") if row["status"] == "ouvert"][:8]
+        threads = [row for row in read(store.thread_rows, "Fils") if row["status"] == ThreadStatus.OPEN][:8]
         if threads:
             lines.append("Fils ouverts :")
             lines.extend(

@@ -78,12 +78,12 @@ function launcher(strength) {
   }
   return add(el('div'), done, row, list);
 }
-const traces = [['aucune', 'Aucune'], ['tres-legere', 'Très légère'], ['legere', 'Légère'], ['nette', 'Nette']];
+const traces = [['none', 'Aucune'], ['very-light', 'Très légère'], ['light', 'Légère'], ['clear', 'Nette']];
 const dailyChoices = {
-  sleep: ['Sommeil', [['bonne', 'Bon'], ['moyenne', 'Moyen'], ['mauvaise', 'Mauvais']]],
-  life_load: ['Charge de vie', [['legere', 'Légère'], ['normale', 'Normale'], ['elevee', 'Élevée']]]
+  sleep: ['Sommeil', [['good', 'Bon'], ['fair', 'Moyen'], ['poor', 'Mauvais']]],
+  life_load: ['Charge de vie', [['light', 'Légère'], ['normal', 'Normale'], ['high', 'Élevée']]]
 };
-const hrChoices = [['sommeil', 'Nuit courte'], ['rhume', 'Début de rhume'], ['chaleur', 'Chaleur ou terrain'], ['rien', 'Rien de spécial']];
+const hrChoices = [['sleep', 'Nuit courte'], ['cold', 'Début de rhume'], ['heat', 'Chaleur ou terrain'], ['none', 'Rien de spécial']];
 export const fieldSpec = {
   pain: {label: 'Douleur, au pic', name: 'la douleur', values: [0, 0.5, 1, 1.5, 2, 2.5, 3]},
   rpe: {label: 'RPE, séance entière', name: 'le RPE', values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]},

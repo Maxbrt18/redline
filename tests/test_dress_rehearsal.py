@@ -181,7 +181,7 @@ def test_l_etat_du_jour_ne_perime_pas_le_programme(store):
     poser_le_plan(store)
     tour = str(uuid.uuid4())
     reussit(coach("scripts/fact-write.py", "daily", "--date", "2026-08-14",
-                  "--sleep", "mauvaise", "--life-load", "elevee", "--desire", "normale",
+                  "--sleep", "poor", "--life-load", "high", "--desire", "normal",
                   turn=tour), "fact-write daily")
     store.apply_turn_with_receipts(tour)[0]
 

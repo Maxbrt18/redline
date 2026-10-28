@@ -123,7 +123,7 @@ def test_two_easy_runs_with_a_high_heart_rate_at_the_same_pace_are_flagged():
     rows = [*_baseline(), _ef("2026-09-01", 380, 153), _ef("2026-09-03", 379, 154)]
     found = signals.signals(rows, _labels(rows), frozenset())
     alarm = [signal for signal in found if "FC haute" in signal.label]
-    assert alarm and "Alarme n°4" in alarm[0].detail
+    assert alarm and "Vérifier d'abord" in alarm[0].detail
 
 
 def test_a_single_high_run_is_not_a_trend():
@@ -131,7 +131,7 @@ def test_a_single_high_run_is_not_a_trend():
     assert not any("FC haute" in s.label for s in signals.signals(rows, _labels(rows), frozenset()))
 
 
-@pytest.mark.parametrize("doubt", ["sans_brassard", "contexte"])
+@pytest.mark.parametrize("doubt", ["no_sensor", "context"])
 def test_a_doubtful_heart_rate_neither_drifts_nor_feeds_the_reference(doubt):
     """Run without the armband, declared the same day, and yet counted by the gate
         two weeks in a row."""
@@ -142,8 +142,8 @@ def test_a_doubtful_heart_rate_neither_drifts_nor_feeds_the_reference(doubt):
 
 
 def test_only_a_strapless_heart_rate_loses_its_cap_value():
-    assert _ef("2026-09-01", 380, 162, hr_doubt="sans_brassard").hr_valid is None
-    assert _ef("2026-09-01", 380, 162, hr_doubt="contexte").hr_valid == 162
+    assert _ef("2026-09-01", 380, 162, hr_doubt="no_sensor").hr_valid is None
+    assert _ef("2026-09-01", 380, 162, hr_doubt="context").hr_valid == 162
     assert _ef("2026-09-01", 380, 162).hr_valid == 162
 
 

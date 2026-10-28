@@ -372,8 +372,8 @@ def test_the_morning_comes_first_and_a_high_heart_rate_asks_why(browser):
     tab.get_by_text('Noté.').wait_for()
     tab.get_by_role('button', name='Rien de spécial').click()
     tab.wait_for_timeout(200)
-    assert answers == [{'ask': 'daily:2026-10-09:sleep', 'value': 'mauvaise'},
-                       {'ask': 'hr:2026-10-07', 'value': 'rien'}]
+    assert answers == [{'ask': 'daily:2026-10-09:sleep', 'value': 'poor'},
+                       {'ask': 'hr:2026-10-07', 'value': 'none'}]
     tab.close()
 
 

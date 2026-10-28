@@ -39,7 +39,7 @@ def test_heart_rate_at_comparable_pace_comes_last_and_without_a_plan():
 def test_a_strapless_heart_rate_is_never_held_against_its_cap():
     """A heart rate recorded without the armband is never held against its cap."""
     session = {"hr_cap_bpm": 157}
-    strapless = Row(date=dt.date(2026, 10, 7), type="easy", hr_avg=162, hr_doubt="sans_brassard")
+    strapless = Row(date=dt.date(2026, 10, 7), type="easy", hr_avg=162, hr_doubt="no_sensor")
     assert debrief.gaps(strapless, session, None) == []
-    meal = Row(date=dt.date(2026, 10, 6), type="easy", hr_avg=162, hr_doubt="contexte")
+    meal = Row(date=dt.date(2026, 10, 6), type="easy", hr_avg=162, hr_doubt="context")
     assert debrief.gaps(meal, session, None) == ["FC moyenne 162 pour un plafond de 157 (+5)"]

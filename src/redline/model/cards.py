@@ -53,7 +53,7 @@ WEEK_TOTAL_SCHEMA = Schema("semaine du mois", [
 
 MONTH_SCHEMA = Schema("mois", [
     field("period", str, required=False, pattern=r"20\d{2}-\d{2}", note="période canonique du bilan, ex. 2030-09"),
-    field("month", str, note="le titre, ex. Juillet 2026"),
+    field("month", str, note="le titre, ex. Juillet 2030"),
     field("km", float, required=False, minimum=0),
     field("dplus", float, required=False, minimum=0),
     field("sessions", int, required=False, minimum=0),

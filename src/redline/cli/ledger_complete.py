@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Completes a pending measurement by stable identity, without editing a projection.
 
-`--fc-douteuse sans_brassard|contexte --cause "<their words>"` flags an already known
+`--fc-douteuse no_sensor|context --cause "<their words>"` flags an already known
 average HR as doubtful: without an armband it counts nowhere; with a context (meal,
 illness) it leaves the pace-matched HR comparisons, hence the gate.
 
@@ -22,6 +22,7 @@ from redline.model import (
     entrypoint,
 )
 from redline.model.errors import InputError
+from redline.model.vocabulary import HrDoubt
 
 METRICS = ("rpe", "pain", "enjoyment", "distance_km", "duration_s", "pace_s_per_km",
            "hr_avg_bpm", "hr_max_bpm", "cadence_spm", "elevation_gain_m",
@@ -62,7 +63,7 @@ def main() -> int:
     parser.add_argument("--metric", choices=METRICS)
     parser.add_argument("--zone", default=None,
                         help="la zone surveillée, pour --metric pain")
-    parser.add_argument("--fc-douteuse", dest="hr_doubt", choices=("sans_brassard", "contexte"),
+    parser.add_argument("--fc-douteuse", dest="hr_doubt", choices=tuple(HrDoubt),
                         help="déclare douteuse la FC moyenne connue de l'observation")
     parser.add_argument("--cause", default="", help="la cause déclarée par l'athlète, ses mots")
     values = parser.add_mutually_exclusive_group()

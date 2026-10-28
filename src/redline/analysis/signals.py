@@ -198,8 +198,7 @@ def signals(rows: list, weeks: list, intentional_keys: frozenset[str]) -> list:
     if len(recent) >= 2 and all(drift.delta >= HR_DRIFT_BPM for drift in recent[-2:]):
         found.append(Signal(
             "FC haute à allure comparable, deux EF de suite",
-            " ; ".join(str(drift) for drift in recent[-2:]) + ". Alarme n°4 du plan "
-            "(elle a précédé mars 2026). Vérifier d'abord sommeil, maladie, chaleur "
+            " ; ".join(str(drift) for drift in recent[-2:]) + ". Vérifier d'abord sommeil, maladie, chaleur "
             "non mesurée et terrain : un signal n'est pas une cause"))
 
     return found

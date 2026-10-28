@@ -16,6 +16,8 @@ import datetime as dt
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 
+from redline.model.vocabulary import LifeLoad, Sleep
+
 from . import session_kinds
 
 #: The supervised period lasts this many ISO weeks, including the week of the first
@@ -170,9 +172,9 @@ def state(lines: list[EfLine], daily: Iterable[dict], today: dt.date,
         if day is None or day < period.start:
             continue
         reasons = []
-        if row.get("life_load") == "elevee" or row.get("charge_vie") == "elevee":
+        if row.get("life_load") == LifeLoad.HIGH:
             reasons.append(f"charge de vie élevée déclarée le {day:%d/%m}")
-        if row.get("sleep") == "mauvaise" or row.get("sommeil") == "mauvaise":
+        if row.get("sleep") == Sleep.POOR:
             reasons.append(f"mauvaise nuit déclarée le {day:%d/%m}")
         if reasons:
             restricted.setdefault(iso_week(day), []).extend(reasons)
