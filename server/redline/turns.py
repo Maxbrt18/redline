@@ -7,19 +7,12 @@ import uuid
 from dataclasses import dataclass, replace
 
 from .agent import AgentRunner, RunResult, RunSpec, SessionMode
+from .prompts import EMPTY_REPLY_NOTE
 from .routing import RoutePlan
 from .state import StateStore
 from .vault import PersistenceFailure, PersistenceResult, VaultRepo
 
 log = logging.getLogger("redline")
-
-#: Relance unique, dans la même session et la même transaction, quand un tour s'arrête
-#: sur un outil sans texte final. Rare, et moins coûteux qu'une phrase générique.
-EMPTY_REPLY_NOTE = (
-    "[NOTE SYSTÈME, invisible pour ⟨athlète⟩ : ton tour s'est terminé sans texte pour "
-    "⟨athlète⟩. Écris maintenant ta réponse finale, telle qu'elle doit partir. Ne relance "
-    "aucune lecture ni écriture déjà faite.]"
-)
 
 
 @dataclass(frozen=True)
