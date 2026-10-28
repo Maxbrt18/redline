@@ -2,7 +2,7 @@
 
 A debrief once started by reciting the coach's machinery aloud ("angle not repeated
 so far ..."). Hardening `STYLE_PROMPT` cannot hold: the trigger required "an angle you
-have not already served", `fact-read.py proactive` was supposed to list them, and
+have not already served", `fact-read proactive` was supposed to list them, and
 **nothing ever wrote them** -- `record_proactive_delivery` hard-coded `angle: None`. The
 model had to reconstruct the served angles from raw summaries and, having no field to
 put that reasoning in, put it in the message.
@@ -56,7 +56,7 @@ def test_the_cli_refuses_an_angle_outside_a_turn(monkeypatch, capsys):
     """Outside a turn, there is no proactive message to qualify."""
     monkeypatch.delenv("REDLINE_TURN_ID", raising=False)
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://x/y")
-    monkeypatch.setattr("sys.argv", ["fact-write.py", "angle", "titre Strava"])
+    monkeypatch.setattr("sys.argv", ["fact-write", "angle", "titre Strava"])
 
     with pytest.raises(InputError) as refus:
         fact_write.main()
@@ -76,5 +76,5 @@ def test_both_paths_that_ask_for_an_angle_also_name_where_it_goes():
 
     """
     enveloppe = build_proactive_prompt("strava_debrief", "90000000010")
-    assert "fact-write.py angle" in enveloppe
-    assert "fact-write.py angle" in PROACTIVE_TRIGGERS["strava_debrief"]
+    assert "fact-write angle" in enveloppe
+    assert "fact-write angle" in PROACTIVE_TRIGGERS["strava_debrief"]

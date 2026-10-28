@@ -1,7 +1,7 @@
 """The notebook dashboard: today's session, the week, the race.
 
 Everything is COMPUTED at read time from the owners: the active program revision
-carries the intent, the PostgreSQL ledger carries the fact, and the `scripts/ledger.py`
+carries the intent, the PostgreSQL ledger carries the fact, and the `redline ledger`
 functions do the counting (volume, pain, gauge, trajectory). Nothing is stored here: a
 displayed number without a computation would be a copy, and a copy drifts.
 
@@ -10,7 +10,7 @@ due dated check withholds its sessions, a revision to re-arbitrate is stated. Th
 notebook has no fallback on the macro plan.
 
 Writes: only the feelings the ledger already requests (RPE, pain, enjoyment, wake
-trace), through the same methods as `ledger-complete.py`, and only if the request is
+trace), through the same methods as `redline ledger-complete`, and only if the request is
 still open at write time.
 """
 
@@ -48,7 +48,7 @@ from .plans import PlanStatus, blocked_session_ids
 
 ACTOR = "carnet"
 MOVING_TYPES = session_kinds.MOVING
-#: The morning check-in: the declarative daily state, with the values of `fact-write.py daily`.
+#: The morning check-in: the declarative daily state, with the values of `redline fact-write daily`.
 DAILY_FIELDS = {"sleep": tuple(Sleep), "life_load": tuple(LifeLoad)}
 #: A high heart rate at comparable pace asks its question for two days; the answer goes
 #: to the daily state of the run's day.

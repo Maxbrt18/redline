@@ -1,7 +1,7 @@
 """The exercise tables of `coaching/strength.md`, rendered from the programme.
 
-Lives here rather than in `scripts/strength-tables.py` so that both consumers can
-simply import it: the CLI that regenerates the tables, and the `vault-check.py`
+Lives here rather than in `redline strength-tables` so that both consumers can
+simply import it: the CLI that regenerates the tables, and the `redline vault-check`
 control that reports a drift. A hyphenated file name is not an importable module.
 """
 

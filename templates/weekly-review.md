@@ -9,7 +9,7 @@ maj: AAAA-MM-JJ
 > Les séances ne se recopient pas ici : elles sont dans le registre, une ligne chacune.
 > Ce fichier porte ce que le registre ne peut pas porter — l'intention, l'agrégat, la lecture.
 > Le programme opérationnel est une révision `weekly_plan` typée dans PostgreSQL, créée avec
-> `python3 scripts/week-plan.py revise --week AAAA-Wnn` puis rendue dans le bloc généré ci-dessous.
+> `redline week-plan revise --week AAAA-Wnn` puis rendue dans le bloc généré ci-dessous.
 > Le frontmatter ne porte aucun état opérationnel. Sans révision valide, aucune prescription.
 
 <!-- WEEK_PLAN_START -->
@@ -34,7 +34,7 @@ _Tendance douleur : lire les 3-4 dernières lignes du registre, pas la mémoire 
 
 - Capacités nourries cette semaine (six capacités PostgreSQL) :
 - TODO longue durée : mois médical ([[athlete]] §Suivi médical) fait ? **Sinon relancer l'athlète**
-- Hygiène du vault : `python3 scripts/vault-check.py` → verdict, et corrections faites séance tenante
+- Hygiène du vault : `redline vault-check` → verdict, et corrections faites séance tenante
 
 ## Renfo de la semaine qui vient ([[strength]])
 

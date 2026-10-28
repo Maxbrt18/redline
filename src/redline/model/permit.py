@@ -243,6 +243,6 @@ def render(lines: list[EfLine], current: State, week: str | None = None) -> list
         out.append(f"Compteur d'obtention : {run} EF courues sur {MIN_EF} requises "
                    f"d'ici la fin de {current.window.obtention_week}.")
     out.append("Non détectés automatiquement : parcours neuf ; grosse forme "
-               + ("(seuil non fixé, se lit sur « FC à allure » de signals.py)."
+               + ("(seuil non fixé, se lit sur « FC à allure » de redline signals)."
                   if BIG_FORM_THRESHOLD is None else f"(seuil {BIG_FORM_THRESHOLD})."))
     return out

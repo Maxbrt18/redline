@@ -2,7 +2,7 @@
 """Links an existing Messenger observation to its Strava activity.
 
 The fact keeps its original idempotency key; only the missing external identifier is
-added. The key is read with `scripts/fact-read.py observations`.
+added. The key is read with `redline fact-read observations`.
 """
 
 from __future__ import annotations

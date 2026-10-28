@@ -78,4 +78,4 @@ def test_morning_card_is_rendered_by_the_service_not_the_agent(
 
     assert rendered == [("renfo-a", today)]
     assert len(agent.calls) == 1
-    assert "chart-strength.py" not in agent.calls[0]["message"]
+    assert "chart-strength" not in agent.calls[0]["message"]

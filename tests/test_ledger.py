@@ -1,4 +1,4 @@
-"""Unit tests for scripts/ledger.py -- the load gauge and the trends.
+"""Unit tests for redline ledger -- the load gauge and the trends.
 
 The calibration week (16-22 Feb 2026 = 100 by definition, coaching/protocols.md) is the
 non-regression test of the whole gauge: if a change breaks it, the gauge stops meaning
@@ -89,7 +89,7 @@ def test_only_running_and_walking_carry_a_descent_weight():
 # ------------------------------------------------- the RPE target, single source
 
 def test_the_targets_come_from_the_workout_notes():
-    """`scripts/ledger.py` used to carry a hard-coded COPY of the `target_rpe`: dead
+    """`redline ledger` used to carry a hard-coded COPY of the `target_rpe`: dead
     entries and missing notes meant a strength session above its target triggered
     nothing. The numbers now exist once. This is the only test in the suite that really
     reads the notes: it tells that the literal table in conftest has not fallen behind."""

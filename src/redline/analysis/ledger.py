@@ -6,10 +6,10 @@ negotiation"), so it PRINTS ITS INPUTS. A number nobody can reconstruct is a num
 that drifts.
 
 Usage:
-    python3 scripts/ledger.py                       # the last week
-    python3 scripts/ledger.py --week 2030-W30    # the load line for a weekly review
-    python3 scripts/ledger.py --pain-trend 3  # last 3 weeks
-    python3 scripts/ledger.py --csv                 # both tables, normalized, on stdout
+    redline ledger                       # the last week
+    redline ledger --week 2030-W30    # the load line for a weekly review
+    redline ledger --pain-trend 3  # last 3 weeks
+    redline ledger --csv                 # both tables, normalized, on stdout
 
 Reads observations, metrics, daily declarations and instruments directly from
 PostgreSQL. No Markdown ledger is kept in parallel.
@@ -957,7 +957,7 @@ def race_projection(rows: list[Row], today: dt.date, race_on: dt.date,
 
 
 def next_race_date(store: LedgerStore, today: dt.date) -> dt.date | None:
-    """The next TYPED race (`fact-write.py deadline --kind race`), never prose."""
+    """The next TYPED race (`redline fact-write deadline --kind race`), never prose."""
     dates = []
     for row in store.deadline_rows():
         if row.get("kind") != "race" or row.get("status") == "done":
@@ -1031,7 +1031,7 @@ def week_report(store: LedgerStore, rows: list[Row], instruments: dict, targets:
                 closing: bool = False) -> list[str]:
     """A week's report: volume, gauge, pain, then the slope.
 
-    ONE function for the CLI (`ledger.py --week`) and for the dossier the service
+    ONE function for the CLI (`redline ledger --week`) and for the dossier the service
     computes before the Sunday review (`weekly_dossier.py`): two renderings of the same
     computation would diverge.
     """
@@ -1095,7 +1095,7 @@ def week_report(store: LedgerStore, rows: list[Row], instruments: dict, targets:
         if projection:
             lines.extend(projection_lines(projection, target_km))
         elif race_on is None:
-            lines.append("Projection course : aucune course typée (fact-write.py deadline "
+            lines.append("Projection course : aucune course typée (redline fact-write deadline "
                          "--kind race) — rien à projeter.")
     return lines
 

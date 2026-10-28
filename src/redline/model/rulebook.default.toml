@@ -88,7 +88,7 @@ title = "Assimilation"
 text = "-25 à -30 % toutes les 3-4 semaines, fréquence gardée ; on n'y ajoute rien."
 grade = "règle de coaching"
 owner = "coaching/current-plan.md § garde-fou n°2"
-enforced_by = "le coach ; feasibility.py (semaines d'assimilation)"
+enforced_by = "le coach ; redline feasibility (semaines d'assimilation)"
 
 [[rules]]
 id = "n3"
@@ -104,7 +104,7 @@ title = "Sommeil et FC"
 text = "2-3 mauvaises nuits consécutives ou FC anormalement haute en footing : qualité supprimée, semaine traitée en assimilation."
 grade = "règle de coaching"
 owner = "coaching/current-plan.md § garde-fou n°4"
-enforced_by = "le coach ; FC à allure calculée par signals.py"
+enforced_by = "le coach ; FC à allure calculée par redline signals"
 
 [[rules]]
 id = "n5"
@@ -128,7 +128,7 @@ title = "Espacement"
 text = "jamais deux jours exigeants consécutifs (qualité, sortie longue, EF > {hard_min_hours} h). Une semaine à contrainte se réduit, elle ne se condense pas."
 grade = "règle de coaching"
 owner = "coaching/current-plan.md § garde-fou n°7"
-enforced_by = "week-plan.py revise (champ demanding)"
+enforced_by = "redline week-plan revise (champ demanding)"
 
 [[rules]]
 id = "n8"
@@ -136,7 +136,7 @@ title = "Transition"
 text = "séance dont la nature sort des {transition_lookback_days} derniers jours (1re qualité, 1er bloc descente, terrain neuf). {transitions_per_week} par semaine au plus, sous-dosée, plafond écrit avant."
 grade = "pari"
 owner = "coaching/current-plan.md § garde-fou n°8"
-enforced_by = "week-plan.py revise (champ transition) ; feasibility.py (à rebours)"
+enforced_by = "redline week-plan revise (champ transition) ; redline feasibility (à rebours)"
 
 [[rules]]
 id = "po"
@@ -144,7 +144,7 @@ title = "Porte"
 text = "une hausse facile (palier de SL sans pourcentage fixe, EF allongée, sortie de plus) s'ajoute si le pic d'effort hebdo reste au plus {gate_effort_peak}/10 sans hausse sur {gate_trend_weeks} semaines, réveils à la base ; elles se cumulent. Case rouge : semaine suivante figée ; deux : un cran en arrière."
 grade = "règle de coaching"
 owner = "coaching/current-plan.md § La porte"
-enforced_by = "le coach ; écart aux 30 jours affiché par week-plan.py et ledger.py"
+enforced_by = "le coach ; écart aux 30 jours affiché par redline week-plan et redline ledger"
 
 [[rules]]
 id = "s9"
@@ -152,4 +152,4 @@ title = "Arrivée à vide"
 text = "plus longue sortie sans nouveau record sur {stall_weeks} semaines closes : le protocole d'instruction des baisses s'ouvre, sans attendre le jalon daté."
 grade = "règle de coaching"
 owner = "athlete/goals.md"
-enforced_by = "ledger.py --week (bloc Trajectoire)"
+enforced_by = "redline ledger --week (bloc Trajectoire)"

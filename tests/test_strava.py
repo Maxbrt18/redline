@@ -1,4 +1,4 @@
-"""scripts/strava.py: reading Strava's payloads and keeping access alive."""
+"""redline strava: reading Strava's payloads and keeping access alive."""
 
 import json
 import urllib.parse
@@ -58,7 +58,7 @@ def test_the_activity_carries_what_the_ledger_needs():
 
 
 def test_the_activity_hands_weather_exactly_what_it_asks_for():
-    """weather.py wants a polyline and a local wall-clock time, without an offset."""
+    """weather wants a polyline and a local wall-clock time, without an offset."""
     query = strava.parse_activity(RUN).weather_query
     assert query == {"polyline": "g|avGsvu[ICGEO", "time": "2026-08-14T07:32:50"}
 
@@ -105,7 +105,7 @@ def test_a_ride_is_measured_in_speed_not_in_pace():
 
 
 def test_raw_values_are_never_pre_rounded():
-    """ledger-add.py is the only one that rounds: two roundings in a row diverge."""
+    """ledger-add is the only one that rounds: two roundings in a row diverge."""
     out = strava.parse_activity(RUN)
     assert out.hr_avg_bpm == 148.2
     assert out.distance_m == 6969.4
@@ -150,8 +150,8 @@ def test_laps_come_from_the_endpoint_only_when_the_field_is_absent(monkeypatch):
 # ------------------------------------------------------------------ streams
 
 def test_streams_are_flattened_into_what_descent_already_eats(monkeypatch):
-    """descent.py has always accepted {"altitude": [...]}. Strava wraps the list in an
-    object: flattening it here avoids touching descent.py."""
+    """descent has always accepted {"altitude": [...]}. Strava wraps the list in an
+    object: flattening it here avoids touching descent."""
     monkeypatch.setattr(strava, "call", lambda *a, **k: {
         "altitude": {"data": [262.9, 300.0, 262.6], "series_type": "distance"}})
     out = strava.cmd_streams(type("Args", (), {"id": "1", "keys": "altitude"})())
@@ -164,7 +164,7 @@ def test_streams_are_flattened_into_what_descent_already_eats(monkeypatch):
 # ------------------------------------------------------------------ interface
 
 def test_the_json_flag_works_on_both_sides_of_the_subcommand():
-    """`strava.py activity 42 --json` is the order one naturally types, and argparse
+    """`strava activity 42 --json` is the order one naturally types, and argparse
     refused it: "unrecognized arguments" does not say where to put the flag. This
     script exists so that an agent need not guess the syntax."""
     parser = strava.build_parser()
@@ -405,7 +405,7 @@ def test_an_expired_token_is_retried_once_then_given_up(monkeypatch):
 def test_a_failure_is_reported_without_ever_printing_a_secret(monkeypatch, capsys):
     monkeypatch.setattr(strava, "call",
                         lambda *a, **k: (_ for _ in ()).throw(strava.StravaError("injoignable")))
-    monkeypatch.setattr("sys.argv", ["strava.py", "check"])
+    monkeypatch.setattr("sys.argv", ["strava", "check"])
     assert strava.main() == 1
     captured = capsys.readouterr()
     assert "Strava indisponible" in captured.err

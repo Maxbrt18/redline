@@ -95,7 +95,7 @@ def test_the_morning_does_not_delegate_the_card_to_the_agent(make_bot):
     agent, _ = _morning(make_bot, [renfo()], produced=["strength-2026-08-18.png"])
     message = agent.calls[0]["message"]
     assert "SÉANCE DE RENFO AUJOURD'HUI" not in message
-    assert "chart-strength.py" not in message
+    assert "chart-strength" not in message
 
 
 def test_a_day_without_strength_gets_no_such_instruction(make_bot):

@@ -9,14 +9,14 @@ the injury before the athlete admits it.
 **What this script does NOT do, and why.** Four of the checks in section D live in Strava,
 not in the ledger: downhill pace on reference segments, shortened routes, unusual pauses at
 the end of a run, note length. They stay with the coach at the weekly review, via
-`scripts/strava.py`: this script only reads the ledger.
+`redline strava`: this script only reads the ledger.
 
 **The thresholds are coarse, on purpose.** They need not be right: they must force a look.
 A signal that comes out here is never a verdict, it is a line to go and check, the same
 doctrine as the gauge: "warning signal, never a guillotine".
 
-    python3 scripts/signals.py            # the last 4 weeks
-    python3 scripts/signals.py --weeks 6
+    redline signals            # the last 4 weeks
+    redline signals --weeks 6
 """
 
 from __future__ import annotations

@@ -64,7 +64,7 @@ INSTANCE_SCHEMA = Schema("redline.toml", [
             field("icon", str, required=False, choices=CAPABILITY_ICONS,
                   note="le pictogramme de la capacité dans le carnet"),
         ]))),
-    # What `vault-check.py` holds the vault to; without it, nothing is checked for it.
+    # What `redline vault-check` holds the vault to; without it, nothing is checked for it.
     field("vault", dict, required=False, schema=Schema("[vault]", [
         field("note_types", list, required=False, item=field(
             "type", str, minimum=1, maximum=40),

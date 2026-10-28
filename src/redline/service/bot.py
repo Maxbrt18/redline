@@ -1862,7 +1862,7 @@ class CoachBot:
                                    questions: tuple[str, ...] = ()) -> None:
         """Acknowledge what was actually delivered, never what the model was preparing.
 
-        `turn_id` carries the angle the turn deposited (`fact-write.py angle`): the trace is
+        `turn_id` carries the angle the turn deposited (`redline fact-write angle`): the trace is
         written after delivery, well after the persistence boundary, so this is where what the
         model chose is re-read. Empty for a send the service composes itself: it has no angle
         to qualify.

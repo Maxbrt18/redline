@@ -29,7 +29,7 @@ def _known(row: dict, metric: str, suffix: str = "") -> str | None:
 def observations(store: Any, limit: int) -> list[str]:
     """Recent observations, WITH their key and what is left to complete.
 
-    The key is shown because `ledger-complete.py` requires it: an identifier that
+    The key is shown because `redline ledger-complete` requires it: an identifier that
     nothing published could not be supplied. A row recorded without a Strava id lives
     under a `messenger:<date>:<slug>` key, and the output must reveal it.
     """

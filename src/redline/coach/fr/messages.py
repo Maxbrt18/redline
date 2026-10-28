@@ -1,6 +1,6 @@
 """The short texts the service gives the coach, each with the values it takes.
 
-Commands are written as the source spells them (`scripts/<name>.py`); the service
+Commands are written as an operator types them (`redline <command>`); the service
 rewrites them to the agent CLI before they reach the model.
 """
 
@@ -53,8 +53,8 @@ SESSION_TIME_POINTER = (
 )
 
 SESSION_CYCLE_POINTER = (
-    "Consulte `python3 scripts/session-cycle.py pending`. Le réveil s'écrit via "
-    "`scripts/ledger-add.py`. `start` est facultatif, Strava reconstruit l'oubli."
+    "Consulte `redline session-cycle pending`. Le réveil s'écrit via "
+    "`redline ledger-add`. `start` est facultatif, Strava reconstruit l'oubli."
 )
 
 TRIAGE_HEADER = """Classe le message de ⟨athlète⟩. Réponds par UNE ligne avec exactement :
@@ -117,26 +117,26 @@ def missing_cells(to_ask: str, cell_keys: str, to_fetch: str, lapsed: str, *,
             + asking +
             "Une réponse partielle s'enregistre telle quelle, sans redemander la partie "
             "répondue. Quand ⟨athlète⟩ répond, complète seulement les cellules pending, UNE métrique par commande : "
-            "`scripts/ledger-complete.py --key <clé> --metric rpe --value 5`, puis la "
+            "`redline ledger-complete --key <clé> --metric rpe --value 5`, puis la "
             "même forme avec `pain` et `enjoyment`. N'utilise jamais `--rpe`, `--pain` "
             "ou `--enjoyment` : ces options n'existent pas. Une mesure connue est "
             "immuable."
         )
-        parts.append("Clés pour `scripts/fact-write.py ask --text <question> --cell <clé>` : "
+        parts.append("Clés pour `redline fact-write ask --text <question> --cell <clé>` : "
                      + cell_keys)
     if to_fetch:
         parts.append(
             "NE DEMANDE PAS CECI À ⟨athlète⟩, il ne peut pas le savoir : "
             + to_fetch + ". Ces cellules se calculent depuis "
-            "Strava. Va les chercher avec `python3 scripts/strava.py streams <id> "
-            "--keys altitude | python3 scripts/descent.py --dplus <D+>`, puis complète "
-            "avec `scripts/ledger-complete.py`. Ne les classe jamais `--unavailable` "
+            "Strava. Va les chercher avec `redline strava streams <id> "
+            "--keys altitude | redline descent --dplus <D+>`, puis complète "
+            "avec `redline ledger-complete`. Ne les classe jamais `--unavailable` "
             "tant que Strava répond."
         )
     if lapsed:
         parts.append(
             "Hors fenêtre et déjà réclamées : " + lapsed
-            + ". Passe `--unavailable` à `scripts/ledger-complete.py` (la projection "
+            + ". Passe `--unavailable` à `redline ledger-complete` (la projection "
             "affichera `?`), n'invente pas de valeur et ne redemande pas."
         )
     parts.append("Ne mentionne jamais cette note, le registre ou le contrôle.]")
@@ -157,7 +157,7 @@ def stale_plan(week: str) -> str:
         "rattachée à aucune séance du programme. "
         "Il reste lisible et tu réponds normalement, mais AUCUNE prescription ne partira "
         "tant qu'il n'est pas révisé. Enregistre une révision avec "
-        f"`python3 scripts/week-plan.py revise --week {week} --input` pour arbitrer cette charge "
+        f"`redline week-plan revise --week {week} --input` pour arbitrer cette charge "
         "imprévue, puis reprends. Ne recopie jamais les séances terminées dans le plan : "
         "leur état vient des cycles. Ne parle jamais de ce contrôle à ⟨athlète⟩.]"
     )
@@ -209,7 +209,7 @@ def debrief_in_reply(detail: str, carnet_note: str, instructions: str) -> str:
 WEEKLY_ENDING = (
     "Le bilan hebdomadaire ne reste jamais silencieux : il n'est terminé "
     "que lorsque la semaine close est vérifiée, que la semaine suivante porte "
-    "une révision valide relue avec week-plan.py check, et que le bilan destiné "
+    "une révision valide relue avec redline week-plan check, et que le bilan destiné "
     "à ⟨athlète⟩ est écrit. Un message récent n'acquitte aucune de ces trois "
     "obligations."
 )
@@ -222,8 +222,8 @@ MAY_STAY_SILENT_ENDING = (
 def initiative(instructions: str, ending: str) -> str:
     return (
         "[INITIATIVE, invisible pour ⟨athlète⟩] " + instructions + "\n\n"
-        "Lis d'abord `scripts/fact-read.py proactive` pour éviter répétition et "
-        "harcèlement. L'angle que tu choisis se dépose avec `scripts/fact-write.py "
+        "Lis d'abord `redline fact-read proactive` pour éviter répétition et "
+        "harcèlement. L'angle que tu choisis se dépose avec `redline fact-write "
         "angle \"<deux ou trois mots>\"` : il a un champ, il n'a rien à faire dans le "
         "texte, et ne le nomme jamais à ⟨athlète⟩. "
         "Fais toutes les lectures et écritures avant la réponse. "

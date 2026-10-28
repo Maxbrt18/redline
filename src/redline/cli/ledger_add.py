@@ -4,7 +4,7 @@
 The command normalises the floats supplied by Strava, validates each option against
 the contract of `model/ledger.py`, then writes the canonical observation directly.
 
-    python3 scripts/ledger-add.py --date YYYY-MM-DD --type EF --km 6.84 \\
+    redline ledger-add --date YYYY-MM-DD --type EF --km 6.84 \\
         --temps 0:41:56 --allure 6:08 --fcmoy 156.61 --fcmax 168 --cad 168.88 \\
         --dplus 64.7 --dmoins 64 --wbgt 20 --strava 90000000003 --note "…"
 
@@ -131,8 +131,8 @@ def _write_database(url: str, raw: dict[str, str], pains: dict[str, str], key: s
     if turn_id and store.observation_id(key) is not None:
         raise table.LedgerError(
             f"observation déjà enregistrée : {key}. "
-            "Lis fact-read.py observations ; complète seulement les mesures manquantes "
-            f"avec ledger-complete.py --key {key} --metric <mesure> --value <valeur>. "
+            "Lis redline fact-read observations ; complète seulement les mesures manquantes "
+            f"avec redline ledger-complete --key {key} --metric <mesure> --value <valeur>. "
             "Ne recrée pas la séance et ne change pas sa clé.")
     if turn_id:
         store.stage_command(
@@ -163,7 +163,7 @@ def main() -> int:
     parser.add_argument("--idempotency-key", default="",
                         help="clé stable obligatoire sans Strava, ex. messenger:<mid>:lecture")
     parser.add_argument("--start-local", default="",
-                        help="heure locale ISO rendue par strava.py (`start_local`)")
+                        help="heure locale ISO rendue par redline strava (`start_local`)")
     parser.add_argument("--session-key", default="",
                         help="appariement explicite, ex. 2030-W34:w34-ven-ef")
     for item in table.INPUTS:

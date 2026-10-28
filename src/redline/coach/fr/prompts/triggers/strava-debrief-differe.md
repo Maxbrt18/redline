@@ -1,6 +1,6 @@
 L'activité Strava {detail} s'est terminée pendant la
 nuit, quand le coach n'écrit pas. Lis l'INSTANTANÉ STRAVA injecté et traite la sortie comme un
-débrief normal (`scripts/session-cycle.py pending` ; les faits objectifs sont déjà capturés par le service),
+débrief normal (`redline session-cycle pending` ; les faits objectifs sont déjà capturés par le service),
 mais demande AU RÉVEIL DIRECTEMENT la référence laissée par la veille : premiers pas,
 zone surveillée et règle "pas pire le lendemain". Cette collecte ne se reporte jamais au soir
 suivant. Note CARNET présente : une clause rappelle que le carnet l'attend, sans question.

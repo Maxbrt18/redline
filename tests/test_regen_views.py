@@ -1,4 +1,4 @@
-"""scripts/regen-views.py + VaultRepo.regenerate_views: drift in generated views
+"""redline regen-views + VaultRepo.regenerate_views: drift in generated views
 can no longer be committed.
 
 The bot used to append a row to the ledger and commit without anyone rerunning the
@@ -32,7 +32,7 @@ class TestTheEntryPoint:
 
     def test_no_generated_block_in_the_vault_is_an_orphan(self):
         """THE test of the list. An earlier version looked for
-        `"refresh(" in text` in the scripts: `decisions-index.py` wrote its block
+        `"refresh(" in text` in the scripts: `decisions-index` wrote its block
         with a direct `re.sub`, so the heuristic missed it -- a guard with a false
         negative on the only case that existed.
 

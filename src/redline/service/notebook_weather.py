@@ -1,6 +1,6 @@
 """The weather of an upcoming session, for the notebook's departure sheet.
 
-Open-Meteo, free and keyless, like `scripts/weather.py` (which serves the ledger: the
+Open-Meteo, free and keyless, like `redline weather` (which serves the ledger: the
 weather of a COMPLETED session). Here, the forecast of an UPCOMING session: three hours
 around the start, and the night hour. Nothing is stored: a forecast changes, so it is
 requested again, at most every 30 minutes per place and day.

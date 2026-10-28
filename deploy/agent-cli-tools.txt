@@ -1,20 +1,20 @@
 # Domain CLIs exposed to the 24/7 coach. One line per command, backed by a module of
 # src/redline/cli/. Deny by default: a new script is listed here only if a Messenger
 # turn really needs it. CI checks existence, ordering and prompt references.
-chart-month.py
-chart-week.py
-decisions-index.py
-descent.py
-fact-read.py
-fact-write.py
-feasibility.py
-knowledge-search.py
-ledger-add.py
-ledger-complete.py
-ledger.py
-session-cycle.py
-signals.py
-strava.py
-vault-check.py
-weather.py
-week-plan.py
+chart-month
+chart-week
+decisions-index
+descent
+fact-read
+fact-write
+feasibility
+knowledge-search
+ledger
+ledger-add
+ledger-complete
+session-cycle
+signals
+strava
+vault-check
+weather
+week-plan

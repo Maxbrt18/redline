@@ -2,7 +2,7 @@
 
 The `corrections-replay.json` registry says how a corrected rule is replayed: a bench
 scenario, code, nothing (outside the bench), or an `a-rejouer` debt. The real content of
-the registry is judged in `vault-check.py`; here, only what the code guarantees.
+the registry is judged in `vault-check`; here, only what the code guarantees.
 """
 
 import datetime as dt

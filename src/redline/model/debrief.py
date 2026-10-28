@@ -167,7 +167,7 @@ def workout_reps(laps: Sequence[Lap]) -> list[dict] | None:
 
 def quality_card(laps: Sequence[Lap], session: dict | None,
                  date: str = "") -> dict | None:
-    """The `chart-workout.py` payload for a quality session, else None."""
+    """The `redline chart-workout` payload for a quality session, else None."""
     if session is None or not is_quality(session):
         return None
     reps = workout_reps(laps)

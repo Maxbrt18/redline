@@ -31,7 +31,7 @@ def test_n2_distinguishes_a_missing_fact_from_an_exploration():
 
 def test_n1_reads_the_postgres_projection_not_the_deleted_ledger():
     note = DEPTH_NOTES["N1"]
-    assert "fact-read.py observations" in note
+    assert "fact-read observations" in note
     assert "athlete/ledger.md" in note and "n'existe plus" in note
 
 
@@ -160,7 +160,7 @@ def test_debrief_reads_the_activity_and_varies_its_question():
     debrief = PROACTIVE_TRIGGERS["strava_debrief"]
     assert "TITRE ET SA DESCRIPTION" in debrief
     assert "Batterie" in debrief
-    assert "fact-read.py proactive" in debrief
+    assert "fact-read proactive" in debrief
     assert "non servi" in debrief
     # The instruction separates what is READ from what is WRITTEN: paraphrasing a
     # "do not open with" rule meant for the message made the coach announce its method.
@@ -168,8 +168,8 @@ def test_debrief_reads_the_activity_and_varies_its_question():
     # The angle also needs a PLACE to go, otherwise the separation above does not hold:
     # a reasoning given no field ends up in the prose, and hardening the prompt alone
     # closes the only exit it had.
-    assert "fact-write.py angle" in debrief
-    assert "ledger-add.py" in debrief
+    assert "fact-write angle" in debrief
+    assert "ledger-add" in debrief
     assert "DÉJÀ capturé" in debrief
     assert "D- et WBGT compris" in debrief
     assert "NE RÉVISE PAS le plan" in debrief
@@ -197,12 +197,12 @@ def test_morning_collects_the_previous_day_wake_reference_immediately():
 
 def test_morning_checks_plan_threads_and_upcoming_dates():
     morning = PROACTIVE_TRIGGERS["morning"]
-    assert "week-plan.py show/check" in morning
-    assert "fact-read.py threads" in morning
+    assert "week-plan show/check" in morning
+    assert "fact-read threads" in morning
     assert "échéances" in morning and "PostgreSQL" in morning
     assert "PRÉVENANCE" in morning
-    assert "fact-read.py proactive" in morning
-    assert "chart-strength.py" not in morning
+    assert "fact-read proactive" in morning
+    assert "chart-strength" not in morning
     assert "coaching/strength.md" in morning
     assert "le service génère et joint la carte" in morning
 
@@ -219,7 +219,7 @@ def test_weekly_closes_the_loop_and_prepares_next_week():
     assert "Une question seulement si un choix utile reste ouvert" in weekly
     assert "Une condition du jour va dans la `note` de sa séance" in _flat(weekly)
     # The calibration game is stopped: no trend to report.
-    assert "session-cycle.py report" not in weekly
+    assert "session-cycle report" not in weekly
 
 
 def test_a_known_session_time_has_a_carrier_without_becoming_a_questionnaire():
@@ -254,8 +254,8 @@ def test_weekly_closes_the_predictions_that_came_due():
     """A prediction that no review closes is never falsifiable: every due one gets a
     verdict at the review."""
     weekly = " ".join(PROACTIVE_TRIGGERS["weekly"].split())
-    assert "fact-read.py predictions --due" in weekly
-    assert "fact-write.py prediction --key <clé> --outcome true|false|void" in weekly
+    assert "fact-read predictions --due" in weekly
+    assert "fact-write prediction --key <clé> --outcome true|false|void" in weekly
     assert "verdict sur CHAQUE prédiction échue" in weekly
     # Body predictions for long runs and increases attach to the next-morning wake
     # reading and are settled from the notebook.
@@ -284,10 +284,10 @@ def test_style_keeps_channel_and_decision_guardrails():
     assert "si le critère est ambigu, demande" in STYLE_PROMPT
     assert "porte de sortie chiffrée" in STYLE_PROMPT
     assert "UN CHIFFRE NE SE CITE PAS" in STYLE_PROMPT
-    assert f"{prompts.AGENT_CLI} ledger.py --week" in STYLE_PROMPT
+    assert f"{prompts.AGENT_CLI} ledger --week" in STYLE_PROMPT
     assert "Vol. cible" in STYLE_PROMPT
     assert "n'annonce pas leur arrivée" in STYLE_PROMPT
-    assert f"{prompts.AGENT_CLI} fact-read.py corrections" in STYLE_PROMPT
+    assert f"{prompts.AGENT_CLI} fact-read corrections" in STYLE_PROMPT
     assert "Même incident = même clé" in STYLE_PROMPT
 
 
@@ -355,7 +355,7 @@ def test_runtime_prompts_stay_within_explicit_context_budgets():
     message, and a model imitates its own turns before obeying an instruction. The budget
     measures a cost, not a virtue.
 
-    The proactive-trigger ceiling pays for a COMMAND, `fact-write.py angle`, which gives
+    The proactive-trigger ceiling pays for a COMMAND, `fact-write angle`, which gives
     the angle a place to go: a reasoning given no field ends up in the prose.
     """
     # The explicit launcher adds a word to the former bare CLI mentions. That cost buys
@@ -431,13 +431,13 @@ def test_missing_cells_publish_the_real_one_metric_cli_contract():
         [{"date": "2026-08-30", "type": "long",
           "missing": ["RPE", "Dlr", "Plaisir"]}], [])
 
-    assert (f"{prompts.AGENT_CLI} ledger-complete.py --key <clé> "
+    assert (f"{prompts.AGENT_CLI} ledger-complete --key <clé> "
             "--metric rpe --value 5") in note
     assert "N'utilise jamais `--rpe`, `--pain`" in note
 
 
 def test_style_names_relational_memory_and_its_closed_vocabularies():
-    assert f"{prompts.AGENT_CLI} fact-write.py thread" in STYLE_PROMPT
+    assert f"{prompts.AGENT_CLI} fact-write thread" in STYLE_PROMPT
     assert "`open` ou `closed`" in _flat(STYLE_PROMPT)
     assert "ces deux mots exactement" in STYLE_PROMPT
     assert "coaching/adherence.md" in STYLE_PROMPT
@@ -447,7 +447,7 @@ def test_style_names_relational_memory_and_its_closed_vocabularies():
 
 def test_conversation_knows_the_strength_card_exists():
     for depth in ("N1", "N2"):
-        assert "chart-strength.py" not in DEPTH_NOTES[depth]
+        assert "chart-strength" not in DEPTH_NOTES[depth]
         assert "générée et jointe déterministement" in DEPTH_NOTES[depth]
     assert "Vérifie avant de dire" in STYLE_PROMPT
 
@@ -456,12 +456,12 @@ def test_strava_is_declared_on_every_path_the_coach_can_take():
     """A capability declared on a single path does not exist on the others. Strava is
     therefore named where every turn passes: the style, the debrief reading walk, and
     the two triggers that start from an activity."""
-    assert f"{prompts.AGENT_CLI} strava.py" in STYLE_PROMPT
+    assert f"{prompts.AGENT_CLI} strava" in STYLE_PROMPT
     assert "TU AS ACCÈS À STRAVA" in STYLE_PROMPT
-    assert f"{prompts.AGENT_CLI} strava.py" in DEPTH_NOTES["N1"]
+    assert f"{prompts.AGENT_CLI} strava" in DEPTH_NOTES["N1"]
     for kind in ("strava_debrief", "strava_debrief_differe"):
         assert "INSTANTANÉ STRAVA" in PROACTIVE_TRIGGERS[kind]
-        assert f"{prompts.AGENT_CLI} strava.py" not in PROACTIVE_TRIGGERS[kind]
+        assert f"{prompts.AGENT_CLI} strava" not in PROACTIVE_TRIGGERS[kind]
 
 
 def test_a_debrief_uses_the_captured_snapshot_instead_of_refetching_strava():
@@ -478,7 +478,7 @@ def test_every_command_the_prompts_hand_out_is_runnable_as_written():
         flat = " ".join(text.split())
         assert "python3 scripts/" not in flat
         assert "`scripts/" not in flat.replace("`scripts/` direct", "")
-        for command in ("strava.py", "descent.py", "weather.py"):
+        for command in ("strava", "descent", "weather"):
             if f"`{prompts.AGENT_CLI} {command}" in flat:
                 assert f"{prompts.AGENT_CLI} {command}" in flat
 
@@ -501,12 +501,12 @@ def test_a_stale_plan_asks_for_a_revision_before_the_turn_not_after():
     assert "2026-W33" in note
     assert "tu réponds normalement" in note
     assert "AUCUNE prescription" in note
-    assert "week-plan.py revise --week 2026-W33" in note
+    assert "week-plan revise --week 2026-W33" in note
     assert "Ne parle jamais de ce contrôle" in note
 
 
 def test_the_cadence_is_never_doubled_twice():
-    """The x2 is applied in scripts/strava.py, which tells a stride from a pedal turn.
+    """The x2 is applied in redline strava, which tells a stride from a pedal turn.
     The prompt must say NOT to redo it, otherwise 168 becomes 336."""
     assert "ne la multiplie pas une deuxième fois" in PROACTIVE_TRIGGERS["strava_debrief"]
 
@@ -661,7 +661,7 @@ def test_the_glyph_rule_reaches_the_data_channel_not_only_the_written_prompts():
     two of them VERBATIM into the hidden instruction, and a note goes out to the
     athlete's phone.
 
-    The refusal is applied at WRITE time (`week-plan.py revise`), not in `validate`:
+    The refusal is applied at WRITE time (`week-plan revise`), not in `validate`:
     history is append-only and `revise` validates the whole plan, so a rule applied at
     read time would refuse today's revision because of yesterday's text.
     """
@@ -735,7 +735,7 @@ def test_a_restriction_names_its_rule_and_fact_wherever_the_plan_is_revised():
 def test_weekly_uses_the_dossier_and_closes_every_due_prediction():
     weekly = " ".join(PROACTIVE_TRIGGERS["weekly"].split())
     assert "DOSSIER DU BILAN" in weekly and "ne le recalcule pas" in weekly
-    assert "fact-read.py predictions --due" in weekly
+    assert "fact-read predictions --due" in weekly
     assert "--reason" in weekly and "decisions-index" not in weekly
     assert "protocole d'instruction des baisses" in weekly
     assert "action prête à faire" in weekly and "repli daté" in weekly
@@ -848,4 +848,4 @@ def test_a_quality_session_is_judged_on_its_written_criteria_only():
 def test_the_workout_card_is_no_longer_the_models_choice():
     assert "chart-workout" not in " ".join(PROACTIVE_TRIGGERS.values())
     assert "chart-workout" not in STYLE_PROMPT
-    assert "chart-workout.py" not in (DEPLOY_DIR / "agent-cli-tools.txt").read_text()
+    assert "chart-workout" not in (DEPLOY_DIR / "agent-cli-tools.txt").read_text()

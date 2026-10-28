@@ -45,7 +45,7 @@ def store():
 
 
 def coach(command: str, *arguments: str, turn: str = "") -> subprocess.CompletedProcess:
-    """A coach command (`scripts/week-plan.py`, as the instructions spell it),
+    """A coach command (`redline week-plan`, as the instructions spell it),
     launched exactly the way the service launches it."""
     environment = {**os.environ, "DATABASE_URL": URL}
     if turn:
@@ -98,7 +98,7 @@ def test_un_debrief_complet_passe_la_frontiere_du_tour(store):
     poser_le_plan(store)
     tour = str(uuid.uuid4())
 
-    reussit(coach("scripts/ledger-add.py", "--date", "2026-08-14", "--type", "easy",
+    reussit(coach("redline ledger-add", "--date", "2026-08-14", "--type", "easy",
                   "--km", "6.969", "--temps", "43:05", "--allure", "6:11",
                   "--fcmoy", "151.3", "--cad", "165", "--dplus", "64.6",
                   "--strava", "90000000002", "--start-local", "2026-08-14T07:15:00",
@@ -106,7 +106,7 @@ def test_un_debrief_complet_passe_la_frontiere_du_tour(store):
 
     assert store.apply_turn_with_receipts(tour)[0] == 1
     assert store.load_plan("2026-W33")["revisions"][-1]["sessions"][0]["status"] == "done"
-    assert reussit(coach("scripts/week-plan.py", "check", "--week", "2026-W33"),
+    assert reussit(coach("redline week-plan", "check", "--week", "2026-W33"),
                    "check").returncode == 0
 
 
@@ -116,21 +116,21 @@ def test_donner_un_rpe_ne_casse_jamais_rien(store):
     # The session predates the plan: its persistence watermark has therefore already seen it.
     # This is the starting point of the gesture under test.
     tour_seance = str(uuid.uuid4())
-    reussit(coach("scripts/ledger-add.py", "--date", "2026-08-14", "--type", "bike",
+    reussit(coach("redline ledger-add", "--date", "2026-08-14", "--type", "bike",
                   "--km", "36.9", "--temps", "1:42:57",
                   "--idempotency-key", "messenger:2026-08-14:velo", turn=tour_seance),
             "ledger-add")
     store.apply_turn_with_receipts(tour_seance)[0]
     poser_le_plan(store)
-    assert coach("scripts/week-plan.py", "check", "--week", "2026-W33").returncode == 0
+    assert coach("redline week-plan", "check", "--week", "2026-W33").returncode == 0
 
     # Hours later, the athlete gives their perceived effort. NOTHING must move on the plan.
     tour = str(uuid.uuid4())
-    reussit(coach("scripts/ledger-complete.py", "--date", "2026-08-14", "--type", "bike",
+    reussit(coach("redline ledger-complete", "--date", "2026-08-14", "--type", "bike",
                   "--metric", "rpe", "--value", "7.5", turn=tour), "ledger-complete")
     store.apply_turn_with_receipts(tour)[0]
 
-    plan = coach("scripts/week-plan.py", "check", "--week", "2026-W33")
+    plan = coach("redline week-plan", "check", "--week", "2026-W33")
     assert plan.returncode == 0, (
         "compléter une mesure ne doit pas périmer le programme : "
         + (plan.stderr or plan.stdout))
@@ -141,27 +141,27 @@ def test_completer_sans_connaitre_la_cle_inventee_hier(store):
     It has the date; the date must be enough. Otherwise it guesses, and guesses wrong."""
     poser_le_plan(store)
     tour_seance = str(uuid.uuid4())
-    reussit(coach("scripts/ledger-add.py", "--date", "2026-08-14", "--type", "bike",
+    reussit(coach("redline ledger-add", "--date", "2026-08-14", "--type", "bike",
                   "--km", "36.9", "--temps", "1:42:57",
                   "--idempotency-key", "messenger:2026-08-14:velo-du-padre",
                   turn=tour_seance), "ledger-add sans id Strava")
     store.apply_turn_with_receipts(tour_seance)[0]
 
-    lecture = reussit(coach("scripts/fact-read.py", "observations", "--limit", "5"),
+    lecture = reussit(coach("redline fact-read", "observations", "--limit", "5"),
                       "fact-read")
     assert "clé=messenger:2026-08-14:velo-du-padre" in lecture.stdout, (
         "la clé exigée par ledger-complete doit être publiée par le lecteur")
 
     tour_lien = str(uuid.uuid4())
     reussit(coach(
-        "scripts/ledger-link.py", "--key", "messenger:2026-08-14:velo-du-padre",
+        "redline ledger-link", "--key", "messenger:2026-08-14:velo-du-padre",
         "--strava", "90000000001", turn=tour_lien), "rattachement à Strava")
     assert store.activity_recorded(90000000001) is False
     store.apply_turn_with_receipts(tour_lien)[0]
     assert store.activity_recorded(90000000001) is True
 
     tour = str(uuid.uuid4())
-    reussit(coach("scripts/ledger-complete.py", "--date", "2026-08-14", "--type", "bike",
+    reussit(coach("redline ledger-complete", "--date", "2026-08-14", "--type", "bike",
                   "--metric", "pain", "--value", "0", turn=tour), "complétion par date")
     store.apply_turn_with_receipts(tour)[0]
 
@@ -170,7 +170,7 @@ def test_une_cle_fausse_echoue_tout_de_suite_pas_a_la_frontiere(store):
     """A faulty command fails WHILE the coach can still correct itself. At the turn
     boundary it has already written its reply and everything is lost."""
     poser_le_plan(store)
-    process = coach("scripts/ledger-complete.py", "--key", "strava:90000000001",
+    process = coach("redline ledger-complete", "--key", "strava:90000000001",
                     "--metric", "rpe", "--value", "7", turn=str(uuid.uuid4()))
     assert process.returncode != 0, "une clé inexistante doit échouer immédiatement"
     assert "observation inconnue" in (process.stderr + process.stdout)
@@ -180,12 +180,12 @@ def test_l_etat_du_jour_ne_perime_pas_le_programme(store):
     """Saying one slept badly feeds the gauge; it does not make the program wrong."""
     poser_le_plan(store)
     tour = str(uuid.uuid4())
-    reussit(coach("scripts/fact-write.py", "daily", "--date", "2026-08-14",
+    reussit(coach("redline fact-write", "daily", "--date", "2026-08-14",
                   "--sleep", "poor", "--life-load", "high", "--desire", "normal",
                   turn=tour), "fact-write daily")
     store.apply_turn_with_receipts(tour)[0]
 
-    assert reussit(coach("scripts/week-plan.py", "check", "--week", "2026-W33"),
+    assert reussit(coach("redline week-plan", "check", "--week", "2026-W33"),
                    "check").returncode == 0
 
 
@@ -194,13 +194,13 @@ def test_un_programme_perime_reste_lisible_et_le_dit(store):
     prints, and the exit code names the remedy."""
     poser_le_plan(store)
     tour = str(uuid.uuid4())
-    reussit(coach("scripts/ledger-add.py", "--date", "2026-08-14", "--type", "easy",
+    reussit(coach("redline ledger-add", "--date", "2026-08-14", "--type", "easy",
                   "--km", "7", "--temps", "43:00",
                   "--idempotency-key", "messenger:2026-08-14:ef", turn=tour),
             "ledger-add sans révision")
     store.apply_turn_with_receipts(tour)[0]
 
-    process = coach("scripts/week-plan.py", "show", "--week", "2026-W33")
+    process = coach("redline week-plan", "show", "--week", "2026-W33")
     assert process.returncode == 3, "périmé = 3, jamais 1"
     assert "w33-ven-ef" in process.stdout, "le programme doit rester lisible"
     assert "révision" in process.stderr
@@ -223,23 +223,23 @@ def test_le_mot_du_matin_joue_toute_sa_sequence(store):
     """What the `morning` trigger orders, in the order it orders it."""
     poser_le_plan(store)
     sequence(
-        ("plan du jour", ["scripts/week-plan.py", "show", "--week", "2026-W33"]),
-        ("validation", ["scripts/week-plan.py", "check", "--week", "2026-W33"]),
-        ("registre", ["scripts/fact-read.py", "observations", "--limit", "10"]),
-        ("fils ouverts", ["scripts/fact-read.py", "threads"]),
-        ("échéances", ["scripts/fact-read.py", "deadlines"]),
-        ("cockpit", ["scripts/fact-read.py", "capabilities"]),
-        ("journal proactif", ["scripts/fact-read.py", "proactive"]),
+        ("plan du jour", ["redline week-plan", "show", "--week", "2026-W33"]),
+        ("validation", ["redline week-plan", "check", "--week", "2026-W33"]),
+        ("registre", ["redline fact-read", "observations", "--limit", "10"]),
+        ("fils ouverts", ["redline fact-read", "threads"]),
+        ("échéances", ["redline fact-read", "deadlines"]),
+        ("cockpit", ["redline fact-read", "capabilities"]),
+        ("journal proactif", ["redline fact-read", "proactive"]),
     )
 
 
 def test_le_bilan_du_dimanche_joue_toute_sa_sequence(store):
     """What the `weekly` trigger orders. It touches the most scripts, so it is the one
     that breaks most quietly -- once a week, on Sunday."""
-    # A Sunday without any session does not exist: `signals.py` refuses an empty ledger, and
+    # A Sunday without any session does not exist: `signals` refuses an empty ledger, and
     # the rehearsal must play a lived week, not a theoretical one.
     tour_seance = str(uuid.uuid4())
-    reussit(coach("scripts/ledger-add.py", "--date", "2026-08-14", "--type", "easy",
+    reussit(coach("redline ledger-add", "--date", "2026-08-14", "--type", "easy",
                   "--km", "7", "--temps", "43:00", "--allure", "6:08",
                   "--rpe", "3", "--pain", "1", "--plaisir", "7",
                   "--idempotency-key", "messenger:2026-08-14:ef-bilan",
@@ -247,27 +247,27 @@ def test_le_bilan_du_dimanche_joue_toute_sa_sequence(store):
     store.apply_turn_with_receipts(tour_seance)[0]
     poser_le_plan(store)
     sequence(
-        ("agrégats", ["scripts/ledger.py", "--week", "2026-W33"]),
-        ("tendance douleur", ["scripts/ledger.py", "--pain-trend", "3"]),
-        ("signaux faibles", ["scripts/signals.py"]),
-        ("adhérence du plan", ["scripts/week-plan.py", "check", "--week", "2026-W33"]),
-        ("cockpit", ["scripts/fact-read.py", "capabilities"]),
+        ("agrégats", ["redline ledger", "--week", "2026-W33"]),
+        ("tendance douleur", ["redline ledger", "--pain-trend", "3"]),
+        ("signaux faibles", ["redline signals"]),
+        ("adhérence du plan", ["redline week-plan", "check", "--week", "2026-W33"]),
+        ("cockpit", ["redline fact-read", "capabilities"]),
     )
     tour = str(uuid.uuid4())
-    reussit(coach("scripts/fact-write.py", "deadline", "--key", "repetition-hebdo",
+    reussit(coach("redline fact-write", "deadline", "--key", "repetition-hebdo",
                   "--due-on", "2026-08-20", "--item", "échéance de la répétition",
                   "--fact-owner", "coaching/decisions.md", "--status", "todo",
                   turn=tour), "échéance")
     store.apply_turn_with_receipts(tour)[0]
     assert "échéance de la répétition" in reussit(
-        coach("scripts/fact-read.py", "deadlines"), "relecture").stdout
+        coach("redline fact-read", "deadlines"), "relecture").stdout
 
 
 def test_le_debrief_strava_joue_toute_sa_sequence(store):
     """Record and reconcile with the cycle -- the full chain of a debrief."""
     poser_le_plan(store)
     tour = str(uuid.uuid4())
-    reussit(coach("scripts/ledger-add.py", "--date", "2026-08-14", "--type", "easy",
+    reussit(coach("redline ledger-add", "--date", "2026-08-14", "--type", "easy",
                   "--km", "6.969", "--temps", "43:05", "--allure", "6:11",
                   "--fcmoy", "151.3", "--cad", "165", "--dplus", "64.6",
                   "--dmoins", "65", "--wbgt", "23", "--strava", "90000000002",
@@ -276,4 +276,4 @@ def test_le_debrief_strava_joue_toute_sa_sequence(store):
                   turn=tour), "ledger-add")
     assert store.apply_turn_with_receipts(tour)[0] == 1
     assert store.load_plan("2026-W33")["revisions"][-1]["sessions"][0]["status"] == "done"
-    assert coach("scripts/week-plan.py", "check", "--week", "2026-W33").returncode == 0
+    assert coach("redline week-plan", "check", "--week", "2026-W33").returncode == 0

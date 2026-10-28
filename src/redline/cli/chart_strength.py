@@ -19,7 +19,7 @@ Two outputs from that one selection: the PNG, and a `.link` sidecar holding the 
 interactive snapshot. After the image is delivered, the service stores that snapshot
 and turns its opaque capability into a button. Both views therefore cannot disagree.
 
-Usage:  python3 scripts/chart-strength.py -o strength-example.png < selection.json
+Usage:  redline chart-strength -o strength-example.png < selection.json
 """
 
 from pathlib import Path

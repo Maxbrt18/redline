@@ -1,6 +1,6 @@
 """How each correction from the athlete is replayed, read from a typed registry.
 
-`coaching/corrections.md` tells the error and names its carrier; `vault-check.py`
+`coaching/corrections.md` tells the error and names its carrier; `redline vault-check`
 verifies that a carrier is NAMED, never that it carries. A code rule is frozen by a test.
 A drafting rule, carried by a prompt or CLAUDE.md, can only be shown to still hold by a
 scenario replayed by `redline.cli.evaluate_coaching`.

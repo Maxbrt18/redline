@@ -4,7 +4,7 @@ aliases: [débrief séance, debrief-seance]
 ---
 
 <!-- Après CHAQUE séance. < 60 s. Chaque champ a une destination : le registre
-     PostgreSQL via `ledger-add.py` / `ledger-complete.py`. Rien n'est demandé qui n'ait
+     PostgreSQL via `redline ledger-add` / `redline ledger-complete`. Rien n'est demandé qui n'ait
      pas d'usage. Le pattern de douleur passe avant le chiffre : "empire au fil de la
      sortie" = stade avancé, "apparaît puis se dissipe" = charge encaissée
      (coaching/protocols.md batterie E). Le RPE se lit en voyant la cible du jour :

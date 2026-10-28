@@ -32,7 +32,7 @@ BASE = "http://redline.test"
 
 
 def dose(**data) -> dict:
-    """A dose exactly as chart-strength.py hands it to the page."""
+    """A dose exactly as chart-strength hands it to the page."""
     return Dose.read(data).payload()
 
 

@@ -21,7 +21,7 @@ ENJOYMENT_TYPES = session_kinds.ENJOYMENT
 
 @dataclass(frozen=True)
 class ObservationInput:
-    """An option of `ledger-add.py` and its destination in the typed observation."""
+    """An option of `redline ledger-add` and its destination in the typed observation."""
 
     name: str
     pattern: str

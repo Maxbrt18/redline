@@ -92,7 +92,7 @@ def test_week_plan_reads_the_revision_from_input():
 def test_a_resumed_claude_turn_names_its_own_file_in_its_message(make_config):
     """The agent freezes the system prompt at the first turn of the session and replays
         it on every `--resume`. A per-turn path placed there would still designate the
-        first turn, and `week-plan.py revise` would refuse the file. The path therefore
+        first turn, and `week-plan revise` would refuse the file. The path therefore
         travels in the message; the system prompt no longer depends on the turn."""
     runner = ClaudeCodeRunner(make_config(agent_provider="claude"), state=None)
     first = runner._command("bilan", "sess-42", turn_id=OTHER)
@@ -142,7 +142,7 @@ def _fake_claude(tmp_path, tool_result: str, denials: list | None = None) -> str
     events = [
         {"type": "assistant", "message": {"content": [{
             "type": "tool_use", "id": "t1", "name": "Bash",
-            "input": {"command": "/usr/local/bin/redline-agent-cli week-plan.py preview "
+            "input": {"command": "/usr/local/bin/redline-agent-cli week-plan preview "
                                  "--week 2026-W01 --input .agent-tmp/x.json"}}]}},
         {"type": "user", "message": {"content": [{
             "type": "tool_result", "tool_use_id": "t1", "content": tool_result}]}},

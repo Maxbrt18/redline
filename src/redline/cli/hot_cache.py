@@ -6,8 +6,8 @@ Two blocks, computed from PostgreSQL: Form (volumes, gauge, pain trend) and Stat
 of the hot cache is hand-written: editorial judgement, not derived state, and it must
 carry no state that has an owner.
 
-    python3 scripts/hot-cache.py           # writes
-    python3 scripts/hot-cache.py --check   # reports drift, writes nothing (CI)
+    redline hot-cache           # writes
+    redline hot-cache --check   # reports drift, writes nothing (CI)
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ def main() -> int:
     if not drifted:
         print("Blocs Forme et État déjà à jour.")
     elif args.check:
-        raise InputError("Blocs du hot-cache dérivés — régénère avec `python3 scripts/hot-cache.py`.")
+        raise InputError("Blocs du hot-cache dérivés — régénère avec `redline hot-cache`.")
     else:
         print("Blocs Forme et État régénérés.")
     return 0

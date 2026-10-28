@@ -18,10 +18,15 @@ FAILURE = 1
 
 
 def run(main: Callable[[], int | None]) -> NoReturn:
-    local_time.apply_to_process()
     try:
+        local_time.apply_to_process()
         code = main()
     except RedlineError as exc:
         print(exc, file=sys.stderr)
         code = FAILURE
+    raise SystemExit(code)
+
+
+def exit_with(code: int) -> NoReturn:
+    """Leave with `code`, for an entry point that needs no vault (`redline --help`)."""
     raise SystemExit(code)

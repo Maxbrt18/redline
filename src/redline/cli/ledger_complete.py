@@ -43,7 +43,7 @@ def resolve_key(store, key: str, date: str, kind: str) -> str:
     if not candidats:
         raise InputError(f"aucune observation le {date}"
                          + (f" de type {kind}" if kind else "")
-                         + " — vérifie avec `fact-read.py observations`")
+                         + " — vérifie avec `redline fact-read observations`")
     if len(candidats) > 1:
         details = " · ".join(f"{row['kind']} (clé={row['idempotency_key']})"
                              for row in candidats)
@@ -55,7 +55,7 @@ def resolve_key(store, key: str, date: str, kind: str) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--key", default="",
-                        help="clé de l'observation (cf. `fact-read.py observations`)")
+                        help="clé de l'observation (cf. `redline fact-read observations`)")
     parser.add_argument("--date", default="",
                         help="AAAA-MM-JJ — alternative à --key, résolue sur le registre")
     parser.add_argument("--type", dest="kind", default="",
@@ -77,7 +77,7 @@ def main() -> int:
     from redline.storage import Database, OperationalStore, StorageError
 
     if not args.key and not args.date:
-        parser.error("--key ou --date obligatoire (cf. `fact-read.py observations`)")
+        parser.error("--key ou --date obligatoire (cf. `redline fact-read observations`)")
     if args.hr_doubt:
         if args.metric or args.value is not None or args.unavailable:
             parser.error("--hr-doubt se passe seul, sans --metric ni valeur")

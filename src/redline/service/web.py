@@ -127,7 +127,7 @@ def _iter_events(payload: dict):
 def _exercise_cues(vault: Path) -> dict:
     """{slug: [cues]} for the page, read once at startup.
 
-    Never fatal: a broken exercise note must fail `vault-check.py` and the card
+    Never fatal: a broken exercise note must fail `redline vault-check` and the card
     rendering, not the service startup. Without cues the « Le geste » button simply
     does not appear and the session runs as usual.
     """

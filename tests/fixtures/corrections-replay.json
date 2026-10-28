@@ -11,7 +11,7 @@
     "carriers": [
       "src/redline/analysis/signals.py"
     ],
-    "note": "alarme retirée de signals.py",
+    "note": "alarme retirée de redline signals",
     "scenarios": []
   },
   {

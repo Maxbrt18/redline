@@ -53,7 +53,7 @@ def render(store: OperationalStore, root: Path, week: str, today: dt.date) -> st
     typed = [row for row in every
              if row.get("status") == "open" and _as_date(row["due_on"]) <= today]
     lines += ["", f"Prédictions échues ({len(typed)}), ferme chacune avec "
-                  "`fact-write.py prediction --key <clé> --outcome true|false|void`. Un "
+                  "`redline fact-write prediction --key <clé> --outcome true|false|void`. Un "
                   "verdict s'adosse à un fait lu ; void est un verdict, l'invention n'en "
                   "est pas un. Une réfutée porte `--reason optimistic` (moins bien que "
                   "prédit) ou `cautious` (mieux) ; une void `--reason instrument` (la "
@@ -79,7 +79,7 @@ def render(store: OperationalStore, root: Path, week: str, today: dt.date) -> st
         lines += ["", "Permis EF de la semaine close (choix scellés du coach face au "
                       "couru) : solde chaque prédiction easy-permit-* avec ces écarts, "
                       "puis scelle les EF de la semaine suivante avec "
-                      "`fact-write.py permit` AVANT d'écrire la révision. L'EF ne "
+                      "`redline fact-write permit` AVANT d'écrire la révision. L'EF ne "
                       "porte que son enveloppe (`duration_cap_min`), jamais ta durée, "
                       "et ton choix ne se révèle pas avant le bilan (protocols.md "
                       "§ Permis EF) :"]

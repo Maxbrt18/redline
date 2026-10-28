@@ -4,9 +4,9 @@
 The entry point exists so the list of generators has one owner: a copied list is the
 drift that `CLAUDE.md` forbids for facts. It lives here, callers read it.
 
-    python3 scripts/regen-views.py           # writes
-    python3 scripts/regen-views.py --check   # reports drift, writes nothing
-    python3 scripts/regen-views.py --check --static-only  # CI, without PostgreSQL
+    redline regen-views           # writes
+    redline regen-views --check   # reports drift, writes nothing
+    redline regen-views --check --static-only  # CI, without PostgreSQL
 
 Each generator stays responsible for its own error message: they are all chained --
 even after a failure -- and the result is 1 as soon as one of them failed.
@@ -33,8 +33,8 @@ GENERATOR_TIMEOUT = 120
 
 # Every script that writes a block between markers belongs here: a generator missing
 # from this list is one nobody reruns.
-OPERATIONAL_GENERATORS = ("hot-cache.py",)
-STATIC_GENERATORS = ("strength-tables.py",)
+OPERATIONAL_GENERATORS = ("hot-cache",)
+STATIC_GENERATORS = ("strength-tables",)
 GENERATORS = OPERATIONAL_GENERATORS + STATIC_GENERATORS
 
 

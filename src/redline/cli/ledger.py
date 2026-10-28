@@ -1,4 +1,4 @@
-"""The `ledger.py` command: see `redline.analysis.ledger`."""
+"""The `redline ledger` command: see `redline.analysis.ledger`."""
 
 from redline.analysis.ledger import main
 from redline.model import entrypoint

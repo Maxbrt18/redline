@@ -1,4 +1,4 @@
-"""`decisions-index.py --find`: a decision is found by its words, read whole, alone."""
+"""`decisions-index --find`: a decision is found by its words, read whole, alone."""
 
 from conftest import load_script
 

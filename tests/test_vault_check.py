@@ -1,4 +1,4 @@
-"""Tests for `scripts/vault-check.py`, the vault consistency checker.
+"""Tests for `redline vault-check`, the vault consistency checker.
 
 The checker carries more than plain structure checks: assertions about vault content live
 here instead of in pytest, because content the bot rewrites several times a day has no place

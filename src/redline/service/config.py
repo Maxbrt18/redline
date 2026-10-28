@@ -35,7 +35,7 @@ EXTRA_SECRETS = frozenset({"HEALTHCHECK_PING_URL"})
 
 # Values required by executable tools inside the sandbox:
 #   DATABASE_URL         → fact-read, ledger, week-plan (application role, no DDL)
-#   STRAVA_CLIENT_*      → scripts/strava.py
+#   STRAVA_CLIENT_*      → redline strava
 #   STRAVA_TOKEN_CACHE   → a PATH, not a secret, but its name contains "TOKEN"
 #   REDLINE_TURN_ID      → the turn's transactional boundary
 #   CHROMIUM_PATH        → card rendering
