@@ -116,7 +116,7 @@ log = logging.getLogger("redline")
 # that just arrived, so there is always something to say. Their silence is a read failure
 # and is retried once. The others (morning note, check-in) may have nothing to say, and
 # that is the right answer.
-SILENCE_IS_A_FAILURE = frozenset({"strava_debrief", "strava_debrief_differe"})
+SILENCE_IS_A_FAILURE = frozenset({"strava_debrief", "strava_debrief_late"})
 CONTROL_COMMANDS = frozenset({"/status", "/cancel"})
 # Depths whose business packet already carries the open threads (`context_packet.py`).
 PACKET_THREAD_DEPTHS = frozenset({"N2", "N3"})
@@ -138,7 +138,7 @@ def unrecorded_line(kinds: Iterable[str]) -> str:
 
 
 #: Initiatives that asked for feelings the notebook now collects.
-NOTEBOOK_KINDS = frozenset({"strava_debrief", "strava_debrief_differe", "morning"})
+NOTEBOOK_KINDS = frozenset({"strava_debrief", "strava_debrief_late", "morning"})
 
 
 class CoachBot:
@@ -165,7 +165,7 @@ class CoachBot:
         "strava_debrief": 4.0,
         # Already a next-morning message: if the agent is down at 07:30 it still makes
         # sense at 10:00, not the day after.
-        "strava_debrief_differe": 4.0,
+        "strava_debrief_late": 4.0,
         "morning": 3.0,
         "weekly": 6.0,
         "weekly_repair": 12.0,
@@ -173,7 +173,7 @@ class CoachBot:
         "silence": 24.0,
         # The cell leaves its window at midnight: a claim replayed the next day no longer asks
         # for a memory but for a reconstruction. It dies with the night.
-        "registre_incomplet": 2.0,
+        "ledger_incomplete": 2.0,
         "missed_session": 8.0,
         "daily_signal": 12.0,
         "premortem": 24.0,
@@ -185,7 +185,7 @@ class CoachBot:
         "strength_card": 12.0,
         "operator_message": 6.0,
         # The notebook no longer takes the trace after 14:00: `expires_at` already bounds the job.
-        "trace_reveil": 3.5,
+        "wake_trace": 3.5,
     }
 
     def __init__(self, client: MessengerClient, repo: VaultRepo,
@@ -1204,10 +1204,10 @@ class CoachBot:
         if job.kind == "strength_card":
             self._deliver_strength_card_job(job)
             return
-        if job.kind == "registre_incomplet":
+        if job.kind == "ledger_incomplete":
             self._deliver_missing_cells(job)
             return
-        if job.kind == "trace_reveil" and not self.wake_reminder_due(job.psid):
+        if job.kind == "wake_trace" and not self.wake_reminder_due(job.psid):
             # Data entered in the notebook (or in the chat) between queueing and sending.
             self._complete_job(job)
             return

@@ -176,7 +176,7 @@ def test_debrief_reads_the_activity_and_varies_its_question():
 
 
 def test_deferred_debrief_is_about_the_morning_after():
-    deferred = PROACTIVE_TRIGGERS["strava_debrief_differe"]
+    deferred = PROACTIVE_TRIGGERS["strava_debrief_late"]
     assert "déjà capturés par le service" in deferred
     assert "AU RÉVEIL" in deferred
     assert "AU RÉVEIL DIRECTEMENT" in deferred
@@ -312,7 +312,7 @@ def test_the_rating_scales_ride_with_the_levels_where_numbers_are_given():
 def test_the_morning_debrief_never_asks_for_a_mark_out_of_ten():
     """The morning-after wake reading is "completely different and hard to rate". The
     trigger carries the wording, not only the prohibition."""
-    differe = PROACTIVE_TRIGGERS["strava_debrief_differe"]
+    differe = PROACTIVE_TRIGGERS["strava_debrief_late"]
     assert "NE DEMANDE PAS UNE NOTE SUR 10" in differe
     assert "(aucune, très légère, légère, nette)" in _flat(differe)
 
@@ -459,7 +459,7 @@ def test_strava_is_declared_on_every_path_the_coach_can_take():
     assert f"{prompts.AGENT_CLI} strava" in STYLE_PROMPT
     assert "TU AS ACCÈS À STRAVA" in STYLE_PROMPT
     assert f"{prompts.AGENT_CLI} strava" in DEPTH_NOTES["N1"]
-    for kind in ("strava_debrief", "strava_debrief_differe"):
+    for kind in ("strava_debrief", "strava_debrief_late"):
         assert "INSTANTANÉ STRAVA" in PROACTIVE_TRIGGERS[kind]
         assert f"{prompts.AGENT_CLI} strava" not in PROACTIVE_TRIGGERS[kind]
 
@@ -593,7 +593,7 @@ def test_evening_claim_hides_storage_plumbing():
 
     from redline.service.proactive_messages import compose_closed_proactive
 
-    claim = compose_closed_proactive("registre_incomplet", json.dumps({
+    claim = compose_closed_proactive("ledger_incomplete", json.dumps({
         "date": "2026-09-24", "type": "easy", "missing": ["RPE"],
         "markers": ["2026-09-24:easy:RPE"]}))
     assert claim is not None

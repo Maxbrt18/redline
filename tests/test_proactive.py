@@ -126,7 +126,7 @@ def test_pending_ledger_cells_accept_the_iso_date_from_the_read_model(
 
     job = due_trigger(sched, TUESDAY_NOON.replace(hour=20))
 
-    assert job.kind == "registre_incomplet"
+    assert job.kind == "ledger_incomplete"
     assert json.loads(job.detail)["date"] == "2026-07-14"
 
 
@@ -141,7 +141,7 @@ def test_pending_wake_cells_are_not_claimed_in_the_evening(store, make_config):
     }]
 
     assert due_trigger(sched, TUESDAY_NOON.replace(hour=20)) is None
-    assert not any(job["kind"] == "registre_incomplet"
+    assert not any(job["kind"] == "ledger_incomplete"
                    for job in store.proactive.jobs())
 
 
@@ -156,7 +156,7 @@ def test_objective_only_ledger_cells_never_wake_the_athlete(store, make_config):
     }]
 
     assert due_trigger(sched, TUESDAY_NOON.replace(hour=20)) is None
-    assert not any(job["kind"] == "registre_incomplet"
+    assert not any(job["kind"] == "ledger_incomplete"
                    for job in store.proactive.jobs())
 
 
@@ -389,11 +389,11 @@ def test_a_missing_wake_trace_is_recalled_at_half_past_ten_until_two(store, make
     sched = _wake_scheduler(store, make_config)
 
     sched._materialize_triggers(PSID, TUESDAY_MORNING.replace(hour=10, minute=29))
-    assert not any(job["kind"] == "trace_reveil" for job in store.proactive.jobs())
+    assert not any(job["kind"] == "wake_trace" for job in store.proactive.jobs())
 
     sched._materialize_triggers(PSID, TUESDAY_MORNING.replace(hour=10, minute=30))
-    job = next(job for job in store.proactive.jobs() if job["kind"] == "trace_reveil")
-    assert job["id"] == "trace-reveil:2026-07-14"
+    job = next(job for job in store.proactive.jobs() if job["kind"] == "wake_trace")
+    assert job["id"] == "wake-trace:2026-07-14"
     assert job["expire_at"] == datetime(
         2026, 7, 14, 14, 0, tzinfo=ZoneInfo("Europe/Paris")).timestamp()
 
@@ -409,7 +409,7 @@ def test_no_wake_reminder_when_the_trace_is_in_or_after_two(store, make_config):
     late._materialize_triggers(PSID, TUESDAY_MORNING.replace(hour=14))
 
     late._bot.wake_reminder_due.assert_not_called()
-    assert not any(job["kind"] == "trace_reveil" for job in store.proactive.jobs())
+    assert not any(job["kind"] == "wake_trace" for job in store.proactive.jobs())
 
 
 # ------------------------------------------------- debrief as soon as the athlete is done

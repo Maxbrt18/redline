@@ -257,12 +257,12 @@ class VaultRepo:
 
     def record_proactive_delivery(self, job, sent_at: datetime, message: str,
                                   turn_id: str = "") -> None:
-        """Journalise un message seulement après sa livraison Messenger."""
+        """Record a message only once Messenger has delivered it."""
         if self._store is None:
             raise StorageError("stockage PostgreSQL absent pour la trace proactive")
         kind = {
             "morning": "morning", "weekly": "weekly", "monthly": "monthly",
-            "strava_debrief": "debrief", "strava_debrief_differe": "debrief",
+            "strava_debrief": "debrief", "strava_debrief_late": "debrief",
         }.get(job.kind, "other")
         source_key = job.job_id or f"{job.kind}:{job.detail}:{sent_at.isoformat()}"
         self._store.add_proactive_message({

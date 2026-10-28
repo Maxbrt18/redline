@@ -256,7 +256,7 @@ HELP_TEXT = prompt("help")
 
 PROACTIVE_TRIGGERS = {
     kind: agent_cli(prompt("triggers/" + kind.replace("_", "-")))
-    for kind in ("strava_debrief", "strava_debrief_differe", "morning", "daily_signal",
+    for kind in ("strava_debrief", "strava_debrief_late", "morning", "daily_signal",
                  "premortem", "correction", "decision_challenge", "race_countdown",
                  "weekly_repair", "weekly", "monthly")
 }

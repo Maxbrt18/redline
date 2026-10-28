@@ -964,11 +964,7 @@ proactive_jobs = sa.Table(
     sa.CheckConstraint("status IN ('pending','running','done','failed')",
                        name="ck_proactive_jobs_status"),
     sa.CheckConstraint(
-        "kind IN ('strava_debrief','strava_debrief_differe','silence',"
-        "'registre_incomplet','morning','weekly','weekly_repair','monthly',"
-        "'session_followup','missed_session','daily_signal','premortem','correction',"
-        "'decision_challenge','gut_review','gear_alert','race_countdown','strength_card',"
-        "'calibration_eve','operator_message','trace_reveil')",
+        f"kind IN ({voc.sql_values(voc.ProactiveKind)})",
         name="ck_proactive_jobs_kind"),
     sa.CheckConstraint("length(last_error) <= 500", name="ck_proactive_jobs_last_error"),
     sa.CheckConstraint("attempts >= 0", name="ck_proactive_jobs_attempts"),

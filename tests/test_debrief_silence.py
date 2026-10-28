@@ -51,11 +51,11 @@ def test_a_debrief_that_goes_silent_is_retried_once_then_failed(make_bot, store)
 def test_the_deferred_debrief_is_held_to_the_same_rule(make_bot, store):
     bot, client = _silent_bot(make_bot)
 
-    bot._respond_proactive(_claimed(store, "strava_debrief_differe"))
+    bot._respond_proactive(_claimed(store, "strava_debrief_late"))
 
     assert not client.send_text.called
     assert store.proactive.jobs(active_only=True)[0]["kind"] == \
-        "strava_debrief_differe"
+        "strava_debrief_late"
 
 
 def test_a_monthly_note_keeps_the_right_to_say_nothing(make_bot):
@@ -83,7 +83,7 @@ def test_a_morning_note_may_also_stay_silent(make_bot, store):
 def test_only_the_activity_driven_triggers_treat_silence_as_a_failure():
     """The list is explicit: a trigger added tomorrow picks its side, it does not
         inherit it from a default."""
-    assert {"strava_debrief", "strava_debrief_differe"} == SILENCE_IS_A_FAILURE
+    assert {"strava_debrief", "strava_debrief_late"} == SILENCE_IS_A_FAILURE
 
 
 def test_a_debrief_that_actually_speaks_is_never_flagged_as_an_incident(make_bot):
