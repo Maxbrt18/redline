@@ -32,7 +32,8 @@ const sdDuration = seconds => {
 const sdMinutes = seconds => Math.round(seconds / 60) + '′';
 const sdZone = (hr, bounds) => 1 + bounds.filter(edge => hr >= edge).length;
 const sdZoneChip = n => { const chip = el('span', 'Z' + n, 'n-zc'); chip.style.setProperty('--zc', 'var(--z' + n + ')'); return chip; };
-const sdBounds = data => (data.zones && data.zones.bounds) || [143, 157, 171, 185];
+// Les bornes viennent de l'instance (Karvonen sur ses FC), jamais d'une valeur par défaut.
+const sdBounds = data => data.hr_bounds || [];
 // La cible d'effort en mots : « 6-7 » pour une bande, « 4 » pour une valeur unique.
 const sdAim = target => target.rpe_min != null && target.rpe_min !== target.rpe_max ? target.rpe_min + '-' + target.rpe_max : String(target.rpe_max);
 function sdHead(title, aside) {
@@ -382,7 +383,7 @@ function sdWork(data) {
 function sdZones(data) {
   if (!data.zones) return null;
   const seconds = data.zones.seconds, total = seconds.reduce((a, b) => a + b, 0) || 1, top = Math.max(...seconds) || 1;
-  const bounds = data.zones.bounds, card = el('div', null, 'n-dcard n-dzones');
+  const bounds = sdBounds(data), card = el('div', null, 'n-dcard n-dzones');
   const span = n => n === 1 ? '< ' + bounds[0] : n === 5 ? '> ' + bounds[3] : bounds[n - 2] + '–' + bounds[n - 1];
   seconds.forEach((value, index) => {
     const n = index + 1, row = el('div', null, 'n-dz'), fill = el('i');

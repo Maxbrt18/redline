@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from . import hr_zones
 from .schema import Schema, SchemaError, field
 
 FILENAME = "redline.toml"
@@ -32,6 +33,10 @@ INSTANCE_SCHEMA = Schema("redline.toml", [
     field("athlete", dict, schema=Schema("[athlete]", [
         field("name", str, minimum=1, maximum=40,
               note="le prénom que le coach emploie dans ses messages"),
+        field("hr_rest", int, minimum=30, maximum=100,
+              note="la FC de repos, en bpm : la base des zones Karvonen"),
+        field("hr_max", int, minimum=120, maximum=230,
+              note="la FC max, en bpm, mesurée ou estimée"),
     ])),
     field("notebook", dict, schema=Schema("[notebook]", [
         field("place", str, minimum=1, maximum=80,
@@ -74,7 +79,13 @@ class Instance:
     place: str
     injuries: tuple[Injury, ...]
     capabilities: tuple[Capability, ...]
+    hr_rest: int
+    hr_max: int
 
+    @property
+    def hr_bounds(self) -> tuple[int, ...]:
+        """Les FC où commencent Z2 à Z5. Le haut de la Z2 (`[1]`) plafonne les EF."""
+        return hr_zones.bounds(self.hr_rest, self.hr_max)
 
     def capability_label(self, slug: str) -> str:
         """Le libellé déclaré, sinon celui que porte le slug."""
@@ -107,13 +118,16 @@ def parse(text: str) -> Instance:
         payload = tomllib.loads(text)
     except tomllib.TOMLDecodeError as exc:
         raise InstanceError(f"{FILENAME} illisible : {exc}") from None
+    # Le gabarit d'abord : `hr_max = "[FC max]"` est un champ à remplir, pas une erreur
+    # de type à déchiffrer.
+    unfilled = placeholders(payload)
+    if unfilled:
+        raise InstanceError("\n  - ".join([f"{FILENAME} incomplet :", *unfilled]))
     try:
         INSTANCE_SCHEMA.validate(payload)
     except SchemaError as exc:
         raise InstanceError(str(exc)) from None
-    unfilled = placeholders(payload)
-    if unfilled:
-        raise InstanceError("\n  - ".join([f"{FILENAME} incomplet :", *unfilled]))
+    athlete = payload["athlete"]
     slugs = [entry["slug"] for entry in payload["capabilities"]]
     if len(set(slugs)) != len(slugs):
         raise InstanceError(f"{FILENAME} : slug de capacité en double ({', '.join(slugs)})")
@@ -122,11 +136,13 @@ def parse(text: str) -> Instance:
     if len(set(zones)) != len(zones):
         raise InstanceError(f"{FILENAME} : zone surveillée en double ({', '.join(zones)})")
     return Instance(
-        athlete_name=payload["athlete"]["name"],
+        athlete_name=athlete["name"],
         place=payload["notebook"]["place"],
         injuries=tuple(Injury(entry["slug"], entry["label"]) for entry in injuries),
         capabilities=tuple(Capability(entry["slug"], entry["label"])
                            for entry in payload["capabilities"]),
+        hr_rest=athlete["hr_rest"],
+        hr_max=athlete["hr_max"],
     )
 
 
