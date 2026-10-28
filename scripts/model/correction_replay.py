@@ -6,7 +6,7 @@ règle de code, un test la fige. Pour une règle de rédaction, portée par un p
 CLAUDE.md, seul un scénario rejoué par `server/evaluate-coaching.py` peut montrer qu'elle
 tient encore. Au 2026-10-04, 6 des 51 corrections avaient un scénario.
 
-Le registre `server/tests/fixtures/corrections-replay.json` donne à chaque correction un
+Le registre du vault (`vault_layout.CORRECTIONS_REPLAY`) donne à chaque correction un
 mode de rejeu, choisi par un humain et jamais deviné depuis la prose :
 
 - `scenario` : un ou plusieurs scénarios de `coaching-scenarios.json` la rejouent ;
@@ -28,9 +28,9 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import paths, vault_layout
 from .errors import InputError
 
-LEDGER = "server/tests/fixtures/corrections-replay.json"
 SCENARIOS = "server/tests/fixtures/coaching-scenarios.json"
 MODES = ("scenario", "code", "hors-banc", "a-rejouer")
 #: Une correction nouvelle a deux bilans pour recevoir son mode de rejeu.
@@ -103,13 +103,14 @@ class Audit:
     owed: list[str]
 
 
-def audit(root: Path, corrections_text: str, today: dt.date) -> Audit:
-    """`corrections_text` vient de l'appelant (le `Vault` de vault-check) ; le registre,
-    les scénarios et les porteurs se lisent sous `root`."""
+def audit(vault: Path, corrections_text: str, today: dt.date,
+          engine: Path = paths.ENGINE_ROOT) -> Audit:
+    """`corrections_text` vient de l'appelant (le `Vault` de vault-check). Le registre se
+    lit dans le vault, les scénarios dans le moteur ; un porteur vit dans l'un ou l'autre."""
     corrections = entries(corrections_text)
-    ledger = load_ledger((root / LEDGER).read_text(encoding="utf-8"))
+    ledger = load_ledger((vault / vault_layout.CORRECTIONS_REPLAY).read_text(encoding="utf-8"))
     scenario_ids = {case["id"] for case in
-                    json.loads((root / SCENARIOS).read_text(encoding="utf-8"))}
+                    json.loads((engine / SCENARIOS).read_text(encoding="utf-8"))}
     keys = {correction.key for correction in corrections}
     unregistered = [c for c in corrections if c.key not in ledger]
     broken = []
@@ -117,7 +118,7 @@ def audit(root: Path, corrections_text: str, today: dt.date) -> Audit:
         broken += [f"{key} : scénario inconnu {name}" for name in row.get("scenarios", [])
                    if name not in scenario_ids]
         broken += [f"{key} : porteur absent {path}" for path in row.get("carriers", [])
-                   if not (root / path).exists()]
+                   if not (vault / path).exists() and not (engine / path).exists()]
     return Audit(
         unregistered=unregistered,
         late=[c for c in unregistered if (today - c.date).days > GRACE_DAYS],

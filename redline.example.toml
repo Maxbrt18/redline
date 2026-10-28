@@ -38,3 +38,17 @@ label = "Durabilité"
 [[capabilities]]
 slug = "cap2-descente"
 label = "Descente"
+
+# Ce que `vault-check.py` vérifie dans le vault. Facultatif : sans ce bloc, ni le type
+# des notes ni le budget de lecture ne sont contrôlés.
+# [vault]
+# Les valeurs admises du champ `type` du frontmatter.
+# note_types = ["concept", "episode", "exercise"]
+#
+# Le coût de lecture de l'agent, en mots, par étage : un étage dit quand ses fichiers
+# se paient (à chaque message, ou seulement quand un jugement s'engage), et deux étages
+# ne se compensent jamais. La somme des plafonds d'un étage ne dépasse pas son total.
+# [[vault.budget]]
+# tier = "par tour"
+# total = 3600
+# files = [{ path = "CLAUDE.md", words = 2200 }, { path = "ai/hot-cache.md", words = 1400 }]

@@ -12,6 +12,7 @@ import pytest
 from conftest import ENGINE_ROOT, load_script
 
 from scripts.model import correction_replay as replay
+from scripts.model.vault_layout import CORRECTIONS_REPLAY as LEDGER
 
 vault_check = load_script("vault-check")
 
@@ -59,9 +60,11 @@ def test_une_correction_en_double_est_refusee():
 
 
 def _root(tmp_path, ledger):
+    """A vault holding the registry, which is also the engine holding the scenarios."""
     fixtures = tmp_path / "server" / "tests" / "fixtures"
     fixtures.mkdir(parents=True)
-    (fixtures / "corrections-replay.json").write_text(json.dumps(ledger), encoding="utf-8")
+    (tmp_path / "coaching").mkdir()
+    (tmp_path / LEDGER).write_text(json.dumps(ledger), encoding="utf-8")
     (fixtures / "coaching-scenarios.json").write_text(json.dumps([{"id": "connu"}]),
                                                        encoding="utf-8")
     (tmp_path / "porteur.py").write_text("", encoding="utf-8")
@@ -76,7 +79,7 @@ def test_l_audit_separe_retard_orphelins_references_cassees_et_dette(tmp_path):
         {"correction": KEYS[4], "replay": "hors-banc", "note": "objection retirée"},
         {"correction": "2026-07-01 — Disparue", "replay": "hors-banc", "note": "n"},
     ])
-    found = replay.audit(root, JOURNAL, dt.date(2026, 10, 10))
+    found = replay.audit(root, JOURNAL, dt.date(2026, 10, 10), root)
     assert [c.key for c in found.unregistered] == [KEYS[0]]
     assert found.late == []
     assert found.orphans == ["2026-07-01 — Disparue"]
@@ -87,8 +90,8 @@ def test_l_audit_separe_retard_orphelins_references_cassees_et_dette(tmp_path):
 
 def test_une_correction_non_classee_passe_au_rouge_apres_deux_bilans(tmp_path):
     root, journal = _root(tmp_path, []), "## 2026-10-04 — Seule\n"
-    assert replay.audit(root, journal, dt.date(2026, 10, 18)).late == []
-    late = replay.audit(root, journal, dt.date(2026, 10, 19)).late
+    assert replay.audit(root, journal, dt.date(2026, 10, 18), root).late == []
+    late = replay.audit(root, journal, dt.date(2026, 10, 19), root).late
     assert [c.key for c in late] == ["2026-10-04 — Seule"]
 
 
@@ -101,7 +104,7 @@ def test_vault_check_rouge_sur_reference_cassee_orange_sur_dette(tmp_path):
     assert report.failed == 1
 
     report = vault_check.Report(quiet=True)
-    (root / replay.LEDGER).write_text(json.dumps([{
+    (root / LEDGER).write_text(json.dumps([{
         "correction": "2026-10-04 — Seule", "replay": "a-rejouer", "note": "n"}]))
     vault_check.check_corrections_replay(vault_check.Vault(root, journal), report)
     assert (report.failed, report.warned) == (0, 1)
@@ -109,4 +112,5 @@ def test_vault_check_rouge_sur_reference_cassee_orange_sur_dette(tmp_path):
 
 def test_le_registre_reel_respecte_son_schema():
     """Forme seulement : sa complétude est un contenu, jugé par vault-check."""
-    replay.load_ledger((ENGINE_ROOT / replay.LEDGER).read_text(encoding="utf-8"))
+    replay.load_ledger((ENGINE_ROOT / "server/tests/fixtures/corrections-replay.json")
+                      .read_text(encoding="utf-8"))

@@ -350,7 +350,7 @@ route du scénario, juge sur le profil N2), sans outil, mémoire persistante ni 
 comme le banc Codex ; `evaluation/runner.py` borne les modèles payables.
 Les fixtures `server/tests/fixtures/coaching-scenarios.json` portent 36 scénarios, leur
 contexte, posture, réponse illustrative et critères d'acceptation ; ceux qui naissent d'une
-correction réelle nomment leur origine (`origin`), vérifiée par `test_coaching_scenarios.py`. Le registre `tests/fixtures/corrections-replay.json` donne à chaque entrée de
+correction réelle nomment leur origine (`origin`), vérifiée par `test_coaching_scenarios.py`. Le registre `coaching/corrections-replay.json` du vault donne à chaque entrée de
 `coaching/corrections.md` son mode de rejeu ; `vault-check.py` signale celles qui attendent
 encore un scénario (`a-rejouer`). Les routes sont imposées
 par les fixtures et les lectures remplacées par des faits fictifs : ce banc évalue la

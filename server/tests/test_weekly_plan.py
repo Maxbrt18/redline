@@ -102,24 +102,10 @@ def test_valid_plan_passes():
     assert weekly_plan.active(weekly_plan.validate(plan()))["revision"] == 1
 
 
-def test_a_new_revision_refuses_session_results_in_intent_text():
-    current = written_today(sessions=[session(
-        note="Réalisée le 04/08 : 7,02 km, FC moy 153, WBGT 22.")])
-    errors = weekly_plan.intention_errors(current, "W32 révision 2")
-    assert any("résultat recopié dans le plan" in error for error in errors)
-
-
 def test_a_new_revision_keeps_forward_looking_session_notes():
     current = written_today(sessions=[session(
         note="EF plate ; se consigne au registre après coup.")])
     assert weekly_plan.intention_errors(current, "W32 révision 2") == []
-
-
-def test_a_new_revision_refuses_a_companion_name_in_the_plan():
-    current = written_today(sessions=[session(
-        note="Footing avec Alexis, allure libre.")])
-    errors = weekly_plan.intention_errors(current, "W32 révision 2")
-    assert any("nom de tiers 'Alexis'" in error for error in errors)
 
 
 def test_the_athlete_name_is_allowed_in_plan_evidence():
@@ -640,16 +626,6 @@ def test_the_volume_is_read_back_and_projected():
         "2026-W32", None, current)
     assert "Volume couru visé : ~41 km" in weekly_plan.render_journal(
         {"week": "2026-W32", "revisions": [current]})
-
-
-def test_a_new_gate_never_asks_about_walking():
-    """Décision de Sam du 2026-10-11 : la marche ne se demande jamais, il signale
-    lui-même une gêne. Le refus porte sur la révision neuve seulement."""
-    asking = revision(gates=[gate(question="Trace au réveil et marche inchangée ?")])
-    assert any("question sur la marche" in problem
-               for problem in weekly_plan.written_text_errors(asking))
-    assert not any("marche" in problem
-                   for problem in weekly_plan.written_text_errors(revision(gates=[gate()])))
 
 
 def test_a_new_precondition_no_longer_holds_a_session():

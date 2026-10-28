@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import math
 import re
 import time
 import uuid
+from collections import Counter
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -57,11 +59,10 @@ from .relationship import SERVICE_LINE_PREFIXES, question_fingerprint, render_me
 from .state import ProactiveState, StateStore
 
 JOB_KEEP = 100
-_RELATION_STOPWORDS = {
-    "alors", "après", "avec", "cette", "comme", "dans", "depuis", "elle", "elles",
-    "encore", "entre", "faire", "mais", "même", "pour", "plus", "sans", "sera",
-    "sont", "tout", "toute", "très", "vers", "votre",
-}
+
+
+def _words(text: str) -> set[str]:
+    return set(re.findall(r"\w{4,}", text.lower()))
 
 
 def _at(epoch: float) -> dt.datetime:
@@ -477,20 +478,27 @@ class PostgresStateStore(StateStore):
                              [dict(row) for row in resolved_rows])
 
     def correction_context(self, text: str) -> str:
-        tokens = set(re.findall(r"[a-zà-ÿ0-9]{4,}", text.lower())) - _RELATION_STOPWORDS
+        """The three past corrections closest to `text`.
+
+        Words are weighted by how rare they are among the corrections, so the words
+        every sentence uses count for almost nothing, in any language. A correction is
+        kept when it shares at least the weight of a word found in half of them.
+        """
+        tokens = _words(text)
         if not tokens:
             return ""
         with self.database.engine.connect() as connection:
             rows = list(connection.execute(sa.select(correction_deliveries).where(
                 correction_deliveries.c.athlete_id == ATHLETE).order_by(
                     correction_deliveries.c.registered_at.desc()).limit(50)).mappings())
+        summaries = [(row["summary"], _words(row["summary"])) for row in rows]
+        frequency = Counter(word for _, words in summaries for word in words)
         scored = []
-        for row in rows:
-            words = (set(re.findall(r"[a-zà-ÿ0-9]{4,}", row["summary"].lower()))
-                     - _RELATION_STOPWORDS)
-            score = len(tokens & words)
-            if score:
-                scored.append((score, row["summary"]))
+        for summary, words in summaries:
+            score = sum(math.log((len(summaries) + 1) / frequency[word])
+                        for word in tokens & words)
+            if score >= math.log(2):
+                scored.append((score, summary))
         if not scored:
             return ""
         selected = [summary for _, summary in sorted(scored, reverse=True)[:3]]

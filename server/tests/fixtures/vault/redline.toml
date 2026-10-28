@@ -37,3 +37,16 @@ label = "Injury"
 [[capabilities]]
 slug = "cap6-mental"
 label = "Mental"
+
+[vault]
+note_types = ["capacite", "exercice", "seance-type"]
+
+[[vault.budget]]
+tier = "par tour"
+total = 3600
+files = [{ path = "CLAUDE.md", words = 2200 }, { path = "ai/hot-cache.md", words = 1400 }]
+
+[[vault.budget]]
+tier = "N2"
+total = 2800
+files = [{ path = "athlete/athlete.md", words = 2800 }]

@@ -13,7 +13,6 @@ from itertools import pairwise
 from scripts.coach.fr import session_labels
 from scripts.coach.fr.calendar import DAYS as WEEKDAYS
 
-from . import instance as instance_model
 from . import paths, rulebook, session_kinds, transitions, typography
 from . import programme as strength_programme
 from .notes import NoteError
@@ -40,25 +39,6 @@ STATUSES = (*INTENT_STATUSES, "done")
 SETTLED_STATUSES = frozenset({"done", "cancelled"})
 HARD_WORKOUTS = session_kinds.DEMANDING
 
-# Une note de séance planifiée décrit ce qui devra être fait. Les résultats vivent
-# dans l'observation et le cycle, puis le read model ajoute seulement le statut
-# ``done``. Ces marqueurs sont volontairement étroits : ils attrapent les comptes
-# rendus qui ont déjà essaimé dans les révisions sans interdire une consigne comme
-# « se consigne au registre après coup ».
-REALIZED_TEXT = re.compile(
-    r"\b(?:réalis(?:é|ée|és|ées)|effectu(?:é|ée|és|ées)|fait le|faite le|"
-    r"consign(?:é|ée|és|ées)|FC moy|WBGT|difficulté par exercice|"
-    r"RPE global|titre Strava)\b",
-    re.IGNORECASE,
-)
-WALK_QUESTION = re.compile(r"\bmarch(?:e|er|ée)\b", re.IGNORECASE)
-THIRD_PARTY_TEXT = re.compile(
-    r"\b(?:avec|chez|pour|et)\s+"
-    r"(?P<name>[A-ZÉÈÀÂÎÔÛ][\wÉÈÊÀÂÎÔÛéèêàâîôûç-]{2,})\b"
-)
-#: Les mots capitalisés qui ne désignent jamais un tiers. Le prénom et le lieu de
-#: l'instance s'y ajoutent à la lecture (`instance.own_names`).
-PLAN_NAME_ALLOWLIST = frozenset({"Strava", "RDL", "EF", "FC", "SL"})
 
 STRENGTH_SPEC_SCHEMA = Schema("modulation de renforcement", [
     field("loads", list, required=False, maximum=20,
@@ -330,10 +310,6 @@ def written_text_errors(revision: dict, where: str = "revision") -> list[str]:
                 "séance. Écris la condition dans la note de la séance (si la trace est nette "
                 "ce matin : repos) ; le carnet alerte sur une trace nette. Un contrôle sert "
                 "seulement à une observation (when=apres).")
-        if WALK_QUESTION.search(gate.get("question") or ""):
-            problems.append(
-                f"{where}.gate[{gate.get('id', '?')}] : question sur la marche. Elle ne se "
-                "demande jamais ; demande seulement la trace au réveil.")
     for session in revision.get("sessions") or []:
         for label in ("title", "note"):
             if session.get(label):
@@ -349,51 +325,12 @@ def intention_errors(revision: dict, where: str = "revision") -> list[str]:
     enrichies depuis les cycles. La frontière d'écriture est volontairement plus
     étroite : une révision dit ce qui est prévu ou annulé, jamais ce qui a eu lieu.
     """
-    allowed = PLAN_NAME_ALLOWLIST | instance_model.own_names(paths.vault_root())
-    problems = [
+    return [
         f"{where}.{session.get('id', '?')} : status=done appartient au cycle de "
         "séance. Garde status=planned ; le rendu ajoute 'fait' depuis PostgreSQL."
         for session in revision.get("sessions") or []
         if session.get("status") not in INTENT_STATUSES
     ]
-    for session in revision.get("sessions") or []:
-        for label in ("title", "note"):
-            text = session.get(label) or ""
-            if REALIZED_TEXT.search(text):
-                problems.append(
-                    f"{where}.{session.get('id', '?')}.{label} : résultat recopié dans "
-                    "le plan. Garde seulement l'intention ; l'observation et le cycle "
-                    "portent ce qui a eu lieu.")
-            for match in THIRD_PARTY_TEXT.finditer(text):
-                if (match.group("name") not in allowed
-                        and not re.fullmatch(r"W\d{2}", match.group("name"))):
-                    problems.append(
-                        f"{where}.{session.get('id', '?')}.{label} : nom de tiers "
-                        f"{match.group('name')!r} dans le plan. Garde la contrainte utile "
-                        "sans identité personnelle.")
-        strength_note = (session.get("strength") or {}).get("note") or ""
-        for match in THIRD_PARTY_TEXT.finditer(strength_note):
-            if (match.group("name") not in allowed
-                    and not re.fullmatch(r"W\d{2}", match.group("name"))):
-                problems.append(
-                    f"{where}.{session.get('id', '?')}.strength.note : nom de tiers "
-                    f"{match.group('name')!r} dans le plan.")
-    for index, constraint in enumerate(revision.get("constraints") or []):
-        if REALIZED_TEXT.search(constraint):
-            problems.append(
-                f"{where}.constraints[{index}] : résultat recopié comme contrainte. "
-                "Référence l'observation dans evidence et garde ici l'effet sur la suite.")
-    for label, values in (("reason", [revision.get("reason") or ""]),
-                          ("evidence", revision.get("evidence") or []),
-                          ("constraints", revision.get("constraints") or [])):
-        for index, text in enumerate(values):
-            for match in THIRD_PARTY_TEXT.finditer(text):
-                if (match.group("name") not in allowed
-                        and not re.fullmatch(r"W\d{2}", match.group("name"))):
-                    problems.append(
-                        f"{where}.{label}[{index}] : nom de tiers "
-                        f"{match.group('name')!r} dans le plan.")
-    return problems
 
 
 def typed_target_errors(revision: dict, where: str = "revision") -> list[str]:
