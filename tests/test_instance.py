@@ -90,3 +90,19 @@ def test_heart_rates_give_the_karvonen_bounds():
     assert (sam.hr_rest, sam.hr_max) == (55, 190)
     assert sam.hr_bounds == (136, 149, 163, 176)
 
+
+
+def test_the_process_clock_follows_the_instance_zone(monkeypatch):
+    import os
+    import time
+
+    from redline.model import local_time
+    monkeypatch.setenv("TZ", "UTC")
+    time.tzset()
+    try:
+        local_time.apply_to_process()
+        assert os.environ["TZ"] == "Europe/Paris"
+        assert time.tzname[0] in {"CET", "CEST"}
+    finally:
+        monkeypatch.undo()
+        time.tzset()

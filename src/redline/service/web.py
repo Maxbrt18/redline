@@ -454,7 +454,7 @@ def create_app(config: Config, bot: CoachBot, state: Any,
 
     # Read ONCE, at boot. `commit` is the checkout the process started on, which the
     # coach's own vault commits move afterwards; `runtime_tree` fingerprints the CODE
-    # (server/, scripts/, migrations/), which only a deployment changes. The release
+    # (deploy/, src/, migrations/ of the engine), which only a deployment changes. The release
     # check compares the latter.
     booted_commit = bot.repo.head()[:12]
     runtime_tree = bot.repo.runtime_tree()

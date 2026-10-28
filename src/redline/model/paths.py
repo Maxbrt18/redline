@@ -23,6 +23,19 @@ from pathlib import Path
 ENGINE_ROOT = Path(__file__).resolve().parents[3]
 
 
+def state_dir() -> Path:
+    """Where a running service keeps what it writes outside PostgreSQL: the outbox of
+    cards, the attachments being read, the Strava token cache. `REDLINE_STATE_DIR`, by
+    default `var/` in the checkout; read at the call, like the vault."""
+    raw = os.environ.get("REDLINE_STATE_DIR", "").strip()
+    return Path(raw).expanduser().resolve() if raw else ENGINE_ROOT / "var"
+
+
+def outbox_dir() -> Path:
+    """A PNG written here during a turn goes out to the athlete after the text."""
+    return state_dir() / "outbox"
+
+
 def vault_root() -> Path:
     """Le vault de l'instance, lu à l'appel (le service charge son .env après import)."""
     raw = os.environ.get("VAULT_PATH", "").strip()

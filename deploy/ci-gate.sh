@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Un seul verdict final pour le code ; le contenu du vault se vérifie sur la machine
-# qui le porte (scripts/vault-check.py).
+# qui le porte (vault-check.py).
 # Usage : ci-gate.sh [SHA] [nom de workflow requis…]
 # Code checks est toujours requis ; les autres runs déclenchés sont tous contrôlés.
 sha=${1:-$(git rev-parse HEAD)}

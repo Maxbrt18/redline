@@ -155,13 +155,13 @@ def test_the_scan_actually_finds_something():
 
 
 def test_production_secret_file_lives_outside_the_agent_workspace():
-    unit = (ROOT / "server" / "coach-messenger.service").read_text(encoding="utf-8")
+    unit = (ROOT / "deploy" / "systemd" / "coach-messenger.service").read_text(encoding="utf-8")
     assert "EnvironmentFile=/etc/redline/runtime/coach-messenger.env" in unit
-    assert "EnvironmentFile=/home/ubuntu/redline/server/.env" not in unit
+    assert "EnvironmentFile=/home/ubuntu/redline/.env" not in unit
 
 
 def _agent_tool_policy() -> list[str]:
-    return [line for raw in (ROOT / "server" / "agent-cli-tools.txt").read_text(
+    return [line for raw in (ROOT / "deploy" / "agent-cli-tools.txt").read_text(
         encoding="utf-8").splitlines() if (line := raw.strip()) and not line.startswith("#")]
 
 
@@ -190,7 +190,7 @@ def test_every_cli_named_to_the_live_agent_is_in_the_root_owned_policy():
 
 
 def test_systemd_requires_both_root_owned_agent_cli_files():
-    unit = (ROOT / "server" / "coach-messenger.service").read_text(encoding="utf-8")
+    unit = (ROOT / "deploy" / "systemd" / "coach-messenger.service").read_text(encoding="utf-8")
     assert "ExecStartPre=/usr/bin/test -x /usr/local/bin/redline-agent-cli" in unit
     assert ("ExecStartPre=/usr/bin/test -r "
             "/usr/local/share/redline/agent-cli-tools.txt") in unit
@@ -221,7 +221,7 @@ def test_root_owned_launcher_refuses_a_cli_modified_during_the_turn(tmp_path):
         "REDLINE_REPO": str(repo),
         "REDLINE_TURN_ID": "0f6b1c2e-3a4d-4e5f-8a9b-0c1d2e3f4a5b",
     }
-    launcher = ROOT / "server" / "redline-agent-cli"
+    launcher = ROOT / "deploy" / "redline-agent-cli"
 
     # RWF-015 : sans identité de tour, le lanceur du coach n'ouvre aucun chemin
     # d'écriture directe. Vider la variable ne suffit plus à sortir de la transaction.

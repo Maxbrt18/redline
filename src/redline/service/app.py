@@ -1,7 +1,7 @@
 """Composition root: wires the bricks together and starts the service.
 
 This is the only module that knows everyone. The public entry point is
-`python3 -m redline` (see __main__.py), run from the server/ directory.
+`python -m redline` (see `redline/__main__.py`).
 """
 
 
@@ -12,12 +12,12 @@ import logging
 import sys
 from pathlib import Path
 
-from redline.model import paths
+from redline.model import local_time, paths
 
 from .agent_factory import build_agent
 from .attachments import AttachmentService
 from .bot import CoachBot
-from .config import OUTBOX_DIR, SERVER_DIR, Config, _load_dotenv
+from .config import Config, _load_dotenv
 from .messenger import MessengerClient
 from .notebook import NotebookService
 from .outbox import Outbox
@@ -49,7 +49,8 @@ def main() -> None:
     events_log = logging.getLogger("redline.service.events")
     events_log.addHandler(event_handler)
     events_log.propagate = False
-    _load_dotenv(SERVER_DIR / ".env")
+    _load_dotenv(paths.ENGINE_ROOT / ".env")
+    local_time.apply_to_process()
     config = Config.from_env()
 
     if not config.database_url:
@@ -89,7 +90,7 @@ def main() -> None:
     notebook = NotebookService(NotebookStore(database), repo, state,
                                Path(config.vault_path), config.coach_base_url,
                                operational=operational_store, instance=config.instance)
-    bot = CoachBot(client, repo, agent, state, config, Outbox(OUTBOX_DIR),
+    bot = CoachBot(client, repo, agent, state, config, Outbox(paths.outbox_dir()),
                    attachments=attachments, notebook=notebook)
     bot.start()
 

@@ -19,13 +19,13 @@ from sqlalchemy import exc as sa_exc
 
 from redline.model import agent_input, session_cycle, vault_layout
 from redline.model import ledger as ledger_model
+from redline.model import paths as engine_paths
 from redline.model import weekly_plan as weekly_plan_model
 from redline.model.context_packet import render_context_packet
 from redline.storage.database import StorageError
 from redline.storage.repository import OperationalStore
 
 from . import clock
-from .config import OUTBOX_DIR
 from .plans import PlanStatus, render_plan_message
 
 log = logging.getLogger("redline")
@@ -44,7 +44,7 @@ SETTLED_CYCLE_STATES = session_cycle.TERMINAL_STATES | {"completed"}
 # Deploying those belongs to the service manager, outside a message transaction.
 #
 # ⭐ « Runtime » veut dire : *le service tourne différemment après ce commit*. Un
-# fichier que rien n'exécute ni ne charge n'en est pas, même s'il vit sous `server/`.
+# fichier que rien n'exécute ni ne charge n'en est pas, même s'il vit sous `deploy/`.
 # La liste avait dérivé vers « tout ce qui ressemble à du code » et deux familles y
 # étaient entrées à tort — d'où le blocage du 2026-08-21, causé par quatre fiches
 # d'exercice et un fichier de test, dont aucun ne demande le moindre redémarrage :
@@ -53,7 +53,7 @@ SETTLED_CYCLE_STATES = session_cycle.TERMINAL_STATES | {"completed"}
 #     c'est le coach lui-même qui les édite. Les classer runtime, c'est faire geler la
 #     synchronisation du vault par une écriture que le coach a le droit de faire.
 RUNTIME_PATHS = (
-    "server/",
+    "deploy/",
     "src/",
     "migrations/",
     ".github/",
@@ -63,7 +63,7 @@ RUNTIME_PATHS = (
 )
 
 #: Les arbres dont l'empreinte identifie le code déployé (`/health`, release).
-RUNTIME_TREES = ("server", "src", "migrations")
+RUNTIME_TREES = ("deploy", "src", "migrations")
 
 # Causes d'alerte technique. La clé évite de dupliquer une cause pendant un même
 # passage de synchronisation ou de persistance.
@@ -138,9 +138,11 @@ def forbidden_in_turn(path: str) -> bool:
 class VaultRepo:
     def __init__(self, path: str, remote: str, branch: str,
                  operational_store: OperationalStore | None = None,
-                 regen_command: tuple[str, ...] = ()) -> None:
+                 regen_command: tuple[str, ...] = (),
+                 engine_root: Path = engine_paths.ENGINE_ROOT) -> None:
         """`regen_command` regenerates the static views; without it, none are."""
         self._path = path
+        self._engine_root = engine_root
         self._regen_command = regen_command
         self._remote = remote
         self._branch = branch
@@ -207,12 +209,12 @@ class VaultRepo:
         return self._head()
 
     def runtime_tree(self, ref: str = "HEAD") -> str:
-        """L'empreinte du CODE à ``ref`` : elle ne bouge pas quand le coach committe.
-
-        HEAD avance à chaque tour qui écrit une note ; il ne dit pas quel code tourne.
-        `server/verify-release.sh` recalcule la même empreinte depuis le SHA déployé.
+        """L'empreinte du CODE du moteur à ``ref`` : elle ne bouge pas quand le coach
+        committe, et elle se lit dans le dépôt du moteur, que le vault en soit un autre
+        ou le même. `deploy/verify-release.sh` recalcule la même depuis le SHA déployé.
         """
-        trees = [self._git("rev-parse", f"{ref}:{path}", log_errors=False).stdout.strip()
+        trees = [self._git("rev-parse", f"{ref}:{path}", log_errors=False,
+                           cwd=self._engine_root).stdout.strip()
                  for path in RUNTIME_TREES]
         if not all(trees):
             return ""
@@ -274,7 +276,7 @@ class VaultRepo:
         }, actor="messenger-delivery")
 
     def _reset_worktree(self) -> None:
-        """`clean -fd` sans `-x` : les fichiers ignorés survivent, dont `server/outbox/`
+        """`clean -fd` sans `-x` : les fichiers ignorés survivent, dont `var/`
         dont les images sont encore en attente d'archivage."""
         self._git("reset", "--hard", "HEAD")
         self._git("clean", "-fd")
@@ -575,8 +577,9 @@ class VaultRepo:
             revision = json.loads(context)["revision"]
         except (json.JSONDecodeError, KeyError):
             return False
-        OUTBOX_DIR.mkdir(parents=True, exist_ok=True)
-        target = str(OUTBOX_DIR / f"plan-{week.lower()}-r{revision}.png")
+        outbox = engine_paths.outbox_dir()
+        outbox.mkdir(parents=True, exist_ok=True)
+        target = str(outbox / f"plan-{week.lower()}-r{revision}.png")
         command = [sys.executable, "-m", "redline.cli.chart_plan", "--week", week, "-o", target]
         if today:
             command += ["--today", today]
@@ -595,8 +598,9 @@ class VaultRepo:
 
     def render_workout_card(self, card: dict, activity_id: str) -> bool:
         """Rend la carte des répétitions d'une séance de qualité dans l'outbox."""
-        OUTBOX_DIR.mkdir(parents=True, exist_ok=True)
-        target = str(OUTBOX_DIR / f"workout-{activity_id}.png")
+        outbox = engine_paths.outbox_dir()
+        outbox.mkdir(parents=True, exist_ok=True)
+        target = str(outbox / f"workout-{activity_id}.png")
         try:
             process = subprocess.run(
                 [sys.executable, "-m", "redline.cli.chart_workout", "-o", target],
@@ -659,11 +663,12 @@ class VaultRepo:
             self._alert(ALERT_PUSH, "Commit enregistré localement mais push Git échoué")
         return False
 
-    def _git(self, *args: str, log_errors: bool = True) -> subprocess.CompletedProcess:
+    def _git(self, *args: str, log_errors: bool = True,
+             cwd: str | Path | None = None) -> subprocess.CompletedProcess:
         command = ["git", *args]
         try:
             process = subprocess.run(
-                command, cwd=self._path, capture_output=True, text=True,
+                command, cwd=cwd or self._path, capture_output=True, text=True,
                 timeout=GIT_TIMEOUT)
         except subprocess.TimeoutExpired:
             process = subprocess.CompletedProcess(

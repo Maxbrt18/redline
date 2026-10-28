@@ -13,7 +13,7 @@ from conftest import ENGINE_ROOT, RecordingBot
 # something a vault checkout on the Mac necessarily has. Without this, collecting this
 # one module aborts the WHOLE run -- so `pytest` at the weekly review reported an error
 # instead of the 116 tests that do pass.
-pytest.importorskip("flask", reason="dépendance runtime du VPS (server/requirements.txt)")
+pytest.importorskip("flask", reason="dépendance runtime du VPS (requirements.txt)")
 
 from redline.model.dose import Dose
 from redline.service import clock, strength

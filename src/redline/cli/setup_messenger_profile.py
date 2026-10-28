@@ -10,7 +10,7 @@ The button labels and payloads stay in French (the athlete reads them); the code
 is in English.
 
 Usage (sur le VPS, environnement du service renseigné) :
-  python3 server/setup_messenger_profile.py
+  python -m redline.cli.setup_messenger_profile
 """
 
 import os
@@ -19,7 +19,8 @@ from pathlib import Path
 
 import requests
 
-from redline.service.config import SERVER_DIR, _load_dotenv
+from redline.model import paths
+from redline.service.config import _load_dotenv
 
 MENU = [
     {"type": "postback", "title": "Le point sur ma semaine",
@@ -44,7 +45,7 @@ ICE_BREAKERS = [
 
 def main() -> None:
     external_env = Path("/etc/redline/runtime/coach-messenger.env")
-    _load_dotenv(external_env if external_env.is_file() else SERVER_DIR / ".env")
+    _load_dotenv(external_env if external_env.is_file() else paths.ENGINE_ROOT / ".env")
     token = os.environ.get("MESSENGER_PAGE_TOKEN")
     if not token:
         sys.exit("MESSENGER_PAGE_TOKEN absent de l'environnement du service.")

@@ -19,25 +19,23 @@ EnvironmentFile=/etc/redline/runtime/coach-messenger.env
 # (agent-runtime-update.py) owns both runtimes: the Codex SDK ships its runtime
 # from the active venv, and `claude` comes from ~/.claude-runtimes/current, ahead
 # of the global npm install that only serves as the bootstrap fallback. The venv comes
-# FIRST on purpose: card scripts are run through bash
-# as `python3 scripts/chart-*.py`, so the `python3` resolved here is the one that
-# has to import playwright. Point it at the system python and the coach silently
-# stops attaching images. The venv lives OUTSIDE the repo -- the bot does
-# `git add -A`, and a venv inside the working tree would get committed.
+# FIRST on purpose: it holds the engine (installed editable from this checkout) and
+# playwright, and the coach's commands run with the `python` resolved here. The venv
+# lives OUTSIDE the repo -- the bot does `git add -A`, and a venv inside the working
+# tree would get committed.
 Environment=PATH=/home/ubuntu/.venvs/redline-current/bin:/home/ubuntu/.claude-runtimes/current/node_modules/.bin:/home/ubuntu/.local/bin:/usr/local/bin:/usr/bin:/bin
 # Claude Code must not update itself: only the nightly updater promotes a version,
 # after a real preflight. Its own updater failed silently from 2.1.197 onwards.
 Environment=DISABLE_AUTOUPDATER=1
-Environment=PYTHONPATH=/home/ubuntu/redline/src
-# Timezone: the schedule (debrief, morning note, usage-limit reset, commit stamps)
-# must be on the athlete's local time, not UTC.
-Environment=TZ=Europe/Paris
+# The service sets its own time zone from the vault's redline.toml, and its runtime
+# state (outbox, attachments, Strava token) lives in REDLINE_STATE_DIR, by default
+# var/ in this checkout.
 
 ExecStartPre=/usr/bin/test -S /run/redline-postgres/.s.PGSQL.5432
 ExecStartPre=/usr/bin/test -x /usr/local/bin/redline-agent-cli
 ExecStartPre=/usr/bin/test -r /usr/local/share/redline/agent-cli-tools.txt
 ExecStart=/home/ubuntu/.venvs/redline-current/bin/python -m redline
-ExecStartPost=/home/ubuntu/redline/server/wait-ready.sh 90
+ExecStartPost=/home/ubuntu/redline/deploy/wait-ready.sh 90
 Restart=always
 RestartSec=5
 

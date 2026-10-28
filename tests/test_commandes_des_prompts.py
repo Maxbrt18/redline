@@ -138,7 +138,7 @@ def test_toute_commande_passe_par_le_lanceur_autorise():
 
 def test_toute_commande_citee_est_dans_la_politique_du_lanceur():
     autorisees = {
-        line for line in (ENGINE_ROOT / "server" / "agent-cli-tools.txt").read_text().splitlines()
+        line for line in (ENGINE_ROOT / "deploy" / "agent-cli-tools.txt").read_text().splitlines()
         if line and not line.startswith("#")
     }
     citees = {script.removeprefix("scripts/") for _, script, _, _ in COMMANDES}

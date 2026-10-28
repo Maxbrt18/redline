@@ -11,12 +11,14 @@ import sys
 from collections.abc import Callable
 from typing import NoReturn
 
+from . import local_time
 from .errors import RedlineError
 
 FAILURE = 1
 
 
 def run(main: Callable[[], int | None]) -> NoReturn:
+    local_time.apply_to_process()
     try:
         code = main()
     except RedlineError as exc:

@@ -6,9 +6,9 @@ import os
 import subprocess
 from pathlib import Path
 
-from conftest import SERVER_DIR
+from conftest import DEPLOY_DIR
 
-WAIT_READY = SERVER_DIR / "wait-ready.sh"
+WAIT_READY = DEPLOY_DIR / "wait-ready.sh"
 
 
 def test_wait_ready_retries_connection_refused_and_http_503(tmp_path: Path) -> None:

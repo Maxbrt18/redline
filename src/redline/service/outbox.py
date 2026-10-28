@@ -1,6 +1,6 @@
 """The image outbox: the channel through which the agent attaches charts.
 
-The contract, in two invariants. A PNG written into server/outbox/ during a run goes
+The contract, in two invariants. A PNG written into the outbox (`paths.outbox_dir()`) during a run goes
 out after the last text, then moves to outbox/sent/ -- and if the run failed or stayed
 SILENT, it is archived WITHOUT being sent: never an image without its message. A `.link`
 sidecar travels with its image everywhere, sent, archived and discarded with it: there

@@ -6,7 +6,7 @@ Unattended-Upgrade::Origins-Pattern {
 	"origin=Docker,label=Docker CE";
 };
 // Un noyau de sécurité n'est actif qu'après redémarrage. 04:00 est le creux d'activité
-// du VPS (collecteur Vélo'v compris) ; le service, Caddy et Docker repartent seuls.
+// du VPS ; le service, Caddy et Docker repartent seuls.
 Unattended-Upgrade::Automatic-Reboot "true";
 Unattended-Upgrade::Automatic-Reboot-Time "04:00";
 Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";

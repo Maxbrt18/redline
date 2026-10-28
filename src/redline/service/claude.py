@@ -70,7 +70,7 @@ def _parse_reset_epoch(detail: str, now: datetime | None = None) -> int | None:
     return int(target.timestamp())
 
 
-#: Ce qu'un tour autonome peut faire. Partagé avec `server/claude-runtime-smoke.py`,
+#: Ce qu'un tour autonome peut faire. Partagé avec `deploy/claude-runtime-smoke.py`,
 #: qui refuse une nouvelle version de Claude Code si elle bloque la forme exacte d'un
 #: appel de CLI du coach : la 2.1.287 a refusé `… < /tmp/x.json` le 11/10.
 AUTONOMOUS_PERMISSIONS = (

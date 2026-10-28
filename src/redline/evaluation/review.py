@@ -2,7 +2,7 @@
 
 Il vivait dans `redline` et a filtré les réponses Messenger jusqu'au 2026-09-25 :
 refus et délais dépassés remplaçaient des réponses déjà rédigées par des phrases
-génériques. Il ne sert plus qu'à `server/evaluate-coaching.py`, sur des scénarios.
+génériques. Il ne sert plus qu'à `redline.cli.evaluate_coaching`, sur des scénarios.
 """
 
 from __future__ import annotations

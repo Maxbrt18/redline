@@ -16,7 +16,7 @@ esac
 }
 
 repo_root=$(git rev-parse --show-toplevel)
-runtime_paths=(server src migrations alembic.ini pyproject.toml)
+runtime_paths=(deploy src migrations alembic.ini pyproject.toml requirements.txt)
 # Le coach committe ses notes dès qu'un tour les touche, y compris un message rejoué au
 # démarrage : HEAD peut donc légitimement dépasser le SHA déployé. Ce qui doit être
 # identique, c'est le CODE.
@@ -34,12 +34,12 @@ git -C "$repo_root" diff --quiet -- "${runtime_paths[@]}"
 git -C "$repo_root" diff --cached --quiet -- "${runtime_paths[@]}"
 # Même empreinte que `VaultRepo.runtime_tree` : sha256 des trois arbres, séparés par
 # une espace, sans fin de ligne.
-trees=$(git -C "$repo_root" rev-parse "$expected:server" "$expected:src" \
+trees=$(git -C "$repo_root" rev-parse "$expected:deploy" "$expected:src" \
   "$expected:migrations" | paste -sd ' ' -)
 expected_tree=$(printf '%s' "$trees" | { command -v sha256sum >/dev/null 2>&1 && sha256sum || shasum -a 256; } | cut -c1-12)
 
 python_bin=${REDLINE_PYTHON:-python3}
-"$repo_root/server/wait-ready.sh" "${REDLINE_READY_TIMEOUT_SECONDS:-90}"
+"$repo_root/deploy/wait-ready.sh" "${REDLINE_READY_TIMEOUT_SECONDS:-90}"
 health=$(curl -fsS --max-time 3 http://127.0.0.1:8000/health)
 ready=$(curl -fsS --max-time 3 http://127.0.0.1:8000/ready)
 

@@ -9,7 +9,7 @@ figures; one that crosses its limit turns red.
 
 Input: WEEK_SCHEMA in src/redline/model/cards.py, from --input (stdin outside a turn).
 
-Usage:  python3 scripts/chart-week.py -o server/outbox/week-29.png < data.json
+Usage:  python3 scripts/chart-week.py -o week-29.png < data.json
 """
 
 from pathlib import Path

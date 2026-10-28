@@ -3,7 +3,7 @@
 `coaching/corrections.md` raconte l'erreur et nomme son porteur ; `vault-check.py`
 (« règles de méta portées ») vérifie qu'un porteur est NOMMÉ, jamais qu'il porte. Pour une
 règle de code, un test la fige. Pour une règle de rédaction, portée par un prompt ou
-CLAUDE.md, seul un scénario rejoué par `server/evaluate-coaching.py` peut montrer qu'elle
+CLAUDE.md, seul un scénario rejoué par `redline.cli.evaluate_coaching` peut montrer qu'elle
 tient encore. Au 2026-10-04, 6 des 51 corrections avaient un scénario.
 
 Le registre du vault (`vault_layout.CORRECTIONS_REPLAY`) donne à chaque correction un

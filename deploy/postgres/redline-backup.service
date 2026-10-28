@@ -12,7 +12,7 @@ StateDirectory=redline-backups
 StateDirectoryMode=0700
 Environment=REDLINE_POSTGRES_ENV=/etc/redline/postgres.env
 EnvironmentFile=/etc/redline/postgres.env
-ExecStart=/home/ubuntu/redline/server/postgres/backup.sh
+ExecStart=/home/ubuntu/redline/deploy/postgres/backup.sh
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict

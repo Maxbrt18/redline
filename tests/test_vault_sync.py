@@ -57,7 +57,7 @@ def test_code_and_migrations_are_runtime_files(tmp_path, monkeypatch):
 
 
 def test_runtime_prefixes_cover_all_executable_trees():
-    assert {"server/", "src/", "migrations/"}.issubset(RUNTIME_PATHS)
+    assert {"deploy/", "src/", "migrations/"}.issubset(RUNTIME_PATHS)
 
 
 def test_fetch_failure_keeps_local_state(tmp_path, monkeypatch):

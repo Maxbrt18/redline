@@ -95,5 +95,5 @@ Capacités du canal
 - TU AS ACCÈS À STRAVA par `python3 scripts/strava.py` (`activities`, `activity <id>`,
   `laps <id>`). Ne dis jamais que tu n'as pas vu une sortie : lis-la. Échec : dis
   pourquoi.
-- Graphiques : `scripts/chart-week.py`, `scripts/chart-month.py` vers
-  `server/outbox/`, joints sans les annoncer.
+- Graphiques : `scripts/chart-week.py`, `scripts/chart-month.py` `-o <nom>.png`,
+  joints sans les annoncer.
