@@ -63,7 +63,7 @@ def main() -> int:
         cases = [c for c in cases if c['id'] in selected]
     if not cases:
         parser.error('Aucun scénario')
-    system = instructions(args.variant, (paths.ENGINE_ROOT / 'CLAUDE.md').read_text())
+    system = instructions(args.variant, (paths.vault_root() / 'CLAUDE.md').read_text())
     manifest = {'variant': args.variant, 'fixtures_sha256': digest(raw),
                 'instructions_sha256': digest(system), 'instructions': system,
                 'scope': 'Rédaction avec faits fictifs, routes imposées, sans outil.', 'results': []}
