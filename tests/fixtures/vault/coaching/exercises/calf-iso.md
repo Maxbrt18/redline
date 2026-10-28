@@ -1,5 +1,5 @@
 ---
-type: exercice
+type: exercise
 aliases: [mollet iso]
 name: "Mollet isométrique à mi-course"
 cue: "Tenir à mi-course, ni en bas ni en haut."
@@ -13,7 +13,7 @@ dose:
   sets: 3
   seconds: 30
   rest_s: 45
-status: actif
+status: active
 tags: [renfo, isometrique, mollet]
 ---
 

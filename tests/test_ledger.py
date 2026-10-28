@@ -89,7 +89,7 @@ def test_only_running_and_walking_carry_a_descent_weight():
 # ------------------------------------------------- the RPE target, single source
 
 def test_the_targets_come_from_the_workout_notes():
-    """`scripts/ledger.py` used to carry a hard-coded COPY of the `rpe_cible`: dead
+    """`scripts/ledger.py` used to carry a hard-coded COPY of the `target_rpe`: dead
     entries and missing notes meant a strength session above its target triggered
     nothing. The numbers now exist once. This is the only test in the suite that really
     reads the notes: it tells that the literal table in conftest has not fallen behind."""
@@ -100,7 +100,7 @@ def test_a_workout_note_declaring_an_unknown_kind_is_refused(tmp_path):
     """A note's `kinds:` must name registry kinds, or its RPE target would match nothing."""
     workouts = tmp_path / "coaching" / "workouts"
     workouts.mkdir(parents=True)
-    (workouts / "ef.md").write_text("---\ntype: seance-type\nkinds: [EF]\nrpe_cible: 3\n---\n",
+    (workouts / "ef.md").write_text("---\ntype: workout\nkinds: [EF]\ntarget_rpe: 3\n---\n",
                                     encoding="utf-8")
     with pytest.raises(NoteError, match=r"ef\.md"):
         programme.rpe_targets(tmp_path)
@@ -428,7 +428,7 @@ def test_walking_km_are_counted_apart_from_running_km():
 
 
 def test_an_unknown_week_is_refused_never_answered_with_zero():
-    """`--semaine 31` used to match no row, print « 0.00 h-éq (0/100) », and look
+    """`--week 31` used to match no row, print « 0.00 h-éq (0/100) », and look
     exactly like a rest week. A reader that meets a non-conforming input REFUSES."""
     known = ["2026-W30", "2026-W31"]
     assert ledger.normalize_week("31", known) == "2026-W31"
@@ -552,7 +552,7 @@ def test_the_projection_says_what_a_target_would_require_not_what_is_allowed():
     lines = ledger.projection_lines(projection, target_km=30.0)
     assert any("+17 %/sem" in line and "+21 %/sem" in line for line in lines)
     assert not any("10 %" in line for line in lines)
-    assert "--cible-sl" in ledger.projection_lines(projection)[-1]
+    assert "--long-run-target" in ledger.projection_lines(projection)[-1]
     assert ledger.race_projection(rows, dt.date(2026, 12, 1), dt.date(2026, 11, 26)) is None
 
 

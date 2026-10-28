@@ -1,5 +1,5 @@
 ---
-type: exercice
+type: exercise
 aliases: [pliométrie, contacts, sauts, sautillements]
 name: "Pliométrie : sautillements pieds nus"
 cue: "PIEDS JOINTS, rebonds rapides et bas de 5-10 cm."
@@ -15,7 +15,7 @@ dose:
   contacts: 40
   block: 10
   rest_s: 30
-status: actif
+status: active
 tags: [renfo, os, pliometrie]
 ---
 

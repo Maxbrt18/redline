@@ -1,10 +1,10 @@
 ---
-type: seance-type
-capacite: [vitesse, mental]
-rpe_cible: 3
-duree_min: 75
+type: workout
+capabilities: [vitesse, mental]
+target_rpe: 3
+duration_min: 75
 phase: [specifique-2]
-statut: actif
+status: active
 ---
 
 # fractionne

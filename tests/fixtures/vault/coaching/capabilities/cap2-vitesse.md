@@ -1,8 +1,8 @@
 ---
-type: capacite
+type: capability
 aliases: [vitesse]
-capacite_num: 2
-tags: [capacite]
+capability_number: 2
+tags: [capability]
 ---
 
 # Vitesse

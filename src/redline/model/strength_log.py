@@ -27,11 +27,11 @@ from pathlib import Path
 
 from .views import csv_rows as rows
 
-COLUMNS = ("date", "sid", "seance", "slug", "valeurs", "droite", "gauche", "score", "passe",
+COLUMNS = ("date", "sid", "workout", "slug", "both", "right", "left", "score", "skipped",
            "status", "completed_slots", "note")
 
 SEPARATOR = "|"
-YES = "oui"
+YES = "yes"
 
 
 def series(value: str | None) -> list:
@@ -64,14 +64,14 @@ def human(row: dict, limit: int = 64) -> str:
     """
     if row.get("status") == "gated":
         return "retiré — douleur"
-    if row.get("passe"):
+    if row.get("skipped"):
         return "pas fait"
     parts = []
-    for label, column in (("D", "droite"), ("G", "gauche")):
+    for label, column in (("D", "right"), ("G", "left")):
         if row.get(column):
             parts.append(f"{label} {'·'.join(str(n) for n in series(row[column]))}")
-    if row.get("valeurs"):
-        parts.append("·".join(str(n) for n in series(row["valeurs"])))
+    if row.get("both"):
+        parts.append("·".join(str(n) for n in series(row["both"])))
     line = " · ".join(parts)
     if row.get("status") == "partial":
         line = f"partiel · {line}" if line else "partiel"

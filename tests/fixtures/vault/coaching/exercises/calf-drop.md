@@ -1,5 +1,5 @@
 ---
-type: exercice
+type: exercise
 aliases: [mollet excentrique]
 name: "Mollet unipodal, descente lente"
 cue: "Descente en 5 s ; remonter sur les deux pieds."
@@ -14,7 +14,7 @@ dose:
   reps: 8
   side: each
   rest_s: 90
-status: actif
+status: active
 tags: [renfo, excentrique, mollet]
 ---
 

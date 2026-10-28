@@ -1,5 +1,5 @@
 ---
-type: exercice
+type: exercise
 aliases: [fente soléaire iso]
 name: "Fente soléaire isométrique (genou fléchi)"
 target: "soléaire, isométrique"
@@ -12,7 +12,7 @@ dose:
   seconds: [30, 45]
   side: each
   rest_s: 45
-status: retire
+status: retired
 tags: [renfo, isometrique, mollet]
 ---
 

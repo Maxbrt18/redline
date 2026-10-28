@@ -1,5 +1,5 @@
 ---
-type: exercice
+type: exercise
 aliases: [tibial postérieur, inversion résistée]
 name: "Tibial postérieur, inversion élastique"
 cue: "Pointe vers l’intérieur, talon fixe, genou immobile."
@@ -15,7 +15,7 @@ dose:
   reps: 15
   side: each
   rest_s: 45
-status: actif
+status: active
 tags: [renfo, cheville]
 ---
 

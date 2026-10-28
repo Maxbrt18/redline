@@ -1,8 +1,8 @@
 ---
-type: capacite
+type: capability
 aliases: [ravitaillement]
-capacite_num: 3
-tags: [capacite]
+capability_number: 3
+tags: [capability]
 ---
 
 # Ravitaillement

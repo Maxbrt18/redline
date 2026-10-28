@@ -131,11 +131,11 @@ def test_an_unknown_session_names_the_ones_that_exist(programme):
 
 def test_an_exercise_note_missing_its_dose_is_refused():
     with pytest.raises(SchemaError, match="champ « dose » manquant"):
-        EXERCISE_SCHEMA.validate({"type": "exercice", "name": "Mollet"}, "x.md")
+        EXERCISE_SCHEMA.validate({"type": "exercise", "name": "Mollet"}, "x.md")
 
 
 def test_a_session_without_exercises_is_refused():
     problems = SESSION_SCHEMA.errors(
-        {"type": "seance-type", "title": "T", "rule": "une règle assez longue",
+        {"type": "workout", "title": "T", "rule": "une règle assez longue",
          "exercises": [], "routine": "x"}, "renfo-x.md")
     assert problems == ["renfo-x.md : champ « exercises » : longueur 0, minimum 1"]

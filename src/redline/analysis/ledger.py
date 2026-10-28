@@ -7,8 +7,8 @@ that drifts.
 
 Usage:
     python3 scripts/ledger.py                       # the last week
-    python3 scripts/ledger.py --semaine 2030-W30    # the load line for a weekly review
-    python3 scripts/ledger.py --tendance-douleur 3  # last 3 weeks
+    python3 scripts/ledger.py --week 2030-W30    # the load line for a weekly review
+    python3 scripts/ledger.py --pain-trend 3  # last 3 weeks
     python3 scripts/ledger.py --csv                 # both tables, normalized, on stdout
 
 Reads observations, metrics, daily declarations and instruments directly from
@@ -388,7 +388,7 @@ def _week_label(day: dt.date) -> str:
 def normalize_week(text: str, known: list[str]) -> str:
     """« 31 », « W31 », « 2030-w31 » -> « 2030-W31 », rejecting unknown weeks.
 
-    Without this, `--semaine 31` would raise nothing: the label would match no row, the
+    Without this, `--week 31` would raise nothing: the label would match no row, the
     week would come out empty and the gauge would print « 0.00 h-éq (0/100) », a perfectly
     credible zero. A reader that meets non-conforming data REFUSES, it does not interpret.
     """
@@ -712,7 +712,7 @@ class Volume:
 
     The plan carries the INTENTION, the ledger carries the FACT, and nothing tells them
     apart once a figure leaves its table. This computation is the only one allowed to
-    produce a weekly volume: `--semaine` prints it and `model/hot_cache.py` renders it.
+    produce a weekly volume: `--week` prints it and `model/hot_cache.py` renders it.
     """
 
     km_run: float
@@ -1002,7 +1002,7 @@ def projection_lines(projection: Projection, target_km: float | None = None) -> 
              f"utile(s) avant l'affûtage ({projection.taper_from}), depuis "
              f"{projection.start_km:.1f} km (plus longue des 30 j)."]
     if not target_km:
-        lines.append("Cible de sortie longue non fournie (--cible-sl KM) : rythme "
+        lines.append("Cible de sortie longue non fournie (--long-run-target KM) : rythme "
                      "nécessaire non calculé.")
         return lines
     parts = []
@@ -1031,7 +1031,7 @@ def week_report(store: LedgerStore, rows: list[Row], instruments: dict, targets:
                 closing: bool = False) -> list[str]:
     """A week's report: volume, gauge, pain, then the slope.
 
-    ONE function for the CLI (`ledger.py --semaine`) and for the dossier the service
+    ONE function for the CLI (`ledger.py --week`) and for the dossier the service
     computes before the Sunday review (`weekly_dossier.py`): two renderings of the same
     computation would diverge.
     """
@@ -1102,16 +1102,16 @@ def week_report(store: LedgerStore, rows: list[Row], instruments: dict, targets:
 
 # -------------------------------------------------------------------------------- CLI
 
-# The export's column names. Pain has one column per zone, `dlr_<zone>`, between `rpe`
-# and `plaisir`: whatever reads this CSV finds every series under its own name.
-CSV_HEADERS = ["date", "semaine", "type", "km", "duree_h", "fc_moy", "cad",
-               "dplus", "dmoins", "rpe", "plaisir", "note"]
+# The export's column names. Pain has one column per zone, `pain_<zone>`, between `rpe`
+# and `enjoyment`: whatever reads this CSV finds every series under its own name.
+CSV_HEADERS = ["date", "week", "type", "km", "duration_h", "hr_avg", "cadence",
+               "dplus", "dminus", "rpe", "enjoyment", "note"]
 
 
 def _export_csv(rows: list[Row], zones: list[PainZone]) -> str:
     buffer = io.StringIO()
     writer = csv.writer(buffer)
-    pain_headers = [f"dlr_{zone.slug}" for zone in zones]
+    pain_headers = [f"pain_{zone.slug}" for zone in zones]
     writer.writerow([*CSV_HEADERS[:10], *pain_headers, *CSV_HEADERS[10:]])
     for row in rows:
         writer.writerow([row.date, row.week, row.type, row.km,
@@ -1126,10 +1126,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--root", default=paths.vault_root(), type=Path)
-    parser.add_argument("--semaine", dest="week", help="ex. 2030-W30")
-    parser.add_argument("--tendance-douleur", dest="pain_weeks", type=int, metavar="N")
+    parser.add_argument("--week", dest="week", help="ex. 2030-W30")
+    parser.add_argument("--pain-trend", dest="pain_weeks", type=int, metavar="N")
     parser.add_argument("--csv", action="store_true", help="export normalisé sur stdout")
-    parser.add_argument("--cible-sl", dest="target_km", type=float, metavar="KM",
+    parser.add_argument("--long-run-target", dest="target_km", type=float, metavar="KM",
                         help="distance de sortie longue à atteindre avant l'affûtage")
     args = parser.parse_args()
 

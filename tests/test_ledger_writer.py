@@ -98,13 +98,13 @@ def _zones(monkeypatch, add, zones=("genou",)):
 
 @pytest.mark.parametrize("trace", ["", "?"])
 def test_un_reveil_sans_trace_ne_sécrit_pas(monkeypatch, capsys, trace):
-    """Without `--dlr`, the measure used to be born `pending` silently and the athlete's
+    """Without `--pain`, the measure used to be born `pending` silently and the athlete's
     answer lived only in the note. The gate never read it."""
     add = _load_writer()
     _zones(monkeypatch, add)
     argv = ["ledger-add.py", "--dry-run", "--date", "2026-10-11", "--type", "wake-trace",
             "--note", "Trace légère déclarée par Sam"]
-    monkeypatch.setattr(sys, "argv", argv + (["--dlr", trace] if trace else []))
+    monkeypatch.setattr(sys, "argv", argv + (["--pain", trace] if trace else []))
     assert add.main() == 1
     assert "réveil sans trace" in capsys.readouterr().err
 
@@ -116,7 +116,7 @@ def test_le_mot_de_alex_devient_la_valeur(monkeypatch, capsys, word, value):
     _zones(monkeypatch, add)
     monkeypatch.setattr(sys, "argv", [
         "ledger-add.py", "--dry-run", "--date", "2026-10-11", "--type", "wake-trace",
-        "--dlr", word])
+        "--pain", word])
     assert add.main() == 0
     assert f"'Dlr': {{'genou': '{value}'}}" in capsys.readouterr().out
 
@@ -126,7 +126,7 @@ def test_avec_plusieurs_zones_chaque_douleur_nomme_la_sienne(monkeypatch, capsys
     _zones(monkeypatch, add, ("talon", "cheville"))
     monkeypatch.setattr(sys, "argv", [
         "ledger-add.py", "--dry-run", "--date", "2026-10-11", "--type", "easy",
-        "--dlr", "talon=2", "--dlr", "cheville=?"])
+        "--pain", "talon=2", "--pain", "cheville=?"])
     assert add.main() == 0
     assert "'Dlr': {'talon': '2', 'cheville': '?'}" in capsys.readouterr().out
 
@@ -139,7 +139,7 @@ def test_une_douleur_sans_zone_claire_est_refusee(monkeypatch, capsys, given, re
     _zones(monkeypatch, add, ("talon", "cheville"))
     argv = ["ledger-add.py", "--dry-run", "--date", "2026-10-11", "--type", "easy"]
     for value in given:
-        argv += ["--dlr", value]
+        argv += ["--pain", value]
     monkeypatch.setattr(sys, "argv", argv)
     assert add.main() == 1
     assert refused in capsys.readouterr().err
@@ -150,7 +150,7 @@ def test_un_reveil_exige_une_trace_par_zone(monkeypatch, capsys):
     _zones(monkeypatch, add, ("talon", "cheville"))
     monkeypatch.setattr(sys, "argv", [
         "ledger-add.py", "--dry-run", "--date", "2026-10-11", "--type", "wake-trace",
-        "--dlr", "talon=aucune"])
+        "--pain", "talon=aucune"])
     assert add.main() == 1
     assert "réveil sans trace pour cheville" in capsys.readouterr().err
 

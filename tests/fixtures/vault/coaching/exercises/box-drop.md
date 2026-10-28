@@ -1,5 +1,5 @@
 ---
-type: exercice
+type: exercise
 aliases: [box drop]
 name: "Box drop bipodal"
 target: "absorption sous impact"
@@ -12,7 +12,7 @@ dose:
   sets: 3
   reps: 5
   rest_s: 60
-status: actif
+status: active
 tags: [renfo, pliometrie, descente]
 ---
 

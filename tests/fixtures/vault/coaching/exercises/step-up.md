@@ -1,5 +1,5 @@
 ---
-type: exercice
+type: exercise
 aliases: [step-up, montée sur marche]
 name: "Step-up sur marche haute"
 cue: "Monter avec la jambe du dessus, sans pousser sur celle du bas."
@@ -14,7 +14,7 @@ dose:
   reps: 8
   side: each
   rest_s: 60
-status: actif
+status: active
 tags: [renfo, fessier]
 ---
 

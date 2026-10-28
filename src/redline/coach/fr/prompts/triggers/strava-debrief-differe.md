@@ -7,7 +7,7 @@ suivant. Note CARNET présente : une clause rappelle que le carnet l'attend, san
 NE DEMANDE PAS UNE NOTE SUR 10 : demande la trace laissée (aucune, très
 légère, légère, nette) ou fais falsifier l'annonce de la veille ("plus, moins ou pile ce que ton 2
 d'hier annonçait ?"), plus les premiers pas et le test du toucher. Son mot va tel quel
-dans `--dlr` (`none`, `very-light`, `light`, `clear`), et tu ne le narres pas.
+dans `--pain` (`none`, `very-light`, `light`, `clear`), et tu ne le narres pas.
 La réponse de ⟨athlète⟩ devient une ligne `wake-trace`, distincte de la douleur d'effort. Si
 c'était une sortie nocturne, questionne aussi vigilance, appuis et moral dans le noir,
 qui alimentent la capacité n°4. Ne parle pas du programme du jour ici.

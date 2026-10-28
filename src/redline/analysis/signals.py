@@ -16,7 +16,7 @@ A signal that comes out here is never a verdict, it is a line to go and check, t
 doctrine as the gauge: "warning signal, never a guillotine".
 
     python3 scripts/signals.py            # the last 4 weeks
-    python3 scripts/signals.py --semaines 6
+    python3 scripts/signals.py --weeks 6
 """
 
 from __future__ import annotations
@@ -238,7 +238,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--root", default=paths.vault_root(), type=Path)
-    parser.add_argument("--semaines", dest="weeks", type=int, default=4)
+    parser.add_argument("--weeks", dest="weeks", type=int, default=4)
     args = parser.parse_args()
 
     store = gauge.open_store()

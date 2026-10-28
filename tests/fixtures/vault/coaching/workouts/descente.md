@@ -1,10 +1,10 @@
 ---
-type: seance-type
-capacite: [cotes, genou]
-rpe_cible: 4
-duree_min: 60
+type: workout
+capabilities: [cotes, genou]
+target_rpe: 4
+duration_min: 60
 phase: [specifique-1, specifique-2]
-statut: actif
+status: active
 ---
 
 # descente

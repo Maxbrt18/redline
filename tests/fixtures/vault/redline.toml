@@ -45,7 +45,7 @@ label = "Mental"
 icon = "mind"
 
 [vault]
-note_types = ["capacite", "exercice", "seance-type"]
+note_types = ["capability", "exercise", "workout"]
 
 [[vault.budget]]
 tier = "par tour"

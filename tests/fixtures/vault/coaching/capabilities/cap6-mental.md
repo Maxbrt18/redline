@@ -1,8 +1,8 @@
 ---
-type: capacite
+type: capability
 aliases: [mental]
-capacite_num: 6
-tags: [capacite]
+capability_number: 6
+tags: [capability]
 ---
 
 # Mental

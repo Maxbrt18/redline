@@ -146,8 +146,8 @@ def _strength_payload(session: dict, report: dict, rows: list[dict], *,
     exercises = []
     for row in rows:
         sets = []
-        for column, side in (("valeurs", "both"), ("droite", "right"), ("gauche", "left")):
-            for index, repetitions in enumerate(strength_log.series(row.get(column)), 1):
+        for side in ("both", "right", "left"):
+            for index, repetitions in enumerate(strength_log.series(row.get(side)), 1):
                 sets.append({"side": side, "set_index": index, "repetitions": repetitions})
         source_index = next(index for index, exercise in enumerate(session["exercises"])
                             if exercise.get("slug") == row["slug"])
@@ -161,7 +161,7 @@ def _strength_payload(session: dict, report: dict, rows: list[dict], *,
         exercises.append({
             "exercise_slug": row["slug"],
             "difficulty": int(row["score"]) if row.get("score") is not None else None,
-            "skipped": row.get("passe") == strength_log.YES,
+            "skipped": row.get("skipped") == strength_log.YES,
             "sets": sets,
             "status": row.get("status"),
             "completed_slots": row.get("completed_slots"),

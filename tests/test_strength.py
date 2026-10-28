@@ -182,11 +182,11 @@ def test_the_log_rows_are_the_message_seen_from_the_other_side():
     })
     rows = strength.log_entries(SESSION, report, day="2026-08-01")
     assert rows == [
-        {"date": "2026-08-01", "sid": "2026-07-25-A", "seance": "a",
-         "slug": "calf-raise-bent", "droite": "14|11", "gauche": "12|10", "score": 6,
+        {"date": "2026-08-01", "sid": "2026-07-25-A", "workout": "a",
+         "slug": "calf-raise-bent", "right": "14|11", "left": "12|10", "score": 6,
          "status": "completed", "completed_slots": 4, "note": ""},
-        {"date": "2026-08-01", "sid": "2026-07-25-A", "seance": "a",
-         "slug": "plyometrics", "passe": "oui", "status": "skipped", "completed_slots": 0,
+        {"date": "2026-08-01", "sid": "2026-07-25-A", "workout": "a",
+         "slug": "plyometrics", "skipped": "yes", "status": "skipped", "completed_slots": 0,
          "note": ""},
     ]
 
@@ -195,7 +195,7 @@ def test_partial_work_keeps_counts_and_unmeasured_validations():
     clean = parsed({"exercises": [{"i": 1, "status": "partial", "reps": [17, None],
                                     "note": "Arrêt, équilibre difficile à gauche."}]})
     row = strength.log_entries(SESSION, clean, "2026-10-02")[0]
-    assert row["droite"] == "17" and "passe" not in row
+    assert row["right"] == "17" and "skipped" not in row
     assert row["completed_slots"] == 2 and row["status"] == "partial"
     assert row["note"] in strength.format_message(SESSION, clean)
 
@@ -213,8 +213,8 @@ def test_the_blocks_of_a_contact_exercise_are_logged_as_one_series():
          "dose": dose(measure="contacts", contacts=40, block=10)}])
     report = parsed({"exercises": [{"i": 0, "reps": [10, 10, 8, 10]}]}, session)
     rows = strength.log_entries(session, report, day="2026-08-01")
-    assert rows[0]["valeurs"] == "10|10|8|10"
-    assert "droite" not in rows[0]
+    assert rows[0]["both"] == "10|10|8|10"
+    assert "right" not in rows[0]
 
 
 def test_an_exercise_without_a_slug_is_not_logged():

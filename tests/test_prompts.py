@@ -192,7 +192,7 @@ def test_morning_collects_the_previous_day_wake_reference_immediately():
     assert "Ne demande jamais un chiffre /10 pour le" in morning
     assert "réveil et ne reporte jamais" in morning
     assert "ne reporte jamais cette question au soir ou au lendemain" in morning
-    assert "`--dlr` et son mot" in morning
+    assert "`--pain` et son mot" in morning
 
 
 def test_morning_checks_plan_threads_and_upcoming_dates():
@@ -284,7 +284,7 @@ def test_style_keeps_channel_and_decision_guardrails():
     assert "si le critère est ambigu, demande" in STYLE_PROMPT
     assert "porte de sortie chiffrée" in STYLE_PROMPT
     assert "UN CHIFFRE NE SE CITE PAS" in STYLE_PROMPT
-    assert f"{prompts.AGENT_CLI} ledger.py --semaine" in STYLE_PROMPT
+    assert f"{prompts.AGENT_CLI} ledger.py --week" in STYLE_PROMPT
     assert "Vol. cible" in STYLE_PROMPT
     assert "n'annonce pas leur arrivée" in STYLE_PROMPT
     assert f"{prompts.AGENT_CLI} fact-read.py corrections" in STYLE_PROMPT
@@ -762,7 +762,7 @@ def test_the_race_countdown_defers_to_the_plan():
 
 def test_monthly_judges_outcomes_not_only_the_process():
     monthly = " ".join(PROACTIVE_TRIGGERS["monthly"].split())
-    assert "Juge le RÉSULTAT" in monthly and "--cible-sl" in monthly
+    assert "Juge le RÉSULTAT" in monthly and "--long-run-target" in monthly
 
 
 def test_a_session_is_bound_to_the_instruction_files_it_actually_read(tmp_path):

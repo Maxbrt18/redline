@@ -1,11 +1,11 @@
 ---
-type: seance-type
+type: workout
 kinds: [threshold, hills]
-capacite: [endurance, genou]
-rpe_cible: 6
-duree_min: 50
+capabilities: [endurance, genou]
+target_rpe: 6
+duration_min: 50
 phase: [specifique-1, specifique-2]
-statut: actif
+status: active
 ---
 
 # seuil-cote

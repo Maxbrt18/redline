@@ -1,11 +1,11 @@
 ---
-type: seance-type
+type: workout
 kinds: [easy]
-capacite: [endurance]
-rpe_cible: 3
-duree_min: 45
+capabilities: [endurance]
+target_rpe: 3
+duration_min: 45
 phase: [base, general, specifique-1, specifique-2]
-statut: actif
+status: active
 ---
 
 # ef

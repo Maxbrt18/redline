@@ -19,6 +19,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from redline.model import strength_log
 from redline.model.errors import InputError
 
 PAGE_PATH = "/s"
@@ -300,19 +301,19 @@ def log_entries(session: dict, clean: dict, day: str) -> list:
         if not item or not slug:
             continue
         row = {"date": day, "sid": sid,
-               "seance": _clean_text(session.get("session"))[:20], "slug": slug}
+               "workout": _clean_text(session.get("session"))[:20], "slug": slug}
         row.update(status=item["status"], completed_slots=item["completed_slots"],
                    note=item["note"])
         if item["skipped"]:
-            row["passe"] = "oui"
+            row["skipped"] = strength_log.YES
         else:
             sides = item["sides"]
             if sides.get("d") or sides.get("g"):
-                for column, key in (("droite", "d"), ("gauche", "g")):
+                for column, key in (("right", "d"), ("left", "g")):
                     if sides.get(key):
                         row[column] = "|".join(str(value) for value in sides[key])
             elif sides.get(""):
-                row["valeurs"] = "|".join(str(value) for value in sides[""])
+                row["both"] = "|".join(str(value) for value in sides[""])
             if item["score"] is not None:
                 row["score"] = item["score"]
         entries.append(row)

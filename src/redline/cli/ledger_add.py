@@ -8,8 +8,8 @@ the contract of `model/ledger.py`, then writes the canonical observation directl
         --temps 0:41:56 --allure 6:08 --fcmoy 156.61 --fcmax 168 --cad 168.88 \\
         --dplus 64.7 --dmoins 64 --wbgt 20 --strava 90000000003 --note "…"
 
-Pain is given per monitored zone: `--dlr genou=2 --dlr cheville=?`. With a single
-zone, `--dlr 2` is enough.
+Pain is given per monitored zone: `--pain genou=2 --pain cheville=?`. With a single
+zone, `--pain 2` is enough.
 
 `--dry-run` prints the validated payload without writing.
 """
@@ -57,7 +57,7 @@ def morning_trace_errors(raw: dict[str, str], pains: dict[str, str],
                          zones: list[str]) -> list[str]:
     """A `reveil` row carries its trace, or it is not written.
 
-    Without `--dlr` the measurement would silently be born `pending` and the athlete's
+    Without `--pain` the measurement would silently be born `pending` and the athlete's
     answer would live only in the note, leaving the gate "incomplete" and prompting a
     follow-up on something already answered. The word the athlete uses is accepted as
     is and converted here (aucune 0, très légère 0.5, légère 1, nette 2).
@@ -79,7 +79,7 @@ def morning_trace_errors(raw: dict[str, str], pains: dict[str, str],
         if given and given != table.UNKNOWN:
             continue
         problems.append(
-            f"réveil sans trace pour {zone} : passe --dlr {zone}=aucune, « très légère », "
+            f"réveil sans trace pour {zone} : passe --pain {zone}=aucune, « très légère », "
             "légère ou nette (0, 0.5, 1 ou 2). Sa base habituelle est légère ; mieux que "
             "d'habitude ou très légère = très légère. Si l'athlète n'a nommé aucune trace, "
             "n'écris pas de ligne et demande-la.")
@@ -170,7 +170,7 @@ def main() -> int:
         parser.add_argument(f"--{option_of(item)}", default="",
                             help=f"champ « {item.name} »"
                                  + (f" ({item.note})" if item.note else ""))
-    parser.add_argument("--dlr", action="append", default=[], metavar="ZONE=VALEUR",
+    parser.add_argument("--pain", action="append", default=[], metavar="ZONE=VALEUR",
                         help=f"douleur d'une zone surveillée ({table.PAIN_NOTE}) ; "
                              "répétable, « ? » = demandée puis perdue")
     args = parser.parse_args()
@@ -187,14 +187,14 @@ def main() -> int:
 
     database_url = (os.environ.get("DATABASE_URL") or "").strip()
     zones: list[str] = []
-    if args.dlr or raw_values.get("Type") == session_kinds.WAKE_TRACE:
+    if args.pain or raw_values.get("Type") == session_kinds.WAKE_TRACE:
         if not database_url:
             print("DATABASE_URL obligatoire : les zones surveillées vivent en base",
                   file=sys.stderr)
             return 2
         zones = _active_zones(database_url)
     try:
-        pains = table.parse_pains([value.strip() for value in args.dlr], zones)
+        pains = table.parse_pains([value.strip() for value in args.pain], zones)
     except table.LedgerError as exc:
         print(f"observation refusée : {exc}", file=sys.stderr)
         return 1

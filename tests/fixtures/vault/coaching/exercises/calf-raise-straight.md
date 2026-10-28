@@ -1,5 +1,5 @@
 ---
-type: exercice
+type: exercise
 aliases: [mollet genou tendu, gastrocnémien]
 name: "Mollet unipodal, genou TENDU"
 cue: "Genou TENDU, descente en 3 s ; arrête 2 répétitions AVANT l'échec."
@@ -15,7 +15,7 @@ dose:
   reps: [18, 22]
   side: each
   rest_s: 90
-status: actif
+status: active
 tags: [renfo, mollet]
 ---
 

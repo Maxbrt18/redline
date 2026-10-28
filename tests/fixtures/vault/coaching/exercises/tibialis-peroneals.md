@@ -1,5 +1,5 @@
 ---
-type: exercice
+type: exercise
 aliases: [tibial antérieur, péroniers]
 name: "Tibial antérieur + péroniers, élastique"
 cue: "Flexion dorsale puis éversion, la cheville seule travaille."
@@ -12,7 +12,7 @@ dose:
   sets: 2
   reps: 15
   rest_s: 45
-status: actif
+status: active
 tags: [renfo]
 ---
 

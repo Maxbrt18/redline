@@ -28,7 +28,7 @@ from .dose import DOSE_SCHEMA, Dose
 from .notes import NoteError, frontmatter, read_all
 from .schema import Schema, field
 
-STATUSES = ("actif", "retire")
+STATUSES = ("active", "retired")
 SLUG_PATTERN = r"[a-z0-9][a-z0-9-]{0,39}"
 WEEK = r"W\d{2}"
 
@@ -46,7 +46,7 @@ DISPLAY_FIELDS = [
 
 EXERCISE_SCHEMA = Schema("exercice", [
     *DISPLAY_FIELDS,
-    field("type", str, choices=("exercice",)),
+    field("type", str, choices=("exercise",)),
     field("name", str, minimum=3, maximum=90,
           note="tel qu'il s'imprime sur la card, à bout de bras"),
     field("target", str, required=False, maximum=60,
@@ -63,31 +63,31 @@ EXERCISE_SCHEMA = Schema("exercice", [
     field("dose", dict, schema=DOSE_SCHEMA),
     field("since", str, required=False, pattern=WEEK,
           note="semaine ISO d'entrée au programme, ex. W32"),
-    field("status", str, required=False, choices=STATUSES, default="actif"),
+    field("status", str, required=False, choices=STATUSES, default="active"),
     field("aliases", list, required=False, item=field("alias", str)),
     field("tags", list, required=False, item=field("tag", str)),
 ])
 
-# The French keys are the shared contract of the session notes and of the Obsidian base
-# `coaching/seances-types.base`, so they are validated strictly here.
+# These keys are the shared contract of the workout notes and of any Obsidian base built
+# on them, so they are validated strictly here.
 SESSION_SCHEMA = Schema("séance", [
-    field("type", str, choices=("seance-type",)),
+    field("type", str, choices=("workout",)),
     field("title", str, note="le titre imprimé en tête de card"),
     field("rule", str, minimum=10, maximum=200,
           note="la règle imprimée en pied de card — ce que l'athlète lit PENDANT la séance"),
     field("exercises", list, minimum=1, item=field("exercice", object),
           note="les slugs, DANS L'ORDRE (il est non négociable)"),
     field("aliases", list, required=False, item=field("alias", str)),
-    field("capacite", list, required=False, item=field("cap", str)),
-    field("rpe_cible", int, required=False, minimum=1, maximum=10),
-    field("duree_min", int, required=False, minimum=5, maximum=120),
+    field("capabilities", list, required=False, item=field("cap", str)),
+    field("target_rpe", int, required=False, minimum=1, maximum=10),
+    field("duration_min", int, required=False, minimum=5, maximum=120),
     field("phase", list, required=False, item=field("phase", str)),
-    field("contre_indications", list, required=False, item=field("ci", str)),
-    field("regle_execution", str, required=False,
+    field("contraindications", list, required=False, item=field("ci", str)),
+    field("execution_rule", str, required=False,
           note="guidage de programmation, pour le coach — pas la règle de la card"),
     field("variants", dict, required=False,
           note="les variantes déclarées, ex. degraded"),
-    field("statut", str, required=False, choices=("actif", "retire")),
+    field("status", str, required=False, choices=STATUSES),
     field("routine", str, pattern=SLUG_PATTERN,
           note="l'identifiant de la routine, celui que le programme et le registre citent"),
     field("min_gap_h", dict, required=False,
@@ -295,7 +295,7 @@ class Programme:
             "title": session["title"],
             "rule": session["rule"],
             "date": choice.get("date", ""),
-            "duration_min": choice.get("duration_min") or session.get("duree_min") or 30,
+            "duration_min": choice.get("duration_min") or session.get("duration_min") or 30,
             "note": choice.get("note", ""),
             "gate": gate,
             "exercises": kept,
@@ -334,12 +334,12 @@ def _workout_notes(vault: Path) -> list[tuple[Path, dict]]:
 def rpe_targets(vault: Path) -> dict[tuple[str, str | None], float]:
     """The RPE target of each (kind, routine), read from the workout notes.
 
-    A kind without a declared `rpe_cible` is absent: the caller compares nothing
+    A kind without a declared `target_rpe` is absent: the caller compares nothing
     rather than inventing a target.
     """
     targets: dict[tuple[str, str | None], float] = {}
     for _, data in _workout_notes(vault):
-        target = data.get("rpe_cible")
+        target = data.get("target_rpe")
         if target is None:
             continue
         if "routine" in data:

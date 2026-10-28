@@ -1,5 +1,5 @@
 ---
-type: exercice
+type: exercise
 name: "Échauffement progressif"
 cue: "Monter progressivement l’intensité avant les excentriques."
 equipment: []
@@ -9,7 +9,7 @@ how:
 dose:
   measure: time
   seconds: 240
-status: actif
+status: active
 tags: [renfo, echauffement]
 ---
 
