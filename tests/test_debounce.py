@@ -1,14 +1,13 @@
-"""Le regroupement des textos envoyés en rafale en un seul run Claude.
+"""Grouping of texts sent in a burst into a single Claude run.
 
-Deux horloges, et c'est ce qui rend la chose fragile : on attend
-`DEBOUNCE_SECONDS` après le DERNIER texto (relancé à chaque nouveau), avec un
-plafond `DEBOUNCE_MAX_SECONDS` depuis le PREMIER. Les deux sont des options
-documentées de `.env.example`, et rien ne les couvrait — alors qu'une régression ici
-lance un run Claude par texto d'une rafale, ou en perd un (audit 2026-07-29).
+Two clocks, which is what makes this fragile: we wait `DEBOUNCE_SECONDS` after the
+LAST text (restarted on every new one), with a cap `DEBOUNCE_MAX_SECONDS` since the
+FIRST. Both are documented options of `.env.example`. A regression here starts one
+Claude run per text of a burst, or loses one.
 
-On teste `ready_buffer` plutôt que `next` : c'est là qu'est l'arithmétique, et
-ça évite de faire dormir la suite. `time.monotonic` est figé, donc aucun test ne
-dépend de la vitesse de la machine qui l'exécute.
+We test `ready_buffer` rather than `next`: that is where the arithmetic lives, and it
+keeps the suite from sleeping. `time.monotonic` is frozen, so no test depends on the
+speed of the machine running it.
 """
 
 import time
@@ -24,7 +23,7 @@ def bot(make_bot):
 
 
 def at(moment):
-    """Fige l'horloge du module : le debounce lit `time.monotonic`."""
+    """Freezes the module clock: the debounce reads `time.monotonic`."""
     return patch("redline.service.work_queue.time.monotonic", return_value=moment)
 
 
@@ -45,12 +44,12 @@ def test_it_ripens_once_the_quiet_delay_has_passed(bot):
 
 
 def test_a_new_text_pushes_the_deadline_back(bot):
-    """Le cœur du debounce : Sam qui écrit en trois fois n'est pas trois runs."""
+    """The core of the debounce: three texts in a row are not three runs."""
     with at(100.0):
         bot.submit_inbound("4242", "j'ai couru")
     with at(104.0):
         bot.submit_inbound("4242", "6 km")
-        assert bot._queue.ready_buffer()[0] is None   # l'échéance a reculé à 109
+        assert bot._queue.ready_buffer()[0] is None   # the deadline moved back to 109
     with at(108.0):
         assert bot._queue.ready_buffer()[0] is None
     with at(109.0):
@@ -69,10 +68,10 @@ def test_the_burst_is_delivered_as_one_message(bot):
 
 
 def test_the_cap_wins_over_a_never_ending_burst(bot):
-    """Sans plafond, quelqu'un qui écrit une ligne toutes les 4 s ne reçoit jamais de
-    réponse : chaque texto repousserait l'échéance indéfiniment."""
+    """Without a cap, someone typing a line every 4 s never gets a reply: each text
+        would push the deadline back indefinitely."""
     moment = 100.0
-    for _ in range(10):                     # un texto toutes les 4 s, sans respirer
+    for _ in range(10):                     # a text every 4 s, without a pause
         with at(moment):
             bot.submit_inbound("4242", "encore")
         moment += 4.0
@@ -85,19 +84,19 @@ def test_an_empty_queue_asks_to_sleep_indefinitely(bot):
 
 
 def test_the_nearest_deadline_drives_the_wait(bot):
-    """Le délai rendu sert de timeout à `Condition.wait` : le prendre sur le mauvais
-    tampon ferait dormir le worker au-delà d'une réponse déjà mûre."""
+    """The returned delay is used as the timeout of `Condition.wait`: taking it from the
+        wrong buffer would make the worker sleep past an already ripe reply."""
     with at(100.0):
         bot.submit_inbound("4242", "premier")
     with at(102.0):
         bot.submit_inbound("9999", "second")
     with at(103.0):
         _, wait = bot._queue.ready_buffer()
-    assert wait == pytest.approx(2.0)       # 4242 mûrit à 105, 9999 à 107
+    assert wait == pytest.approx(2.0)       # 4242 ripens at 105, 9999 at 107
 
 
 def test_the_wait_is_never_zero(bot):
-    """Un timeout nul ferait tourner le worker en boucle serrée sur le CPU."""
+    """A zero timeout would make the worker spin in a tight CPU loop."""
     with at(100.0):
         bot.submit_inbound("4242", "salut")
     with at(104.999999):
@@ -172,9 +171,9 @@ def test_a_failed_direct_message_is_retried_and_stays_durable(make_bot, store):
     client.action.return_value = DeliveryResult.success()
     bot = make_bot(
         agent=agent, client=client, debounce_seconds=0, debounce_max_seconds=0)
-    # Une reprise immédiate, puis la suivante hors de portée du test : avec (0.01,)
-    # seul, un troisième passage pouvait tomber avant `stop()` (6 appels au lieu de 4).
-    bot.REACTIVE_RETRY_DELAYS = (0.01, 60.0)  # < OUTAGE_NOTICE_AFTER : aucun avis
+    # An immediate retry, then the next one out of the test's reach: with (0.01,) alone,
+    # a third pass could land before `stop()` (6 calls instead of 4).
+    bot.REACTIVE_RETRY_DELAYS = (0.01, 60.0)  # < OUTAGE_NOTICE_AFTER: no notice
 
     bot.start()
     deadline = time.time() + 1
@@ -182,7 +181,7 @@ def test_a_failed_direct_message_is_retried_and_stays_durable(make_bot, store):
         time.sleep(0.01)
     bot.stop()
 
-    # Deux profils de route à chaque passage, puis une reprise applicative.
+    # Two route profiles on each pass, then an application-level retry.
     assert len(agent.calls) == 4
     assert store.pending_inbound()[0]["message_id"] == "m-retry"
     client.send_text.assert_not_called()

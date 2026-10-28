@@ -1,17 +1,16 @@
-"""Compléter une mesure ne doit pas exiger un identifiant que rien ne publie.
+"""Completing a measure must not require an identifier that nothing publishes.
 
-Le 2026-08-14, Sam donne le RPE et la douleur de son vélo de la veille. Le coach
-connaît l'id Strava de la sortie, il tente donc `strava:90000000001`. Mais la ligne
-avait été consignée sans id, sous `messenger:2026-08-13:velo-remplace-renfob`, et la
-clé n'apparaissait nulle part : ni dans `fact-read.py observations`, ni ailleurs. Elle
-n'avait vécu que dans la mémoire de la session — effacée entre-temps.
+The athlete gives the RPE and pain of a bike ride from the day before. The coach knows
+the Strava id of the activity and tries `strava:90000000001`. But the row had been
+recorded without an id, under a `messenger:` key, and that key appeared nowhere: not
+in `fact-read.py observations`, nor elsewhere. It had only lived in the memory of the
+session, long gone. Result: "unknown observation", turn refused, technical incident.
+A check demanded a correct path that nothing made reachable.
 
-Résultat : « observation inconnue », tour refusé, incident technique. Encore le même
-motif — un contrôle exigeant un chemin correct que rien ne rend accessible.
-
-Deux remèdes ici : la clé se lit (elle est publiée), et la date suffit (c'est ce que
-le coach sait vraiment). Plus un troisième, le plus important : l'erreur tombe TOUT DE
-SUITE, tant que le coach peut encore relancer, au lieu d'attendre la frontière du tour.
+Two remedies here: the key is readable (it is published), and the date is enough
+(what the coach really knows). Plus a third, the most important: the error falls
+IMMEDIATELY, while the coach can still retry, instead of waiting for the turn
+boundary.
 """
 
 import datetime as dt
@@ -48,7 +47,7 @@ REVEIL = _row("2026-08-13", "wake-trace", "messenger:abc:reveil", identifier=2)
 
 
 def test_a_date_resolves_the_key_the_coach_cannot_guess():
-    """Le cas exact du 2026-08-14 : le coach a la date, pas la clé inventée hier."""
+    """The coach has the date, not a key invented the day before."""
     cli = _cli()
     assert cli.resolve_key(_Store([VELO]), "", "2026-08-13", "") == VELO["idempotency_key"]
 
@@ -59,9 +58,9 @@ def test_an_explicit_key_still_wins():
 
 
 def test_an_ambiguous_date_lists_the_candidates_with_their_keys():
-    """Deux lignes le même jour : on ne devine pas à la place du coach, on lui montre
-    les clés pour qu'il tranche. Une erreur qui n'expose pas la sortie possible oblige
-    à deviner une deuxième fois."""
+    """Two rows on the same day: we do not guess in the coach's place, we show it the
+        keys so it can decide. An error that does not expose the way out forces a second
+        guess."""
     cli = _cli()
     with pytest.raises(InputError) as refus:
         cli.resolve_key(_Store([VELO, REVEIL]), "", "2026-08-13", "")
@@ -84,8 +83,8 @@ def test_a_date_without_any_observation_names_where_to_look():
 
 
 def test_the_key_is_published_by_the_reader_that_the_coach_runs():
-    """Le remède de fond : `ledger-complete.py` exige une clé, donc le lecteur doit la
-    publier. Ne pas l'afficher revenait à demander un identifiant secret."""
+    """The root remedy: `ledger-complete.py` requires a key, so the reader must publish
+        it. Not displaying it amounted to asking for a secret identifier."""
     from redline.cli import fact_read
 
     rows = [{**VELO, "measurements": {"rpe": {"state": "pending"},
@@ -94,5 +93,5 @@ def test_the_key_is_published_by_the_reader_that_the_coach_runs():
     lignes = fact_read.observations(_Store(rows), 10)
 
     assert any(VELO["idempotency_key"] in ligne for ligne in lignes)
-    # Et ce qui reste à compléter, sinon le coach ne sait pas quoi réclamer.
+    # And what remains to be completed, otherwise the coach does not know what to ask for.
     assert any("à compléter : pain, rpe" in ligne for ligne in lignes)

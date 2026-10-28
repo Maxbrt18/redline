@@ -1,9 +1,8 @@
-"""Un tour remet son JSON à une CLI par `--input`, dans un fichier à lui.
+"""A turn hands its JSON to a CLI through `--input`, in a file of its own.
 
-11/10 : Claude Code 2.1.287 a refusé `week-plan.py revise … < /tmp/x.json` trois fois
-au bilan W41, et W42 n'a jamais été écrite. La forme nue `--input <chemin>` ne dépend
-plus de l'analyse des redirections ; le nom propre au tour empêche de relire le JSON
-d'un autre tour.
+The bare form `--input <path>` no longer depends on the parsing of shell redirections
+(`... < /tmp/x.json` can be refused by the agent's permission layer); the per-turn
+file name prevents reading the JSON of another turn.
 """
 
 from __future__ import annotations
@@ -75,7 +74,7 @@ def test_clear_removes_only_the_files_of_that_turn(tmp_path):
 
 
 def test_the_turn_directory_is_ignored_by_git():
-    """Le service fait `git add -A` : sans ça, chaque JSON partirait dans un commit."""
+    """The service runs `git add -A`: without this, every JSON would end up in a commit."""
     result = subprocess.run(
         ["git", "check-ignore", "-q", f"{agent_input.DIRECTORY}/{TURN}.json"],
         cwd=ENGINE_ROOT, check=False)
@@ -83,7 +82,7 @@ def test_the_turn_directory_is_ignored_by_git():
 
 
 def test_week_plan_reads_the_revision_from_input():
-    """`revise` et `preview` déclarent `--input` : le prompt le leur dicte."""
+    """`revise` and `preview` declare `--input`: the prompt dictates it to them."""
     result = subprocess.run(
         [*cli_command("week-plan"), "--help"], cwd=ENGINE_ROOT,
         capture_output=True, text=True, check=True)
@@ -91,10 +90,10 @@ def test_week_plan_reads_the_revision_from_input():
 
 
 def test_a_resumed_claude_turn_names_its_own_file_in_its_message(make_config):
-    """27/10 : Claude Code fige le prompt système au premier tour de la session et le
-    rejoue à chaque `--resume`. Un chemin propre au tour posé là désignait encore le
-    premier tour, et `week-plan.py revise` refusait le fichier. Le chemin voyage donc
-    dans le message ; le prompt système ne dépend plus du tour."""
+    """The agent freezes the system prompt at the first turn of the session and replays
+        it on every `--resume`. A per-turn path placed there would still designate the
+        first turn, and `week-plan.py revise` would refuse the file. The path therefore
+        travels in the message; the system prompt no longer depends on the turn."""
     runner = ClaudeCodeRunner(make_config(agent_provider="claude"), state=None)
     first = runner._command("bilan", "sess-42", turn_id=OTHER)
     command = runner._command("Fais le changement", "sess-42", turn_id=TURN)
@@ -109,7 +108,7 @@ def test_a_resumed_claude_turn_names_its_own_file_in_its_message(make_config):
 
 
 def test_a_refused_path_says_how_to_succeed_with_write(tmp_path):
-    """27/10 : refus, `cp` interdit, révision autorisée abandonnée."""
+    """A refusal, a forbidden `cp`, an authorized revision abandoned."""
     with pytest.raises(agent_input.AgentInputError,
                        match=f"Réécris le même JSON avec Write dans "
                              f"{agent_input.DIRECTORY}/{TURN}.json"):
@@ -139,7 +138,7 @@ def _smoke():
 
 
 def _fake_claude(tmp_path, tool_result: str, denials: list | None = None) -> str:
-    """Un binaire qui rejoue le flux stream-json d'un appel de CLI."""
+    """A binary that replays the stream-json flow of a CLI call."""
     events = [
         {"type": "assistant", "message": {"content": [{
             "type": "tool_use", "id": "t1", "name": "Bash",

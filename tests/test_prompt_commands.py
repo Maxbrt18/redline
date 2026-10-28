@@ -1,15 +1,14 @@
-"""Toute commande nommée dans un prompt doit exister et accepter ce qu'on lui dicte.
+"""Every command named in a prompt must exist and accept what it is told.
 
-Un prompt qui cite une commande fausse ne casse pas au déploiement : il casse plus
-tard, chez Sam, au milieu d'un débrief. Le 2026-08-14 le déclencheur de débrief
-proposait `... | scripts/descent.py` — hors de l'unique lanceur autorisé, donc refusé,
-donc déguisé en panne d'accès Strava. Le même jour, un scénario de test appelait
-`fact-write.py daily --day` alors que l'option s'appelle `--date`.
+A prompt that cites a wrong command does not break at deployment: it breaks later,
+mid-conversation. A debrief trigger that pipes into `scripts/descent.py` is outside the
+single authorised launcher, so it is refused and disguised as an access outage. A test
+scenario calling `fact-write.py daily --day` when the option is `--date` is the same
+kind of fault.
 
-Ces deux fautes sont invisibles aux tests unitaires : les prompts sont des chaînes,
-personne ne les exécute. Ici on les lit comme ce qu'elles sont — des ORDRES — et on
-vérifie que chacun est exécutable : le script existe, son `--help` passe, et les
-sous-commandes et options citées y figurent vraiment.
+Both are invisible to unit tests: prompts are strings, nobody executes them. Here they
+are read as what they are -- ORDERS -- and each is checked to be executable: the script
+exists, its `--help` passes, and the cited subcommands and options really appear in it.
 """
 
 from __future__ import annotations
@@ -23,15 +22,15 @@ from conftest import ENGINE_ROOT, cli_command
 
 from redline.service import prompts
 
-# Les commandes vivent dans des `spans` entre accents graves. On ne parse donc pas
-# la prose : on lit ce que le prompt présente lui-même comme une commande.
+# Commands live in backtick `spans`. The prose is not parsed: only what the prompt
+# itself presents as a command is read.
 SPAN = re.compile(r"`([^`]+)`")
 SCRIPT = re.compile(
     r"/usr/local/bin/redline-agent-cli\s+([a-z-]+\.py)((?:\s+[a-z][a-z-]*)*)")
 
 
 def _prompts() -> dict[str, str]:
-    """Tous les textes injectés au coach, réunis sous un nom lisible."""
+    """All the texts injected into the coach, gathered under a readable name."""
     textes = {
         "STYLE_PROMPT": prompts.STYLE_PROMPT,
         "TRIAGE_RULES": prompts.TRIAGE_RULES,
@@ -39,8 +38,7 @@ def _prompts() -> dict[str, str]:
         "STRENGTH_CARD_POINTER": prompts.STRENGTH_CARD_POINTER,
         "STRENGTH_REPORT_NOTE": prompts.STRENGTH_REPORT_NOTE,
         "stale_plan_note": prompts.stale_plan_note("2026-W33"),
-        # Rapatriés de `bot.py` le 2026-08-19 : ils citent des commandes, donc ils
-        # entrent ici comme les autres.
+        # These cite commands, so they enter here like the others.
         "canonical_plan_note": prompts.canonical_plan_note(""),
         "active_revision_note": prompts.active_revision_note(""),
         "missing_cells_note": prompts.missing_cells_note(
@@ -54,11 +52,11 @@ def _prompts() -> dict[str, str]:
 
 
 def _commandes() -> list[tuple[str, str, str, tuple[str, ...]]]:
-    """(origine, script, sous-commandes, options) pour chaque commande citée.
+    """(origin, script, subcommands, options) for each cited command.
 
-    Le découpage sur les tubes n'est pas un détail : sans lui, le `--dplus` de
-    `descent.py` était attribué à `strava.py` dans le pipe du débrief, et le test
-    accusait le mauvais script d'ignorer une option qu'il n'a jamais eue.
+    Splitting on pipes matters: without it, the `--dplus` of `descent.py` would be
+    attributed to `strava.py` in a debrief pipe, and the test would blame the wrong
+    script for ignoring an option it never had.
     """
     trouvees = []
     for origine, texte in _prompts().items():
@@ -79,8 +77,8 @@ COMMANDES = _commandes()
 
 
 def test_les_prompts_citent_bien_des_commandes():
-    """Garde-fou du garde-fou : si l'extraction casse, tout le fichier passerait au
-    vert en ne vérifiant rien."""
+    """Guard of the guard: if the extraction breaks, the whole file would pass green
+    while checking nothing."""
     assert len(COMMANDES) >= 10
     scripts = {script for _, script, _, _ in COMMANDES}
     assert "scripts/strava.py" in scripts
@@ -100,9 +98,8 @@ def test_chaque_commande_citee_est_executable(origine, script, suite, options):
 
     texte_aide = aide.stdout + aide.stderr
     for sous_commande in suite.split():
-        # `show/check` et consorts sont écrits en toutes lettres dans les prompts ;
-        # une sous-commande absente de l'aide est une commande que le coach ne peut
-        # pas lancer.
+        # `show/check` and the like are written out in full in the prompts; a
+        # subcommand absent from the help is a command the coach cannot run.
         assert sous_commande in texte_aide, (
             f"{origine} cite `{script} {sous_commande}`, absent de son aide")
 
@@ -116,12 +113,11 @@ def test_chaque_commande_citee_est_executable(origine, script, suite, options):
 
 
 def test_toute_commande_passe_par_le_lanceur_autorise():
-    """Le prompt et ``dontAsk`` doivent décrire exactement le même chemin.
+    """The prompt and ``dontAsk`` must describe exactly the same path.
 
-    Le 26/08, la doctrine disait ``scripts/ledger-add.py`` alors que Bash n'autorisait
-    que ``redline-agent-cli``. Le refus a ensuite été raconté comme une panne de
-    sauvegarde. Toute mention d'une CLI métier est donc normalisée, pas seulement les
-    exemples qui portent des options.
+    If the doctrine says ``scripts/ledger-add.py`` while Bash only allows
+    ``redline-agent-cli``, the refusal gets reported as a save outage. Every mention of a
+    business CLI is therefore normalised, not only the examples that carry options.
     """
     fautes = []
     for origine, texte in _prompts().items():

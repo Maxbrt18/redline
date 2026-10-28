@@ -1,8 +1,8 @@
-"""scripts/descent.py — le D− que l'API Strava ne renvoie pas.
+"""scripts/descent.py -- the elevation loss that the Strava API does not return.
 
-Le contrôle qui compte est le dernier : sur la seule activité du registre dont le D−
-était connu par ailleurs, la méthode retombe à 0,5 % près. Sans lui, ces tests ne
-vérifieraient qu'une soustraction.
+The check that matters is the last one: on the only ledger activity whose loss was
+known otherwise, the method falls back within 0.5 %. Without it, these tests would
+only verify a subtraction.
 """
 
 import pytest
@@ -15,13 +15,13 @@ def test_a_loop_descends_what_it_climbed():
 
 
 def test_a_pure_climb_barely_descends():
-    """Lac-A J1 : montée à pied de 1108 m, arrivée en haut."""
+    """Day 1: 1108 m climbed on foot, arrival at the top."""
     assert descent.descent(1108.1, [636.7, 1728.2]) == 17
 
 
 def test_a_pure_descent_is_not_read_from_the_gain():
-    """Lac-A J3 : 19,7 m de D+ pour ~1100 de D−. C'est exactement la ligne que la
-    colonne D+ seule décrivait comme une journée plate."""
+    """Day 3: 19.7 m of gain for ~1100 of loss. This is exactly the row that the gain
+        column alone described as a flat day."""
     assert descent.descent(19.7, [1683.4, 602.4]) == 1101
 
 
@@ -35,7 +35,7 @@ def test_a_stream_of_one_point_is_refused_not_guessed():
 
 
 def test_the_mcp_payload_is_accepted_as_is():
-    """Le flux passe tel quel depuis get_activity_streams, sans réemballage."""
+    """The stream passes as is from get_activity_streams, without repackaging."""
     assert descent._altitude('{"altitude": [1, 2, 3]}') == [1, 2, 3]
     assert descent._altitude("[1, 2, 3]") == [1, 2, 3]
 
@@ -46,7 +46,7 @@ def test_a_payload_without_altitude_is_named():
 
 
 def test_matches_the_only_descent_strava_ever_gave_us():
-    """2026-07-21, descente du Gotzenalm : 1096 m relevés dans Strava, seule ligne du
-    registre à porter un D− avant le backfill. La méthode rend 1101."""
+    """Descent of a mountain: 1096 m recorded in Strava, the only ledger row to carry
+        a loss before the backfill. The method returns 1101."""
     computed = descent.descent(19.7, [1683.4, 602.4])
     assert abs(computed - 1096) / 1096 < 0.01

@@ -1,4 +1,4 @@
-"""Les écarts calculés d'une sortie (audit du 2026-10-11)."""
+"""The computed gaps of a run."""
 
 import datetime as dt
 
@@ -19,8 +19,8 @@ def test_planned_versus_done_names_every_typed_target():
 
 
 def test_a_duration_cap_hidden_behind_a_distance_is_never_a_gap():
-    """15/10 : « 57 min pour 55 » reproché sur un plafond qu'aucun message n'avait
-    donné, le rendu taisant la durée dès qu'une distance engage."""
+    """"57 min for 55" was reproached on a cap that no message had given, the rendering
+        omitting the duration as soon as a distance is committed."""
     row = Row(date=dt.date(2026, 10, 15), type="threshold", km=9.2, hours=0.95)
     seuil = {"distance_cap_km": 9.0, "duration_cap_min": 55}
     assert debrief.gaps(row, seuil, None) == ["distance 9,2 km pour un plafond de 9 (+0,2)"]
@@ -37,7 +37,7 @@ def test_heart_rate_at_comparable_pace_comes_last_and_without_a_plan():
 
 
 def test_a_strapless_heart_rate_is_never_held_against_its_cap():
-    """07/10 : « la FC n'est pas à regarder, je n'avais pas de capteur » (2026-10-20)."""
+    """A heart rate recorded without the armband is never held against its cap."""
     session = {"hr_cap_bpm": 157}
     strapless = Row(date=dt.date(2026, 10, 7), type="easy", hr_avg=162, hr_doubt="sans_brassard")
     assert debrief.gaps(strapless, session, None) == []

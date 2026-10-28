@@ -1,10 +1,9 @@
-"""Ce que le plan persisté DIT sur le téléphone de Sam.
+"""What the persisted plan SAYS on the athlete's phone.
 
-Le rendu est déterministe et c'est ce qui fait foi : il n'a donc pas le droit d'être
-illisible. Le 2026-08-11 il a sérialisé la semaine entière en une phrase — sept jours,
-leurs zones de FC, leurs cadences et leurs `note` internes, identifiants de contrôle
-daté compris — doublée trente secondes plus tard par la carte qui disait la même chose
-en mieux.
+The rendering is deterministic and authoritative: it must not be unreadable. It once
+serialized the whole week in one sentence -- seven days, their HR zones, cadences and
+internal `note` fields, dated-check identifiers included -- doubled shortly after by the
+card saying the same thing better.
 """
 
 import json
@@ -51,8 +50,8 @@ def test_the_week_is_one_line_per_day_and_never_a_paragraph(repo):
 
 
 def test_the_week_carries_no_internal_note(repo):
-    """`note` est écrit pour l'archive et pour la carte, jamais pour un résumé de sept
-    jours : c'est lui qui a fait déborder le message du 11/08."""
+    """`note` is written for the archive and for the card, never for a seven-day
+    summary: it is what made the message overflow."""
     message = repo.weekly_plan_message("2026-W33")
     assert "cadence visée" not in message
     assert "terrain Hameau" not in message
@@ -67,13 +66,12 @@ def test_a_replan_shows_the_rest_of_the_week_not_the_days_already_lived(repo):
 
 
 def test_the_rest_of_the_week_never_contains_a_session_already_run(repo, monkeypatch):
-    """Le 2026-08-16 : la SL du dimanche, courue le matin même et passée à `done` par la
-    révision qui a lu le fichier Strava, est repartie l'après-midi sous « la suite de la
-    semaine ». Le filtre ne regardait que la DATE, et la date du jour passe toujours.
+    """A Sunday long run, run the same morning and set to `done` by the revision that
+    read the activity file, was sent again in the afternoon under "the rest of the week".
+    The filter only looked at the DATE, and the current date always passes.
 
-    Les deux autres rendus du même objet lisaient `status` depuis toujours — la carte
-    écrit « · fait », le journal « (fait) ». Seul celui que Sam lit vraiment, et le
-    seul à affirmer « la suite », l'ignorait.
+    The two other renderings of the same object always read `status`. Only the one the
+    athlete really reads, and the only one asserting "the rest", ignored it.
     """
     ran = [{**session, "status": "done"} if session["date"] == "2026-08-16" else session
            for session in SESSIONS]
@@ -85,8 +83,8 @@ def test_the_rest_of_the_week_never_contains_a_session_already_run(repo, monkeyp
 
 
 def test_a_cancelled_session_is_never_a_prescription(repo, monkeypatch):
-    """Une séance retirée de la semaine ne se prescrit pas, et ne se raconte pas non
-    plus : `scheduled()` la sort des trois rendus, celui-ci compris."""
+    """A session removed from the week is neither prescribed nor told: `scheduled()`
+    drops it from the three renderings, this one included."""
     dropped = [{**session, "status": "cancelled"} if session["date"] == "2026-08-16"
                else session for session in SESSIONS]
     monkeypatch.setattr(repo, "weekly_plan_context",
@@ -98,8 +96,8 @@ def test_a_cancelled_session_is_never_a_prescription(repo, monkeypatch):
 
 def test_the_morning_names_a_session_already_run_rather_than_prescribing_it(repo,
                                                                             monkeypatch):
-    """Le mot du matin DÉCRIT la journée : il garde la séance faite, marquée. C'est
-    « la suite de la semaine » qui prescrit, et elle seule qui l'exclut."""
+    """The morning message DESCRIBES the day: it keeps the done session, marked. It is
+    "the rest of the week" that prescribes, and it alone excludes it."""
     ran = [{**session, "status": "done"} if session["date"] == "2026-08-16" else session
            for session in SESSIONS]
     monkeypatch.setattr(repo, "weekly_plan_context",
@@ -109,11 +107,11 @@ def test_the_morning_names_a_session_already_run_rather_than_prescribing_it(repo
 
 
 def test_the_morning_carries_everything_because_nothing_else_will(repo):
-    """Le mot du matin n'envoie pas de carte : ce texto est le seul canal du jour."""
+    """The morning message sends no card: this text is the only channel of the day."""
     message = repo.weekly_plan_message("2026-W33", today="2026-08-16")
     assert message == ("Aujourd'hui : SL vallonnée, cible 10 km, plafond 11 km, RPE 4-4, "
                        "Z2 143-157 bpm, Premier D+ SL, D+ doux 150-250 m, terrain Hameau.")
-    # Une note déjà ponctuée ne récolte pas un second point.
+    # An already punctuated note does not get a second full stop.
     assert repo.weekly_plan_message("2026-W33", today="2026-08-10").endswith("cadence ~168, "
                                                                             "EF plat, cadence visée 168.")
 
@@ -136,9 +134,9 @@ def test_a_gate_holds_only_the_sessions_it_names(repo):
 
 
 def test_a_gate_does_not_turn_todays_held_session_into_nothing(repo):
-    """Le 28/08, l'EF conditionnelle existait encore dans r7, mais le rendu du matin
-    a affirmé « Rien de prévu aujourd'hui » après l'avoir filtrée. Une attente de
-    réponse n'est ni une annulation ni un repos prescrit.
+    """A conditional easy run still existed in the revision, but the morning rendering
+    asserted "nothing planned today" after filtering it out. Waiting for an answer is
+    neither a cancellation nor a prescribed rest.
     """
     message = repo.weekly_plan_message(
         "2026-W33", today="2026-08-16",
@@ -161,12 +159,12 @@ def test_an_unreadable_context_renders_nothing_rather_than_half_a_plan(repo, mon
 
 
 def test_un_jour_quon_vide_se_nomme_au_lieu_de_disparaitre(repo, monkeypatch):
-    """L'incident du 25/08 : le seul rendu que Sam lise taisait le jour amputé.
+    """The only rendering the athlete reads kept silent on the amputated day.
 
-    Le coach annule le renfo B du jeudi et oublie de créer la sortie qui devait le
-    remplacer. Avant ce correctif, « la suite de la semaine » sautait de mercredi à
-    vendredi : le trou était invisible des DEUX côtés, puisque le coach relit la même
-    liste filtrée avant de rédiger sa réponse.
+    The coach cancels a strength session and forgets to create the outing meant to
+    replace it. Before the fix, "the rest of the week" jumped over the day: the gap was
+    invisible on BOTH sides, since the coach re-reads the same filtered list before
+    writing its reply.
     """
     ampute = [{**session, "status": "cancelled"} if session["date"] == "2026-08-16"
               else session for session in SESSIONS]
@@ -179,9 +177,9 @@ def test_un_jour_quon_vide_se_nomme_au_lieu_de_disparaitre(repo, monkeypatch):
 
 
 def test_un_jour_retenu_par_un_controle_ne_se_dit_pas_vide(repo):
-    """La question du contrôle part dans le même tour : elle dit déjà ce qu'on attend.
+    """The check question goes out in the same turn: it already says what is awaited.
 
-    Annoncer « rien de prévu » à la place serait une prescription, et fausse.
+    Announcing "nothing planned" instead would be a prescription, and a false one.
     """
     message = repo.weekly_plan_message(
         "2026-W33", since="2026-08-11", exclude_ids=frozenset({"w33-r1-dim-sl"}))
@@ -190,7 +188,7 @@ def test_un_jour_retenu_par_un_controle_ne_se_dit_pas_vide(repo):
 
 
 def test_un_jour_deja_couru_ne_se_dit_pas_vide(repo, monkeypatch):
-    """Un jour derrière nous n'a plus rien à prescrire, et n'est pas un trou."""
+    """A day behind us has nothing left to prescribe, and is not a gap."""
     couru = [{**session, "status": "done"} if session["date"] == "2026-08-11"
              else session for session in SESSIONS]
     monkeypatch.setattr(repo, "weekly_plan_context",
@@ -202,7 +200,7 @@ def test_un_jour_deja_couru_ne_se_dit_pas_vide(repo, monkeypatch):
 
 
 def test_une_semaine_entierement_vide_reste_une_phrase(repo, monkeypatch):
-    """Sept lignes « rien de prévu » diraient moins bien la même chose."""
+    """Seven "nothing planned" lines would say the same thing worse."""
     monkeypatch.setattr(repo, "weekly_plan_context",
                         lambda week: json.dumps({"revision": 6, "sessions": [
                             {**SESSIONS[0], "status": "cancelled"}]}))

@@ -1,15 +1,13 @@
-"""Ce que la MACHINE garde pour l'exploitation sans le donner à Sam.
+"""What the MACHINE keeps for operations without giving it to the athlete.
 
-Le 2026-08-21 Sam a reçu, sous en-tête technique, trois textos d'affilée pour UNE
-seule panne : deux fois « une mise à jour du runtime attend un déploiement », puis
-« commit enregistré localement mais push Git échoué ». Le doublon venait de
-`_push()`, qui rejoue `sync()` avant de réessayer ; le troisième était la conséquence
-du premier, pas un incident distinct ; et rien, côté transport, n'empêchait la même
-panne de repartir au tour suivant.
+One single outage must not produce several technical texts in a row: a duplicate came
+from `_push()`, which replays `sync()` before retrying, a later one was the consequence
+of the first rather than a distinct incident, and nothing on the transport side
+prevented the same outage from going out again on the next turn.
 
-Une panne interne n'appelle aucune action de l'athlète. Les alertes du dépôt sont
-déjà dédupliquées tant qu'elles n'ont pas été drainées ; le bot les journalise sans
-ajouter d'état durable ni envoyer de texto.
+An internal outage calls for no action from the athlete. The repository's alerts are
+already deduplicated until drained; the bot logs them without adding durable state or
+sending a text.
 """
 
 from unittest.mock import MagicMock

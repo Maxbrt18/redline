@@ -15,8 +15,8 @@ def _laps(*rows):
             for t, d, h in rows]
 
 
-# Les tours réels de l'activité 90000000005 (15/10) : échauffement, 4 x 3 min en
-# côte, récups en trottinant, retour au calme plus rapide que les récups.
+# Laps of a sample activity: warm-up, 4 x 3 min uphill, jog recoveries, cool-down
+# faster than the recoveries.
 SEUIL_DU_15 = _laps(
     ("17:42", 2.453, 155.7), ("3:04", 0.654, 178.6), ("3:26", 0.498, 159.6),
     ("3:02", 0.647, 178.0), ("4:43", 0.683, 158.7), ("3:01", 0.652, 178.7),
@@ -63,7 +63,7 @@ def test_a_single_effort_or_no_laps_gives_no_card():
                                       ("8:00", 1.3, 140))) is None
 
 
-# ------------------------------------------------------------------ le bot
+# ------------------------------------------------------------------ the bot
 
 import time  # noqa: E402
 from unittest.mock import MagicMock  # noqa: E402
@@ -127,7 +127,7 @@ def test_a_quality_debrief_runs_on_the_judgement_route(make_bot, tmp_path):
     bot._respond_proactive(ProactiveJob(psid="4242", kind="strava_debrief",
                                         prompt="p", quality=True))
     bot._respond_proactive(ProactiveJob(psid="4242", kind="strava_debrief", prompt="p"))
-    # Codex dans les tests : N2 = Sol, N1 = Luna.
+    # Codex in the tests: N2 = Sol, N1 = Luna.
     assert [call["model"] for call in agent.calls] == ["gpt-6-sol", "gpt-6-luna"]
 
 

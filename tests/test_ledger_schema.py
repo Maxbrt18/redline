@@ -1,4 +1,4 @@
-"""Contrat d'entrée et complétude des observations typées."""
+"""Input contract and completeness of typed observations."""
 
 import datetime as dt
 
@@ -10,7 +10,7 @@ PENDING = {"state": "pending"}
 
 def typed_observation(day: dt.date, kind="easy", *, strava=123, pains=None,
                       **measurements) -> dict:
-    """La douleur de la zone fictive naît `pending`, comme le repository la crée."""
+    """The pain of the fictional zone is born `pending`, as the repository creates it."""
     return {"occurred_on": day, "kind": kind, "strava_activity_id": strava,
             "measurements": measurements,
             "pains": {"injury": PENDING} if pains is None else pains}

@@ -187,8 +187,8 @@ def test_qualitative_morning_history_is_not_converted_into_a_numeric_score():
 
 
 def test_the_packet_carries_the_rules_in_force_and_flags_overdue_deadlines():
-    """Le règlement compilé départage les formulations anciennes ; une échéance échue
-    se voit comme telle (audit du 2026-09-27)."""
+    """The compiled rulebook arbitrates between old formulations; an overdue deadline
+        shows up as such."""
     class Store:
         def observation_rows(self):
             return []
@@ -224,8 +224,8 @@ def test_the_packet_carries_the_rules_in_force_and_flags_overdue_deadlines():
 
 
 def test_the_sunday_review_receives_its_computed_dossier_and_the_n2_packet(make_bot):
-    """Le bilan ne refait plus de tête ce qui se calcule (audit du 2026-09-27) ; il
-    reçoit aussi le règlement en vigueur et les échéances via le paquet N2."""
+    """The review no longer redoes by hand what can be computed; it also receives the
+        rulebook in force and the deadlines through the N2 packet."""
     bot = make_bot()
     bot._repo.coaching_context.return_value = "[CONTEXTE TYPÉ N2]"
     bot._repo.weekly_dossier.return_value = "[DOSSIER DU BILAN calculé]"

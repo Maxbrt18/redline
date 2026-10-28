@@ -1,22 +1,15 @@
-"""Un débrief qui parle sans consigner sa séance est une panne interne.
+"""A debrief that speaks without recording its session is an internal failure.
 
-⭐ LA CONTREPARTIE DE `required_weeks`. Un tour prescriptif doit PROUVER qu'il a révisé
-la semaine, sinon rien ne part. Rien n'exigeait qu'un débrief prouve qu'il a consigné la
-séance dont il venait de parler : son critère de succès était « un message est parti ».
-
-Ce que ça a coûté, sur les deux jours de bascule vers Codex :
-
-    13/08 10:21  Proactive strava_debrief sent in 18 s
-                 (un seul exec, tué par le bac à sable :
-                  « bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted »)
-                 → « Comment ont réagi les jambes sur ce vélo ? » — sortie jamais lue,
-                   jamais consignée, journalisée en SUCCÈS.
-    14/08 08:34  strava.py sans identifiants → SILENCE. Deuxième sortie perdue.
-
-Découvert le 16/08, par un volume hebdomadaire faux : 24,16 km pour 3 sorties au lieu
-de 31,13 pour 4, et une jauge à 49/100 au lieu de 87. Le débrief muet était déjà traité
-comme une panne (`test_debrief_silence.py`) ; le débrief BAVARD qui n'écrit rien, non —
-et c'est celui du 13/08, le premier de la chaîne.
+The counterpart of `required_weeks`. A prescriptive turn must PROVE that it revised
+the week, otherwise nothing is sent. Nothing required a debrief to prove it had
+recorded the session it had just talked about: its success criterion was "a message
+was sent". Two failure modes this covers:
+  - a single exec killed by the sandbox, the question asked about an activity that was
+    never read nor recorded, yet logged as a SUCCESS;
+  - the Strava script running without credentials, which ends in SILENCE.
+Either way a session is lost and the weekly volume and gauge come out wrong. The mute
+debrief was already treated as a failure (`test_debrief_silence.py`); the TALKATIVE
+debrief that writes nothing was not.
 """
 
 from datetime import time as dtime
@@ -52,11 +45,10 @@ def _bot(make_bot, client, *, recorded: bool):
     repo.drain_alerts.return_value = []
     repo.activity_recorded.return_value = recorded
     return make_bot(repo=repo, client=client,
-                    # Fenêtre ouverte 24 h, comme partout ailleurs dans la suite : sans
-                    # ça le test dépend de l'heure qu'il est. Écrit un dimanche matin,
-                    # il passait ; relancé le soir même à 23 h, les trois assertions
-                    # tombaient sur « budget/hour blocks the send » et le contrat du
-                    # débrief n'était plus vérifié du tout.
+                    # Window open for 24 h, as everywhere else in the suite: without it the test
+                    # depends on the time of day. Run late in the evening, the three assertions
+                    # fell on «budget/hour blocks the send» and the debrief contract was no
+                    # longer verified at all.
                     proactive_active_start=dtime(0, 0),
                     agent=FakeAgent(result=RunResult(
                         full_text="Comment ont réagi les jambes sur ce vélo ?")))
@@ -84,7 +76,7 @@ def test_the_check_asks_about_the_activity_of_this_very_job(make_bot, client):
 
 
 def test_a_recorded_activity_raises_nothing(make_bot, client):
-    """Le contrôle négatif : un débrief qui fait son travail ne produit aucun bruit."""
+    """The negative control: a debrief that does its job produces no noise."""
     bot = _bot(make_bot, client, recorded=True)
 
     bot._respond_proactive(ProactiveJob(psid="4242", kind="strava_debrief",
@@ -104,8 +96,8 @@ def test_the_deferred_debrief_carries_the_same_contract(make_bot, client, caplog
 
 
 def test_a_trigger_without_an_activity_is_never_accused(make_bot, client):
-    """Le mot du matin ne part d'aucune activité : lui demander d'en consigner une
-    inventerait une panne à chaque réveil."""
+    """The morning note starts from no activity: asking it to record one would
+        invent a failure at every wake-up."""
     bot = _bot(make_bot, client, recorded=False)
 
     bot._respond_proactive(ProactiveJob(psid="4242", kind="morning", prompt="matin"))

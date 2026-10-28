@@ -1,4 +1,4 @@
-"""L'écran Injury du carnet : des faits par semaine calendaire, jamais un verdict."""
+"""The notebook Injury screen: facts per calendar week, never a verdict."""
 
 from __future__ import annotations
 
@@ -36,6 +36,6 @@ def test_injury_counts_each_calendar_week_even_without_a_note():
         ('W40', 1.5, 1, None), ('W41', 1.0, 1, None)]
     assert [p['long'] for p in view['points']] == [False, True, True, False]
     assert view['wakes'] == [{'date': '2026-09-18', 'pain': 1.0}]
-    # Les manques des deux dernières semaines seulement, du plus récent au plus ancien.
+    # Only the gaps of the last two weeks, most recent first.
     assert view['missing'] == ['2026-10-07']
     assert [item['value'] for item in view['scale']] == [1, 2, 3]

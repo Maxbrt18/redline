@@ -1,10 +1,9 @@
-"""Une révision Alembic est un instantané : elle ne relit jamais le schéma courant.
+"""An Alembic revision is a snapshot: it never rereads the current schema.
 
-Une migration qui importerait `redline.storage.schema` (ou ses constantes) créerait
-le schéma DU JOUR au lieu de celui de sa date : la révision suivante, qui le fait
-évoluer, trouverait déjà ses tables et échouerait sur toute base neuve, tandis que
-les bases existantes, elles, n'auraient jamais vu l'étape. L'histoire du schéma ne
-se réécrit pas.
+A migration that imported `redline.storage.schema` (or its constants) would create
+TODAY's schema instead of the schema of its own revision: the next revision, which
+evolves it, would find its tables already there and fail on any fresh database, while
+existing databases would never have seen the step. Schema history is not rewritten.
 """
 
 import ast

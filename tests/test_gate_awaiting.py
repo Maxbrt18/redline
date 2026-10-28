@@ -1,24 +1,24 @@
-"""Un contrôle daté échu attend une RÉPONSE ; il ne signale pas une panne.
+"""An overdue dated check awaits an ANSWER; it does not signal a failure.
 
-La conversation du 2026-08-12, 07h46, que ces tests existent pour rendre impossible :
+The conversation these tests exist to make impossible:
 
-    Redline — Le programme hebdomadaire n'a pas passé ses contrôles. Je reste
-              silencieux sur les séances plutôt que de ressortir un ancien plan.
-    Sam  — Et bien règle le problème de programme. Prends ton temps
-    Redline — Le vault contient déjà des modifications non enregistrées. Je n'écris
-              rien tant qu'elles ne sont pas isolées.
+    Redline -- The weekly program did not pass its checks. I stay silent on the
+               sessions rather than resurface an old plan.
+    Athlete -- Then fix the program problem. Take your time.
+    Redline -- The vault already holds unsaved changes. I write nothing until they
+               are isolated.
 
-Ce qui s'était réellement passé : le contrôle de douleur du jour tombait ce matin-là, donc
-`check` rendait non nul, donc la persistance refusait le tour — et le message de coach
-qui posait EXACTEMENT la question du contrôle a été jeté au profit de la phrase de
-plomberie. Un mécanisme fait pour produire une question produisait une avarie. Les
-écritures du tour refusé restaient ensuite dans le worktree, et le garde-fou « worktree
-propre » a bâillonné les 25 tours suivants, y compris la question de Sam.
+What really happened: the pain check of the day was due that morning, so `check`
+returned non-zero, so persistence refused the turn -- and the coach message asking
+EXACTLY the check question was discarded in favor of the plumbing sentence. A mechanism
+built to produce a question produced a failure. The writes of the refused turn then
+stayed in the worktree, and the "clean worktree" guard gagged the following turns,
+including the athlete's question.
 
-Trois verrous, un par étage :
-  1. modèle et CLI — contrôle échu ≠ dérive matérielle (code de sortie 2, pas 1) ;
-  2. vault — `AWAITING` s'enregistre, et un tour refusé ne laisse rien derrière lui ;
-  3. bot — le coach parle, seule la prescription attend.
+Three locks, one per layer:
+  1. model and CLI -- overdue check != material drift (exit code 2, not 1);
+  2. vault -- `AWAITING` is recorded, and a refused turn leaves nothing behind;
+  3. bot -- the coach speaks, only the prescription waits.
 """
 
 import datetime as dt
@@ -33,10 +33,10 @@ from redline.service.plans import due_gates_by_kind
 from redline.service.proactive import ProactiveJob
 from redline.service.vault import PersistenceResult, VaultRepo
 
-# ------------------------------------------------------- 1. le modèle et la CLI
+# ------------------------------------------------------- 1. the model and the CLI
 
 def test_a_due_gate_is_exposed_as_a_question_not_a_storage_failure():
-    """Un contrôle ne peut être levé que par la réponse de Sam."""
+    """A check can only be lifted by the athlete's answer."""
     from redline.model import weekly_plan
 
     p = week_with_a_later_session([precondition()])
@@ -46,10 +46,10 @@ def test_a_due_gate_is_exposed_as_a_question_not_a_storage_failure():
 
 
 def test_due_gates_reads_the_context_already_loaded():
-    """Pas de second sous-processus pour savoir ce qu'on vient de lire.
+    """No second subprocess to learn what was just read.
 
-    Le service ne fait que LIRE la chaîne : ce qu'est un contrôle échu, et ce qui
-    sépare une pré-condition d'une observation, est déclaré par le modèle.
+    The service only READS the string: what an overdue check is, and what separates a
+    precondition from an observation, is declared by the model.
     """
     context = json.dumps({"revision": 3, "gates": [
         {"id": "g1", "due": "2026-08-12", "when": "avant", "holds": ["s1"],
@@ -64,16 +64,16 @@ def test_due_gates_reads_the_context_already_loaded():
     assert due_gates_by_kind("", today="2026-08-12") == ([], [])
 
 
-# ------------------------------------------------------------------ 2. le vault
+# ------------------------------------------------------------------ 2. the vault
 
 def vault_at(clone):
     return VaultRepo(str(clone), "origin", "main")
 
 
 def test_a_refused_turn_leaves_nothing_behind(git_clone):
-    """LE bug du 2026-08-12 : le résidu d'un tour refusé bâillonnait tous les suivants.
+    """The residue of a refused turn used to gag all the following ones.
 
-    Un tour qui ne livre rien doit être annulable, sinon la transaction n'en est pas une.
+    A turn that delivers nothing must be cancellable, otherwise it is not a transaction.
     """
     _, clone = git_clone
     repo = vault_at(clone)
@@ -101,11 +101,11 @@ def test_abandon_turn_also_rewinds_a_commit_claude_made_itself(git_clone):
 
 
 def test_ensure_clean_recovers_instead_of_blocking_forever(git_clone):
-    """Le filet, pour le cas que `abandon_turn` ne couvre pas : un crash du processus.
+    """The safety net, for the case `abandon_turn` does not cover: a process crash.
 
-    Ce clone n'est écrit que par le service, donc ce qui traîne est notre propre
-    résidu. On le jette et on travaille. Perdre une note jamais committée coûte
-    infiniment moins cher que le coach muet une heure sur la question de Sam.
+    This clone is only written by the service, so what lingers is our own residue. It is
+    discarded and work goes on. Losing a never-committed note costs far less than a mute
+    coach for an hour on the athlete's question.
     """
     _, clone = git_clone
     repo = vault_at(clone)
@@ -116,7 +116,7 @@ def test_ensure_clean_recovers_instead_of_blocking_forever(git_clone):
 
 
 def test_the_outbox_survives_a_cleanup(git_clone):
-    """`clean -fd` sans `-x` : une carte déjà rendue attend encore son archivage."""
+    """`clean -fd` without `-x`: an already rendered card still awaits its archiving."""
     _, clone = git_clone
     (clone / "server").mkdir()
     (clone / "server" / ".gitignore").write_text("outbox/\n")
@@ -130,7 +130,7 @@ def test_the_outbox_survives_a_cleanup(git_clone):
     assert (outbox / "plan.png").exists()
 
 
-# -------------------------------------------------------------------- 3. le bot
+# -------------------------------------------------------------------- 3. the bot
 
 def plan_context(revision_number=2, gates=None):
     return json.dumps({"revision": revision_number, "sessions": [],
@@ -144,10 +144,10 @@ DUE_GATE = [{"id": "w33-injury", "due": "2000-01-01",
 
 
 def test_the_coach_speaks_while_a_gate_holds_the_prescription(make_bot):
-    """Le message qui aurait dû partir à 07h46 le 2026-08-12.
+    """The message that should have gone out.
 
-    Claude avait écrit la question du contrôle. Elle a été jetée. Ici elle part, et
-    c'est la LIGNE DE SÉANCES qui attend — l'inverse exact de ce qui s'est produit.
+    The model had written the check question. It was discarded. Here it goes out, and
+    the SESSION LINE waits -- the exact opposite of what happened.
     """
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
@@ -168,17 +168,17 @@ def test_the_coach_speaks_while_a_gate_holds_the_prescription(make_bot):
     assert "au réveil ce matin" in burst
     client.send_text.assert_not_called()
     repo.weekly_plan_message.assert_not_called()
-    # Et Claude a été prévenu de la nature de l'attente, pas d'une avarie.
+    # And the model was told the nature of the wait, not of a failure.
     assert "CONTRÔLE DATÉ ÉCHU" in agent.calls[0]["message"]
 
 
 def test_a_due_gate_surfaces_even_on_a_social_message(make_bot):
-    """« salut » triage en N0, qui ne charge pas le plan — et le contrôle du jour
-    serait passé à la trappe.
+    """"hi" triages to N0, which does not load the plan -- and the check of the day
+    would be missed.
 
-    Même famille de panne que le 2026-08-12 : un mécanisme fait pour poser une question
-    qui ne la pose pas. Un contrôle daté est une obligation de la JOURNÉE, il ne dépend
-    pas du niveau de lecture du message. `show` coûte 0,13 s, l'excuse ne tient pas.
+    Same failure family: a mechanism built to ask a question that does not ask it. A
+    dated check is an obligation of the DAY, it does not depend on the reading level of
+    the message. `show` is cheap, so there is no excuse.
     """
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
@@ -217,8 +217,8 @@ def test_the_morning_asks_the_gate_question_instead_of_reporting_a_failure(make_
 
 
 def test_a_failed_turn_does_not_gag_the_next_one(make_bot):
-    """Le vrai coût du 2026-08-12 : ce n'est pas le message de 07h46, c'est l'heure
-    de silence derrière. Un tour refusé nettoie, le tour suivant travaille."""
+    """The real cost is not the lost message, it is the hour of silence behind it. A
+    refused turn cleans up, the next turn works."""
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
     repo.sync.return_value = False
@@ -248,12 +248,12 @@ def test_a_model_failure_is_rolled_back_too(make_bot):
 
 
 def test_a_light_proactive_never_touches_the_conversation_session(make_bot):
-    """Annuler un tour rembobine git, pas la mémoire du modèle.
+    """Cancelling a turn rewinds git, not the model memory.
 
-    2026-08-12, 09h04 : la session de la tentative de 07h46 croyait avoir déjà écrit son
-    message, donc la reprise a répondu silence. Un proactif léger part désormais d'une
-    COPIE de la conversation (fork) : première tentative ou reprise, la session
-    principale ne garde aucune trace d'une initiative non livrée, et rien n'est effacé.
+    The session of the failed attempt believed it had already written its message, so
+    the retry answered silence. A light proactive turn now starts from a COPY of the
+    conversation (fork): first attempt or retry, the main session keeps no trace of an
+    undelivered initiative, and nothing is erased.
     """
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
@@ -277,24 +277,24 @@ def test_a_light_proactive_never_touches_the_conversation_session(make_bot):
     assert bot._state.session_id("4242", "codex") == "conversation"
 
 
-# --------------------------------- 4. une observation ne ferme pas la journée (18/08)
+# --------------------------------- 4. an observation does not close the day
 
 def test_an_observation_gate_leaves_the_week_prescriptible():
-    """Bout en bout : le modèle ne bloque pas, donc la persistance n'est pas AWAITING,
-    donc le plan canonique part et la carte du jour avec lui."""
+    """End to end: the model does not block, so persistence is not AWAITING, so the
+    canonical plan goes out and the card of the day with it."""
     from redline.model import weekly_plan
 
     p = plan([session(status="done")])
     p["revisions"][0]["gates"] = [gate(when="apres")]
     today = dt.date(2026, 8, 8)
-    assert weekly_plan.due_gates(p, today=today)          # la question se pose
-    assert weekly_plan.blocking_gates(p, today=today) == []   # elle ne ferme rien
+    assert weekly_plan.due_gates(p, today=today)          # the question is asked
+    assert weekly_plan.blocking_gates(p, today=today) == []   # it closes nothing
     assert weekly_plan.gate_reasons(p, today=today) == []
 
 
 def test_the_two_kinds_reach_the_prompt_as_two_separate_instructions():
-    """Fondues en une seule note, l'interdiction de prescrire d'une pré-condition
-    s'appliquait à une observation : le message du 18/08, exactement."""
+    """Merged into a single note, the ban on prescribing of a precondition applied to
+    an observation."""
     from redline.service.prompts import gate_note
 
     context = json.dumps({"revision": 3, "gates": [
@@ -311,7 +311,7 @@ def test_the_two_kinds_reach_the_prompt_as_two_separate_instructions():
     interdiction, permission = note.split("\n\n")
     assert "la blessure au réveil ?" in interdiction
     assert "NE PRESCRIS PAS les séances retenues (s1)" in interdiction
-    # L'observation porte l'instruction INVERSE, et nomme la carte explicitement.
+    # The observation carries the OPPOSITE instruction, and names the card explicitly.
     assert "la cheville a parlé" in permission
     assert "NE PRESCRIS PAS" not in permission
     assert "ELLE NE RETIENT RIEN" in permission

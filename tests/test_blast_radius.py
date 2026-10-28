@@ -1,7 +1,7 @@
-"""Une écriture refusée ne se confirme pas, mais la réponse du coach part toujours.
+"""A refused write is not confirmed, but the coach's reply always goes out.
 
-La porte déterministe agit sur l'effet (faits non enregistrés, séances non prescrites),
-jamais sur la prose : Sam reçoit la réponse ET une ligne précise sur ce qui manque.
+The deterministic gate acts on the effect (facts not recorded, sessions not prescribed),
+never on the prose: the athlete gets the reply AND a precise line about what is missing.
 """
 
 from datetime import datetime
@@ -43,7 +43,7 @@ def _sent(client) -> str:
 
 
 def test_a_refused_write_keeps_the_answer_and_names_what_was_not_recorded(make_bot):
-    """Les faits refusés ne sont pas confirmés ; la réponse, elle, n'est pas jetée."""
+    """Refused facts are not confirmed; the reply itself is not thrown away."""
     bot, client = _bot(make_bot, PersistenceResult(
         False, detail="mesure déjà connue", failure=PersistenceFailure.WRITE_REFUSED,
         refused=("measurement.complete",)))
@@ -57,7 +57,7 @@ def test_a_refused_write_keeps_the_answer_and_names_what_was_not_recorded(make_b
 
 
 def test_a_refusal_of_internal_commands_only_adds_nothing(make_bot):
-    """Une question déclarée perdue ne change rien pour Sam : aucune alarme."""
+    """A question declared lost changes nothing for the athlete: no alarm."""
     bot, client = _bot(make_bot, PersistenceResult(
         False, detail="question inconnue", failure=PersistenceFailure.WRITE_REFUSED,
         refused=("question.ask",)))
@@ -70,11 +70,10 @@ def test_a_refusal_of_internal_commands_only_adds_nothing(make_bot):
 
 
 def test_a_refused_write_drops_the_session_that_now_believes_a_lie(make_bot):
-    """Une session vit des heures et croit avoir écrit ce qui a été annulé. Le
-    2026-08-14, après trois tours annulés, le coach a tenté de COMPLÉTER une
-    observation jamais créée — « observation inconnue : strava:90000000002 » — et
-    aurait recommencé indéfiniment. La base est relue au démarrage : repartir d'un
-    contexte neuf est la seule correction sûre."""
+    """A session lives for hours and believes it wrote what was cancelled. After several
+    cancelled turns the coach could try to COMPLETE an observation that was never created
+    ("observation inconnue") and would retry forever. The database is re-read at startup:
+    starting from a fresh context is the only safe correction."""
     bot, _ = _bot(make_bot, PersistenceResult(
         False, detail="observation inconnue", failure=PersistenceFailure.WRITE_REFUSED))
     bot._state.set_session("4242", "codex", "session-qui-croit-avoir-ecrit")
@@ -100,9 +99,9 @@ def test_an_unexpected_persistence_exception_finalizes_the_turn(make_bot):
 
 
 def test_a_healthy_turn_keeps_its_session(make_bot):
-    """Le contrôle négatif : on ne jette pas la continuité conversationnelle sans
-    raison. Sans lui, un bot qui repart de zéro à chaque message passerait le test
-    précédent."""
+    """Negative control: conversational continuity is not thrown away without reason.
+    Without it, a bot that starts from scratch on every message would pass the previous
+    test."""
     bot, _ = _bot(make_bot, PersistenceResult(True))
     bot._state.set_session("4242", "codex", "session-vivante")
 
@@ -112,7 +111,7 @@ def test_a_healthy_turn_keeps_its_session(make_bot):
 
 
 def test_a_refused_write_prescribes_nothing(make_bot):
-    """Le coach parle, mais un tour qui n'a rien pu écrire ne prescrit rien."""
+    """The coach speaks, but a turn that could write nothing prescribes nothing."""
     bot, client = _bot(make_bot, PersistenceResult(
         False, detail="mesure déjà connue", failure=PersistenceFailure.WRITE_REFUSED))
 
@@ -122,8 +121,8 @@ def test_a_refused_write_prescribes_nothing(make_bot):
 
 
 def test_a_stale_plan_holds_the_prescription_but_not_the_conversation(make_bot):
-    """Même traitement qu'un contrôle daté échu : le programme ne décrit plus la
-    semaine, il attend une révision. Ce n'est pas une avarie."""
+    """Same treatment as an overdue dated check: the program no longer describes the
+    week, it waits for a revision. This is not a failure."""
     bot, client = _bot(make_bot, PersistenceResult(
         True, stale=("2026-W33",)))
 
@@ -136,8 +135,8 @@ def test_a_stale_plan_holds_the_prescription_but_not_the_conversation(make_bot):
 
 
 def test_an_absent_plan_holds_the_sessions_but_never_the_answer(make_bot):
-    """Sans programme valide, aucune séance ne sort ; la réponse du coach, oui, et une
-    ligne précise quand Sam a demandé son programme."""
+    """Without a valid program no session goes out; the coach's reply does, along with a
+    precise line when the athlete asked for the program."""
     bot, client = _bot(make_bot, PersistenceResult(True, invalid=("2026-W39",)),
                        plan_context="", plan_change=True, plan_asked=True)
 
@@ -151,8 +150,8 @@ def test_an_absent_plan_holds_the_sessions_but_never_the_answer(make_bot):
 
 
 def test_a_safety_answer_always_leaves_even_without_a_plan(make_bot):
-    """RWF-002 : une consigne d'arrêt ou une orientation médicale n'attend ni lecture,
-    ni programme valide (CLAUDE.md, Limites du coaching)."""
+    """A stop instruction or a medical referral waits for neither reading nor a valid
+    program."""
     answer = "Arrête maintenant et marche pour rentrer. Si la douleur persiste, avis médical."
     bot, client = _bot(make_bot, PersistenceResult(True, invalid=("2026-W39",)),
                        plan_context="", plan_change=True)
@@ -166,17 +165,15 @@ def test_a_safety_answer_always_leaves_even_without_a_plan(make_bot):
 
 
 def test_the_morning_note_leaves_without_its_sessions_when_the_plan_is_stale(make_bot):
-    """Le mot du matin prend des nouvelles, relance un fil, pose la question du jour :
-    rien de tout ça ne dépend d'un programme à jour. Seule la ligne de séances attend
-    que le programme soit remis en face du réalisé."""
+    """The morning note checks in, follows up a thread, asks the question of the day:
+    none of that depends on an up-to-date program. Only the sessions line waits until the
+    program is set against what was actually done."""
     iso = datetime.now().isocalendar()
     semaine = f"{iso.year}-W{iso.week:02d}"
-    # La fenêtre d'envoi par défaut (07:30-21:30) se lit en heure MURALE. Les runners
-    # CI tournent en UTC : le 2026-08-15 à 06:41 puis 07:08 UTC, l'envoi était bloqué
-    # par l'heure et ce test tombait sur un message vide — un rouge qui accusait le
-    # rayon de souffle alors que la note du matin s'était assemblée correctement
-    # (« programme périmé », journalisé). Son sujet n'est pas la fenêtre : on l'ouvre,
-    # sinon il ne teste ce qu'il annonce que si l'horloge veut bien.
+    # The default send window (07:30-21:30) is read in WALL-CLOCK time. CI runners run in
+    # UTC, so the send could be blocked by the hour and the test would see an empty message.
+    # Its subject is not the window: it is opened, otherwise the test checks what it
+    # claims only when the clock allows.
     bot, client = _bot(make_bot, PersistenceResult(
         True, stale=(semaine,)),
         proactive_active_start=dtime(0, 0))
@@ -190,9 +187,9 @@ def test_the_morning_note_leaves_without_its_sessions_when_the_plan_is_stale(mak
 
 
 def test_a_healthy_turn_speaks_without_any_incident(make_bot):
-    """Le contrôle négatif : sans panne ni péremption, le coach parle et rien ne
-    ressemble à une avarie. Sans lui, un test qui vérifie l'absence d'un message
-    passerait aussi sur un bot devenu complètement muet."""
+    """Negative control: with no failure and nothing stale, the coach speaks and nothing
+    looks like an incident. Without it, a test that checks the absence of a message would
+    also pass on a bot that has gone completely mute."""
     bot, client = _bot(make_bot, PersistenceResult(True),
                        plan_asked=True)
 

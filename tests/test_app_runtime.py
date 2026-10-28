@@ -1,4 +1,4 @@
-"""Le contrat de runtime du service, vérifié avant toute configuration externe."""
+"""The service runtime contract, checked before any external configuration."""
 
 import pytest
 

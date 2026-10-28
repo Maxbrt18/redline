@@ -24,7 +24,7 @@ def test_heavy_kinds_run_sol_isolated(make_bot, kind):
 
 @pytest.mark.parametrize("kind", ["morning", "strava_debrief"])
 def test_light_kinds_run_on_a_fork_of_the_conversation(make_bot, kind):
-    """Le proactif léger voit la conversation sans jamais s'y inscrire."""
+    """The light proactive turn sees the conversation without ever joining it."""
     bot, agent = _bot(make_bot)
     bot._respond_proactive(ProactiveJob(psid="4242", kind=kind, prompt="p"))
     assert [(c["model"], c["session_mode"]) for c in agent.calls] == [
@@ -34,12 +34,11 @@ def test_light_kinds_run_on_a_fork_of_the_conversation(make_bot, kind):
 
 
 def test_heavy_kinds_get_their_own_effort_and_timeout(make_bot):
-    """Le bilan hebdo ne partage pas le budget de l'interactif.
+    """Weekly review does not share the interactive budget.
 
-    Le 2026-08-02, il a été tué à 600 s après avoir tout consommé, puis le budget
-    proactif a bloqué le lendemain : le run coûteux avait le délai d'un texto. Ce
-    test pince les DEUX moitiés du correctif -- si l'une repasse au réglage
-    interactif, le même soir se reproduit sans rien casser d'autre.
+    The expensive run needs a longer timeout than a text message, and its failure must
+    not consume the proactive budget of the next day. This test pins BOTH halves: if
+    either falls back to the interactive setting, the failure mode returns silently.
     """
     bot, agent = _bot(make_bot)
     bot._respond_proactive(ProactiveJob(psid="4242", kind="weekly", prompt="p"))

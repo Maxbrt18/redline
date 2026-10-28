@@ -1,4 +1,4 @@
-"""Les notes de capacité ne dupliquent plus l'état opérationnel PostgreSQL."""
+"""Capability notes no longer duplicate the operational state held in PostgreSQL."""
 
 import pytest
 from conftest import VAULT_ROOT

@@ -1,4 +1,4 @@
-"""Politique unique de routage et fallback borné."""
+"""Single routing policy and bounded fallback."""
 
 from dataclasses import replace
 
@@ -124,7 +124,7 @@ def test_turn_executor_never_relaunches_work_that_already_started():
 
 
 def test_a_read_only_turn_discards_database_and_git_changes():
-    """La frontière reste effective quand Codex tourne en danger-full-access."""
+    """The boundary stays effective when Codex runs in danger-full-access."""
     from unittest.mock import MagicMock
 
     agent = MagicMock(provider="codex")
@@ -211,7 +211,7 @@ def _executor(results, persisted=None):
 
 @pytest.mark.parametrize("applied", [0, 3])
 def test_a_turn_is_one_model_call_whatever_it_writes(applied):
-    """La réponse qui a travaillé part telle quelle : aucune seconde rédaction."""
+    """The reply that did the work goes out as is: no second rewrite."""
     executor, agent, repo = _executor(
         [RunResult(full_text="Noté, et bravo pour la régularité.")],
         PersistenceResult(True, applied_commands=applied))

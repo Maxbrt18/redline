@@ -1,4 +1,4 @@
-"""Adaptateur Codex : SDK typé, sessions natives et aucun parseur de flux CLI."""
+"""Codex adapter: typed SDK, native sessions and no CLI stream parser."""
 
 import json
 from dataclasses import replace
@@ -149,7 +149,7 @@ def test_each_writable_codex_process_receives_its_turn_id(make_config, store):
 
 
 def test_production_turns_do_not_start_a_codex_sandbox(make_config, store):
-    """Aucun namespace bubblewrap ne se trouve sur le chemin des CLI métier."""
+    """No bubblewrap namespace sits on the path of the business CLIs."""
     runner, client, sdk = _runner(make_config, store)
 
     runner.run("4242", "lis Strava", turn_id="turn-42")
@@ -185,17 +185,14 @@ def test_a_live_codex_thread_is_resumed_natively(make_config, store):
 
 
 def test_a_thread_opened_under_other_instructions_is_never_resumed(make_config, store):
-    """⭐ Une session est dérivée de son prompt : quand il change, elle ne vaut plus.
+    """A session is derived from its prompt: when the prompt changes, the session is void.
 
-    Le 2026-08-16, la consigne de signature est corrigée à 9 h 08, la prod tire et
-    redémarre dans la seconde, et le fil ouvert à 7 h 45 continue — avec, en contexte,
-    une vingtaine de messages signés « — Redline ». Le SDK réinjecte pourtant les
-    instructions neuves à chaque reprise : ce ne sont pas elles qui manquaient, ce sont
-    les EXEMPLES qui restaient. Un modèle imite d'abord ses propres tours.
+    The SDK re-injects the fresh instructions on every resume, so they are not what was
+    missing: the EXAMPLES in the old context remain, and a model imitates its own turns
+    first (for example earlier messages carrying an old signature).
 
-    Le TTL ne rattrapait rien : il est glissant, donc une conversation vivante ne
-    repart jamais d'elle-même. Un correctif de comportement n'atterrissait qu'après
-    six heures de silence de Sam, ou un `/clear` qu'il fallait penser à taper.
+    The TTL does not catch this: it is sliding, so a live conversation never restarts on its
+    own. A behaviour fix would only land after a long silence or an explicit `/clear`.
     """
     store.set_session("4242", "codex", "thread-live", "empreinte-d-avant")
     runner, client, _ = _runner(make_config, store)
@@ -207,8 +204,8 @@ def test_a_thread_opened_under_other_instructions_is_never_resumed(make_config, 
 
 
 def test_a_thread_predating_the_digest_column_is_replaced_too(make_config, store):
-    """Empreinte absente = empreinte périmée : les sessions d'avant la colonne
-    repartent de zéro plutôt que de survivre à une règle écrite après elles."""
+    """Missing fingerprint = stale fingerprint: sessions from before the column
+    restart from zero rather than outliving a rule written after them."""
     store.set_session("4242", "codex", "thread-live")
     runner, client, _ = _runner(make_config, store)
 
@@ -242,11 +239,11 @@ def test_an_isolated_turn_is_ephemeral_and_never_resumed(make_config, store):
 
 
 def test_sdk_capacity_error_from_handle_run_remains_fallbackable(make_config, store):
-    """Une saturation du modèle n'est pas du travail utile déjà engagé.
+    """Model saturation is not useful work already engaged.
 
-    Le SDK expose cette panne comme une erreur retryable, mais elle arrive depuis
-    ``handle.run`` après la création du handle. Le transport ne doit pas la
-    transformer en ``IN_FLIGHT`` et interdire le repli Luna.
+    The SDK exposes this failure as a retryable error, but it comes from
+    ``handle.run`` after the handle is created. The transport must not
+    turn it into ``IN_FLIGHT`` and forbid the fallback model.
     """
     class CapacityError(RuntimeError):
         pass
@@ -320,8 +317,8 @@ def test_triage_timeout_falls_back_to_the_default_without_a_second_profile(
 
 
 def test_one_codex_process_serves_every_triage_and_one_serves_each_turn(make_config, store):
-    """Deux messages : le processus du triage est réutilisé, un processus outillé par
-    tour. Avant, triage, tour et réécriture relançaient chacun `codex app-server`."""
+    """Two messages: the triage process is reused, with one tooled process per
+    turn. Triage, turn and rewrite used to each relaunch `codex app-server`."""
     payload = json.dumps({
         "depth": "N1", "emotional": False, "holding": None,
         "plan_change": False, "plan_asked": False, "plan_scope": "none",
@@ -339,8 +336,8 @@ def test_one_codex_process_serves_every_triage_and_one_serves_each_turn(make_con
 
 
 def test_the_constitution_option_is_the_one_codex_understands():
-    """Vérifié avec `codex debug prompt-input` (0.157.0) : sans cette option, un runtime
-    neuf ne charge pas `CLAUDE.md` ; avec elle, il le charge en entier."""
+    """Verified with `codex debug prompt-input`: without this option, a fresh runtime
+    does not load `CLAUDE.md`; with it, it loads it in full."""
     assert CONSTITUTION_OVERRIDE == 'project_doc_fallback_filenames=["CLAUDE.md"]'
     assert NO_PROJECT_DOC_OVERRIDE == "project_doc_max_bytes=0"
 
@@ -466,11 +463,9 @@ def test_close_releases_the_long_lived_sdk_runtime(make_config, store):
 
 def test_the_service_secrets_are_blanked_before_codex_ever_starts(make_config, store,
                                                                   monkeypatch):
-    """Codex recopie l'environnement du service dans ses instantanés de shell, en
-    clair et sur le disque (2026-08-14 : neuf fichiers, jeton de page Messenger
-    compris). Le filtre doit donc s'appliquer à la CONSTRUCTION du client, avant que
-    le binaire ne démarre — le neutraliser après coup n'effacerait pas les copies
-    déjà écrites."""
+    """Codex copies the service environment into its shell snapshots, in clear text on
+    disk. The filter must therefore apply when the client is BUILT, before the binary
+    starts -- neutralizing it afterwards would not erase the copies already written."""
     monkeypatch.setenv("MESSENGER_PAGE_TOKEN", "EAAG-secret")
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:p@/redline")
     monkeypatch.setenv("STRAVA_CLIENT_SECRET", "strava-secret")
@@ -480,8 +475,8 @@ def test_the_service_secrets_are_blanked_before_codex_ever_starts(make_config, s
 
     env = sdk.configs[0]["env"]
     assert env["MESSENGER_PAGE_TOKEN"] == ""
-    # Ce dont le bac à sable a besoin n'est jamais écrasé : il hérite de la vraie
-    # valeur par la copie que fait le SDK, donc rien à surcharger ici.
+    # What the sandbox needs is never overwritten: it inherits the real value through the
+    # SDK's copy, so nothing to override here.
     assert "DATABASE_URL" not in env
     assert "STRAVA_CLIENT_SECRET" not in env
     assert env["PATH"]

@@ -1,21 +1,20 @@
-"""Les modules du carnet et du renfo, vérifiés sans navigateur.
+"""The notebook and strength modules, checked without a browser.
 
-Le code s'écrit en modules ES et le service les assemble en un seul script
-(`redline.service.page.bundle`). Dans ce script, tout partage une portée : un nom oublié
-dans un `import` marcherait quand même, et la liste des imports cesserait de dire
-de quoi dépend un fichier. Ces tests tiennent la promesse des modules :
+The code is written as ES modules and the service assembles them into a single script
+(`redline.service.page.bundle`). In that script everything shares one scope: a name missing
+from an `import` would still work, and the import list would stop saying what a file depends
+on. These tests hold the module contract:
 
-- tout ce qu'un module prend à un autre est importé, et tout import sert ;
-- un module ne réassigne jamais ce qu'il importe (il passe par une fonction du
-  module propriétaire, comme `setTimer`), sinon le code ne tiendrait plus chargé
-  par un navigateur comme de vrais modules ;
-- une déclaration exportée ne déclare qu'un nom, pour que l'assemblage la voie ;
-- aucun fichier n'est oublié dans les listes d'assemblage.
+- everything a module takes from another is imported, and every import is used;
+- a module never reassigns what it imports (it goes through a function of the owning
+  module, like `setTimer`), otherwise the code would stop working when loaded by a
+  browser as real modules;
+- an exported declaration declares a single name, so that the assembly sees it;
+- no file is missing from the assembly lists.
 
-L'analyse est lexicale (un tokenizer JS minimal) : elle connaît les chaînes, les
-gabarits, les commentaires et les expressions régulières, pas la portée. Une
-variable locale qui porte le nom d'un export d'un autre module se lit donc comme
-un emprunt : renomme la variable locale.
+The analysis is lexical (a minimal JS tokenizer): it knows strings, templates, comments and
+regular expressions, not scope. A local variable named like an export of another module
+therefore reads as a borrow: rename the local variable.
 """
 
 from __future__ import annotations
@@ -31,7 +30,7 @@ IDENT = re.compile(r"[A-Za-z_$][\w$]*")
 NUMBER = re.compile(r"\d[\d_]*(?:\.\d+)?(?:e[+-]?\d+)?|\.\d+")
 PUNCT = re.compile(r"\?\.|\?\?=?|\.\.\.|===|!==|\*\*=?|=>|<<=|>>>?=?|[-+*/%&|^<>!=]=|&&=?|\|\|=?|\+\+|--|<<|>>"
                    r"|[{}()\[\];,.<>+\-*/%&|^!~?:=@#]")
-# Après ces tokens, une barre oblique ouvre une expression régulière, pas une division.
+# After these tokens, a slash opens a regular expression, not a division.
 REGEX_BEFORE = {"(", ",", "=", ":", "[", "!", "&", "|", "?", "{", "}", ";", "+", "-", "*", "%", "<", ">",
                 "~", "^", "=>", "&&", "||", "??", "==", "===", "!=", "!==", "+=", "-=",
                 "return", "typeof", "case", "do", "else", "in", "of", "new", "delete", "void", "throw"}
@@ -45,7 +44,7 @@ def tokens(src: str) -> list[tuple[str, str, int]]:
 
 
 def _scan(src: str, pos: int, out: list, inside: bool) -> int:
-    """Jusqu'à la fin, ou jusqu'au } qui ferme un ${...} quand `inside`."""
+    """Up to the end, or up to the } closing a ${...} when `inside`."""
     depth, end = 0, len(src)
     while pos < end:
         char = src[pos]
@@ -104,7 +103,7 @@ def _scan(src: str, pos: int, out: list, inside: bool) -> int:
 
 
 def references(toks):
-    """Les identifiants employés comme variables : ni propriété, ni clé d'objet."""
+    """Identifiers used as variables: neither a property nor an object key."""
     for index, (kind, value, _) in enumerate(toks):
         if kind != "id":
             continue
@@ -145,7 +144,7 @@ BUNDLES = {"carnet": page.CARNET_SCRIPT}
 
 
 def modules(names):
-    """{module: (source sans imports, tokens, noms déclarés au niveau 0, imports)}."""
+    """{module: (source without imports, tokens, names declared at level 0, imports)}."""
     found = {}
     for name in names:
         source = (page.PAGE_DIR / name).read_text(encoding="utf-8")
@@ -206,7 +205,7 @@ def test_every_module_and_stylesheet_is_assembled():
     listed = {*page.CARNET_SCRIPT, *page.CARNET_STYLE}
     on_disk = {str(path.relative_to(page.PAGE_DIR)) for folder in ("shared", "carnet", "strength")
                for pattern in ("*.js", "*.css") for path in (page.PAGE_DIR / folder).rglob(pattern)}
-    on_disk.discard("carnet/sw.js")  # le service worker, servi tel quel par sa route
+    on_disk.discard("carnet/sw.js")  # the service worker, served as is by its route
     assert on_disk == listed
 
 

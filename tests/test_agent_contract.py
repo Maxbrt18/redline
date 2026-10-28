@@ -1,7 +1,7 @@
-"""Contrat commun aux moteurs de conversation.
+"""Contract shared by the conversation engines.
 
-Le bot ne doit connaître ni les drapeaux de Claude Code, ni les objets du SDK
-Codex. Il exprime seulement le cycle de vie attendu pour la session.
+The bot must know neither the Claude Code flags nor the Codex SDK objects. It only
+expresses the lifecycle expected for the session.
 """
 
 from redline.service.agent import RunResult, RunSpec, SessionMode, Triage

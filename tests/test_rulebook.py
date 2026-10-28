@@ -1,5 +1,5 @@
-"""Le règlement : celui de l'instance, ou le défaut du moteur ; court, sans histoire,
-et ce que le coach lit est ce que le code applique."""
+"""The rulebook: the instance's own, or the engine default; short, without history,
+and what the coach reads is what the code applies."""
 
 import os
 import re
@@ -83,8 +83,8 @@ def test_the_default_rulebook_declares_every_rule_the_engine_enforces():
 
 
 def test_the_rulebook_is_short_enough_to_travel_with_every_packet():
-    # Il est injecté à chaque tour N1+ : un règlement qui grossit redevient un
-    # palimpseste. Relever ce plafond exige de retirer une règle, pas d'en ajouter.
+    # It is injected on every N1+ turn: a rulebook that grows becomes a palimpsest
+    # again. Raising this cap requires removing a rule, not adding one.
     assert len(rulebook.render().split()) <= 400
 
 
@@ -93,14 +93,14 @@ def test_the_rulebook_uses_only_phone_friendly_signs():
 
 
 def test_the_default_carries_no_history():
-    """La règle en vigueur, jamais son histoire : aucune date dans le défaut du moteur."""
+    """The rule in force, never its history: no date in the engine default."""
     assert not re.search(r"20\d\d-\d\d-\d\d|\bW\d\d\b", rulebook.render())
 
 
 def test_no_fixed_percentage_bounds_the_long_run():
-    """La progression de la sortie longue se juge, aucun pourcentage fixe ne la borne.
-    Les seuls pourcentages restants sont ceux de l'assimilation (n2) et de la réduction
-    sur douleur (n3)."""
+    """The progression of the long run is judged, no fixed percentage bounds it.
+        The only percentages left are those of assimilation (n2) and of the pain
+        reduction (n3)."""
     for rule in rulebook.current().rules:
         if rule.id in {"n2", "n3"}:
             continue

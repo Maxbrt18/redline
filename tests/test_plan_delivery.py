@@ -1,20 +1,16 @@
-"""QUAND le programme canonique part — la question que personne ne testait.
+"""WHEN the canonical program is sent.
 
-`test_plan_message.py` pince ce que le bloc DIT une fois rendu ; ici on pince ce qui
-déclenche son envoi. Le trou entre les deux a coûté la conversation du 2026-08-12 :
-Sam demande si une sortie vélo avec son père pose problème, le coach lui répond
-trois fois — et lui colle trois fois le même programme W33 r5, inchangé, plus trois
-fois la même carte, sous une question que le coach venait de lui poser. Verdict :
-« c'est super long ta façon de répéter le programme à chaque message ».
+`test_plan_message.py` pins what the block SAYS once rendered; here we pin what triggers
+its sending. The gap between the two let the same unchanged program, plus the same card,
+be pasted three times in one conversation, under a question the coach had just asked.
 
-La règle depuis : le bloc suit un FAIT (ce qui reste à faire a changé, une demande,
-une livraison perdue), jamais l'hypothèse « ce message touche peut-être au plan ».
+The rule: the block follows a FACT (what remains to do changed, a request, a lost
+delivery), never the hypothesis "this message may touch the plan".
 
-Le fait s'est précisé le 2026-08-16 : il ne s'agit PAS d'un numéro de révision qui
-monte. Une révision s'écrit aussi pour enregistrer du passé, et ce jour-là celle des
-ressentis de la sortie du matin a renvoyé à Sam la séance qu'il venait de courir.
-Les contextes de ces tests portent donc de vraies séances, et le rendu réel tourne :
-c'est la couture entre « ce que le bloc dit » et « quand il part » qui a lâché.
+The fact is NOT a revision number going up. A revision is also written to record the
+past, and one recording the feelings of a morning run once sent back the session just
+run. The contexts of these tests therefore carry real sessions, and the real rendering
+runs: the seam between "what the block says" and "when it is sent" is what is under test.
 """
 
 import json
@@ -34,7 +30,7 @@ TOMORROW = TODAY + timedelta(days=1)
 
 
 def session(**changed) -> dict:
-    """Une séance à faire aujourd'hui, sauf mention contraire."""
+    """A session to do today, unless stated otherwise."""
     return {"id": "w33-r1-jour-ef", "title": "EF", "date": TODAY.isoformat(),
             "kind": "run", "workout": "easy", "status": "planned",
             "distance_target_km": 7.0, "distance_cap_km": 9.0,
@@ -49,15 +45,15 @@ def context(revision, sessions=None, gates=None):
 
 @pytest.fixture
 def repo():
-    """Un vault dont la semaine est valide, prescriptible, et déjà connue de Sam."""
+    """A vault whose week is valid, prescribable, and already known to the athlete."""
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
     repo.sync.return_value = False
     repo.ensure_clean.return_value = []
     repo.head.return_value = "0123456789abcdef"
     repo.weekly_plan_context.return_value = context(5)
-    # Seul le chemin PROACTIF passe encore par la méthode du repo ; le réactif rend
-    # lui-même, depuis les deux contextes qu'il compare.
+    # Only the PROACTIVE path still goes through the repo method; the reactive one
+    # renders itself, from the two contexts it compares.
     repo.weekly_plan_message.return_value = "Programme de la semaine suivante"
     repo.persist_turn.return_value = PersistenceResult(True)
     repo.pending_ledger_cells.return_value = []
@@ -73,35 +69,35 @@ def client():
     return client
 
 
-#: Les ouvertures des textos de programme (sans semaine ISO ni révision depuis le 15/10).
+#: Openings of the program texts (no ISO week nor revision number).
 CANONICAL = ("Programme", "Aujourd'hui", "Prochaine séance", "La suite de la semaine", "Changement", "Rien de prévu")
 
 
 def programmes(client):
-    """Les textos canoniques réellement partis, avarie technique exclue."""
+    """Canonical texts actually sent, technical failures excluded."""
     return [call.args[1] for call in client.send_text.call_args_list
             if call.args[1].startswith(CANONICAL)]
 
 
 def current_week(bot):
-    """La semaine que le bot calcule lui-même : un test ne code pas l'heure en dur."""
+    """The week the bot computes itself: a test does not hardcode the time."""
     return bot._iso_week(datetime.now())
 
 
-# ---------------------------------------------------------------- se taire
+# ---------------------------------------------------------------- staying silent
 
 def test_a_whole_conversation_about_one_bike_ride_repeats_no_programme(repo, client,
                                                                        make_bot):
-    """La conversation du 2026-08-12, rejouée telle quelle.
+    """A conversation replayed as is.
 
-    Trois messages « P » légitimes — disponibilité, durée, jour — et un plan que rien
-    ne modifie : le coach parle trois fois, le programme zéro.
+    Three legitimate "P" messages (availability, duration, day) and a plan nothing
+    modifies: the coach speaks three times, the program zero.
     """
     bot = make_bot(repo=repo, client=client,
                    agent=FakeAgent(result=RunResult(full_text="Tu la ferais quel jour ?"),
                                      depth="N2", plan_change=True))
     bot._state.owe_plan("4242", current_week(bot), 5)
-    bot._state.settle_plan("4242")          # r5 est arrivé : le compte est soldé
+    bot._state.settle_plan("4242")          # r5 has arrived: the debt is settled
 
     for message in ("je fais une sortie vélo de route avec mon père ça pose problème ?",
                     "ça sera max 1h30/2h mais de toute façon pas de choc",
@@ -113,10 +109,10 @@ def test_a_whole_conversation_about_one_bike_ride_repeats_no_programme(repo, cli
 
 
 def test_the_reactive_path_never_renders_the_plan_card(repo, client, make_bot):
-    """La carte disait une troisième fois ce que la prose et le bloc disaient déjà.
+    """The card said a third time what the prose and the block already said.
 
-    Elle reste au dimanche, où elle publie une semaine entière et où elle est le
-    message. En réactif, une révision touche un ou deux jours : le texto suffit.
+    It stays on Sunday, where it publishes a whole week and is the message. Reactively,
+    a revision touches one or two days: the text message is enough.
     """
     due_gate = {"id": "g1", "due": "2000-01-01", "when": "avant",
                 "holds": ["w33-r1-jour-ef"],
@@ -132,13 +128,13 @@ def test_the_reactive_path_never_renders_the_plan_card(repo, client, make_bot):
     repo.render_weekly_plan_card.assert_not_called()
 
 
-# ---------------------------------------------------------------- parler
+# ---------------------------------------------------------------- speaking
 
 def test_a_new_revision_leaves_once_and_only_once(repo, client, make_bot):
-    """Le fait qui justifie l'envoi est consommé par l'envoi : il ne rejoue pas."""
+    """The fact justifying the send is consumed by the send: it does not replay."""
     moved = [session(date=TOMORROW.isoformat())]
-    repo.weekly_plan_context.side_effect = [context(5), context(6, moved),  # tour 1
-                                            context(6, moved), context(6, moved)]  # tour 2
+    repo.weekly_plan_context.side_effect = [context(5), context(6, moved),  # turn 1
+                                            context(6, moved), context(6, moved)]  # turn 2
     bot = make_bot(repo=repo, client=client,
                    agent=FakeAgent(result=RunResult(full_text="Je décale ton renfo"),
                                      depth="N2", plan_change=True))
@@ -149,16 +145,15 @@ def test_a_new_revision_leaves_once_and_only_once(repo, client, make_bot):
 
 
 def test_a_revision_that_only_records_the_past_says_nothing(repo, client, make_bot):
-    """Le 2026-08-16, rejoué tel quel — et la vraie définition du « fait ».
+    """Replayed as is, and the true definition of the "fact".
 
-    Sam finit sa SL vallonnée, la débriefe, donne ses trois repères. Le coach écrit
-    r12 pour consigner RPE 3-4, pic de douleur 0,75-1 et plaisir 7 : une révision de plus,
-    dont la liste de séances est IDENTIQUE à celle de r11. Il ne reste rien à faire de
-    la semaine, et Sam a pourtant reçu « la suite de la semaine : dim 16/08 : SL
-    vallonnée, cible 10 km » — la séance dont il venait de rendre compte.
+    The athlete finishes a long run, debriefs it, gives his three markers. The coach
+    writes a revision recording RPE, pain peak and enjoyment: one more revision, whose
+    session list is IDENTICAL to the previous one. Nothing remains to do this week, yet
+    the athlete received "the rest of the week" listing the session just reported.
 
-    Deux fautes cousues ensemble : le bloc partait sur un numéro qui monte, et son rendu
-    ignorait `status`. Ce test tient les deux bouts.
+    Two faults stitched together: the block left on a rising number, and its rendering
+    ignored `status`. This test holds both ends.
     """
     done = [session(status="done")]
     repo.weekly_plan_context.side_effect = [context(11, done), context(12, done)]
@@ -172,9 +167,9 @@ def test_a_revision_that_only_records_the_past_says_nothing(repo, client, make_b
 
 
 def test_alex_asking_for_his_programme_gets_it_even_unchanged(repo, client, make_bot):
-    """Le contrepoids indispensable : sans « D », resserrer l'envoi rendait le coach
-    MUET sur « je fais quoi demain ? » — la prose n'a pas le droit de prescrire, et
-    « P » ne se lève pas sur une question qui ne change rien."""
+    """The indispensable counterweight: without "D", tightening the send made the coach
+    MUTE on "what do I do tomorrow?" -- the prose may not prescribe, and "P" does not
+    fire on a question that changes nothing."""
     bot = make_bot(repo=repo, client=client,
                    agent=FakeAgent(result=RunResult(full_text="Tu as ça au programme"),
                                      depth="N1", plan_scope="next"))
@@ -184,8 +179,8 @@ def test_alex_asking_for_his_programme_gets_it_even_unchanged(repo, client, make
 
 
 def test_asking_twice_answers_twice(repo, client, make_bot):
-    """Une question posée deux fois mérite deux réponses : la dette de livraison ne
-    doit pas se transformer en « je te l'ai déjà dit »."""
+    """A question asked twice deserves two answers: the delivery debt must not turn into
+    "I already told you"."""
     bot = make_bot(repo=repo, client=client,
                    agent=FakeAgent(result=RunResult(full_text="Voilà"),
                                      depth="N1", plan_asked=True))
@@ -197,7 +192,7 @@ def test_asking_twice_answers_twice(repo, client, make_bot):
 
 def test_morning_initiative_does_not_repeat_a_revision_already_shown_today(
         repo, client, make_bot):
-    """Le marqueur limite l'initiative, jamais une nouvelle demande de Sam."""
+    """The marker limits initiative, never a new request from the athlete."""
     bot = make_bot(
         repo=repo, client=client,
         agent=FakeAgent(result=RunResult(full_text="Voilà"), plan_scope="today"))
@@ -209,14 +204,14 @@ def test_morning_initiative_does_not_repeat_a_revision_already_shown_today(
     assert len(programmes(client)) == 1
 
 
-# ---------------------------------------------------------------- la dette
+# ---------------------------------------------------------------- the debt
 
 def test_a_programme_lost_in_transport_is_still_owed_on_the_next_turn(repo, client,
                                                                       make_bot):
-    """Le seul cas où un programme inchangé repart, et la raison d'avoir une dette.
+    """The only case where an unchanged program is sent again, and the reason for a debt.
 
-    Sans elle, un texto perdu ne repartait JAMAIS : le tour suivant rend deux fois le
-    même texto, conclut « rien de neuf », et la prescription reste dans le serveur.
+    Without it, a lost text message was NEVER resent: the next turn renders the same
+    text twice, concludes "nothing new", and the prescription stays on the server.
     """
     moved = [session(date=TOMORROW.isoformat())]
     repo.weekly_plan_context.side_effect = [context(5), context(6, moved),
@@ -229,7 +224,7 @@ def test_a_programme_lost_in_transport_is_still_owed_on_the_next_turn(repo, clie
     assert bot._state.plan_owed("4242") == (current_week(bot), 6)
 
     client.send_text.return_value = DeliveryResult.success()
-    bot._respond("4242", "tu disais ?")     # ni « P » ni « D » : c'est la dette qui parle
+    bot._respond("4242", "tu disais ?")     # neither "P" nor "D": the debt speaks
 
     sent = programmes(client)
     assert len(sent) == 2
@@ -249,8 +244,8 @@ def test_a_settled_programme_leaves_nothing_owed(repo, client, make_bot):
 
 
 def test_a_debt_owed_for_another_week_never_replays_here(repo, client, make_bot):
-    """Une dette est datée. Celle de la semaine dernière ne fait pas parler celle-ci —
-    sinon un dimanche raté rendrait le lundi bavard pour toujours."""
+    """A debt is dated. Last week's does not make this week speak -- otherwise a missed
+    Sunday would make Monday chatty forever."""
     bot = make_bot(repo=repo, client=client,
                    agent=FakeAgent(result=RunResult(full_text="ok"), depth="N1"))
     bot._state.owe_plan("4242", "1999-W01", 5)
@@ -259,15 +254,15 @@ def test_a_debt_owed_for_another_week_never_replays_here(repo, client, make_bot)
     assert programmes(client) == []
 
 
-# ------------------------------------------------------ ce que « P » commande
+# ------------------------------------------------------ what "P" commands
 
 def test_a_replan_announced_in_one_line_still_validates_its_week(repo, client, make_bot):
-    """« je saute demain finalement » : N0 par la forme, prescriptif par le fond.
+    """"I skip tomorrow after all": N0 by form, prescriptive by substance.
 
-    Le niveau de lecture pilotait seul le verrou fail-closed, si bien qu'un replan dit
-    en cinq mots partait sans plan canonique dans le prompt et sans semaine à valider.
-    Depuis que « P » ne déclenche plus d'envoi, c'est exactement — et seulement — ce
-    qu'il commande : relire le plan, et engager la validation.
+    The reading level alone drove the fail-closed lock, so a replan said in five words
+    left without the canonical plan in the prompt and without a week to validate.
+    Now that "P" no longer triggers a send, this is exactly -- and only -- what it
+    commands: re-read the plan, and engage validation.
     """
     repo.weekly_plan_context.side_effect = [context(5), context(6)]
     agent = FakeAgent(result=RunResult(full_text="Noté"), depth="N0", plan_change=True)
@@ -279,11 +274,11 @@ def test_a_replan_announced_in_one_line_still_validates_its_week(repo, client, m
     assert required == (current_week(bot),)
 
 
-# ------------------------------------------------------- ce qui ne bouge pas
+# ------------------------------------------------------- what does not move
 
 def test_a_gate_still_holds_the_prescription_even_on_a_fresh_revision(repo, client,
                                                                       make_bot):
-    """Un contrôle daté échu retient la ligne de séances, révision neuve ou pas."""
+    """An overdue dated check holds the session line, fresh revision or not."""
     due_gate = {"id": "g1", "due": TODAY.isoformat(), "when": "avant",
                 "holds": ["w33-r1-jour-ef"], "question": "la blessure ?",
                 "on_fail": "rest"}
@@ -302,8 +297,8 @@ def test_a_gate_still_holds_the_prescription_even_on_a_fresh_revision(repo, clie
 
 
 def test_an_invalid_week_prescribes_nothing_at_all(repo, client, make_bot):
-    """Sans révision valide, aucun bloc de séances : la réponse du coach part, suivie
-    d'une ligne qui dit précisément la limite à celui qui demandait son programme."""
+    """Without a valid revision, no session block: the coach reply goes out, followed
+    by a line telling precisely the limit to whoever asked for the program."""
     repo.weekly_plan_context.return_value = ""
     repo.persist_turn.return_value = PersistenceResult(False)
     bot = make_bot(repo=repo, client=client,
@@ -320,7 +315,7 @@ def test_an_invalid_week_prescribes_nothing_at_all(repo, client, make_bot):
 
 def test_applied_facts_do_not_open_the_gate_when_the_plan_is_invalid(
         repo, client, make_bot):
-    """Le succès des faits et la prescriptibilité sont deux verdicts distincts."""
+    """Fact success and prescribability are two distinct verdicts."""
     bot = make_bot(repo=repo, client=client)
     week = current_week(bot)
     repo.weekly_plan_context.return_value = ""
@@ -338,8 +333,8 @@ def test_applied_facts_do_not_open_the_gate_when_the_plan_is_invalid(
 
 
 def test_the_sunday_card_survives_the_reactive_cleanup(repo, client, make_bot):
-    """La publication du dimanche garde sa carte : c'est la semaine entière, et c'est
-    le seul endroit où l'image apporte plus que le texte."""
+    """The Sunday publication keeps its card: it is the entire week, and the only place
+    where the image brings more than the text."""
     bot = make_bot(repo=repo, client=client,
                    agent=FakeAgent(result=RunResult(full_text="Bilan de la semaine")))
     bot._respond_proactive(ProactiveJob(psid="4242", kind="weekly", prompt="bilan"))
@@ -349,7 +344,7 @@ def test_the_sunday_card_survives_the_reactive_cleanup(repo, client, make_bot):
 
 def test_weekly_retry_on_monday_keeps_the_sunday_period(
         repo, client, make_bot, monkeypatch):
-    """Le job durable nomme W34 : son retry lundi prépare encore W35, jamais W36."""
+    """The durable job names W34: its Monday retry still prepares W35, never W36."""
     from datetime import datetime
     from zoneinfo import ZoneInfo
 
@@ -375,9 +370,8 @@ def test_weekly_retry_on_monday_keeps_the_sunday_period(
 # ------------------------------------------------------------------- /deep
 
 def test_deep_keeps_the_triage_flags_it_did_not_decide(repo, client, make_bot):
-    """`/deep` fixe le NIVEAU, rien d'autre. Reconstruire le triage champ par champ
-    perdait en silence tout champ ajouté après coup — `plan_asked` en aurait été le
-    premier mort."""
+    """`/deep` sets the LEVEL, nothing else. Rebuilding the triage field by field
+    silently lost any field added later -- `plan_asked` would have been the first."""
     bot = make_bot(repo=repo, client=client,
                    agent=FakeAgent(result=RunResult(full_text="Analyse"),
                                      depth="N1", plan_asked=True))

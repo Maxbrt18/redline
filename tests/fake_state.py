@@ -1,4 +1,4 @@
-"""Double mémoire réservé aux tests unitaires ; la production n'a que PostgreSQL."""
+"""In-memory double reserved for unit tests; production only has PostgreSQL."""
 
 from __future__ import annotations
 

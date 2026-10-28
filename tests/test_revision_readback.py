@@ -1,13 +1,13 @@
-"""Ce que la CLI rend au coach APRÈS qu'il a écrit une révision.
+"""What the CLI returns to the coach AFTER it wrote a revision.
 
-Le 2026-08-25, Sam annonce en un message trois faits : repos aujourd'hui, renfo
-demain matin, sortie avec des amis jeudi. La révision 3 n'en encode qu'un, et son
-propre motif affirme les trois. La 4 en corrige deux et reconduit l'oubli du jeudi.
-Entre les deux, la CLI a répondu « révision N enregistrée et validée » : le coach n'a
-jamais relu l'objet qu'il venait d'écrire, il a raconté celui qu'il croyait avoir écrit.
+A message announced three facts: rest today, strength tomorrow morning, an outing with
+friends on Thursday. One revision encoded only one of them, while its own reason claimed
+all three; the next fixed two and carried the Thursday omission over. In between, the CLI
+answered "revision N recorded and validated": the coach never re-read the object it had
+just written, it told the one it believed it had written.
 
-⭐ Une révision se relit avant de se raconter, et la relecture montre la semaine ENTIÈRE
-   -- jours vides et séances annulées compris, seuls endroits où un oubli se voit.
+A revision is re-read before being told, and the re-read shows the WHOLE week
+-- empty days and cancelled sessions included, the only places an omission shows.
 """
 
 import pytest
@@ -35,7 +35,7 @@ R4 = {
 
 
 def test_le_jour_ampute_se_voit_dans_la_relecture():
-    """Le trou du 25/08 : jeudi n'a plus qu'une annulation, et ça se lit."""
+    """Thursday is left with only a cancellation, and it shows."""
     lignes = weekly_plan.revision_week_lines("2026-W35", R4)
 
     assert "jeu 27/08 : Renfo B (cancelled)" in lignes
@@ -73,7 +73,7 @@ def test_le_diff_nomme_ce_qui_a_bouge(mutation, attendu):
 
 
 def test_une_revision_qui_ne_change_rien_le_dit_franchement():
-    """Le cas le plus dangereux : le coach croit avoir consigné, l'objet est identique."""
+    """The most dangerous case: the coach thinks it recorded, the object is identical."""
     texte = weekly_plan.revision_readback("2026-W35", R4, {**R4, "revision": 5})
 
     assert "AUCUNE séance ajoutée, annulée, déplacée ni modifiée" in texte
@@ -87,7 +87,7 @@ def test_la_premiere_revision_na_pas_de_predecesseur():
 
 
 def test_la_relecture_reclame_une_relecture():
-    """Un rendu que le modèle survole ne sert à rien : il porte sa propre consigne."""
+    """A rendering the model skims is useless: it carries its own instruction."""
     texte = weekly_plan.revision_readback("2026-W35", R4, {**R4, "revision": 5})
 
     assert "RELIS LA SEMAINE AVANT DE RÉPONDRE" in texte
@@ -112,7 +112,7 @@ def _r3(reason, sessions=None):
 
 
 def test_la_r3_reelle_du_25_aout_est_refusee():
-    """Son motif annonçait le jeudi ; son objet ne touchait que le mercredi."""
+    """Its reason announced Thursday; its object only touched Wednesday."""
     fautes = weekly_plan.coherence_errors("2026-W35", R2, _r3(
         "Sam a couru avec des amis jeudi matin au lieu de l'EF de mercredi ; le "
         "renfo B du 27/08 est decale, date a arbitrer au moment venu."))
@@ -127,23 +127,23 @@ def test_la_r3_reelle_du_25_aout_est_refusee():
     "L'EF du 2026-08-26 est annulée.",
 ])
 def test_un_motif_qui_ne_nomme_que_le_jour_touche_passe(reason):
-    """Les trois écritures d'un jour se valent : nom, date courte, date ISO."""
+    """The three spellings of a day are equivalent: name, short date, ISO date."""
     assert weekly_plan.coherence_errors("2026-W35", R2, _r3(reason)) == []
 
 
 def test_un_jour_hors_semaine_ne_compte_pas():
-    """« l'avis du 03/09 » parle d'une autre semaine : ce plan ne peut pas le porter."""
+    """A mention of another date belongs to another week: this plan cannot carry it."""
     assert weekly_plan.coherence_errors(
         "2026-W35", R2, _r3("L'EF de mercredi saute ; avis clinique le 03/09.")) == []
 
 
 def test_la_premiere_revision_nest_pas_jugee_sur_ses_jours():
-    """Elle les touche tous par construction : la règle n'y dirait rien."""
+    """It touches all of them by construction: the rule would say nothing."""
     assert weekly_plan.coherence_errors("2026-W35", None, _r3("lundi mardi dimanche")) == []
 
 
 def test_la_faute_ouvre_les_deux_chemins_corrects():
-    """Un garde-fou qui ne dit que non fabrique son contournement (règle du 06/08)."""
+    """A guard that only says no breeds its own workaround."""
     faute = weekly_plan.coherence_errors("2026-W35", R2, _r3("Rien ne bouge dimanche."))[0]
 
     assert "retire-le du motif" in faute
@@ -158,7 +158,7 @@ def test_un_jour_vide_par_cette_revision_est_signale():
 
 
 def test_un_jour_deja_vide_a_la_revision_precedente_ne_se_resignale_pas():
-    """Le signal porte sur ce que CETTE révision fait, pas sur un état hérité."""
+    """The signal is about what THIS revision does, not about an inherited state."""
     deja = _r3("mercredi")
 
     assert weekly_plan.sessions_orphelines(deja, {**deja, "revision": 4}) == []
@@ -181,8 +181,8 @@ def test_a_future_change_requires_exact_evidence_rule_and_fields():
 
 
 def test_a_session_done_today_is_not_a_change_to_justify():
-    """27/10 : l'EF et le renfo du matin, rendus `done` par le cycle, rendaient
-    impossible toute révision du jour, `done` étant refusé à l'écriture."""
+    """Sessions rendered `done` by the cycle made any same-day revision impossible,
+    since `done` is refused on write."""
     previous = {"revision": 3, "sessions": [
         _session("w44-mar-ef", "2026-10-27", status="done"),
         _session("w44-jeu-sl", "2026-10-29", workout="long")]}
@@ -205,7 +205,7 @@ def _cancel(evidence, motif=None):
 
 
 def test_a_restriction_without_a_typed_motif_is_refused():
-    """Audit du 2026-10-09 : 19 restrictions sans prémisse, dont 7 par une révision."""
+    """Restrictions without a premise, some of them introduced by a revision."""
     errors = weekly_plan.change_evidence_errors(R2, _cancel(["observation:2026-08-24-ef"]))
 
     assert any("w35-mer-ef.motif : restriction (annulée) sans motif typé" in error

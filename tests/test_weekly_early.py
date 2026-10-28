@@ -1,8 +1,8 @@
-"""Le bilan hebdo part dès que le dimanche est soldé, pas à 19 h (2026-10-18).
+"""The weekly review goes out as soon as Sunday is settled, not at a fixed hour.
 
-Le 2026-10-18, le mini footing était fait à 10 h et le renfo dans la foulée : rien ne
-pouvait plus changer le bilan, mais la semaine suivante n'existait qu'après 19 h.
-L'heure fixe reste le repli quand une séance du dimanche n'est pas soldée.
+When the Sunday sessions are done early, nothing can change the review any more, so the
+next week must not wait for the evening. The fixed hour remains the fallback when a
+Sunday session is not settled.
 """
 
 import datetime as dt

@@ -1,16 +1,11 @@
-"""La répétition générale : les VRAIES commandes du coach, dans le VRAI ordre.
+"""Dress rehearsal: the REAL coach commands, in the REAL order.
 
-Le 2026-08-14, cinq défauts se sont succédé en production, tous de la même famille —
-un chemin que le coach ne pouvait pas emprunter et dont l'échec détruisait son tour.
-Chacun a été découvert de la même façon : Sam envoie un message, le bot casse.
-Aucun test ne jouait ce que le coach fait réellement, dans l'ordre où il le fait.
+Unit tests check each piece in isolation, and they all passed while the bot was unusable
+because a path the coach could not take failed and destroyed its turn. This file does not test
+one piece: it replays the SEQUENCES of a coaching day, with the scripts called the way the
+coach calls them, across the same turn boundary.
 
-Les tests unitaires du dépôt vérifient chaque pièce isolément, et ils passaient tous
-pendant que le bot était inutilisable. Ce fichier ne teste pas une pièce : il rejoue
-les SÉQUENCES d'une journée de coaching, avec les scripts appelés comme le coach les
-appelle, à travers la même frontière de tour. Il aurait attrapé les cinq.
-
-Chaque test porte le scénario vécu qu'il rejoue.
+Each test carries the lived scenario it replays.
 """
 
 from __future__ import annotations
@@ -37,7 +32,7 @@ def clean_database():
         names = ", ".join(f"redline.{table.name}" for table in metadata.sorted_tables)
         connection.execute(sa.text(f"TRUNCATE TABLE {names} RESTART IDENTITY CASCADE"))
         connection.execute(sa.text("INSERT INTO redline.athletes(id) VALUES ('sam')"))
-        # La zone surveillée de l'instance fictive, comme le service la synchronise.
+        # The monitored zone of the fictitious instance, as the service syncs it.
         connection.execute(sa.text(
             "INSERT INTO redline.pain_zones(athlete_id, slug, label) VALUES ('sam', 'injury', 'Injury')"))
     yield
@@ -50,8 +45,8 @@ def store():
 
 
 def coach(command: str, *arguments: str, turn: str = "") -> subprocess.CompletedProcess:
-    """Une commande du coach (`scripts/week-plan.py`, comme les consignes l'écrivent),
-    lancée exactement comme le service la lance."""
+    """A coach command (`scripts/week-plan.py`, as the instructions spell it),
+    launched exactly the way the service launches it."""
     environment = {**os.environ, "DATABASE_URL": URL}
     if turn:
         environment["REDLINE_TURN_ID"] = turn
@@ -66,7 +61,7 @@ def reussit(process: subprocess.CompletedProcess, geste: str) -> subprocess.Comp
 
 
 def revision_json(numero: int) -> str:
-    """Une révision valide de 2026-W33, telle que le coach l'écrirait."""
+    """A valid revision of a build week, as the coach would write it."""
     import json
     return json.dumps({
         "revision": numero,
@@ -95,12 +90,11 @@ def poser_le_plan(store, numero: int = 1) -> None:
     store.apply_turn_with_receipts(tour)[0]
 
 
-# --------------------------------------------------------------------- séquences
+# --------------------------------------------------------------------- sequences
 
 def test_un_debrief_complet_passe_la_frontiere_du_tour(store):
-    """LE scénario du 2026-08-14 matin. Le coach lit la sortie et la consigne ; le
-    rapprochement fait passer le cycle à ``completed`` sans recopier l'exécution dans
-    le plan. Ce jour-là, ce même enchaînement a été détruit deux fois."""
+    """A full morning debrief. The coach reads the output and records it; reconciliation
+    moves the cycle to ``completed`` without copying the execution into the plan."""
     poser_le_plan(store)
     tour = str(uuid.uuid4())
 
@@ -117,11 +111,10 @@ def test_un_debrief_complet_passe_la_frontiere_du_tour(store):
 
 
 def test_donner_un_rpe_ne_casse_jamais_rien(store):
-    """« Effort ressenti 7-8/10 et pic de douleur 0/10 » a détruit deux tours. Un chiffre
-    déclaré est le geste le plus banal du coaching : il doit passer, et laisser le
-    programme prescriptible."""
-    # La séance préexiste au plan : son filigrane de persistance l'a donc déjà vue.
-    # C'est le point de départ du geste qu'on teste.
+    """Giving a perceived-effort figure and a pain peak is the most ordinary coaching
+    gesture: it must go through and leave the program prescribable."""
+    # The session predates the plan: its persistence watermark has therefore already seen it.
+    # This is the starting point of the gesture under test.
     tour_seance = str(uuid.uuid4())
     reussit(coach("scripts/ledger-add.py", "--date", "2026-08-14", "--type", "bike",
                   "--km", "36.9", "--temps", "1:42:57",
@@ -131,7 +124,7 @@ def test_donner_un_rpe_ne_casse_jamais_rien(store):
     poser_le_plan(store)
     assert coach("scripts/week-plan.py", "check", "--week", "2026-W33").returncode == 0
 
-    # Des heures plus tard, Sam donne son ressenti. RIEN ne doit bouger côté plan.
+    # Hours later, the athlete gives their perceived effort. NOTHING must move on the plan.
     tour = str(uuid.uuid4())
     reussit(coach("scripts/ledger-complete.py", "--date", "2026-08-14", "--type", "bike",
                   "--metric", "rpe", "--value", "7.5", turn=tour), "ledger-complete")
@@ -144,8 +137,8 @@ def test_donner_un_rpe_ne_casse_jamais_rien(store):
 
 
 def test_completer_sans_connaitre_la_cle_inventee_hier(store):
-    """Le coach ne se souvient pas de la clé d'une ligne écrite dans une session morte.
-    Il a la date ; la date doit suffire. Sinon il devine, et il devine faux."""
+    """The coach does not remember the key of a row written in a dead session.
+    It has the date; the date must be enough. Otherwise it guesses, and guesses wrong."""
     poser_le_plan(store)
     tour_seance = str(uuid.uuid4())
     reussit(coach("scripts/ledger-add.py", "--date", "2026-08-14", "--type", "bike",
@@ -174,9 +167,8 @@ def test_completer_sans_connaitre_la_cle_inventee_hier(store):
 
 
 def test_une_cle_fausse_echoue_tout_de_suite_pas_a_la_frontiere(store):
-    """La règle qui aurait évité la journée entière : une commande fautive échoue
-    PENDANT que le coach peut encore se corriger. À la frontière du tour, il a déjà
-    écrit sa réponse et tout est perdu."""
+    """A faulty command fails WHILE the coach can still correct itself. At the turn
+    boundary it has already written its reply and everything is lost."""
     poser_le_plan(store)
     process = coach("scripts/ledger-complete.py", "--key", "strava:90000000001",
                     "--metric", "rpe", "--value", "7", turn=str(uuid.uuid4()))
@@ -185,8 +177,7 @@ def test_une_cle_fausse_echoue_tout_de_suite_pas_a_la_frontiere(store):
 
 
 def test_l_etat_du_jour_ne_perime_pas_le_programme(store):
-    """Dire qu'on a mal dormi nourrit la jauge ; ça ne rend pas le programme faux.
-    C'était la troisième des quatre portes qui cassaient un tour."""
+    """Saying one slept badly feeds the gauge; it does not make the program wrong."""
     poser_le_plan(store)
     tour = str(uuid.uuid4())
     reussit(coach("scripts/fact-write.py", "daily", "--date", "2026-08-14",
@@ -199,8 +190,8 @@ def test_l_etat_du_jour_ne_perime_pas_le_programme(store):
 
 
 def test_un_programme_perime_reste_lisible_et_le_dit(store):
-    """La CLI et le service doivent s'accorder : périmé n'est pas invalide. Le
-    programme s'imprime, et le code de sortie nomme le remède."""
+    """The CLI and the service must agree: stale is not invalid. The program
+    prints, and the exit code names the remedy."""
     poser_le_plan(store)
     tour = str(uuid.uuid4())
     reussit(coach("scripts/ledger-add.py", "--date", "2026-08-14", "--type", "easy",
@@ -215,21 +206,21 @@ def test_un_programme_perime_reste_lisible_et_le_dit(store):
     assert "révision" in process.stderr
 
 
-# ------------------------------------------------- les déclencheurs proactifs
+# ------------------------------------------------- proactive triggers
 
 def sequence(*gestes: tuple[str, list[str]]) -> None:
-    """Joue une suite de commandes et nomme celle qui lâche.
+    """Play a series of commands and name the one that fails.
 
-    Un déclencheur proactif n'est pas une commande mais un ENCHAÎNEMENT : le mot du
-    matin lit le plan, les fils, les échéances, le cockpit, puis écrit sa trace. Les
-    tester un par un laisse passer ce qui casse entre deux.
+    A proactive trigger is not one command but a CHAIN: the morning message reads the plan,
+    the threads, the deadlines, the cockpit, then writes its trace. Testing them one by one
+    misses what breaks between two.
     """
     for nom, arguments in gestes:
         reussit(coach(*arguments), nom)
 
 
 def test_le_mot_du_matin_joue_toute_sa_sequence(store):
-    """Ce que le déclencheur `morning` ordonne, dans l'ordre où il l'ordonne."""
+    """What the `morning` trigger orders, in the order it orders it."""
     poser_le_plan(store)
     sequence(
         ("plan du jour", ["scripts/week-plan.py", "show", "--week", "2026-W33"]),
@@ -243,11 +234,10 @@ def test_le_mot_du_matin_joue_toute_sa_sequence(store):
 
 
 def test_le_bilan_du_dimanche_joue_toute_sa_sequence(store):
-    """Ce que le déclencheur `weekly` ordonne. Il touche le plus de scripts, donc
-    c'est lui qui casse le plus discrètement — une fois par semaine, le dimanche."""
-    # Un dimanche sans aucune séance n'existe pas : `signals.py` refuse d'ailleurs un
-    # registre vide, et la répétition doit jouer une semaine vécue, pas une semaine
-    # théorique.
+    """What the `weekly` trigger orders. It touches the most scripts, so it is the one
+    that breaks most quietly -- once a week, on Sunday."""
+    # A Sunday without any session does not exist: `signals.py` refuses an empty ledger, and
+    # the rehearsal must play a lived week, not a theoretical one.
     tour_seance = str(uuid.uuid4())
     reussit(coach("scripts/ledger-add.py", "--date", "2026-08-14", "--type", "easy",
                   "--km", "7", "--temps", "43:00", "--allure", "6:08",
@@ -274,8 +264,7 @@ def test_le_bilan_du_dimanche_joue_toute_sa_sequence(store):
 
 
 def test_le_debrief_strava_joue_toute_sa_sequence(store):
-    """Consigner et rapprocher du cycle — l'enchaînement complet d'un débrief,
-    celui qui a été détruit deux fois le 2026-08-14."""
+    """Record and reconcile with the cycle -- the full chain of a debrief."""
     poser_le_plan(store)
     tour = str(uuid.uuid4())
     reussit(coach("scripts/ledger-add.py", "--date", "2026-08-14", "--type", "easy",

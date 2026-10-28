@@ -1,4 +1,4 @@
-"""La pièce jointe est lisible quelques secondes, jamais une nouvelle base de faits."""
+"""The attachment is readable for a few seconds, never a new fact base."""
 
 from __future__ import annotations
 

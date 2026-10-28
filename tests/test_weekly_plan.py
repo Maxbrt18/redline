@@ -1,4 +1,4 @@
-"""Le contrat relationnel du programme hebdomadaire et ses projections."""
+"""Relational contract of the weekly plan and its projections."""
 
 import datetime as dt
 import io
@@ -61,8 +61,8 @@ def written_today(**overrides):
 
 
 def frozen_clock(monkeypatch, week_plan):
-    """`revise` horodate lui-même depuis le 25/08 : sans horloge figée, une révision
-    de test pour W32 serait jugée écrite aujourd'hui, et ses contrôles datés périmés."""
+    """`revise` timestamps itself: without a frozen clock, a test revision for W32
+    would be judged written today, and its dated checks stale."""
     monkeypatch.setattr(week_plan, "now_stamp", lambda: LE_JOUR_DE_LECRITURE)
 
 
@@ -72,10 +72,10 @@ def with_session(**session_overrides):
 
 
 def test_remaining_drops_what_is_settled_and_what_is_behind():
-    """⭐ Le calcul unique de « ce qui reste à faire », et la raison d'exister de ce
-    module : trois rendus le refaisaient à la main, et celui qui affirmait le plus fort
-    (« la suite de la semaine », sur le téléphone de Sam) était le seul à ignorer
-    `status`. Le 2026-08-16 il lui a redonné à faire la SL qu'il venait de courir.
+    """The single computation of "what remains to do", and the reason this module
+    exists: three renderers used to redo it by hand, and the one that asserted the most
+    ("the rest of the week", on the athlete's phone) was the only one ignoring
+    `status`, so it could hand back a session already run.
     """
     ran = session("w33-dim-sl", date="2026-08-16", workout="long", status="done")
     dropped = session("w33-jeu-b", date="2026-08-13", workout="strength", routine="b", status="cancelled")
@@ -85,13 +85,13 @@ def test_remaining_drops_what_is_settled_and_what_is_behind():
 
     assert weekly_plan.remaining(sessions, since="2026-08-16") == [ahead]
     assert weekly_plan.scheduled(sessions) == [ran, ahead, behind]
-    # Borne inclusive : la journée en cours reste à faire tant qu'elle n'est pas faite.
+    # Inclusive bound: the current day remains to do until it is done.
     assert ahead in weekly_plan.remaining(sessions, since="2026-08-17")
 
 
 def test_only_a_settled_status_leaves_the_prescription():
-    """Écrit en négatif exprès : un statut ajouté plus tard reste prescriptible, parce
-    qu'oublier une séance à faire est pire que d'en afficher une de trop."""
+    """Written as a negative on purpose: a status added later stays prescribable, because
+    forgetting a session to do is worse than showing one too many."""
     assert set(weekly_plan.STATUSES) > weekly_plan.SETTLED_STATUSES
     for status in weekly_plan.STATUSES:
         kept = weekly_plan.remaining([session(status=status)], since="2026-08-01")
@@ -132,8 +132,8 @@ def test_location_and_gut_target_are_typed():
     {"weather": {"wbgt_max_c": 24, "on_alert": "Décale le départ à 7 h."}},
 ])
 def test_retired_proactive_fields_are_refused_not_silently_stored(retired):
-    """Repère mental, coordonnées et météo sont retirés le 2026-09-28 : un plan qui les
-    écrit encore doit échouer bruyamment, pas porter un réglage que rien ne lit."""
+    """Mental cue, coordinates and weather are removed: a plan that still writes them
+    must fail loudly, not carry a setting nothing reads."""
     with pytest.raises(SchemaError):
         weekly_plan.validate(plan([session("sl", "2026-08-09", "long",
                                            start_time="08:00", **retired)]))
@@ -170,7 +170,7 @@ def test_active_strength_drop_must_name_an_exercise_in_the_programme():
 
 
 def test_a_closed_week_is_not_judged_against_todays_strength_programme():
-    """W39 : un « drop » d'exercice retiré du programme après coup vidait l'archive."""
+    """An exercise `drop` removed from the program after the fact must not empty the archive."""
     strength = session(
         "w32-jeu-b", "2026-08-06", "strength", routine="b", kind="strength",
         demanding=False, strength={"drop": ["box-drop"]})
@@ -317,7 +317,7 @@ def test_renderers_show_only_the_active_revision_and_postgresql_owner():
     assert "PostgreSQL →" in hot and "≤10 km" in hot
 
 
-# --------------------------------------------------- codes de sortie de la CLI
+# --------------------------------------------------- CLI exit codes
 
 def _week_plan_cli():
     from redline.cli import week_plan
@@ -348,7 +348,7 @@ def test_a_prescriptible_week_exits_zero_and_prints_the_plan(capsys):
 
 
 def test_a_week_to_review_still_prints_its_plan_and_exits_three(capsys):
-    """Une charge non rattachée demande un arbitrage sans rendre le plan illisible."""
+    """An unattached load asks for arbitration without making the plan unreadable."""
     cli = _week_plan_cli()
     store = _FakeStore(_w32_plan(), needs_arbitration=True)
 
@@ -364,8 +364,8 @@ def test_a_week_to_review_still_prints_its_plan_and_exits_three(capsys):
 
 
 def test_a_due_gate_still_takes_precedence_over_staleness(capsys):
-    """Un contrôle daté se pose à Sam, une péremption se répare tout seul : quand
-    les deux tiennent, c'est la question qui passe devant."""
+    """A dated check is put to the athlete, an expiry repairs itself: when both hold,
+    the question comes first."""
     cli = _week_plan_cli()
     plan = _w32_plan()
     plan["revisions"][0]["sessions"] = [session("w32-mer-ef", "2026-08-05")]
@@ -377,14 +377,13 @@ def test_a_due_gate_still_takes_precedence_over_staleness(capsys):
     assert "w32-mer-ef" in capsys.readouterr().out
 
 
-# ------------------------------------------- contrôles datés : avant, ou après ?
+# ------------------------------------------- dated checks: before, or after?
 #
-# ⭐ 2026-08-18. Le programme portait « après le bloc de pliométrie de la séance A, la
-# cheville gauche a-t-elle parlé ? », échéance le jour de cette séance A. Une
-# OBSERVATION, écrite dans le seul moule qui existait — celui d'une PRÉ-CONDITION. Le
-# service a fait exactement ce qu'on lui demandait : il a retenu la prescription en
-# attendant la réponse à une question qui exigeait de faire la séance retenue. Sam a
-# reçu un message qui nommait son renfo, posait la question, et ne livrait pas la carte.
+# A check phrased as an observation ("after the plyometric block of session A, did the
+# ankle complain?") due on the day of that session must not be written as a PRECONDITION.
+# The service would hold the prescription while waiting for an answer that requires doing
+# the held session, and the athlete would get a message naming the strength session,
+# asking the question, and not delivering the card.
 
 
 def observation(**overrides):
@@ -396,7 +395,7 @@ def precondition(holds=("w32-ven-ef",), **overrides):
 
 
 def week_with_a_later_session(gates):
-    """Une semaine dont la séance retenue tombe le jour de l'échéance, pas avant."""
+    """A week whose held session falls on the due day, not before."""
     current = plan([session("w32-lun-ef", "2026-08-03", status="done"),
                     session("w32-ven-ef", "2026-08-08")])
     current["revisions"][0]["gates"] = gates
@@ -404,8 +403,8 @@ def week_with_a_later_session(gates):
 
 
 def test_an_observation_gate_holds_nothing_back():
-    """LE test du 18/08. Sa réponse n'existe qu'après la séance : elle ne peut pas
-    être la condition de cette séance, donc elle ne retient rien."""
+    """Its answer only exists after the session: it cannot be the condition of that
+    session, so it holds nothing."""
     current = plan([session(status="done")])
     current["revisions"][0]["gates"] = [observation()]
     today = dt.date(2026, 8, 8)
@@ -440,10 +439,9 @@ def test_an_observation_may_not_claim_to_hold_a_session():
 
 
 def test_a_precondition_must_name_what_it_holds():
-    """« Avant » se paie d'un `holds`. Écrire « je retiens la séance A » juste à côté
-    d'une question qui demande comment la séance A s'est passée est une contradiction
-    qu'on ne peut plus ne pas voir — c'est tout ce qu'un schéma peut faire, et c'est
-    exactement ce qui manquait le 18/08."""
+    """"Before" is paid for with a `holds`. Writing "I hold session A" right next to a
+    question asking how session A went is a contradiction that cannot be overlooked;
+    that is all a schema can do."""
     broken = plan([session(status="done")])
     broken["revisions"][0]["gates"] = [gate(when="avant")]
     with pytest.raises(SchemaError, match="sans `holds`"):
@@ -457,8 +455,8 @@ def test_a_gate_cannot_hold_a_session_that_does_not_exist():
 
 
 def test_a_gate_cannot_hold_a_session_already_past_when_it_is_asked():
-    """Retenir une séance du lundi avec une question du vendredi ne retient rien :
-    elle a eu lieu. C'est le signe qu'on voulait une observation."""
+    """Holding a Monday session with a Friday question holds nothing: it already
+    happened. That signals an observation was meant."""
     broken = plan([session("w32-lun-ef", "2026-08-03"),
                    session("w32-ven-ef", "2026-08-07")])
     broken["revisions"][0]["gates"] = [precondition(due="2026-08-08",
@@ -467,7 +465,7 @@ def test_a_gate_cannot_hold_a_session_already_past_when_it_is_asked():
         weekly_plan.validate(broken)
 
 
-# ------------------------------ la frontière que toute révision neuve doit tenir
+# ------------------------------ the boundary every new revision must hold
 
 def test_a_new_revision_does_not_persist_a_schema_version(monkeypatch, capsys):
     from conftest import load_script
@@ -495,8 +493,8 @@ def test_a_new_revision_does_not_persist_a_schema_version(monkeypatch, capsys):
 
 
 def test_a_new_revision_may_no_longer_carry_an_untyped_gate(monkeypatch):
-    """Bout en bout : le contrat que la CLI estampille rend `when` obligatoire, donc la
-    révision du 18/08 telle qu'elle a été écrite serait aujourd'hui refusée."""
+    """End to end: the contract the CLI stamps makes `when` mandatory, so an untyped
+    observation gate written the old way is refused."""
     from conftest import load_script
 
     week_plan = load_script("week-plan")
@@ -511,13 +509,13 @@ def test_a_new_revision_may_no_longer_carry_an_untyped_gate(monkeypatch):
     fresh = written_today(number=1, sessions=[session()])
     untyped = gate()
     untyped.pop("when")
-    fresh["gates"] = [untyped]          # exactement la forme du 2026-08-18
+    fresh["gates"] = [untyped]          # the legacy untyped shape
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(fresh)))
     monkeypatch.delenv("REDLINE_TURN_ID", raising=False)
 
-    # `week_plan.SchemaError` et non celui importé en tête : chargé comme un fichier, le
-    # script résout `model.*` là où la suite résout `redline.model.*`. Deux identités
-    # pour la même classe, et c'est le script qui décide de celle qu'il lève.
+    # `week_plan.SchemaError`, not the one imported at the top: loaded as a file, the
+    # script resolves `model.*` where the suite resolves `redline.model.*`. Two identities
+    # for the same class, and the script decides which one it raises.
     with pytest.raises(week_plan.SchemaError, match="when"):
         frozen_clock(monkeypatch, week_plan)
         week_plan._database_command(FakeStore(), "revise", "2026-W32", optional=False)
@@ -555,8 +553,8 @@ def test_plan_cli_distinguishes_preview_from_pending_application(command, monkey
 
 
 def test_a_week_with_a_plan_and_no_journal_gets_one(tmp_path):
-    """W36 et W39 n'avaient pas de journal : la création était une étape du bilan
-    confiée au modèle, sautée deux fois sur quatre (audit du 2026-09-27)."""
+    """The journal creation used to be a model-driven step of the review, skipped
+    sometimes; it is now part of the revision itself."""
     from redline.storage.projector import ensure_journals
 
     class Store:
@@ -573,13 +571,13 @@ def test_a_week_with_a_plan_and_no_journal_gets_one(tmp_path):
     assert "# Bilan 2026-W39 (21-27 septembre)" in text
     assert "<!-- WEEK_PLAN_START -->\n<!-- WEEK_PLAN_END -->" in text
     assert existing.read_text(encoding="utf-8") == "déjà écrit par le bilan"
-    # Une semaine qui chevauche deux mois nomme les deux.
+    # A week spanning two months names both.
     assert "(28 septembre - 4 octobre)" in weekly_plan.journal_skeleton(
         "2026-W40", dt.date(2026, 9, 27))
 
 
 def test_a_running_week_states_its_volume_in_a_number():
-    """« Environ 41 km » en prose ne se lit pas : le carnet a besoin du chiffre."""
+    """"About 41 km" in prose cannot be read: the logbook needs the number."""
     assert weekly_plan.typed_target_errors(written_today()) == []
     fresh = written_today()
     del fresh["volume_target_km"]
@@ -591,7 +589,7 @@ def test_a_running_week_states_its_volume_in_a_number():
     assert "hr_cap_bpm" in weekly_plan.typed_target_errors(zoned)[0]
     capped = written_today(sessions=[session(hr_zone="Z1-Z2, 130-157 bpm", hr_cap_bpm=157)])
     assert weekly_plan.typed_target_errors(capped) == []
-    # L'historique d'avant le 2026-10-07 reste lisible sans eux.
+    # History from before the removal stays readable without them.
     weekly_plan.validate({"week": "2026-W32", "revisions": [revision()]})
 
 
@@ -622,8 +620,8 @@ def test_the_volume_is_read_back_and_projected():
 
 
 def test_a_new_precondition_no_longer_holds_a_session():
-    """Décision du 2026-10-11 : 19 contrôles bloquants, aucun échec sur son critère ;
-    23 changements de séance sur 25 venaient de Sam. La condition va dans la séance."""
+    """Blocking checks almost never failed their criterion, and most session changes
+    came from the athlete. The condition goes in the session."""
     holding = revision(gates=[gate(when="avant", holds=["w32-sam-sl"])])
     assert any("ne retient plus de séance" in problem
                for problem in weekly_plan.written_text_errors(holding))

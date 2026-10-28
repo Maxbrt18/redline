@@ -1,18 +1,16 @@
-"""VaultRepo : ce qu'un tour enregistre avant sa livraison, et rien n'échoue en silence.
+"""VaultRepo: what a turn records before its delivery, and nothing fails silently.
 
-La panne du 2026-08-10 tenait dans une cellule (`FCmoy: 156.6`) et dans deux trous
-d'architecture que ces tests ferment :
-
-  - **Deux politiques contraires sur le même événement.** `regenerate_views` dit qu'un
-    générateur en échec ne doit jamais bloquer un commit, et `test_regen_views.py` le
-    prouve depuis toujours — sur un dépôt de test SANS hook. En prod, `.githooks/
-    pre-commit` tournait en `set -e` et avortait le commit. Le test était vert et la
-    prod tombait : la couverture s'arrêtait exactement là où la contradiction vivait.
-  - **L'échec de persistance était muet.** Le débrief Strava du jour a été rédigé,
-    jeté, et personne n'a été prévenu. Sam l'a appris en trouvant son coach cassé.
-
-Depuis le 2026-09-25, la frontière est coupée en deux : `persist_turn` (PostgreSQL et
-commit local, sans réseau) précède la livraison ; `publish` (vues, commit, push) la suit.
+A failure came down to one table cell (`FCmoy: 156.6`) and two architecture gaps that
+these tests close:
+  - **Two opposite policies on the same event.** `regenerate_views` says a failing
+    generator must never block a commit, and `test_regen_views.py` proves it -- on a
+    test repository WITHOUT a hook. In production, `.githooks/pre-commit` ran under
+    `set -e` and aborted the commit. The test was green and production failed: coverage
+    stopped exactly where the contradiction lived.
+  - **A persistence failure was mute.** The day's Strava debrief was written, thrown
+    away, and nobody was warned.
+The boundary is split in two: `persist_turn` (PostgreSQL and local commit, no network)
+precedes delivery; `publish` (views, commit, push) follows it.
 """
 
 import os
@@ -49,7 +47,7 @@ class TestNothingFailsSilently:
             sys.executable, "-c", "import sys; sys.exit('registre illisible')"))
         repo.persist_turn()
         repo.publish()
-        assert "source.md" in _committed(git_repo)         # la session est sauvée
+        assert "source.md" in _committed(git_repo)         # the session is saved
         assert any("régénération" in alert.text for alert in repo.drain_alerts())
 
     def test_a_commit_created_during_the_turn_is_taken_over_by_the_service(self, git_repo):
@@ -66,11 +64,11 @@ class TestNothingFailsSilently:
         assert "coach (messenger)" in subprocess.run(
             ["git", "log", "-1", "--format=%s"], cwd=git_repo,
             capture_output=True, text=True).stdout
-        assert not repo.publish()  # ce dépôt de test n'a pas d'origin
+        assert not repo.publish()  # this test repository has no origin
 
     def test_a_code_commit_created_during_the_turn_is_restored_not_the_whole_turn(
             self, git_repo):
-        """RWF-003 : l'effet dangereux est le fichier de code, pas les notes du tour."""
+        """The dangerous effect is the code file, not the notes of the turn."""
         base = _head(git_repo)
         path = git_repo / "src" / "redline" / "service" / "surprise.py"
         path.parent.mkdir(parents=True)
@@ -122,9 +120,9 @@ class TestNothingFailsSilently:
 
 
 class TestTheHookAgreesWithTheCode:
-    """La contradiction qui a fait tomber la prod : le hook avortait le commit que
-    `regenerate_views` a explicitement décidé de laisser passer. Aucun test ne
-    l'exerçait, parce que les dépôts de test n'ont pas de `core.hooksPath`."""
+    """The contradiction that took production down: the hook aborted the commit that
+        `regenerate_views` explicitly decided to let through. No test exercised it,
+        because test repositories have no `core.hooksPath`."""
 
     def test_the_real_hook_does_not_abort_a_commit_on_a_failing_generator(
             self, git_repo, tmp_path):
@@ -144,7 +142,7 @@ class TestTheHookAgreesWithTheCode:
         assert "notes.md" in _committed(git_repo)
 
     def test_the_hook_stages_what_it_regenerates_and_nothing_else(self, git_repo, tmp_path):
-        """`git add -u` embarquait toute édition non stagée : aucun commit ciblé."""
+        """`git add -u` swept up every unstaged edit: no targeted commit."""
         generator = tmp_path / "fake" / "redline" / "cli"
         generator.mkdir(parents=True)
         (generator.parent / "__init__.py").write_text("", encoding="utf-8")
@@ -201,7 +199,7 @@ def test_actual_revised_week_is_checked_without_a_triage_flag(git_repo):
 
 
 def test_the_persistence_boundary_never_touches_the_network(git_repo, monkeypatch):
-    """RWF-010 : la réponse part dès que PostgreSQL a validé ; vues et push après."""
+    """The reply goes out as soon as PostgreSQL has committed; views and push come after."""
     store = MagicMock()
     store.apply_turn_with_receipts.return_value = (1, ())
     store.projection_pending.return_value = True

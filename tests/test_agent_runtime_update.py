@@ -1,4 +1,4 @@
-"""Tests purs des garde-fous du metteur à jour du runtime d'agent (Codex ou Claude)."""
+"""Pure tests of the guardrails of the agent runtime updater (Codex or Claude)."""
 
 import importlib.util
 import sys
@@ -12,7 +12,7 @@ SCRIPT = SERVER / "agent-runtime-update.py"
 SPEC = importlib.util.spec_from_file_location("agent_runtime_update", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
 updater = importlib.util.module_from_spec(SPEC)
-sys.modules[SPEC.name] = updater  # requis par @dataclass
+sys.modules[SPEC.name] = updater  # required by @dataclass
 SPEC.loader.exec_module(updater)
 
 
@@ -38,7 +38,7 @@ def test_requirement_bounds_fail_closed_for_unknown_policies(requirements):
 
 
 def test_both_tracked_manifests_hold_a_single_valid_range():
-    """Les deux runtimes lisent leur borne dans le dépôt, avec la même règle."""
+    """Both runtimes read their bound from the repository, with the same rule."""
     requirements = (ENGINE_ROOT / "requirements.txt").read_text(encoding="utf-8")
     claude = (SERVER / "claude-runtime.txt").read_text(encoding="utf-8")
     assert updater._manifest_bounds(requirements, "openai-codex")
@@ -111,7 +111,7 @@ def test_claude_candidate_installs_the_exact_version_in_its_own_prefix():
 
 
 def test_the_service_path_serves_the_managed_claude_before_the_global_one():
-    """Le lien géré précède /usr/bin : sans lui, le Claude global reste le recours."""
+    """The managed link precedes /usr/bin: without it, the global Claude is the fallback."""
     unit = (SERVER / "systemd" / "coach-messenger.service").read_text(encoding="utf-8")
     path = next(line.split("=", 2)[2] for line in unit.splitlines()
                 if line.startswith("Environment=PATH="))
@@ -155,7 +155,7 @@ def test_pruning_keeps_the_active_runtime_and_its_predecessor(tmp_path):
 
 
 def test_preflight_runs_with_the_service_identity_and_environment(tmp_path):
-    """Le prévol Claude doit voir le jeton du service sans qu'il passe par argv."""
+    """The Claude preflight must see the service token without it going through argv."""
     unit = tmp_path / "coach-messenger.service"
     unit.write_text(
         "[Service]\nType=simple\nUser=ubuntu\nWorkingDirectory=/srv/repo\n"
@@ -180,7 +180,7 @@ def _unit(tmp_path, env_text, *, environment=""):
 
 
 def test_the_nightly_check_follows_the_provider_the_coach_really_uses(tmp_path):
-    """Sous Claude, prévoler Codex mesurait un compte inutilisé (2026-10-06)."""
+    """Under Claude, preflighting Codex would measure an unused account."""
     assert updater._agent_provider(_unit(tmp_path, "AGENT_PROVIDER=claude\n")) == "claude"
     assert updater._agent_provider(_unit(tmp_path, "AGENT_PROVIDER='Codex'\n")) == "codex"
     assert updater._agent_provider(_unit(tmp_path, "OTHER=1\n")) == "codex"

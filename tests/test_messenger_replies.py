@@ -1,4 +1,4 @@
-"""Le swipe-reply est une relation explicite, pas une ressemblance de texte."""
+"""Swipe-reply is an explicit relation, not a text resemblance."""
 
 from conftest import FakeAgent
 

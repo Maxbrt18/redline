@@ -1,4 +1,4 @@
-"""Navigation mobile, confidentialité du DOM et erreurs réseau, dans Chromium."""
+"""Mobile navigation, DOM privacy and network errors, in Chromium."""
 
 import json
 import time
@@ -149,8 +149,8 @@ def test_today_week_and_course_fit_a_phone_and_keep_text_inert(browser, width):
     tab.get_by_text('FC +5', exact=True).wait_for()
     assert not tab.locator('.n-rail .out').is_visible()
     tab.locator('.n-krow', has_text='FC +5').click()
-    # Ouvert, le dépassement se lit sur la jauge : l'étiquette s'efface, la ligne de faits ne
-    # répète ni la durée ni la FC (maquette G1, 2026-10-10).
+    # Open, the overrun reads on the gauge: the label fades, the facts line repeats neither
+    # the duration nor the HR.
     assert tab.locator('.n-rail .out').is_visible()
     assert not tab.get_by_text('FC +5', exact=True).is_visible()
     assert tab.locator('.n-kday.open .n-kmore p').first.inner_text() == '8,35 km · 5:45/km · douleur 0,5 · plaisir 8'
@@ -166,8 +166,8 @@ def test_today_week_and_course_fit_a_phone_and_keep_text_inert(browser, width):
     tab.get_by_role('heading', name='Semaine 41').wait_for()
     tab.get_by_role('button', name='Course', exact=True).click()
     tab.get_by_role('heading', name='J-50').wait_for()
-    # Le volume sur son objectif, la sortie longue dessous ; celle de la semaine en cours
-    # est celle du programme tant qu'elle n'est pas courue (2026-10-10).
+    # The volume against its target, the long run below; the current week uses the
+    # programme long run until it has been run.
     assert tab.locator('.n-vchart .vl').all_text_contents() == ['39,7/40', '14,1/41']
     assert tab.locator('.n-vchart .slv').all_text_contents() == ['15,8', '16']
     assert tab.locator('.n-vchart .sls').all_text_contents() == ['prévue dim.']
@@ -209,8 +209,8 @@ def test_expired_access_clears_private_content(browser):
 
 
 def test_a_first_connection_waits_for_its_cookie_before_asking_for_figures(browser):
-    """Sans cookie, tout appel avant l'échange du lien revient en 401 et verrouillait le
-    carnet alors que la connexion réussissait juste après (2026-10-26)."""
+    """Without a cookie, any call before the link exchange returns 401 and used to lock the
+    notebook although the connection succeeded right after."""
     tab = browser.new_page(viewport={'width': 390, 'height': 844})
     serve(tab)
     cookie = {'set': False}
@@ -274,7 +274,7 @@ def test_messenger_browser_keeps_link_for_safari(browser):
 
 
 def pull(tab, distance=260):
-    """Tire la page vers le bas depuis le haut, au doigt."""
+    """Pull the page down from the top, by finger."""
     tab.evaluate("""distance => {
         const touch = y => new Touch({identifier: 1, target: document.body, clientX: 180, clientY: y});
         const fire = (type, y, list) => document.body.dispatchEvent(new TouchEvent(type, {
@@ -286,8 +286,8 @@ def pull(tab, distance=260):
 
 
 def test_settings_live_in_a_sheet_and_pulling_refreshes(browser):
-    """Plus de pied de page : thème, installation, appareil et fraîcheur dans une feuille
-    ouverte depuis le haut ; tirer la page recalcule, un petit geste ne fait rien."""
+    """No more footer: theme, installation, device and freshness in a sheet opened from the
+    top; pulling the page recomputes, a small gesture does nothing."""
     context = browser.new_context(viewport={'width': 390, 'height': 844}, has_touch=True, user_agent=(
         'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Version/18.0 Mobile/15E148 Safari/604.1'))
     tab = context.new_page()
@@ -329,8 +329,8 @@ def test_settings_live_in_a_sheet_and_pulling_refreshes(browser):
 
 
 def test_tabs_are_prepared_while_today_is_read_and_shown_without_waiting(browser):
-    """Semaine et Course se chargent derrière Aujourd'hui ; un onglet déjà vu s'affiche
-    depuis la mémoire même si le réseau est tombé entre-temps."""
+    """Week and Race load behind Today; a tab already seen is shown from memory even if the
+    network dropped in the meantime."""
     context = browser.new_context(viewport={'width': 390, 'height': 844})
     tab = context.new_page()
     requested = []
@@ -349,7 +349,7 @@ def test_tabs_are_prepared_while_today_is_read_and_shown_without_waiting(browser
 
 
 def test_the_morning_comes_first_and_a_high_heart_rate_asks_why(browser):
-    """Avant midi, le point du matin passe devant la séance ; une FC haute pose sa question."""
+    """Before noon, the morning check-in comes before the session; a high HR asks its question."""
     morning = {**TODAY, 'asks': [
         {'id': 'wake:2026-10-09:injury', 'type': 'wake', 'zone': 'injury', 'label': 'Injury',
          'date': '2026-10-09'},
@@ -378,7 +378,7 @@ def test_the_morning_comes_first_and_a_high_heart_rate_asks_why(browser):
 
 
 def test_the_theme_follows_the_phone_unless_pinned_on_this_device(browser):
-    """Auto par défaut ; Clair ou Sombre s'épinglent sur l'appareil et survivent au rechargement."""
+    """Auto by default; Light or Dark are pinned on the device and survive a reload."""
     context = browser.new_context(viewport={'width': 390, 'height': 844}, color_scheme='light')
     tab = context.new_page()
     serve(tab)
@@ -391,7 +391,7 @@ def test_the_theme_follows_the_phone_unless_pinned_on_this_device(browser):
     tab.get_by_role('button', name='Sombre').click()
     assert tab.evaluate("document.documentElement.dataset.theme") == 'dark'
     assert tab.evaluate(background) != light
-    # Sous la feuille, la bande d'état prend le voile ; refermée, le fond du thème.
+    # Under the sheet, the status bar takes the scrim; closed, the theme background.
     assert tab.evaluate("[...document.querySelectorAll('meta[name=theme-color]')].every(m => m.content === '#0e0b0a')")
     tab.keyboard.press('Escape')
     assert tab.evaluate("[...document.querySelectorAll('meta[name=theme-color]')].every(m => m.content === '#110e0d')")
@@ -407,8 +407,8 @@ def test_the_theme_follows_the_phone_unless_pinned_on_this_device(browser):
 
 
 def test_the_weather_answers_what_to_wear_and_whether_night_falls_during_the_run(browser):
-    """Météo B (2026-10-08) : le ciel et le ressenti au départ, puis la nuit dite par
-    rapport à la séance ; la barre d'état garde le fond du thème."""
+    """Weather B: the sky and the felt temperature at the start, then the night relative to
+    the session; the status bar keeps the theme background."""
     tab = browser.new_page(viewport={'width': 390, 'height': 844})
     serve(tab)
     start = {**TODAY, 'asks': [], 'sessions': [{**TODAY['sessions'][0], 'start_time': '17:00'}, RENFO]}
@@ -433,8 +433,8 @@ SKY = {'place': 'Paris', 'date': '2026-10-09', 'sunrise': '07:55', 'sunset': '19
 
 
 def test_returning_to_the_app_keeps_the_page_still(browser):
-    """Un retour rapide ne recharge rien ; un retour tardif recalcule sans redessiner ce qui
-    n'a pas changé, sans redemander la météo, et la page reste où on l'avait laissée."""
+    """A quick return reloads nothing; a late return recomputes without redrawing what did not
+    change, without asking the weather again, and the page stays where it was left."""
     tab = browser.new_page(viewport={'width': 390, 'height': 600})
     requested = []
     tab.on('request', lambda request: requested.append(request.url.split('/carnet-api/')[-1].split('?')[0]))
@@ -512,21 +512,22 @@ SWIPE_BACK = """async ([fast]) => {
 
 
 def swipe_back(tab, fast=True):
-    """Le glissement vers la droite depuis le milieu de l'écran, rapide (l'écran part) ou lâché à l'arrêt."""
+    """The swipe to the right from the middle of the screen, fast (the screen leaves) or
+    released at rest."""
     tab.evaluate(SWIPE_BACK, [fast])
 
 
 def test_navigation_never_loses_the_athlete(browser):
-    """Carte de navigation (2026-10-08) : trois racines, des écrans poussés qui reculent
-    d'un cran, une pile gardée par onglet. Le glissement depuis le bord est celui du
-    carnet, pas l'historique du navigateur, qui emportait la barre d'onglets (2026-10-09)."""
+    """Navigation map: three roots, pushed screens that step back one level, one stack kept per
+    tab. The swipe from the edge is the notebook's, not the browser history, which took the
+    tab bar along."""
     tab = browser.new_page(viewport={'width': 393, 'height': 852})
     serve(tab)
     tab.goto(BASE + '/carnet')
     tab.get_by_role('heading', name='EF, permis accompagné', exact=True).wait_for()
     assert title(tab) == 'Aujourd’hui' and not tab.locator('#back').is_visible()
     entries = tab.evaluate('history.length')
-    # Semaine s'ouvre sur la semaine en cours ; une semaine passée se pousse.
+    # Week opens on the current week; a past week is pushed.
     tab.get_by_role('button', name='Semaine', exact=True).click()
     tab.get_by_role('heading', name='Semaine 41').wait_for()
     assert tab.locator('.n-wk').count() == 0
@@ -536,7 +537,7 @@ def test_navigation_never_loses_the_athlete(browser):
     assert 'terminée' in tab.locator('#lt-sub').inner_text()
     tab.get_by_role('button', name='Retour').click()
     tab.wait_for_function("document.getElementById('lt-title').textContent === 'Semaine 41'")
-    # Toutes les semaines, puis une semaine, puis le geste retour du navigateur.
+    # All the weeks, then one week, then the browser back gesture.
     tab.get_by_role('button', name='Toutes les semaines').click()
     tab.wait_for_function("document.getElementById('lt-title').textContent === 'Toutes les semaines'")
     tab.get_by_role('button', name='Semaine 36').click()
@@ -549,7 +550,7 @@ def test_navigation_never_loses_the_athlete(browser):
     tab.wait_for_function("document.getElementById('lt-title').textContent === 'Toutes les semaines'")
     tab.locator('.n-move').wait_for(state='detached')
     assert tab.locator('.n-nav').count() == 1
-    # Course : archives, puis une carte ; le retour remonte d'un cran, pas à la racine.
+    # Race: archives, then a card; back goes up one level, not to the root.
     tab.get_by_role('button', name='Course', exact=True).click()
     tab.get_by_role('heading', name='J-50').wait_for()
     tab.get_by_role('button', name='Toutes les archives').click()
@@ -561,7 +562,7 @@ def test_navigation_never_loses_the_athlete(browser):
     tab.wait_for_function("document.getElementById('lt-title').textContent === 'Archives'")
     tab.get_by_role('button', name='Monthly · 2026-09').click()
     tab.get_by_role('heading', name='Le mot du coach').wait_for()
-    # Chaque onglet garde sa pile ; retoucher l'onglet actif ramène à sa racine.
+    # Each tab keeps its stack; tapping the active tab again returns to its root.
     tab.get_by_role('button', name='Semaine', exact=True).click()
     tab.wait_for_function("document.getElementById('lt-title').textContent === 'Toutes les semaines'")
     tab.get_by_role('button', name='Course', exact=True).click()
@@ -591,7 +592,7 @@ SESSION = {'sid': 'w41-ven-renfo-2026-10-09', 'session': 'a', 'title': 'Renfo A'
 
 
 def guided(tab, today=None):
-    """Le carnet avec un renfo prêt : « Séance guidée » obtient un lien, la séance le résout."""
+    """The notebook with a strength session ready: `Séance guidée` gets a link."""
     serve(tab)
     data = today or {**TODAY, 'strength': {**TODAY['strength'], 'session': SESSION}}
     tab.route(BASE + '/carnet-api/today', lambda route: route.fulfill(content_type='application/json', body=json.dumps(data)))
@@ -608,9 +609,9 @@ def in_session(tab):
 
 
 def test_the_guided_session_opens_over_the_notebook_and_closes_back_to_it(browser):
-    """Le renfo est un écran du carnet (maquette validée le 2026-10-09) : il s'ouvre en
-    plein écran sans quitter /carnet ni rien empiler dans l'historique, sans onglets,
-    avec ✕ et le son dans la barre ; non commencé, ✕ le referme sans rien demander."""
+    """Strength is a notebook screen: it opens full screen without leaving /carnet or pushing
+    anything in the history, without tabs, with a close button and the sound in the bar; not
+    started, the close button closes it without asking."""
     tab = browser.new_page(viewport={'width': 393, 'height': 852})
     guided(tab)
     entries = tab.evaluate('history.length')
@@ -629,13 +630,13 @@ def test_the_guided_session_opens_over_the_notebook_and_closes_back_to_it(browse
 
 
 def test_leaving_a_started_session_asks_and_loses_nothing(browser):
-    """Commencée, la séance demande confirmation avant de se fermer, en disant que rien
-    n'est perdu ; Aujourd'hui dit ensuite où elle en est, et la reprise y ramène."""
+    """Once started, the session asks for confirmation before closing, saying nothing is lost;
+    Today then says where it stands, and resuming brings it back."""
     tab = browser.new_page(viewport={'width': 393, 'height': 852})
     guided(tab)
     tab.get_by_role('button', name='Séance guidée →').click()
     tab.wait_for_selector('.p-step--live')
-    tab.locator('.p-ctrl .p-btn--wide').first.click()    # Step-up fait : Mollet en cours
+    tab.locator('.p-ctrl .p-btn--wide').first.click()    # Step-up done: calf in progress
     tab.wait_for_function("document.querySelector('.p-step--live .p-step__name').textContent === 'Mollet'")
     tab.get_by_role('button', name='Fermer la séance').click()
     sheet = tab.locator('#leave-sheet')
@@ -655,7 +656,7 @@ def test_leaving_a_started_session_asks_and_loses_nothing(browser):
 
 
 def test_no_gesture_leaves_the_session_by_accident(browser):
-    """Entre deux séries, un glissement vers la droite ne fait pas sortir de la séance."""
+    """Between two sets, a swipe to the right does not leave the session."""
     tab = browser.new_page(viewport={'width': 393, 'height': 852})
     guided(tab)
     tab.get_by_role('button', name='Séance guidée →').click()
@@ -667,7 +668,7 @@ def test_no_gesture_leaves_the_session_by_accident(browser):
 
 
 def test_a_reloaded_page_comes_back_to_the_session(browser):
-    """iOS recharge parfois une PWA restée en arrière-plan : la séance ouverte revient."""
+    """iOS sometimes reloads a PWA left in the background: the open session comes back."""
     tab = browser.new_page(viewport={'width': 393, 'height': 852})
     guided(tab)
     tab.get_by_role('button', name='Séance guidée →').click()
@@ -679,8 +680,8 @@ def test_a_reloaded_page_comes_back_to_the_session(browser):
 
 
 def test_a_messenger_link_opens_the_session_alone_then_the_notebook(browser):
-    """/s#t=… ouvre la même app directement sur la séance, sans connexion du carnet ;
-    ✕ mène au carnet, en remplaçant la page."""
+    """/s#t=... opens the same app directly on the session, without the notebook connection;
+    the close button leads to the notebook, replacing the page."""
     tab = browser.new_page(viewport={'width': 393, 'height': 852})
     serve(tab)
     tab.route(BASE + '/s', lambda route: route.fulfill(content_type='text/html', body=session_document(render.CARDS_DIR)))
@@ -722,12 +723,12 @@ def test_the_top_bar_folds_the_title_when_it_scrolls_under(browser):
 
 
 def replying(data):
-    """Une route qui rend ces données (Playwright passe la requête à qui prend deux arguments)."""
+    """A route that returns this data (Playwright passes the request to a two-argument handler)."""
     return lambda route: route.fulfill(content_type='application/json', body=json.dumps(data))
 
 
 def test_every_value_of_a_scale_is_visible_without_scrolling(browser):
-    """Une question à la fois : la douleur sur une ligne, le RPE et le plaisir sur deux."""
+    """One question at a time: pain on one line, RPE and enjoyment on two."""
     for fields, shape in ((['pain:injury', 'rpe'], [7, True, 1]), (['rpe'], [10, True, 2]), (['enjoyment'], [11, True, 2])):
         tab = browser.new_page(viewport={'width': 320, 'height': 700})
         serve(tab)
@@ -765,15 +766,15 @@ FROZEN_GAP = """() => {
 
 
 def test_a_frozen_screen_lands_exactly_on_the_real_one(browser):
-    """La cause racine du saut de fin de transition (2026-10-09) : la copie d'un écran
-    doit avoir la géométrie exacte de l'original, à l'ouverture comme au retour."""
+    """Root cause of the jump at the end of a transition: the copy of a screen must have the
+    exact geometry of the original, on opening as on return."""
     tab = browser.new_page(viewport={'width': 393, 'height': 852}, has_touch=True)
     serve(tab)
     tab.goto(BASE + '/carnet')
     tab.get_by_role('button', name='Semaine', exact=True).click()
     tab.get_by_role('heading', name='Semaine 41').wait_for()
-    # Un premier passage met la semaine en mémoire : la copie et l'original montrent alors
-    # le même écran, sans donnée qui arrive entre les deux.
+    # A first pass puts the week in memory: the copy and the original then show the same
+    # screen, with no data arriving in between.
     tab.get_by_role('button', name='Semaine 40').click()
     tab.get_by_role('button', name='Retour').click()
     tab.wait_for_function("document.getElementById('lt-title').textContent === 'Semaine 41'")
@@ -783,7 +784,7 @@ def test_a_frozen_screen_lands_exactly_on_the_real_one(browser):
     tab.locator('.n-move').first.wait_for(state='detached')
     tab.get_by_role('button', name='Retour').click()
     tab.wait_for_function("document.getElementById('lt-title').textContent === 'Semaine 41'")
-    # Au retour, la copie est l'écran qu'on quitte : on la compare à lui, rouvert.
+    # On return, the copy is the screen being left: compare it to that one, reopened.
     gap = tab.evaluate("""() => {
         const layer = document.querySelector('.n-move:not(.under)');
         layer.style.transition = 'none'; layer.style.transform = 'none';
@@ -797,8 +798,8 @@ def test_a_frozen_screen_lands_exactly_on_the_real_one(browser):
 
 
 def test_a_card_opens_in_the_app_and_closes_like_a_screen(browser):
-    """La visionneuse remplace l'onglet Safari : elle s'ouvre dans l'app, se ferme par
-    la croix ou Échap, et sans feuille de partage l'image se télécharge."""
+    """The viewer replaces the Safari tab: it opens inside the app, closes with the cross or
+    Escape, and without a share sheet the image is downloaded."""
     tab = browser.new_page(viewport={'width': 393, 'height': 852}, accept_downloads=True)
     serve(tab)
     entry = {**ENTRY, 'body': 'Texte', 'image_hash': 'abc', 'snapshot': None, 'report': None, 'related': []}
@@ -823,8 +824,8 @@ def test_a_card_opens_in_the_app_and_closes_like_a_screen(browser):
 
 
 def test_the_last_numbers_open_without_network_and_say_when_they_date_from(browser):
-    """Sans réseau, le carnet rouvre sur les derniers chiffres gardés, datés ; une
-    carte d'archive n'est jamais gardée sur l'appareil."""
+    """Offline, the notebook reopens on the last kept figures, dated; an archive card is never
+    kept on the device."""
     context = browser.new_context(viewport={'width': 393, 'height': 852})
     tab = context.new_page()
     serve(tab)
@@ -862,9 +863,8 @@ def test_a_rest_day_shows_tomorrow_whole_with_its_weather(browser):
 
 
 def test_the_red_point_moves_from_the_run_to_the_strength_once_done(browser):
-    """Le fil du jour (2026-10-09) : la séance faite se coche et garde ses chiffres, ses
-    ressentis viennent une question à la fois, le renfo prend le seul point rouge ; les
-    repères mènent à leur onglet."""
+    """The day thread: the completed session ticks off and keeps its figures, its feelings come
+    one question at a time, strength takes the only red dot; the markers lead to their tab."""
     done = ef('w41-ven-ef', '2026-10-09', 'done', {
         'km': 8.35, 'duration_min': 48, 'hr_avg': 162, 'rpe': None, 'pains': [], 'enjoyment': None,
         'started_at': '2026-10-09T07:10:00+02:00', 'over': ['hr_avg'], 'observation_id': 'obs'})
@@ -893,8 +893,7 @@ def test_the_red_point_moves_from_the_run_to_the_strength_once_done(browser):
 
 
 def test_the_landmarks_open_more_detail(browser):
-    """Les repères mènent au détail : la semaine en barres, l'écran Douleur poussé
-    par-dessus Aujourd'hui (2026-10-09)."""
+    """The markers lead to the detail: the week in bars, the Pain screen pushed over Today."""
     tab = browser.new_page(viewport={'width': 393, 'height': 852})
     serve(tab)
     tab.goto(BASE + '/carnet')
@@ -909,7 +908,7 @@ def test_the_landmarks_open_more_detail(browser):
     assert tab.locator('.n-pchart circle').count() == 3
     assert tab.locator('.n-pchart circle.sl').count() == 1
     assert tab.locator('.n-pchart circle.out').count() == 1
-    # Une seule échelle, graduée de 0 à 3 ; le réveil s'y place à sa valeur (2026-10-10).
+    # A single scale, graduated from 0 to 3; the wake-up reading sits on it at its value.
     assert tab.locator('.n-pchart .yl').all_text_contents() == ['0', '1', '2', '3']
     wake, zero = tab.locator('.n-pchart rect.wk'), tab.locator('.n-pchart .yl').first
     assert wake.count() == 1
@@ -927,8 +926,8 @@ def test_the_landmarks_open_more_detail(browser):
 
 
 def test_two_watched_zones_get_two_tiles_and_two_morning_traces(browser):
-    """Deux zones surveillées : chacune sa tuile dans les repères, sa trace au réveil,
-    et l'écran de douleur passe de l'une à l'autre sans empiler la navigation."""
+    """Two watched zones: each has its tile in the markers, its wake-up trace, and the pain
+    screen switches from one to the other without stacking the navigation."""
     weeks = [{'week': '2026-W40', 'peak': 1.0}, {'week': '2026-W41', 'peak': 0.5}]
     two = {**TODAY, 'pain': {'cap': 2.0, 'zones': [
         {'zone': 'genou', 'label': 'Genou', 'weeks': weeks},

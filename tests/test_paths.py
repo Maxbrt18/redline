@@ -1,8 +1,8 @@
-"""Le moteur et le vault sont deux racines, et un script les distingue.
+"""The engine and the vault are two roots, and a script tells them apart.
 
-Le jour où le moteur s'installe hors du vault qu'il sert, une lecture de note qui
-partirait encore de `__file__` lirait le dépôt du moteur -- vide de notes -- sans que
-rien ne casse bruyamment. Ces tests tiennent la frontière par un vrai lancement.
+When the engine is installed outside the vault it serves, a note read that still started
+from `__file__` would read the engine repository -- empty of notes -- without anything
+failing loudly. These tests hold the boundary through a real launch.
 """
 
 import os

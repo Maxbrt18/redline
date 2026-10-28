@@ -1,4 +1,4 @@
-"""Le coach relit ses messages sans ses tics (audit du 2026-10-11)."""
+"""The coach rereads its messages without its tics."""
 
 from redline.model import voice
 from redline.service.relationship import render_memory

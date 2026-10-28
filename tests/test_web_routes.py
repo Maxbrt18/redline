@@ -1,14 +1,13 @@
-"""Les routes HTTP elles-mêmes — c'est-à-dire la moitié du service exposée à Internet.
+"""The HTTP routes themselves: the half of the service exposed to the Internet.
 
-`test_web.py` couvrait les briques (`_iter_events`, `_signature_valid`)
-puis sautait directement à `/strength-report`. Entre les deux, aucune garde d'accès
-n'était testée AU NIVEAU DE LA ROUTE : ni le handshake Meta, ni le 403 sur signature
-invalide, ni le verrou `MESSENGER_ALLOWED_PSID`, ni le filtre `STRAVA_OWNER_ID` dont
-`.env.example` dit noir sur blanc « Strava ne signe pas ses events : sans ce filtre,
-n'importe quel POST déclencherait un débrief fantôme ».
+`test_web.py` covers the building blocks (`_iter_events`, `_signature_valid`) and then jumps
+straight to `/strength-report`. In between, no access guard would be tested AT ROUTE LEVEL:
+neither the Meta handshake, nor the 403 on an invalid signature, nor the
+`MESSENGER_ALLOWED_PSID` lock, nor the `STRAVA_OWNER_ID` filter, without which any POST would
+trigger a phantom debrief (Strava does not sign its events).
 
-Une brique correcte qu'une route oublie d'appeler est une brique inutile, et c'est
-précisément ce qu'un test unitaire de brique ne peut pas voir (audit 2026-07-29).
+A correct building block that a route forgets to call is a useless block, and that is exactly
+what a unit test of the block cannot see.
 """
 
 import hashlib
@@ -58,8 +57,8 @@ def test_verify_returns_the_challenge_on_the_right_token(client):
                        "&hub.challenge=1234")
     assert response.status_code == 200
     assert response.get_data(as_text=True) == "1234"
-    # Le challenge vient de la requête : rendu en HTML, il devenait un XSS réfléchi
-    # sur l'origine du carnet (audit 2026-10-08).
+    # The challenge comes from the request: rendered as HTML it would be a reflected XSS
+    # on the notebook origin.
     assert response.mimetype == "text/plain"
     assert response.headers["X-Content-Type-Options"] == "nosniff"
 
@@ -72,9 +71,9 @@ def test_verify_returns_the_challenge_on_the_right_token(client):
     "hub.mode=subscribe&hub.verify_token=jeton-attendu",
 ])
 def test_verify_refuses_anything_else(client, query):
-    """Rendre le challenge à qui ne connaît pas le jeton laisserait n'importe qui
-    abonner son propre webhook à la page ; un challenge qui n'est pas un simple
-    identifiant n'a rien à faire dans une réponse."""
+    """Returning the challenge to someone who does not know the token would let anyone
+    subscribe their own webhook to the page; a challenge that is not a plain identifier
+    has no place in a response."""
     api, _, _ = client(verify_token="jeton-attendu")
     assert api.get(f"/webhook?{query}").status_code == 403
 
@@ -86,8 +85,8 @@ def test_an_empty_verify_token_opens_nothing(client):
 
 
 def test_an_oversized_body_is_refused_before_any_read(client):
-    """Waitress accepte 1 Gio par défaut et `get_data()` le chargeait en mémoire avant
-    même de vérifier la signature."""
+    """Waitress accepts 1 GiB by default and `get_data()` loaded it into memory before
+    even checking the signature."""
     api, bot, _ = client(app_secret=SECRET, allowed_psid="4242")
     response = api.post("/webhook", data=b"x" * (1024 * 1024 + 1),
                         content_type="application/json")
@@ -120,7 +119,7 @@ def test_a_swipe_reply_is_claimed_with_its_target(client, store):
 
 
 def test_an_unsigned_message_is_refused_at_the_route(client):
-    """403 AVANT de toucher au bot : le corps n'est même pas parsé."""
+    """403 BEFORE touching the bot: the body is not even parsed."""
     api, bot, _ = client(app_secret=SECRET, allowed_psid="4242")
     response = api.post("/webhook", json=message())
     assert response.status_code == 403
@@ -134,8 +133,8 @@ def test_a_forged_signature_is_refused(client):
 
 
 def test_the_psid_lock_drops_a_stranger(client):
-    """LE verrou : le coach ne parle qu'à Sam. Un inconnu qui écrit à la page
-    déclencherait sinon un run Claude sur son vault à lui."""
+    """THE lock: the coach only talks to the athlete. A stranger writing to the page would
+    otherwise trigger an agent run on their own vault."""
     api, bot, _ = client(app_secret=SECRET, allowed_psid="4242")
     assert post_signed(api, message(psid="9999")).status_code == 200
     assert bot.inbound == []
@@ -148,8 +147,8 @@ def test_without_a_configured_psid_no_message_passes(client):
 
 
 def test_a_replayed_message_id_runs_claude_once(client):
-    """Meta livre « au moins une fois » : sans la déduplication au niveau de la
-    route, une relivraison est un deuxième run Claude sur le même texto."""
+    """Meta delivers "at least once": without deduplication at route level, a redelivery
+    is a second agent run on the same text message."""
     api, bot, _ = client(app_secret=SECRET, allowed_psid="4242")
     post_signed(api, message(mid="m1"))
     post_signed(api, message(mid="m1"))
@@ -169,7 +168,7 @@ def test_a_replayed_message_stays_claimed_after_app_recreation(client, store):
 
 
 def test_a_malformed_body_is_swallowed_not_crashed(client):
-    """200 sur du JSON illisible : un 500 fait retenter Meta en boucle."""
+    """200 on unreadable JSON: a 500 makes Meta retry in a loop."""
     api, _, _ = client(app_secret=SECRET)
     raw = b"pas du json"
     signature = hmac.new(SECRET.encode(), raw, hashlib.sha256).hexdigest()
@@ -202,8 +201,8 @@ def test_a_sticker_is_acknowledged_and_a_photo_answered(client):
 
 
 def test_an_inbound_message_opens_the_24h_window(client, store):
-    """`mark_inbound` est ce qui autorise le coach à répondre : sans lui, la fenêtre
-    Messenger se referme et les proactifs sont refusés."""
+    """`mark_inbound` is what allows the coach to reply: without it, the Messenger window
+    closes and proactive messages are refused."""
     api, _, _ = client(app_secret=SECRET, allowed_psid="4242")
     assert store.last_inbound("4242") == 0
     post_signed(api, message())
@@ -226,7 +225,7 @@ def strava(client):
 
 
 def test_strava_verify_answers_in_json(strava):
-    """Strava attend le challenge en JSON, pas en texte brut comme Meta."""
+    """Strava expects the challenge as JSON, not as plain text like Meta."""
     api, _, _ = strava(strava_verify_token="jeton-strava")
     response = api.get(f"{STRAVA_URL}?hub.mode=subscribe"
                        "&hub.verify_token=jeton-strava&hub.challenge=abcd")
@@ -255,9 +254,9 @@ def test_an_activity_from_the_athlete_schedules_a_debrief(strava, store):
 @pytest.mark.parametrize("path", [
     "/strava-webhook", "/strava-webhook/faux", f"/strava-webhook/{'t' * 43}"])
 def test_strava_events_need_the_secret_path(strava, store, path):
-    """LE contrôle d'accès de cette route : Strava ne signe pas ses events et
-    `owner_id` se lit dans l'URL publique du profil. Sans le secret, n'importe quel
-    POST planifiait un débrief et un appel Strava (audit 2026-10-08)."""
+    """THE access control of this route: Strava does not sign its events and `owner_id` can
+    be read in the public profile URL. Without the secret, any POST would schedule a debrief
+    and a Strava call."""
     api, _, _ = strava(strava_verify_token="jeton-strava")
     assert api.post(path, json=_activity()).status_code == 404
     assert api.get(f"{path}?hub.mode=subscribe&hub.verify_token=jeton-strava"
@@ -276,14 +275,14 @@ def test_strava_route_is_disabled_without_its_locks(strava, store, overrides):
 
 @pytest.mark.parametrize("owner", ["888", ""])
 def test_an_activity_from_anyone_else_is_ignored(strava, store, owner):
-    """Le 200 est volontaire — on ne renseigne pas l'émetteur."""
+    """The 200 is deliberate: the sender is told nothing."""
     api, _, _ = strava()
     assert api.post(STRAVA_URL, json=_activity(owner=owner)).status_code == 200
     assert store.proactive.jobs(active_only=True) == []
 
 
 def test_a_non_creation_event_schedules_nothing(strava, store):
-    """Une mise à jour de titre ne se débriefe pas."""
+    """A title update is not debriefed."""
     api, _, _ = strava()
     event = dict(_activity(), aspect_type="update", updates={"title": "Footing"})
     api.post(STRAVA_URL, json=event)
@@ -306,7 +305,7 @@ def test_an_arrival_wakes_the_scheduler_to_capture_it_at_once(make_config, store
 
 
 def test_a_renamed_activity_brings_its_debrief_forward(make_config, store):
-    """Titre et description s'enregistrent ensemble : renommer, c'est avoir fini."""
+    """Title and description are saved together: renaming means being done."""
     api, nudges = _nudged(make_config, store)
     api.post(STRAVA_URL, json=_activity())
     assert store.proactive.jobs(active_only=True)[0]["due"] > time.time() + 200
@@ -341,20 +340,19 @@ def test_an_invalid_activity_id_is_ignored(strava, store, object_id):
 
 
 def test_health_answers(client):
-    """Ce que healthchecks.io et Caddy interrogent."""
+    """What healthchecks.io and Caddy poll."""
     api, _, _ = client()
     assert api.get("/health").status_code == 200
 
 
 def test_health_reports_the_running_commit(client):
-    """Le trou qui a coûté 7 jours de prompts périmés : rien ne disait sur quel
-    code le service tournait. `/health` doit le dire, sinon le redémarrage
-    automatique est une automatisation qu'on ne peut pas vérifier."""
+    """Nothing said which code the service was running. `/health` must say it, otherwise the
+    automatic restart is an automation that cannot be verified."""
     api, _, _ = client()
     body = api.get("/health").get_json()
     assert body["status"] == "ok"
-    assert body["commit"] == "0123456789ab"     # tronqué à 12, comme `git log --oneline`
-    assert body["runtime_tree"] == "0123456789ab"  # l'empreinte que compare la release
+    assert body["commit"] == "0123456789ab"     # truncated to 12, like `git log --oneline`
+    assert body["runtime_tree"] == "0123456789ab"  # the fingerprint that the release compares
     assert body["uptime_s"] >= 0
 
 

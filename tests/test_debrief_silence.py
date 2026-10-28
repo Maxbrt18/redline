@@ -1,20 +1,11 @@
-"""Un débrief muet est une panne à reprendre, pas un message pour Sam.
+"""A mute debrief is a failure to retry, not a message for the athlete.
 
-Le 2026-08-14 au matin, ce que Sam a vécu :
-
-    08:33  Proactive trigger: strava_debrief (priority)
-    08:34  Proactive strava_debrief -> SILENCE (nothing useful to say)
-    08:53  Sam — T'as vu ma sortie de ce matin ?
-           Redline — Pas encore, je n'ai pas ses données sous les yeux.
-
-La trace du run montre un coach qui a cherché honnêtement : outil Strava dans sa liste,
-grep du dépôt, ouverture de la page de l'activité, `STRAVA_ACCESS_TOKEN`, curl. Cinq
-tentatives, aucun accès — Strava n'existait que comme MCP déclaré pour le moteur Claude,
-et le service tournait sur Codex depuis deux jours.
-
-Le log a écrit « nothing useful to say » pour une activité qui venait d'arriver. C'est
-la phrase qui a rendu la panne invisible : un mot du matin a le droit de n'avoir rien à
-dire, un débrief non — il n'existe QUE parce qu'il y a quelque chose à débriefer.
+Failure mode: the debrief runs and the coach searches honestly (Strava tool in its
+list, repository grep, activity page, access token, curl), but has no access to
+Strava because the data source is only declared for one engine. The log then says
+"nothing useful to say" for an activity that has just arrived. That phrase makes the
+failure invisible: a morning note may have nothing to say, a debrief may not -- it
+exists ONLY because there is something to debrief.
 """
 
 import time
@@ -28,7 +19,7 @@ from redline.service.proactive import ProactiveJob
 
 
 def _silent_bot(make_bot):
-    """Un coach qui choisit de se taire (`send=false`), comme le 2026-08-14 à 08h34."""
+    """A coach that chooses to stay silent (`send=false`)."""
     client = MagicMock()
     client.send_text.return_value = MagicMock(ok=True)
     return make_bot(agent=FakeAgent(result=RunResult(full_text="", silent=True)),
@@ -43,7 +34,7 @@ def _claimed(store, kind):
 
 
 def test_a_debrief_that_goes_silent_is_retried_once_then_failed(make_bot, store):
-    """Une seule reprise : avant, toutes les 5 minutes pendant quatre heures."""
+    """A single retry, instead of every 5 minutes for four hours."""
     bot, client = _silent_bot(make_bot)
 
     bot._respond_proactive(_claimed(store, "strava_debrief"))
@@ -68,8 +59,8 @@ def test_the_deferred_debrief_is_held_to_the_same_rule(make_bot, store):
 
 
 def test_a_monthly_note_keeps_the_right_to_say_nothing(make_bot):
-    """Le silence reste la bonne réponse quand rien ne mérite un message : transformer
-    tout SILENCE en incident rendrait le canal bavard, ce qui est l'autre faute."""
+    """Silence remains the right answer when nothing deserves a message: turning every
+        SILENCE into an incident would make the channel chatty, which is the other fault."""
     bot, client = _silent_bot(make_bot)
 
     bot._respond_proactive(ProactiveJob(psid="4242", kind="monthly", prompt="magazine"))
@@ -90,8 +81,8 @@ def test_a_morning_note_may_also_stay_silent(make_bot, store):
 
 
 def test_only_the_activity_driven_triggers_treat_silence_as_a_failure():
-    """La liste est explicite : un déclencheur ajouté demain choisit son camp, il ne
-    l'hérite pas d'un défaut."""
+    """The list is explicit: a trigger added tomorrow picks its side, it does not
+        inherit it from a default."""
     assert {"strava_debrief", "strava_debrief_differe"} == SILENCE_IS_A_FAILURE
 
 

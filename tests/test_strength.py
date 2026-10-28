@@ -11,9 +11,9 @@ def dose(**data) -> dict:
     return Dose.read(data).payload()
 
 
-# The real shape, built by the real algebra: this fixture used to carry the
-# pre-2026-07-25 keys (`mode`, `sets`, a French `dose` string), so every assertion
-# below was made against a session the page could no longer receive.
+# The real shape, built by the real algebra: the fixture must carry the keys the page
+# actually receives, otherwise every assertion below is made against a session the page
+# could no longer receive.
 SESSION = {
     "sid": "2026-07-25-A",
     "session": "a",
@@ -143,9 +143,9 @@ def test_format_message_reads_like_the_athlete_wrote_it():
     # The number must never travel without saying what it measures.
     assert "Difficulté ressentie" in message
     assert "- Échauffement : 3/10" in message
-    # Les deux jambes se lisent séparément ou pas du tout : la page valide
-    # droite puis gauche, donc 14 et 11 sont la droite, 12 et 10 la gauche. Les
-    # additionner rendrait invisible l'écart G/D, qui est un drapeau.
+    # The two legs are read separately or not at all: the page validates right then
+    # left, so 14 and 11 are the right leg, 12 and 10 the left. Summing them would hide
+    # the left/right gap, which is a flag.
     assert "droite 14, 11 · gauche 12, 10" in message
     assert "- Pliométrie : pas fait" in message
     assert "Injury : 1/10 après la séance (rien avant)." in message
@@ -158,16 +158,15 @@ def test_format_message_without_any_report():
     assert "Injury" not in message
 
 
-# ------------------------------------------------- le journal typé des séances
+# ------------------------------------------------- the typed session log
 
 def test_a_blank_set_does_not_shift_the_other_leg():
-    """LE bug que l'attribution positionnelle existe pour empêcher.
+    """THE bug that positional attribution exists to prevent.
 
-    La page valide droite puis gauche ; elle poste ses comptes AVEC les blancs.
-    Filtrer les blancs avant l'envoi (ce qu'elle faisait) décalait tout d'un cran
-    dès qu'une série était laissée vide, et rangeait les comptes suivants sous la
-    mauvaise jambe — silencieusement, dans le seul chiffre qui pilote la
-    progression.
+    The page validates right then left; it posts its counts WITH the blanks.
+    Filtering the blanks before sending (as it used to) shifted everything by one
+    as soon as a set was left empty, and filed the following counts under the
+    wrong leg -- silently, in the one number that drives progression.
     """
     clean = strength.parse_report(
         {"exercises": [{"i": 1, "reps": [14, None, 11, 10]}]}, SESSION["exercises"])
@@ -219,9 +218,9 @@ def test_the_blocks_of_a_contact_exercise_are_logged_as_one_series():
 
 
 def test_an_exercise_without_a_slug_is_not_logged():
-    """Une dérogation (`add` dans la sélection du matin) n'est pas un exercice du
-    programme : elle n'a pas d'identité, donc rien à quoi la comparer la semaine
-    suivante. Le nom est de la prose et bouge ; ce n'est pas une clé."""
+    """A deviation (`add` in the morning selection) is not a program exercise: it has
+    no identity, so nothing to compare it with the following week. The name is prose
+    and moves; it is not a key."""
     session = dict(SESSION, exercises=[
         {"name": "Un truc improvisé", "dose": dose(measure="reps", sets=2, reps=8)}])
     assert strength.log_entries(
@@ -230,14 +229,14 @@ def test_an_exercise_without_a_slug_is_not_logged():
 
 
 def test_an_untouched_exercise_leaves_no_row():
-    """Une absence d'observation n'est pas un « pas fait » : même règle qu'au
-    registre, où une journée sans séance n'appelle pas de ligne."""
+    """No observation is not a "not done": same rule as the ledger, where a day
+    without a session calls for no row."""
     rows = strength.log_entries(
         SESSION, parsed({"exercises": [{"i": 0}]}), day="2026-08-01")
     assert [row["slug"] for row in rows] == ["warmup-a"]
 
 
-# ---------------------------------------------- les deux lectures de chaque zone
+# ---------------------------------------------- the two readings of each zone
 
 @pytest.mark.parametrize("report,said", [
     ({"before": 1, "after": 3}, "Injury : 1/10 avant, 3/10 après (monté)."),
@@ -247,9 +246,9 @@ def test_an_untouched_exercise_leaves_no_row():
     ({"after": 2}, "Injury : 2/10 après la séance (rien avant)."),
 ])
 def test_the_two_readings_never_get_merged(report, said):
-    """Le registre en fait deux séries qui ne se mélangent pas (2026-07-29) : la
-    lecture au repos et le pic à l'effort. Un seul chiffre ne répondait ni à l'une
-    ni à l'autre — « 2/10 après » n'a pas de sens sans ce qu'il valait avant."""
+    """The ledger keeps two series that never mix: the rest reading and the effort peak.
+    A single figure answered neither -- "2/10 after" means nothing without what it was
+    before."""
     assert said in strength.format_message(SESSION, parsed({"pains": {"injury": report}}))
 
 
@@ -269,8 +268,8 @@ def test_a_zone_the_instance_does_not_watch_is_refused():
 
 
 def test_a_gated_exercise_is_not_an_exercise_that_was_skipped():
-    """L'un est une décision du coach que la page applique, l'autre un choix de
-    Sam. Les confondre ferait lire une inobservance là où la règle a joué."""
+    """One is a coach decision that the page applies, the other a choice of the
+    athlete. Confusing them would read a non-compliance where the rule applied."""
     message = strength.format_message(SESSION, parsed({"exercises": [
         {"i": 1, "skipped": True, "gated": True},
         {"i": 2, "skipped": True},

@@ -1,19 +1,16 @@
 """The interactive session page, driven in a real browser.
 
 The page is the only part of this service written in JavaScript, and the only one
-the athlete touches with his hands mid-session. Playwright is already a dependency
+the athlete touches with their hands mid-session. Playwright is already a dependency
 here (the cards are rendered with it), so there is no excuse for leaving it
 untested.
 
 Everything is asserted THROUGH THE DOM, never against internal functions: what
 matters is what appears under the thumb, not how it was computed.
 
-WHAT THIS FILE USED TO TEST, AND NO LONGER DOES. Sixteen parametrized cases once
-proved that the page correctly re-derived measure/sets/side/seconds from French
-dose STRINGS. That parser is gone (2026-07-25): the dose arrives structured from
-`coaching/exercises/*.md`, already rendered for display. Those cases are not
-weakened, they are meaningless -- so the doses below are built by the real
-`Dose.payload()`, and what is asserted is that the page HONOURS them.
+The page does not parse dose strings: the dose arrives structured from
+`coaching/exercises/*.md`, already rendered for display. The doses below are built by the
+real `Dose.payload()`, and what is asserted is that the page HONOURS them.
 """
 
 import datetime as dt
@@ -52,13 +49,12 @@ def session(*exercises, **extra) -> dict:
 
 @pytest.fixture(scope="module")
 def browser():
-    """Lancé comme les cartes le sont, `CHROMIUM_PATH` compris.
+    """Launched the way the cards are, `CHROMIUM_PATH` included.
 
-    Ce harnais ouvrait son Chromium en dur pendant que `cards/render.py` honorait
-    `CHROMIUM_PATH` : sur une plateforme sans téléchargement Playwright (le VPS est en
-    arm64), les cartes se rendaient et ces 19 tests échouaient — pas parce que la page
-    était cassée, mais parce que le test avait sa propre façon de démarrer le
-    navigateur (2026-07-29).
+    `cards/render.py` honours `CHROMIUM_PATH`; this harness must start the browser the same
+    way, otherwise on a platform without a Playwright download (the VPS is arm64) the cards
+    render while these tests fail, not because the page is broken but because the test
+    started the browser its own way.
     """
     with sync_playwright() as engine:
         instance = engine.chromium.launch(**render._launch_kwargs())
@@ -101,8 +97,8 @@ def open_session(browser, document):
             status=200, content_type="application/json",
             body=json.dumps({"status": "ok", "session": data, "zones": ZONES})))
         tab.goto(f"{BASE}/s#t={token}")
-        # L'un OU l'autre : une séance qui porte un garde-fou ouvre sur la lecture
-        # de douleur, et n'a donc aucun exercice à l'écran tant qu'on n'a pas répondu.
+        # One OR the other: a session that carries a guardrail opens on the pain reading, and so has
+        # no exercise on screen until it has been answered.
         tab.wait_for_selector(".p-step--live, #open:not([hidden])", timeout=5000)
         return tab
 
@@ -146,10 +142,9 @@ def send(tab) -> None:
 def forward(tab) -> None:
     """Take the single forward action, whatever it is called right now.
 
-    La liste `quiet` énumère TOUT ce qui n'avance pas la séance. Elle est le point
-    faible de ce harnais : y oublier un bouton ne casse pas un test, ça fait cliquer
-    ailleurs. « Le geste » l'a montré le 2026-07-31 — trois tests rouges dont deux
-    n'avaient rien à voir avec la fonctionnalité testée.
+    The `quiet` list enumerates EVERYTHING that does not advance the session. It is the weak
+    point of this harness: forgetting a button there does not break a test, it makes the
+    click land elsewhere.
     """
     tab.evaluate("""() => {
         const quiet = ['Passer', 'Démarrer', 'Pause', 'Reprendre', '−1', '+1', '+10',
@@ -200,8 +195,8 @@ def test_the_dose_is_displayed_already_rendered(open_session):
 
 @pytest.mark.parametrize("side,split", [("each", True), ("both", False)])
 def test_a_per_side_dose_is_walked_side_by_side(open_session, side, split):
-    """The 25/07 bug: the side lived only in the French dose string, and an
-    omission cost the left/right split that flags the calf test."""
+    """The side lived only in the French dose string, and an omission cost the left/right
+    split that flags the calf test."""
     tab = open_session(session(exercise(measure="reps", sets=2, reps=8, side=side)))
     assert ("droite" in control(tab)["label"]) is split
 
@@ -259,30 +254,30 @@ def test_rest_runs_only_when_the_session_prescribes_one(open_session):
 
 
 def test_a_side_is_not_a_set_and_takes_no_rest(open_session):
-    """Une série par jambe, c'est « droite puis gauche » : le repos ne tombe
-    qu'une fois les deux côtés faits. Le page coupait entre chaque côté, ce qui
-    doublait les repos et cassait le rythme de l'exercice (bug du 31/07)."""
+    """One set per leg means "right then left": the rest only falls once both sides are done.
+    The page used to cut between each side, which doubled the rests and broke the rhythm of
+    the exercise."""
     tab = open_session(session(exercise("Mollet", measure="reps", sets=2, reps=8,
                                         side="each", rest_s=90)))
-    forward(tab)                       # série 1 · droite
+    forward(tab)                       # set 1 - right
     state = control(tab)
     assert state["label"] == "Série 1/2 · gauche"
 
-    forward(tab)                       # série 1 · gauche : là, le repos
+    forward(tab)                       # set 1 - left: the rest happens here
     state = control(tab)
     assert state["label"] == "Repos"
     assert state["value"] == "Ensuite : Mollet · Série 2/2 · droite"
     assert state["buttons"] == ["Reprendre", "Annuler la dernière validation"]
     click(tab, "Reprendre")
 
-    forward(tab)                       # série 2 · droite
+    forward(tab)                       # set 2 - right
     assert control(tab)["label"] == "Série 2/2 · gauche"
 
 
 def test_the_page_shows_what_the_last_session_banked(open_session):
-    """Toute la progression du programme se joue sur « plus que la fois d'avant, ou
-    pas », et la page rouvrait identique chaque semaine. La ligne est rendue côté
-    vault (`strength_log.human`) : la page ne formate rien, elle affiche."""
+    """The whole progression of the programme rests on "more than last time, or not", and
+    the page used to reopen identical every week. The line is rendered vault-side
+    (`strength_log.human`): the page formats nothing, it displays."""
     banked = exercise("Mollet", measure="amrap", sets=2, side="each")
     banked["last"] = "D 14·12 · G 13·11 — 6/10"
     tab = open_session(session(banked, exercise("Jambier", measure="reps", sets=1, reps=15)))
@@ -291,7 +286,7 @@ def test_the_page_shows_what_the_last_session_banked(open_session):
     assert tab.evaluate("() => document.querySelector('.p-last__value')?.textContent") \
         == "D 14·12 · G 13·11 — 6/10"
 
-    # Un exercice sans historique n'affiche rien : pas de « — », pas de ligne vide.
+    # An exercise without history shows nothing: no dash, no empty line.
     forward(tab)
     forward(tab)
     forward(tab)
@@ -300,9 +295,9 @@ def test_the_page_shows_what_the_last_session_banked(open_session):
 
 
 def test_the_counts_are_posted_positionally_so_the_sides_hold(open_session):
-    """Le côté d'un compte est porté par sa POSITION dans la liste des créneaux, et
-    le serveur la relit sur la séance. Filtrer les blancs avant l'envoi décalait
-    tout d'un cran dès qu'une série était laissée vide."""
+    """The side of a count is carried by its POSITION in the slot list, and the server
+    re-reads it on the session. Filtering blanks before sending shifted everything by one
+    as soon as a set was left empty."""
     tab = open_session(session(exercise("Mollet", measure="amrap", sets=2, side="each")))
     for reached in ("14", "", "11"):
         tab.evaluate("value => { document.getElementById('amrap').value = value; }", reached)
@@ -316,11 +311,11 @@ def test_the_counts_are_posted_positionally_so_the_sides_hold(open_session):
 
 
 def test_plyometrics_is_walked_one_block_at_a_time(open_session):
-    """« 40 contacts, en blocs de 10, 30 s entre blocs » — et l'intervalle EST le
-    mécanisme : la mécanosensibilité osseuse s'effondre après ~20 cycles
-    consécutifs, et espacer les sauts augmente le gain à nombre de contacts égal
-    (strength.md, exercice 6). La page comptait 40 d'un trait et posait le repos
-    après tout l'exercice : elle affichait la prescription sans la délivrer.
+    """"40 contacts, in blocks of 10, 30 s between blocks": the interval IS the mechanism:
+    bone mechanosensitivity collapses after ~20 consecutive cycles, and spacing the jumps
+    increases the gain for an equal number of contacts (strength.md, exercise 6). The page
+    counted 40 in one go and put the rest after the whole exercise: it displayed the
+    prescription without delivering it.
     """
     tab = open_session(session(exercise("Pliométrie", measure="contacts",
                                         contacts=40, block=10, rest_s=30),
@@ -334,8 +329,8 @@ def test_plyometrics_is_walked_one_block_at_a_time(open_session):
             click(tab, "Reprendre")
 
     assert labels == ["Bloc 1/4", "Bloc 2/4", "Bloc 3/4", "Bloc 4/4"]
-    assert rests == 4          # trois entre blocs, un avant l'exercice suivant
-    # Quatre blocs de dix se relisent « 40 contacts », pas « 10 · 10 · 10 · 10 ».
+    assert rests == 4          # three between blocks, one before the next exercise
+    # Four blocks of ten read "40 contacts", not "10 · 10 · 10 · 10".
     assert tab.evaluate(
         "() => document.querySelector('.p-step__dose').textContent") == "40 contacts"
 
@@ -350,9 +345,8 @@ def test_amrap_counts_are_kept_and_shown_back(open_session):
 
 
 def test_the_clock_starts_at_the_first_move_not_at_the_first_tap(open_session):
-    """Le lien arrive avec le message du coach et traîne dans le téléphone : la
-    durée était comptée depuis l'OUVERTURE de la page, donc gonflée de tout le
-    temps d'attente (bug du 31/07)."""
+    """The link arrives with the coach message and lingers in the phone: the duration was
+    counted from the page OPENING, so inflated by all the waiting time."""
     tab = open_session(session(exercise("A", measure="reps", sets=1, reps=15),
                                sid="clock-test"))
     stored = ("() => JSON.parse(localStorage['redline:strength:clock-test'] || 'null')"
@@ -364,8 +358,8 @@ def test_the_clock_starts_at_the_first_move_not_at_the_first_tap(open_session):
     tab.wait_for_selector("#review:not([hidden])")
     started = tab.evaluate(stored)
     assert started is not None
-    # Le premier geste vient de tomber : la séance dure zéro, pas la seconde et
-    # demie qu'elle a passée à attendre sur l'écran.
+    # The first gesture has just landed: the session lasts zero, not the second and a half it
+    # spent waiting on the screen.
     assert tab.evaluate("() => Date.now()") - started < 1000
 
 
@@ -386,23 +380,19 @@ def test_progress_survives_a_reload(open_session):
 
 @pytest.mark.parametrize("width", [320, 375])
 def test_no_dose_of_the_programme_runs_to_three_lines(open_session, width):
-    """Le garde-fou de mise en page qui manquait ici.
+    """The layout guardrail.
 
-    Les cartes en ont un depuis le 25/07 (`cards/render.py` refuse une card dont un
-    texte déborde) ; la page, qui est pourtant la seule surface que Sam touche
-    pendant la séance, n'en avait aucun. Elle a donc cassé « 3 min » en deux lignes
-    et « 40 contacts, en blocs de 10 » en trois : la dose vivait dans une colonne de
-    droite, comme sur la carte — sauf que la carte fait 1080 px et le téléphone 375.
+    The cards have one (`cards/render.py` refuses a card whose text overflows); the page,
+    which is the only surface the athlete touches during the session, had none, and broke
+    "3 min" onto two lines and "40 contacts, in blocks of 10" onto three: the dose lived in a
+    right-hand column, like on the card, except the card is 1080 px wide and the phone 375.
 
-    **Deux lignes, pas une**, et le seuil est là plutôt qu'à 1 après mesure : la plus
-    longue dose du programme (« 2-3 × jusqu'à échec technique / jambe », 37
-    caractères) demande 265 px pour 265 px disponibles à 375 px de large. La faire
-    tenir sur une ligne coûterait de descendre à 12 px, ce qui contredit la consigne
-    qui gouverne toute cette page — lisibilité à bout de bras avant toute finesse
-    visuelle. Ce qu'on interdit, c'est la troisième ligne.
+    **Two lines, not one**: the longest dose of the programme (37 characters) needs 265 px
+    for 265 px available at 375 px wide. Fitting it on one line would mean dropping to 12 px,
+    which contradicts the rule governing this whole page: legibility at arm's length before
+    any visual finesse. What is forbidden is the third line.
 
-    Toutes les doses ci-dessous sont transcrites de `coaching/strength.md`, séances
-    A et B.
+    All the doses below are transcribed from `coaching/strength.md`, sessions A and B.
     """
     doses = [
         {"measure": "time", "seconds": 180},
@@ -414,10 +404,10 @@ def test_no_dose_of_the_programme_runs_to_three_lines(open_session, width):
         {"measure": "time", "seconds": [120, 180]},
         {"measure": "time", "sets": 3, "seconds": [30, 45], "side": "each"},
     ]
-    # Le premier exercice est celui qui s'ouvre : on en met un devant pour que TOUTES
-    # les doses testées soient rendues dans une ligne repliée.
-    # Le premier exercice est celui qui s'ouvre : on en met un devant pour que TOUTES
-    # les doses testées soient rendues dans une ligne repliée.
+    # The first exercise is the one that opens: put one in front so that ALL the tested doses
+    # are rendered in a collapsed line.
+    # The first exercise is the one that opens: put one in front so that ALL the tested doses
+    # are rendered in a collapsed line.
     tab = open_session(session(exercise("Ouvert", measure="reps", sets=1, reps=1),
                                *[exercise("Un nom d'exercice plutôt long, comme ils "
                                           "le sont tous", **data) for data in doses]),
@@ -430,8 +420,8 @@ def test_no_dose_of_the_programme_runs_to_three_lines(open_session, width):
     broken = [item["text"] for item in laid_out if item["lines"] > 2]
     assert not broken, f"dose(s) sur 3 lignes ou plus à {width} px : {broken}"
 
-    # Et rien ne dépasse en largeur : une page qui défile horizontalement est une
-    # page qu'on ne peut pas utiliser d'une main.
+    # And nothing overflows in width: a page that scrolls horizontally is a page that cannot
+    # be used with one hand.
     assert tab.evaluate(
         "() => document.documentElement.scrollWidth <= document.documentElement.clientWidth")
 
@@ -606,9 +596,9 @@ def test_the_report_posted_back_is_the_session_that_was_done(open_session):
 
 
 def test_a_failed_report_is_kept_and_leaves_on_its_own(open_session):
-    """Le compte-rendu est le SEUL chemin par lequel la séance revient au coach, et
-    il s'emprunte depuis une cave, un vestiaire, ou pendant un redéploiement du VPS.
-    Avant, un POST raté affichait « réessaie » et n'essayait jamais."""
+    """The report is the ONLY path by which the session comes back to the coach, and it is
+    used from a cellar, a locker room, or during a VPS redeploy. A failed POST must not just
+    display "retry" and never try."""
     tab = open_session(session(exercise("A", measure="reps", sets=1, reps=15),
                                sid="retry-test"))
     tab.route("**/strength-report", lambda route: route.abort())
@@ -621,7 +611,7 @@ def test_a_failed_report_is_kept_and_leaves_on_its_own(open_session):
     assert stored["pending"] is True
     assert dt.date.fromisoformat(stored["performedOn"]) == dt.date.today()
 
-    # Le réseau revient : le timer de backoff renvoie sans événement ni geste.
+    # The network returns: the backoff timer resends with no event or gesture.
     posted = []
     tab.route("**/strength-report", lambda route: (
         posted.append(route.request.post_data), route.fulfill(status=200, body="ok")))
@@ -647,8 +637,8 @@ def test_a_permanent_refusal_is_not_retried_as_a_network_failure(open_session):
 
 
 def open_sound(tab):
-    """Le son se règle dans une feuille, ouverte par l'icône de la barre, comme les
-    réglages du carnet (un seul style pour toute l'app, Sam, 2026-10-09)."""
+    """Sound is set in a sheet, opened from the bar icon, like the notebook settings (one
+    style for the whole app)."""
     tab.locator("#seance-sound").click()
     tab.locator("#sound-sheet.open").wait_for()
 
@@ -660,9 +650,8 @@ def silence(tab):
 
 
 def test_the_sound_can_be_silenced_and_stays_silenced(open_session):
-    """Un bip pendant un isométrique de 45 s est le seul moyen de ne pas regarder
-    l'écran ; il doit aussi pouvoir se taire, et s'en souvenir. L'icône de la barre
-    le dit : haut-parleur barré."""
+    """A beep during a 45 s isometric is the only way not to watch the screen; it must also be
+    mutable, and remember it. The bar icon says so: crossed-out speaker."""
     tab = open_session(session(exercise("A", measure="time", seconds=45), sid="son-test"))
     icon = tab.locator("#seance-sound")
     assert icon.get_attribute("aria-label") == "Son" and "muted" not in icon.get_attribute("class")
@@ -678,39 +667,38 @@ def test_the_sound_can_be_silenced_and_stays_silenced(open_session):
     assert tab.locator("#sound-panel").get_by_role("button", name="Non").get_attribute("aria-pressed") == "true"
 
 
-# -------------------------------------------------------------------- le geste
+# ---------------------------------------------------------------- the cues
 
 def test_the_cues_come_from_the_page_not_from_the_link(open_session):
-    """Elles sont cuites dans le document, par slug, et le lien ne les porte pas.
+    """They are baked into the document, by slug, and the link does not carry them.
 
-    Mesuré le 2026-07-31 : le geste des 9 exercices de la séance A porte le
-    fragment à 106 % du plafond, 103 % même réduit à deux consignes par exercice
-    une fois « la dernière fois » présente. Le lien ne pouvait pas porter les deux
-    — et il porte déjà le slug, qui suffit à retrouver les consignes.
+    The cues of the 9 exercises of session A bring the fragment to 106% of the ceiling, 103%
+    even when reduced to two cues per exercise once "last time" is present. The link could
+    not carry both, and it already carries the slug, which is enough to find the cues.
     """
     step = exercise("Squat unipodal sur marche haute", measure="reps", sets=1, reps=6)
     step["slug"] = "step-down"
     data = session(step, exercise("Sans consigne", measure="reps", sets=1, reps=8))
     tab = open_session(data)
 
-    # Le lien n'en porte pas une lettre.
+    # The link carries not a letter of it.
     assert "talon" not in json.dumps(data, ensure_ascii=False)
 
-    # Replié par défaut : rien à l'écran tant qu'on ne demande pas.
+    # Collapsed by default: nothing on screen until asked.
     assert tab.evaluate("() => !!document.querySelector('.p-how__list')") is False
     tab.evaluate("() => document.querySelector('.p-how__toggle').click()")
     cues = tab.evaluate(
         "() => [...document.querySelectorAll('.p-how__cue')].map(n => n.textContent)")
     assert cues == CUES["step-down"]
 
-    # Et l'exercice suivant, qui n'a pas de consigne, n'a pas de bouton.
+    # And the next exercise, which has no cue, has no button.
     forward(tab)
     assert tab.evaluate("() => !!document.querySelector('.p-how__toggle')") is False
 
 
 def test_the_cue_panel_stays_open_across_exercises(open_session):
-    """Qui veut les consignes les veut sur tous les exercices, pas à redemander
-    neuf fois — l'état est global et survit au rechargement."""
+    """Whoever wants the cues wants them on every exercise, not to ask again nine times: the
+    state is global and survives a reload."""
     first = exercise("Un", measure="reps", sets=1, reps=6)
     second = exercise("Deux", measure="reps", sets=1, reps=6)
     first["slug"] = second["slug"] = "step-down"
@@ -724,9 +712,8 @@ def test_the_cue_panel_stays_open_across_exercises(open_session):
 
 
 def test_a_page_without_cues_still_runs(browser):
-    """Une note d'exercice cassée doit faire échouer vault-check et le rendu de la
-    carte, jamais le démarrage du service : sans consignes, le bouton n'apparaît
-    pas et la séance se déroule comme avant."""
+    """A broken exercise note must fail vault-check and the card render, never the service
+    start: without cues, the button does not appear and the session runs as before."""
     bare = session_page.document(CARDS_DIR, {})
     tab = browser.new_page(viewport={"width": 375, "height": 812})
     serve(tab, bare)
@@ -739,15 +726,15 @@ def test_a_page_without_cues_still_runs(browser):
     tab.goto(f"{BASE}/s#t={'G' * 32}")
     tab.wait_for_selector(".p-step--live")
     assert tab.evaluate("() => !!document.querySelector('.p-how__toggle')") is False
-    # Le nom apparaît dans le script de la page (il le lit) ; ce qui doit manquer,
-    # c'est l'AFFECTATION.
+    # The name appears in the page script (it reads it); what must be missing is the
+    # ASSIGNMENT.
     assert "window.REDLINE_HOW=" not in bare
     tab.close()
 
 
-# ------------------------------------------------------- l'ouverture et la blessure
+# ------------------------------------------------------- the opening and the injury
 
-# La zone surveillée que la page demande avant et après, comme le serveur la sert.
+# The watched zone that the page asks for before and after, as the server serves it.
 ZONES = [{"zone": "injury", "label": "Injury"}]
 GATE = {"pain_max": 2, "drop": ["plyometrics"],
         "say": "Douleur au-dessus de 2 : on saute la pliométrie et on garde le reste léger."}
@@ -771,8 +758,8 @@ def gated_session(*extra):
 
 
 def test_a_session_without_a_gate_never_asks(open_session):
-    """La page ne demande la blessure à l'ouverture que si le coach a écrit quoi en
-    faire. Sans garde-fou, rien ne change et la séance s'ouvre directement."""
+    """The page only asks for the injury at opening if the coach wrote what to do with it.
+    Without a guardrail, nothing changes and the session opens directly."""
     tab = open_session(session(exercise("A", measure="reps", sets=1, reps=8)))
     assert opening(tab) is False
 
@@ -780,17 +767,17 @@ def test_a_session_without_a_gate_never_asks(open_session):
 def test_the_gate_drops_what_the_coach_named_and_says_his_sentence(open_session):
     tab = open_session(gated_session())
     assert opening(tab) is True
-    pick(tab, 4)                      # au-dessus du seuil de 2
+    pick(tab, 4)                      # above the threshold of 2
     assert opening(tab) is False
 
-    # La phrase est celle du coach, mot pour mot : la page n'écrit rien. Et elle a
-    # sa propre ligne : l'écrire dans `#note` effaçait la note de séance.
+    # The sentence is the coach's, word for word: the page writes nothing. And it has its own
+    # line: writing it into `#note` erased the session note.
     assert tab.text_content("#gate") == GATE["say"]
     doses = tab.evaluate(
         "() => [...document.querySelectorAll('.p-step__dose')].map(n => n.textContent)")
     assert "retiré — garde-fou" in doses
 
-    # Et l'exercice retiré n'est pas à faire : la séance ouvre sur l'autre.
+    # And the removed exercise is not to be done: the session opens on the other one.
     assert tab.text_content(".p-step--live .p-step__name") == "Mollet"
 
 
@@ -804,9 +791,8 @@ def test_a_reading_under_the_threshold_changes_nothing(open_session):
 
 
 def test_the_opening_can_be_skipped_and_then_nothing_is_gated(open_session):
-    """Rien n'est obligatoire ici : un outil contre lequel il faut lutter est un
-    outil qu'on cesse d'ouvrir. Sans lecture, le garde-fou ne peut pas se
-    déclencher — et il ne se déclenche pas."""
+    """Nothing is mandatory here: a tool you have to fight is a tool you stop opening.
+    Without a reading, the guardrail cannot trigger, and it does not."""
     tab = open_session(gated_session())
     tab.evaluate("""() => [...document.querySelectorAll('#open .p-btn')]
         .find(b => b.textContent.startsWith('Je passe')).click()""")
@@ -815,8 +801,8 @@ def test_the_opening_can_be_skipped_and_then_nothing_is_gated(open_session):
 
 
 def test_a_zero_is_an_answer_not_an_absence(open_session):
-    """Le piège du drapeau booléen : une douleur parfaitement silencieuse vaut 0, et
-    sans `opened` l'écran d'ouverture se rouvrirait à chaque retour sur l'onglet."""
+    """The boolean flag trap: a perfectly silent pain is 0, and without `opened` the opening
+    screen would reopen at each return to the tab."""
     tab = open_session(gated_session())
     pick(tab, 0)
     assert opening(tab) is False
@@ -829,8 +815,8 @@ def test_both_readings_reach_the_report(open_session):
     tab = open_session(gated_session())
     pick(tab, 1)
     tab.route("**/strength-report", lambda route: route.fulfill(status=200, body="ok"))
-    forward(tab)                                  # le mollet
-    for _ in range(4):                            # les quatre blocs
+    forward(tab)                                  # the calf
+    for _ in range(4):                            # the four blocks
         forward(tab)
     tab.wait_for_selector("#review:not([hidden])")
     tab.evaluate("""() => document.querySelectorAll('.p-scale')
@@ -843,8 +829,8 @@ def test_both_readings_reach_the_report(open_session):
 
 
 def test_the_gate_sentence_does_not_eat_the_session_note(open_session):
-    """Elle s'écrivait dans `#note` : la note du coach disparaissait en silence,
-    le jour précis où il a le plus de choses à dire."""
+    """It used to be written into `#note`: the coach note silently disappeared, on the very
+    day it has the most to say."""
     data = gated_session()
     data["note"] = "Demi-dose, sans pliométrie."
     tab = open_session(data)
@@ -854,11 +840,10 @@ def test_the_gate_sentence_does_not_eat_the_session_note(open_session):
 
 
 def test_the_beeps_actually_fire(browser, document):
-    """Le seul test « son » qui existait vérifiait le LIBELLÉ du bouton et sa
-    persistance : tout le chemin audio pouvait être mort et la suite serait restée
-    verte. Ici on instrumente `AudioContext` avant le chargement et on compte les
-    oscillateurs réellement démarrés — le décompte doit sonner les dernières
-    secondes, puis la fin.
+    """The only "sound" test checked the button LABEL and its persistence: the whole audio
+    path could be dead and the suite would stay green. Here `AudioContext` is instrumented
+    before loading and the oscillators actually started are counted: the countdown must
+    sound the last seconds, then the end.
     """
     tab = browser.new_page(viewport={"width": 375, "height": 812})
     tab.add_init_script("""
@@ -887,24 +872,24 @@ def test_the_beeps_actually_fire(browser, document):
     tab.goto(f"{BASE}/s#t={'H' * 32}")
     tab.wait_for_selector(".p-step--live")
     click(tab, "Démarrer")
-    # On attend que le décompte soit ALLÉ AU BOUT (l'exercice suivant s'ouvre tout
-    # seul), pas qu'un nombre de bips soit atteint : la première version lisait le
-    # compteur dès deux bips et ratait systématiquement celui de la fin.
+    # Wait for the countdown to have RUN TO THE END (the next exercise opens by itself), not for
+    # a number of beeps to be reached: reading the counter at two beeps always missed the end
+    # beep.
     tab.wait_for_function(
         "() => document.querySelector('.p-step--live .p-step__name').textContent === 'Suite'",
         timeout=10000)
     beeps = tab.evaluate("() => window.__beeps")
-    # Des bips de décompte (880 Hz) PUIS celui de la fin (523) — deux hauteurs, et
-    # la dernière est celle de la fin.
+    # Countdown beeps (880 Hz) THEN the end one (523): two pitches, and the last one is the
+    # end one.
     assert 880 in beeps and 988 in beeps and beeps[-2:] == [523, 523], beeps
     tab.close()
 
 
 def test_sound_and_screen_lock_survive_a_phone_sleep(browser, document):
-    """Sur iPhone, après une veille, le contexte audio reste « interrupted » et le
-    verrou d'écran est tombé : il fallait fermer la page et la rouvrir. On simule
-    la veille (page cachée, contexte interrompu, verrou relâché) et on exige qu'un
-    seul tap au retour rende le son ET le verrou.
+    """On iPhone, after sleep, the audio context stays "interrupted" and the screen lock is
+    released: the page had to be closed and reopened. Sleep is simulated (page hidden,
+    context interrupted, lock released) and a single tap on return must restore both the
+    sound AND the lock.
     """
     tab = browser.new_page(viewport={"width": 375, "height": 812})
     tab.add_init_script("""
@@ -1141,8 +1126,8 @@ def test_sound_settings_test_and_intensity_survive_reload(open_session):
 
 
 def test_voice_is_off_by_default_so_music_keeps_playing(open_session):
-    """Sur iPhone, speechSynthesis met en pause la musique des autres apps : la
-    voix ne parle que si on l'a demandée, et le choix survit au rechargement."""
+    """On iPhone, speechSynthesis pauses other apps' music: the voice only speaks if it was
+    asked for, and the choice survives a reload."""
     tab = open_session(session(exercise('Iso', measure='time', sets=2, seconds=10, rest_s=5)))
     open_sound(tab)
     voice = tab.get_by_role('switch', name='Annoncer le côté à voix haute')
@@ -1256,10 +1241,9 @@ def test_network_retry_freezes_note_and_reuses_exact_payload(open_session):
 
 
 def test_the_session_wears_the_theme_pinned_in_the_notebook(browser, document):
-    """Le carnet garde le choix du thème (Auto, Clair, Sombre) ; le renfo l'ignorait et
-    suivait le seul téléphone : Sombre épinglé, la séance s'ouvrait en clair
-    (2026-10-09). Les deux pages lisent maintenant la même clé, avant le premier
-    affichage, bande d'état d'iOS comprise."""
+    """The notebook keeps the theme choice (Auto, Light, Dark); strength used to ignore it and
+    follow the phone alone: with Dark pinned, the session opened light. Both pages now read
+    the same key, before the first paint, iOS status bar included."""
     tab = browser.new_page(viewport={"width": 375, "height": 812}, color_scheme="light")
     serve(tab, document)
     tab.route("**/strength-session", lambda route: route.fulfill(

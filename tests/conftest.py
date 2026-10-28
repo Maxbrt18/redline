@@ -6,7 +6,7 @@ copied: `_bot(...)` had four near-identical definitions, the fake Claude three, 
 two, and the vault root six sites in two idioms. The cost is not the ~90 lines -- it is
 that adding a parameter to `CoachBot.__init__` meant finding four call sites, and that
 a test file quietly wiring its own bot differently from the others is a difference
-nobody sees (audit 2026-07-29).
+nobody sees.
 """
 
 import atexit
@@ -34,25 +34,24 @@ TESTS_DIR = Path(__file__).resolve().parent
 ENGINE_ROOT = TESTS_DIR.parent
 #: Units, launcher, allowlist and scripts of a deployment.
 DEPLOY_DIR = ENGINE_ROOT / "deploy"
-# Le vault fictif des tests : `redline.toml` (le seul endroit où le prénom de l'athlète
-# fictif est écrit), le programme de renfo, les fiches de séance, les capacités et le
-# journal des décisions. Personne de réel : il existe pour que les tests qui lisent du
-# contenu de vault tournent sur ce dépôt, qui ne livre que le moteur.
+# The fictional test vault: `redline.toml` (the only place the fictional athlete's
+# first name is written), the strength program, session sheets, capabilities and the
+# decision log. Nobody real: it exists so that tests reading vault content run in this
+# repository, which ships only the engine.
 TEST_VAULT = TESTS_DIR / "fixtures" / "vault"
-# La suite tourne comme le service : le moteur d'un côté, le vault de l'autre, désigné
-# par `VAULT_PATH`. Une COPIE, pour qu'un test qui écrit dans le vault ne salisse pas la
-# fixture versionnée ; elle est faite avant tout import qui lirait `VAULT_PATH`.
+# The suite runs like the service: the engine on one side, the vault on the other,
+# designated by `VAULT_PATH`. A COPY, so a test writing into the vault does not dirty the
+# versioned fixture; it is made before any import that would read `VAULT_PATH`.
 VAULT_ROOT = Path(tempfile.mkdtemp(prefix="redline-vault-")) / "vault"
 shutil.copytree(TEST_VAULT, VAULT_ROOT)
 atexit.register(shutil.rmtree, VAULT_ROOT.parent, ignore_errors=True)
 os.environ["VAULT_PATH"] = str(VAULT_ROOT)
 
-# Les cibles de RPE telles que `coaching/workouts/*.md` les déclare aujourd'hui.
-# LITTÉRALES ici, et déclarées une seule fois pour toute la suite : les tests de jauge
-# doivent mesurer la FORMULE, pas le contenu du vault, qui bouge plusieurs fois par jour
-# (même raison que `test_the_checker_runs_on_the_real_vault_and_reports`). Qu'elles
-# correspondent encore aux fiches est vérifié à part, une fois, par
-# `test_the_targets_come_from_the_workout_notes`.
+# RPE targets as `coaching/workouts/*.md` declares them. LITERAL here, and declared once
+# for the whole suite: gauge tests must measure the FORMULA, not the vault content,
+# which changes several times a day (same reason as
+# `test_the_checker_runs_on_the_real_vault_and_reports`). That they still match the
+# sheets is checked separately, once, by `test_the_targets_come_from_the_workout_notes`.
 RPE_TARGETS = {("easy", None): 3.0, ("long", None): 4.5, ("threshold", None): 6.0,
                ("hills", None): 6.0, ("strides", None): 3.0, ("cadence", None): 3.0,
                ("bike", None): 3.0, ("strength", "a"): 6.0, ("strength", "b"): 6.0,
@@ -217,17 +216,16 @@ def make_bot(make_config, store):
             repo = MagicMock()
             repo.sync.return_value = False
             repo.is_clean.return_value = True
-            # Rend une LISTE : sur un MagicMock nu, « rien à jeter » serait un mock
-            # truthy, et toute la suite journaliserait un résidu imaginaire.
+            # Returns a LIST: on a bare MagicMock, "nothing to discard" would be a truthy
+            # mock, and the whole suite would log an imaginary residue.
             repo.ensure_clean.return_value = []
             repo.weekly_plan_context.return_value = ""
-            # `weekly_plan_message` rend une CHAÎNE, et depuis le 2026-08-11 elle est
-            # assemblée avec le texte du coach au lieu de le remplacer : un MagicMock
-            # truthy passait tant qu'on ne faisait que l'affecter, plus depuis qu'on
-            # le concatène.
+            # `weekly_plan_message` returns a STRING, assembled with the coach text
+            # instead of replacing it: a truthy MagicMock was enough when it was only
+            # assigned, not once it is concatenated.
             repo.weekly_plan_message.return_value = "Aujourd'hui : EF, plafond 9 km."
             repo.persist_turn.return_value = PersistenceResult(True)
-            # Une seule lecture du registre par tour : (réclamables, hors fenêtre).
+            # A single registry read per turn: (claimable, out of window).
             repo.ledger_cells.return_value = ([], [])
             repo.publish.return_value = True
             repo.drain_alerts.return_value = []
@@ -237,8 +235,8 @@ def make_bot(make_config, store):
             outbox.snapshot.return_value = set()
             outbox.collect_new.return_value = []
             outbox.link_for.return_value = None
-            # Rend une LISTE : sur un MagicMock nu, « rien à solder » serait truthy et
-            # chaque bot de la suite signalerait un résidu d'outbox imaginaire.
+            # Returns a LIST: on a bare MagicMock, "nothing to settle" would be truthy and
+            # every bot in the suite would report an imaginary outbox residue.
             outbox.leftovers.return_value = []
         if client is None:
             client = MagicMock()
@@ -296,21 +294,20 @@ def git_clone(tmp_path, git_repo):
     git(git_repo, "config", "receive.denyCurrentBranch", "ignore")
     clone = tmp_path / "clone"
     git(tmp_path, "clone", str(git_repo), str(clone))
-    # UN CLONE N'HÉRITE PAS DU `.git/config` DE SON ORIGINE : sans ces deux lignes, tout
-    # test qui commite dans le clone passe sur le Mac (identité globale) et meurt sur la
-    # CI en « Author identity unknown » (2026-08-12). Même famille que les deux tests qui
-    # lisaient l'heure du mur le 2026-08-11 : un environnement implicite qu'on croit
-    # maîtrisé. La fixture le rend explicite une fois pour toutes.
+    # A CLONE DOES NOT INHERIT ITS ORIGIN'S `.git/config`: without these two lines, any
+    # test committing in the clone passes on a laptop (global identity) and dies on CI
+    # with "Author identity unknown". Same family as tests reading the wall clock: an
+    # implicit environment assumed to be controlled. The fixture makes it explicit.
     git(clone, "config", "user.email", "t@t")
     git(clone, "config", "user.name", "t")
     return git_repo, clone
 
 
-# La zone surveillée de l'instance fictive (`[[injuries]]` de redline.toml) : les tests
-# de douleur lisent cette zone, jamais une douleur sans zone.
+# The watched zone of the fictional instance (`[[injuries]]` in redline.toml): pain
+# tests read this zone, never a pain without a zone.
 ZONE = "injury"
 
 
 def zoned(value):
-    """`pains` d'une ligne du registre : la douleur de la zone fictive, ou rien."""
+    """`pains` of a registry row: the pain of the fictional zone, or nothing."""
     return {} if value is None else {ZONE: value}

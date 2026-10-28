@@ -1,4 +1,4 @@
-"""Le prénom de l'athlète se rend à la sortie, jamais écrit dans le moteur."""
+"""The athlete's first name is rendered at output, never written into the engine."""
 
 import re
 import subprocess
@@ -21,8 +21,8 @@ def test_the_name_replaces_the_token_and_french_elides(name, expected):
 
 
 def test_the_style_prompt_renders_exactly_the_text_it_was_written_for():
-    """Le gabarit ne change rien d'autre que le prénom : rendu avec un prénom sans
-    élision, il redonne le texte d'origine, caractère par caractère."""
+    """The template changes nothing but the first name: rendered with a name without
+    elision, it gives back the original text, character for character."""
     rendered = persona.render(prompts.STYLE_PROMPT, "Marie")
     assert persona.TOKEN not in rendered
     assert rendered == prompts.STYLE_PROMPT.replace(persona.TOKEN, "Marie")
@@ -54,8 +54,8 @@ def test_nothing_reaches_the_phone_with_the_token(make_config):
 
 
 def test_no_name_is_written_in_the_engine():
-    """Le garde-fou : un prénom réintroduit en dur dans le code ou les gabarits se voit
-    ici. Les tests, eux, nomment l'athlète fictif de leur instance."""
+    """The guard: a first name hard-coded back into the code or templates shows up
+    here. The tests name the fictional athlete of their own instance."""
     tracked = subprocess.run(["git", "ls-files"], cwd=ENGINE_ROOT, capture_output=True,
                              text=True, check=True).stdout.split()
     offenders = []

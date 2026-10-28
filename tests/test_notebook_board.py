@@ -1,8 +1,8 @@
-"""Le tableau de bord du carnet, calculé par un vrai PostgreSQL sur une semaine type.
+"""The notebook dashboard, computed by a real PostgreSQL on a typical week.
 
-La semaine imite W41 : repos, EF + renfo, EF, EF + renfo, footing, sortie longue. Ce
-qui compte n'est pas le rendu mais la provenance : l'intention vient de la révision,
-le fait du registre, et une réponse du carnet n'écrit que ce que le registre réclame.
+The week mimics a build week: rest, easy + strength, easy, easy + strength, jog, long run. What
+matters is not the rendering but the provenance: intent comes from the revision, the fact from
+the ledger, and a notebook answer only writes what the ledger asks for.
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ def store():
         names = ", ".join(f"redline.{table.name}" for table in metadata.sorted_tables)
         connection.execute(sa.text(f"TRUNCATE TABLE {names} RESTART IDENTITY CASCADE"))
         connection.execute(sa.text("INSERT INTO redline.athletes(id) VALUES ('sam')"))
-        # La zone surveillée de l'instance fictive, comme le service la synchronise.
+        # The watched zone of the fictitious instance, as the service synchronises it.
         connection.execute(sa.text(
             "INSERT INTO redline.pain_zones(athlete_id, slug, label) VALUES ('sam', 'injury', 'Injury')"))
     yield OperationalStore(database)
@@ -44,7 +44,7 @@ def store():
 
 
 class Repo:
-    """Le minimum de VaultRepo que le carnet lit : statut et révision active."""
+    """The minimum of VaultRepo that the notebook reads: status and active revision."""
 
     def __init__(self, store, status=PlanStatus.VALID):
         self.store, self.status = store, status
@@ -168,7 +168,7 @@ def test_the_coach_waits_only_for_what_the_ledger_claims(store):
 
 
 def test_a_net_wake_trace_alerts_the_coach_with_the_session_condition(store):
-    """Décision du 2026-10-11 : la condition vit dans la séance, l'alerte la déclenche."""
+    """The condition lives in the session, the alert triggers it."""
     seed_week(store)
     morning = dt.datetime(2026, 10, 7, 8, 0, tzinfo=PARIS)
     alert = board(store, morning).answer("wake:2026-10-07:injury", "nette")["alert"]
@@ -280,7 +280,7 @@ def test_without_a_plan_nothing_is_prescribed_but_the_ledger_still_counts(store)
     assert view["totals"]["km_done"] == 8.0 and view["totals"]["km_target"] is None
     week = board(store).week_view(WEEK, [])
     assert [item["km"] for item in week["extra"]] == [8.0]
-    json.dumps(view)  # le carnet le sert tel quel
+    json.dumps(view)  # the notebook serves it as is
 
 
 def test_routes_serve_the_three_screens_and_hand_a_crossing_to_the_coach(
@@ -330,7 +330,7 @@ def test_routes_serve_the_three_screens_and_hand_a_crossing_to_the_coach(
 
 def test_the_last_feeling_of_a_strava_run_brings_its_debrief_forward(
         store, make_config, monkeypatch):
-    """Ressentis complets : Sam a fini avec sa sortie, le débrief n'attend plus."""
+    """Complete feelings: the athlete finished with the run, the debrief no longer waits."""
     from unittest.mock import MagicMock
 
     from redline.service import clock
@@ -369,7 +369,7 @@ def test_the_last_feeling_of_a_strava_run_brings_its_debrief_forward(
 
 
 def test_the_current_week_announces_the_next_one_once_planned(store):
-    """Le dimanche, la semaine suivante s'organise : elle se montre dès qu'elle existe."""
+    """On Sunday the following week is organised: it shows as soon as it exists."""
     seed_week(store)
     sunday = dt.datetime(2026, 10, 11, 13, 0, tzinfo=PARIS)
     assert board(store, sunday).week_view(WEEK, [])["next"] is None

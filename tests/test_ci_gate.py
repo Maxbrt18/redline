@@ -1,4 +1,4 @@
-"""La porte après push couvre le SHA exact et tous ses workflows, y compris le vault."""
+"""The post-push gate covers the exact SHA and all its workflows, including the vault."""
 
 import json
 import os
@@ -109,8 +109,8 @@ def test_un_workflow_non_declenche_n_est_pas_exige(gate):
 
 def test_les_runs_crees_apres_le_push_sont_attendus(gate):
     invoke, _ = gate
-    # Le délai doit couvrir un second sondage (2 s plus tard). À 1 s, `SECONDS` en bash
-    # pouvait franchir sa borne pendant le premier appel au faux gh : rouge au hasard.
+    # The delay must cover a second poll (2 s later). At 1 s, bash's `SECONDS` could
+    # cross its boundary during the first call to the fake gh: randomly red.
     result = invoke([[], [run(), run("Vault content", run_id=2)]], "Vault content",
                     wait="8")
     assert result.returncode == 0

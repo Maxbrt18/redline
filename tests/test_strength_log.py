@@ -1,7 +1,7 @@
-"""La lecture de `athlete/strength-log.csv`, projection de PostgreSQL.
+"""Reading `athlete/strength-log.csv`, a projection of PostgreSQL.
 
-Ce qui est testé ici, c'est ce que la page et la vue du journal lisent : la dernière
-séance par exercice, les séries, et la ligne affichée sous l'exercice en cours.
+What is tested here is what the page and the journal view read: the latest session per
+exercise, the sets, and the line displayed under the current exercise.
 """
 
 import pytest
@@ -37,7 +37,7 @@ def test_series_reads_back_what_was_written():
     assert series("") == [] and series(None) == []
 
 
-# --------------------------------------------------------- ce que la page lit
+# --------------------------------------------------------- what the page reads
 
 @pytest.mark.parametrize("data,line", [
     ({"droite": "14|12|11", "gauche": "13|11|10", "score": 6},
@@ -48,8 +48,8 @@ def test_series_reads_back_what_was_written():
     ({}, ""),
 ])
 def test_the_line_the_page_shows_is_rendered_here(data, line):
-    """Rendu dans le vault, comme `Dose.human()` : une seule fonction du dépôt
-    fabrique une ligne lisible, et la page ne formate rien."""
+    """Rendered in the vault, like `Dose.human()`: a single function in the repository
+    builds a readable line, and the page formats nothing."""
     assert human(dict(data)) == line
 
 

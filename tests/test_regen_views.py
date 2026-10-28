@@ -1,11 +1,10 @@
-"""scripts/regen-views.py + VaultRepo.regenerate_views : la dérive des vues générées
-ne peut plus être committée.
+"""scripts/regen-views.py + VaultRepo.regenerate_views: drift in generated views
+can no longer be committed.
 
-Deux CI rouges de suite (28 et 29/07) venaient du même trou : le bot ajoutait une
-ligne au registre et committait, sans que personne relance les générateurs. Le hook
-`pre-commit` ne couvrait que les clones où quelqu'un avait tapé
-`git config core.hooksPath` — jamais le VPS après un reclone, jamais une session
-Claude sur le web. Le seul endroit qui couvre tout le monde est le code qui commit.
+The bot used to append a row to the ledger and commit without anyone rerunning the
+generators. A `pre-commit` hook only covered clones where someone had set
+`git config core.hooksPath` -- never a fresh clone on the server, never a web session.
+The only place that covers everyone is the code that commits.
 """
 
 import importlib.util
@@ -25,22 +24,22 @@ MARKER = re.compile(r"<!-- ([A-Z_]+)_START -->")
 
 class TestTheEntryPoint:
     def test_every_generator_it_names_exists(self):
-        """Un générateur renommé sans être renommé ici passerait inaperçu : le script
-        sortirait en erreur au prochain commit du bot, qui l'avale et le logge."""
+        """A generator renamed without being renamed here would go unnoticed: the script
+        would exit with an error at the bot's next commit, which swallows and logs it."""
         regen = load_script('regen-views')
         for name in regen.GENERATORS:
             assert importlib.util.find_spec(cli.module(name)), name
 
     def test_no_generated_block_in_the_vault_is_an_orphan(self):
-        """LE test de la liste, réécrit le 2026-07-29. La version d'avant cherchait
-        `"refresh(" in text` dans les scripts : `decisions-index.py` écrivait son bloc
-        par un `re.sub` direct, donc l'heuristique le ratait — un garde-fou avec un
-        faux négatif sur le seul cas qui existait.
+        """THE test of the list. An earlier version looked for
+        `"refresh(" in text` in the scripts: `decisions-index.py` wrote its block
+        with a direct `re.sub`, so the heuristic missed it -- a guard with a false
+        negative on the only case that existed.
 
-        On interroge maintenant le VAULT, pas la forme du code : tout marqueur
-        `<!-- X_START -->` présent dans une note doit avoir un générateur qui le
-        revendique. C'est l'invariant qu'on veut (aucun bloc sans propriétaire), et il
-        ne dépend d'aucune façon d'écrire les générateurs."""
+        It now queries the VAULT, not the shape of the code: every marker
+        `<!-- X_START -->` present in a note must have a generator that
+        claims it. This is the invariant we want (no block without an owner), and it
+        does not depend on how the generators are written."""
         owned = {hot_cache.BLOCK, hot_cache.STATE_BLOCK,
                  weekly_plan.BLOCK,
                  strength_tables.LOG_BLOCK,
@@ -52,10 +51,10 @@ class TestTheEntryPoint:
         assert found <= owned, f"bloc sans générateur : {sorted(found - owned)}"
 
     def test_check_reports_a_drift_without_repairing_it(self, tmp_path):
-        """`--check` ne doit jamais réparer ce qu'il est censé signaler. Sur un vault
-        jetable : la version d'avant lançait les vrais générateurs sur le vrai vault et
-        n'assertait que « rien n'a bougé » — elle passait aussi bien si `--check`
-        marchait que s'ils plantaient tous les deux avant d'écrire."""
+        """`--check` must never repair what it is supposed to report. On a throwaway
+        vault: an earlier version ran the real generators on the real vault and
+        only asserted "nothing moved" -- it passed just as well if `--check`
+        worked as if they both crashed before writing."""
         note = tmp_path / "note.md"
         start, end = views.markers("BLOC")
         note.write_text(f"avant\n{start}\npérimé\n{end}\naprès\n", encoding="utf-8")
@@ -66,7 +65,7 @@ class TestTheEntryPoint:
 
 
 def _persist_and_publish(git_repo):
-    """Le tour committe ses notes avant la livraison ; les vues suivent après."""
+    """The turn commits its notes before delivery; the views follow after."""
     generator = git_repo.parent / "generator.py"
     repo = VaultRepo(str(git_repo), "origin", "main",
                      regen_command=(sys.executable, str(generator)) if generator.exists() else ())
@@ -80,8 +79,8 @@ class TestTheBotRegeneratesAfterDelivery:
         (clone.parent / "generator.py").write_text(body, encoding="utf-8")
 
     def test_the_generated_view_is_refreshed_and_committed(self, git_repo):
-        """Le fait qui compte : ce que le générateur écrit se retrouve DANS le commit,
-        pas dans le répertoire de travail à traîner jusqu'au prochain."""
+        """What matters: what the generator writes ends up IN the commit,
+        not in the working directory left dangling until the next one."""
         self._install(git_repo, "open('derived.md', 'w').write('frais')\n")
         (git_repo / "source.md").write_text("nouvelle ligne")
         _persist_and_publish(git_repo)
@@ -92,8 +91,8 @@ class TestTheBotRegeneratesAfterDelivery:
                                   capture_output=True, text=True).stdout.strip()
 
     def test_a_broken_generator_does_not_swallow_the_session(self, git_repo, caplog):
-        """Perdre les notes d'une session parce qu'une ligne du registre est malformée
-        serait bien pire qu'un bloc périmé : on logge, on committe quand même."""
+        """Losing a session's notes because a ledger row is malformed
+        would be much worse than a stale block: log it, commit anyway."""
         self._install(git_repo, "import sys; sys.exit('registre illisible')\n")
         (git_repo / "source.md").write_text("notes de la session")
         _persist_and_publish(git_repo)
@@ -103,8 +102,8 @@ class TestTheBotRegeneratesAfterDelivery:
         assert "registre illisible" in caplog.text
 
     def test_a_clone_without_the_script_still_commits(self, git_repo):
-        """Les dépôts de test (et tout clone qui n'est pas le vault) n'ont pas le
-        script : son absence ne doit pas être une panne."""
+        """Test repositories (and any clone that is not the vault) do not have the
+        script: its absence must not be a failure."""
         (git_repo / "source.md").write_text("x")
         _persist_and_publish(git_repo)
         assert "source.md" in subprocess.run(
@@ -112,8 +111,8 @@ class TestTheBotRegeneratesAfterDelivery:
             cwd=git_repo, capture_output=True, text=True).stdout
 
     def test_nothing_dirty_regenerates_nothing(self, git_repo):
-        """Le bot appelle ça après CHAQUE message : deux sous-processus python sur un
-        vault propre, plusieurs fois par heure, pour rien."""
+        """The bot calls this after EVERY message: two python subprocesses on a
+        clean vault, several times an hour, for nothing."""
         self._install(git_repo, "open('derived.md', 'w').write('ne devrait pas exister')\n")
         _persist_and_publish(git_repo)
         assert not (git_repo / "derived.md").exists()

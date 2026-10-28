@@ -71,8 +71,8 @@ def test_a_capture_failure_never_wakes_the_coach_without_data(store, make_config
 
 
 def test_an_activity_strava_no_longer_knows_is_abandoned_at_once(store, make_config):
-    """Du 17 au 25/09, deux activités supprimées ont été redemandées 1 500 fois
-    chacune : un 404 ne guérit pas en réessayant."""
+    """Deleted activities were requested again 1,500 times each: a 404 does not heal
+        by retrying."""
     from redline.integrations.strava import StravaNotFound
 
     sched = scheduler(store, make_config(proactive_morning=None))
@@ -227,9 +227,9 @@ def test_expired_retry_is_dropped(store, make_config):
 
 
 def test_debrief_passes_despite_the_minimum_gap(store, make_config):
-    """Regression 2026-07-18: the morning note at 07:46 was burning the 4 h gap, so
-    the debrief of a run finished at 08:28 never went out (and landed stale at 11:46).
-    A gap-blocked budget must still let a priority trigger through."""
+    """The morning note at 07:46 was burning the 4 h gap, so the debrief of a run
+        finished at 08:28 never went out (and landed stale at 11:46).
+        A gap-blocked budget must still let a priority trigger through."""
     config = make_config(proactive_min_gap_hours=4)
     sched = scheduler(store, config)
     suppress_silence(store)
@@ -257,7 +257,7 @@ def test_ordinary_trigger_still_held_by_the_gap(store, make_config):
 
 
 def test_no_number_of_deliveries_creates_a_daily_cap(store, make_config):
-    """Le compteur est une trace, jamais une porte d'envoi."""
+    """The counter is a trace, never a send gate."""
     config = make_config(proactive_min_gap_hours=0)
     for _ in range(100):
         store.proactive.finish_delivery("", TUESDAY_NOON)
@@ -384,8 +384,8 @@ def _wake_scheduler(store, make_config, due=True):
 
 
 def test_a_missing_wake_trace_is_recalled_at_half_past_ten_until_two(store, make_config):
-    """2026-10-09 : le carnet prend la trace jusqu'à 14 h, sans notification. Un seul
-    rappel, le matin même ; jamais le soir (correction du 2026-09-15)."""
+    """The logbook takes the trace until 14:00, without notification. A single
+        reminder, the same morning; never in the evening."""
     sched = _wake_scheduler(store, make_config)
 
     sched._materialize_triggers(PSID, TUESDAY_MORNING.replace(hour=10, minute=29))
@@ -397,7 +397,7 @@ def test_a_missing_wake_trace_is_recalled_at_half_past_ten_until_two(store, make
     assert job["expire_at"] == datetime(
         2026, 7, 14, 14, 0, tzinfo=ZoneInfo("Europe/Paris")).timestamp()
 
-    # Une lecture du carnet par matin, pas une par minute.
+    # One logbook read per morning, not one per minute.
     sched._materialize_triggers(PSID, TUESDAY_MORNING.replace(hour=11))
     assert sched._bot.wake_reminder_due.call_count == 1
 
@@ -412,11 +412,11 @@ def test_no_wake_reminder_when_the_trace_is_in_or_after_two(store, make_config):
     assert not any(job["kind"] == "trace_reveil" for job in store.proactive.jobs())
 
 
-# ------------------------------------------------- débrief dès que Sam a fini
+# ------------------------------------------------- debrief as soon as the athlete is done
 
 def test_an_activity_is_captured_on_arrival_without_waking_the_coach(store, make_config):
-    """La sortie entre au registre tout de suite : le carnet peut demander ses
-    ressentis pendant que le débrief attend son signal ou son délai."""
+    """The activity enters the ledger right away: the logbook can ask for its
+        feelings while the debrief waits for its signal or its delay."""
     sched = scheduler(store, make_config(proactive_morning=None))
     store.proactive.record_activity("999", due=time.time() + 300)
     store.ingest_strava_activity = MagicMock(return_value={"status": "matched"})
@@ -451,8 +451,8 @@ def test_the_debrief_rereads_the_title_written_after_the_capture(store, make_con
 
 
 def test_a_failed_capture_is_retried_within_the_minute_then_every_five(store, make_config):
-    """Un raté passager ne coûte pas 5 min de plus ; une erreur qui se répète
-    n'use pas le quota Strava (24 reprises le 26/09)."""
+    """A transient failure does not cost 5 more minutes; a repeating error does not
+        burn the Strava quota."""
     sched = scheduler(store, make_config(proactive_morning=None))
     suppress_silence(store)
     store.proactive.record_activity("999", due=TUESDAY_NOON.timestamp() - 10)

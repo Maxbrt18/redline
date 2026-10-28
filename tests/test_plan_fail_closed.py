@@ -1,7 +1,7 @@
-"""Aucune séance ne part sans programme valide, et aucune réponse n'est jetée pour ça.
+"""No session leaves without a valid program, and no reply is discarded for that.
 
-La porte déterministe retient le BLOC de séances et les faits non enregistrés ; la prose
-du coach part toujours, avec une ligne précise quand une limite concerne Sam.
+The deterministic gate holds back the session BLOCK and the unrecorded facts; the
+coach prose always goes out, with a precise line when a limit concerns the athlete.
 """
 
 import json
@@ -16,7 +16,7 @@ from redline.service.agent import RunResult
 from redline.service.proactive import ProactiveJob
 from redline.service.vault import PersistenceResult
 
-#: Les ouvertures des textos de programme.
+#: Openings of the program texts.
 CANONICAL = ("Programme", "Aujourd'hui", "Prochaine séance", "La suite de la semaine", "Changement", "Rien de prévu")
 
 
@@ -26,9 +26,8 @@ def context(revision, sessions=None):
 
 
 def session(day, **changed) -> dict:
-    """Une séance à faire ce jour-là. Les contextes de ce fichier en portent depuis le
-    2026-08-16 : l'envoi ne suit plus un numéro de révision mais ce qu'il reste à
-    faire, donc une semaine vide ne fait plus partir de bloc."""
+    """A session to do that day. The contexts of this file carry them: sending follows
+    what remains to do, not a revision number, so an empty week sends no block."""
     return {"id": f"w32-r1-{day.isoformat()}-ef", "title": "EF", "date": day.isoformat(),
             "kind": "run", "workout": "easy", "status": "planned",
             "distance_cap_km": 9.0, "demanding": False, **changed}
@@ -59,8 +58,8 @@ def test_an_invalid_plan_never_sends_sessions_and_says_so_when_asked(make_bot):
 
 @pytest.mark.parametrize("claim", ["C’est enregistré.", "Je te passe à 14 km dimanche."])
 def test_failed_writes_keep_the_answer_but_never_confirm_it(make_bot, store, claim):
-    """Une écriture refusée n'efface ni la prose ni la conversation : Sam lit ce que
-    le coach a écrit ET ce qui n'a pas été enregistré. Aucune séance ne part."""
+    """A refused write erases neither the prose nor the conversation: the athlete reads
+    what the coach wrote AND what was not recorded. No session is sent."""
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
     repo.weekly_plan_context.return_value = context(2, [session(date.today())])
@@ -95,16 +94,15 @@ def test_a_failed_model_run_never_commits_partial_changes(make_bot):
 
 
 def test_a_plan_changing_message_answers_on_the_active_plan_when_no_revision_is_needed(make_bot):
-    """Le triage juge « P » sur le TEXTE, avant d'avoir ouvert le vault — le prompt dit
-    lui-même « MODIFIE potentiellement ». Exiger une révision derrière cette hypothèse
-    punissait la bonne réponse : le 2026-08-10 à 10h15, Sam raconte sa sortie, le plan
-    W33 r1 la couvrait déjà, Claude n'a donc rien révisé, et le coach s'est verrouillé en
-    annonçant un « programme invalide » parfaitement valide — sans commit tenté et sans
-    une ligne de log.
+    """Triage judges "P" on the TEXT, before the vault is opened -- the prompt itself
+    says "potentially MODIFIES". Requiring a revision behind that hypothesis punished
+    the right answer: when the plan already covers what the athlete reports, the model
+    revises nothing, and the coach used to lock itself announcing an "invalid program"
+    that was perfectly valid -- with no commit attempted and no log line.
 
-    Ce que le tour DOIT faire n'a pas changé : parler normalement. Ce qu'il ne fait plus,
-    depuis le 2026-08-12, c'est ressortir le programme derrière — voir
-    `test_plan_delivery.py`, et le drapeau « P » n'est plus le déclencheur d'un envoi.
+    What the turn MUST do is unchanged: speak normally. What it no longer does is
+    send the program behind it -- see `test_plan_delivery.py`; the "P" flag no longer
+    triggers a send.
     """
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
@@ -125,8 +123,8 @@ def test_a_plan_changing_message_answers_on_the_active_plan_when_no_revision_is_
 
 
 def test_a_plan_changing_message_without_a_valid_plan_sends_no_session(make_bot):
-    """Le verrou qui compte, lui, ne bouge pas : sans révision canonique, pas de bloc de
-    séances. La réponse part ; Sam n'a pas demandé son programme, rien n'est ajouté."""
+    """The lock that matters does not move: without a canonical revision, no session
+    block. The reply goes out; the athlete did not ask for the program, nothing is added."""
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
     repo.sync.return_value = False
@@ -143,7 +141,7 @@ def test_a_plan_changing_message_without_a_valid_plan_sends_no_session(make_bot)
 
 
 def test_a_factual_correction_is_not_blocked_by_an_unrelated_missing_plan(make_bot):
-    """Reproduction du 31/08 : corriger la chaussure est N3, pas une prescription."""
+    """Fixing the shoe is N3, not a prescription."""
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
     repo.sync.return_value = False
@@ -167,25 +165,24 @@ def test_a_factual_correction_is_not_blocked_by_an_unrelated_missing_plan(make_b
 
 
 def test_the_persisted_plan_leaves_in_its_own_message_after_the_coach(make_bot):
-    """Le plan ACCOMPAGNE le coach, il ne le remplace plus (2026-08-11).
+    """The plan ACCOMPANIES the coach, it no longer replaces it.
 
-    Remplacer verrouillait sur un indice de ce qu'on protège (« le modèle a parlé »)
-    plutôt que sur ce qu'on protège (« une prescription non écrite engage Sam »), et
-    au pire moment : un replan arrive quand la douleur monte ou qu'une séance saute,
-    donc quand il y a le plus à expliquer. Ce matin-là, Sam a reçu « Tu dis que c'est
-    plus haut que la normale ce matin. » puis sept jours de plan sérialisés, et rien
-    d'autre — tout le coaching du message avait été jeté par cette ligne.
+    Replacing locked on a clue of what is protected ("the model spoke") rather than on
+    what is protected ("an unwritten prescription binds the athlete"), and at the worst
+    moment: a replan arrives when pain rises or a session is skipped, so when there is
+    the most to explain. The athlete used to get a one-line reply and seven serialized
+    days of plan, and nothing else -- all the coaching of the message had been dropped.
 
-    Ce qui reste garanti, et ce que ce test pince : le plan persisté part, en dernier,
-    dans son propre texto. C'est lui qui fait foi, et Sam l'a toujours sous les yeux.
+    What stays guaranteed, and what this test pins: the persisted plan goes out, last,
+    in its own text message. It is authoritative, and the athlete always has it in view.
     """
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
     repo.sync.return_value = False
     yesterday = date.today() - timedelta(days=1)
-    # Le dimanche, demain appartient à la semaine suivante et ne peut donc pas
-    # apparaître dans « la suite de la semaine ». Le test porte sur une séance encore
-    # à livrer dans la semaine courante, pas sur le passage ISO dimanche -> lundi.
+    # On Sunday, tomorrow belongs to the next week and so cannot appear in "the rest of
+    # the week". The test targets a session still to deliver in the current week, not
+    # the ISO Sunday -> Monday crossing.
     remaining = date.today() + timedelta(days=1 if date.today().weekday() < 6 else 0)
     repo.weekly_plan_context.side_effect = [
         context(2, [session(yesterday), session(date.today())]),
@@ -199,14 +196,14 @@ def test_the_persisted_plan_leaves_in_its_own_message_after_the_coach(make_bot):
     assert "On garde 9 km dimanche" in client.send_burst.call_args_list[0].args[1]
     canonical = client.send_text.call_args_list[-1].args[1]
     assert canonical.startswith(CANONICAL)
-    # La suite de la semaine, pas les jours déjà passés.
+    # The rest of the week, not the days already past.
     assert f"{remaining:%d/%m}" in canonical and f"{yesterday:%d/%m}" not in canonical
 
 
 def test_the_plan_still_leaves_on_an_n0_replan(make_bot):
-    """Un replan ne demande pas de niveau de lecture : « je saute demain » est social par
-    la forme et prescriptif par le fond. La semaine perd sa séance de demain — c'est CE
-    CHANGEMENT qui fait partir le bloc, pas le niveau du triage ni son drapeau « P »."""
+    """A replan needs no reading level: "I skip tomorrow" is social by form and
+    prescriptive by substance. The week loses its session of tomorrow -- THAT CHANGE
+    sends the block, not the triage level nor its "P" flag."""
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
     repo.sync.return_value = False
@@ -224,8 +221,8 @@ def test_the_plan_still_leaves_on_an_n0_replan(make_bot):
 
 def test_a_morning_without_a_valid_plan_speaks_without_sessions_and_arms_the_repair(
         make_bot, store):
-    """RWF-009 : le mot du matin n'est plus régénéré toutes les 5 minutes pour une
-    semaine absente. Il part sans séance, et la réparation a un propriétaire unique."""
+    """The morning message is no longer regenerated every 5 minutes for a missing week.
+    It goes out without a session, and the repair has a single owner."""
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
     repo.sync.return_value = False
@@ -264,13 +261,13 @@ def test_sunday_requires_both_the_closing_and_next_week(make_bot):
 
 def test_a_morning_with_a_broken_render_still_speaks_without_regenerating(make_bot,
                                                                            store):
-    """Un rendu cassé reste un travail du service, pas un signal pour l'athlète ni une
-    raison de relancer le modèle : la prose part seule, l'incident reste au journal."""
+    """A broken rendering remains a service matter, not a signal for the athlete nor a
+    reason to re-run the model: the prose goes out alone, the incident stays in the log."""
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
     repo.sync.return_value = False
     repo.weekly_plan_context.return_value = context(2)
-    repo.weekly_plan_message.return_value = ""      # le rendu casse
+    repo.weekly_plan_message.return_value = ""      # the rendering breaks
     repo.persist_turn.return_value = PersistenceResult(True)
     repo.drain_alerts.return_value = []
     client = MagicMock()
@@ -283,13 +280,12 @@ def test_a_morning_with_a_broken_render_still_speaks_without_regenerating(make_b
 
 
 def morning_bot(make_bot, full_text, silent=False):
-    """La fenêtre proactive est ouverte en grand, et c'est le point du test.
+    """The proactive window is wide open, and that is the point of the test.
 
-    Ces deux tests sont les premiers à aller jusqu'au budget d'envoi, qui lit
-    `datetime.now()` : verts sur le Mac à 10h, rouges sur la CI qui tourne en UTC
-    avant l'ouverture à 7h30 (2026-08-11). Une horloge implicite dans un chemin qu'on
-    croit maîtrisé — la faute déjà commise le 2026-08-04 (voir README). Ce qui est
-    mesuré ici est le contenu du message, jamais l'heure qu'il est.
+    These two tests are the first to reach the send budget, which reads
+    `datetime.now()`: green on a laptop at 10:00, red on CI running in UTC before the
+    7:30 opening. An implicit clock in a path assumed to be controlled. What is measured
+    here is the message content, never the time of day.
     """
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
@@ -307,10 +303,10 @@ def morning_bot(make_bot, full_text, silent=False):
 
 
 def test_the_morning_note_survives_the_plan_it_announces(make_bot):
-    """Écraser `full_text` supprimait tout ce pour quoi le mot du matin existe : la
-    question du contrôle daté, la relance de fil, la question `daily.csv`. Il ne restait
-    qu'une ligne de séance — et un contrôle daté est justement une question à POSER
-    avant de prescrire."""
+    """Overwriting `full_text` dropped everything the morning message exists for: the
+    dated-check question, the thread reminder, the `daily.csv` question. Only a session
+    line was left -- and a dated check is precisely a question to ASK before
+    prescribing."""
     client = morning_bot(make_bot, "La blessure, elle donne quoi au réveil ce matin ?")
     sent = " ".join(call.args[1] for call in client.send_burst.call_args_list)
     assert "au réveil ce matin" in sent
@@ -318,26 +314,25 @@ def test_the_morning_note_survives_the_plan_it_announces(make_bot):
 
 
 def test_a_silent_morning_still_announces_the_day(make_bot):
-    """Le coach peut n'avoir rien à ajouter ; la séance du jour part quand même."""
+    """The coach may have nothing to add; the session of the day goes out anyway."""
     client = morning_bot(make_bot, "", silent=True)
     sent = " ".join(call.args[1] for call in client.send_burst.call_args_list)
     assert sent.strip() == "Aujourd'hui : Renfo A, 30 min"
 
 
 def test_a_cell_is_marked_asked_only_when_a_message_really_leaves(make_bot):
-    """« Demandé » veut dire qu'un message est parti, pas qu'un prompt a été assemblé.
+    """"Asked" means a message went out, not that a prompt was assembled.
 
-    Le 2026-08-10 à 10h15, le tour s'est terminé en fail-closed sans qu'un mot sorte —
-    et les trois cellules du jour ont quand même été classées « demandées ». La
-    sentinelle `?` (« demandé, et perdu ») aurait pu tomber sur une question jamais
-    posée, ce que le code s'interdit explicitement.
+    A turn once ended fail-closed without a word going out -- and the three cells of
+    the day were nonetheless classed "asked". The `?` sentinel ("asked, and lost") could
+    have landed on a question never asked, which the code explicitly forbids.
     """
     entry = {"date": "2026-08-10", "type": "easy", "missing": ["RPE", "Dlr", "Plaisir"]}
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
     repo.sync.return_value = False
-    repo.weekly_plan_context.return_value = ""          # semaine sans plan valide
-    repo.persist_turn.return_value = PersistenceResult(False)  # donc fail-closed
+    repo.weekly_plan_context.return_value = ""          # week without a valid plan
+    repo.persist_turn.return_value = PersistenceResult(False)  # hence fail-closed
     repo.pending_ledger_cells.return_value = [entry]
     repo.drain_alerts.return_value = []
     bot = make_bot(repo=repo, client=MagicMock(),

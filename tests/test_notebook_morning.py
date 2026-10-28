@@ -1,7 +1,7 @@
-"""Le point du matin et la question d'une FC haute, sans base : un registre en mémoire.
+"""The morning check-in and the high-heart-rate question, without a database: an in-memory ledger.
 
-Ce que le carnet écrit ici passe par `put_daily`, qui remplace la ligne du jour : le
-carnet doit donc compléter l'état sans effacer ce qu'un autre canal y a déjà mis.
+What the notebook writes here goes through `put_daily`, which replaces the day row: the
+notebook must therefore complete the state without erasing what another channel already put there.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ def known(value):
 
 
 def ef(day: dt.date, hr: int) -> dict:
-    """Une EF plate de 8 km en 48 min, complète : rien à réclamer."""
+    """A flat 8 km easy run in 48 min, complete: nothing to ask for."""
     return {"id": uuid.uuid4(), "kind": "easy", "occurred_on": day, "note": "",
             "idempotency_key": f"strava:{day}", "started_at": None,
             "measurements": {"distance_km": known(8.0), "duration_s": known(48 * 60),
