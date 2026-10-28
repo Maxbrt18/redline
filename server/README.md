@@ -8,7 +8,7 @@ systemd et l'utilisateur `ubuntu` sont ceux d'un VPS réel, à adapter avant d'i
 La vue d'ensemble, le chemin d'un message et les invariants décrivent le système tel quel.
 
 La politique de coaching ne vit pas dans le service. Elle appartient à `CLAUDE.md`,
-aux notes propriétaires du vault et aux schémas de `scripts/model/`. Le service
+aux notes propriétaires du vault et aux schémas de `src/redline/model/`. Le service
 authentifie, ordonnance, persiste et livre.
 
 ## Vue d'ensemble
@@ -113,19 +113,19 @@ comme annulés parce qu'une projection ou un push Git a échoué.
 | `outbox.py` | cycle de vie des images et sidecars |
 | `strength_artifact.py` | carte renfo rendue depuis la prescription typée |
 | `prompts.py` | choix des textes injectés à chaque tour et des workflows proactifs |
-| `scripts/coach/fr/` | les mots du coach et du service : `prompts/*.md`, `messages.py` (notes), `replies.py` (limites), `initiatives.py`, `notebook.py`, `session_labels.py`, `calendar.py` |
+| `src/redline/coach/fr/` | les mots du coach et du service : `prompts/*.md`, `messages.py` (notes), `replies.py` (limites), `initiatives.py`, `notebook.py`, `session_labels.py`, `calendar.py` |
 | `strength.py`, `page/` | capacités opaques et page de renforcement |
-| `scripts/storage/repository/` | transactions et faits opérationnels, un module par agrégat |
-| `scripts/storage/projector.py` | vues Obsidian régénérables |
+| `src/redline/storage/repository/` | transactions et faits opérationnels, un module par agrégat |
+| `src/redline/storage/projector.py` | vues Obsidian régénérables |
 
 Pour modifier un comportement :
 
 - ton, méthode ou règle de coaching : `CLAUDE.md` ou son propriétaire dans le vault ;
-- texte injecté par le service : `scripts/coach/fr/` ; quand il est injecté : `prompts.py` ;
+- texte injecté par le service : `src/redline/coach/fr/` ; quand il est injecté : `prompts.py` ;
 - décision d'envoi : `bot.py` ;
-- forme du programme : `scripts/model/weekly_plan.py` ;
+- forme du programme : `src/redline/model/weekly_plan.py` ;
 - rendu Messenger du programme : `plans.py` ;
-- persistance d'un fait : le module de son agrégat dans `scripts/storage/repository/` ;
+- persistance d'un fait : le module de son agrégat dans `src/redline/storage/repository/` ;
 - calendrier d'une initiative : `proactive.py`.
 
 ## Invariants
@@ -191,7 +191,7 @@ Pour modifier un comportement :
   dépendances ou les assets lus au démarrage.
 - **« Runtime » = le service tourne différemment après ce commit** (choix de design,
   2026-08-21). Ni `coaching/exercises/*.md` — des données relues à chaque appel de
-  `chart-strength.py`, et que le coach édite lui-même — ni `server/tests/` n'en sont :
+  `chart-strength.py`, et que le coach édite lui-même — ni `tests/` n'en sont :
   aucun ne demande de redémarrage, et un test poussé avec du code est de toute façon
   retenu par le code. Les y avoir laissés faisait geler la synchronisation du vault sur
   une écriture parfaitement légitime.
@@ -348,7 +348,7 @@ fictives avec les profils du fournisseur de `AGENT_PROVIDER` (Claude en producti
 route du scénario, juge sur le profil N2), sans outil, mémoire persistante ni envoi.
 `ClaudeCodeRunner.one_shot` lance `claude -p` dans un dossier vide, donc sans `CLAUDE.md`,
 comme le banc Codex ; `evaluation/runner.py` borne les modèles payables.
-Les fixtures `server/tests/fixtures/coaching-scenarios.json` portent 36 scénarios, leur
+Les fixtures `tests/fixtures/coaching-scenarios.json` portent 36 scénarios, leur
 contexte, posture, réponse illustrative et critères d'acceptation ; ceux qui naissent d'une
 correction réelle nomment leur origine (`origin`), vérifiée par `test_coaching_scenarios.py`. Le registre `coaching/corrections-replay.json` du vault donne à chaque entrée de
 `coaching/corrections.md` son mode de rejeu ; `vault-check.py` signale celles qui attendent
@@ -356,7 +356,7 @@ encore un scénario (`a-rejouer`). Les routes sont imposées
 par les fixtures et les lectures remplacées par des faits fictifs : ce banc évalue la
 rédaction, pas le routage réel ni les effets des outils. La relecture humaine reste nécessaire ;
 les compteurs de questions et paragraphes ne mesurent pas le naturel. Avec
-`--fixtures server/tests/fixtures/coaching-review-cases.json`, le même outil teste treize
+`--fixtures tests/fixtures/coaching-review-cases.json`, le même outil teste treize
 verdicts attendus et échoue sur un désaccord. Ces appels explicites sont payants, hors CI ;
 les tests déterministes couvrent séparément mémoire, échecs d'outils et transport.
 
@@ -456,7 +456,7 @@ course à venir à la plus longue des 30 jours précédents. Elle est informativ
 rien : aucun pourcentage fixe ne borne la sortie longue. Les règles en vigueur, une
 ligne chacune, leurs seuils et les natures de transition vivent dans `rulebook.toml` à la
 racine du vault ; sans lui, le moteur applique `rulebook.default.toml`, qu'un vault
-remplace en entier, jamais en partie. `scripts/model/rulebook.py` le valide (le service
+remplace en entier, jamais en partie. `src/redline/model/rulebook.py` le valide (le service
 refuse de démarrer sur un règlement non conforme) et le relit s'il change. Le paquet de
 contexte l'injecte à chaque tour N1+ et au bilan.
 
@@ -896,7 +896,7 @@ fond de ses zones, le temps par zone, la séance précédente du même type, la 
 chaussures et la semaine. Les flux allégés et la météo horaire sont relevés chez Strava et
 Open-Meteo au premier affichage, puis gardés dans `strava_activity_intakes.streams` et
 `.weather` ; une panne laisse l'écran sans son graphique. Les zones sont celles de
-Karvonen (`scripts/model/hr_zones.py`) sur la FC de repos et la FC max de
+Karvonen (`src/redline/model/hr_zones.py`) sur la FC de repos et la FC max de
 `redline.toml`, jamais celles de Strava. Sur une
 qualité, la réserve (garde-fou n°6) se déclare d'un geste tant que la séance est dans sa
 fenêtre de complétude : `reserve:<observation>` écrit la mesure `reps_in_reserve`.

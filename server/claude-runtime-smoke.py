@@ -48,8 +48,8 @@ def _cli_call_allowed(binary: str, model: str, cwd: str) -> None:
     cours ») : sa réponse prouve que la commande a passé les permissions, sans rien
     lire ni écrire en base.
     """
-    from redline.claude import AUTONOMOUS_PERMISSIONS
-    from scripts.model import agent_input
+    from redline.model import agent_input
+    from redline.service.claude import AUTONOMOUS_PERMISSIONS
 
     turn = str(uuid.uuid4())
     path = agent_input.turn_path(turn)

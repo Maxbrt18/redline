@@ -42,25 +42,26 @@ the facts before it speaks**.
 
 | Path | What it is |
 |---|---|
-| `server/redline/` | The service: Messenger and Strava webhooks, proactive messages, agent runtime, mobile "notebook" web app (PWA) |
-| `scripts/` | The CLIs the agent calls (`ledger*.py`, `week-plan.py`, `strava.py`, `weather.py`, `fact-*.py`…) and the typed models behind them |
-| `scripts/storage/`, `migrations/` | PostgreSQL schema (Alembic) and repository layer |
-| `scripts/cards/` | HTML/PNG card renderer (week, month, workout, strength) |
+| `src/redline/service/` | The service: Messenger and Strava webhooks, proactive messages, agent runtime, mobile "notebook" web app (PWA) |
+| `src/redline/cli/` | The commands the agent calls (`ledger.py`, `week-plan.py`, `strava.py`, `fact-write.py`…), one module each |
+| `src/redline/model/`, `analysis/`, `integrations/`, `coach/` | The typed domain, the ledger and its reports, Strava and the weather, the coach's words |
+| `src/redline/storage/`, `migrations/` | PostgreSQL schema (Alembic) and repository layer |
+| `src/redline/cards/` | HTML/PNG card renderer (week, month, workout, strength) |
 | `templates/` | Note templates for a vault (athlete onboarding, weekly review, debrief…) |
 | `CLAUDE.md` | A **template** of the agent's instruction file: reading ladder, calibration rule, fact-ownership table |
 | `docs/storage-architecture.md` | Why PostgreSQL owns operational facts and Git owns knowledge |
-| `server/tests/` | 1,976 tests (engine, storage, web app, prompts), run against a fictional vault; 159 skip without PostgreSQL |
+| `tests/` | 1,982 tests (engine, storage, web app, prompts), run against a fictional vault; 159 skip without PostgreSQL |
 
 ## The cards
 
 Some answers are images instead of prose: the weekly recap, the month view, the workout
 debrief and the strength session arrive as cards typeset by the browser renderer in
-`scripts/cards/`, from the numbers the ledger already owns. The three below are rendered
-from the committed samples (`scripts/cards/samples/*.json`; the race name is a
+`src/redline/cards/`, from the numbers the ledger already owns. The three below are rendered
+from the committed samples (`src/redline/cards/samples/*.json`; the race name is a
 placeholder):
 
 ```bash
-python3 scripts/chart-week.py -o /tmp/week.png < scripts/cards/samples/week.json
+python -m redline.cli.chart_week -o /tmp/week.png < src/redline/cards/samples/week.json
 ```
 
 <p>
@@ -76,7 +77,7 @@ python3 scripts/chart-week.py -o /tmp/week.png < scripts/cards/samples/week.json
 The knowledge vault of the original deployment (athlete profile, journal, decisions,
 corrections, research notes, strength programme) is private and deliberately absent. Bring
 your own: the scripts expect a vault laid out as described in `CLAUDE.md`. The test suite
-ships a small fictional one, Sam's, in `server/tests/fixtures/vault/`: the tests run on a
+ships a small fictional one, Sam's, in `tests/fixtures/vault/`: the tests run on a
 temporary copy of it through `VAULT_PATH`, exactly as the service runs on yours.
 
 ## Running it
@@ -89,8 +90,9 @@ runtime.
 ```bash
 python3.12 -m venv .venv && . .venv/bin/activate
 pip install -r server/requirements.txt -r server/requirements-dev.txt
+pip install --no-deps -e .   # the engine, as the `redline` package
 playwright install chromium   # the page and card tests drive a real browser
-PYTHONPATH=.:server pytest -q server/tests
+pytest -q
 ```
 
 Every skip carries its reason: 159 need PostgreSQL (`TEST_DATABASE_URL`), and the browser

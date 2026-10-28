@@ -37,18 +37,24 @@ uuid='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
   exit 2
 }
 
+# `week-plan.py` est la commande que nomment les consignes ; `redline.cli.week_plan`
+# est le module qui la porte.
+name=${script%.py}
+module="redline.cli.${name//-/_}"
+source_file="src/redline/cli/${name//-/_}.py"
+
 cd "$repo"
-[ -f "scripts/$script" ] || {
-  echo "agent-cli: scripts/$script absent" >&2
+[ -f "$source_file" ] || {
+  echo "agent-cli: $source_file absent" >&2
   exit 1
 }
-git ls-files --error-unmatch -- "scripts/$script" >/dev/null 2>&1 || {
-  echo "agent-cli: script non suivi par Git" >&2
+git ls-files --error-unmatch -- "$source_file" >/dev/null 2>&1 || {
+  echo "agent-cli: commande non suivie par Git" >&2
   exit 1
 }
 
 runtime_changes=$(git status --porcelain --untracked-files=all -- \
-  scripts server migrations alembic.ini pyproject.toml)
+  src server migrations alembic.ini pyproject.toml)
 [ -z "$runtime_changes" ] || {
   echo "agent-cli: runtime différent du commit déployé, exécution refusée" >&2
   exit 1
@@ -75,4 +81,4 @@ vault=${VAULT_PATH:-$repo}
   exit 1
 }
 cd "$vault"
-exec "$python_bin" "$repo/scripts/$script" "$@"
+exec "$python_bin" -m "$module" "$@"

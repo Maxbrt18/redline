@@ -30,16 +30,10 @@ on:
       - "pyproject.toml"
       - "alembic.ini"
       - "migrations/**"
-      - "server/postgres/**"
-      - "server/**/*.py"
-      - "server/requirements*.txt"
-      - "server/redline/page/**"
-      # Scénarios et registre de rejeu : pytest en vérifie le schéma, et ci-gate.sh
-      # exige ce workflow pour tout SHA poussé.
-      - "server/tests/fixtures/**"
-      - "scripts/**/*.py"
+      - "server/**"
+      - "src/**"
+      - "tests/**"
       - "scripts/**/*.sh"
-      - "scripts/cards/**"
   pull_request:
   workflow_dispatch:
 
@@ -92,6 +86,7 @@ jobs:
                                         'psycopg[binary,pool]==3.3.3' \
                                         "$CODEX_REQUIREMENT" \
                                         types-requests types-PyYAML
+          python -m pip install --quiet --no-deps -e .
 
       - name: Database schema
         env:

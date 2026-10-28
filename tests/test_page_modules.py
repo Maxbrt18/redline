@@ -1,0 +1,220 @@
+"""Les modules du carnet et du renfo, vérifiés sans navigateur.
+
+Le code s'écrit en modules ES et le service les assemble en un seul script
+(`redline.service.page.bundle`). Dans ce script, tout partage une portée : un nom oublié
+dans un `import` marcherait quand même, et la liste des imports cesserait de dire
+de quoi dépend un fichier. Ces tests tiennent la promesse des modules :
+
+- tout ce qu'un module prend à un autre est importé, et tout import sert ;
+- un module ne réassigne jamais ce qu'il importe (il passe par une fonction du
+  module propriétaire, comme `setTimer`), sinon le code ne tiendrait plus chargé
+  par un navigateur comme de vrais modules ;
+- une déclaration exportée ne déclare qu'un nom, pour que l'assemblage la voie ;
+- aucun fichier n'est oublié dans les listes d'assemblage.
+
+L'analyse est lexicale (un tokenizer JS minimal) : elle connaît les chaînes, les
+gabarits, les commentaires et les expressions régulières, pas la portée. Une
+variable locale qui porte le nom d'un export d'un autre module se lit donc comme
+un emprunt : renomme la variable locale.
+"""
+
+from __future__ import annotations
+
+import posixpath
+import re
+
+import pytest
+
+from redline.service import page
+
+IDENT = re.compile(r"[A-Za-z_$][\w$]*")
+NUMBER = re.compile(r"\d[\d_]*(?:\.\d+)?(?:e[+-]?\d+)?|\.\d+")
+PUNCT = re.compile(r"\?\.|\?\?=?|\.\.\.|===|!==|\*\*=?|=>|<<=|>>>?=?|[-+*/%&|^<>!=]=|&&=?|\|\|=?|\+\+|--|<<|>>"
+                   r"|[{}()\[\];,.<>+\-*/%&|^!~?:=@#]")
+# Après ces tokens, une barre oblique ouvre une expression régulière, pas une division.
+REGEX_BEFORE = {"(", ",", "=", ":", "[", "!", "&", "|", "?", "{", "}", ";", "+", "-", "*", "%", "<", ">",
+                "~", "^", "=>", "&&", "||", "??", "==", "===", "!=", "!==", "+=", "-=",
+                "return", "typeof", "case", "do", "else", "in", "of", "new", "delete", "void", "throw"}
+ASSIGN = {"=", "+=", "-=", "*=", "/=", "%=", "&&=", "||=", "??=", "++", "--"}
+
+
+def tokens(src: str) -> list[tuple[str, str, int]]:
+    out: list[tuple[str, str, int]] = []
+    _scan(src, 0, out, inside=False)
+    return out
+
+
+def _scan(src: str, pos: int, out: list, inside: bool) -> int:
+    """Jusqu'à la fin, ou jusqu'au } qui ferme un ${...} quand `inside`."""
+    depth, end = 0, len(src)
+    while pos < end:
+        char = src[pos]
+        if char in " \t\r\n":
+            pos += 1
+        elif src.startswith("//", pos):
+            newline = src.find("\n", pos)
+            pos = end if newline < 0 else newline
+        elif src.startswith("/*", pos):
+            pos = src.index("*/", pos) + 2
+        elif char in "'\"":
+            stop = pos + 1
+            while src[stop] != char:
+                stop += 2 if src[stop] == "\\" else 1
+            out.append(("str", src[pos:stop + 1], pos))
+            pos = stop + 1
+        elif char == "`":
+            out.append(("tmpl", "`", pos))
+            stop = pos + 1
+            while src[stop] != "`":
+                if src[stop] == "\\":
+                    stop += 2
+                elif src.startswith("${", stop):
+                    stop = _scan(src, stop + 2, out, inside=True)
+                else:
+                    stop += 1
+            pos = stop + 1
+        elif char == "}" and inside and depth == 0:
+            return pos + 1
+        elif match := IDENT.match(src, pos):
+            out.append(("id", match.group(), pos))
+            pos = match.end()
+        elif match := NUMBER.match(src, pos):
+            out.append(("num", match.group(), pos))
+            pos = match.end()
+        elif char == "/" and (not out or (out[-1][0] in ("punct", "id") and out[-1][1] in REGEX_BEFORE)):
+            stop, in_class = pos + 1, False
+            while src[stop] != "/" or in_class:
+                if src[stop] == "\\":
+                    stop += 1
+                elif src[stop] in "[]":
+                    in_class = src[stop] == "["
+                stop += 1
+            pos = stop + 1
+            while pos < end and src[pos].isalpha():
+                pos += 1
+            out.append(("regex", "", pos))
+        else:
+            match = PUNCT.match(src, pos)
+            assert match, f"caractère inattendu {char!r} en {pos}"
+            value = match.group()
+            depth += (value == "{") - (value == "}")
+            out.append(("punct", value, pos))
+            pos = match.end()
+    return pos
+
+
+def references(toks):
+    """Les identifiants employés comme variables : ni propriété, ni clé d'objet."""
+    for index, (kind, value, _) in enumerate(toks):
+        if kind != "id":
+            continue
+        before = toks[index - 1][1] if index else None
+        after = toks[index + 1][1] if index + 1 < len(toks) else None
+        if before in (".", "?.") or (after == ":" and before in ("{", ",")):
+            continue
+        yield value, index
+
+
+def declared_at_top(toks) -> list[str]:
+    names, depth, index = [], 0, 0
+    while index < len(toks):
+        kind, value, _ = toks[index]
+        if kind == "punct" and value in "([{":
+            depth += 1
+        elif kind == "punct" and value in ")]}":
+            depth -= 1
+        elif depth == 0 and value in ("function", "class") and kind == "id":
+            names.append(toks[index + 1 + (toks[index + 1][1] == "*")][1])
+        elif depth == 0 and value in ("const", "let") and kind == "id":
+            names.append(toks[index + 1][1])
+            inner, cursor = 0, index + 2
+            while cursor < len(toks) and not (inner == 0 and toks[cursor][1] == ";"):
+                if toks[cursor][1] in "([{" and toks[cursor][0] == "punct":
+                    inner += 1
+                elif toks[cursor][1] in ")]}" and toks[cursor][0] == "punct":
+                    inner -= 1
+                elif inner == 0 and toks[cursor][1] == "," and toks[cursor + 2][1] in ("=", ";", ","):
+                    names.append(toks[cursor + 1][1])
+                cursor += 1
+        index += 1
+    return names
+
+
+IMPORT = re.compile(r"^import \{([^}]*)\} from '([^']+)';\n", re.MULTILINE)
+BUNDLES = {"carnet": page.CARNET_SCRIPT}
+
+
+def modules(names):
+    """{module: (source sans imports, tokens, noms déclarés au niveau 0, imports)}."""
+    found = {}
+    for name in names:
+        source = (page.PAGE_DIR / name).read_text(encoding="utf-8")
+        imported = {}
+        for listed, target in IMPORT.findall(source):
+            resolved = posixpath.normpath(posixpath.join(posixpath.dirname(name), target))
+            for item in listed.split(","):
+                imported[item.strip()] = resolved
+        body = IMPORT.sub("", source)
+        toks = tokens(body)
+        found[name] = (body, toks, declared_at_top(toks), imported)
+    return found
+
+
+@pytest.mark.parametrize("bundle", BUNDLES)
+def test_each_page_assembles_into_one_script(bundle):
+    script = page.bundle(BUNDLES[bundle])
+    assert script.startswith("(() => {\n'use strict';") and "\nimport " not in script
+
+
+@pytest.mark.parametrize("bundle", BUNDLES)
+def test_a_module_imports_exactly_what_it_borrows(bundle):
+    found = modules(BUNDLES[bundle])
+    owner = {declared: name for name, (_, _, names, _) in found.items() for declared in names}
+    problems = []
+    for name, (_, toks, names, imported) in found.items():
+        used = {value for value, _ in references(toks)}
+        for borrowed in sorted(used - set(names)):
+            if borrowed in owner and owner[borrowed] != name and imported.get(borrowed) != owner[borrowed]:
+                problems.append(f"{name} emploie {borrowed} sans l'importer de {owner[borrowed]}")
+        problems += [f"{name} importe {item} sans s'en servir" for item in imported if item not in used]
+    assert not problems, "\n".join(problems)
+
+
+@pytest.mark.parametrize("bundle", BUNDLES)
+def test_a_module_never_reassigns_an_import(bundle):
+    problems = []
+    for name, (_, toks, _, imported) in modules(BUNDLES[bundle]).items():
+        for value, index in references(toks):
+            after = toks[index + 1][1] if index + 1 < len(toks) else None
+            before = toks[index - 1][1] if index else None
+            if value in imported and (after in ASSIGN or before in ("++", "--")):
+                problems.append(f"{name} réassigne {value} (importé de {imported[value]})")
+    assert not problems, "\n".join(problems)
+
+
+@pytest.mark.parametrize("bundle", BUNDLES)
+def test_an_exported_declaration_declares_one_name(bundle):
+    problems = []
+    for name in BUNDLES[bundle]:
+        for line in (page.PAGE_DIR / name).read_text(encoding="utf-8").splitlines():
+            if re.match(r"export (const|let) ", line) and len(declared_at_top(tokens(line + ";"))) > 1:
+                problems.append(f"{name} : {line[:80]}")
+    assert not problems, "\n".join(problems)
+
+
+def test_every_module_and_stylesheet_is_assembled():
+    listed = {*page.CARNET_SCRIPT, *page.CARNET_STYLE}
+    on_disk = {str(path.relative_to(page.PAGE_DIR)) for folder in ("shared", "carnet", "strength")
+               for pattern in ("*.js", "*.css") for path in (page.PAGE_DIR / folder).rglob(pattern)}
+    on_disk.discard("carnet/sw.js")  # le service worker, servi tel quel par sa route
+    assert on_disk == listed
+
+
+def test_a_broken_import_stops_the_service_instead_of_blanking_the_page(tmp_path, monkeypatch):
+    (tmp_path / "a.js").write_text("import {missing} from './b.js';\nmissing();\n")
+    (tmp_path / "b.js").write_text("export function present() {}\n")
+    monkeypatch.setattr(page, "PAGE_DIR", tmp_path)
+    page.bundle.cache_clear()
+    with pytest.raises(ValueError, match="missing"):
+        page.bundle(("b.js", "a.js"))
+    page.bundle.cache_clear()

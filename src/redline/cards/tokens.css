@@ -1,0 +1,82 @@
+/* Redline design tokens -- the palette and the faces, and nothing else.
+ *
+ * Shared by the cards and the interactive session page (src/redline/service/page/):
+ * tokens are shared, geometry is not.
+ *
+ * TWO PALETTES, ONE SET OF NAMES (2026-10-01, charte « Ligne rouge »). Both derive
+ * from the logo: its red (#d40000) and its warm black. The light one is the
+ * default; the dark one applies under data-theme="dark", or when the phone asks
+ * for it and nothing pinned the theme.
+ *  - The cards pin theme in render.py (CARD_THEME). Switching every card to dark
+ *    is that one constant.
+ *  - The page pins nothing: it follows the phone.
+ * The dark block is written twice (attribute, then media query) because CSS
+ * cannot join an attribute selector and a media query in one rule. Edit both.
+ *
+ * WHAT THE COLOURS MEAN. Everything is ink, except intensity and what crosses
+ * the line:
+ *  --ink / --muted / --faint  text, by rank
+ *  --data                     volume done (bars, rails): volume is not intensity
+ *  --ghost                    what was planned, and the recoveries: the frame
+ *                             the data sits in
+ *  --red                      the logo red: the brand mark, and intensity -- a
+ *                             quality rep run within its limit
+ *  --over                     a limit crossed: a rep faster than R1, a gauge past
+ *                             its cap, the verdict that reports it. It is --red
+ *                             pushed toward the ink, one
+ *                             step further on the same scale (darker on paper,
+ *                             lighter on black): more intense than intense
+ *                             (l'athlète, 2026-10-01). Derived by color-mix, so it
+ *                             follows both palettes and never drifts from --red.
+ * There is no green and no amber any more: a status that is not a crossing is
+ * said in words, not in a coloured dot.
+ */
+:root {
+  --bg:     #f7f5f2;
+  --panel:  #ebe7e2;   /* the only surfaces left: what a finger can press */
+  --grid:   #ddd7d0;
+  --ink:    #1a1514;
+  --muted:  #5f5650;
+  --faint:  #8a8079;
+  --data:   #2e2725;
+  --ghost:  #dcd5cd;
+  --red:    #d40000;
+  --over:   color-mix(in oklab, var(--red) 58%, var(--ink));
+  --brand:  #d40000;
+
+  --radius: 12px;
+
+  --sans:    'Redline Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --display: 'Redline Display', 'Redline Sans', system-ui, sans-serif;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg:     #110e0d;
+  --panel:  #221d1b;
+  --grid:   #2e2826;
+  --ink:    #f5f0ea;
+  --muted:  #a69d95;
+  --faint:  #7b726b;
+  --data:   #d8cdc1;
+  --ghost:  #3a3330;
+  --red:    #f0362b;   /* the logo red is too dark to be READ on black */
+  --brand:  #d40000;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:     #110e0d;
+    --panel:  #221d1b;
+    --grid:   #2e2826;
+    --ink:    #f5f0ea;
+    --muted:  #a69d95;
+    --faint:  #7b726b;
+    --data:   #d8cdc1;
+    --ghost:  #3a3330;
+    --red:    #f0362b;
+    --brand:  #d40000;
+    color-scheme: dark;
+  }
+}

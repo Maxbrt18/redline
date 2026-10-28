@@ -1,6 +1,21 @@
-# Tooling only: the service dependencies live in server/requirements.txt. Vault scripts
-# run as `python3 scripts/<name>.py`, and the service as `python3 -m redline`; neither
-# application package is installed into the venv.
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+# The engine installs as the `redline` package, editable (`pip install --no-deps -e .`):
+# the checkout stays the code that runs. Its pinned dependencies live in
+# server/requirements.txt, which the runtime updater installs into the service venv.
+[project]
+name = "redline"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"*" = ["*.md", "*.css", "*.js", "*.html", "*.json", "*.toml", "*.txt", "*.png", "*.woff2"]
 
 [tool.ruff]
 line-length = 100
@@ -25,27 +40,24 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["evaluation", "redline", "scripts"]
+known-first-party = ["redline"]
 
 [tool.ruff.lint.per-file-ignores]
 # Test names are sentences on purpose (test_a_view_is_replaced_between_its_markers).
-"server/tests/*" = ["E741"]
+"tests/*" = ["E741"]
 
 [tool.vulture]
 # Le code de production seul : les tests n'entrent pas dans l'analyse, donc une
 # fonction que seul son propre test appelle est signalée comme morte (2026-09-28 :
 # une quinzaine en vivaient ainsi). Un faux positif se déclare ici, nommé.
-paths = ["scripts", "server/redline", "server/evaluation", "server/codex-runtime-smoke.py",
-         "server/claude-runtime-smoke.py", "server/agent-runtime-update.py",
-         "server/evaluate-coaching.py",
-         "server/evaluate-conversation.py",
-         "server/setup_messenger_profile.py", "server/notebook-import.py"]
+paths = ["src", "server/codex-runtime-smoke.py", "server/claude-runtime-smoke.py",
+         "server/agent-runtime-update.py"]
 exclude = ["*/tests/*"]
 min_confidence = 60
 # Routes Flask : appelées par le framework, jamais par le code.
 ignore_decorators = ["@app.get", "@app.post", "@app.before_request", "@app.after_request", "@app.errorhandler"]
 ignore_names = [
-    # Chargement paresseux du paquet `scripts.storage` (PEP 562).
+    # Chargement paresseux du paquet `redline.storage` (PEP 562).
     "__getattr__",
     # Déclaration des déclencheurs que la base doit porter, vérifiée contre elle.
     "TRIGGERS",
@@ -66,23 +78,16 @@ ignore_names = [
 # existing for eleven days, and the Sunday review crashed instead of being deferred.
 # Neither ruff nor the tests see a missing method on `self`; mypy names it.
 python_version = "3.12"
-# Tout `scripts/` depuis le 2026-08-18, CLI à tiret comprises. Ce qui l'en empêchait
-# n'était pas leur nom mais la double racine d'import : chargées comme `scripts.*`,
-# elles faisaient voir à mypy les mêmes modules de modèle sous deux noms. La racine est
-# unique désormais (voir `tests/test_racine_import.py`), et ces ~2 500 lignes sont
-# précisément celles que le coach exécute à chaque tour.
-files = ["server/redline", "server/evaluation", "scripts"]
+files = ["src"]
 warn_unused_ignores = true
 warn_redundant_casts = true
 
 [[tool.mypy.overrides]]
 # No stubs published, and the import is already guarded at the call site.
-module = ["waitress", "playwright.*", "redline.*"]
+module = ["waitress", "playwright.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
-testpaths = ["server/tests"]
-# `.` porte `scripts.*`, `server` porte `redline.*`. UNE racine par arbre, et `scripts`
-# n'est PAS sur le chemin : un `from model.x import` y retrouverait le même module sous
-# un second nom, avec ses propres classes -- deux `SchemaError` qui ne se rattrapent pas.
-pythonpath = [".", "server"]
+testpaths = ["tests"]
+# `tests` for conftest helpers; `src` so the suite runs without an install.
+pythonpath = ["tests", "src"]
