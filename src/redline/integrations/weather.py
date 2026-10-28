@@ -1,46 +1,42 @@
 #!/usr/bin/env python3
-"""Météo d'un run, pour nourrir le jugement du coach.
+"""Weather of a run, to inform the coach's judgement.
 
-Croise le lieu + l'heure de départ d'une activité avec Open-Meteo (gratuit, sans
-clé API) et renvoie un résumé compact en français : température, humidité, vent,
-précipitations, et le **WBGT** — la charge thermique réelle, qui est ce qui va au
-registre. Stdlib uniquement, y compris le WBGT — rien à installer sur le VPS.
+Combines the place and start time of an activity with Open-Meteo (free, no API key)
+and returns a compact French summary: temperature, humidity, wind, precipitation,
+and the **WBGT**, the real heat load, which is what goes into the ledger. Standard
+library only, WBGT included, so nothing has to be installed on the server.
 
-Le coach 24/7 récupère le polyline encodé et l'heure de départ avec
-`python3 scripts/strava.py activity <id>`, qui les rend prêts à l'emploi dans son
-bloc `weather_query`.
+The coach gets the encoded polyline and the start time from
+`python3 scripts/strava.py activity <id>`, which returns them ready to use in its
+`weather_query` block.
 
-⚠ **Strava ne donne qu'une heure murale locale, SANS fuseau.** C'est le seul appel
-à connaître :
+Strava only gives a local wall-clock time, WITHOUT a timezone. This is the one call
+to know:
 
   python3 scripts/weather.py --polyline 'ki{eFvqfiVsBc@...' \
       --time '2026-08-05T19:01:46' --local
 
-`--local` dit « cette heure est l'heure locale du lieu de départ » et le script
-résout le décalage lui-même auprès d'Open-Meteo (`timezone=auto` sur les
-coordonnées). **Ne colle JAMAIS un `Z` sur un `start_local` pour le faire
-passer** : ça le déclare UTC, donc décalé de 2 h l'été à Paris, donc lu sur la
-mauvaise heure de la rampe thermique — c'est exactement le bug du 2026-08-05
-(29 °C écrits pour 31-33 °C réels, voir `coaching/corrections.md`).
+`--local` means "this time is the local time of the start place"; the script resolves
+the offset itself from Open-Meteo (`timezone=auto` on the coordinates). NEVER append
+a `Z` to a `start_local` to make it pass: that declares it UTC, so it is shifted by
+the local offset and read at the wrong hour of the thermal ramp.
 
-Sans `--local`, `--time` exige un fuseau explicite (`+02:00`, ou `Z` si et
-seulement si l'heure est vraiment en UTC).
+Without `--local`, `--time` requires an explicit timezone (`+02:00`, or `Z` only if
+the time really is UTC).
 
-Le script lit **deux points** : le départ (1ᵉʳ point du polyline) et le milieu du
-parcours. Quand les deux divergent de plus de 2 °C, il le dit — une boucle qui
-part des coteaux et descend en ville ne se résume pas par sa météo de départ.
+The script reads **two points**: the start (first polyline point) and the middle of
+the route. When the two differ by more than 2 degrees C it says so: a loop that
+starts on hillsides and descends into town is not summed up by its start weather.
 
-**Le WBGT est ce qui compte, pas la température.** 23 °C à 78 % d'humidité
-chargent autant que 31 °C à 37 % ; une colonne de température rangeait ces deux
-séances à 8 °C l'une de l'autre. Le calcul est plus bas (portage de Liljegren) et
-sa lecture est dans `coaching/protocols.md` § Lire la charge thermique. ⚠ Il se
-**consigne**, il ne prescrit rien.
+**WBGT is what matters, not air temperature.** 23 C at 78 % humidity loads as much as
+31 C at 37 %; a temperature column would rank those two sessions 8 C apart. The
+computation is below (Liljegren port) and how to read it is in `coaching/protocols.md`.
+It is recorded, it prescribes nothing.
 
-Open-Meteo : l'API `forecast` sert le passé récent, l'API `archive` au-delà. La
-bascule et sa raison sont au point de décision, pas ici. Confronté aux METAR de
-Paris-Orly et Roissy le 2026-08-06, le modèle colle aux thermomètres réels
-à **±0,5 °C** — quand un chiffre paraît faux, c'est l'appel qu'il faut suspecter
-(heure, lieu), pas le modèle.
+Open-Meteo: the `forecast` API serves the recent past, the `archive` API anything
+older. The switch and its reason are at the decision point, not here. Checked against
+airport METAR observations, the model matches real thermometers to about +-0.5 C:
+when a figure looks wrong, suspect the call (time, place), not the model.
 """
 
 import argparse
@@ -59,11 +55,11 @@ HOURLY = ("temperature_2m,apparent_temperature,relative_humidity_2m,"
           "wind_speed_10m,precipitation,weather_code,surface_pressure,"
           "shortwave_radiation,direct_radiation")
 
-# Au-delà de cet écart entre le départ et le milieu du parcours, la météo de
-# départ ne décrit plus la séance et le résumé le signale.
+# Beyond this gap between the start and the middle of the route, the start weather no
+# longer describes the session and the summary flags it.
 ECART_SIGNIFICATIF_C = 2.0
 
-# Codes WMO → libellé FR (sous-ensemble utile pour de la course).
+# WMO codes -> French label (subset useful for running).
 WMO = {
     0: "ciel dégagé", 1: "plutôt dégagé", 2: "partiellement nuageux", 3: "couvert",
     45: "brouillard", 48: "brouillard givrant",
@@ -79,22 +75,20 @@ WMO = {
 
 
 # ---------------------------------------------------------------------------
-# WBGT extérieur — portage fidèle de Liljegren et al. (2008)
+# Outdoor WBGT: faithful port of Liljegren et al. (2008)
 #
-# « Modeling the Wet Bulb Globe Temperature Using Standard Meteorological
-# Measurements », J Occup Environ Hyg 5(10):645-655. C'est le standard de fait,
-# et la seule implémentation dont la littérature de performance (Ely 2007) est
-# l'usage direct. Note-source : episodes/src-liljegren-wbgt-model.md
+# "Modeling the Wet Bulb Globe Temperature Using Standard Meteorological
+# Measurements", J Occup Environ Hyg 5(10):645-655. It is the de facto standard.
 #
-# ⚠ **Portage, pas approximation.** Les corrélations, coefficients et constantes
-# viennent de la source C publique (mdljts/wbgt, wbgt.c + wbgt.h) et ne se
-# « simplifient » pas : un prototype de la session du 2026-08-06 avait bricolé le
-# Nusselt de la sphère et sortait un globe faux de plusieurs degrés.
+# This is a port, not an approximation. The correlations, coefficients and constants
+# come from the public C source (mdljts/wbgt, wbgt.c + wbgt.h) and must not be
+# "simplified": an altered sphere Nusselt number yields a globe temperature that is
+# wrong by several degrees.
 #
-# Ce que le modèle demande — et c'est ce qui le rend utilisable ici : T air,
-# humidité, pression, vent, rayonnement solaire, fraction directe, cosinus du
-# zénith. **Aucun rayonnement infrarouge en entrée** : l'émissivité atmosphérique
-# est estimée en interne (`emis_atm`). Open-Meteo sert exactement ces variables.
+# Inputs the model needs: air temperature, humidity, pressure, wind, solar radiation,
+# direct fraction, cosine of the zenith angle. No infrared radiation input: the
+# atmospheric emissivity is estimated internally (`emis_atm`). Open-Meteo serves
+# exactly these variables.
 # ---------------------------------------------------------------------------
 
 STEFANB = 5.6696e-8
@@ -117,22 +111,19 @@ MAX_ITER = 500
 SOLAR_CONST = 1367.0
 NORMSOLAR_MAX = 0.85
 
-# Drapeaux ACSM des courses sur route. ⚠ Ils sont CONSIGNÉS, jamais appliqués
-# comme un plafond : Blackman et al. 2026 (43 études) mesurent ~4 bpm d'écart de
-# FC entre deux catégories voisines, moins que ce qu'un changement d'allure ou de
-# sommeil produit — une bande situe une journée, elle ne résout pas un individu
-# (episodes/src-wbgt-risk-categories-meta.md).
-# ⚠ À ne pas confondre avec les catégories de la *politique chaleur extrême* de
-# l'ACSM (≤22,2 / 22,3-25,6 / 25,7-27,8 / ≥27,9), un autre découpage — c'est
-# celui que teste Blackman. Les drapeaux ci-dessous sont ceux qu'un coureur
-# rencontre sur une épreuve, et ils couvrent aussi le froid, ce dont on a besoin
-# pour une course de nuit fin novembre.
+# ACSM flags for road races. They are RECORDED, never applied as a ceiling: a meta-analysis
+# of 43 studies measures about 4 bpm of heart-rate difference between adjacent
+# categories, less than a change of pace or sleep produces. A band places a day, it
+# does not resolve an individual.
+# Not to be confused with the ACSM extreme-heat policy categories
+# (<=22.2 / 22.3-25.6 / 25.7-27.8 / >=27.9), a different split. The flags below are
+# the ones a runner meets at a race, and they also cover cold.
 ACSM_BANDS = ((10.0, "blanc"), (18.0, "vert"), (23.0, "jaune"),
               (28.0, "rouge"), (float("inf"), "noir"))
 
 
 def acsm_band(wbgt):
-    """La bande ACSM du WBGT donné. Voir l'avertissement sur ACSM_BANDS."""
+    """The ACSM band of the given WBGT. See the warning on ACSM_BANDS."""
     for limit, name in ACSM_BANDS:
         if wbgt < limit:
             return name
@@ -140,20 +131,20 @@ def acsm_band(wbgt):
 
 
 def esat(tk):
-    """Pression de vapeur saturante au-dessus de l'eau liquide, en hPa."""
+    """Saturation vapour pressure over liquid water, in hPa."""
     y = (tk - 273.15) / (tk - 32.18)
     return 1.004 * 6.1121 * math.exp(17.502 * y)
 
 
 def dew_point(e):
-    """Point de rosée (K) pour une pression de vapeur e (hPa)."""
+    """Dew point (K) for a vapour pressure e (hPa)."""
     z = math.log(e / (6.1121 * 1.004))
     return 240.97 * z / (17.502 - z) + 273.15
 
 
 def emis_atm(tair, rh):
-    """Émissivité atmosphérique estimée depuis T et humidité — c'est elle qui
-    dispense de fournir le rayonnement infrarouge descendant."""
+    """Atmospheric emissivity estimated from T and humidity; it removes the need
+    to supply downwelling infrared radiation."""
     return 0.575 * (rh * esat(tair)) ** 0.143
 
 
@@ -195,16 +186,16 @@ def h_cylinder_in_air(tair, pair, speed):
 
 
 class WBGTError(InputError):
-    """Le bilan d'énergie n'a pas convergé — on refuse, on n'invente pas."""
+    """The energy balance did not converge: refuse rather than invent a value."""
 
 
 def t_globe(tair, rh, pair, speed, solar, fdir, cza):
-    """Température du globe noir (K). Bilan d'énergie itératif."""
+    """Black globe temperature (K). Iterative energy balance."""
     tsfc = tair
     prev = tair
-    # Garde anti-division, pas une correction physique : `solar_parameters`
-    # renvoie déjà fdir=0 et solar=0 sous CZA_MIN, donc le terme s'annule de
-    # toute façon. Sans ce clamp, la nuit produit 0×inf = nan au lieu de 0.
+    # Division guard, not a physical correction: `solar_parameters` already returns
+    # fdir=0 and solar=0 below CZA_MIN, so the term cancels anyway. Without this
+    # clamp, night produces 0*inf = nan instead of 0.
     cza = max(cza, CZA_MIN)
     for _ in range(MAX_ITER):
         tref = 0.5 * (prev + tair)
@@ -220,15 +211,14 @@ def t_globe(tair, rh, pair, speed, solar, fdir, cza):
 
 
 def t_wetbulb(tair, rh, pair, speed, solar, fdir, cza, rad=1):
-    """Bulbe humide (K). `rad=1` → NATUREL (ventilé par le vent ambiant, exposé
-    au rayonnement) ; `rad=0` → **psychrométrique**, le terme radiatif retiré.
+    """Wet bulb (K). `rad=1` is the NATURAL wet bulb (ventilated by ambient wind,
+    exposed to radiation); `rad=0` is the **psychrometric** one, radiative term removed.
 
-    Le mode `rad=0` n'est pas un ornement : c'est la porte de validation. Le
-    bulbe humide psychrométrique est une grandeur qu'Open-Meteo calcule de son
-    côté (`wet_bulb_temperature_2m`), par un tout autre chemin. Les faire
-    coïncider met à l'épreuve d'un coup `esat`, `diffusivity`, `viscosity`,
-    `h_cylinder_in_air`, `evap` et `RATIO` — soit la quasi-totalité de la
-    thermodynamique du portage — contre une source indépendante.
+    The `rad=0` mode is the validation hook: the psychrometric wet bulb is a quantity
+    Open-Meteo computes on its side (`wet_bulb_temperature_2m`) by a different path.
+    Making them agree tests `esat`, `diffusivity`, `viscosity`, `h_cylinder_in_air`,
+    `evap` and `RATIO` at once, nearly all the thermodynamics of the port, against an
+    independent source.
     """
     tsfc = tair
     sza = math.acos(max(min(cza, 1.0), -1.0))
@@ -255,9 +245,9 @@ def t_wetbulb(tair, rh, pair, speed, solar, fdir, cza, rad=1):
 
 
 def sun_position(lat, lon, when):
-    """(cos de l'angle zénithal, distance Terre-Soleil en UA) à l'instant donné.
-    Position solaire de bas ordre — précision très au-delà de ce qu'une lecture
-    horaire d'Open-Meteo justifie de prétendre."""
+    """(cosine of the zenith angle, Earth-Sun distance in AU) at the given instant.
+    Low-order solar position, far more precise than an hourly Open-Meteo reading
+    justifies."""
     utc = when.astimezone(UTC)
     n = (utc - datetime(2000, 1, 1, 12, tzinfo=UTC)).total_seconds() / 86400.0
     mean_lon = (280.460 + 0.9856474 * n) % 360.0
@@ -277,19 +267,16 @@ def sun_position(lat, lon, when):
 
 
 def solar_parameters(lat, lon, when, solar):
-    """(rayonnement recalé, cos zénith, fraction directe) — `calc_solar_parameters`.
+    """(rescaled radiation, cosine of zenith, direct fraction), `calc_solar_parameters`.
 
-    ⚠ **La fraction directe se DÉRIVE, elle ne se fournit pas.** Open-Meteo sert
-    pourtant `direct_radiation`, et l'utiliser paraîtrait plus juste. On ne le
-    fait pas : `Tglobe` a été calibrée avec CETTE paramétrisation de `fdir`, et
-    y injecter une fraction d'une autre provenance casse l'étalonnage tout en
-    rendant le portage invalidable contre la référence. `direct_radiation` reste
-    consigné dans la sortie — de quoi tester un jour si l'écart compte, ce qui
-    est précisément la forme d'une question falsifiable.
+    The direct fraction is DERIVED, not supplied. Open-Meteo serves `direct_radiation`
+    and using it might look more accurate, but `Tglobe` was calibrated with THIS
+    parametrisation of `fdir`; injecting a fraction of another origin breaks the
+    calibration and makes the port impossible to validate against the reference.
+    `direct_radiation` stays recorded in the output so the difference can be tested.
 
-    Le recalage du rayonnement (`solar = normsolar · toasolar`) n'existe que dans
-    ce chemin, et c'est lui qui tient le régime « soleil rasant » — celui des
-    sorties du soir de l'athlète.
+    The radiation rescaling (`solar = normsolar * toasolar`) exists only in this path,
+    and it handles the low-sun regime (evening sessions).
     """
     cza, soldist = sun_position(lat, lon, when)
     toasolar = SOLAR_CONST * max(0.0, cza) / (soldist * soldist)
@@ -306,13 +293,12 @@ def solar_parameters(lat, lon, when, solar):
 
 
 def wbgt_outdoor(temp_c, rh_pct, pressure_hpa, wind_kmh, solar, lat, lon, when):
-    """WBGT extérieur (°C) = 0,7·Tnwb + 0,2·Tg + 0,1·Ta.
+    """Outdoor WBGT (C) = 0.7*Tnwb + 0.2*Tg + 0.1*Ta.
 
-    `wind_kmh` est le vent à 10 m d'Open-Meteo, utilisé tel quel. Liljegren sait
-    ramener une vitesse à 2 m, mais son estimateur demande une classe de
-    stabilité construite sur un gradient vertical de température qu'on n'a pas ;
-    le driver original ne l'applique d'ailleurs que si la hauteur diffère de la
-    référence. L'écart joue quelques dixièmes sur le globe.
+    `wind_kmh` is the Open-Meteo 10 m wind, used as is. Liljegren can scale a speed to
+    2 m, but its estimator needs a stability class built on a vertical temperature
+    gradient that is not available; the original driver only applies it when the
+    height differs from the reference. The difference is a few tenths on the globe.
     """
     tair = temp_c + 273.15
     rh = rh_pct / 100.0
@@ -334,8 +320,8 @@ def wbgt_outdoor(temp_c, rh_pct, pressure_hpa, wind_kmh, solar, lat, lon, when):
 
 
 def decode_polyline(encoded, precision=5):
-    """Décode un polyline encodé Google (celui de Strava) → liste de (lat, lon).
-    On n'a besoin que du premier point, mais on décode proprement quand même."""
+    """Decode a Google encoded polyline (Strava's) into a list of (lat, lon).
+    Only the first point is needed, but the whole line is decoded properly."""
     coords, index, lat, lon = [], 0, 0, 0
     factor = 10 ** precision
     length = len(encoded)
@@ -344,8 +330,8 @@ def decode_polyline(encoded, precision=5):
             shift, result = 0, 0
             while True:
                 if index >= length:
-                    # Polyline tronqué (copie incomplète, échappement de shell
-                    # mangé…). Mieux vaut le dire que renvoyer un point faux.
+                    # Truncated polyline (incomplete copy, eaten shell escape...).
+                    # Better to say so than to return a wrong point.
                     raise ValueError(
                         "polyline tronqué ou mal échappé : la dernière "
                         "coordonnée est incomplète. Vérifie la copie "
@@ -367,21 +353,20 @@ def decode_polyline(encoded, precision=5):
 
 
 def parse_time(value, local=False):
-    """ISO 8601 → datetime. Aware si un fuseau est présent, naive avec `--local`.
+    """ISO 8601 to datetime. Aware if a timezone is present, naive with `--local`.
 
-    Deux chemins, et un seul est correct pour chaque source :
+    Two paths, and only one is correct for each source:
 
-    - `local=True` : la valeur est une heure **murale au lieu de départ**, sans
-      fuseau — c'est exactement ce que rend le champ `start_local` de
-      `scripts/strava.py activity`. Le
-      décalage est résolu plus tard, depuis les coordonnées (`resolve_offset`),
-      parce que lui seul connaît le fuseau du lieu et l'heure d'été à cette date.
-    - `local=False` : la valeur DOIT porter un fuseau explicite.
+    - `local=True`: the value is a **wall-clock time at the start place**, without a
+      timezone, which is what the `start_local` field of `scripts/strava.py activity`
+      returns. The offset is resolved later from the coordinates (`resolve_offset`),
+      because only that step knows the place's timezone and daylight saving at that
+      date.
+    - `local=False`: the value MUST carry an explicit timezone.
 
-    Le garde-fou précédent (2026-08-05) refusait l'heure sans fuseau sans offrir
-    d'alternative — or `start_local` est le seul champ disponible. Il s'est donc
-    fait contourner par un `Z` ajouté à la main, qui a produit le chiffre faux
-    qu'il devait empêcher. `--local` est le chemin correct qui manquait.
+    Rejecting a time without a timezone with no alternative would push callers to
+    append a `Z` by hand, producing the wrong figure the guard exists to prevent;
+    `--local` is the correct path.
     """
     v = value.strip()
     has_z = v.endswith(("Z", "z"))
@@ -408,17 +393,15 @@ def parse_time(value, local=False):
 
 
 def resolve_offset(lat, lon, naive_local):
-    """Heure murale au lieu de départ → datetime aware. Renvoie (dt, nom du fuseau).
+    """Wall-clock time at the start place to aware datetime. Returns (dt, timezone name).
 
-    Open-Meteo sert le **nom IANA** du fuseau des coordonnées (`timezone=auto`),
-    et `zoneinfo` en tire le décalage exact à la date visée — heure d'été
-    comprise. C'est ce qui permet au coach de ne jamais déduire un décalage
-    lui-même.
+    Open-Meteo serves the **IANA name** of the timezone of the coordinates
+    (`timezone=auto`), and `zoneinfo` derives the exact offset at the target date,
+    daylight saving included. The caller never has to infer an offset itself.
 
-    On demande le fuseau SANS plage de dates : les deux API la bornent (le passé
-    lointain et le futur lointain sortent de leur fenêtre et renvoient 400),
-    alors que le fuseau, lui, ne dépend que des coordonnées. Une course de nuit
-    en novembre prochain doit pouvoir être résolue aujourd'hui.
+    The timezone is requested WITHOUT a date range: both APIs bound it (the far past
+    and far future fall outside their window and return 400), while the timezone
+    depends only on the coordinates. A future date must be resolvable today.
     """
     data = fetch(FORECAST_URL, {
         "latitude": round(lat, 4), "longitude": round(lon, 4),
@@ -430,7 +413,7 @@ def resolve_offset(lat, lon, naive_local):
             from zoneinfo import ZoneInfo
             return naive_local.replace(tzinfo=ZoneInfo(name)), name
         except Exception:
-            pass  # base tz absente du système : on retombe sur l'offset servi.
+            pass  # tz database missing on the system: fall back to the served offset.
 
     offset = data.get("utc_offset_seconds")
     if offset is None:
@@ -438,7 +421,7 @@ def resolve_offset(lat, lon, naive_local):
             "Open-Meteo n'a renvoyé ni nom de fuseau ni décalage pour ces "
             "coordonnées. Repasse --time avec un offset explicite, sans --local."
         )
-    # Décalage du jour, pas de la date visée : juste hors saison d'été/hiver.
+    # Offset of today, not of the target date: wrong across a daylight-saving change.
     return naive_local.replace(tzinfo=timezone(timedelta(seconds=offset))), name
 
 
@@ -459,24 +442,24 @@ def fetch(url, params):
 
 
 def get_weather(lat, lon, when):
-    """Renvoie le dict météo de l'heure la plus proche de `when` (datetime aware).
-    Choisit forecast (récent) ou archive (ancien) selon l'âge."""
+    """Return the weather dict of the hour closest to `when` (aware datetime).
+    Picks forecast (recent) or archive (old) according to age."""
     now = datetime.now(UTC)
     age_days = (now - when).total_seconds() / 86400
     utc = when.astimezone(UTC)
 
-    # Fenêtre de ±1 jour, pas la seule journée UTC : un départ à 23h locale (la
-    # TargetRace part à 23h le 28/11) tombe au bord de la journée UTC, et
-    # l'heure la plus proche peut être de l'autre côté de minuit.
+    # Window of +-1 day, not the single UTC day: a late-evening local start falls at
+    # the edge of the UTC day, and the closest hour may be on the other side of
+    # midnight.
     common = {
         "latitude": round(lat, 4), "longitude": round(lon, 4),
         "hourly": HOURLY, "timezone": "UTC",
         "start_date": (utc - timedelta(days=1)).strftime("%Y-%m-%d"),
         "end_date": (utc + timedelta(days=1)).strftime("%Y-%m-%d"),
     }
-    # L'API forecast couvre le passé récent via start_date/end_date (fenêtre de
-    # quelques mois) ; au-delà, l'archive prend le relais. `past_days` est
-    # incompatible avec une plage de dates, on ne l'utilise donc pas.
+    # The forecast API covers the recent past via start_date/end_date (window of a few
+    # months); beyond it, the archive takes over. `past_days` is incompatible with a
+    # date range, so it is not used.
     url = FORECAST_URL if age_days <= 60 else ARCHIVE_URL
     data = fetch(url, common)
 
@@ -510,10 +493,10 @@ def get_weather(lat, lon, when):
         "conditions": WMO.get(at("weather_code"), "conditions inconnues"),
     }
 
-    # Le WBGT est un CONFORT de lecture, pas la donnée : s'il manque une entrée
-    # ou si le bilan d'énergie ne converge pas, on rend la météo sans lui plutôt
-    # que de priver le coach de tout. Une clé absente se lit ; un chiffre
-    # inventé, non.
+    # WBGT is a reading convenience, not the data: if an input is missing or the
+    # energy balance does not converge, return the weather without it rather than
+    # deprive the coach of everything. A missing key can be read; an invented figure
+    # cannot.
     needed = (out["temp"], out["humidite"], out["pression"], out["vent"],
               out["rayonnement"])
     if all(v is not None for v in needed):
@@ -543,9 +526,9 @@ def format_summary(w, when, milieu=None):
     local = when.strftime("%Y-%m-%d %H:%M %Z")
     out = f"Météo au départ ({local}) : " + ", ".join(parts) + "."
 
-    # Le départ n'est qu'un point. Quand le milieu du parcours en diverge
-    # nettement (coteaux → ville, fond de vallée → crête), la météo de départ ne
-    # décrit plus la séance et se citerait à tort comme « la météo du run ».
+    # The start is only one point. When the middle of the route differs markedly
+    # (hillsides to town, valley floor to ridge), the start weather no longer
+    # describes the session and would be wrongly quoted as the weather of the run.
     if milieu and milieu["temp"] is not None and w["temp"] is not None:
         ecart = milieu["temp"] - w["temp"]
         if abs(ecart) >= ECART_SIGNIFICATIF_C:
@@ -610,8 +593,8 @@ def main():
         try:
             milieu = get_weather(milieu_pt[0], milieu_pt[1], when)
         except Exception:
-            # Le second point est un confort, pas la donnée : son échec ne doit
-            # jamais priver le coach de la météo de départ.
+            # The second point is a convenience, not the data: its failure must never
+            # deprive the coach of the start weather.
             milieu = None
 
     if args.json:

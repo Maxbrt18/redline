@@ -7,7 +7,6 @@ in this table only.
 
 Revision ID: 20261028_0006
 Revises: 20261028_0005
-Create Date: 2026-10-28
 """
 
 from __future__ import annotations

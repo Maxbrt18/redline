@@ -1,12 +1,11 @@
-"""Le dossier du bilan du dimanche, calculé par le service AVANT le tour du modèle.
+"""The Sunday review dossier, computed by the service BEFORE the model's turn.
 
-Volume, jauge, douleur, trajectoire, signaux, prédictions échues et échéances se
-calculent une fois, par le même code que les CLI (`ledger.week_report`,
-`signals.signals`, `model.predictions`), et sont remis au modèle comme
-une donnée. Le modèle garde ce qui est à lui : juger, décider, écrire. Il relance une
-CLI seulement pour vérifier un point précis.
+Volume, gauge, pain, trajectory, signals, due predictions and deadlines are computed once,
+by the same code as the CLIs (`ledger.week_report`, `signals.signals`,
+`model.predictions`), and handed to the model as data. The model keeps what is its own:
+judging, deciding, writing. It reruns a CLI only to check a specific point.
 
-Pas une CLI : aucun tour ne l'appelle, le service l'importe (`redline/vault.py`).
+Not a CLI: no turn calls it, the service imports it (`redline/vault.py`).
 """
 
 from __future__ import annotations
@@ -22,7 +21,7 @@ from redline.model import programme
 if TYPE_CHECKING:
     from redline.storage import OperationalStore
 
-#: Au-delà, le dossier résume au lieu d'énumérer : il est injecté dans un prompt.
+#: Beyond this, the dossier summarises instead of listing: it is injected into a prompt.
 MAX_LISTED = 12
 
 
@@ -31,7 +30,7 @@ def _as_date(value: Any) -> dt.date:
 
 
 def render(store: OperationalStore, root: Path, week: str, today: dt.date) -> str:
-    """Le dossier de la semaine `week` (celle qui se CLÔT), vu depuis `today`."""
+    """The dossier for week `week` (the one that CLOSES), seen from `today`."""
     rows = ledger.parse_ledger(store)
     instruments = ledger.load_instruments(store)
     targets = programme.rpe_targets(root)

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Récupère les archives restantes sans inventer de livraison ni recalculer de bilan.
+"""Recovers the remaining archives without inventing a delivery or recomputing a review.
 
-Exécuter sur ampere avec l'environnement du service : --year 2026 --apply.
-Sans --apply, inventaire seul ; l'import est idempotent et ne touche pas aux fichiers.
+Run on the host with the service environment: --year <YYYY> --apply.
+Without --apply it only takes inventory; the import is idempotent and leaves files alone.
 """
 
 from __future__ import annotations
@@ -62,8 +62,8 @@ def recover(store: NotebookStore, root: Path, psid: str, year: int, apply: bool)
         if snapshot:
             kind, period, title = "strength", snapshot.get("date", ""), snapshot.get("title", "Renfo")
         else:
-            # Frontière historique figée : seuls les noms effectivement inventoriés
-            # sont reconnus ; aucune extraction d'un titre ou de la prose du bilan.
+            # Frozen legacy boundary: only the names actually inventoried are recognised;
+            # no title or review prose is extracted.
             month = re.fullmatch(r"month-(20\d{2}-\d{2})", image.stem)
             week = re.fullmatch(r"(?:bilan-|week-)(?:(20\d{2})-)?[wW](\d{2})", image.stem)
             if month:

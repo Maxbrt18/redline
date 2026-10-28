@@ -46,9 +46,9 @@ def run_migrations_online() -> None:
         )).scalar_one()
         if is_migrator:
             connection.execute(text("SET ROLE redline_owner"))
-        # Les lectures ci-dessus ouvrent une transaction implicite SQLAlchemy. Alembic
-        # doit démarrer sa propre transaction DDL, sinon le contexte extérieur annule
-        # silencieusement migration et version au retour de la connexion.
+        # The reads above open an implicit SQLAlchemy transaction. Alembic must start its
+        # own DDL transaction, otherwise the outer context silently rolls back migration
+        # and version when the connection is returned.
         connection.commit()
         context.configure(connection=connection, target_metadata=target_metadata,
                           compare_type=True, include_schemas=True)

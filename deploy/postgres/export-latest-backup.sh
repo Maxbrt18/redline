@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Commande forcée de la clé SSH GitHub Actions : aucune commande arbitraire ne doit
-# pouvoir être exécutée sur le VPS avec cette identité.
+# Forced command of the GitHub Actions SSH key: no arbitrary command may run on the
+# VPS with this identity.
 [[ -z "${SSH_ORIGINAL_COMMAND:-}" ]] || {
   echo "commande distante interdite" >&2
   exit 64

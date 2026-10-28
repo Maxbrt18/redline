@@ -4,7 +4,7 @@
  * session page; this file owns the card GEOMETRY, which is not shared (a card is
  * frozen at 1080 px). render.document() inlines both, in that order.
  *
- * CHARTE « LIGNE ROUGE » (2026-10-01):
+ * DESIGN RULES (« Ligne rouge » system):
  *  - Nothing is boxed. Rows are separated by a hairline, figures by space; a
  *    rounded panel with a border is the signature of a component library, and it
  *    made every card read as generated.

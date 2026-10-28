@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-"""Abonnement webhook Strava : état et renouvellement, sans jamais afficher un secret.
+"""Strava webhook subscription: status and renewal, never printing a secret.
 
-Strava n'accepte qu'un abonnement par application et ne signe pas ses événements :
-l'URL de callback `<COACH_BASE_URL>/strava-webhook/<STRAVA_WEBHOOK_SECRET>` est donc
-la seule authentification de la route. `renew` remplace l'abonnement existant par
-celui-là ; Strava valide aussitôt l'URL par le handshake `hub.*`, donc le service doit
-déjà tourner avec ce secret. Sans changement à faire, `renew` ne touche à rien.
+Strava accepts only one subscription per application and does not sign its events:
+the callback URL `<COACH_BASE_URL>/strava-webhook/<STRAVA_WEBHOOK_SECRET>` is
+therefore the route's only authentication. `renew` replaces the existing subscription
+with that one; Strava validates the URL immediately through the `hub.*` handshake, so
+the service must already be running with this secret. When nothing needs to change,
+`renew` touches nothing.
 
-Usage (sur le VPS, environnement du service chargé) :
+Usage (on the VPS, with the service environment loaded):
   set -a; . /etc/redline/runtime/coach-messenger.env; set +a
-  python3 deploy/strava-subscription.py status   # code 0 si l'abonnement est le bon
+  python3 deploy/strava-subscription.py status   # exit 0 if the subscription is correct
   python3 deploy/strava-subscription.py renew
 """
 

@@ -1,8 +1,8 @@
-"""Juge de réponse du banc d'évaluation, hors production.
+"""Reply judge of the evaluation bench, outside production.
 
-Il vivait dans `redline` et a filtré les réponses Messenger jusqu'au 2026-09-25 :
-refus et délais dépassés remplaçaient des réponses déjà rédigées par des phrases
-génériques. Il ne sert plus qu'à `redline.cli.evaluate_coaching`, sur des scénarios.
+It is no longer part of the Messenger reply path, because refusals and timeouts would
+replace already written replies with generic sentences. It only serves
+`redline.cli.evaluate_coaching`, on scenarios.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 
 from redline.model.errors import ExternalError
 
-if TYPE_CHECKING:  # annotations seulement : le banc n'impose aucun moteur à l'import
+if TYPE_CHECKING:  # annotations only: the bench imposes no engine at import
     from redline.evaluation.runner import OneShot
     from redline.service.agent import RunSpec
 
@@ -109,12 +109,12 @@ def review_prompt(answer: str, request: str, plans: dict[str, str], *,
 
 
 def review_result(raw: str) -> bool | ReviewVerdict:
-    """Un refus exploitable est strictement typé ; aucun texte libre ne lève le contrôle."""
+    """A usable refusal is strictly typed; no free text lifts the check."""
     try:
         data = json.loads(raw)
     except (ValueError, TypeError) as exc:
         raise ReviewUnavailable("verdict de contrôle illisible") from exc
-    # Compatibilité avec les réponses booléennes strictes du contrat précédent.
+    # Compatible with the strict boolean replies of the previous contract.
     if isinstance(data, dict) and set(data) == {"approved"}:
         if type(data["approved"]) is bool:
             return data["approved"]

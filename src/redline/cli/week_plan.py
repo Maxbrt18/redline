@@ -1,24 +1,21 @@
 #!/usr/bin/env python3
 """Create/revise/show/check the canonical weekly training plan.
 
-Codes de sortie de `check` et `show`, et la distinction porte tout le reste :
+Exit codes of `check` and `show`; the distinction carries everything else:
 
-- ``0`` prescriptible ;
-- ``2`` valide mais EN ATTENTE D'UNE RÉPONSE DE L'ATHLÈTE — un contrôle daté est échu.
-  Le programme est intact, `show` l'imprime quand même sur stdout, et la conduite à
-  tenir est de POSER la question du contrôle (elle est sur stderr), pas de réparer
-  quoi que ce soit ;
-- ``3`` valide mais À RÉEXAMINER — une activité non rattachée à une séance du plan est
-  apparue depuis son calcul. Intact et imprimé lui aussi ; la conduite à tenir est
-  d'arbitrer cette charge imprévue, pas de recopier les séances terminées ;
-- ``1`` invalide : absent ou illisible. Là seulement, rien n'est lisible et rien ne
-  sort.
+- ``0`` prescribable;
+- ``2`` valid but AWAITING AN ANSWER FROM THE ATHLETE: a dated check is due. The
+  programme is intact, `show` still prints it on stdout, and the right move is to ASK the
+  check's question (it is on stderr), not to repair anything;
+- ``3`` valid but TO BE REVIEWED: an activity not attached to a planned session appeared
+  since the plan was computed. Intact and printed as well; the right move is to arbitrate
+  that unplanned load, not to copy the completed sessions;
+- ``1`` invalid: missing or unreadable. Only there is nothing readable and nothing printed.
 
-Confondre 2 et 1 supprimait le mot du matin les jours de contrôle (2026-08-12).
-Confondre 3 et 1 faisait pire (2026-08-14) : la CLI rendait « invalide » avec un
-stdout VIDE pendant que le service rendait « périmé, tu peux répondre ». Le coach
-lançait `show`, ne voyait rien, et concluait que son programme était cassé — alors
-qu'il l'avait sous les yeux dans son prompt.
+Confusing 2 with 1 suppresses the morning message on check days. Confusing 3 with 1 is
+worse: the CLI reports "invalid" with an EMPTY stdout while the service reports "stale,
+you may answer", so the coach concludes the programme is broken although it is in its
+prompt.
 """
 
 from __future__ import annotations
@@ -54,7 +51,7 @@ from redline.storage import StorageError
 
 
 def _distance_notes(store, revision: dict) -> str:
-    """L'écart aux 30 jours de chaque course à venir (garde-fou n°8, informatif)."""
+    """The gap to the 30 days of each upcoming race (guardrail no. 8, informative)."""
     import datetime as dt
 
     from redline.analysis import ledger
@@ -62,8 +59,8 @@ def _distance_notes(store, revision: dict) -> str:
         rows = ledger.parse_ledger(store)
     except Exception as exc:
         return f"Écart aux 30 jours : lecture du registre impossible ({exc.__class__.__name__})."
-    # L'horodatage de la révision est celui du service (`now_stamp`) : c'est le jour
-    # depuis lequel « à venir » se juge, pas l'horloge de la machine qui relit.
+    # The revision timestamp is the service's (`now_stamp`): it is the day "upcoming" is
+    # judged from, not the clock of the machine rereading.
     written_on = dt.date.fromisoformat(str(revision["computed_at"])[:10])
     notes = ledger.transition_notes(rows, revision["sessions"], written_on)
     if not notes:
@@ -89,26 +86,25 @@ def _database_store():
 def _database_command(store, command: str, week: str, optional: bool,
                       input_path: str | None = None) -> int:
     if command in {"revise", "preview"}:
-        # Un tour du coach remet son JSON par `--input`, jamais par `<` : voir
-        # `src/redline/model/agent_input.py`. stdin reste la voie des lancements opérateur.
+        # A coach turn hands its JSON over via `--input`, never `<`: see
+        # `src/redline/model/agent_input.py`. stdin remains the operator-launch path.
         revision = agent_input.read_json(input_path)
         existing = store.load_plan(week)
         expected = 1 if existing is None else len(existing["revisions"]) + 1
         if revision.get("revision") != expected:
             raise SchemaError([f"revision : attendu {expected}, reçu {revision.get('revision')!r}"])
         current = dict(revision)
-        # ⭐ L'HORODATAGE APPARTIENT AU SERVICE, PLUS AU MODÈLE (2026-08-25). Le champ
-        # n'était vérifié que sur sa FORME : les deux révisions du 25/08 portent minuit
-        # et midi UTC, toutes deux écrites à 21h13. Un coach qui invente l'heure qu'il
-        # est invente aussi le jour dont l'athlète lui parle -- et `semantic_errors` compare
-        # l'échéance d'un contrôle daté à ce champ, donc une heure fausse désarme un
-        # garde-fou. La seule horloge fiable de la chaîne est celle qui écrit.
+        # The timestamp belongs to the service, not the model. A model that invents the
+        # time of day also invents the day the athlete is talking about, and
+        # `semantic_errors` compares a dated check's due date to this field, so a wrong
+        # time would disarm a guardrail. The only reliable clock in the chain is the one
+        # that writes.
         current["computed_at"] = now_stamp()
-        # Le texte qui ENTRE est jugé avant le plan qui le contient : la révision est
-        # réinjectée au coach à chaque tour prescriptif, et title/note partent sur le
-        # téléphone de l'athlète. Jugé ici et pas dans `validate` parce que l'historique
-        # est append-only : la même règle appliquée au plan entier refuserait la
-        # révision du jour à cause du texte de la veille.
+        # The incoming text is judged before the plan containing it: the revision is fed
+        # back to the coach on every prescriptive turn, and title/note go to the athlete's
+        # phone. Judged here and not in `validate` because history is append-only: the
+        # same rule applied to the whole plan would refuse today's revision because of
+        # yesterday's text.
         previous = existing["revisions"][-1] if existing else None
         fautes = [
             *intention_errors(current, f"{week} révision {current['revision']}"),
@@ -121,10 +117,10 @@ def _database_command(store, command: str, week: str, optional: bool,
             raise SchemaError(fautes)
         candidate = {"week": week, "revisions": [*(existing or {}).get("revisions", []), current]}
         validate(candidate)
-        # ⭐ La relecture part sur stdout DANS LES DEUX CHEMINS (2026-08-25). Le tour
-        # Messenger passe par `stage_command` : c'est précisément celui du coach, donc
-        # celui qui doit relire. Ne la rendre qu'au chemin CLI aurait laissé la
-        # production sans son garde-fou et l'aurait donnée au seul usage manuel.
+        # The readback goes to stdout in BOTH paths. The Messenger turn goes through
+        # `stage_command`, which is precisely the coach's path and so the one that must
+        # reread; rendering it only on the CLI path would leave production without the
+        # guardrail.
         turn_id = (os.environ.get("REDLINE_TURN_ID") or "").strip()
         if command == "preview":
             store.preview_command(commands.PLAN_REVISE,
@@ -171,12 +167,10 @@ def _database_command(store, command: str, week: str, optional: bool,
               file=sys.stderr)
         return EXIT_AWAITING_GATE
     if stale:
-        # Le programme est INTACT : il ne décrit simplement plus la semaine. Il s'imprime
-        # donc, comme pour un contrôle daté, et seule la prescription attend.
-        # Jusqu'au 2026-08-14 la péremption levait une NoteError AVANT l'impression :
-        # code 1, stdout vide, donc un coach qui lance `show` conclut que son programme
-        # est cassé alors qu'il l'a sous les yeux dans son prompt. La CLI disait
-        # « invalide » pendant que le service disait « périmé, tu peux répondre ».
+        # The programme is INTACT: it simply no longer describes the week. It is printed,
+        # as for a dated check, and only the prescription waits. Raising a NoteError before
+        # printing would give exit code 1 and an empty stdout, and a coach running `show`
+        # would conclude the programme is broken.
         print(f"{week} : arbitrage obligatoire, activité non rattachée apparue depuis "
               "la révision — le programme reste lisible, mais rien ne se prescrit "
               "avant une révision",

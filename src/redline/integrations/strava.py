@@ -52,20 +52,20 @@ TIMEOUT = 30
 LIST_KEYS = ("id", "name", "sport", "start_local", "distance_km", "moving_time",
              "elevation_gain_m")
 
-# Marge avant expiration : un jeton valide 40 s ne survit pas à l'appel qu'on
-# s'apprête à faire.
+# Safety margin before expiry: a token valid for 40 s would not survive the call
+# about to be made.
 EXPIRY_MARGIN = 120
 
 
 class StravaError(ExternalError):
-    """Une panne d'accès Strava, dite en clair et sans jamais recopier un secret."""
+    """A Strava access failure, stated plainly and never echoing a secret."""
 
 
 class StravaNotFound(StravaError):
-    """Un 404 : réessayer ne fera pas réapparaître une activité supprimée ou privée."""
+    """A 404: retrying will not bring back a deleted or private activity."""
 
 
-# --------------------------------------------------------------------- jetons
+# --------------------------------------------------------------------- tokens
 
 def _cache_path() -> Path:
     override = (os.environ.get("STRAVA_TOKEN_CACHE") or "").strip()
@@ -76,12 +76,12 @@ def _read_cache(path: Path) -> dict:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        # Un cache illisible n'est pas une panne : il se reconstruit au refresh.
+        # An unreadable cache is not a failure: it is rebuilt on refresh.
         return {}
 
 
 def _write_cache(path: Path, payload: dict) -> None:
-    """Écriture atomique et privée : ce fichier porte un jeton de rafraîchissement."""
+    """Atomic, private write: this file holds a refresh token."""
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(".tmp")
     temporary.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -113,7 +113,7 @@ def _refresh(client_id: str, client_secret: str, refresh_token: str) -> dict:
 
 
 def _app_identity() -> tuple[str, str]:
-    """L'identité de l'application, seul fait Strava porté par l'environnement."""
+    """The application identity, the only Strava fact held by the environment."""
     client_id = (os.environ.get("STRAVA_CLIENT_ID") or "").strip()
     client_secret = (os.environ.get("STRAVA_CLIENT_SECRET") or "").strip()
     if not client_id or not client_secret:
@@ -125,19 +125,15 @@ def _app_identity() -> tuple[str, str]:
 
 
 def access_token(*, force_refresh: bool = False) -> str:
-    """Un jeton d'accès valide, renouvelé et persisté au besoin.
+    """A valid access token, refreshed and persisted as needed.
 
-    **Deux faits, deux propriétaires, aucun recouvrement.** L'environnement porte
-    l'identité de l'application (client id et secret), qui ne tourne jamais toute
-    seule. Le cache porte les jetons, qui tournent à chaque renouvellement. Le
-    refresh token a longtemps vécu aux deux endroits, l'un servant d'amorce à
-    l'autre : dès la première rotation la copie de `.env` devenait fausse sans que
-    rien ne le dise, et on se retrouvait à lire une valeur périmée pour diagnostiquer
-    un accès vivant. C'est la règle du propriétaire unique de CLAUDE.md, appliquée à
-    un secret plutôt qu'à une séance.
+    Two facts, two owners, no overlap. The environment holds the application identity
+    (client id and secret), which never rotates by itself. The cache holds the tokens,
+    which rotate on every refresh. Keeping the refresh token in both places would leave
+    a stale copy after the first rotation, so it lives in the cache only.
 
-    Conséquence assumée : sans cache, aucun repli. L'amorçage est un geste explicite,
-    `strava.py login`, et le message d'erreur le nomme.
+    Without a cache there is no fallback: bootstrapping is the explicit
+    `strava.py login` step, and the error message names it.
     """
     client_id, client_secret = _app_identity()
 
@@ -166,10 +162,10 @@ def access_token(*, force_refresh: bool = False) -> str:
     return str(fresh["access_token"])
 
 
-# ---------------------------------------------------------------------- appels
+# ---------------------------------------------------------------------- calls
 
 def call(endpoint: str, params: dict | None = None) -> Any:
-    """Un GET authentifié, avec un seul renouvellement en cas de 401."""
+    """An authenticated GET, with a single token refresh on a 401."""
     query = f"?{urllib.parse.urlencode(params)}" if params else ""
     url = f"{API}{endpoint}{query}"
 
@@ -181,7 +177,7 @@ def call(endpoint: str, params: dict | None = None) -> Any:
                 return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             if exc.code == 401 and attempt == 1:
-                continue  # jeton périmé côté Strava : on renouvelle et on refait UNE fois
+                continue  # token stale on Strava's side: refresh and retry ONCE
             if exc.code == 404:
                 raise StravaNotFound(
                     f"Strava ne connaît pas {endpoint} : activité supprimée, privée, "
@@ -198,7 +194,7 @@ def call(endpoint: str, params: dict | None = None) -> Any:
     raise StravaError("Strava a refusé le jeton deux fois de suite")
 
 
-# ------------------------------------------------------------------ lecture
+# ------------------------------------------------------------------ reading
 
 def _wall_clock(value: str | None) -> str | None:
     """`start_date_local` is a wall-clock time, but Strava serialises it with a `Z`."""
@@ -257,7 +253,7 @@ def parse_activity(raw: dict) -> Activity:
 
 
 def distill_gear(raw: dict) -> dict:
-    """Compteur de vie d'une paire, exprimé une fois en kilomètres."""
+    """Lifetime counter of a pair, expressed once in kilometres."""
     distance = raw.get("distance")
     if distance is None:
         raise StravaError("Strava ne rend aucun kilométrage pour cette paire")
@@ -273,10 +269,10 @@ def distill_gear(raw: dict) -> dict:
     }
 
 
-# ------------------------------------------------------------------ rendu
+# ------------------------------------------------------------------ rendering
 
 def _render(data: Any, indent: int = 0) -> list[str]:
-    """Un bloc `clé: valeur` lisible — moins cher en contexte qu'un JSON indenté."""
+    """A readable `key: value` block, cheaper in context than indented JSON."""
     pad = "  " * indent
     lines = []
     if isinstance(data, dict):
@@ -304,7 +300,7 @@ def emit(data: Any, as_json: bool) -> None:
     print("\n".join(line for line in _render(data)).strip())
 
 
-# ------------------------------------------------------------------ commandes
+# ------------------------------------------------------------------ commands
 
 def cmd_activity(args) -> Any:
     """The summary, plus what `weather.py` needs for an outdoor activity."""
@@ -335,7 +331,7 @@ def cmd_activities(args) -> Any:
 
 
 def cmd_streams(args) -> Any:
-    """Les flux, aplatis à la forme que `descent.py` accepte déjà telle quelle."""
+    """The streams, flattened to the shape `descent.py` already accepts as is."""
     keys = args.keys
     raw = call(f"/activities/{args.id}/streams", {"keys": keys, "key_by_type": "true"})
     return {name: stream.get("data") for name, stream in raw.items()
@@ -358,12 +354,10 @@ def cmd_gear(args) -> Any:
 
 
 def cmd_login(args) -> Any:
-    """Amorce l'autorisation : c'est le SEUL geste qui écrit un jeton à la main.
+    """Bootstrap the authorisation: the ONLY step that writes a token by hand.
 
-    Le code d'autorisation se lit sur l'entrée standard, jamais en argument : un
-    secret passé en argument atterrit dans `~/.bash_history`, et c'est précisément
-    comme ça que les identifiants Strava se sont retrouvés en clair dans cinq
-    fichiers que personne ne surveillait (ménage du 2026-08-14).
+    The authorisation code is read from standard input, never from an argument: a
+    secret passed as an argument lands in the shell history.
     """
     client_id, client_secret = _app_identity()
     authorize = "https://www.strava.com/oauth/authorize?" + urllib.parse.urlencode({
@@ -429,7 +423,7 @@ def cmd_login(args) -> Any:
 
 
 def cmd_check(args) -> Any:
-    """La preuve que la capacité est vivante — à lancer avant d'affirmer qu'elle ne l'est pas."""
+    """Proof that access is alive: run it before claiming it is not."""
     athlete = call("/athlete")
     cache = _read_cache(_cache_path())
     remaining = int(cache.get("expires_at", 0) - time.time())
@@ -460,12 +454,11 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--json", action="store_true", help="sortie machine")
 
-    # `--json` s'accepte AVANT comme APRÈS la sous-commande. Un appelant écrit
-    # naturellement `strava.py activity 42 --json`, et argparse ne l'accepte qu'en
-    # tête sans ce parent : l'erreur « unrecognized arguments » ne dit pas où mettre
-    # le drapeau, et ce script existe pour qu'un agent n'ait pas à deviner.
-    # SUPPRESS est ce qui rend les deux ordres compatibles : sans lui, le défaut de la
-    # sous-commande écraserait un `--json` déjà posé en tête.
+    # `--json` is accepted both BEFORE and AFTER the subcommand. A caller naturally
+    # writes `strava.py activity 42 --json`, which argparse only accepts up front
+    # without this parent, and its error does not say where the flag belongs.
+    # SUPPRESS makes both orders compatible: without it, the subcommand's default
+    # would overwrite a `--json` already set up front.
     commun = argparse.ArgumentParser(add_help=False)
     commun.add_argument("--json", action="store_true", default=argparse.SUPPRESS,
                         help="sortie machine")

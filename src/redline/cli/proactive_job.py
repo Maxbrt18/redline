@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Inspecte ou rouvre un bilan périodique exact après un incident d'exploitation.
+"""Inspects or reopens one exact periodic review after an operational incident.
 
-Commande opérateur seulement : elle reste hors de `deploy/agent-cli-tools.txt`, donc
-le coach en sandbox ne peut pas rejouer lui-même une initiative déjà acquittée.
+Operator command only: it stays out of `deploy/agent-cli-tools.txt`, so the sandboxed
+coach cannot replay an already acknowledged initiative itself.
 """
 
 from __future__ import annotations

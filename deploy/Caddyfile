@@ -1,19 +1,19 @@
-# Caddy — HTTPS automatique (Let's Encrypt) pour le webhook Messenger.
-# Le domaine coach.example.com doit résoudre vers l'IP du VPS via un
-# enregistrement A chez Cloudflare, en mode "DNS only" (nuage GRIS, pas orange) :
-# sinon Cloudflare intercepte le TLS et empêche Caddy d'obtenir son certificat.
-# Caddy obtient et renouvelle le cert tout seul, tant que les ports 80 et 443 sont
-# ouverts et que le domaine pointe bien ici.
+# Caddy -- automatic HTTPS (Let's Encrypt) for the Messenger webhook.
+# The domain coach.example.com must resolve to the VPS IP through an A record in
+# Cloudflare set to "DNS only" (grey cloud, not orange): otherwise Cloudflare
+# terminates TLS and Caddy cannot obtain its certificate.
+# Caddy obtains and renews the certificate by itself as long as ports 80 and 443 are
+# open and the domain points here.
 #
 #   sudo cp ~/redline/deploy/Caddyfile /etc/caddy/Caddyfile
 #   sudo systemctl restart caddy
 #   sudo systemctl status caddy
 
 coach.example.com {
-	# Email pour les avis d'expiration Let's Encrypt (optionnel mais conseillé).
+	# Email for Let's Encrypt expiry notices (optional but recommended).
 	tls admin@example.com
 
-	# Aucun corps légitime n'approche 1 Mo ; le service applique le même plafond.
+	# No legitimate body comes near 1 MB; the service enforces the same cap.
 	request_body {
 		max_size 1MB
 	}
@@ -24,11 +24,11 @@ coach.example.com {
 		-Via
 	}
 
-	# /ready interroge PostgreSQL à chaque appel : réservé au VPS (wait-ready.sh,
-	# verify-release.sh et le runtime updater passent par 127.0.0.1:8000).
-	# /health reste public : réponse en mémoire, sans base.
+	# /ready queries PostgreSQL on every call: reserved for the VPS (wait-ready.sh,
+	# verify-release.sh and the runtime updater go through 127.0.0.1:8000).
+	# /health stays public: in-memory answer, no database.
 	respond /ready 404
 
-	# Le service HTTP écoute en local ; Caddy fait le TLS et proxifie.
+	# The HTTP service listens locally; Caddy terminates TLS and proxies.
 	reverse_proxy 127.0.0.1:8000
 }

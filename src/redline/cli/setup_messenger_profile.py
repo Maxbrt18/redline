@@ -9,7 +9,7 @@ typed it: the webhook (redline/web.py) routes it to the coach with no lookup tab
 The button labels and payloads stay in French (the athlete reads them); the code
 is in English.
 
-Usage (sur le VPS, environnement du service renseigné) :
+Usage (on the server, with the service environment set):
   python -m redline.cli.setup_messenger_profile
 """
 

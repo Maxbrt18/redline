@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Banc conversationnel sur plusieurs tours, isolé de PostgreSQL et de Messenger.
+"""Multi-turn conversation bench, isolated from PostgreSQL and Messenger.
 
---dry-run ne charge ni configuration ni SDK. --compare travaille hors ligne.
-La génération utilise le même adaptateur one_shot que evaluate-coaching.py ; elle
-n'évalue ni les écritures, ni le triage, ni la reprise réelle d'une session du service.
+--dry-run loads neither configuration nor SDK. --compare works offline.
+Generation uses the same one_shot adapter as evaluate-coaching.py; it does not
+evaluate writes, triage, or the service's real session resumption.
 """
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ def main() -> int:
             report = compare_runs(*(json.loads(p.read_text()) for p in args.compare))
         except (ValueError, KeyError) as exc:
             parser.error(str(exc))
-        # Le correcteur ne reçoit pas la clé des variantes dans sa grille.
+        # The reviewer does not receive the variants key in its grid.
         blind = report.pop('blind_review')
         key = report.pop('key')
         write_json(args.output, report)

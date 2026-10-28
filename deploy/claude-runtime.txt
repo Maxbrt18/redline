@@ -1,3 +1,3 @@
-# Plage de Claude Code que le metteur à jour nocturne peut promouvoir depuis le
-# canal npm `stable`. Changer de version majeure reste une décision humaine.
+# Range of Claude Code versions the nightly updater may promote from the npm `stable`
+# channel. A major version change stays a manual decision.
 @anthropic-ai/claude-code>=2.1.197,<3.0.0

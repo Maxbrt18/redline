@@ -16,7 +16,6 @@ The downgrade refuses a strength session whose routine is neither `a` nor `b`.
 
 Revision ID: 20261028_0004
 Revises: 20261027_0003
-Create Date: 2026-10-28
 """
 
 from __future__ import annotations

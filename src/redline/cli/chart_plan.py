@@ -22,12 +22,10 @@ DAYS = ("Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche")
 
 
 def detail(session: dict) -> str:
-    """Ce qui engage, demandé au modèle.
+    """What the session commits to, as asked of the model.
 
-    La carte portait sa propre copie, et elle avait déjà dérivé : elle ne rendait RIEN
-    pour une séance dont le seul engagement est un plafond de durée -- une ligne de
-    programme affichée sans sa consigne. `details_of` la donne comme les deux autres
-    rendus le font depuis toujours.
+    Shared with the other renderers through `details_of`: a private copy would render
+    nothing for a session whose only commitment is a duration cap.
     """
     return ", ".join(details_of(session))
 
@@ -75,10 +73,8 @@ def main() -> None:
     if plan is None:
         raise InputError(f"Programme {args.week} absent dans PostgreSQL")
     validate(plan)
-    # `--today` datait le FILTRE des séances et pas le contrôle de fraîcheur : la card
-    # décidait « à recalculer » d'après l'horloge tout en s'affichant à une autre date.
-    # Même faute que le contrôle CI devenu rouge tout seul le 2026-08-04 (voir README) :
-    # une date implicite dans un chemin qu'on croit daté.
+    # `--today` dates the session FILTER and the freshness check alike: the card must not
+    # decide "needs recalculation" from the clock while displaying another date.
     as_of = dt.date.fromisoformat(args.today) if args.today else None
     revision = active(plan)
     stale = gate_reasons(plan, as_of)
@@ -86,8 +82,8 @@ def main() -> None:
         stale.append("données de la semaine modifiées depuis le dernier calcul")
     if stale:
         raise InputError("Plan à recalculer : " + " ; ".join(stale))
-    # Vue descriptive : la carte raconte la semaine, séances faites marquées « (fait) ».
-    # Ce qu'est une séance annulée ou soldée se demande au modèle, jamais réécrit ici.
+    # Descriptive view: done sessions are marked « (fait) ». Whether a session is cancelled
+    # or settled is asked of the model, never reimplemented here.
     sessions = scheduled(revision["sessions"])
     if args.today:
         sessions = [session for session in sessions if session["date"] == args.today]

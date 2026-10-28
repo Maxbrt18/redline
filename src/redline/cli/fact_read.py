@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Lit les faits PostgreSQL sans fabriquer de fichier de stockage secondaire."""
+"""Reads facts from PostgreSQL without creating any secondary storage file."""
 
 
 
@@ -26,14 +26,11 @@ def _known(row: dict, metric: str, suffix: str = "") -> str | None:
 
 
 def observations(store: Any, limit: int) -> list[str]:
-    """Les observations récentes, AVEC leur clé et ce qui reste à compléter.
+    """Recent observations, WITH their key and what is left to complete.
 
-    La clé est affichée parce que `ledger-complete.py` l'exige : ne pas la montrer
-    revenait à demander un identifiant que rien ne publiait. Le 2026-08-14, l'athlète
-    donne le RPE de son vélo de la veille ; le coach connaît son id Strava et tente
-    donc `strava:90000000001`, alors que la ligne avait été consignée sans id, sous
-    `messenger:2026-08-13:velo-remplace-renfob`. La mesure était impossible à écrire,
-    et rien dans la sortie ne permettait de s'en apercevoir.
+    The key is shown because `ledger-complete.py` requires it: an identifier that
+    nothing published could not be supplied. A row recorded without a Strava id lives
+    under a `messenger:<date>:<slug>` key, and the output must reveal it.
     """
     rows = store.observation_rows()[:limit]
     lines = [f"Observations récentes ({len(rows)})"]
@@ -75,11 +72,11 @@ def exposures(store: Any, limit: int, include_candidates: bool) -> list[str]:
 
 
 def strength(store: Any, limit: int) -> list[str]:
-    """Les comptes rendus de renfo canoniques, récents d'abord.
+    """Canonical strength reports, most recent first.
 
-    La page écrit cette structure avant de prévenir le coach. La publier ici évite
-    qu'il tente de reconstruire une séance depuis la projection CSV ou, pire, de la
-    ressaisir comme une observation générale.
+    The page writes this structure before notifying the coach. Publishing it here
+    keeps the coach from rebuilding a session from the CSV projection or re-entering
+    it as a general observation.
     """
     rows = list(reversed(store.strength_history()))[:limit]
     lines = [f"Séances de renfo récentes ({len(rows)})"]
@@ -149,7 +146,7 @@ def capabilities(store: Any) -> list[str]:
 
 
 def _as_read(row: dict) -> str:
-    """Un message de la conversation tel que le coach le relit (`src/redline/model/voice.py`)."""
+    """A conversation message as the coach rereads it (`src/redline/model/voice.py`)."""
     return row["body"] if row["role"] == "athlete" else voice.muted(row["body"])
 
 

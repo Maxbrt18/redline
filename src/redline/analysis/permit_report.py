@@ -1,7 +1,7 @@
-"""Le rapport du permis EF, lu depuis PostgreSQL : même code pour le bilan et la CLI.
+"""The easy-run permit report, read from PostgreSQL: same code for the review and the CLI.
 
-Le calcul vit dans `src/redline/model/permit.py` ; ici on ne fait que réunir les faits
-(choix scellés, registre, état du jour, plans, captures Strava).
+The computation lives in `src/redline/model/permit.py`; this module only gathers the facts
+(sealed choices, ledger, daily state, plans, Strava captures).
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ def _caps(store: Any, weeks: set[str]) -> dict[str, int | None]:
 def _group(store: Any, activity_id: int) -> bool | None:
     try:
         count = Activity.from_json(store.strava_intake(activity_id)["distilled"]).athlete_count
-    except Exception:  # capture absente : le groupe reste inconnu, jamais supposé
+    except Exception:  # no capture: the group stays unknown, never assumed
         return None
     return None if count is None else int(count) > 1
 
@@ -50,16 +50,16 @@ def report(store: Any, today: dt.date, week: str | None = None) -> list[str]:
     period = permit.window(choices)
     if period is None:
         return []
-    # Le plafond d'une EF est le haut de la Z2 de l'athlète : une seule source, ses FC.
+    # An easy run's cap is the top of the athlete's Z2: a single source, their HR bounds.
     hr_cap = instance.load(paths.vault_root()).hr_bounds[1]
     rows = ledger.parse_ledger(store)
     runs = [permit.Run(row.date, row.type,
                        None if row.hours is None else row.hours * 60,
                        row.hr_valid, _strava_id(row.idempotency_key))
             for row in rows if row.date >= period.start]
-    # Le permis se juge sur la PIRE trace du matin, toutes zones confondues : une zone qui
-    # proteste suffit à le refuser. C'est le seul endroit où les zones se rejoignent, et
-    # elles s'y rejoignent par le maximum, jamais par une moyenne.
+    # The permit is judged on the WORST morning trace across all zones: one complaining
+    # zone is enough to refuse it. This is the only place zones are merged, and they are
+    # merged by the maximum, never by an average.
     traces: dict[dt.date, float] = {}
     for row in rows:
         if row.type == session_kinds.WAKE_TRACE and row.pains and row.date >= period.start:

@@ -72,7 +72,7 @@ def default_session_id(out: Path, built: dict) -> str:
 
 def render_card(selection: dict, out: Path, *, root: Path | None = None,
                 html_only: bool = False) -> tuple[Path, dict]:
-    """Valide, résout et rend la carte ; les erreurs remontent au propriétaire."""
+    """Validates, resolves and renders the card; errors surface to the owner."""
     root = root or paths.vault_root()
     selection = dict(selection)
     explicit_sid = "sid" in selection

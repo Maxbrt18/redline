@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Un seul verdict final pour le code ; le contenu du vault se vérifie sur la machine
-# qui le porte (vault-check.py).
-# Usage : ci-gate.sh [SHA] [nom de workflow requis…]
-# Code checks est toujours requis ; les autres runs déclenchés sont tous contrôlés.
+# A single final verdict for the code; vault content is verified on the machine that
+# holds it (vault-check.py).
+# Usage: ci-gate.sh [SHA] [required workflow name...]
+# Code checks is always required; every other triggered run is checked too.
 sha=${1:-$(git rev-parse HEAD)}
 if (( $# )); then shift; fi
 required=("Code checks" "$@")
@@ -24,8 +24,8 @@ sha=$(git rev-parse "${sha}^{commit}")
 deadline=$((SECONDS + timeout))
 previous=""
 while :; do
-  # group_by + max_by : une relance verte remplace un ancien run rouge du même
-  # workflow. Aucun filtrage de workflow : Vault content et la sauvegarde comptent.
+  # group_by + max_by: a green rerun replaces an older red run of the same workflow.
+  # No workflow filtering: Vault content and the backup count too.
   runs=$(gh run list --commit "$sha" --limit 100 \
     --json databaseId,workflowName,status,conclusion,url \
     --jq 'group_by(.workflowName) | map(max_by(.databaseId)) | .[] | [.workflowName,.databaseId,.status,.conclusion,.url] | map(tostring) | join("|")')

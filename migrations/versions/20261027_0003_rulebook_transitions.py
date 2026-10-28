@@ -1,15 +1,14 @@
-"""Les natures de transition viennent du règlement de l'instance, plus de la base.
+"""Transition kinds come from the instance's rulebook, no longer from the database.
 
-`ck_planned_sessions_transition` énumérait les six natures que le moteur connaissait.
-Elles appartiennent désormais à `rulebook.toml` et se vérifient à l'écriture du
-programme : la contrainte ne garde que la forme d'un slug.
+`ck_planned_sessions_transition` enumerated the six kinds the engine knew. They now
+belong to `rulebook.toml` and are checked when the plan is written: the constraint only
+keeps the shape of a slug.
 
-Le retour en arrière remet la liste d'origine ; il échoue si une séance porte une nature
-qu'elle ne contient pas, plutôt que d'effacer la nature de cette séance.
+The downgrade restores the original list; it fails if a session carries a kind the list
+does not contain, rather than erasing that session's kind.
 
 Revision ID: 20261027_0003
 Revises: 20261026_0002
-Create Date: 2026-10-27
 """
 
 from __future__ import annotations

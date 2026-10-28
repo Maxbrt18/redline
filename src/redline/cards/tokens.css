@@ -3,7 +3,7 @@
  * Shared by the cards and the interactive session page (src/redline/service/page/):
  * tokens are shared, geometry is not.
  *
- * TWO PALETTES, ONE SET OF NAMES (2026-10-01, charte « Ligne rouge »). Both derive
+ * TWO PALETTES, ONE SET OF NAMES (« Ligne rouge » system). Both derive
  * from the logo: its red (#d40000) and its warm black. The light one is the
  * default; the dark one applies under data-theme="dark", or when the phone asks
  * for it and nothing pinned the theme.
@@ -26,9 +26,9 @@
  *                             pushed toward the ink, one
  *                             step further on the same scale (darker on paper,
  *                             lighter on black): more intense than intense
- *                             (l'athlète, 2026-10-01). Derived by color-mix, so it
+ *                             Derived by color-mix, so it
  *                             follows both palettes and never drifts from --red.
- * There is no green and no amber any more: a status that is not a crossing is
+ * There is no green and no amber: a status that is not a crossing is
  * said in words, not in a coloured dot.
  */
 :root {

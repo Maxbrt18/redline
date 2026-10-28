@@ -1,23 +1,21 @@
 #!/usr/bin/env python3
-"""Les signaux faibles, calculés — la moitié du § D de `coaching/protocols.md` qui
-peut se lire depuis le registre.
+"""Weak signals, computed: the half of section D of `coaching/protocols.md` that
+can be read from the ledger.
 
-`protocols.md` liste depuis le 2026-07-09 cinq contrôles « qui ne peuvent pas mentir ».
-Aucun n'était **calculé** : ils reposaient sur le fait que le coach y pense, en
-relisant, un dimanche. C'est le dispositif censé attraper la blessure
-avant l'aveu — et l'aveu du 09/07 est arrivé avec deux mois de retard.
+`protocols.md` lists five checks "that cannot lie". None was **computed**: they relied on
+the coach remembering them when rereading on a Sunday. This is the mechanism meant to catch
+the injury before the athlete admits it.
 
-**Ce que ce script NE fait pas, et pourquoi.** Quatre des contrôles du § D vivent chez
-Strava, pas au registre : allure en descente sur les segments de référence, parcours
-écourtés, pauses inhabituelles en fin de sortie, longueur des notes. Ils restent à la
-charge du coach au bilan hebdo, via `scripts/strava.py` (le MCP a été retiré le
-2026-08-14) : ce script ne lit que le registre.
+**What this script does NOT do, and why.** Four of the checks in section D live in Strava,
+not in the ledger: downhill pace on reference segments, shortened routes, unusual pauses at
+the end of a run, note length. They stay with the coach at the weekly review, via
+`scripts/strava.py`: this script only reads the ledger.
 
-**Les seuils sont grossiers, et c'est assumé.** Ils n'ont pas besoin d'être justes : ils
-doivent forcer le regard. Un signal qui sort ici n'est jamais un verdict, c'est une ligne
-à aller vérifier — la même doctrine que la jauge, « signal d'alerte, jamais couperet ».
+**The thresholds are coarse, on purpose.** They need not be right: they must force a look.
+A signal that comes out here is never a verdict, it is a line to go and check, the same
+doctrine as the gauge: "warning signal, never a guillotine".
 
-    python3 scripts/signals.py            # les 4 dernières semaines
+    python3 scripts/signals.py            # the last 4 weeks
     python3 scripts/signals.py --semaines 6
 """
 
@@ -35,36 +33,35 @@ from redline.model import (
     session_kinds,
 )
 
-# Une cadence à allure égale qui MONTE mérite un regard. Elle ne porte pas sa cause :
-# travail volontaire, terrain, allure, bruit de mesure et protection sont des hypothèses.
-# En pas/min deux pieds : 4 est au-dessus du bruit d'une moyenne de séance.
+# A cadence that RISES at equal pace deserves a look. It does not carry its cause:
+# deliberate work, terrain, pace, measurement noise and protection are all hypotheses.
+# In steps/min, both feet: 4 is above the noise of a session average.
 CADENCE_JUMP = 4.0
-# Les sorties entre lesquelles la cadence est comparable. Ailleurs (côtes, trail, D+,
-# qualité) elle vit sa vie et l'y mesurer reviendrait à lire le terrain, pas le injury.
+# The runs between which cadence is comparable. Elsewhere (hills, trail, D+, quality
+# work) it varies on its own and measuring it there would read the terrain, not the injury.
 EASY_TYPES = session_kinds.EASY_RUNS
-# La plus longue sortie se compte sur tout ce qui est COURU : la plafonner aux seules
-# EF/SL ferait passer une sortie de groupe ou une course pour une semaine calme, et
-# c'est exactement la sortie qui a fait exploser la charge le 29/07.
+# The longest run is counted over everything RUN: capping it to easy/long runs only would
+# make a group run or a race look like a calm week, and that is exactly the kind of run
+# that makes the load spike.
 RUN_TYPES = session_kinds.RUN
-# Le plaisir n'est plus un signal (2026-10-09, [[decisions]]) : « il chute une à deux
-# sorties avant que la douleur ne soit avouée » avait été écrit le 09/07 sans source, ne
-# s'est jamais vérifié dans le registre, et a produit six messages et une correction.
-# La plus longue sortie n'a PLUS de signal de saut : aucun pourcentage fixe ne juge sa
-# progression depuis le 2026-09-27 (décision de l'athlète, `src/redline/model/rulebook.py`).
-# Elle reste affichée, et sa STAGNATION reste signalée (scénario 9).
+# Enjoyment is no longer a signal: the claim that it drops one or two runs before pain is
+# admitted had no source and was never verified in the ledger.
+# The longest run has NO jump signal any more: no fixed percentage judges its progression
+# (see `src/redline/model/rulebook.py`). It is still displayed, and its STAGNATION is
+# still reported (scenario 9).
 
-# ⭐ ALARME N°4, CALCULÉE (2026-09-27). « FC anormalement haute en footing » est le
-# marqueur qui a précédé l'effondrement de mars 2026 d'une à deux semaines
-# (current-plan.md, garde-fou n°4) ; il n'était calculé nulle part. On compare une EF
-# plate à ses voisines d'ALLURE, jamais à une moyenne globale : sinon on mesure l'allure.
-HR_DRIFT_BPM = 6            # au-dessus du bruit d'une FC moyenne de séance
-HR_PACE_BAND_S = 20         # « même allure » : ±20 s/km
-HR_BASELINE_DAYS = 42       # six semaines de référence, antérieures à la sortie
-HR_BASELINE_MIN = 3         # en dessous, pas de référence, donc pas de verdict
-HR_FLAT_M_PER_KM = 15       # au-delà, le relief pilote la FC
+# COMPUTED ALARM no. 4. "Abnormally high HR on an easy run" is the marker that preceded the
+# earlier collapse by one to two weeks; it was computed nowhere. A flat easy run is
+# compared to its neighbours at the same PACE, never to a global average: otherwise we
+# would be measuring pace.
+HR_DRIFT_BPM = 6            # above the noise of a session-average HR
+HR_PACE_BAND_S = 20         # "same pace": ±20 s/km
+HR_BASELINE_DAYS = 42       # six reference weeks, before the run
+HR_BASELINE_MIN = 3         # below this, no reference, hence no verdict
+HR_FLAT_M_PER_KM = 15       # above this, the relief drives HR
 HR_MIN_KM = 4.0
-# La météo normalise la FC, elle ne l'excuse pas (CLAUDE.md) : une journée chaude
-# n'entre ni dans la référence ni dans la comparaison. WBGT inconnu : gardé.
+# Weather normalises HR, it does not excuse it: a hot day enters neither the reference nor
+# the comparison. Unknown WBGT: kept.
 HR_HOT_WBGT_C = 22.0
 
 
@@ -78,15 +75,15 @@ class Signal:
 
 
 def _weeks(rows: list, count: int) -> list:
-    """Les `count` dernières étiquettes de semaine présentes au registre, dans l'ordre."""
+    """The last `count` week labels present in the ledger, in order."""
     return sorted({row.week for row in rows})[-count:]
 
 
 def intentional_cadence_keys(store: gauge.LedgerStore) -> frozenset[str]:
-    """Les sorties dont la cadence a été travaillée exprès, prescrite ou volontaire.
+    """The runs whose cadence was worked on purpose, prescribed or voluntary.
 
-    Une hausse de cadence voulue n'est pas un signal. Chaque lecteur des signaux passe
-    par ici : le dossier du bilan l'avait oublié et signalait le travail demandé.
+    A deliberate cadence increase is not a signal. Every reader of the signals goes
+    through here, so requested work is never flagged.
     """
     exposures = store.exposure_rows(confirmed_only=True)
     return frozenset(
@@ -96,7 +93,7 @@ def intentional_cadence_keys(store: gauge.LedgerStore) -> frozenset[str]:
 
 
 def current(store: gauge.LedgerStore, count: int = 4) -> list:
-    """Les signaux des `count` dernières semaines du registre, tels que tout lecteur les voit."""
+    """The signals of the last `count` ledger weeks, as every reader sees them."""
     rows = gauge.parse_ledger(store)
     weeks = _weeks(rows, count)
     return signals(rows, weeks, intentional_cadence_keys(store)) if weeks else []
@@ -107,10 +104,10 @@ def _mean(values: list) -> float | None:
 
 
 def cadence_at_easy_pace(rows: list, weeks: list, intentional_keys: frozenset[str]) -> list:
-    """Cadence moyenne sur les sorties faciles, semaine par semaine, à allure comparable.
+    """Mean cadence on easy runs, week by week, at comparable pace.
 
-    On ne compare que des sorties faciles entre elles, sinon on mesure surtout le
-    terrain. Même comparable, une hausse reste un constat et jamais son explication.
+    Only easy runs are compared with each other, otherwise we mostly measure the
+    terrain. Even when comparable, a rise is an observation, never its explanation.
     """
     out = []
     for label in weeks:
@@ -150,12 +147,11 @@ class HrDrift:
 
 
 def _flat_easy_runs(rows: list) -> list:
-    """Les EF comparables : plates, assez longues, avec chrono et FC, hors chaleur.
+    """Comparable easy runs: flat, long enough, with timing and HR, not in the heat.
 
-    Une FC déclarée douteuse n'entre ni dans la référence ni dans la comparaison, quel
-    que soit le motif : sans brassard elle est fausse, en contexte (repas, maladie) elle
-    mesure autre chose que la fatigue. La porte W40-W42 comptait une sortie du 07/10
-    courue sans brassard (audit d'effet du 2026-10-19).
+    An HR declared doubtful enters neither the reference nor the comparison, whatever the
+    reason: without the armband it is wrong, with a context (meal, illness) it measures
+    something other than fatigue.
     """
     runs = [row for row in rows
             if row.type == session_kinds.EASY and row.km and row.km >= HR_MIN_KM and row.hours
@@ -166,7 +162,7 @@ def _flat_easy_runs(rows: list) -> list:
 
 
 def hr_at_pace(rows: list) -> list[HrDrift]:
-    """Chaque EF comparée à la médiane des EF de même allure des six semaines d'avant."""
+    """Each easy run compared to the median of same-pace easy runs of the six weeks before."""
     runs = _flat_easy_runs(rows)
     out = []
     for run in runs:
@@ -182,7 +178,7 @@ def hr_at_pace(rows: list) -> list[HrDrift]:
 
 
 def signals(rows: list, weeks: list, intentional_keys: frozenset[str]) -> list:
-    """Ce qui mérite un regard cette semaine. Vide = rien à signaler, et c'est normal."""
+    """What deserves a look this week. Empty = nothing to report, and that is normal."""
     found = []
 
     cadences = [(label, value) for label, value, n in cadence_at_easy_pace(
@@ -223,7 +219,7 @@ def render(rows: list, weeks: list, intentional_keys: frozenset[str],
     lines.append("  Plus longue (km)           " + " · ".join(
         f"{label[-3:]} {value:.1f}" if value else f"{label[-3:]} —"
         for label, value in longest_run(rows, weeks)))
-    # La pente : le scénario 9 se lit sur des semaines qui ne progressent plus.
+    # The slope: scenario 9 reads on weeks that no longer progress.
     stall = gauge.long_run_stall(rows, today or dt.date.today())
     if stall:
         lines.append(f"  {stall}")

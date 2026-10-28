@@ -5,13 +5,13 @@ Deliberately NOT a chart: this is a checklist you keep open on your phone betwee
 sets, so legibility at arm's length beats any visual cleverness.
 
 Input: SELECTION_SCHEMA in src/redline/model/programme.py, from --input (stdin outside a
-turn). What arrives is a SELECTION of the programme -- exercises, doses, title and footer rule all live in
-`coaching/exercises/*.md` and `coaching/workouts/renfo-*.md`, and the morning run
-picks and modulates rather than retyping nine exercises.
+turn). What arrives is a SELECTION of the programme -- exercises, doses, title and
+footer rule all live in `coaching/exercises/*.md` and `coaching/workouts/renfo-*.md`,
+and the caller picks and modulates rather than retyping every exercise.
 
 The `gate` field of that schema is the day's pain guardrail -- {zone?, pain_max, drop, say},
 applied by the interactive page if the pain moved between the message and the moment
-L'athlète opens the link. It is OPTIONAL, so omitting it raises nothing and simply leaves
+the athlete opens the link. It is OPTIONAL, so omitting it raises nothing and simply leaves
 the session unguarded: name it whenever the session carries impact or the pain trend
 is not flat.
 
@@ -19,7 +19,7 @@ Two outputs from that one selection: the PNG, and a `.link` sidecar holding the 
 interactive snapshot. After the image is delivered, the service stores that snapshot
 and turns its opaque capability into a button. Both views therefore cannot disagree.
 
-Usage:  python3 scripts/chart-strength.py -o strength-2026-07-25.png < selection.json
+Usage:  python3 scripts/chart-strength.py -o strength-example.png < selection.json
 """
 
 from pathlib import Path

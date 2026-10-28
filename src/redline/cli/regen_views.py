@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
-"""Régénère TOUTES les vues générées du vault, en un seul appel.
+"""Regenerates ALL generated views of the vault in a single call.
 
-Le point d'entrée existe parce que la liste des générateurs avait deux copies (le
-hook `pre-commit` et rien d'autre) et qu'un troisième appelant — le bot du VPS —
-en aurait fait une troisième. Une liste de générateurs recopiée est exactement la
-dérive que `CLAUDE.md` interdit aux faits : elle vit ici, les appelants la lisent.
+The entry point exists so the list of generators has one owner: a copied list is the
+drift that `CLAUDE.md` forbids for facts. It lives here, callers read it.
 
-    python3 scripts/regen-views.py           # écrit
-    python3 scripts/regen-views.py --check   # signale une dérive, n'écrit rien
-    python3 scripts/regen-views.py --check --static-only  # CI, sans PostgreSQL
+    python3 scripts/regen-views.py           # writes
+    python3 scripts/regen-views.py --check   # reports drift, writes nothing
+    python3 scripts/regen-views.py --check --static-only  # CI, without PostgreSQL
 
-Chaque générateur reste responsable de son propre message d'erreur : on les enchaîne
-tous — même après un échec — et on rend 1 dès que l'un d'eux a échoué.
+Each generator stays responsible for its own error message: they are all chained --
+even after a failure -- and the result is 1 as soon as one of them failed.
 """
 
 from __future__ import annotations
@@ -24,8 +22,8 @@ from pathlib import Path
 
 from redline import cli
 
-# La racine du MOTEUR : les générateurs vivent ici. Le vault qu'ils régénèrent est
-# `VAULT_PATH` (src/redline/model/paths.py), transmis tel quel aux sous-processus.
+# The ENGINE root: the generators live here. The vault they regenerate is `VAULT_PATH`
+# (src/redline/model/paths.py), passed unchanged to the subprocesses.
 from redline.model import (
     entrypoint,
     paths,
@@ -41,10 +39,10 @@ GENERATORS = OPERATIONAL_GENERATORS + STATIC_GENERATORS
 
 
 def run(root: Path | None = None, check: bool = False, *, static_only: bool = False) -> int:
-    """Enchaîne les générateurs. Retourne le nombre de ceux qui ont échoué.
+    """Chains the generators. Returns how many of them failed.
 
-    On ne s'arrête pas au premier échec : si le registre et le programme sont tous
-    les deux cassés, autant les voir tous les deux d'un coup.
+    It does not stop at the first failure: if the ledger and the plan are both broken,
+    both are reported at once.
     """
     vault = root or paths.vault_root()
     environ = {**os.environ, "VAULT_PATH": str(vault)}

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Attend la readiness applicative réelle ; systemd Type=simple ne l'attend pas.
+# Waits for real application readiness; systemd Type=simple does not.
 set -euo pipefail
 
 timeout_seconds=${1:-90}

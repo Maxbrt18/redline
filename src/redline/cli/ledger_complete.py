@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Complète une mesure pending par identité stable, sans éditer une projection.
+"""Completes a pending measurement by stable identity, without editing a projection.
 
-`--fc-douteuse sans_brassard|contexte --cause "<ses mots>"` déclare douteuse une FC
-moyenne déjà connue (2026-10-20) : sans brassard elle ne compte plus nulle part ;
-en contexte (repas, maladie) elle sort des comparaisons de FC à allure, donc de la porte.
+`--fc-douteuse sans_brassard|contexte --cause "<their words>"` flags an already known
+average HR as doubtful: without an armband it counts nowhere; with a context (meal,
+illness) it leaves the pace-matched HR comparisons, hence the gate.
 
-La douleur se complète par zone : `--metric pain --zone genou --value 2`. `--zone` peut
-se taire quand l'observation ne porte qu'une zone.
+Pain is completed per zone: `--metric pain --zone genou --value 2`. `--zone` may be
+omitted when the observation carries a single zone.
 """
 
 from __future__ import annotations
@@ -29,13 +29,10 @@ METRICS = ("rpe", "pain", "enjoyment", "distance_km", "duration_s", "pace_s_per_
 
 
 def resolve_key(store, key: str, date: str, kind: str) -> str:
-    """La clé de l'observation visée, par identité stable OU par sa date.
+    """The key of the targeted observation, by stable identity OR by its date.
 
-    `--key` seul exigeait un identifiant que rien ne publiait : inventé au moment du
-    `ledger-add`, il ne survivait qu'à la mémoire de la session. Le 2026-08-14 cette
-    mémoire a été effacée entre-temps, le coach a deviné `strava:<id>` — logique, il
-    avait l'id sous les yeux — et la ligne portait `messenger:2026-08-13:...`. Une
-    date, elle, se lit dans le registre et se dit en français.
+    `--key` alone required an identifier that nothing published: invented at `ledger-add`
+    time, it survived only in the session's memory. A date can be read from the ledger.
     """
     if key:
         return key
@@ -91,13 +88,12 @@ def main() -> int:
         parser.error("--zone ne vaut que pour --metric pain")
 
     store = OperationalStore(Database(args.database_url, application_name="ledger-complete"))
-    # Résolu AVANT la mise en scène : une commande de tour préparée sur une clé
-    # inexistante n échoue qu à la validation, donc bien après la réponse du coach.
+    # Resolved BEFORE staging: a turn command prepared on a nonexistent key only fails
+    # at validation, well after the coach's reply.
     key = resolve_key(store, args.key, args.date, args.kind)
-    # Vérifiée MAINTENANT, pas à la frontière du tour. Une commande mise en scène sur
-    # une clé inexistante ne se révèle qu'à la validation, c'est-à-dire une fois la
-    # réponse du coach écrite : il ne peut plus se corriger, et tout le tour tombe.
-    # Ici il lit l'erreur, relance avec la bonne clé, et son message part intact.
+    # Checked NOW, not at the turn boundary: once the reply is written the coach can no
+    # longer correct itself and the whole turn falls. Here it reads the error, retries
+    # with the right key, and its message goes out intact.
     observation_id = store.observation_id(key)
     if observation_id is None:
         recents = " · ".join(

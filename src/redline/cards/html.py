@@ -45,7 +45,7 @@ def tiles(items: list) -> str:
     made for figures, and a sentence set in it reads like a headline.
 
     status="bad" -- the instrument crossed its limit -- turns the VALUE red. "ok"
-    and "warn" draw nothing: there is no status dot any more (2026-10-01, a dot
+    and "warn" draw nothing: there is no status dot (a dot
     beside a label reads as a badge). A milder state belongs in the words of the
     value or of its sub line.
     """

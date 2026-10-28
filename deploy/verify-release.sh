@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Vérifie que le processus actif correspond exactement au commit attendu et au
-# schéma Alembic embarqué. À lancer après le redémarrage systemd.
+# Verifies that the running process matches the expected commit and the embedded
+# Alembic schema exactly. Run after the systemd restart.
 set -euo pipefail
 
 expected=${1:-}
@@ -17,9 +17,9 @@ esac
 
 repo_root=$(git rev-parse --show-toplevel)
 runtime_paths=(deploy src migrations alembic.ini pyproject.toml requirements.txt)
-# Le coach committe ses notes dès qu'un tour les touche, y compris un message rejoué au
-# démarrage : HEAD peut donc légitimement dépasser le SHA déployé. Ce qui doit être
-# identique, c'est le CODE.
+# The coach commits its notes as soon as a turn touches them, including a message
+# replayed at startup: HEAD may therefore legitimately be ahead of the deployed SHA.
+# What must be identical is the CODE.
 git -C "$repo_root" merge-base --is-ancestor "$expected" HEAD || {
   echo "release: le checkout ne contient pas $expected" >&2
   exit 1
@@ -29,11 +29,11 @@ git -C "$repo_root" diff --quiet "$expected" HEAD -- "${runtime_paths[@]}" || {
   exit 1
 }
 
-# Une projection Markdown sale est normale ; du runtime sale ne l'est jamais.
+# A dirty Markdown projection is normal; a dirty runtime never is.
 git -C "$repo_root" diff --quiet -- "${runtime_paths[@]}"
 git -C "$repo_root" diff --cached --quiet -- "${runtime_paths[@]}"
-# Même empreinte que `VaultRepo.runtime_tree` : sha256 des trois arbres, séparés par
-# une espace, sans fin de ligne.
+# Same fingerprint as `VaultRepo.runtime_tree`: sha256 of the three trees, separated
+# by a space, without a trailing newline.
 trees=$(git -C "$repo_root" rev-parse "$expected:deploy" "$expected:src" \
   "$expected:migrations" | paste -sd ' ' -)
 expected_tree=$(printf '%s' "$trees" | { command -v sha256sum >/dev/null 2>&1 && sha256sum || shasum -a 256; } | cut -c1-12)

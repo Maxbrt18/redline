@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Régénère les blocs générés de `ai/hot-cache.md` depuis leurs propriétaires.
+"""Regenerates the generated blocks of `ai/hot-cache.md` from their owners.
 
-Deux blocs, calculés depuis PostgreSQL : Forme (volumes, jauge, tendance douleur) et
-État (trajectoire de la sortie longue, échéances échues, capacités, prédictions à
-solder). Le reste du hot-cache est écrit à la main : c'est du jugement éditorial, pas de
-l'état dérivé, et il ne doit porter aucun état qui a un propriétaire.
+Two blocks, computed from PostgreSQL: Form (volumes, gauge, pain trend) and State
+(long-run trajectory, overdue deadlines, capabilities, predictions to settle). The rest
+of the hot cache is hand-written: editorial judgement, not derived state, and it must
+carry no state that has an owner.
 
-    python3 scripts/hot-cache.py           # écrit
-    python3 scripts/hot-cache.py --check   # signale une dérive, n'écrit rien (CI)
+    python3 scripts/hot-cache.py           # writes
+    python3 scripts/hot-cache.py --check   # reports drift, writes nothing (CI)
 """
 
 from __future__ import annotations

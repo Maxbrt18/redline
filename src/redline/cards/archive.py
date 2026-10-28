@@ -1,4 +1,4 @@
-"""Identité documentaire typée voyageant avec une image, jamais extraite de sa prose."""
+"""Typed document identity travelling with an image, never extracted from its prose."""
 
 import hashlib
 import json

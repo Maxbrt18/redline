@@ -12,7 +12,6 @@ know stops it rather than being dropped.
 
 Revision ID: 20261028_0005
 Revises: 20261028_0004
-Create Date: 2026-10-28
 """
 
 from __future__ import annotations

@@ -1,7 +1,7 @@
-"""L'adaptateur du banc, choisi par `AGENT_PROVIDER` comme en production.
+"""The bench adapter, chosen by `AGENT_PROVIDER` as in production.
 
-Le banc ne parlait qu'à Codex ; la production est passée à Claude. Les deux adaptateurs
-exposent `one_shot` avec le même contrat : un tour isolé, sans outil ni session.
+Both adapters expose `one_shot` with the same contract: an isolated turn, with no tool
+and no session.
 """
 from __future__ import annotations
 
@@ -32,8 +32,8 @@ def bench_runner(config: Config) -> OneShot:
 
 
 def check_model(config: Config, spec: RunSpec) -> None:
-    """Le banc ne paie que les modèles des profils canoniques (`routing.py`) : une
-    surcharge d'environnement vers un autre modèle échoue avant le premier appel."""
+    """The bench only pays for the models of the canonical profiles (`routing.py`): an
+    environment override to another model fails before the first call."""
     from redline.service.routing import default_models
 
     allowed = default_models(config.agent_provider)
