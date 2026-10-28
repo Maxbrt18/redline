@@ -23,8 +23,10 @@ from dataclasses import dataclass
 from dataclasses import field as _dataclass_field
 from typing import Any
 
+from .errors import InputError
 
-class SchemaError(ValueError):
+
+class SchemaError(InputError):
     """Non-conforming data. Carries EVERY problem, not the first one."""
 
     def __init__(self, problems: Sequence[str]) -> None:

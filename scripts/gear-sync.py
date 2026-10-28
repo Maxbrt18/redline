@@ -14,13 +14,15 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts import strava
+from scripts.model import entrypoint
+from scripts.model.errors import ConfigError
 from scripts.storage import Database, OperationalStore
 
 
 def main() -> int:
     database_url = os.environ.get("DATABASE_URL", "").strip()
     if not database_url:
-        raise SystemExit("DATABASE_URL absent")
+        raise ConfigError("DATABASE_URL absent")
     database = Database(database_url, application_name="gear-sync")
     try:
         store = OperationalStore(database)
@@ -35,4 +37,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    entrypoint.run(main)

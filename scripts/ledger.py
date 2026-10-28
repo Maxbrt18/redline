@@ -38,11 +38,13 @@ if str(ROOT) not in sys.path:
 
 from scripts.model import (  # noqa: E402
     daily,
+    entrypoint,
     paths,
     programme,
     rulebook,
 )
 from scripts.model import ledger as table  # noqa: E402
+from scripts.model.errors import InputError  # noqa: E402
 
 POINTS_PER_EQ_HOUR = 14.0          # calibrated 2026-07-19, coaching/protocols.md
 LEVEL_CAP, RATIO_CAP = 85, 1.3
@@ -1194,7 +1196,7 @@ def main() -> int:
         store = open_store()
         rows = parse_ledger(store)
     except table.LedgerError as exc:
-        sys.exit(f"Registre illisible — {exc}")
+        raise InputError(f"Registre illisible — {exc}") from exc
     instruments = load_instruments(store)
     # Les cibles viennent des fiches de séance, jamais d'une table en dur.
     targets = programme.rpe_targets(args.root)
@@ -1233,7 +1235,7 @@ def main() -> int:
         try:
             label = normalize_week(args.week, sorted(per_week))
         except ValueError as exc:
-            sys.exit(f"Semaine refusée — {exc}")
+            raise InputError(f"Semaine refusée — {exc}") from exc
     else:
         label = max(per_week)
 
@@ -1246,4 +1248,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    entrypoint.run(main)

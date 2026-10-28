@@ -22,7 +22,11 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.model import commands  # noqa: E402
+from scripts.model import (  # noqa: E402
+    commands,
+    entrypoint,
+)
+from scripts.model.errors import InputError  # noqa: E402
 
 METRICS = ("rpe", "pain", "enjoyment", "distance_km", "duration_s", "pace_s_per_km",
            "hr_avg_bpm", "hr_max_bpm", "cadence_spm", "elevation_gain_m",
@@ -44,13 +48,13 @@ def resolve_key(store, key: str, date: str, kind: str) -> str:
                  if row["occurred_on"].isoformat() == date
                  and (not kind or row["kind"] == kind)]
     if not candidats:
-        raise SystemExit(f"aucune observation le {date}"
+        raise InputError(f"aucune observation le {date}"
                          + (f" de type {kind}" if kind else "")
                          + " — vérifie avec `fact-read.py observations`")
     if len(candidats) > 1:
         details = " · ".join(f"{row['kind']} (clé={row['idempotency_key']})"
                              for row in candidats)
-        raise SystemExit(f"{len(candidats)} observations le {date} : {details}. "
+        raise InputError(f"{len(candidats)} observations le {date} : {details}. "
                          "Précise --type, ou passe --key.")
     return candidats[0]["idempotency_key"]
 
@@ -104,7 +108,7 @@ def main() -> int:
         recents = " · ".join(
             f"{row['occurred_on'].isoformat()} {row['kind']} (clé={row['idempotency_key']})"
             for row in store.observation_rows()[:5])
-        raise SystemExit(f"observation inconnue : {key}. Récentes — {recents}")
+        raise InputError(f"observation inconnue : {key}. Récentes — {recents}")
     if args.hr_doubt:
         payload = {"idempotency_key": key, "reason": args.hr_doubt, "note": args.cause.strip()}
         if turn_id:
@@ -144,4 +148,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    entrypoint.run(main)

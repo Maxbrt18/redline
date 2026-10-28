@@ -27,8 +27,15 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts import ledger  # noqa: E402
-from scripts.model import rulebook, transitions  # noqa: E402
+from scripts import (  # noqa: E402
+    ledger,
+)
+from scripts.model import (  # noqa: E402
+    entrypoint,
+    rulebook,
+    transitions,
+)
+from scripts.model.errors import ConfigError  # noqa: E402
 
 
 def novelties(sessions: list[dict], rows: list, as_of: dt.date) -> tuple[str, ...]:
@@ -101,7 +108,7 @@ def main() -> int:
     args = parser.parse_args()
     url = (os.environ.get("DATABASE_URL") or "").strip()
     if not url:
-        raise SystemExit("DATABASE_URL obligatoire : les plans vivent dans PostgreSQL")
+        raise ConfigError("DATABASE_URL obligatoire : les plans vivent dans PostgreSQL")
     from scripts.storage import Database, OperationalStore
     store = OperationalStore(Database(url, application_name="feasibility"))
     today = args.date or dt.date.today()
@@ -111,4 +118,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    entrypoint.run(main)

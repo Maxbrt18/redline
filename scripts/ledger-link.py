@@ -16,7 +16,10 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.model import commands  # noqa: E402
+from scripts.model import (  # noqa: E402
+    commands,
+    entrypoint,
+)
 
 
 def main() -> int:
@@ -49,4 +52,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    entrypoint.run(main)

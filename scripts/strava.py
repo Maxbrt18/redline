@@ -77,6 +77,11 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts.model import entrypoint  # noqa: E402
+from scripts.model.errors import ExternalError  # noqa: E402
 
 API = "https://www.strava.com/api/v3"
 TOKEN_URL = "https://www.strava.com/oauth/token"
@@ -90,7 +95,7 @@ FOOT_SPORTS = {"Run", "TrailRun", "VirtualRun", "Walk", "Hike"}
 EXPIRY_MARGIN = 120
 
 
-class StravaError(RuntimeError):
+class StravaError(ExternalError):
     """Une panne d'accès Strava, dite en clair et sans jamais recopier un secret."""
 
 
@@ -609,4 +614,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    entrypoint.run(main)

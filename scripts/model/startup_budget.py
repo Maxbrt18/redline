@@ -37,6 +37,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from .errors import InputError
+
 # Ce qu'on paie, et à quelle fréquence.
 PER_TURN = "par tour"   # à CHAQUE message, y compris « ça va ? »
 N2 = "N2"               # seulement quand un jugement s'engage (hausse, douleur, renfo)
@@ -64,7 +66,7 @@ TIER_OF = {
 FILES = tuple(CEILINGS)
 
 
-class BudgetError(ValueError):
+class BudgetError(InputError):
     """Configuration incohérente : dans un étage, la somme des plafonds dépasse le total."""
 
 

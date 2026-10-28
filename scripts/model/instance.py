@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from . import hr_zones
+from .errors import ConfigError
 from .schema import Schema, SchemaError, field
 
 FILENAME = "redline.toml"
@@ -57,7 +58,7 @@ INSTANCE_SCHEMA = Schema("redline.toml", [
 ])
 
 
-class InstanceError(ValueError):
+class InstanceError(ConfigError):
     """`redline.toml` absent, illisible, non conforme ou encore à remplir."""
 
 

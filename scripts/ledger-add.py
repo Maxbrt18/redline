@@ -28,7 +28,11 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.model import commands, session_cycle  # noqa: E402
+from scripts.model import (  # noqa: E402
+    commands,
+    entrypoint,
+    session_cycle,
+)
 from scripts.model import ledger as table  # noqa: E402
 
 
@@ -234,4 +238,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    entrypoint.run(main)

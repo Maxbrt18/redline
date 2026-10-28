@@ -32,6 +32,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.model import (  # noqa: E402
+    entrypoint,
     paths,
     views,
 )
@@ -54,6 +55,7 @@ from scripts.model.decisions import (  # noqa: E402,F401
     verdict_template,
     week_end,
 )
+from scripts.model.errors import InputError  # noqa: E402
 from scripts.model.views import ViewDrift  # noqa: E402
 
 DECISIONS = "coaching/decisions.md"
@@ -185,16 +187,16 @@ def main() -> int:
     try:
         drifted = views.apply(path, BLOCK, render_index(decisions, today), check=args.check)
     except ViewDrift as exc:
-        sys.exit(str(exc))
+        raise InputError(str(exc)) from exc
 
     if not drifted:
         print("Index déjà à jour.")
     elif args.check:
-        sys.exit("Index périmé — lancer `python3 scripts/decisions-index.py`.")
+        raise InputError("Index périmé — lancer `python3 scripts/decisions-index.py`.")
     else:
         print(f"Index régénéré ({len(decisions)} décisions).")
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    entrypoint.run(main)

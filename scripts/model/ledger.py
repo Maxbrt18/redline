@@ -7,6 +7,7 @@ import re
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
+from .errors import InputError
 from .schema import Schema, field
 
 UNKNOWN = "?"
@@ -81,7 +82,7 @@ INPUT_SCHEMA = Schema("observation", [
 ])
 
 
-class LedgerError(ValueError):
+class LedgerError(InputError):
     """Une observation refusée à la frontière d'entrée."""
 
 

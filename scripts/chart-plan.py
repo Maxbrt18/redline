@@ -14,6 +14,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.cards import html, render  # noqa: E402
+from scripts.model import entrypoint  # noqa: E402
+from scripts.model.errors import ConfigError, InputError  # noqa: E402
 from scripts.model.weekly_plan import (  # noqa: E402
     active,
     details_of,
@@ -72,12 +74,12 @@ def main() -> None:
     args = parser.parse_args()
     database_url = (os.environ.get("DATABASE_URL") or "").strip()
     if not database_url:
-        raise SystemExit("DATABASE_URL obligatoire : le journal ne contient qu'une projection")
+        raise ConfigError("DATABASE_URL obligatoire : le journal ne contient qu'une projection")
     from scripts.storage import Database, OperationalStore
     store = OperationalStore(Database(database_url, application_name="chart-plan"))
     plan = store.load_plan(args.week)
     if plan is None:
-        raise SystemExit(f"Programme {args.week} absent dans PostgreSQL")
+        raise InputError(f"Programme {args.week} absent dans PostgreSQL")
     validate(plan)
     # `--today` datait le FILTRE des séances et pas le contrôle de fraîcheur : la card
     # décidait « à recalculer » d'après l'horloge tout en s'affichant à une autre date.
@@ -89,7 +91,7 @@ def main() -> None:
     if store.plan_needs_arbitration(args.week, revision["revision"]):
         stale.append("données de la semaine modifiées depuis le dernier calcul")
     if stale:
-        raise SystemExit("Plan à recalculer : " + " ; ".join(stale))
+        raise InputError("Plan à recalculer : " + " ; ".join(stale))
     # Vue descriptive : la carte raconte la semaine, séances faites marquées « (fait) ».
     # Ce qu'est une séance annulée ou soldée se demande au modèle, jamais réécrit ici.
     sessions = scheduled(revision["sessions"])
@@ -104,4 +106,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    entrypoint.run(main)

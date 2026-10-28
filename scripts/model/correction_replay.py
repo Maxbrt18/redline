@@ -28,6 +28,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from .errors import InputError
+
 CORRECTIONS = "coaching/corrections.md"
 LEDGER = "server/tests/fixtures/corrections-replay.json"
 SCENARIOS = "server/tests/fixtures/coaching-scenarios.json"
@@ -39,7 +41,7 @@ HEADING = re.compile(r"^#{2,3} (\d{4}-\d{2}-\d{2}.*)$", re.MULTILINE)
 DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
-class ReplayFormatError(ValueError):
+class ReplayFormatError(InputError):
     """Le registre ne respecte pas son schéma : on refuse au lieu d'interpréter."""
 
 

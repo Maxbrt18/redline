@@ -44,8 +44,10 @@ if str(ROOT) not in sys.path:
 
 from scripts.model import (  # noqa: E402
     commands,
+    entrypoint,
     paths,
 )
+from scripts.model.errors import ConfigError, InputError  # noqa: E402
 
 if TYPE_CHECKING:
     from scripts.storage import OperationalStore
@@ -97,7 +99,7 @@ def merge(fields: tuple, args: argparse.Namespace, existing: dict | None) -> dic
                    for _, name, required in fields
                    if required and getattr(args, name, UNSET) is UNSET]
         if missing:
-            raise SystemExit(
+            raise InputError(
                 "champs obligatoires manquants : " + ", ".join(missing)
                 + " — sans --patch, une écriture porte la ligne entière")
     payload = {}
@@ -114,7 +116,7 @@ def _existing(store: Any, command: str, key: str) -> dict:
     field = "thread_key" if command == "thread" else "deadline_key"
     found = [row for row in rows if row[field] == key]
     if not found:
-        raise SystemExit(
+        raise InputError(
             f"--patch sur une clé inexistante : {key!r} — "
             "créer une ligne demande la forme complète, sans --patch")
     return found[0]
@@ -164,7 +166,7 @@ def _prediction(args, _) -> dict:
     missing = [name for name in ("domain", "statement", "probability", "due_on")
                if getattr(args, name) is None]
     if missing:
-        raise SystemExit("création de prédiction : options manquantes " + ", ".join(
+        raise InputError("création de prédiction : options manquantes " + ", ".join(
             "--" + name.replace("_", "-") for name in missing))
     payload = {"prediction_key": args.key, "operation": "create", "domain": args.domain,
                "statement": args.statement, "probability": args.probability,
@@ -172,14 +174,14 @@ def _prediction(args, _) -> dict:
     rule = (args.resolves, args.resolves_on, args.success_if)
     if any(part is not None for part in rule):
         if None in rule:
-            raise SystemExit("prédiction rattachée : --resolves, --resolves-on et "
+            raise InputError("prédiction rattachée : --resolves, --resolves-on et "
                              "--success-if vont ensemble")
         payload["resolves_on"] = {"kind": args.resolves, "date": args.resolves_on.isoformat(),
                                   "success_if": args.success_if}
         if args.resolves_zone:
             payload["resolves_on"]["zone"] = args.resolves_zone
     elif args.resolves_zone:
-        raise SystemExit("--resolves-zone ne vaut que pour une prédiction rattachée")
+        raise InputError("--resolves-zone ne vaut que pour une prédiction rattachée")
     return payload
 
 
@@ -196,7 +198,7 @@ def _correction(args, _) -> dict:
     known = {entry.key for entry in correction_replay.entries(journal.read_text(encoding="utf-8"))}
     entry = args.entry.strip()
     if entry not in known:
-        raise SystemExit(
+        raise InputError(
             f"correction : « {entry} » n'est pas une entrée de {correction_replay.CORRECTIONS}. "
             "Écris d'abord l'entrée (« ## AAAA-MM-JJ — titre »), puis passe son titre exact "
             "à --entry.")
@@ -217,7 +219,7 @@ def _permit(args, _) -> dict:
 
 def _exposure(args, _) -> dict:
     if (args.target_value is None) != (args.target_unit is None):
-        raise SystemExit("--target-value et --target-unit vont ensemble")
+        raise InputError("--target-value et --target-unit vont ensemble")
     return {
         "exposure_key": args.key,
         "observation_key": args.observation_key,
@@ -309,7 +311,7 @@ def _payload(args, existing: dict | None = None) -> tuple[str, str, dict]:
 def _direct(store, command: str, payload: dict) -> object:
     write = COMMANDS[command].write
     if write is None:
-        raise SystemExit(f"fact-write : « {command} » ne s'écrit que dans un tour")
+        raise InputError(f"fact-write : « {command} » ne s'écrit que dans un tour")
     return write(store, payload)
 
 
@@ -467,7 +469,7 @@ def main() -> int:
     args = parser().parse_args()
     turn_id = (os.environ.get("REDLINE_TURN_ID") or "").strip()
     if not args.database_url:
-        raise SystemExit("DATABASE_URL obligatoire : les projections sont en lecture seule")
+        raise ConfigError("DATABASE_URL obligatoire : les projections sont en lecture seule")
     from scripts.storage import Database, OperationalStore, StorageError
 
     store = OperationalStore(Database(args.database_url, application_name="fact-write"))
@@ -476,7 +478,7 @@ def main() -> int:
     existing = _existing(store, args.command, args.key) if getattr(
         args, "patch", False) else None
     if args.command in {"angle", "ask"} and not turn_id:
-        raise SystemExit(
+        raise InputError(
             "Cette commande qualifie le message du tour en cours : hors d'un tour "
             "(REDLINE_TURN_ID absent) il n'y a aucun message à qualifier.")
     entity_key, kind, payload = _payload(args, existing)
@@ -494,7 +496,7 @@ def main() -> int:
             return 0
         written = _direct(store, args.command, payload)
     except StorageError as exc:
-        raise SystemExit(f"fact-write : {entity_key} refusé : {exc}") from exc
+        raise StorageError(f"fact-write : {entity_key} refusé : {exc}") from exc
     # False = la même ligne existait déjà ; rien n'a été écrit.
     print(f"{entity_key} déjà enregistré, rien d'écrit." if written is False
           else f"{entity_key} enregistré.")
@@ -502,4 +504,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    entrypoint.run(main)

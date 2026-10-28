@@ -21,6 +21,8 @@ if str(ROOT / "server") not in sys.path:
     sys.path.insert(0, str(ROOT / "server"))
 
 from redline.postgres_state import PostgresStateStore  # noqa: E402
+from scripts.model import entrypoint  # noqa: E402
+from scripts.model.errors import ConfigError, InputError  # noqa: E402
 from scripts.storage import Database  # noqa: E402
 
 PERIODIC_KEY = re.compile(
@@ -31,7 +33,7 @@ PERIODIC_KEY = re.compile(
 def _state() -> PostgresStateStore:
     url = (os.environ.get("DATABASE_URL") or "").strip()
     if not url:
-        raise SystemExit("DATABASE_URL obligatoire")
+        raise ConfigError("DATABASE_URL obligatoire")
     return PostgresStateStore(Database(url, application_name="proactive-job"))
 
 
@@ -39,7 +41,7 @@ def _row(state: PostgresStateStore, key: str) -> dict:
     try:
         return next(job for job in state.proactive.jobs() if job["id"] == key)
     except StopIteration:
-        raise SystemExit(f"job inconnu : {key}") from None
+        raise InputError(f"job inconnu : {key}") from None
 
 
 def main() -> int:
@@ -58,7 +60,7 @@ def main() -> int:
     before = _row(state, args.job_key)
     if args.command == "reopen":
         if before["status"] not in {"done", "failed"}:
-            raise SystemExit(
+            raise InputError(
                 f"{args.job_key} : réouverture refusée, statut {before['status']}")
         now = time.time()
         state.proactive.reopen_job(
@@ -72,4 +74,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    entrypoint.run(main)

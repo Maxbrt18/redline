@@ -20,6 +20,8 @@ import importlib.util
 import pytest
 from conftest import ENGINE_ROOT
 
+from scripts.model.errors import InputError
+
 
 def _cli():
     spec = importlib.util.spec_from_file_location(
@@ -66,7 +68,7 @@ def test_an_ambiguous_date_lists_the_candidates_with_their_keys():
     les clés pour qu'il tranche. Une erreur qui n'expose pas la sortie possible oblige
     à deviner une deuxième fois."""
     cli = _cli()
-    with pytest.raises(SystemExit) as refus:
+    with pytest.raises(InputError) as refus:
         cli.resolve_key(_Store([VELO, REVEIL]), "", "2026-08-13", "")
     message = str(refus.value)
     assert "vélo" in message and "reveil" in message
@@ -82,7 +84,7 @@ def test_a_type_disambiguates_without_needing_the_key():
 
 def test_a_date_without_any_observation_names_where_to_look():
     cli = _cli()
-    with pytest.raises(SystemExit, match=r"fact-read\.py observations"):
+    with pytest.raises(InputError, match=r"fact-read\.py observations"):
         cli.resolve_key(_Store([VELO]), "", "2026-08-01", "")
 
 

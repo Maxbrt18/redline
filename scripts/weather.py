@@ -51,6 +51,14 @@ import sys
 import urllib.parse
 import urllib.request
 from datetime import UTC, datetime, timedelta, timezone
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts.model import entrypoint  # noqa: E402
+from scripts.model.errors import ExternalError, InputError  # noqa: E402
 
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
@@ -193,7 +201,7 @@ def h_cylinder_in_air(tair, pair, speed):
     return nu * thermal_cond(tair) / D_WICK
 
 
-class WBGTError(RuntimeError):
+class WBGTError(InputError):
     """Le bilan d'énergie n'a pas convergé — on refuse, on n'invente pas."""
 
 
@@ -576,33 +584,33 @@ def main():
         try:
             pts = decode_polyline(args.polyline)
         except ValueError as exc:
-            sys.exit(str(exc))
+            raise InputError(str(exc)) from exc
         if not pts:
-            sys.exit("Polyline vide ou illisible.")
+            raise InputError("Polyline vide ou illisible.")
         lat, lon = pts[0]
         if len(pts) >= 3:
             milieu_pt = pts[len(pts) // 2]
     elif args.lat is not None and args.lon is not None:
         lat, lon = args.lat, args.lon
     else:
-        sys.exit("Fournir --polyline, ou --lat et --lon.")
+        raise InputError("Fournir --polyline, ou --lat et --lon.")
 
     try:
         when = parse_time(args.time, local=args.local)
     except ValueError as exc:
-        sys.exit(str(exc))
+        raise InputError(str(exc)) from exc
 
     fuseau = None
     if args.local:
         try:
             when, fuseau = resolve_offset(lat, lon, when)
         except Exception as exc:
-            sys.exit(f"Fuseau du lieu de départ indéterminable : {exc}")
+            raise ExternalError(f"Fuseau du lieu de départ indéterminable : {exc}") from exc
 
     try:
         w = get_weather(lat, lon, when)
     except Exception as exc:
-        sys.exit(f"Météo indisponible : {exc}")
+        raise ExternalError(f"Météo indisponible : {exc}") from exc
 
     milieu = None
     if milieu_pt:
@@ -623,4 +631,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    entrypoint.run(main)

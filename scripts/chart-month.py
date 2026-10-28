@@ -20,6 +20,7 @@ if str(ROOT) not in sys.path:
 
 from scripts.cards import archive, charts, cli, html, render  # noqa: E402
 from scripts.cards.format import fmt_num  # noqa: E402
+from scripts.model import entrypoint  # noqa: E402
 from scripts.model.cards import MONTH_SCHEMA  # noqa: E402
 
 
@@ -95,4 +96,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    entrypoint.run(main)
