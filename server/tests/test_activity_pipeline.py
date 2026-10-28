@@ -9,9 +9,9 @@ class Store:
         self.finished = []
         self.gear = []
 
-    def ingest_strava_activity(self, distilled):
-        self.distilled = distilled
-        return {"activity_id": distilled["id"], "status": "matched"}
+    def ingest_strava_activity(self, activity):
+        self.activity = activity
+        return {"activity_id": activity.id, "status": "matched"}
 
     def strava_intake(self, activity_id):
         if self.intake is not None:
@@ -56,9 +56,9 @@ def test_objective_enrichments_are_finished_before_the_packet_is_returned():
     result = pipeline.run(42)
 
     assert result["status"] == "matched"
-    assert result["snapshot"]["activity"]["nom"] == "easy"
-    assert result["snapshot"]["laps"][0]["cadence_pas_min"] == 170
-    assert "meteo" not in result["snapshot"]["activity"]
+    assert result["snapshot"]["activity"]["name"] == "easy"
+    assert result["snapshot"]["laps"][0]["cadence_spm"] == 170
+    assert "route_polyline" not in result["snapshot"]["activity"]
     assert (42, "elevation_loss", {"value": 140}) in store.finished
     assert (42, "wbgt", {"value": 21.4, "unavailable": False}) in store.finished
 
@@ -98,10 +98,9 @@ def test_a_known_enrichment_is_not_fetched_again_on_a_replay():
 
 
 def test_a_persisted_capture_survives_a_restart_without_refetching_strava():
-    distilled = strava.distill_activity(activity())
-    distilled["laps"] = [strava.distill_lap(activity()["laps"][0], "Run", 1)]
+    stored = strava.parse_activity(activity()).to_json()
     store = Store(elevation="known", wbgt="known", intake={
-        **store_intake(distilled),
+        **store_intake(stored),
         "elevation_loss_state": "known",
         "wbgt_state": "known",
     })
@@ -113,13 +112,13 @@ def test_a_persisted_capture_survives_a_restart_without_refetching_strava():
         store, activity_fetch=forbidden, gear_fetch=forbidden).run(42)
 
     assert result["snapshot"]["activity"]["id"] == 42
-    assert result["snapshot"]["laps"][0]["rep"] == 1
+    assert result["snapshot"]["laps"][0]["lap"] == 1
     assert store.gear == []
 
 
-def store_intake(distilled):
+def store_intake(stored):
     return {
-        "distilled": distilled,
+        "distilled": stored,
         "status": "matched",
         "candidate_session_keys": ["2026-W34:w34-dim-sl"],
         "observation_id": "observation-42",
@@ -127,8 +126,8 @@ def store_intake(distilled):
 
 
 def test_the_pipeline_uses_the_same_wall_clock_contract_as_strava():
-    distilled = strava.distill_activity(activity())
-    assert distilled["meteo"]["time"] == "2026-08-23T08:00:00"
+    query = strava.parse_activity(activity()).weather_query
+    assert query["time"] == "2026-08-23T08:00:00"
 
 
 def test_the_used_shoe_counter_is_refreshed_with_the_activity():
@@ -158,20 +157,19 @@ def test_a_gear_provider_failure_never_erases_the_activity():
 
 
 def captured_store(**feelings):
-    distilled = strava.distill_activity(activity())
-    distilled["laps"] = []
+    stored = strava.parse_activity({**activity(), "laps": []}).to_json()
     store = Store(elevation="known", wbgt="known", intake={
-        **store_intake(distilled), "elevation_loss_state": "known", "wbgt_state": "known"})
+        **store_intake(stored), "elevation_loss_state": "known", "wbgt_state": "known"})
     store.observation_feelings = lambda observation_id: feelings
     return store
 
 
 def test_the_debrief_rereads_the_words_written_after_the_capture():
-    """Capturée à l'arrivée, la sortie s'appelle encore « EF » ; Sam l'a renommée."""
+    """Captured on arrival, the activity still had its default name; Sam renamed it."""
     store = captured_store()
     renamed = {**activity(), "name": "Footing des quais", "description": "jambes lourdes"}
     result = ActivityPipeline(store, activity_fetch=lambda _: renamed).run(42, fresh_words=True)
-    assert result["snapshot"]["activity"]["nom"] == "Footing des quais"
+    assert result["snapshot"]["activity"]["name"] == "Footing des quais"
     assert result["snapshot"]["activity"]["description"] == "jambes lourdes"
 
 
@@ -180,27 +178,26 @@ def test_an_unreadable_title_keeps_the_captured_words():
         raise RuntimeError("Strava indisponible")
 
     result = ActivityPipeline(captured_store(), activity_fetch=broken).run(42, fresh_words=True)
-    assert result["snapshot"]["activity"]["nom"] == "easy"
+    assert result["snapshot"]["activity"]["name"] == "easy"
 
 
 def test_the_feelings_already_given_travel_with_the_snapshot():
     store = captured_store(rpe=3.0, pain=0.5, enjoyment=8.0)
     result = ActivityPipeline(store, activity_fetch=lambda _: activity()).run(42)
-    assert result["snapshot"]["ressentis"] == {"rpe": 3.0, "pain": 0.5, "enjoyment": 8.0}
-    assert "ressentis" not in ActivityPipeline(
+    assert result["snapshot"]["feelings"] == {"rpe": 3.0, "pain": 0.5, "enjoyment": 8.0}
+    assert "feelings" not in ActivityPipeline(
         captured_store(), activity_fetch=lambda _: activity()).run(42)["snapshot"]
 
 
 def test_computed_gaps_reach_the_snapshot(monkeypatch):
-    """Audit du 2026-10-11 : ce qui a aidé Sam, ce sont des écarts calculés."""
     import datetime as dt
 
     from scripts import ledger
     from scripts.model import weekly_plan
 
     class Linked(Store):
-        def ingest_strava_activity(self, distilled):
-            return {"activity_id": distilled["id"], "status": "matched",
+        def ingest_strava_activity(self, activity):
+            return {"activity_id": activity.id, "status": "matched",
                     "observation_id": "obs"}
 
         def week_session_links(self, week):
@@ -217,24 +214,23 @@ def test_computed_gaps_reach_the_snapshot(monkeypatch):
     result = ActivityPipeline(Linked(), activity_fetch=lambda activity_id: activity(),
                               stream_fetch=lambda activity_id: [250, 310],
                               weather_fetch=lambda meteo: 20.0).run(42)
-    assert "FC moyenne 164 pour un plafond de 157 (+7)" in result["snapshot"]["ecarts"]
+    assert "FC moyenne 164 pour un plafond de 157 (+7)" in result["snapshot"]["gaps"]
 
 
 def test_a_gap_failure_never_blocks_the_debrief():
     class Linked(Store):
-        def ingest_strava_activity(self, distilled):
-            return {"activity_id": distilled["id"], "status": "matched",
+        def ingest_strava_activity(self, activity):
+            return {"activity_id": activity.id, "status": "matched",
                     "observation_id": "obs"}
 
     result = ActivityPipeline(Linked(), activity_fetch=lambda activity_id: activity(),
                               stream_fetch=lambda activity_id: [250, 310],
                               weather_fetch=lambda meteo: 20.0).run(42)
-    assert "ecarts" not in result["snapshot"]
-    assert result["snapshot"]["activity"]["nom"] == "easy"
+    assert "gaps" not in result["snapshot"]
+    assert result["snapshot"]["activity"]["name"] == "easy"
 
 
 def test_a_quality_session_carries_its_reps_into_the_snapshot(monkeypatch):
-    """Le service construit la carte des répétitions ; le modèle ne la choisit plus."""
     import datetime as dt
 
     raw = activity()
@@ -252,8 +248,8 @@ def test_a_quality_session_carries_its_reps_into_the_snapshot(monkeypatch):
                                 stream_fetch=lambda _: [1, 2],
                                 weather_fetch=lambda _: None).run(42)["snapshot"]
 
-    assert snapshot["qualite"] is True
-    card = snapshot["repetitions"]
+    assert snapshot["quality"] is True
+    card = snapshot["quality_card"]
     assert card["date"] == "15/10" and len(card["reps"]) == 2
     assert card["reps"][0]["recovery"] == {"time_s": 206.0, "dist_m": 498.0}
 
@@ -264,4 +260,4 @@ def test_an_easy_run_has_no_quality_flag(monkeypatch):
     snapshot = ActivityPipeline(Store(), activity_fetch=lambda _: activity(),
                                 stream_fetch=lambda _: [1, 2],
                                 weather_fetch=lambda _: None).run(42)["snapshot"]
-    assert "qualite" not in snapshot and "repetitions" not in snapshot
+    assert "quality" not in snapshot and "quality_card" not in snapshot

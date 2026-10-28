@@ -1,9 +1,4 @@
-"""scripts/strava.py — l'accès Strava, indépendant du moteur.
-
-Le contrôle qui compte est celui de la cadence : c'est le seul endroit du dépôt où
-la règle « multiplier par 2 » devient fausse, et aucune ligne de prompt ne savait le
-dire. Les autres vérifient qu'on ne perd pas l'accès en silence.
-"""
+"""scripts/strava.py: reading Strava's payloads and keeping access alive."""
 
 import json
 import urllib.parse
@@ -11,38 +6,36 @@ import urllib.parse
 import pytest
 
 from scripts import strava
+from scripts.model import activity as activity_model
 
 # ------------------------------------------------------------------ cadence
 
 def test_a_run_cadence_is_doubled_into_steps_per_minute():
-    """Strava compte une jambe : 82,5 chez lui, 165 au registre."""
-    assert strava._cadence(82.4951, "Run") == ("cadence_pas_min", 165.0)
+    """Strava counts one foot: 82.5 there, 165 steps per minute."""
+    assert strava._cadence(82.4951, on_foot=True) == {"cadence_spm": 165.0}
 
 
 def test_a_trail_run_counts_feet_the_same_way():
-    assert strava._cadence(80.0, "TrailRun") == ("cadence_pas_min", 160.0)
+    assert strava.parse_activity({**RUN, "sport_type": "TrailRun",
+                                  "average_cadence": 80.0}).cadence_spm == 160.0
 
 
 def test_a_ride_cadence_is_a_crank_and_is_never_doubled():
-    """La sortie vélo du 2026-08-13 : 80 tr/min est un régime de pédalier. Le ×2 de
-    CLAUDE.md y écrirait 160, un chiffre que personne ne pédale."""
-    assert strava._cadence(80.0, "Ride") == ("cadence_tr_min", 80.0)
+    assert strava._cadence(80.0, on_foot=False) == {"cadence_rpm": 80.0}
 
 
 def test_an_absent_cadence_stays_absent_rather_than_becoming_zero():
-    assert strava._cadence(None, "Run") is None
+    assert strava._cadence(None, on_foot=True) == {}
 
 
-# ------------------------------------------------------------------ distillat
+# ------------------------------------------------------------------ activity
 
 RUN = {
     "id": 90000000002,
     "name": "Morning Run",
     "description": "jambes lourdes",
     "sport_type": "Run",
-    # Tel quel dans la réponse de l'API, `Z` compris : c'est une heure MURALE que
-    # Strava sérialise comme si elle était UTC. Une fixture « propre » sans le Z
-    # rendrait ces tests verts sur un script cassé — c'est ce qui est arrivé.
+    # As the API sends it, `Z` included: a wall-clock time serialised as if it were UTC.
     "start_date_local": "2026-08-14T07:32:50Z",
     "distance": 6969.4,
     "moving_time": 2585,
@@ -55,37 +48,30 @@ RUN = {
 }
 
 
-def test_the_distilled_activity_carries_what_the_ledger_needs():
-    out = strava.distill_activity(RUN)
-    assert out["distance_km"] == 6.969
-    assert out["allure_min_km"] == "6:11"
-    assert out["cadence_pas_min"] == 165.0
-    assert out["dplus_m"] == 64.6
-    assert out["description"] == "jambes lourdes"
+def test_the_activity_carries_what_the_ledger_needs():
+    out = strava.parse_activity(RUN)
+    assert out.distance_km == 6.969
+    assert out.pace_s_per_km == 371
+    assert out.cadence_spm == 165.0
+    assert out.elevation_gain_m == 64.6
+    assert out.description == "jambes lourdes"
 
 
-def test_the_distilled_activity_hands_weather_exactly_what_it_asks_for():
-    """weather.py veut un polyline et une heure murale locale, sans fuseau ajouté."""
-    meteo = strava.distill_activity(RUN)["meteo"]
-    assert meteo["polyline"] == "g|avGsvu[ICGEO"
-    assert meteo["time"] == "2026-08-14T07:32:50"
-    assert not meteo["time"].endswith("Z")
+def test_the_activity_hands_weather_exactly_what_it_asks_for():
+    """weather.py wants a polyline and a local wall-clock time, without an offset."""
+    query = strava.parse_activity(RUN).weather_query
+    assert query == {"polyline": "g|avGsvu[ICGEO", "time": "2026-08-14T07:32:50"}
 
 
-def test_the_z_strava_glues_onto_a_local_time_is_removed_everywhere():
-    """Le `Z` de `start_date_local` ment : l'heure est murale. Le garder décale la
-    météo de 2 h l'été et fausse la température de 2 à 4 °C — le bug du 2026-08-05.
-    `weather.py --local` refuse d'ailleurs toute heure portant un fuseau, donc laisser
-    le Z casse le débrief de toute sortie extérieure."""
+def test_the_z_strava_glues_onto_a_local_time_is_removed():
+    """Read as UTC, the start would move the weather by the local offset."""
     assert strava._wall_clock("2026-08-14T07:32:50Z") == "2026-08-14T07:32:50"
     assert strava._wall_clock("2026-08-14T07:32:50") == "2026-08-14T07:32:50"
     assert strava._wall_clock(None) is None
-    assert strava.distill_activity(RUN)["depart_local"] == "2026-08-14T07:32:50"
+    assert strava.parse_activity(RUN).start_local == "2026-08-14T07:32:50"
 
 
 def test_the_local_time_survives_the_guard_that_weather_actually_applies():
-    """Le contrôle qui compte : la valeur rendue passe le `parse_time` réel de
-    weather.py. Un test qui ne vérifie que l'absence du Z croit sur parole."""
     import importlib.util
 
     spec = importlib.util.spec_from_file_location(
@@ -93,32 +79,41 @@ def test_the_local_time_survives_the_guard_that_weather_actually_applies():
     weather = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(weather)
 
-    meteo = strava.distill_activity(RUN)["meteo"]
-    parsed = weather.parse_time(meteo["time"], local=True)
+    query = strava.parse_activity(RUN).weather_query
+    parsed = weather.parse_time(query["time"], local=True)
     assert (parsed.hour, parsed.minute) == (7, 32)
     with pytest.raises(ValueError, match="SANS fuseau"):
         weather.parse_time(RUN["start_date_local"], local=True)
 
 
-def test_an_indoor_activity_gets_no_weather_block():
-    """Un tapis n'a pas de météo : proposer un polyline vide ferait chercher pour rien."""
-    assert "meteo" not in strava.distill_activity({**RUN, "trainer": True})
+def test_the_activity_command_hands_weather_its_query_and_nothing_else(monkeypatch):
+    monkeypatch.setattr(strava, "call", lambda *a, **k: RUN)
+    out = strava.cmd_activity(type("Args", (), {"id": "2"})())
+    assert out["weather_query"] == {"polyline": "g|avGsvu[ICGEO", "time": "2026-08-14T07:32:50"}
+    assert out["pace_min_per_km"] == "6:11" and "route_polyline" not in out
+
+
+def test_an_indoor_activity_has_no_route_and_no_weather():
+    indoor = strava.parse_activity({**RUN, "trainer": True})
+    assert indoor.route_polyline is None
+    assert indoor.weather_query is None
 
 
 def test_a_ride_is_measured_in_speed_not_in_pace():
-    ride = {"sport_type": "Ride", "distance": 36949.8, "moving_time": 6177,
-            "average_cadence": 80.0}
-    out = strava.distill_activity(ride)
-    assert out["vitesse_kmh"] == 21.5
-    assert "allure_min_km" not in out
-    assert out["cadence_tr_min"] == 80.0
+    ride = strava.parse_activity({"id": 1, "sport_type": "Ride", "distance": 36949.8,
+                                  "moving_time": 6177, "average_cadence": 80.0})
+    assert ride.pace_s_per_km is None
+    out = activity_model.summary(ride)
+    assert out["speed_kmh"] == 21.5
+    assert "pace_min_per_km" not in out
+    assert out["cadence_rpm"] == 80.0
 
 
 def test_raw_values_are_never_pre_rounded():
-    """ledger-add.py est le seul qui arrondit : deux arrondis en série divergent."""
-    out = strava.distill_activity(RUN)
-    assert out["fc_moy"] == 148.2
-    assert out["dplus_m"] == 64.6
+    """ledger-add.py is the only one that rounds: two roundings in a row diverge."""
+    out = strava.parse_activity(RUN)
+    assert out.hr_avg_bpm == 148.2
+    assert out.distance_m == 6969.4
 
 
 def test_gear_distance_is_converted_from_strava_metres_once():
@@ -135,22 +130,26 @@ def test_gear_distance_is_converted_from_strava_metres_once():
 
 # ------------------------------------------------------------------ laps
 
-def test_a_pace_just_under_the_minute_does_not_become_sixty_seconds():
-    """1 km en 419,7 s se lit 7:00, jamais 6:60 : arrondir les secondes seules produit
-    une allure que personne ne sait lire, et qui partirait telle quelle au registre."""
-    assert strava._pace(1000.0, 419.7) == "7:00"
-
-
 def test_each_repetition_is_readable_one_by_one():
-    """C'est la forme de la séance que la moyenne cache (garde-fou n°6)."""
     laps = [
         {"name": "Lap 1", "distance": 400.0, "moving_time": 96, "average_heartrate": 160.0},
         {"name": "Lap 2", "distance": 400.0, "moving_time": 90, "average_heartrate": 172.0},
     ]
-    out = [strava.distill_lap(lap, "Run", i) for i, lap in enumerate(laps, start=1)]
-    assert out[0]["allure_min_km"] == "4:00"
-    assert out[1]["allure_min_km"] == "3:45"
-    assert [lap["rep"] for lap in out] == [1, 2]
+    out = activity_model.lap_summaries(strava.parse_activity({**RUN, "laps": laps}))
+    assert [lap["pace_min_per_km"] for lap in out] == ["4:00", "3:45"]
+    assert [lap["lap"] for lap in out] == [1, 2]
+
+
+def test_laps_come_from_the_endpoint_only_when_the_field_is_absent(monkeypatch):
+    calls = []
+
+    def call(endpoint, *args):
+        calls.append(endpoint)
+        return {**RUN, "laps": []} if endpoint.endswith("/2") else [
+            {"distance": 400.0, "moving_time": 96}]
+    monkeypatch.setattr(strava, "call", call)
+    assert strava.cmd_laps(type("Args", (), {"id": "2"})())["laps"] == []
+    assert calls == ["/activities/2"]
 
 
 # ------------------------------------------------------------------ flux

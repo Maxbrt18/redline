@@ -12,6 +12,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Connection
 
 from scripts.model import commands, ledger, session_cycle, session_kinds, weekly_plan
+from scripts.model.activity import Activity
 
 from .database import Database, StorageError
 from .plan_policy import enforce_gate_resolution
@@ -859,17 +860,6 @@ class OperationalStore:
         return observation_id
 
     @staticmethod
-    def _seconds(value: str | None) -> int | None:
-        if not value:
-            return None
-        parts = [int(part) for part in value.split(":")]
-        if len(parts) == 2:
-            return parts[0] * 60 + parts[1]
-        if len(parts) == 3:
-            return parts[0] * 3600 + parts[1] * 60 + parts[2]
-        raise StorageError(f"durée Strava invalide : {value}")
-
-    @staticmethod
     def _observation_kind_for_workout(workout: str) -> str | None:
         kind = session_kinds.BY_SLUG.get(workout)
         return workout if kind is not None and kind.recorded else None
@@ -878,24 +868,23 @@ class OperationalStore:
     def _compatible_workouts(sport: str) -> tuple[str, ...]:
         return session_kinds.planned_for_sport(sport)
 
-    @classmethod
-    def _strava_measurements(cls, distilled: dict,
+    @staticmethod
+    def _strava_measurements(activity: Activity,
                              intake: dict | None = None) -> dict[str, dict[str, Any]]:
         measurements: dict[str, dict[str, Any]] = {
             "rpe": {"state": "pending"}, "enjoyment": {"state": "pending"},
             "elevation_loss_m": {"state": "pending"},
-            "wbgt_c": ({"state": "pending"} if distilled.get("meteo")
+            "wbgt_c": ({"state": "pending"} if activity.weather_query
                        else {"state": "unavailable"}),
         }
         raw = {
-            "distance_km": ("km", distilled.get("distance_km")),
-            "duration_s": (None, cls._seconds(distilled.get("temps_mouvement"))),
-            "pace_s_per_km": (None, cls._seconds(distilled.get("allure_min_km"))),
-            "hr_avg_bpm": ("FCmoy", distilled.get("fc_moy")),
-            "hr_max_bpm": ("FCmax", distilled.get("fc_max")),
-            "cadence_spm": ("Cad", distilled.get("cadence_pas_min")
-                            or distilled.get("cadence_tr_min")),
-            "elevation_gain_m": ("D+", distilled.get("dplus_m")),
+            "distance_km": ("km", activity.distance_km),
+            "duration_s": (None, activity.moving_s or None),
+            "pace_s_per_km": (None, activity.pace_s_per_km),
+            "hr_avg_bpm": ("FCmoy", activity.hr_avg_bpm),
+            "hr_max_bpm": ("FCmax", activity.hr_max_bpm),
+            "cadence_spm": ("Cad", activity.cadence_spm or activity.cadence_rpm),
+            "elevation_gain_m": ("D+", activity.elevation_gain_m),
         }
         for metric, (field, value) in raw.items():
             if value is None:
@@ -917,7 +906,7 @@ class OperationalStore:
                     measurements[metric] = {"state": "unavailable"}
         return measurements
 
-    def ingest_strava_activity(self, distilled: dict,
+    def ingest_strava_activity(self, activity: Activity,
                                *, actor: str = "strava-ingestion") -> dict:
         """Capture les faits objectifs avant tout raisonnement de coaching.
 
@@ -925,14 +914,14 @@ class OperationalStore:
         candidat unique le même jour. Sinon le distillat reste durable et l'ambiguïté
         est exposée ; aucune taxonomie sportive n'est inventée à partir d'un titre.
         """
-        activity_id = int(distilled.get("id") or 0)
+        activity_id = int(activity.id or 0)
         if activity_id <= 0:
             raise StorageError("identifiant Strava invalide")
-        sport = str(distilled.get("sport") or "").strip()
+        sport = activity.sport.strip()
         if not sport:
             raise StorageError("sport Strava absent")
-        started_raw = distilled.get("depart_local")
-        started_at = session_cycle.local_wall_clock(started_raw) if started_raw else None
+        started_at = (session_cycle.local_wall_clock(activity.start_local)
+                      if activity.start_local else None)
         with self.database.transaction() as connection:
             existing_observation = connection.execute(sa.select(observations).where(
                 observations.c.athlete_id == self.athlete_id,
@@ -985,25 +974,25 @@ class OperationalStore:
                         "occurred_on": started_at.date(), "started_at": started_at,
                         "kind": kind, "idempotency_key": f"strava:{activity_id}",
                         "strava_activity_id": activity_id,
-                        "gear_id": distilled.get("materiel_id"),
-                        "note": f"Strava : {str(distilled.get('nom') or sport).strip()}",
+                        "gear_id": activity.gear_id,
+                        "note": f"Strava : {(activity.name or sport).strip()}",
                         "source": actor,
-                        "measurements": self._strava_measurements(distilled),
+                        "measurements": self._strava_measurements(activity),
                         "session_key": candidate_keys[0],
                     }, actor=actor)
                     status = "matched"
 
             core_values = {
                 "activity_id": activity_id, "athlete_id": self.athlete_id,
-                "started_at": started_at, "sport": sport, "distilled": distilled,
+                "started_at": started_at, "sport": sport, "distilled": activity.to_json(),
                 "status": status, "candidate_session_keys": candidate_keys,
                 "observation_id": observation_id, "error": "", "updated_at": sa.func.now(),
             }
             insert_values = {
                 **core_values,
                 "elevation_loss_state": (
-                    "pending" if distilled.get("dplus_m") is not None else "unavailable"),
-                "wbgt_state": "pending" if distilled.get("meteo") else "unavailable",
+                    "pending" if activity.elevation_gain_m is not None else "unavailable"),
+                "wbgt_state": "pending" if activity.weather_query else "unavailable",
             }
             connection.execute(pg_insert(strava_activity_intakes).values(
                 **insert_values).on_conflict_do_update(
@@ -1304,14 +1293,14 @@ class OperationalStore:
             kind = self._observation_kind_for_workout(planned["workout"])
             if kind is None:
                 raise StorageError("ce type de séance ne peut pas recevoir une activité Strava")
-            distilled = intake["distilled"]
+            activity = Activity.from_json(intake["distilled"])
             self.add_observation_in(connection, {
                 "occurred_on": local_day, "started_at": intake["started_at"],
                 "kind": kind, "idempotency_key": f"strava:{strava_activity_id}",
                 "strava_activity_id": strava_activity_id,
-                "note": f"Strava : {str(distilled.get('nom') or intake['sport']).strip()}",
+                "note": f"Strava : {(activity.name or intake['sport']).strip()}",
                 "source": actor,
-                "measurements": self._strava_measurements(distilled, dict(intake)),
+                "measurements": self._strava_measurements(activity, dict(intake)),
                 "session_key": session_key,
             }, actor=actor)
             return

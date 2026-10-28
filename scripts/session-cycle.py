@@ -81,15 +81,15 @@ def main() -> int:
             results = []
             for summary in rows:
                 activity_id = int(summary["id"])
-                distilled = strava.distill_activity(
+                activity = strava.parse_activity(
                     strava.call(f"/activities/{activity_id}"))
                 if args.dry_run:
                     results.append({"activity_id": activity_id, "status": "a_capturer",
-                                    "depart_local": distilled.get("depart_local"),
-                                    "sport": distilled.get("sport")})
+                                    "start_local": activity.start_local,
+                                    "sport": activity.sport})
                 else:
                     results.append(store.ingest_strava_activity(
-                        distilled, actor="session-cycle-reconcile"))
+                        activity, actor="session-cycle-reconcile"))
             print(json.dumps({"after": after.date().isoformat(), "results": results},
                              ensure_ascii=False, indent=2))
             return 0

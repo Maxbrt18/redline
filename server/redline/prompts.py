@@ -801,7 +801,7 @@ PROACTIVE_TRIGGERS = {
    Statut : `python3 scripts/session-cycle.py pending`. `matched` = observation et cycle
    existent ; `ambiguous` ou `unmatched` = distillat durable : demande l'appariement,
    n'invente aucun type, ne relance pas `ledger-add.py` sur la même identité.
-   `depart_local` a déjà reconstruit le départ. Une seule séance du jour et du même
+   `start_local` a déjà reconstruit le départ. Une seule séance du jour et du même
    type : rattachement automatique ; plusieurs : demande laquelle puis
    `session-cycle.py match`, jamais en silence. La cadence est déjà dans la bonne
    unité, ne la multiplie pas une deuxième fois. Laisse vides RPE, douleur et plaisir

@@ -17,6 +17,7 @@ from redline import strength
 from redline.attachments import encode_payload
 from redline.postgres_state import PostgresStateStore
 from scripts.model import predictions as prediction_model
+from scripts.model.activity import Activity
 from scripts.storage import Database, OperationalStore, StorageError
 from scripts.storage.schema import (
     TRIGGERS,
@@ -768,13 +769,10 @@ def test_deterministic_strava_capture_matches_a_unique_planned_session(store):
     store.append_plan_revision("2026-W33", build_revision(
         1, sessions=[session("w33-ven-ef", date="2026-08-14")],
         computed_at="2026-08-09T19:10:00+02:00"))
-    result = store.ingest_strava_activity({
-        "id": 90000000011, "sport": "Run", "nom": "EF du vendredi",
-        "depart_local": "2026-08-14T08:03:00", "distance_km": 7.123,
-        "temps_mouvement": "42:10", "allure_min_km": "5:55",
-        "fc_moy": 151.2, "fc_max": 168, "cadence_pas_min": 169.4,
-        "dplus_m": 62.5,
-    })
+    result = store.ingest_strava_activity(Activity(
+        id=90000000011, sport="Run", name="EF du vendredi",
+        start_local="2026-08-14T08:03:00", distance_m=7123.0, moving_s=2530,
+        hr_avg_bpm=151.2, hr_max_bpm=168, cadence_spm=169.4, elevation_gain_m=62.5))
     assert result["status"] == "matched"
     assert result["candidate_session_keys"] == ["2026-W33:w33-ven-ef"]
     with store.database.engine.connect() as connection:
@@ -798,11 +796,9 @@ def test_historical_capture_links_an_existing_observation_to_its_cycle(store):
         "measurements": {},
     })
     # L'observation précède la colonne started_at : le distillat doit la compléter.
-    result = store.ingest_strava_activity({
-        "id": 90000000012, "sport": "Run", "nom": "EF historique",
-        "depart_local": "2026-08-14T08:03:00", "distance_km": 7.0,
-        "temps_mouvement": "42:00",
-    })
+    result = store.ingest_strava_activity(Activity(
+        id=90000000012, sport="Run", name="EF historique",
+        start_local="2026-08-14T08:03:00", distance_m=7000.0, moving_s=2520))
     assert result["candidate_session_keys"] == ["2026-W33:w33-ven-ef"]
     with store.database.engine.connect() as connection:
         cycle = connection.execute(sa.select(session_cycles)).mappings().one()
@@ -814,19 +810,17 @@ def test_historical_capture_links_an_existing_observation_to_its_cycle(store):
 
 
 def test_a_wbgt_already_logged_by_the_coach_does_not_sink_the_capture(store):
-    """2026-09-26 : le coach consigne la sortie (WBGT 11) avant le webhook ; le
-    pipeline calcule une autre valeur, levait, et le débrief expirait après deux
-    heures de reprises. La mesure du coach reste, l'écart devient une trace."""
+    """The coach logged the WBGT before the webhook: that value stays and the
+    pipeline's differing one becomes a trace, instead of failing the capture."""
     observation_id = store.add_observation({
         "occurred_on": dt.date(2026, 9, 26), "kind": "easy",
         "idempotency_key": "strava:90000000013", "strava_activity_id": 90000000013,
         "measurements": {"wbgt_c": {"state": "known", "value": 11.0}},
     })
-    store.ingest_strava_activity({
-        "id": 90000000013, "sport": "Run", "nom": "Morning Run",
-        "depart_local": "2026-09-26T07:45:00", "distance_km": 8.0,
-        "temps_mouvement": "48:00", "meteo": {"polyline": "x", "time": "t"},
-    })
+    store.ingest_strava_activity(Activity(
+        id=90000000013, sport="Run", name="Morning Run",
+        start_local="2026-09-26T07:45:00", distance_m=8000.0, moving_s=2880,
+        route_polyline="x"))
     assert store.finish_strava_enrichment(90000000013, "wbgt", value=14.2) == "known"
     with store.database.engine.connect() as connection:
         kept = connection.execute(sa.select(observation_metrics.c.wbgt_c).where(
@@ -846,11 +840,9 @@ def test_deterministic_strava_capture_preserves_ambiguity_without_inventing_a_ty
         1, sessions=[session("w33-ef-a", date="2026-08-14"),
                      session("w33-ef-b", date="2026-08-14")],
         computed_at="2026-08-09T19:10:00+02:00"))
-    result = store.ingest_strava_activity({
-        "id": 90000000014, "sport": "Run", "nom": "Sortie",
-        "depart_local": "2026-08-14T08:03:00", "distance_km": 7.0,
-        "temps_mouvement": "42:00",
-    })
+    result = store.ingest_strava_activity(Activity(
+        id=90000000014, sport="Run", name="Sortie",
+        start_local="2026-08-14T08:03:00", distance_m=7000.0, moving_s=2520))
     assert result["status"] == "ambiguous"
     assert len(result["candidate_session_keys"]) == 2
     assert store.activity_recorded(90000000014) is False
@@ -1618,11 +1610,9 @@ def test_repeated_daily_shoes_do_not_open_rotation_check(store):
             "primary": gear_id == "g-mach", "retired": False,
         })
     for index, day in enumerate((20, 21, 22), start=1):
-        store.ingest_strava_activity({
-            "id": 9900 + index, "sport": "Run",
-            "depart_local": f"2026-08-{day:02d}T08:00:00",
-            "nom": "easy", "distance_km": 7, "materiel_id": "g-mach",
-        })
+        store.ingest_strava_activity(Activity(
+            id=9900 + index, sport="Run", start_local=f"2026-08-{day:02d}T08:00:00",
+            name="easy", distance_m=7000.0, gear_id="g-mach"))
     state = PostgresStateStore(store.database)
     now = dt.datetime(2026, 8, 23, 12, tzinfo=dt.UTC)
     state.materialize_intelligence(now)

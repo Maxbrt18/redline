@@ -238,7 +238,7 @@ def test_session_cycle_survives_a_forgotten_departure_message():
         assert prompts.SESSION_CYCLE_POINTER in DEPTH_NOTES[level]
     assert "start` est facultatif" in prompts.SESSION_CYCLE_POINTER
     assert "Strava reconstruit l'oubli" in prompts.SESSION_CYCLE_POINTER
-    assert "depart_local" in PROACTIVE_TRIGGERS["strava_debrief"]
+    assert "start_local" in PROACTIVE_TRIGGERS["strava_debrief"]
     assert "session_followup" not in PROACTIVE_TRIGGERS
     assert "followup" not in prompts.SESSION_CYCLE_POINTER
     weekly = PROACTIVE_TRIGGERS["weekly"]

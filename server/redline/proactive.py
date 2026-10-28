@@ -385,7 +385,7 @@ class ProactiveScheduler:
                             prompt=prompt,
                             priority=bool(record.get("priority")),
                             attempts=int(record.get("attempts", 1)),
-                            workout_card=(snapshot.get("repetitions")
+                            workout_card=(snapshot.get("quality_card")
                                           if isinstance(snapshot, dict) else None),
                             quality=bool(isinstance(snapshot, dict)
-                                         and snapshot.get("qualite")))
+                                         and snapshot.get("quality")))

@@ -92,6 +92,8 @@ STRAVA_SPORTS = {
     "hike": frozenset({"Walk", "Hike"}),
     "bike": frozenset({"Ride", "VirtualRide", "MountainBikeRide", "GravelRide"}),
 }
+#: Sports counted in steps and paced in min/km.
+FOOT_SPORTS = STRAVA_SPORTS["run"] | STRAVA_SPORTS["hike"]
 
 
 def family(slug: str) -> str:

@@ -13,9 +13,11 @@ phrases courtes et chiffrées sortent. Rien n'est écrit.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 from . import rulebook, session_kinds
+from .activity import Lap
 
 
 def _fr(value: float) -> str:
@@ -90,30 +92,15 @@ def is_quality(session: dict | None) -> bool:
             or session.get("transition") in rulebook.current().quality_kinds)
 
 
-def _seconds(text: Any) -> int | None:
-    if not isinstance(text, str) or not text:
-        return None
-    try:
-        parts = [int(part) for part in text.split(":")]
-    except ValueError:
-        return None
-    seconds = 0
-    for part in parts:
-        seconds = seconds * 60 + part
-    return seconds
-
-
-def _phases(laps: list) -> list[dict]:
+def _phases(laps: Sequence[Lap]) -> list[dict]:
     """Les tours lisibles, dans l'ordre : durée, distance, FC, allure (s/km)."""
     out = []
     for index, lap in enumerate(laps):
-        if not isinstance(lap, dict):
-            continue
-        time_s = _seconds(lap.get("temps"))
+        time_s = lap.moving_s
         if not time_s or time_s < MIN_LAP_S:
             continue
-        dist_m = float(lap.get("distance_km") or 0) * 1000
-        out.append({"time_s": time_s, "dist_m": dist_m, "hr": lap.get("fc_moy"),
+        dist_m = float(lap.distance_m)
+        out.append({"time_s": time_s, "dist_m": dist_m, "hr": lap.hr_avg_bpm,
                     "pace": time_s / (dist_m / 1000) if dist_m > 0 else float("inf"),
                     "index": index})
     return out
@@ -129,7 +116,7 @@ def _merge(phases: list[dict]) -> dict:
     return merged
 
 
-def lap_blocks(laps: list) -> list[tuple[bool, list[dict]]] | None:
+def lap_blocks(laps: Sequence[Lap]) -> list[tuple[bool, list[dict]]] | None:
     """Les tours lisibles groupés en blocs d'effort (`True`) et de récupération.
 
     Sans modèle : les tours se rangent par allure et se coupent au plus grand saut ;
@@ -160,7 +147,7 @@ def lap_blocks(laps: list) -> list[tuple[bool, list[dict]]] | None:
     return blocks
 
 
-def workout_reps(laps: list) -> list[dict] | None:
+def workout_reps(laps: Sequence[Lap]) -> list[dict] | None:
     """Les répétitions lues sur les tours Strava, chacune avec la récup qui la suit.
 
     Les tours lents entre deux répétitions forment sa récup ; échauffement et retour au
@@ -183,7 +170,8 @@ def workout_reps(laps: list) -> list[dict] | None:
     return reps
 
 
-def quality_card(laps: list, session: dict | None, date: str = "") -> dict | None:
+def quality_card(laps: Sequence[Lap], session: dict | None,
+                 date: str = "") -> dict | None:
     """La charge utile de `chart-workout.py` pour une séance de qualité, sinon None."""
     if session is None or not is_quality(session):
         return None

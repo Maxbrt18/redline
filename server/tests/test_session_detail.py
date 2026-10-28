@@ -7,6 +7,7 @@ des précédentes, et un retour au calme qui englobe la dernière récupération
 
 from __future__ import annotations
 
+import dataclasses
 import datetime as dt
 import os
 
@@ -19,15 +20,17 @@ from test_weekly_plan import revision, session
 from redline import session_detail
 from redline.notebook_board import AnswerError, Board
 from scripts.model import hr_zones, instance
+from scripts.model.activity import Activity, Lap
 
 URL = os.environ.get("TEST_DATABASE_URL", "")
 SAM = instance.load(TEST_VAULT)          # FC de repos 55, FC max 190
 PARIS = dt.timezone(dt.timedelta(hours=1))
 
 
-def lap(temps, km, hr, dplus, cadence):
-    return {"temps": temps, "distance_km": km, "fc_moy": hr, "dplus_m": dplus,
-            "cadence_pas_min": cadence}
+def lap(moving, km, hr, dplus, cadence):
+    minutes, seconds = moving.split(":")
+    return Lap(moving_s=int(minutes) * 60 + int(seconds), distance_m=round(km * 1000, 1),
+               hr_avg_bpm=hr, elevation_gain_m=dplus, cadence_spm=cadence)
 
 
 SEUIL_LAPS = [
@@ -78,8 +81,8 @@ def test_the_threshold_reads_four_reps_and_no_final_acceleration():
 
 
 def test_a_last_rep_faster_than_all_the_others_is_a_final_acceleration():
-    laps = [dict(item) for item in SEUIL_LAPS]
-    laps[7]["temps"] = "2:50"
+    laps = list(SEUIL_LAPS)
+    laps[7] = dataclasses.replace(laps[7], moving_s=170)
     assert session_detail.quality(laps, None)["reading"]["final_acceleration"] is True
 
 
@@ -176,11 +179,11 @@ def seed_threshold(store):
                 distance_target_km=None, distance_cap_km=9.5, duration_cap_min=60,
                 rpe_min=6, rpe_max=7),
     ], computed_at="2026-10-25T20:00:00+01:00", volume_target_km=48.0))
-    store.ingest_strava_activity({
-        "id": 90000000006, "sport": "Run", "nom": "Fractionné seuil en côte",
-        "depart_local": "2026-10-26T10:19:53", "distance_km": 8.655,
-        "temps_mouvement": "51:13", "dplus_m": 151.7, "fc_moy": 163.2, "fc_max": 195.0,
-        "cadence_pas_min": 163.8, "laps": SEUIL_LAPS})
+    store.ingest_strava_activity(Activity(
+        id=90000000006, sport="Run", name="Fractionné seuil en côte",
+        start_local="2026-10-26T10:19:53", distance_m=8655.0, moving_s=3073,
+        elevation_gain_m=151.7, hr_avg_bpm=163.2, hr_max_bpm=195.0, cadence_spm=163.8,
+        laps=tuple(SEUIL_LAPS)))
     if observation_of(store, 90000000006) is None:
         store.match_session("2026-W44:w44-lun-seuil", 90000000006)
     return observation_of(store, 90000000006)
