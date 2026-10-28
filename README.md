@@ -49,7 +49,7 @@ the facts before it speaks**.
 | `src/redline/cards/` | HTML/PNG card renderer (week, month, workout, strength) |
 | `deploy/` | systemd units, Caddy, PostgreSQL (Compose, backups), the agent's command launcher and its allowlist, the runtime updater |
 | `templates/` | Note templates for a vault (athlete onboarding, weekly review, debrief…) |
-| `CLAUDE.md` | A **template** of the agent's instruction file: reading ladder, calibration rule, fact-ownership table |
+| `templates/vault/CLAUDE.md` | A **template** of the coach's instruction file, copied into a vault: reading ladder, calibration rule, fact-ownership table |
 | `docs/storage-architecture.md` | Why PostgreSQL owns operational facts and Git owns knowledge |
 | `tests/` | 1,982 tests (engine, storage, web app, prompts), run against a fictional vault; 159 skip without PostgreSQL |
 
@@ -77,7 +77,7 @@ python -m redline.cli.chart_week -o /tmp/week.png < src/redline/cards/samples/we
 
 The knowledge vault of the original deployment (athlete profile, journal, decisions,
 corrections, research notes, strength programme) is private and deliberately absent. Bring
-your own: the scripts expect a vault laid out as described in `CLAUDE.md`. The test suite
+your own: the scripts expect a vault laid out as described in `templates/vault/CLAUDE.md`. The test suite
 ships a small fictional one, Sam's, in `tests/fixtures/vault/`: the tests run on a
 temporary copy of it through `VAULT_PATH`, exactly as the service runs on yours.
 
@@ -101,6 +101,12 @@ tests need `playwright install chromium`.
 
 To commit changes, run `git config core.hooksPath .githooks` first: it enables the
 pre-commit hook that regenerates the generated views before every commit.
+
+## Contributing and security
+
+Conventions for changing the engine (people and coding agents): [`AGENTS.md`](AGENTS.md).
+Reporting a vulnerability: [`SECURITY.md`](SECURITY.md). What the model provider
+receives: [`docs/llm-data.md`](docs/llm-data.md).
 
 ## En bref (FR)
 
