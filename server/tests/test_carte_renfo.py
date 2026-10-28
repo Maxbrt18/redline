@@ -48,9 +48,9 @@ def test_la_carte_de_renfo_se_genere_depuis_une_selection_typee(tmp_path):
 
 
 def test_la_carte_accepte_les_modulations_que_le_matin_prescrit(tmp_path):
-    """Demi-dose, retrait ponctuel et garde-fou injury : les trois leviers que le
+    """Demi-dose, retrait ponctuel et garde-fou de douleur : les trois leviers que le
     déclencheur du matin nomme. S'ils cessent d'être acceptés, le coach se rabat sur
-    une carte pleine dose un jour où le injury parle."""
+    une carte pleine dose un jour où la blessure parle."""
     sortie = tmp_path / "renfo-module.html"
     # Le `gate` retire CONDITIONNELLEMENT ce que `drop` retirerait tout de suite :
     # cumuler les deux est refusé, et à raison — on ne conditionne pas le retrait de
@@ -59,7 +59,7 @@ def test_la_carte_accepte_les_modulations_que_le_matin_prescrit(tmp_path):
         "session": "a", "date": "2026-08-14", "half_dose": True,
         "gate": {"zone": "injury", "pain_max": 2, "drop": ["plyometrics"],
                  "say": "si ça tire, on retire les bonds"},
-        "note": "demi-dose, injury surveillé",
+        "note": "demi-dose, blessure surveillée",
     }
     process = carte(selection, sortie)
     reussit(process, "carte modulée")

@@ -659,7 +659,7 @@ def test_no_injected_text_types_a_glyph_a_phone_keyboard_does_not_carry():
         "stale_plan_note": prompts.stale_plan_note("2026-W34"),
         "gate_note": prompts.gate_note(
             [{"due": "2026-08-17", "holds": ["w34-dim-sl"],
-              "question": "Le injury a tenu la sortie longue ?",
+              "question": "La blessure a tenu la sortie longue ?",
               "on_fail": "on retire les côtes de jeudi"}]),
         # Les deux moitiés se scannent séparément : la note d'observation est un texte
         # injecté à part entière, et elle est arrivée après ce test (2026-08-18).
@@ -713,7 +713,7 @@ def test_the_glyph_rule_reaches_the_data_channel_not_only_the_written_prompts():
         "reason": "EF réalisée — rien à signaler",
         "constraints": ["plafond à 1200 m D−"],
         "gates": [{"id": "g1", "due": "2026-08-23",
-                   "question": "le injury dans les premiers pas — mieux ou pire ?",
+                   "question": "la blessure dans les premiers pas — mieux ou pire ?",
                    "on_fail": "la semaine démarre sans sortie longue"}],
         "sessions": [{"id": "s1", "title": "EF", "note": "allure libre · plat"}],
     }
@@ -730,7 +730,7 @@ def test_the_glyph_rule_reaches_the_data_channel_not_only_the_written_prompts():
         "reason": "EF realisee, rien a signaler",
         "constraints": ["plafond a 1200 m de D-"],
         "gates": [{"id": "g1", "due": "2026-08-23",
-                   "question": "le injury dans les premiers pas, mieux ou pire ?",
+                   "question": "la blessure dans les premiers pas, mieux ou pire ?",
                    "on_fail": "la semaine demarre sans sortie longue"}],
         "sessions": [{"id": "s1", "title": "EF", "note": "allure libre, plat"}],
     }
@@ -857,7 +857,7 @@ def test_an_observation_does_not_hijack_a_social_message():
     """Constat 7 : en N0, la branche observation imposait de prescrire la journée et
     de poser la question du soir, contre la note N0 qui demande de respecter une
     clôture. Un contrôle bloquant, lui, reste entier à tous les niveaux."""
-    blocking = [{"id": "b", "holds": ["s1"], "question": "le injury ?", "on_fail": "repos"}]
+    blocking = [{"id": "b", "holds": ["s1"], "question": "la blessure ?", "on_fail": "repos"}]
     observing = [{"id": "o", "question": "la cheville ?", "on_fail": "on retire"}]
     closing = prompts.gate_note(blocking, observing, closing=True)
     interdiction, observation = closing.split("\n\n")

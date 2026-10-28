@@ -653,7 +653,7 @@ def due_gates(plan: dict, today: dt.date | None = None) -> list[dict]:
     l'état normal du matin où il tombe, jamais une avarie.
 
     La confondre avec un programme cassé a tué le mot du matin du 2026-08-12 : le
-    contrôle injury du jour rendait `check` non nul, la persistance refusait le tour,
+    contrôle de douleur du jour rendait `check` non nul, la persistance refusait le tour,
     et le message de coach qui posait précisément la question du contrôle était jeté
     au profit d'un « le programme n'a pas passé ses contrôles ». Un mécanisme fait
     pour produire une question produisait une panne.

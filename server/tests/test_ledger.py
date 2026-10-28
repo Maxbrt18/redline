@@ -257,7 +257,7 @@ def test_a_palpation_enters_neither_pain_series():
     """Une douleur PROVOQUÉE à la pression n'est ni un pic d'effort ni une lecture
     spontanée au repos : c'est une localisation. Les séries étaient définies par
     négation (`not in REST_TYPES`), donc un type nouveau tombait en silence dans la
-    série d'effort — celle qui juge le injury (2026-08-08)."""
+    série d'effort — celle qui juge la blessure (2026-08-08)."""
     week = ledger.pain_trend([Row(dt.date(2026, 7, 29), "EF", pains=zoned(1.0)),
                               Row(dt.date(2026, 7, 30), "palpation", pains=zoned(4.0))],
                              1, ZONE)[0]

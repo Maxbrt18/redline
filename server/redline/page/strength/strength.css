@@ -203,7 +203,7 @@ textarea.p-input { max-width: none; min-height: 96px; resize: vertical; line-hei
 .p-last__value { margin-top: 3px; font-size: 16px; color: var(--muted); }
 
 /* ---------------------------------------------------------------- ouverture */
-/* La lecture injury d'avant. Même traitement que la revue de fin : c'est la même
+/* La lecture de douleur d'avant. Même traitement que la revue de fin : c'est la même
  * question, posée à l'autre bout de la séance. */
 .p-open { margin-top: 30px; }
 .p-open__title {

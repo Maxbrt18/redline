@@ -103,7 +103,7 @@ def open_session(browser, document):
             body=json.dumps({"status": "ok", "session": data, "zones": ZONES})))
         tab.goto(f"{BASE}/s#t={token}")
         # L'un OU l'autre : une séance qui porte un garde-fou ouvre sur la lecture
-        # injury, et n'a donc aucun exercice à l'écran tant qu'on n'a pas répondu.
+        # de douleur, et n'a donc aucun exercice à l'écran tant qu'on n'a pas répondu.
         tab.wait_for_selector(".p-step--live, #open:not([hidden])", timeout=5000)
         return tab
 
@@ -286,7 +286,7 @@ def test_the_page_shows_what_the_last_session_banked(open_session):
     vault (`strength_log.human`) : la page ne formate rien, elle affiche."""
     banked = exercise("Mollet", measure="amrap", sets=2, side="each")
     banked["last"] = "D 14·12 · G 13·11 — 6/10"
-    tab = open_session(session(banked, exercise("Injury", measure="reps", sets=1, reps=15)))
+    tab = open_session(session(banked, exercise("Jambier", measure="reps", sets=1, reps=15)))
     assert tab.evaluate("() => document.querySelector('.p-last__label')?.textContent") \
         == "Réalisé la dernière fois"
     assert tab.evaluate("() => document.querySelector('.p-last__value')?.textContent") \
@@ -325,7 +325,7 @@ def test_plyometrics_is_walked_one_block_at_a_time(open_session):
     """
     tab = open_session(session(exercise("Pliométrie", measure="contacts",
                                         contacts=40, block=10, rest_s=30),
-                               exercise("Injury", measure="reps", sets=1, reps=15)))
+                               exercise("Jambier", measure="reps", sets=1, reps=15)))
     labels, rests = [], 0
     for _ in range(4):
         labels.append(control(tab)["label"])
@@ -746,12 +746,12 @@ def test_a_page_without_cues_still_runs(browser):
     tab.close()
 
 
-# ------------------------------------------------------- l'ouverture et le injury
+# ------------------------------------------------------- l'ouverture et la blessure
 
 # La zone surveillée que la page demande avant et après, comme le serveur la sert.
 ZONES = [{"zone": "injury", "label": "Injury"}]
 GATE = {"pain_max": 2, "drop": ["plyometrics"],
-        "say": "Injury au-dessus de 2 : on saute la pliométrie et on garde le reste léger."}
+        "say": "Douleur au-dessus de 2 : on saute la pliométrie et on garde le reste léger."}
 
 
 def opening(tab) -> bool:
@@ -772,7 +772,7 @@ def gated_session(*extra):
 
 
 def test_a_session_without_a_gate_never_asks(open_session):
-    """La page ne demande le injury à l'ouverture que si le coach a écrit quoi en
+    """La page ne demande la blessure à l'ouverture que si le coach a écrit quoi en
     faire. Sans garde-fou, rien ne change et la séance s'ouvre directement."""
     tab = open_session(session(exercise("A", measure="reps", sets=1, reps=8)))
     assert opening(tab) is False
@@ -816,7 +816,7 @@ def test_the_opening_can_be_skipped_and_then_nothing_is_gated(open_session):
 
 
 def test_a_zero_is_an_answer_not_an_absence(open_session):
-    """Le piège du drapeau booléen : un injury parfaitement silencieux vaut 0, et
+    """Le piège du drapeau booléen : une douleur parfaitement silencieuse vaut 0, et
     sans `opened` l'écran d'ouverture se rouvrirait à chaque retour sur l'onglet."""
     tab = open_session(gated_session())
     pick(tab, 0)

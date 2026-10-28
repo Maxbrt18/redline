@@ -104,7 +104,7 @@ def test_valid_signature():
 
 VAULT = ENGINE_ROOT
 SESSION = {
-    "sid": "2026-07-25-A", "session": "a", "title": "Renfo A, os & injury",
+    "sid": "2026-07-25-A", "session": "a", "title": "Renfo A, os & tendons",
     "date": "samedi 25 juillet",
     "exercises": [{"slug": "calf-raise-bent", "name": "Mollet unipodal",
                    "dose": Dose.read({"measure": "amrap", "sets": 2,
@@ -188,7 +188,7 @@ def test_report_reaches_the_athletes_own_queue(app_bot, store):
     assert post(client, body).status_code == 201
     psid, text = bot.inbound[0]
     assert psid == "4242"
-    assert "Renfo A, os & injury" in text and "Injury : 1/10 après" in text
+    assert "Renfo A, os & tendons" in text and "Injury : 1/10 après" in text
 
 
 def test_opaque_capability_resolves_the_exact_session(app_bot, store):

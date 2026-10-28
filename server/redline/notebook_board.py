@@ -368,7 +368,7 @@ class Board:
             for zone in self.zones]}
 
     def injury_view(self, zone: str | None = None, weeks: int = 5) -> dict | None:
-        """L'écran Injury du carnet (maquette validée le 2026-10-09) : chaque séance notée
+        """L'écran Douleur du carnet (maquette validée le 2026-10-09) : chaque séance notée
         et chaque réveil sur les semaines calendaires récentes, le pic par semaine, et les
         réveils décrits sans note. Des faits, jamais de verdict (biais de sous-déclaration).
 
@@ -428,7 +428,7 @@ class Board:
         asks: list[dict] = []
         yesterday = self.today - dt.timedelta(days=1)
         # La trace se demande chaque matin, jour de repos compris : sans elle, rien ne
-        # dit si le injury redescend entre deux séances (décision du 2026-10-15).
+        # dit si la douleur redescend entre deux séances (décision du 2026-10-15).
         effort_yesterday = any(row.date == yesterday and row.type in ledger_model.EFFORT_TYPES
                                for row in self.rows)
         labels = self.zone_labels

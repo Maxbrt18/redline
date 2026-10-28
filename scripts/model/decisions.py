@@ -18,22 +18,25 @@ from __future__ import annotations
 import datetime as dt
 import re
 
-# The plan (coaching/current-plan.md, vue macro) runs over these ISO weeks of 2026.
-# A prediction "revue W36" comes due once that week has ended.
-PLAN_YEAR = 2026
-PLAN_WEEKS = range(29, 49)
-# The last week ends on race day (Saturday), not on its Sunday: reviewing a
-# prediction the day after the race is reviewing it too late.
-RACE_DAY = dt.date(2026, 11, 28)
+# A prediction "revue W36" comes due once that week has ended. The week carries no
+# year: it is the W36 of the decision's ISO year, unless that one ended more than half
+# a year before the decision -- a "W03" written in December means next January. No
+# plan window and no race day here: the race date belongs to its typed deadline in
+# PostgreSQL, and this parser reads prose only.
+WRAP_AFTER = dt.timedelta(weeks=26)
 
 
-def week_end(week: int):
-    """Last day of a plan week, or None for a week outside the plan."""
-    if week not in PLAN_WEEKS:
+def week_end(week: int, decided: dt.date) -> dt.date | None:
+    """Sunday of review week `week` for a decision taken on `decided`, or None if that
+    week does not exist (a W53 in a 52-week year)."""
+    year = decided.isocalendar().year
+    try:
+        sunday = dt.date.fromisocalendar(year, week, 7)
+        if decided - sunday > WRAP_AFTER:
+            sunday = dt.date.fromisocalendar(year + 1, week, 7)
+    except ValueError:
         return None
-    if week == PLAN_WEEKS[-1]:
-        return RACE_DAY
-    return dt.date.fromisocalendar(PLAN_YEAR, week, 7)
+    return sunday
 
 HEADING = re.compile(r"^## (\d{4}-\d{2}-\d{2})([^\n—-]*)—\s*(.+)$", re.MULTILINE)
 # Une rubrique de prédiction est une frontière contrôlée : les trois libellés ont
@@ -168,7 +171,9 @@ class Decision:
 
     @property
     def review_date(self) -> dt.date | None:
-        return week_end(self.review_week) if self.review_week else None
+        if not self.review_week:
+            return None
+        return week_end(self.review_week, dt.date.fromisoformat(self.date))
 
     def is_due(self, today: dt.date) -> bool:
         if self.verdict_on or not self.narrative_predictions:
@@ -194,6 +199,11 @@ def parse(text: str) -> list[Decision]:
                 f"décision {decision.date} « {decision.title} » : prédiction ouverte sans "
                 "semaine de revue (écrire « Revue : Wnn », ou ajouter "
                 "« **Revue fixée** (AAAA-MM-JJ) : Wnn » sous une prédiction historique)")
+        elif (decision.narrative_predictions and not decision.verdict_on
+                and decision.review_date is None):
+            problems.append(
+                f"décision {decision.date} « {decision.title} » : la semaine de revue "
+                f"W{decision.review_week:02d} n'existe pas cette année-là")
         for rubric in decision.unindexed_predictions:
             line = text[:m.end() + rubric.start()].count("\n") + 1
             excerpt = decision.body[rubric.start():].splitlines()[0]

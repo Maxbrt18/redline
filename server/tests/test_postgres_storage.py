@@ -591,7 +591,7 @@ def test_a_removed_gate_requires_an_existing_canonical_observation(store):
     first = build_revision(
         1, sessions=[], computed_at="2026-08-09T19:10:00+02:00",
         gates=[{"id": "w33-injury", "due": "2026-08-14", "when": "apres",
-                "question": "Comment est le injury au réveil ce matin ?",
+                "question": "Comment est la blessure au réveil ce matin ?",
                 "on_fail": "appliquer le repli prévu"}])
     store.append_plan_revision("2026-W33", first)
 
@@ -621,7 +621,7 @@ def test_a_due_gate_can_close_on_its_precommitted_fallback(store):
     first = build_revision(
         1, sessions=[], computed_at="2026-08-09T19:10:00+02:00",
         gates=[{"id": "w33-injury", "due": "2026-08-14", "when": "apres",
-                "question": "Comment est le injury au réveil ce matin ?",
+                "question": "Comment est la blessure au réveil ce matin ?",
                 "on_fail": "appliquer le repli prévu"}])
     store.append_plan_revision("2026-W33", first)
     second = build_revision(
@@ -930,7 +930,7 @@ def test_a_typed_gate_survives_the_round_trip_through_postgresql(store):
         "gates": [
             {"id": "g-avant", "due": "2026-08-14", "when": "avant",
              "holds": ["w33-jeu-b", "w33-ven-ef"],
-             "question": "le injury au réveil ?", "on_fail": "repos"},
+             "question": "la blessure au réveil ?", "on_fail": "repos"},
             {"id": "g-apres", "due": "2026-08-15", "when": "apres",
              "question": "la cheville a parlé pendant la pliométrie ?",
              "on_fail": "la pliométrie sort de la séance A"},
@@ -1121,7 +1121,7 @@ def test_an_open_question_requires_an_explicit_review_of_the_answer(store):
 
 def test_two_questions_in_one_swipe_target_survive_a_partial_answer(store):
     state = PostgresStateStore(store.database)
-    first, second = "Quel était ton RPE ?", "Et le injury au réveil ?"
+    first, second = "Quel était ton RPE ?", "Et la blessure au réveil ?"
     _ask(store, state, (first, second), "q",
          platform_messages=(("mid-q", first + " " + second),))
     assert state.claim_inbound("partial", "4242", "text", "RPE 3", reply_to_message_id="mid-q")
@@ -1134,8 +1134,8 @@ def test_two_questions_in_one_swipe_target_survive_a_partial_answer(store):
 
 def test_a_number_or_a_one_word_answer_never_closes_a_medical_question(store):
     state = PostgresStateStore(store.database)
-    _ask(store, state, "Le injury au réveil et à la marche ?", "q")
-    for i, text in enumerate(("172 pas/min", "oui", "le injury, je ne sais pas", "merci")):
+    _ask(store, state, "La blessure au réveil et à la marche ?", "q")
+    for i, text in enumerate(("172 pas/min", "oui", "la blessure, je ne sais pas", "merci")):
         state.claim_inbound(str(i), "4242", "text", text)
         state.record_outbound("4242", "Je te lis.", source_key=f"r:{i}")
         assert store.question_rows()[0]["status"] == "open"
@@ -1175,7 +1175,7 @@ def test_defer_resume_and_refuse_are_distinct_from_answering(store):
 def test_review_rejects_another_persons_answer_and_rolls_back_a_failed_turn(store):
     from scripts.model import commands
     state = PostgresStateStore(store.database)
-    question = "Le injury au réveil ?"
+    question = "La blessure au réveil ?"
     _ask(store, state, question, "q")
     state.claim_inbound("foreign", "9999", "text", "aucune gêne")
     with pytest.raises(ValueError, match="appartenir"):
@@ -1274,25 +1274,25 @@ def test_open_questions_left_unexamined_expire_after_two_weeks(store):
 def test_conversation_search_returns_dated_message_and_neighbours_for_same_psid(store):
     state = PostgresStateStore(store.database)
     assert state.claim_inbound("m1", "4242", "text", "La descente hier était facile")
-    state.record_outbound("4242", "Et le injury après ?", source_key="out:1")
-    assert state.claim_inbound("m2", "4242", "text", "Injury calme au réveil")
+    state.record_outbound("4242", "Et la blessure après ?", source_key="out:1")
+    assert state.claim_inbound("m2", "4242", "text", "Genou calme au réveil")
     assert state.claim_inbound("foreign", "9999", "text", "Ma descente était difficile")
     results = store.conversation_search("4242", "descente", limit=4)
     assert len(results) == 1
     assert results[0]["hit"]["role"] == "athlete"
     assert results[0]["hit"]["body"] == "La descente hier était facile"
-    assert results[0]["after"]["body"] == "Et le injury après ?"
+    assert results[0]["after"]["body"] == "Et la blessure après ?"
 
 
 def test_conversation_search_uses_registered_turn_scope(store):
     state = PostgresStateStore(store.database)
-    assert state.claim_inbound("mine", "4242", "text", "Mon injury va mieux")
-    assert state.claim_inbound("other", "9999", "text", "Mon injury reste sensible")
+    assert state.claim_inbound("mine", "4242", "text", "Mon genou va mieux")
+    assert state.claim_inbound("other", "9999", "text", "Mon genou reste sensible")
     turn_id = str(uuid.uuid4())
     state.register_turn(turn_id, "4242")
 
-    results = store.conversation_search_for_turn(turn_id, "injury")
-    assert [row["hit"]["body"] for row in results] == ["Mon injury va mieux"]
+    results = store.conversation_search_for_turn(turn_id, "genou")
+    assert [row["hit"]["body"] for row in results] == ["Mon genou va mieux"]
     with pytest.raises(ValueError, match="absent ou expiré"):
         store.conversation_search_for_turn(str(uuid.uuid4()), "injury")
 
@@ -1485,13 +1485,13 @@ def test_a_bad_gate_resolution_is_refused_before_it_can_cancel_same_turn_facts(s
     first = build_revision(
         1, sessions=[], computed_at="2026-08-09T19:10:00+02:00",
         gates=[{"id": "w33-injury", "due": "2026-08-14", "when": "avant",
-                "question": "Comment est le injury au réveil ce matin ?",
+                "question": "Comment est la blessure au réveil ce matin ?",
                 "on_fail": "appliquer le repli prévu"}])
     store.append_plan_revision("2026-W33", first)
     turn_id = "d740e54c-1933-4cbc-ae7f-982a908626db"
     store.stage_command(turn_id, "observation:reveil", "observation.add", {
         "occurred_on": "2026-08-14", "kind": "reveil",
-        "idempotency_key": "messenger:reveil", "note": "injury plus calme",
+        "idempotency_key": "messenger:reveil", "note": "genou plus calme",
         "pains": {"injury": {"state": "unavailable"}},
     })
     second = build_revision(
@@ -1843,7 +1843,7 @@ def test_a_fact_is_never_rolled_back_because_a_derived_plan_went_stale(store):
 
 
 def test_completing_a_declarative_cell_never_makes_the_plan_stale(store):
-    """« Effort ressenti 7-8/10 et pic injury 0/10 » a détruit un tour le 2026-08-14 :
+    """« Effort ressenti 7-8/10 et pic de douleur 0/10 » a détruit un tour le 2026-08-14 :
     l'empreinte hachait la VALEUR des mesures, donc déclarer un RPE périmait le plan
     au même titre qu'une séance surgie de nulle part. Un chiffre déclaré appelle un
     jugement de coach, pas une révision de programme."""

@@ -277,7 +277,7 @@ def test_a_factual_message_mentioning_pain_is_not_emotional(make_bot):
     """Guard on the criterion, not on the model: what makes E is that the state of
     mind IS the subject, not that a feeling is mentioned."""
     bot, agent = _bot(make_bot, "N1", emotional=False)
-    bot._respond("4242", "j'ai eu un peu mal au injury mais c'est passé")
+    bot._respond("4242", "j'ai eu un peu mal au genou mais c'est passé")
     assert not agent.calls[0]["message"].startswith(EMOTION_NOTE)
 
 

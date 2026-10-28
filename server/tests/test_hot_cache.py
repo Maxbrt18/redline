@@ -50,7 +50,7 @@ def test_the_walk_share_uses_the_gauge_formula_not_a_copy_of_it():
     """NON-RÉGRESSION (2026-07-29) : `hot_cache` portait sa propre copie de la
     pondération et cette copie avait perdu le +0,5 de la séance de qualité RATÉE.
     Même ligne du bloc, deux arithmétiques : le h-éq d'un côté, la part de marche de
-    l'autre — qui s'en trouvait gonflée et pouvait annoncer un rouge injury que la
+    l'autre — qui s'en trouvait gonflée et pouvait annoncer un rouge de blessure que la
     jauge dément.
 
     Ici : seuil 1 h à RPE 8 (cible 6,5) = 2,0 h-éq · rando 2 h = 1,0 h-éq, donc 33 %

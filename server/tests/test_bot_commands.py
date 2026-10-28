@@ -244,7 +244,7 @@ def test_renfo_command_names_a_held_session_instead_of_denying_it(make_bot):
         }],
         "gates": [{
             "id": "w36-renfo-a-reveil", "due": today, "when": "avant",
-            "question": "Comment est le injury au réveil ?",
+            "question": "Comment est la blessure au réveil ?",
             "on_fail": "Retirer la séance.", "holds": ["w36-renfo-a"],
         }],
     })

@@ -5,8 +5,8 @@ def test_search_finds_a_relevant_concept_with_a_readable_provenance(monkeypatch,
     (tmp_path / "concepts").mkdir()
     (tmp_path / "episodes").mkdir()
     (tmp_path / "concepts" / "shin-pain.md").write_text(
-        "---\naliases: [blessure]\n---\n# Douleur injury\n"
-        "La douleur injury doit être située dans le temps.\n")
+        "---\naliases: [blessure]\n---\n# Douleur au genou\n"
+        "La douleur au genou doit être située dans le temps.\n")
     (tmp_path / "episodes" / "other.md").write_text("# Autre chose\n")
     monkeypatch.setenv("VAULT_PATH", str(tmp_path))
     found = knowledge_search.search("blessure")

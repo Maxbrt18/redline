@@ -14,7 +14,7 @@ Usage:
     python3 scripts/decisions-index.py --due     # predictions whose review week has passed
     python3 scripts/decisions-index.py --check    # exit 1 if the on-disk index is stale (CI)
     python3 scripts/decisions-index.py --validate # syntax only; stable static gate
-    python3 scripts/decisions-index.py --find injury # lit seulement les décisions correspondantes
+    python3 scripts/decisions-index.py --find douleur # lit seulement les décisions correspondantes
     python3 scripts/decisions-index.py --calibration # issues des verdicts, part non testable
 
 The index is rewritten in place between <!-- INDEX_START --> and <!-- INDEX_END -->.
@@ -41,11 +41,8 @@ from scripts.model import (  # noqa: E402
 from scripts.model.decisions import (  # noqa: E402,F401
     HEADING,
     OUTCOMES,
-    PLAN_WEEKS,
-    PLAN_YEAR,
     PREDICTION,
     PREDICTION_START,
-    RACE_DAY,
     STRICT_VERDICTS_FROM,
     VERDICT,
     WEEK,

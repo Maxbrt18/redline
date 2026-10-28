@@ -8,7 +8,7 @@ La conversation du 2026-08-12, 07h46, que ces tests existent pour rendre impossi
     Redline — Le vault contient déjà des modifications non enregistrées. Je n'écris
               rien tant qu'elles ne sont pas isolées.
 
-Ce qui s'était réellement passé : le contrôle injury du jour tombait ce matin-là, donc
+Ce qui s'était réellement passé : le contrôle de douleur du jour tombait ce matin-là, donc
 `check` rendait non nul, donc la persistance refusait le tour — et le message de coach
 qui posait EXACTEMENT la question du contrôle a été jeté au profit de la phrase de
 plomberie. Un mécanisme fait pour produire une question produisait une avarie. Les
@@ -53,7 +53,7 @@ def test_due_gates_reads_the_context_already_loaded():
     """
     context = json.dumps({"revision": 3, "gates": [
         {"id": "g1", "due": "2026-08-12", "when": "avant", "holds": ["s1"],
-         "question": "le injury ?", "on_fail": "repos"},
+         "question": "la blessure ?", "on_fail": "repos"},
         {"id": "g2", "due": "2026-08-14", "when": "apres",
          "question": "plus tard", "on_fail": "repos"},
     ]})
@@ -139,7 +139,7 @@ def plan_context(revision_number=2, gates=None):
 
 DUE_GATE = [{"id": "w33-injury", "due": "2000-01-01",
              "when": "avant", "holds": ["w33-ef"],
-             "question": "Le injury au réveil ce matin, mieux ou pire qu'hier ?",
+             "question": "La blessure au réveil ce matin, mieux ou pire qu'hier ?",
              "on_fail": "repos à la place de l'EF"}]
 
 
@@ -159,7 +159,7 @@ def test_the_coach_speaks_while_a_gate_holds_the_prescription(make_bot):
     repo.drain_alerts.return_value = []
     client = MagicMock()
     agent = FakeAgent(
-        result=RunResult(full_text="Le injury, il donne quoi au réveil ce matin ?"),
+        result=RunResult(full_text="La blessure, elle donne quoi au réveil ce matin ?"),
         depth="N2", plan_change=True)
     bot = make_bot(repo=repo, client=client, agent=agent)
     bot._respond("4242", "salut, on fait quoi aujourd'hui ?")
@@ -191,7 +191,7 @@ def test_a_due_gate_surfaces_even_on_a_social_message(make_bot):
     bot = make_bot(repo=repo, client=MagicMock(), agent=agent)
     bot._respond("4242", "salut")
     assert "CONTRÔLE DATÉ ÉCHU" in agent.calls[0]["message"]
-    assert "Le injury au réveil" in agent.calls[0]["message"]
+    assert "La blessure au réveil" in agent.calls[0]["message"]
 
 
 def test_the_morning_asks_the_gate_question_instead_of_reporting_a_failure(make_bot):
@@ -263,7 +263,7 @@ def test_a_light_proactive_never_touches_the_conversation_session(make_bot):
     repo.weekly_plan_message.return_value = "Aujourd'hui : EF, plafond 9 km."
     repo.persist_turn.return_value = PersistenceResult(True)
     repo.drain_alerts.return_value = []
-    agent = FakeAgent(result=RunResult(full_text="Le injury, il donne quoi ?"))
+    agent = FakeAgent(result=RunResult(full_text="La blessure, elle donne quoi ?"))
     bot = make_bot(repo=repo, client=MagicMock(), agent=agent,
                    proactive_active_start=dt.time(0, 0))
     bot._state.set_session("4242", "codex", "conversation")
@@ -299,7 +299,7 @@ def test_the_two_kinds_reach_the_prompt_as_two_separate_instructions():
 
     context = json.dumps({"revision": 3, "gates": [
         {"id": "g1", "due": "2026-08-18", "when": "avant", "holds": ["s1"],
-         "question": "le injury au réveil ?", "on_fail": "repos"},
+         "question": "la blessure au réveil ?", "on_fail": "repos"},
         {"id": "g2", "due": "2026-08-18", "when": "apres",
          "question": "la cheville a parlé pendant la pliométrie ?", "on_fail": "on retire"},
     ]})
@@ -309,7 +309,7 @@ def test_the_two_kinds_reach_the_prompt_as_two_separate_instructions():
 
     note = gate_note(blocking, observing)
     interdiction, permission = note.split("\n\n")
-    assert "le injury au réveil ?" in interdiction
+    assert "la blessure au réveil ?" in interdiction
     assert "NE PRESCRIS PAS les séances retenues (s1)" in interdiction
     # L'observation porte l'instruction INVERSE, et nomme la carte explicitement.
     assert "la cheville a parlé" in permission

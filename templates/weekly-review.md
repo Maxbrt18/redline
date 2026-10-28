@@ -22,7 +22,7 @@ _Vue générée depuis `weekly_plan`. Ne pas éditer à la main._
 - Intensité : répartition EF / qualité — Sommeil / fraîcheur (déclaratif) :
 - Jauge de charge ([[protocols]]) : X h-éq (Y/100) · ratio 4 sem : Z
 - Cadence moyenne (pas/min, Strava ×2) : · Plaisir de la semaine (/10) :
-- Douleur injury : pic d'effort + trace au réveil, relus depuis PostgreSQL :
+- Douleur par zone : pic d'effort + trace au réveil, relus depuis PostgreSQL :
 - Canari lignes droites/descente : _uniquement si cette exposition a eu lieu_ :
 - Calibration ([[protocols]]) : _uniquement les cycles effectivement capturés ; absence = aucune dette_ :
 
@@ -41,7 +41,7 @@ _Tendance douleur : lire les 3-4 dernières lignes du registre, pas la mémoire 
 _Le coach place les deux créneaux, l'athlète ne les négocie pas. Jamais la veille d'une SL ou d'une
 qualité, jamais le même jour qu'une qualité, A et B espacées d'au moins 48 h._
 
-- Séance A (os & injury) : _jour_
+- Séance A (os & tendons) : _jour_
 - Séance B (force & économie) : _jour_
 - Séances réalisées la semaine écoulée : _n/2_ (traçable au registre)
 - Suivi mollet : tendance des comptes des séances A réellement faites ; aucun test dédié tant qu'il est en pause

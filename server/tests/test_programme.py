@@ -59,10 +59,10 @@ def test_every_exercise_note_renders_its_dose(programme):
 @pytest.mark.parametrize("key,first,last,count", [
     # 13 depuis le 2026-08-21 : les 7 min de contrôle moteur entrent en séance A
     # (decisions.md) — pont fessier et tenue unipodale juste après l'échauffement,
-    # injury postérieur et planche gros orteils dans le bloc accessoire. Les bornes
+    # jambier postérieur et planche gros orteils dans le bloc accessoire. Les bornes
     # ne bougent pas : warmup-a ouvre toujours, short-foot ferme toujours.
     ("a", "warmup-a", "plyometrics", 9),
-    # Box drops suspendus le 2026-08-06 (séance B = transition injury, fenêtre
+    # Box drops suspendus le 2026-08-06 (séance B = transition `injury`, fenêtre
     # W35-W36 — decisions.md) : la séance se termine sur calf-drop. Réouverture
     # arbitrée au bilan W33 ; ce jour-là cette ligne redevient box-drop-single/7.
     ("b", "warmup-b", "calf-drop", 5),
@@ -78,7 +78,7 @@ def test_each_session_resolves_in_its_prescribed_order(programme, key, first, la
 
 
 def test_the_single_session_never_goes_to_failure(programme):
-    """Décision du 2026-10-04 : la traction du mollet est la première charge du injury,
+    """Décision du 2026-10-04 : la traction du mollet est la première charge de la blessure,
     et l'échec ralentit la récupération ; les mollets s'arrêtent 2 répétitions avant."""
     assert [p.dose.measure for p in programme.prescriptions("a")].count("amrap") == 0
     for slug in ("calf-raise-straight", "calf-raise-bent"):

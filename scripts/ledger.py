@@ -53,7 +53,7 @@ HALF_TYPES = {"rando", "vélo", "renfoA", "renfoB"}
 # ⭐ LE TERME DE DÉNIVELÉ LIT LE D−, PAS LE D+ (confrontation n°2, volet dénivelé,
 # 2026-08-16 — `decisions.md`). Ce que les heures ne captent pas, c'est la descente :
 # on y va plus VITE, donc elle pèse moins en temps, alors qu'elle coûte plus en
-# mécanique (impact, freinage, choc injury +23 à 30 % — [[src-vernillo-course-en-pente]]).
+# mécanique (impact, freinage, choc à l'impact +23 à 30 % — [[src-vernillo-course-en-pente]]).
 # La montée, elle, est déjà payée par le temps qu'elle fait perdre, et son surcoût
 # énergétique résiduel est 4 à 18 fois plus petit que ce que le terme facturait
 # ([[src-minetti-cout-pente]]).
@@ -549,7 +549,7 @@ def pain_trend(rows: list[Row], weeks_back: int, zone: str) -> list[PainWeek]:
             # La série d'effort se définit POSITIVEMENT. Écrite « not in REST_TYPES »,
             # elle absorbait en silence tout type nouveau : une `palpation` (douleur
             # provoquée à la pression) aurait compté comme un pic d'effort, c'est-à-dire
-            # dans la série qui juge le injury (2026-08-08).
+            # dans la série qui juge la blessure (2026-08-08).
             effort=_series([value for r in week if (value := r.pain_at(zone)) is not None
                             and r.type in table.EFFORT_TYPES]),
             rest=_series([value for r in week if (value := r.pain_at(zone)) is not None

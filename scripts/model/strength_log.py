@@ -72,7 +72,7 @@ def human(row: dict, limit: int = 64) -> str:
     fabrique une ligne lisible, et la page ne formate rien.
     """
     if row.get("status") == "gated":
-        return "retiré — injury"
+        return "retiré — douleur"
     if row.get("passe"):
         return "pas fait"
     parts = []

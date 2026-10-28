@@ -17,7 +17,7 @@ def dose(**data) -> dict:
 SESSION = {
     "sid": "2026-07-25-A",
     "session": "a",
-    "title": "Renfo A, os & injury",
+    "title": "Renfo A, os & tendons",
     "date": "samedi 25 juillet",
     "rule": "Jusqu'à l'échec technique.",
     "note": "Demi-dose, sans pliométrie.",
@@ -139,7 +139,7 @@ def test_format_message_reads_like_the_athlete_wrote_it():
             {"i": 2, "skipped": True},
         ],
     }))
-    assert "Renfo A, os & injury" in message and "32 min" in message
+    assert "Renfo A, os & tendons" in message and "32 min" in message
     # The number must never travel without saying what it measures.
     assert "Difficulté ressentie" in message
     assert "- Échauffement : 3/10" in message
@@ -275,5 +275,5 @@ def test_a_gated_exercise_is_not_an_exercise_that_was_skipped():
         {"i": 1, "skipped": True, "gated": True},
         {"i": 2, "skipped": True},
     ]}))
-    assert "retiré par le garde-fou injury" in message
+    assert "retiré par le garde-fou de douleur" in message
     assert "- Pliométrie : pas fait" in message

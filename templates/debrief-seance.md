@@ -12,7 +12,7 @@ aliases: [débrief séance, debrief-seance]
 
 **Séance** : <EF | SL | seuil | côtes | cadence | course | rando | renfoA | renfoB>
 **Effort ressenti (RPE)** : ___ /10   ← cible du jour : ___ /10
-**Injury** : pic ___ /10 — et il a :
+**Douleur** : pic ___ /10 — et elle a :
   ( ) disparu à l'échauffement   ( ) apparu puis s'est dissipé
   ( ) resté stable               ( ) empiré au fil de la sortie
 **Plaisir** : ___ /10
