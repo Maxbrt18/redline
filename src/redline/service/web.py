@@ -31,11 +31,11 @@ from redline.storage.repository import OperationalStore
 
 from . import clock, page, persona, strength
 from .attachments import encode_payload
-from .bot import CoachBot
 from .config import Config
 from .notebook import NotebookService
 from .notebook_web import CSP as NOTEBOOK_CSP
 from .notebook_web import register as register_notebook
+from .worker import TurnWorker
 
 # /s serves the notebook's own document, since the guided session is one of its
 # screens: same bytes, same policy. Nothing loads from anywhere else;
@@ -198,7 +198,7 @@ def _accept_strength_report(payload: dict, operational_store: OperationalStore,
     return accepted
 
 
-def create_app(config: Config, bot: CoachBot, state: Any,
+def create_app(config: Config, bot: TurnWorker, state: Any,
                operational_store: OperationalStore | None = None,
                notebook: NotebookService | None = None,
                nudge: Callable[[], None] | None = None) -> Flask:

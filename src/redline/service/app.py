@@ -17,7 +17,6 @@ from redline.model.errors import ConfigError, StorageError
 
 from .agent_factory import build_agent
 from .attachments import AttachmentService
-from .bot import CoachBot
 from .config import Config, _load_dotenv
 from .messenger import MessengerClient
 from .notebook import NotebookService
@@ -26,6 +25,7 @@ from .postgres_state import PostgresStateStore
 from .proactive import ProactiveScheduler
 from .vault import REGEN_COMMAND, VaultRepo
 from .web import create_app
+from .worker import TurnWorker
 
 log = logging.getLogger("redline")
 MIN_PYTHON = (3, 12)
@@ -91,7 +91,7 @@ def main() -> None:
     notebook = NotebookService(NotebookStore(database), repo, state,
                                Path(config.vault_path), config.coach_base_url,
                                operational=operational_store, instance=config.instance)
-    bot = CoachBot(client, repo, agent, state, config, Outbox(paths.outbox_dir()),
+    bot = TurnWorker(client, repo, agent, state, config, Outbox(paths.outbox_dir()),
                    attachments=attachments, notebook=notebook)
     bot.start()
 

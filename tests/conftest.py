@@ -4,7 +4,7 @@ pyproject.toml.
 Everything a test needs to STAND UP a bot lives here, and nowhere else. It used to be
 copied: `_bot(...)` had four near-identical definitions, the fake Claude three, `_git`
 two, and the vault root six sites in two idioms. The cost is not the ~90 lines -- it is
-that adding a parameter to `CoachBot.__init__` meant finding four call sites, and that
+that adding a parameter to `TurnWorker.__init__` meant finding four call sites, and that
 a test file quietly wiring its own bot differently from the others is a difference
 nobody sees.
 """
@@ -165,7 +165,7 @@ class FakeAgent:
 
 
 class RecordingBot:
-    """A CoachBot stand-in for the HTTP routes: records what a route asks of the
+    """A TurnWorker stand-in for the HTTP routes: records what a route asks of the
     bot, without running anything.
 
     Here rather than in a test file because it was copied in two, and `web.py`
@@ -245,8 +245,8 @@ def make_bot(make_config, store):
             client.send_image.return_value = DeliveryResult.success()
             client.send_button.return_value = DeliveryResult.success()
             client.action.return_value = DeliveryResult.success()
-        from redline.service.bot import CoachBot
-        return CoachBot(client=client,
+        from redline.service.worker import TurnWorker
+        return TurnWorker(client=client,
                         repo=repo, agent=agent, state=store,
                         config=make_config(**config), outbox=outbox,
                         attachments=attachments)

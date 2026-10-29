@@ -91,7 +91,7 @@ class MessengerClient:
         """The human rhythm between two texts of a burst: the typing bubble, then a
         pause that grows with what is about to arrive.
 
-        Shared with bot.py, which paces the STREAMED reply the same way: two
+        Shared with worker.py, which paces the STREAMED reply the same way: two
         codepaths sending the same burst must not drift into two rhythms.
         """
         self.action(psid, "typing_on")

@@ -14,7 +14,7 @@ name = "redline"
 version = "0.1.0"
 description = "A running coach on a language model, with its memory in a Markdown vault and PostgreSQL."
 readme = "README.md"
-license = "AGPL-3.0-only"
+license = "AGPL-3.0-or-later"
 license-files = ["LICENSE"]
 requires-python = ">=3.12"
 dependencies = [
@@ -103,7 +103,7 @@ ignore_names = [
 ]
 
 [tool.mypy]
-# Added after a real outage: `_buffer_proactive_retry` was CALLED in bot.py without
+# Added after a real outage: `_buffer_proactive_retry` was CALLED in worker.py without
 # existing for eleven days, and the Sunday review crashed instead of being deferred.
 # Neither ruff nor the tests see a missing method on `self`; mypy names it.
 python_version = "3.12"

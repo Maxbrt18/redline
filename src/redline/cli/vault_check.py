@@ -470,9 +470,9 @@ def check_corrections_replay(vault: Vault, report: Report) -> None:
     """Every correction has a replay mode, chosen by a human.
 
     The owner check verifies that an owner is named; this one verifies that it was decided
-    how the rule is replayed: bench scenario, code, off-bench, or `a-rejouer` debt. A new
+    how the rule is replayed: bench scenario, code, off-bench, or `pending` debt. A new
     correction has two reviews to enter the vault's registry, then the check turns red.
-    Without a registry, nothing is checked. The `a-rejouer` debt stays visible as a
+    Without a registry, nothing is checked. The `pending` debt stays visible as a
     warning until scenarios are written.
     """
     text = vault.text(CORRECTIONS)
@@ -503,7 +503,7 @@ def check_corrections_replay(vault: Vault, report: Report) -> None:
         if pending:
             detail.append(f"{len(pending)} à classer ({pending[0]})")
         if found.owed:
-            detail.append(f"{len(found.owed)} sans scénario (`a-rejouer`)")
+            detail.append(f"{len(found.owed)} sans scénario (`pending`)")
         report.warn("corrections rejouables", " · ".join(detail))
         return
     report.ok("corrections rejouables")

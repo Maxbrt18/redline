@@ -5,12 +5,12 @@ from unittest.mock import MagicMock
 
 from conftest import FakeAgent
 
-from redline.service.bot import CoachBot
 from redline.service.proactive import ProactiveJob
+from redline.service.worker import TurnWorker
 
 
 def _bot(store, make_config):
-    return CoachBot(client=MagicMock(), repo=MagicMock(), agent=MagicMock(provider="claude"),
+    return TurnWorker(client=MagicMock(), repo=MagicMock(), agent=MagicMock(provider="claude"),
                     state=store, config=make_config(), outbox=MagicMock())
 
 
@@ -149,7 +149,7 @@ def test_card_rendered_while_a_message_arrives_is_kept_out_of_transport(make_bot
         store.mark_inbound('4242')
         return target
 
-    with patch('redline.service.bot.render_strength_artifact', side_effect=render):
+    with patch('redline.service.worker.render_strength_artifact', side_effect=render):
         assert not bot._deliver_strength_card('4242', 'card', job=job)
 
     bot._release_job.assert_called_once_with(job)

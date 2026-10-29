@@ -29,7 +29,7 @@ from .prompts import PROACTIVE_TRIGGERS, build_proactive_prompt, strava_snapshot
 from .state import StateStore
 
 if TYPE_CHECKING:  # for annotations only: never a runtime import of bot
-    from .bot import CoachBot
+    from .worker import TurnWorker
 
 log = logging.getLogger("redline")
 
@@ -91,7 +91,7 @@ class ProactiveScheduler:
     # The early weekly review must not double the morning note or the wake request.
     WEEKLY_EARLIEST = dtime(12, 0)
 
-    def __init__(self, bot: CoachBot, state: StateStore, config: Config) -> None:
+    def __init__(self, bot: TurnWorker, state: StateStore, config: Config) -> None:
         self._bot = bot
         self._state = state
         self._config = config

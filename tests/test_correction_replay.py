@@ -1,7 +1,7 @@
 """Every correction has a replay mode.
 
 The `corrections-replay.json` registry says how a corrected rule is replayed: a bench
-scenario, code, nothing (outside the bench), or an `a-rejouer` debt. The real content of
+scenario, code, nothing (outside the bench), or an `pending` debt. The real content of
 the registry is judged in `vault-check`; here, only what the code guarantees.
 """
 
@@ -45,8 +45,8 @@ def test_les_trois_formes_du_journal_donnent_des_cles_uniques():
     ({"correction": "x", "replay": "peut-être"}, "invalide"),
     ({"correction": "x", "replay": "scenario"}, "scenarios"),
     ({"correction": "x", "replay": "code"}, "carriers"),
-    ({"correction": "x", "replay": "a-rejouer"}, "note"),
-    ({"correction": "x", "replay": "hors-banc"}, "note"),
+    ({"correction": "x", "replay": "pending"}, "note"),
+    ({"correction": "x", "replay": "off-bench"}, "note"),
 ])
 def test_une_entree_incomplete_est_refusee(row, message):
     with pytest.raises(replay.ReplayFormatError, match=message):
@@ -54,7 +54,7 @@ def test_une_entree_incomplete_est_refusee(row, message):
 
 
 def test_une_correction_en_double_est_refusee():
-    row = {"correction": "x", "replay": "hors-banc", "note": "n"}
+    row = {"correction": "x", "replay": "off-bench", "note": "n"}
     with pytest.raises(replay.ReplayFormatError, match="double"):
         replay.load_ledger(json.dumps([row, row]))
 
@@ -75,9 +75,9 @@ def test_l_audit_separe_retard_orphelins_references_cassees_et_dette(tmp_path):
     root = _root(tmp_path, [
         {"correction": KEYS[1], "replay": "scenario", "scenarios": ["connu", "inconnu"]},
         {"correction": KEYS[2], "replay": "code", "carriers": ["porteur.py", "absent.py"]},
-        {"correction": KEYS[3], "replay": "a-rejouer", "note": "consigne du modèle"},
-        {"correction": KEYS[4], "replay": "hors-banc", "note": "objection retirée"},
-        {"correction": "2026-07-01 — Disparue", "replay": "hors-banc", "note": "n"},
+        {"correction": KEYS[3], "replay": "pending", "note": "consigne du modèle"},
+        {"correction": KEYS[4], "replay": "off-bench", "note": "objection retirée"},
+        {"correction": "2026-07-01 — Disparue", "replay": "off-bench", "note": "n"},
     ])
     found = replay.audit(root, JOURNAL, dt.date(2026, 10, 10), root)
     assert [c.key for c in found.unregistered] == [KEYS[0]]
@@ -105,7 +105,7 @@ def test_vault_check_rouge_sur_reference_cassee_orange_sur_dette(tmp_path):
 
     report = vault_check.Report(quiet=True)
     (root / LEDGER).write_text(json.dumps([{
-        "correction": "2026-10-04 — Seule", "replay": "a-rejouer", "note": "n"}]))
+        "correction": "2026-10-04 — Seule", "replay": "pending", "note": "n"}]))
     vault_check.check_corrections_replay(vault_check.Vault(root, journal), report)
     assert (report.failed, report.warned) == (0, 1)
 

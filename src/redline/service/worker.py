@@ -1,4 +1,4 @@
-"""CoachBot: the orchestrator. A single worker serializes everything (reactive +
+"""TurnWorker: the orchestrator. A single worker serializes everything (reactive +
 proactive), so git writes and agent turns never step on each other, with a short
 debounce that groups texts sent in a burst into a single run.
 
@@ -141,7 +141,7 @@ def unrecorded_line(kinds: Iterable[str]) -> str:
 NOTEBOOK_KINDS = frozenset({"strava_debrief", "strava_debrief_late", "morning"})
 
 
-class CoachBot:
+class TurnWorker:
     HEAVY_KINDS = HEAVY_PROACTIVE_KINDS
     PATIENT_DEPTHS = frozenset({"N2", "N3"})
     PATIENCE_MIN_GAP = 10 * 60

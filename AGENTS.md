@@ -92,6 +92,8 @@ The same commands run locally and in CI:
 
 ```bash
 ruff check . && mypy && vulture && pytest -q
+shellcheck .githooks/pre-commit templates/vault/.githooks/pre-commit \
+           deploy/agent-cli/redline-agent-cli deploy/postgres/*.sh
 ```
 
 PostgreSQL tests need `TEST_DATABASE_URL`; browser tests need `playwright install

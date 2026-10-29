@@ -614,7 +614,7 @@ def test_no_injected_text_types_a_glyph_a_phone_keyboard_does_not_carry():
         "gate_note[observation]": prompts.gate_note(
             [], [{"due": "2026-08-18", "question": "La cheville a parlé pendant la "
                   "pliométrie ?", "on_fail": "elle sort de la séance A"}]),
-        # Texts moved out of `bot.py`: injected at every turn, so each must be scanned.
+        # Texts moved out of `worker.py`: injected at every turn, so each must be scanned.
         "canonical_plan_note": prompts.canonical_plan_note(""),
         "active_revision_note": prompts.active_revision_note(""),
         "deep_handoff_note": prompts.deep_handoff_note("question puis réponse"),
