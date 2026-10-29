@@ -31,10 +31,10 @@ def clean_database():
     with database.engine.begin() as connection:
         names = ", ".join(f"redline.{table.name}" for table in metadata.sorted_tables)
         connection.execute(sa.text(f"TRUNCATE TABLE {names} RESTART IDENTITY CASCADE"))
-        connection.execute(sa.text("INSERT INTO redline.athletes(id) VALUES ('sam')"))
+        connection.execute(sa.text("INSERT INTO redline.athletes(id) VALUES ('athlete')"))
         # The monitored zone of the fictitious instance, as the service syncs it.
         connection.execute(sa.text(
-            "INSERT INTO redline.pain_zones(athlete_id, slug, label) VALUES ('sam', 'genou', 'Genou')"))
+            "INSERT INTO redline.pain_zones(athlete_id, slug, label) VALUES ('athlete', 'genou', 'Genou')"))
     yield
     database.dispose()
 
