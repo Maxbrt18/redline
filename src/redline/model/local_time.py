@@ -9,6 +9,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from . import instance, paths
+from .errors import ConfigError
 
 
 @cache
@@ -23,10 +24,11 @@ def zone() -> ZoneInfo:
 
 def apply_to_process() -> None:
     """Set the process clock to the athlete's zone, for the code that reads naive local
-    time and for every subprocess it starts. Without a readable instance, nothing."""
+    time and for every subprocess it starts. Without a vault or a readable instance
+    (a card rendered from a sample, for instance), nothing."""
     try:
         name = zone().key
-    except instance.InstanceError:
+    except ConfigError:
         return
     os.environ["TZ"] = name
     time.tzset()

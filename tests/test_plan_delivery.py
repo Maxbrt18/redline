@@ -348,7 +348,7 @@ def test_weekly_retry_on_monday_keeps_the_sunday_period(
     from datetime import datetime
     from zoneinfo import ZoneInfo
 
-    import redline.service.bot as bot_module
+    import redline.service.worker as bot_module
 
     monday = datetime(2026, 8, 24, 7, 30, tzinfo=ZoneInfo("Europe/Paris"))
     monkeypatch.setattr(bot_module.clock, "now", lambda: monday)

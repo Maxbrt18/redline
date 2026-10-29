@@ -16,19 +16,19 @@ from unittest.mock import MagicMock
 from conftest import ENGINE_ROOT, FakeAgent
 
 from redline.service.agent import FailureKind, RunResult, SessionMode
-from redline.service.bot import (
-    ATTACHMENT_UNREADABLE,
-    FAILURE_REPLIES,
-    OUTAGE_NOTICE,
-    PLAN_UNAVAILABLE_LINE,
-    CoachBot,
-)
 from redline.service.messenger import DeliveryResult
 from redline.service.plans import PlanStatus
 from redline.service.proactive import ProactiveJob
 from redline.service.routing import Route
 from redline.service.vault import PersistenceResult
 from redline.service.work_queue import AttachmentRequest, InboundRequest
+from redline.service.worker import (
+    ATTACHMENT_UNREADABLE,
+    FAILURE_REPLIES,
+    OUTAGE_NOTICE,
+    PLAN_UNAVAILABLE_LINE,
+    TurnWorker,
+)
 
 PSID = "4242"
 
@@ -283,7 +283,7 @@ def test_rwf006_a_long_outage_is_announced_once_and_never_leaves_silence(make_bo
         def start(self):
             pass
 
-    monkeypatch.setattr("redline.service.bot.threading.Timer", Timer)
+    monkeypatch.setattr("redline.service.worker.threading.Timer", Timer)
 
     for attempt in (1, 2, 3, 4):
         bot._retry_inbound(InboundRequest(PSID, "question", ("m7",), attempts=attempt))
@@ -303,7 +303,7 @@ def test_rwf006_the_provider_reset_time_paces_the_retry(make_bot, monkeypatch):
         def start(self):
             pass
 
-    monkeypatch.setattr("redline.service.bot.threading.Timer", Timer)
+    monkeypatch.setattr("redline.service.worker.threading.Timer", Timer)
     bot._retry_not_before = time.time() + 3600
 
     bot._retry_inbound(InboundRequest(PSID, "question", ("m8",)))
@@ -617,8 +617,8 @@ def test_publication_happens_after_delivery_in_the_worker(make_bot):
 
 
 def test_retry_delays_are_declared_where_they_are_used():
-    assert CoachBot.PROACTIVE_MAX_ATTEMPTS == 3
-    assert CoachBot.REACTIVE_RETRY_DELAYS[0] == 30.0
+    assert TurnWorker.PROACTIVE_MAX_ATTEMPTS == 3
+    assert TurnWorker.REACTIVE_RETRY_DELAYS[0] == 30.0
 
 
 

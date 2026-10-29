@@ -7,9 +7,9 @@ import time
 
 from conftest import git
 
-from redline.service.bot import CoachBot
 from redline.service.prompts import STALE_VAULT_NOTE
 from redline.service.vault import VaultRepo
+from redline.service.worker import TurnWorker
 
 
 class TestVaultRepoSync:
@@ -31,7 +31,7 @@ class TestWithFreshness:
     def _bot(self, store, make_config):
         # Only _state and _config are exercised by _with_freshness.
         config = make_config()
-        return CoachBot(client=None, repo=None, agent=type("Agent", (), {"provider": "claude"})(), state=store,
+        return TurnWorker(client=None, repo=None, agent=type("Agent", (), {"provider": "claude"})(), state=store,
                         config=config, outbox=None)
 
     def test_note_prepended_for_live_session_when_vault_moved(self, store, make_config):

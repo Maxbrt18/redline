@@ -71,7 +71,7 @@ def main() -> int:
                 ) + (EMOTION_NOTE if case.get('emotional', False) else '')
                 context = case['context'] + '\n' + render_memory(
                     case.get('history', []), case.get('questions', []))
-                # Same as `CoachBot`: the reading-depth note, then the dated checks.
+                # Same as `TurnWorker`: the reading-depth note, then the dated checks.
                 # Without it the bench would judge a coach lacking the pain scale
                 # and the N2 instruction.
                 context += '\n' + DEPTH_NOTES[case['route']]

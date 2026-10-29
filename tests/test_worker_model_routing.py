@@ -1,4 +1,4 @@
-"""CoachBot routing: which proactive kinds run heavy and isolated vs light.
+"""TurnWorker routing: which proactive kinds run heavy and isolated vs light.
 """
 
 import pytest

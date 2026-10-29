@@ -11,9 +11,9 @@ import pytest
 from conftest import FakeAgent
 
 from redline.service.agent import TRIAGE_SCHEMA, SessionMode, Triage, parse_triage
-from redline.service.bot import CoachBot
 from redline.service.claude import ClaudeCodeRunner
 from redline.service.prompts import DEPTH_NOTES, EMOTION_NOTE
+from redline.service.worker import TurnWorker
 
 # ---------------------------------------------------------------- classify()
 
@@ -152,7 +152,7 @@ def test_depth_selects_the_declared_profile(make_bot, depth, model, effort):
 
 def test_the_reactive_path_passes_a_route_plan_instead_of_raw_settings():
     """The bot passes the common abstraction, never scattered parameters."""
-    reactif = (CoachBot._respond_turn, CoachBot._run_proactive_agent)
+    reactif = (TurnWorker._respond_turn, TurnWorker._run_proactive_agent)
     for fonction in reactif:
         tree = ast.parse(textwrap.dedent(inspect.getsource(fonction)))
         named = [keyword.arg for node in ast.walk(tree) if isinstance(node, ast.Call)
@@ -183,7 +183,7 @@ def test_la_date_du_jour_ouvre_le_prompt_a_tous_les_niveaux(make_bot, depth):
 def _typing_kwargs(make_bot, depth, text, **triage):
     """The typing indicator starts before triage; it then receives rank and wait."""
     bot, _ = _bot(make_bot, depth, **triage)
-    with patch("redline.service.bot.TypingIndicator") as typing:
+    with patch("redline.service.worker.TypingIndicator") as typing:
         typing.return_value.__enter__ = lambda self: self
         typing.return_value.__exit__ = lambda self, *a: None
         bot._respond("4242", text)

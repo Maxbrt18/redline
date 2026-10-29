@@ -1,7 +1,7 @@
 [
   {
     "correction": "2026-01-10 — Une distance disponible dans l'activité dite invérifiable",
-    "replay": "a-rejouer",
+    "replay": "pending",
     "note": "donnée enregistrée ignorée ; consigne du modèle",
     "scenarios": []
   },
@@ -16,7 +16,7 @@
   },
   {
     "correction": "2026-01-02 — Un mécanisme expliqué deux fois de travers",
-    "replay": "hors-banc",
+    "replay": "off-bench",
     "note": "mécanisme retiré",
     "scenarios": []
   }

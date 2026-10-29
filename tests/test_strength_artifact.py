@@ -60,7 +60,7 @@ def test_morning_card_is_rendered_by_the_service_not_the_agent(
         rendered.append((session["id"], day))
         return outbox.target(f"strength-{day}.png")
 
-    monkeypatch.setattr("redline.service.bot.render_strength_artifact", render)
+    monkeypatch.setattr("redline.service.worker.render_strength_artifact", render)
     agent = FakeAgent()
     bot = make_bot(
         agent=agent, proactive_active_start=dtime(0, 0))

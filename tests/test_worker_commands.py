@@ -202,7 +202,7 @@ def test_exact_renfo_command_is_deterministic_and_idempotent(
         target.write_bytes(b"png")
         return target
 
-    monkeypatch.setattr("redline.service.bot.render_strength_artifact", render)
+    monkeypatch.setattr("redline.service.worker.render_strength_artifact", render)
     agent = FakeAgent()
     client = MagicMock()
     from redline.service.messenger import DeliveryResult

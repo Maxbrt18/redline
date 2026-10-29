@@ -14,8 +14,8 @@ from unittest.mock import MagicMock
 from conftest import FakeAgent
 
 from redline.service.agent import RunResult
-from redline.service.bot import SILENCE_IS_A_FAILURE
 from redline.service.proactive import ProactiveJob
+from redline.service.worker import SILENCE_IS_A_FAILURE
 
 
 def _silent_bot(make_bot):

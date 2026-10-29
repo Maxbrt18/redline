@@ -5,116 +5,81 @@
 
 Redline is a running coach that lives in Facebook Messenger. It reads your Strava
 activities, keeps an append-only training ledger in PostgreSQL, maintains a revisioned
-weekly plan, debriefs every run, and answers through an LLM agent that is **forced to read
-the facts before it speaks**.
+weekly plan, debriefs every run, and answers through an LLM agent (Claude Code or Codex)
+that is **forced to read the facts before it speaks**.
 
-> **This is the open-source edition.** It is the engine of a personal coach I built and use
-> daily, stripped of everything personal: no athlete data, no Strava data, no keys, no
-> private knowledge vault. What remains is the code, the schema, the templates and the
-> design ideas. It is published as-is: **no support, no roadmap, no guarantees.**
->
-> The coach speaks **French**: prompts, messages and most comments are in French.
-> The code is organised so that it can be translated, but that work is not done.
->
-> The engine never names the athlete: the name, the heart rates behind the training
-> zones, the watched injuries and the tracked capabilities come from `redline.toml` (see `config/redline.example.toml`). The coaching rules,
-> their thresholds and the kinds of transition session come from the vault's
-> `rulebook.toml`, or from the engine's `rulebook.default.toml` when the vault has none.
-> `Sam` is the fictional athlete of the test suite only.
->
-> Redline is an AI, not a medical professional. It gives no diagnosis and no medication
-> advice, and says so.
-
-## Ideas worth stealing
-
-- **One owner per fact.** Sessions and pain readings live in an append-only ledger; the
-  weekly programme is a revisioned object; nothing is copied into prose.
-- **A reading ladder (N0–N3).** The agent reads more as the question gets more
-  consequential, and must escalate before asserting anything it has not read this session.
-- **Numbers are computed, never recalled.** Volume, climb and load come from a ledger CLI,
-  not from the model's memory.
-- **Falsifiable decisions.** Each coaching decision carries a prediction with a date and a
-  failure criterion; a monthly ritual argues against active decisions.
-- **A calibration rule.** When the athlete corrects the coach, the correction is logged
-  with what should have been read, and replayed as a regression scenario.
-
-## What is in the box
-
-| Path | What it is |
-|---|---|
-| `src/redline/service/` | The service: Messenger and Strava webhooks, proactive messages, agent runtime, mobile "notebook" web app (PWA) |
-| `src/redline/cli/` | The commands the agent calls (`redline ledger`, `redline week-plan`, `redline strava`, `redline fact-write`…), one module each |
-| `src/redline/model/`, `analysis/`, `integrations/`, `coach/` | The typed domain, the ledger and its reports, Strava and the weather, the coach's words |
-| `src/redline/storage/`, `migrations/` | PostgreSQL schema (Alembic) and repository layer |
-| `src/redline/cards/` | HTML/PNG card renderer (week, month, workout, strength) |
-| `config/` | The files an operator copies and fills: `redline.example.toml` (the instance, at the vault root), `redline.env.example` (the service), `routing.example.toml`, the Compose and PostgreSQL variables |
-| `deploy/` | How to run it on a host: `agent-cli/` (the launcher of the agent's commands and its allowlist), `systemd/`, `caddy/`, `postgres/` (image, roles, backups); `compose.yml` and `Dockerfile` at the root run it all on one host |
-| `templates/` | Note templates for a vault (athlete onboarding, weekly review, debrief…) |
-| `templates/vault/CLAUDE.md` | A **template** of the coach's instruction file, copied into a vault: reading ladder, calibration rule, fact-ownership table |
-| `docs/storage-architecture.md` | Why PostgreSQL owns operational facts and Git owns knowledge |
-| `tests/` | 1,982 tests (engine, storage, web app, prompts), run against a fictional vault; 159 skip without PostgreSQL |
-
-## The cards
-
-Some answers are images instead of prose: the weekly recap, the month view, the workout
-debrief and the strength session arrive as cards typeset by the browser renderer in
-`src/redline/cards/`, from the numbers the ledger already owns. The three below are rendered
-from the committed samples (`src/redline/cards/samples/*.json`; the race name is a
-placeholder):
-
-```bash
-redline chart-week -o /tmp/week.png < src/redline/cards/samples/week.json
-```
+> **Published as-is: no support, no roadmap, no guarantees.** This is the engine of a
+> coach used daily, without anything personal: no athlete data, no keys, no private
+> knowledge vault. The coach speaks **French**; the code and its documentation are in
+> English. Redline is an AI, not a medical professional: it gives no diagnosis and no
+> medication advice, and says so.
 
 <p>
   <img src="docs/cards/week.webp" alt="Weekly card" width="49%">
   <img src="docs/cards/workout.webp" alt="Workout card" width="49%">
 </p>
-<p>
-  <img src="docs/cards/month.webp" alt="Monthly card" width="49%">
-</p>
 
-## What is NOT included
+## How it works
 
-The knowledge vault of the original deployment (athlete profile, journal, decisions,
-corrections, research notes, strength programme) is private and deliberately absent. Bring
-your own: the scripts expect a vault laid out as described in `templates/vault/CLAUDE.md`. The test suite
-ships a small fictional one, Sam's, in `tests/fixtures/vault/`: the tests run on a
-temporary copy of it through `VAULT_PATH`, exactly as the service runs on yours.
+```mermaid
+flowchart LR
+    Athlete((Athlete)) -- Messenger --> Service
+    Strava -- webhook --> Service
+    Service -- "facts, read model" --> PG[(PostgreSQL)]
+    Service -- "one turn" --> Agent[Claude Code / Codex]
+    Agent -- "redline commands" --> PG
+    Agent -- "reads, writes notes" --> Vault[(Markdown vault, Git)]
+    Service -- "checked reply, cards" --> Athlete
+```
 
-## Running it
+The model writes prose and proposes changes; deterministic code owns everything else.
+Every fact has one owner (PostgreSQL for what happened, the vault for why), the agent
+reads more as a question gets more consequential (N0 to N3), numbers are computed by
+CLIs rather than recalled, and a turn's writes are applied together or not at all.
+[`docs/architecture.md`](docs/architecture.md) describes this harness.
 
-See [`docs/deployment.md`](docs/deployment.md) for the full deployment: PostgreSQL via
-Docker Compose, Alembic migrations, environment variables (`config/redline.env.example`), systemd
-units, Caddy. You need your own Strava API application, a Messenger app, and an LLM agent
-runtime.
+## Try it
+
+The cards render without anything else:
 
 ```bash
 python3.12 -m venv .venv && . .venv/bin/activate
 pip install -c requirements.txt -c requirements-dev.txt -e '.[cards,dev]'
-playwright install chromium   # the page and card tests drive a real browser
-pytest -q
+playwright install chromium
+redline chart-week -o /tmp/week.png < src/redline/cards/samples/week.json
 ```
 
-Every skip carries its reason: 159 need PostgreSQL (`TEST_DATABASE_URL`), and the browser
-tests need `playwright install chromium`.
+To run the whole coach on a server you need a Meta app, a Strava API application, a
+Claude (or OpenAI) account, a domain and a vault of your own. Start with
+[`docs/getting-started.md`](docs/getting-started.md); then:
 
-To commit changes, run `git config core.hooksPath .githooks` first: it enables the
-pre-commit hook that regenerates the generated views before every commit.
+```bash
+cp config/compose.env.example .env     # and fill it in, with redline.env and secrets/
+docker compose up -d --build
+```
 
-## Contributing and security
+## Documentation
 
-Conventions for changing the engine (people and coding agents): [`AGENTS.md`](AGENTS.md).
-Reporting a vulnerability: [`SECURITY.md`](SECURITY.md). What the model provider
-receives: [`docs/llm-data.md`](docs/llm-data.md).
+| | |
+|---|---|
+| [Getting started](docs/getting-started.md) | The first time: the accounts, the vault, the configuration, the first message |
+| [Self-hosting](docs/self-hosting.md) | Docker Compose or systemd, backups, updates, diagnostics |
+| [Architecture](docs/architecture.md) | The harness: the turn, the owners of facts, the reading ladder, routing, delivery |
+| [Vault format](docs/vault-format.md) | The files and frontmatter the engine reads in a vault |
+| [Configuration](docs/configuration.md) | Every environment variable and configuration file |
+| [What the model receives](docs/llm-data.md) | The data sent to the model provider |
+| [Contributing](AGENTS.md) · [Security](SECURITY.md) · [Changes](CHANGELOG.md) | |
 
-## En bref (FR)
+## Development
 
-Redline est un coach de course à pied auto-hébergé : il lit Strava, tient un registre
-d'entraînement en PostgreSQL, révise un plan hebdomadaire et répond via un agent LLM obligé
-de lire les faits avant de parler. Cette version open source ne contient **aucune donnée
-personnelle** : seulement le moteur, le schéma, les gabarits et les idées de conception.
-Publié tel quel, sans support.
+```bash
+pytest -q -rs     # tests needing PostgreSQL or Chromium say why they skip
+git config core.hooksPath .githooks
+```
+
+The suite runs against a fictional athlete, Sam, whose vault is in
+`tests/fixtures/vault/`. PostgreSQL tests need `TEST_DATABASE_URL`; see
+[`AGENTS.md`](AGENTS.md).
 
 ## License
 

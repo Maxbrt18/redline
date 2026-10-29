@@ -10,9 +10,9 @@ mode, chosen by a human and never guessed from prose:
 
 - `scenario`: one or more scenarios of `coaching-scenarios.json` replay it;
 - `code`: the fix is deterministic and lives in the named files (`carriers`);
-- `hors-banc`: nothing replays in conversation (corrected note content, vault
+- `off-bench`: nothing replays in conversation (corrected note content, vault
   maintenance rule, removed mechanism); `note` says why;
-- `a-rejouer`: the fix lives in a model instruction and has no scenario yet. This is the
+- `pending`: the fix lives in a model instruction and has no scenario yet. This is the
   debt the bench must pay down.
 
 This module reads only the identity of the entries from `corrections.md` (section title
@@ -31,7 +31,7 @@ from . import paths, vault_layout
 from .errors import InputError
 
 SCENARIOS = "src/redline/evaluation/coaching-scenarios.json"
-MODES = ("scenario", "code", "hors-banc", "a-rejouer")
+MODES = ("scenario", "code", "off-bench", "pending")
 #: A new correction has this many days to receive its replay mode.
 GRACE_DAYS = 14
 
@@ -87,7 +87,7 @@ def load_ledger(text: str) -> dict[str, dict]:
             raise ReplayFormatError(f"{key} : `scenarios` manquant")
         if mode == "code" and not row.get("carriers"):
             raise ReplayFormatError(f"{key} : `carriers` manquant")
-        if mode in ("hors-banc", "a-rejouer") and not row.get("note"):
+        if mode in ("off-bench", "pending") and not row.get("note"):
             raise ReplayFormatError(f"{key} : `note` manquante")
         ledger[key] = row
     return ledger
@@ -123,5 +123,5 @@ def audit(vault: Path, corrections_text: str, today: dt.date,
         late=[c for c in unregistered if (today - c.date).days > GRACE_DAYS],
         orphans=sorted(key for key in ledger if key not in keys),
         broken=broken,
-        owed=[key for key, row in ledger.items() if row["replay"] == "a-rejouer"],
+        owed=[key for key, row in ledger.items() if row["replay"] == "pending"],
     )

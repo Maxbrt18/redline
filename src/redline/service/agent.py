@@ -134,7 +134,7 @@ class RunResult:
     """Terminal result, independent of the provider.
 
     ``error`` is a TECHNICAL detail meant for the log, never a text for the athlete:
-    only ``bot.py`` decides what is said to them, based on ``failure``.
+    only ``worker.py`` decides what is said to them, based on ``failure``.
     ``silent`` carries the typed choice of an initiative to send nothing.
     """
 
