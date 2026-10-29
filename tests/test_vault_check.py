@@ -189,7 +189,8 @@ def _predictions(monkeypatch, day, rows):
     monkeypatch.setattr(vault_check, "_read_postgres", lambda report, label, read: rows)
 
 
-_DUE = {"prediction_key": "sl-20", "status": "open", "due_on": vault_check.dt.date(2026, 8, 30)}
+#: As `prediction_rows()` returns it: plain values, the date as ISO text.
+_DUE = {"prediction_key": "sl-20", "status": "open", "due_on": "2026-08-30"}
 
 
 def test_a_prediction_due_within_the_grace_period_is_only_a_warning(report, monkeypatch):

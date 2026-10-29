@@ -28,6 +28,7 @@ from redline.model import (
     correction_replay,
     entrypoint,
     ledger,
+    paths,
     vault_layout,
 )
 from redline.model import instance as instance_model
@@ -238,11 +239,11 @@ def _read_postgres(report: Report, label: str, read):
 def check_postgres_storage(vault: Vault, report: Report) -> None:
     def read(store):
         import sqlalchemy as sa
-        from alembic.config import Config
-        from alembic.script import ScriptDirectory
 
-        config = Config(str(vault.root / "alembic.ini"))
-        head = ScriptDirectory.from_config(config).get_current_head()
+        from redline.storage.database import expected_schema_revision
+
+        # The head is the engine's: the vault holds no migrations.
+        head = expected_schema_revision(paths.ENGINE_ROOT / "alembic.ini")
         with store.database.engine.connect() as connection:
             current = connection.execute(sa.text(
                 "SELECT version_num FROM alembic_version")).scalar_one_or_none()
@@ -433,6 +434,8 @@ def check_prediction_debt(vault: Vault, report: Report) -> None:
     if rows is None:
         return
     today = dt.date.today()
+    # The store returns its rows as plain values: the date arrives as ISO text.
+    rows = [{**row, "due_on": dt.date.fromisoformat(str(row["due_on"]))} for row in rows]
     due = sorted((row for row in rows if row["status"] == "open" and row["due_on"] < today),
                  key=lambda row: row["due_on"])
     lines = [f"{row['prediction_key']} (échue le {row['due_on']}, +"

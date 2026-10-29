@@ -21,7 +21,8 @@ from ..schema import (
     strava_activity_intakes,
 )
 
-ATHLETE = "sam"
+#: The one athlete an instance serves: the engine is single-athlete, so its key is fixed.
+ATHLETE = "athlete"
 #: A Strava capture without its streams or weather: what the debrief and the session
 #: cycle read. Streams (hundreds of points) are only needed for the notebook detail.
 _INTAKE_CORE = tuple(column for column in strava_activity_intakes.c
