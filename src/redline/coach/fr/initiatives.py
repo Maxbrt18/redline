@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import datetime as dt
 
-from .calendar import listing
+from redline.coach.dates import listing
 
 UNTITLED_SESSION = "prévue"
 UNNAMED_GEAR = "Ta paire"
 LAST_SESSION = "Comment tu as vécu ta dernière séance ?"
 
 #: How a missing ledger cell is named, asked in Messenger or in the notebook.
-CELL_LABELS = {"Dlr": "ton pic de douleur", "RPE": "ton RPE global", "Plaisir": "ton plaisir"}
-NOTEBOOK_CELL_LABELS = {**CELL_LABELS, "RPE": "ton RPE"}
+CELL_LABELS = {"pain": "ton pic de douleur", "rpe": "ton RPE global", "enjoyment": "ton plaisir"}
+NOTEBOOK_CELL_LABELS = {**CELL_LABELS, "rpe": "ton RPE"}
 
 #: The exact question, a substring of the text: tracked as a question asked, it gives
 #: its meaning to a "légère" typed in the chat.

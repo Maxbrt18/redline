@@ -268,7 +268,7 @@ class TurnCommands(StoreBase):
                 raise ValueError("clé de cellule textuelle attendue")
             day, kind, column = key.split(":", 2)
             dt.date.fromisoformat(day)
-            if not kind or ledger.column_base(column) not in {"RPE", "Dlr", "Plaisir"}:
+            if not kind or ledger.column_base(column) not in ledger.DECLARED_COLUMNS:
                 raise ValueError("cellule déclarative invalide")
 
     def _apply_question_review(self, connection: Connection, payload: dict, actor: str) -> None:

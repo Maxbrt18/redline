@@ -10,19 +10,19 @@
 # ------------------------------------------------------------------ applied thresholds
 
 [parameters]
-# Guardrail no. 8: a transition is a session whose KIND has been absent for this many days.
+# Rule n8: a transition is a session whose KIND has been absent for this many days.
 # It is also the window of the longest recent outing, the reference for a long-run step.
 transition_lookback_days = 30
-# Guardrail no. 8: at most this many transitions per week, checked when the programme is written.
+# Rule n8: at most this many transitions per week, checked when the programme is written.
 transitions_per_week = 1
 # The gate: an easy increase may be added if each zone's weekly effort peak stays at or
 # below this level...
 gate_effort_peak = 1.5
 # ... over this many weeks without an increase.
 gate_trend_weeks = 2
-# Guardrail no. 3: pain cap during effort, on its table.
+# Rule n3: pain cap during effort, on its table.
 pain_cap = 2
-# Guardrail no. 7: a session at least this long (in hours) counts as a hard day.
+# Rule n7: a session at least this long (in hours) counts as a hard day.
 hard_min_hours = 1.25
 # The taper covers the last N weeks, race week included.
 taper_weeks = 3
@@ -34,7 +34,7 @@ stall_tolerance_km = 0.1
 # The waking trace is collected in the morning: after this local time the logbook stops
 # asking for it and the reminder is no longer sent.
 wake_trace_until = "14:00"
-# Guardrail no. 2: the planned assimilation weeks (ISO weeks). Nothing new is placed in them.
+# Rule n2: the planned assimilation weeks (ISO weeks). Nothing new is placed in them.
 assimilation_weeks = []
 
 # ------------------------------------------------------------------ transitions
@@ -79,7 +79,7 @@ id = "n1"
 title = "Qualité"
 text = "une par semaine au plus, introduite seulement porte ouverte. Zéro VMA."
 grade = "règle de coaching"
-owner = "coaching/current-plan.md § garde-fou n°1"
+owner = "coaching/current-plan.md"
 enforced_by = "le coach"
 
 [[rules]]
@@ -87,7 +87,7 @@ id = "n2"
 title = "Assimilation"
 text = "-25 à -30 % toutes les 3-4 semaines, fréquence gardée ; on n'y ajoute rien."
 grade = "règle de coaching"
-owner = "coaching/current-plan.md § garde-fou n°2"
+owner = "coaching/current-plan.md"
 enforced_by = "le coach ; redline feasibility (semaines d'assimilation)"
 
 [[rules]]
@@ -95,7 +95,7 @@ id = "n3"
 title = "Douleur"
 text = "plafond {pain_cap}/10 à l'effort, zone par zone ; au-dessus ou foulée modifiée : arrêt. Persistante > 48 h : -30 %, puis paliers 50/70/85 % et 2 semaines sans qualité."
 grade = "règle de coaching"
-owner = "coaching/current-plan.md § garde-fou n°3"
+owner = "coaching/current-plan.md"
 enforced_by = "le coach"
 
 [[rules]]
@@ -103,7 +103,7 @@ id = "n4"
 title = "Sommeil et FC"
 text = "2-3 mauvaises nuits consécutives ou FC anormalement haute en footing : qualité supprimée, semaine traitée en assimilation."
 grade = "règle de coaching"
-owner = "coaching/current-plan.md § garde-fou n°4"
+owner = "coaching/current-plan.md"
 enforced_by = "le coach ; FC à allure calculée par redline signals"
 
 [[rules]]
@@ -119,7 +119,7 @@ id = "n6"
 title = "Dernier intervalle"
 text = "une qualité finit dans sa bande RPE, une répétition en réserve ; un all-in final la rate. Allures comparées au sein de la séance seulement."
 grade = "règle de coaching"
-owner = "coaching/current-plan.md § garde-fou n°6"
+owner = "coaching/current-plan.md"
 enforced_by = "le coach"
 
 [[rules]]
@@ -127,7 +127,7 @@ id = "n7"
 title = "Espacement"
 text = "jamais deux jours exigeants consécutifs (qualité, sortie longue, EF > {hard_min_hours} h). Une semaine à contrainte se réduit, elle ne se condense pas."
 grade = "règle de coaching"
-owner = "coaching/current-plan.md § garde-fou n°7"
+owner = "coaching/current-plan.md"
 enforced_by = "redline week-plan revise (champ demanding)"
 
 [[rules]]
@@ -135,7 +135,7 @@ id = "n8"
 title = "Transition"
 text = "séance dont la nature sort des {transition_lookback_days} derniers jours (1re qualité, 1er bloc descente, terrain neuf). {transitions_per_week} par semaine au plus, sous-dosée, plafond écrit avant."
 grade = "pari"
-owner = "coaching/current-plan.md § garde-fou n°8"
+owner = "coaching/current-plan.md"
 enforced_by = "redline week-plan revise (champ transition) ; redline feasibility (à rebours)"
 
 [[rules]]

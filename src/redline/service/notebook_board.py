@@ -24,9 +24,9 @@ from pathlib import Path
 from typing import Any
 
 from redline.analysis import ledger, signals
+from redline.coach import dates
 from redline.coach.fr import notebook as notebook_text
 from redline.coach.fr import session_labels
-from redline.coach.fr.calendar import DAY_LETTERS
 from redline.coach.fr.notebook import HR_REASONS, PAIN_SCALE
 from redline.model import (
     debrief,
@@ -309,7 +309,7 @@ class Board:
     # ------------------------------------------------------------ agrégats
     def strip(self, week: Week, sessions: list[dict]) -> list[dict]:
         days = []
-        for index, day in enumerate(week.days):
+        for day in week.days:
             iso = day.isoformat()
             same = [s for s in sessions if s["date"] == iso and s["status"] != "cancelled"]
             done = sum(row.km or 0 for row in week.rows
@@ -324,7 +324,7 @@ class Board:
             abbr = "+".join(dict.fromkeys(
                 session_labels.short(s["workout"]) for s in same)) or ""
             days.append({
-                "date": iso, "letter": DAY_LETTERS[index], "abbr": abbr,
+                "date": iso, "letter": dates.weekday(day, "narrow"), "abbr": abbr,
                 "today": day == self.today, "done_km": round(done, 2) or None,
                 "planned_km": planned_km, "planned_label": planned_label,
                 "long": any(s["workout"] == session_kinds.LONG for s in same),
@@ -433,7 +433,7 @@ class Board:
             day = row["occurred_on"]
             if row["kind"] == session_kinds.WAKE_TRACE and day == self.today:
                 woke_today = True
-            if day > self.today or day < ledger_model.COMPLETENESS_FROM \
+            if day > self.today or day < ledger_model.completeness_from() \
                     or self.today - day >= ledger_model.COMPLETION_WINDOW:
                 continue
             missing = ledger_model.missing_observation_fields(row)
@@ -447,8 +447,7 @@ class Board:
                 continue
             fields = [f"pain:{zone}" for zone in labels
                       if ledger_model.pain_column(zone) in missing]
-            fields += [metric for metric, column in (
-                ("rpe", "RPE"), ("enjoyment", "Plaisir")) if column in missing]
+            fields += [column for column in ("rpe", "enjoyment") if column in missing]
             if fields:
                 asks.append({"id": f"cell:{row['id']}", "type": "cells",
                              "date": day.isoformat(), "kind": row["kind"],

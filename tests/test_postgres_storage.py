@@ -1207,12 +1207,12 @@ def test_only_the_exact_delivered_question_marks_its_declared_cell(store, delive
     state = PostgresStateStore(store.database)
     turn_id = str(uuid.uuid4())
     store.stage_command(turn_id, "ask:rpe", commands.QUESTION_ASK,
-                        {"text": "Quel était ton RPE ?", "cells": ["2026-09-05:easy:RPE"]})
+                        {"text": "Quel était ton RPE ?", "cells": ["2026-09-05:easy:rpe"]})
     store.apply_turn_with_receipts(turn_id)[0]
     state.record_outbound("4242", delivered, source_key="out", turn_id=turn_id)
-    assert state.proactive.marked("asked:2026-09-05:easy:RPE") == ("RPE" in delivered)
-    assert not state.proactive.marked("asked:2026-09-05:easy:Dlr")
-    assert not state.proactive.marked("asked:2026-09-05:easy:Plaisir")
+    assert state.proactive.marked("asked:2026-09-05:easy:rpe") == ("RPE" in delivered)
+    assert not state.proactive.marked("asked:2026-09-05:easy:pain")
+    assert not state.proactive.marked("asked:2026-09-05:easy:enjoyment")
     state.record_outbound("4242", delivered, source_key="out", turn_id=turn_id)
     assert len(store.question_rows()) == (1 if "RPE" in delivered else 0)
 
@@ -1226,12 +1226,12 @@ def test_a_question_is_tracked_only_from_a_declaration_found_in_the_delivered_te
                           source_key="out:rhetoric")
     turn_id = str(uuid.uuid4())
     store.stage_command(turn_id, "ask:rpe", commands.QUESTION_ASK,
-                        {"text": "Quel était ton RPE ?", "cells": ["2026-09-05:easy:RPE"]})
+                        {"text": "Quel était ton RPE ?", "cells": ["2026-09-05:easy:rpe"]})
     store.apply_turn_with_receipts(turn_id)[0]
     state.record_outbound("4242", "Tu l'as ressenti à combien sur dix ?",
                           source_key="out:rephrase", turn_id=turn_id)
     assert store.question_rows() == []
-    assert not state.proactive.marked("asked:2026-09-05:easy:RPE")
+    assert not state.proactive.marked("asked:2026-09-05:easy:rpe")
 
 
 def test_reasking_an_open_question_does_not_erase_a_partial_answer_or_deferral(store):
@@ -2126,7 +2126,7 @@ def test_the_weekly_dossier_is_computed_from_the_same_functions_as_the_clis(stor
                            "kind": "race", "item": "TargetRace",
                            "fact_owner": "athlete/goals.md", "status": "scheduled"})
     text = weekly_dossier.render(store, VAULT_ROOT, "2026-W39", dt.date(2026, 9, 27))
-    assert "Faisabilité à rebours (garde-fou n°8, calculée) : course le 26/11" in text
+    assert "Faisabilité à rebours (règle n8, calculée) : course le 26/11" in text
 
 
 def test_the_weekly_dossier_does_not_flag_cadence_work_that_was_asked_for(store):

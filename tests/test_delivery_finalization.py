@@ -105,7 +105,7 @@ def test_partial_closed_proactive_does_not_mark_an_unreceived_question(make_bot,
     bot._mark_cells_asked = MagicMock()
     job = _running_job(store)
     bot._deliver_closed_proactive(job, ClosedProactive(
-        'Pour ta sortie.\n\nQuel plaisir ?', ('2026-09-06:easy:Plaisir',),
+        'Pour ta sortie.\n\nQuel plaisir ?', ('2026-09-06:easy:enjoyment',),
         question='Quel plaisir ?'))
 
     assert store._conversation[-1]['text'] == 'Pour ta sortie.'

@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 
 from redline.model import local_time, paths
+from redline.model.errors import ConfigError, StorageError
 
 from .agent_factory import build_agent
 from .attachments import AttachmentService
@@ -54,13 +55,13 @@ def main() -> None:
     config = Config.from_env()
 
     if not config.database_url:
-        raise SystemExit("DATABASE_URL obligatoire : aucun stockage de secours n'existe")
+        raise ConfigError("DATABASE_URL obligatoire : aucun stockage de secours n'existe")
     from redline.storage import Database, OperationalStore
     from redline.storage.database import expected_schema_revision
     database = Database(config.database_url, application_name="redline-server")
     expected_revision = expected_schema_revision(paths.ENGINE_ROOT / "alembic.ini")
     if not database.ready(expected_revision):
-        raise SystemExit(
+        raise StorageError(
             "PostgreSQL indisponible ou schéma en retard : démarrage refusé sans "
             f"stockage canonique à la révision {expected_revision}")
     operational_store = OperationalStore(database)

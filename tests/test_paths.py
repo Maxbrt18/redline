@@ -34,7 +34,7 @@ def test_the_service_refuses_to_start_without_a_vault(monkeypatch):
                 "MESSENGER_ALLOWED_PSID"):
         monkeypatch.setenv(key, "x")
     monkeypatch.delenv("VAULT_PATH", raising=False)
-    with pytest.raises(SystemExit, match="VAULT_PATH"):
+    with pytest.raises(ConfigError, match="VAULT_PATH"):
         Config.from_env()
 
 

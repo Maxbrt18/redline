@@ -1,7 +1,8 @@
-"""Reading-depth triage: classification parsing and profile routing."""
+"""Reading-depth triage: the structured answer and profile routing."""
 
 import ast
 import inspect
+import json
 import subprocess
 import textwrap
 from unittest.mock import patch
@@ -9,7 +10,7 @@ from unittest.mock import patch
 import pytest
 from conftest import FakeAgent
 
-from redline.service.agent import SessionMode, Triage
+from redline.service.agent import TRIAGE_SCHEMA, SessionMode, Triage, parse_triage
 from redline.service.bot import CoachBot
 from redline.service.claude import ClaudeCodeRunner
 from redline.service.prompts import DEPTH_NOTES, EMOTION_NOTE
@@ -24,27 +25,37 @@ def _completed(stdout, returncode=0):
     return subprocess.CompletedProcess(args=[], returncode=returncode, stdout=stdout, stderr="")
 
 
-@pytest.mark.parametrize("raw,expected", [
-    ("N0", "N0"),
-    ("N3", "N3"),
-    ("n2", "N2"),
-    ("  N1\n", "N1"),
-    ("Niveau : N3", "N3"),
-    # The v2 format, and the v1 one it must keep tolerating (the small model drifts).
-    ("N2 | - | Deux secondes, je regarde ta semaine.", "N2"),
-    ("N1 | E | Raconte moi ça.", "N1"),
-])
-def test_classify_parses_the_level(make_config, store, raw, expected):
+def _answer(**fields):
+    """What `claude -p --output-format json --json-schema` prints."""
+    data = {"depth": "N1", "emotional": False, "holding": None, "plan_change": False,
+            "plan_asked": False, "plan_scope": "none", **fields}
+    return json.dumps({"type": "result", "is_error": False, "structured_output": data})
+
+
+@pytest.mark.parametrize("depth", ["N0", "N1", "N2", "N3"])
+def test_classify_reads_the_structured_level(make_config, store, depth):
     runner = _runner(make_config, store)
-    with patch("subprocess.run", return_value=_completed(raw)):
-        assert runner.classify("peu importe").depth == expected
+    with patch("subprocess.run", return_value=_completed(_answer(depth=depth))):
+        assert runner.classify("peu importe").depth == depth
 
 
-@pytest.mark.parametrize("stdout", ["", "je ne sais pas", "N9", "blah"])
-def test_unparseable_answer_falls_back(make_config, store, stdout):
+@pytest.mark.parametrize("stdout", [
+    "", "N2", "je ne sais pas", json.dumps({"result": "N2"}), _answer(depth="N9"),
+    _answer(emotional="oui"), _answer(plan_asked=True, plan_scope="none"),
+])
+def test_an_answer_outside_the_schema_falls_back(make_config, store, stdout):
     runner = _runner(make_config, store)
     with patch("subprocess.run", return_value=_completed(stdout)):
         assert runner.classify("peu importe") == Triage()
+
+
+def test_the_triage_call_asks_for_the_schema(make_config, store):
+    runner = _runner(make_config, store)
+    with patch("subprocess.run", return_value=_completed(_answer())) as run:
+        runner.classify("salut")
+    command = run.call_args[0][0]
+    assert json.loads(command[command.index("--json-schema") + 1]) == TRIAGE_SCHEMA
+    assert command[command.index("--output-format") + 1] == "json"
 
 
 @pytest.mark.parametrize("boom", [
@@ -64,65 +75,30 @@ def test_triage_can_be_disabled(make_config, store):
     run.assert_not_called()
 
 
-# ------------------------------------------------- the two extra fields (v2)
+# ------------------------------------------------------------- the fields
 
-def test_the_emotional_flag_is_read(make_config, store):
+def test_the_flags_and_the_holding_line_are_carried(make_config, store):
     runner = _runner(make_config, store)
-    with patch("subprocess.run", return_value=_completed("N1 | E | Raconte.")):
-        assert runner.classify("j'ai plus envie").emotional is True
-
-
-@pytest.mark.parametrize("raw", ["N1", "N1 | - | Deux secondes.", "N1 | x | Deux secondes."])
-def test_absent_or_unknown_second_field_is_not_emotional(raw):
-    assert ClaudeCodeRunner._parse_triage(raw).emotional is False
-
-
-def test_the_holding_line_is_carried(make_config, store):
-    runner = _runner(make_config, store)
-    with patch("subprocess.run",
-               return_value=_completed("N2 | - | Ah, le vélo à la place de samedi.")):
-        assert runner.classify("je fais du vélo ?").holding == "Ah, le vélo à la place de samedi."
-
-
-def test_a_level_without_a_holding_line_still_parses():
-    """A malformed field must cost only that field. The depth is what buys the
-    reading; losing it because the third field is missing would be the tail wagging
-    the dog."""
-    triage = ClaudeCodeRunner._parse_triage("N3")
-    assert (triage.depth, triage.holding) == ("N3", None)
+    answer = _answer(depth="N2", emotional=True, holding="Ah, le vélo à la place de samedi.",
+                     plan_change=True, plan_asked=True, plan_scope="today")
+    with patch("subprocess.run", return_value=_completed(answer)):
+        triage = runner.classify("je fais du vélo ?")
+    assert triage == Triage("N2", True, "Ah, le vélo à la place de samedi.", True, True,
+                            "today")
 
 
 def test_an_overlong_holding_line_is_dropped():
     """The small model answering the question instead of announcing the wait: sending
     a triage-grade answer as a "hang on" line would be worse than the silence."""
-    triage = ClaudeCodeRunner._parse_triage("N2 | - | " + "bla " * 100)
+    data = json.loads(_answer(depth="N2", holding="bla " * 100))["structured_output"]
+    triage = parse_triage(data)
     assert triage.depth == "N2"
     assert triage.holding is None
 
 
-def test_the_holding_line_cannot_move_the_rung():
-    """Depth is read from the FIRST field only: a waiting line that happens to quote a
-    level must not reclassify the message."""
-    assert ClaudeCodeRunner._parse_triage("N1 | - | je regarde si c'est du N3").depth == "N1"
-
-
-@pytest.mark.parametrize("raw,change,asked", [
-    ("N2 | - | Deux secondes. | P | -", True, False),
-    ("N1 | - | Je regarde. | - | D", False, True),
-    ("N2 | - | Deux secondes. | P | D", True, True),
-    # A line in the old format, before the five fields, claims nothing: the worst failure
-    # would be a too-lenient parser sending a program on a missing field.
-    ("N2 | - | Deux secondes. | P", True, False),
-    ("N1", False, False),
-])
-def test_the_two_plan_flags_are_read_apart(raw, change, asked):
-    triage = ClaudeCodeRunner._parse_triage(raw)
-    assert (triage.plan_change, triage.plan_asked) == (change, asked)
-
-
 def test_triage_uses_the_small_model(make_config, store):
     runner = _runner(make_config, store)
-    with patch("subprocess.run", return_value=_completed("N1")) as run:
+    with patch("subprocess.run", return_value=_completed(_answer())) as run:
         runner.classify("salut")
     command = run.call_args[0][0]
     assert "--model" in command and command[command.index("--model") + 1] == "claude-haiku-5-5"
@@ -130,7 +106,7 @@ def test_triage_uses_the_small_model(make_config, store):
 
 def test_triage_carries_the_low_effort_guardrail(make_config, store):
     runner = _runner(make_config, store)
-    with patch("subprocess.run", return_value=_completed("N1")) as run:
+    with patch("subprocess.run", return_value=_completed(_answer())) as run:
         runner.classify("salut")
     command = run.call_args[0][0]
     assert command[command.index("--effort") + 1] == "low"

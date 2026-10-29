@@ -112,7 +112,7 @@ as rolled back because a projection or a Git push failed.
 | `outbox.py` | lifecycle of images and sidecars |
 | `strength_artifact.py` | strength card rendered from the typed prescription |
 | `prompts.py` | choice of the texts injected at each turn and of the proactive workflows |
-| `src/redline/coach/fr/` | the coach's and the service's words: `prompts/*.md`, `messages.py` (notes), `replies.py` (limits), `initiatives.py`, `notebook.py`, `session_labels.py`, `calendar.py` |
+| `src/redline/coach/fr/` | the coach's and the service's words: `prompts/*.md` (instructions and notes), `labels.py`, `replies.py` (limits), `initiatives.py`, `notebook.py`, `session_labels.py`; dates and lists through Babel (`coach/dates.py`) |
 | `strength.py`, `page/` | opaque capabilities and strength page |
 | `src/redline/storage/repository/` | transactions and operational facts, one module per aggregate |
 | `src/redline/storage/projector.py` | regenerable Obsidian views |
@@ -227,7 +227,7 @@ Startup refuses:
 - Python older than 3.12;
 - incomplete Messenger configuration;
 - unknown agent provider;
-- invalid numeric, boolean, time, effort or route value (notably Sol Max);
+- invalid numeric, boolean or time value, or an unusable routing file;
 - unavailable PostgreSQL.
 
 `deploy/coach-messenger.env.example` is the exhaustive reference. Locally, a `.env` at the root is tolerated;
@@ -397,14 +397,14 @@ before any useful work, without raising the model's cost. The default Codex iden
 are `gpt-6-luna` and `gpt-6-sol`, including for overrides and fallbacks. These are the
 model names currently published by OpenAI; they do not mean "Luna/Sol, whatever the
 generation" and will not switch automatically to a future generation. Efforts
-and watchdogs stay optimized for cost, even at the price of latency. Sol Max
-(Sol with `max` or `ultra` effort) is refused at startup, including for a fallback.
+and watchdogs stay optimized for cost, even at the price of latency.
 The proactive window starts at `PROACTIVE_ACTIVE_START` and runs until midnight: it
 has no configurable end, and no work duration is checked against the end of
 the window.
-The variables `AGENT_<ROUTE>_MODEL`, `_EFFORT`, `_FALLBACK_MODEL` and
-`_FALLBACK_EFFORT` allow overriding each row; the old flat variables
-`AGENT_MODEL*`/`AGENT_EFFORT*` are no longer read.
+`REDLINE_ROUTING` names a TOML file whose `[routing.<ROUTE>]` tables override a row
+(`model`, `effort`, `fallback = { model, effort }`), checked at startup; see
+`deploy/routing.example.toml`. The engine names no model it refuses: what a route may
+cost is the operator's choice.
 
 The ordinary session expires according to `SESSION_TTL_HOURS` and stays tied to its provider and
 to the fingerprint of its instructions (`prompts.instruction_digest`): the style prompt and

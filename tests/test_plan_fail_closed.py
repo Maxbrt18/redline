@@ -327,7 +327,7 @@ def test_a_cell_is_marked_asked_only_when_a_message_really_leaves(make_bot):
     the day were nonetheless classed "asked". The `?` sentinel ("asked, and lost") could
     have landed on a question never asked, which the code explicitly forbids.
     """
-    entry = {"date": "2026-08-10", "type": "easy", "missing": ["RPE", "Dlr", "Plaisir"]}
+    entry = {"date": "2026-08-10", "type": "easy", "missing": ["rpe", "pain", "enjoyment"]}
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
     repo.sync.return_value = False

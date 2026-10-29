@@ -56,3 +56,7 @@ files = [{ path = "CLAUDE.md", words = 2200 }, { path = "ai/hot-cache.md", words
 tier = "N2"
 total = 2800
 files = [{ path = "athlete/athlete.md", words = 2800 }]
+
+# Les séances d’avant ce jour suivaient un contrat moins exigeant : jamais réclamées.
+[ledger]
+complete_from = "2026-07-30"

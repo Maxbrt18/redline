@@ -110,7 +110,7 @@ def per_week_errors(sessions: list[dict], where: str) -> list[str]:
         return problems
     names = ", ".join(f"{s['id']} ({s['transition']})" for s in typed)
     return [*problems, f"{where} : {len(typed)} transitions dans la semaine ({names}), "
-            f"garde-fou n°8 : {allowed} au plus"]
+            f"règle n8 : {allowed} au plus"]
 
 
 # ------------------------------------------------------------------ backward solver
@@ -217,10 +217,10 @@ def diagnose(problem: Problem) -> Verdict:
     for kind in problem.required:
         reduced = replace(problem, required=tuple(k for k in problem.required if k != kind))
         levers.append(Option(f"sans {label(kind)} avant la course", solve(reduced)))
-    levers.append(Option("une transition de plus par semaine (garde-fou n°8)",
+    levers.append(Option("une transition de plus par semaine (règle n8)",
                          solve(problem, Rules(per_week=per_week + 1))))
     if problem.assimilation & set(problem.weeks):
-        levers.append(Option("une transition en semaine d'assimilation (garde-fou n°2)",
+        levers.append(Option("une transition en semaine d'assimilation (règle n2)",
                              solve(problem, Rules(open_assimilation=True))))
     return Verdict(problem, False, tuple(levers))
 
@@ -235,7 +235,7 @@ def _option_lines(option: Option, weeks: tuple[str, ...], prefix: str) -> list[s
 def render(verdict: Verdict) -> list[str]:
     """The verdict as sent to the review: short, assumptions included."""
     problem = verdict.problem
-    lines = [f"Faisabilité à rebours (garde-fou n°8, calculée) : course le "
+    lines = [f"Faisabilité à rebours (règle n8, calculée) : course le "
              f"{problem.race_on:%d/%m}, affûtage {short(problem.taper[0])}-"
              f"{short(problem.taper[-1])}."]
     if not problem.weeks:

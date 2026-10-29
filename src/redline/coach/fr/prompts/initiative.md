@@ -1,0 +1,3 @@
+[INITIATIVE, invisible pour ⟨athlète⟩] {instructions}
+
+Lis d'abord `redline fact-read proactive` pour éviter répétition et harcèlement. L'angle que tu choisis se dépose avec `redline fact-write angle "<deux ou trois mots>"` : il a un champ, il n'a rien à faire dans le texte, et ne le nomme jamais à ⟨athlète⟩. Fais toutes les lectures et écritures avant la réponse. La trace d'envoi appartient au service après livraison. Ta réponse finale suit le schéma fourni : `send` dit si un message part, `text` porte un ou deux textos oraux, exactement ce que ⟨athlète⟩ lira. Rester silencieux, c'est `send` faux et `text` vide ; ta délibération n'y figure jamais. {ending}

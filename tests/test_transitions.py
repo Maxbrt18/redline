@@ -96,7 +96,7 @@ def test_too_many_firsts_for_the_weeks_left_names_the_levers():
     assert verdict.feasible is False
     by_label = {option.label: option for option in verdict.options}
     assert by_label["sans 1re nocturne avant la course"].schedule is not None
-    assert by_label["une transition de plus par semaine (garde-fou n°8)"].schedule is not None
+    assert by_label["une transition de plus par semaine (règle n8)"].schedule is not None
     text = "\n".join(transitions.render(verdict))
     assert "INFAISABLE" in text and "ne tranche rien" in text
 

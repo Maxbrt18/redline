@@ -76,7 +76,7 @@ jobs:
           test -n "$CODEX_REQUIREMENT"
           python -m pip install --quiet pytest ruff mypy vulture pyyaml flask requests \
                                         SQLAlchemy==2.0.46 alembic==1.18.4 \
-                                        'psycopg[binary,pool]==3.3.3' \
+                                        'psycopg[binary,pool]==3.3.3' babel==2.17.0 \
                                         "$CODEX_REQUIREMENT" \
                                         types-requests types-PyYAML
           python -m pip install --quiet --no-deps -e .

@@ -38,7 +38,7 @@ WEEK = {
     "days": [{"day": d, "planned_km": 8, "done_km": 7.5} for d in
              ("lun", "mar", "mer", "jeu", "ven", "sam", "dim")],
     "planned_km": 56, "done_km": 52.5, "gauge_level": 60, "gauge_ratio": 1.1,
-    "pain": "stable", "plaisir": 7,
+    "pain": "stable", "enjoyment": 7,
 }
 MONTH = {
     "month": "Juillet 2026", "km": 148, "dplus": 1900, "sessions": 16,
@@ -216,7 +216,7 @@ def test_invalid_json_fails_cleanly(tmp_path):
     # names the field -- these assertions are on the MESSAGE, not just the exit code.
     ("chart-week", dict(WEEK, gauge_lvl=72), "gauge_lvl"),
     ("chart-week", dict(WEEK, pain_flag="rouge"), "pain_flag"),
-    ("chart-week", dict(WEEK, plaisir=42), "plaisir"),
+    ("chart-week", dict(WEEK, enjoyment=42), "enjoyment"),
     ("chart-week", {"dates": "sans semaine"}, "week"),
     ("chart-month", dict(MONTH, race_date="28/11/2026"), "race_date"),
     ("chart-workout", dict(WORKOUT, reps=WORKOUT["reps"][:1]), "reps"),

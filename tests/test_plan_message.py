@@ -40,13 +40,13 @@ def test_the_week_is_one_line_per_day_and_never_a_paragraph(repo):
     message = repo.weekly_plan_message("2026-W33")
     lines = message.splitlines()
     assert lines[0] == "Programme du 10/08 au 16/08 :"
-    assert lines[1:] == ["lun 10/08 : EF, cible 7 km, plafond 9 km (fait)",
-                         "mar 11/08 : Repos (Renfo A reporté)",
-                         "mer 12/08 : rien de prévu",
-                         "jeu 13/08 : rien de prévu",
-                         "ven 14/08 : rien de prévu",
-                         "sam 15/08 : rien de prévu",
-                         "dim 16/08 : SL vallonnée, cible 10 km, plafond 11 km"]
+    assert lines[1:] == ["lun. 10/08 : EF, cible 7 km, plafond 9 km (fait)",
+                         "mar. 11/08 : Repos (Renfo A reporté)",
+                         "mer. 12/08 : rien de prévu",
+                         "jeu. 13/08 : rien de prévu",
+                         "ven. 14/08 : rien de prévu",
+                         "sam. 15/08 : rien de prévu",
+                         "dim. 16/08 : SL vallonnée, cible 10 km, plafond 11 km"]
 
 
 def test_the_week_carries_no_internal_note(repo):
@@ -61,8 +61,8 @@ def test_the_week_carries_no_internal_note(repo):
 def test_a_replan_shows_the_rest_of_the_week_not_the_days_already_lived(repo):
     message = repo.weekly_plan_message("2026-W33", since="2026-08-11")
     assert message.startswith("La suite de la semaine :")
-    assert "lun 10/08" not in message
-    assert "mar 11/08" in message and "dim 16/08" in message
+    assert "lun. 10/08" not in message
+    assert "mar. 11/08" in message and "dim. 16/08" in message
 
 
 def test_the_rest_of_the_week_never_contains_a_session_already_run(repo, monkeypatch):
@@ -121,7 +121,7 @@ def test_two_sessions_on_the_same_day_share_their_line(repo, monkeypatch):
     monkeypatch.setattr(repo, "weekly_plan_context",
                         lambda week: json.dumps({"revision": 2, "sessions": doubled}))
     lines = repo.weekly_plan_message("2026-W33").splitlines()
-    assert lines[2] == ("mar 11/08 : Repos (Renfo A reporté) + EF, cible 7 km, "
+    assert lines[2] == ("mar. 11/08 : Repos (Renfo A reporté) + EF, cible 7 km, "
                         "plafond 9 km (fait)")
 
 
@@ -173,7 +173,7 @@ def test_un_jour_quon_vide_se_nomme_au_lieu_de_disparaitre(repo, monkeypatch):
 
     message = repo.weekly_plan_message("2026-W33", since="2026-08-11")
 
-    assert "dim 16/08 : rien de prévu" in message
+    assert "dim. 16/08 : rien de prévu" in message
 
 
 def test_un_jour_retenu_par_un_controle_ne_se_dit_pas_vide(repo):
@@ -184,7 +184,7 @@ def test_un_jour_retenu_par_un_controle_ne_se_dit_pas_vide(repo):
     message = repo.weekly_plan_message(
         "2026-W33", since="2026-08-11", exclude_ids=frozenset({"w33-r1-dim-sl"}))
 
-    assert "dim 16/08" not in message
+    assert "dim. 16/08" not in message
 
 
 def test_un_jour_deja_couru_ne_se_dit_pas_vide(repo, monkeypatch):
@@ -196,7 +196,7 @@ def test_un_jour_deja_couru_ne_se_dit_pas_vide(repo, monkeypatch):
 
     message = repo.weekly_plan_message("2026-W33", since="2026-08-11")
 
-    assert "mar 11/08" not in message
+    assert "mar. 11/08" not in message
 
 
 def test_une_semaine_entierement_vide_reste_une_phrase(repo, monkeypatch):
@@ -215,9 +215,9 @@ def test_requested_scope_is_rendered_without_reciting_the_week():
     today = render_plan_for_scope(raw, "2026-W33", "today", today="2026-08-11")
     next_session = render_plan_for_scope(raw, "2026-W33", "next", today="2026-08-11")
 
-    assert today.startswith("Aujourd'hui : Repos") and "dim 16/08" not in today
-    assert next_session.startswith("Prochaine séance, mar 11/08")
-    assert "dim 16/08" not in next_session
+    assert today.startswith("Aujourd'hui : Repos") and "dim. 16/08" not in today
+    assert next_session.startswith("Prochaine séance, mar. 11/08")
+    assert "dim. 16/08" not in next_session
 
 
 def test_reactive_revision_renders_only_its_delta():

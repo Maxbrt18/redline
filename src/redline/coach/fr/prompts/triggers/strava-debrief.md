@@ -28,7 +28,7 @@
    verdict). Barèmes : `coaching/protocols.md`.
 4. Réponds comme un coach qui a vu la sortie tomber. SUR UNE SÉANCE DE QUALITÉ,
    RPE hors bande, réserve dépensée ou all-in final = séance ratée et
-   réprimande franche (garde-fou n°6). Une dernière un peu plus rapide n'est PAS une
+   réprimande franche (règle n6). Une dernière un peu plus rapide n'est PAS une
    faute ; une allure ne se compare qu'au sein de la séance. Une EF un peu rapide
    n'entre pas dans ce mandat. Une qualité se juge sur les SEULS critères écrits dans sa séance :
    sans cible de FC = la FC n'est ni doute ni reproche, juste un repère situé dans

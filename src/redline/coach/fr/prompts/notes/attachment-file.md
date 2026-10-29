@@ -1,0 +1,1 @@
+- {kind} | {media_type} | {size} octets | chemin local : {path}

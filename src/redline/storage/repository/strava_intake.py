@@ -46,10 +46,10 @@ class StravaIntake(StoreBase):
             "distance_km": ("km", activity.distance_km),
             "duration_s": (None, activity.moving_s or None),
             "pace_s_per_km": (None, activity.pace_s_per_km),
-            "hr_avg_bpm": ("FCmoy", activity.hr_avg_bpm),
-            "hr_max_bpm": ("FCmax", activity.hr_max_bpm),
-            "cadence_spm": ("Cad", activity.cadence_spm or activity.cadence_rpm),
-            "elevation_gain_m": ("D+", activity.elevation_gain_m),
+            "hr_avg_bpm": ("hr_avg", activity.hr_avg_bpm),
+            "hr_max_bpm": ("hr_max", activity.hr_max_bpm),
+            "cadence_spm": ("cadence", activity.cadence_spm or activity.cadence_rpm),
+            "elevation_gain_m": ("dplus", activity.elevation_gain_m),
         }
         for metric, (field, value) in raw.items():
             if value is None:

@@ -34,10 +34,10 @@ def test_question_review_cli_preserves_partial_and_deferred_states():
 
 
 def test_ask_cli_names_only_the_measurement_actually_requested():
-    args = parse("ask", "--text", "Quel était ton RPE ?", "--cell", "2026-09-05:easy:RPE")
+    args = parse("ask", "--text", "Quel était ton RPE ?", "--cell", "2026-09-05:easy:rpe")
     _, kind, payload = fact_write._payload(args)
     assert kind == "question.ask"
-    assert payload == {"text": "Quel était ton RPE ?", "cells": ["2026-09-05:easy:RPE"]}
+    assert payload == {"text": "Quel était ton RPE ?", "cells": ["2026-09-05:easy:rpe"]}
 
 
 def parse(*argv: str):

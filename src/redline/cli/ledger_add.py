@@ -5,8 +5,8 @@ The command normalises the floats supplied by Strava, validates each option agai
 the contract of `model/ledger.py`, then writes the canonical observation directly.
 
     redline ledger-add --date YYYY-MM-DD --type EF --km 6.84 \\
-        --temps 0:41:56 --allure 6:08 --fcmoy 156.61 --fcmax 168 --cad 168.88 \\
-        --dplus 64.7 --dmoins 64 --wbgt 20 --strava 90000000003 --note "…"
+        --time 0:41:56 --pace 6:08 --hr-avg 156.61 --hr-max 168 --cadence 168.88 \\
+        --dplus 64.7 --dminus 64 --wbgt 20 --strava 90000000003 --note "…"
 
 Pain is given per monitored zone: `--pain genou=2 --pain cheville=?`. With a single
 zone, `--pain 2` is enough.
@@ -33,11 +33,11 @@ from redline.model import ledger as table
 
 
 def option_of(item: table.ObservationInput) -> str:
-    return item.option or item.name.lower()
+    return item.name.replace("_", "-")
 
 
 def _number(name: str, value: str) -> float | int:
-    if name == "Temps":
+    if name == "time":
         parts = [int(part) for part in value.split(":")]
         if len(parts) == 3:
             hours, minutes, seconds = parts
@@ -46,7 +46,7 @@ def _number(name: str, value: str) -> float | int:
         else:
             raise ValueError(f"durée invalide : {value}")
         return hours * 3600 + minutes * 60 + seconds
-    if name == "Allure":
+    if name == "pace":
         minute, second = (int(part) for part in value.split(":"))
         return minute * 60 + second
     number = float(value)
@@ -64,7 +64,7 @@ def morning_trace_errors(raw: dict[str, str], pains: dict[str, str],
     "?" is refused too: a wake-up check without an answer has no row, and the catch-up
     must not turn answers already given into `unavailable`.
     """
-    if raw.get("Type") != session_kinds.WAKE_TRACE:
+    if raw.get("type") != session_kinds.WAKE_TRACE:
         return []
     if not zones:
         return ["réveil sans zone surveillée : il n'y a aucune trace à consigner"]
@@ -91,7 +91,7 @@ def _write_database(url: str, raw: dict[str, str], pains: dict[str, str], key: s
     if not key:
         raise table.LedgerError(
             "--idempotency-key obligatoire sans id Strava (identité stable du fait)")
-    kind = raw["Type"]
+    kind = raw["type"]
     measurements: dict[str, dict[str, Any]] = {}
     for item in table.INPUTS:
         if not item.metric:
@@ -104,14 +104,14 @@ def _write_database(url: str, raw: dict[str, str], pains: dict[str, str], key: s
                 "state": "known", "value": _number(item.name, value)}
         else:
             required = item.name in table.required_columns(kind) or (
-                bool(raw.get("Strava")) and item.name in ("D+", "D-"))
+                bool(raw.get("strava")) and item.name in ("dplus", "dminus"))
             measurements[item.metric] = {
                 "state": "pending" if required else "not_applicable"}
     payload = {
-        "occurred_on": dt.date.fromisoformat(raw["Date"]), "kind": kind,
-        "idempotency_key": key, "strava_activity_id": raw.get("Strava") or None,
-        "routine": raw.get("Routine") or None,
-        "note": raw.get("Note", ""), "source": "ledger-add", "measurements": measurements,
+        "occurred_on": dt.date.fromisoformat(raw["date"]), "kind": kind,
+        "idempotency_key": key, "strava_activity_id": raw.get("strava") or None,
+        "routine": raw.get("routine") or None,
+        "note": raw.get("note", ""), "source": "ledger-add", "measurements": measurements,
         "pains": {zone: table.pain_reading(value) for zone, value in pains.items()},
     }
     if start_local:
@@ -155,8 +155,8 @@ def _active_zones(url: str) -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__.splitlines()[0],
-        epilog="Vide = ne pas passer l'option. « ? » = demandé puis perdu (RPE, Dlr, "
-               "Plaisir seulement).",
+        epilog="Vide = ne pas passer l'option. « ? » = demandé puis perdu (rpe, pain, "
+               "enjoyment seulement).",
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--dry-run", action="store_true",
                         help="affiche la ligne validée, n'écrit rien")
@@ -187,7 +187,7 @@ def main() -> int:
 
     database_url = (os.environ.get("DATABASE_URL") or "").strip()
     zones: list[str] = []
-    if args.pain or raw_values.get("Type") == session_kinds.WAKE_TRACE:
+    if args.pain or raw_values.get("type") == session_kinds.WAKE_TRACE:
         if not database_url:
             print("DATABASE_URL obligatoire : les zones surveillées vivent en base",
                   file=sys.stderr)
@@ -199,9 +199,9 @@ def main() -> int:
         print(f"observation refusée : {exc}", file=sys.stderr)
         return 1
     problems = morning_trace_errors(raw_values, pains, zones)
-    if raw_values.get("Routine") and raw_values.get("Type") != session_kinds.STRENGTH:
+    if raw_values.get("routine") and raw_values.get("type") != session_kinds.STRENGTH:
         problems.append(f"--routine ne vaut que pour --type {session_kinds.STRENGTH}")
-    problems += table.INPUT_SCHEMA.errors(raw_values, raw_values.get("Date", "observation"))
+    problems += table.INPUT_SCHEMA.errors(raw_values, raw_values.get("date", "observation"))
     for zone, value in pains.items():
         try:
             table.pain_reading(value)
@@ -214,15 +214,15 @@ def main() -> int:
     for change in corrected:
         print(change, file=sys.stderr)
     if args.dry_run:
-        print({**raw_values, **({"Dlr": pains} if pains else {})})
+        print({**raw_values, **({"pain": pains} if pains else {})})
         return 0
 
     if not database_url:
         print("DATABASE_URL obligatoire : aucun registre de secours n'existe", file=sys.stderr)
         return 2
     key = args.idempotency_key.strip()
-    if raw_values.get("Strava"):
-        key = f"strava:{raw_values['Strava']}"
+    if raw_values.get("strava"):
+        key = f"strava:{raw_values['strava']}"
     try:
         oid = _write_database(database_url, raw_values, pains, key,
                               start_local=args.start_local.strip(),
@@ -231,7 +231,7 @@ def main() -> int:
         print(f"observation non écrite : {exc}", file=sys.stderr)
         return 1
     state = "préparée pour le tour" if os.environ.get("REDLINE_TURN_ID") else "enregistrée"
-    print(f"{raw_values['Date']} {raw_values['Type']} : observation {oid} {state}.")
+    print(f"{raw_values['date']} {raw_values['type']} : observation {oid} {state}.")
     return 0
 
 

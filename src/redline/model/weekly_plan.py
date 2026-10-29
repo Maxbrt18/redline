@@ -10,8 +10,8 @@ import json
 import re
 from itertools import pairwise
 
+from redline.coach import dates
 from redline.coach.fr import session_labels
-from redline.coach.fr.calendar import DAYS as WEEKDAYS
 
 from . import paths, rulebook, session_kinds, transitions, typography
 from . import programme as strength_programme
@@ -77,7 +77,7 @@ SESSION_SCHEMA = Schema("séance planifiée", [
     field("cadence_target", int, required=False, minimum=120, maximum=220),
     field("demanding", bool),
     field("transition", str, required=False, pattern=rulebook.SLUG,
-          note="nature qui sort des 30 derniers jours (garde-fou n°8), l'une de celles "
+          note="nature absente de la fenêtre de la règle n8, l'une de celles "
                "du règlement ; absent pour une séance déjà connue"),
     field("location_label", str, required=False),
     field("carbs_target_g_h", int, required=False, minimum=0, maximum=150,
@@ -241,9 +241,6 @@ def _week_dates(week: str) -> set[str]:
 # only what is written from now on, otherwise an old revision would become invalid and
 # block all prescription. ISO string comparison, like the rest of the module
 # (`gate["due"] < written_on`): all `computed_at` values carry the same local offset.
-_INTERNAL_RE = re.compile(r"\b(?:rev|r[ée]vision)\.?\s*\d", re.IGNORECASE)
-
-
 def _text_errors(text: str, where: str, label: str, gate_ids: list[str]) -> list[str]:
     """`title`/`note`: what the athlete reads, judged as such."""
     problems = []
@@ -253,11 +250,6 @@ def _text_errors(text: str, where: str, label: str, gate_ids: list[str]) -> list
                 f"{where} : {label} cite le contrôle daté « {gate_id} » — ce texte part "
                 "sur le téléphone de l'athlète et sur la carte, la machinerie interne "
                 "reste dans reason/evidence")
-    match = _INTERNAL_RE.search(text)
-    if match:
-        problems.append(
-            f"{where} : {label} cite une révision (« {match.group()} ») — dis ce que la "
-            "séance devient, pas d'où la consigne vient")
     return problems
 
 
@@ -685,7 +677,7 @@ def details_of(session: dict, *, cadence_unit: str = "") -> list[str]:
 
 def _session_line(session: dict) -> str:
     day = dt.date.fromisoformat(session["date"])
-    label = WEEKDAYS[day.weekday()].capitalize()
+    label = dates.weekday(day).capitalize()
     suffix = " · ".join(details_of(session, cadence_unit=" pas/min"))
     status = "fait" if session["status"] == "done" else session["status"]
     if session.get("transition"):
@@ -723,10 +715,6 @@ def render_journal(plan: dict) -> str:
     return "\n".join(lines)
 
 
-MONTHS = ("janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août",
-          "septembre", "octobre", "novembre", "décembre")
-
-
 def journal_skeleton(week: str, today: dt.date) -> str:
     """The journal of a week that has a program but no file yet.
 
@@ -738,9 +726,8 @@ def journal_skeleton(week: str, today: dt.date) -> str:
     year, number = week.split("-W")
     monday = dt.date.fromisocalendar(int(year), int(number), 1)
     sunday = monday + dt.timedelta(days=6)
-    span = (f"{monday.day}-{sunday.day} {MONTHS[sunday.month - 1]}"
-            if monday.month == sunday.month else
-            f"{monday.day} {MONTHS[monday.month - 1]} - {sunday.day} {MONTHS[sunday.month - 1]}")
+    span = (f"{monday.day}-{dates.day_month(sunday)}" if monday.month == sunday.month
+            else f"{dates.day_month(monday)} - {dates.day_month(sunday)}")
     return "\n".join([
         "---", "type: bilan", f"semaine: {week}", f"maj: {today.isoformat()}", "---", "",
         f"# Bilan {week} ({span})", "",
@@ -758,7 +745,7 @@ def render_hot_cache(plan: dict) -> str:
     revision = active(plan)
     sessions = scheduled(revision["sessions"])
     compact = "; ".join(
-        f"{WEEKDAYS[dt.date.fromisoformat(s['date']).weekday()][:3]} {s['title']}"
+        f"{dates.weekday(dt.date.fromisoformat(s['date']), 'abbreviated')} {s['title']}"
         + (f" ≤{s['distance_cap_km']:g} km" if s.get("distance_cap_km") is not None else "")
         for s in sessions)
     return (f"- **Semaine en cours — {plan['week']} · plan typé r{revision['revision']}** : "
@@ -779,7 +766,7 @@ def _revision_index(revision: dict | None) -> dict[str, dict]:
 
 def _day_label(stamp: str) -> str:
     day = dt.date.fromisoformat(stamp)
-    return f"{WEEKDAYS[day.weekday()][:3]} {day:%d/%m}"
+    return f"{dates.weekday(day, 'abbreviated')} {day:%d/%m}"
 
 
 def _comparable(session: dict) -> tuple:
@@ -1006,63 +993,6 @@ def revision_readback(week: str, previous: dict | None, current: dict) -> str:
                  "marqué AUCUNE SÉANCE est un oubli tant que tu n'as pas vérifié qu'il "
                  "est voulu."]
     return "\n".join(bloc)
-
-
-#: THE MOTIVE AND THE OBJECT ARE JUDGED TOGETHER. `semantic_errors` checks physiological
-#: invariants -- spacing between strength sessions, consecutive demanding days -- but not
-#: whether the revision DOES what it SAYS.
-#:
-#: The check is on days because that is the only claim of a motive that a program can
-#: mechanically contradict. It leaves the two correct paths open: either the revision
-#: forgets that day, or the motive names it without changing it -- and a circumstance
-#: that changes nothing lives in `constraints`, not in the motive.
-_JOURS_NOMMES = {nom: index for index, nom in enumerate(WEEKDAYS)}
-_DATE_COURTE = re.compile(r"\b(\d{2})/(\d{2})\b")
-_DATE_ISO = re.compile(r"\b(20\d{2}-\d{2}-\d{2})\b")
-
-
-def _dates_nommees(text: str, week: str) -> set[str]:
-    monday = dt.date.fromisocalendar(int(week[:4]), int(week[-2:]), 1)
-    semaine = {(monday + dt.timedelta(days=index)).isoformat() for index in range(7)}
-    trouvees = set()
-    lowered = text.lower()
-    for nom, index in _JOURS_NOMMES.items():
-        if re.search(rf"\b{nom}\b", lowered):
-            trouvees.add((monday + dt.timedelta(days=index)).isoformat())
-    for jour, mois in _DATE_COURTE.findall(text):
-        candidate = f"{monday.year}-{mois}-{jour}"
-        if candidate in semaine:
-            trouvees.add(candidate)
-    trouvees.update(stamp for stamp in _DATE_ISO.findall(text) if stamp in semaine)
-    return trouvees & semaine
-
-
-def _dates_touchees(previous: dict | None, current: dict) -> set[str]:
-    avant, apres = _revision_index(previous), _revision_index(current)
-    touchees = set()
-    for session_id, session in apres.items():
-        old = avant.get(session_id)
-        if old is None or _comparable(old) != _comparable(session):
-            touchees.add(session["date"])
-        if old is not None and old["date"] != session["date"]:
-            touchees.update({old["date"], session["date"]})
-    touchees.update(session["date"] for session_id, session in avant.items()
-                    if session_id not in apres)
-    return touchees
-
-
-def coherence_errors(week: str, previous: dict | None, current: dict) -> list[str]:
-    """The reason names a day the object does not touch: one of the two is wrong."""
-    if previous is None:      # a first revision touches the whole week
-        return []
-    nommees = _dates_nommees(current.get("reason") or "", week)
-    manquantes = sorted(nommees - _dates_touchees(previous, current))
-    return [
-        f"revision {current['revision']} : la raison (`reason`) nomme le {_day_label(stamp)} mais "
-        "aucune séance de ce jour n'est ajoutée, annulée, déplacée ni modifiée. Soit la "
-        "révision oublie ce jour et il faut l'écrire, soit la raison le nomme sans le "
-        "changer : retire-le de la raison, ou porte la circonstance dans `constraints`."
-        for stamp in manquantes]
 
 
 def sessions_orphelines(previous: dict | None, current: dict) -> list[str]:

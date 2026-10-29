@@ -5,35 +5,17 @@ from dataclasses import replace
 import pytest
 
 from redline.service.agent import FailureKind, RunResult, SessionMode
-from redline.service.routing import Route, RoutePlan, RoutingConfig
+from redline.service.routing import Route, RoutingConfig, RoutingError
 from redline.service.turns import TurnExecutor
 from redline.service.vault import PersistenceResult
 
 
-@pytest.mark.parametrize("route", [Route.TRIAGE, Route.N0, Route.N1, Route.N2,
-                                    Route.N3, Route.DEEP, Route.HEAVY])
-def test_codex_defaults_match_the_canonical_matrix(route):
-    config = RoutingConfig.default("codex")
-    plan = config.plan(route)
-    assert plan.primary.model != "gpt-6-sol" or plan.primary.effort in {"medium", "high"}
-    assert all(
-        spec.model in {"gpt-6-luna", "gpt-6-sol"}
-        and not (spec.model == "gpt-6-sol" and spec.effort in {"max", "ultra"})
-        for spec in plan.attempts
-    )
-
-
-@pytest.mark.parametrize("route", list(Route))
-@pytest.mark.parametrize("suffix", ["MODEL", "FALLBACK_MODEL"])
-@pytest.mark.parametrize("model", ["gpt-6-astra", "gpt-6-astra-2026-09-01", "unknown"])
-def test_forbidden_model_cannot_return_through_environment(monkeypatch, route, suffix, model):
-    monkeypatch.setenv(f"AGENT_{route.value}_{suffix}", model)
-    refused = ("pas de repli" if route is Route.TRIAGE and suffix == "FALLBACK_MODEL"
-               else "seules Luna et Sol")
-    with pytest.raises(SystemExit, match=refused):
-        RoutingConfig.from_env(
-            "codex", agent_timeout=600, agent_timeout_deep=1800,
-            agent_timeout_heavy=5400, triage_timeout=30)
+def _from_file(tmp_path, text, provider="codex"):
+    path = tmp_path / "routing.toml"
+    path.write_text(text, encoding="utf-8")
+    return RoutingConfig.from_file(provider, path, agent_timeout=600,
+                                   agent_timeout_deep=1800, agent_timeout_heavy=5400,
+                                   triage_timeout=30)
 
 
 def test_the_triage_is_one_fast_classifier_without_fallback():
@@ -69,14 +51,47 @@ def test_codex_matrix_has_luna_n1_and_sol_n2_n3():
             config.plan(Route.N3).primary.effort) == ("gpt-6-sol", "high")
 
 
-def test_a_route_can_be_overridden_without_touching_the_other_routes(monkeypatch):
-    monkeypatch.setenv("AGENT_N1_MODEL", "gpt-6-sol")
-    monkeypatch.setenv("AGENT_N1_EFFORT", "high")
-    config = RoutingConfig.from_env(
-        "codex", agent_timeout=600, agent_timeout_deep=1800,
-        agent_timeout_heavy=5400, triage_timeout=30)
+def test_a_route_can_be_overridden_without_touching_the_other_routes(tmp_path):
+    config = _from_file(tmp_path, '[routing.N1]\nmodel = "gpt-6-sol"\neffort = "high"\n')
     assert config.plan(Route.N1).primary.model == "gpt-6-sol"
-    assert config.plan(Route.N2).primary.model == "gpt-6-sol"
+    assert config.plan(Route.N1).fallbacks == RoutingConfig.default("codex").plan(
+        Route.N1).fallbacks
+    assert config.plan(Route.N2) == RoutingConfig.default("codex").plan(Route.N2)
+
+
+def test_a_fallback_is_overridden_on_its_own(tmp_path):
+    config = _from_file(tmp_path, '[routing.N3]\nfallback = { effort = "xhigh" }\n')
+    assert config.plan(Route.N3).fallbacks[0].effort == "xhigh"
+    assert config.plan(Route.N3).primary == RoutingConfig.default("codex").plan(
+        Route.N3).primary
+
+
+def test_no_file_keeps_the_defaults():
+    config = RoutingConfig.from_file("claude", None, agent_timeout=600,
+                                     agent_timeout_deep=1800, agent_timeout_heavy=5400,
+                                     triage_timeout=10)
+    assert config.plans == RoutingConfig.default("claude").plans
+
+
+@pytest.mark.parametrize("text,refused", [
+    ('[routing.TRIAGE]\nfallback = { model = "x" }\n', "has none"),
+    ('[routing.N7]\nmodel = "x"\n', "unknown route"),
+    ('[routing.N1]\nmodele = "x"\n', "allowed keys"),
+    ('[routing.N1]\nfallback = { temperature = "x" }\n', "allowed keys"),
+    ('[routing.N1]\nmodel = ""\n', "non-empty string"),
+    ('[routing.N1]\neffort = "turbo"\n', "not a codex effort"),
+    ('[agent]\nmodel = "x"\n', r"only \[routing"),
+    ('[routing.N1\n', "unreadable"),
+])
+def test_an_unusable_file_stops_startup(tmp_path, text, refused):
+    with pytest.raises(RoutingError, match=refused):
+        _from_file(tmp_path, text)
+
+
+def test_the_engine_refuses_no_model(tmp_path):
+    """What a route may cost is the operator's choice, not a list in the engine."""
+    config = _from_file(tmp_path, '[routing.N3]\nmodel = "gpt-6-astra"\neffort = "max"\n')
+    assert config.plan(Route.N3).primary.model == "gpt-6-astra"
 
 
 def test_turn_executor_tries_the_fallback_before_persisting(make_config):
@@ -158,16 +173,6 @@ def test_a_failed_fork_does_not_destroy_the_interactive_session():
     state.clear_session.assert_not_called()
 
 
-def test_route_validation_rejects_sol_max_in_a_manual_config():
-    base = RoutingConfig.default("codex")
-    n3 = base.plan(Route.N3)
-    forbidden = replace(n3.primary, model="gpt-6-sol", effort="max")
-    plans = dict(base.plans)
-    plans[Route.N3] = RoutePlan(Route.N3, forbidden, n3.fallbacks)
-    with pytest.raises(SystemExit, match="Sol Max"):
-        RoutingConfig("codex", plans).validate()
-
-
 @pytest.mark.parametrize("effort", ["none", "minimal", "ultra"])
 def test_route_validation_rejects_efforts_unknown_to_claude(effort):
     base = RoutingConfig.default("claude")
@@ -175,19 +180,8 @@ def test_route_validation_rejects_efforts_unknown_to_claude(effort):
     plans = dict(base.plans)
     plans[Route.N1] = replace(
         n1, primary=replace(n1.primary, effort=effort))
-    with pytest.raises(SystemExit, match="invalid pour claude"):
+    with pytest.raises(RoutingError, match="not a claude effort"):
         RoutingConfig("claude", plans).validate()
-
-
-def test_route_validation_rejects_ultra_for_luna():
-    base = RoutingConfig.default("codex")
-    n1 = base.plan(Route.N1)
-    plans = dict(base.plans)
-    plans[Route.N1] = replace(
-        n1, primary=replace(n1.primary, effort="ultra"))
-    with pytest.raises(SystemExit, match=r"gpt-6-luna"):
-        RoutingConfig("codex", plans).validate()
-
 
 
 def test_route_plan_keeps_session_and_read_only_flags_in_sync():
