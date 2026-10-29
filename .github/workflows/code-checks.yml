@@ -91,7 +91,9 @@ jobs:
 
   pages:
     name: cards · notebook (Chromium)
-    runs-on: ubuntu-latest
+    # Pinned: Playwright installs Chromium's system libraries only on the Ubuntu
+    # releases it supports, which `ubuntu-latest` can outrun.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
