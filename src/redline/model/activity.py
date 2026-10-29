@@ -88,7 +88,7 @@ class Activity:
             laps = tuple(Lap(**lap) for lap in data.get("laps") or ())
             return cls(**{**data, "laps": laps})
         except TypeError as exc:
-            raise ActivityError(f"activité stockée illisible : {exc}") from exc
+            raise ActivityError(f"unreadable stored activity: {exc}") from exc
 
 
 def _pace(distance_m: float, moving_s: int) -> int | None:

@@ -22,6 +22,7 @@ import re
 from typing import Any
 
 from redline.analysis import ledger
+from redline.coach.fr import transitions as text
 from redline.model import (
     rulebook,
     session_kinds,
@@ -78,14 +79,13 @@ def report(store: Any, rows: list, today: dt.date,
            free: frozenset[str] = frozenset()) -> list[str]:
     problem = build_problem(store, rows, today, free)
     if problem is None:
-        return ["Faisabilité à rebours : aucune course typée à venir "
-                "(`redline fact-write deadline --kind race`)."]
+        return [text.NO_RACE]
     return transitions.render(transitions.diagnose(problem))
 
 
 def _week(text: str) -> str:
     if not re.fullmatch(r"20\d{2}-W\d{2}", text):
-        raise argparse.ArgumentTypeError(f"semaine attendue AAAA-WNN, reçu {text!r}")
+        raise argparse.ArgumentTypeError(f"week expected as YYYY-WNN, got {text!r}")
     return text
 
 
@@ -94,13 +94,13 @@ def main() -> int:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--unwritten", action="append", default=[], type=_week,
                         metavar="AAAA-WNN",
-                        help="semaine programmée à traiter comme encore à écrire")
+                        help="programmed week to treat as still to be written")
     parser.add_argument("--date", type=dt.date.fromisoformat, default=None,
-                        help="jour de référence AAAA-MM-JJ (défaut : aujourd'hui)")
+                        help="reference day YYYY-MM-DD (default: today)")
     args = parser.parse_args()
     url = (os.environ.get("DATABASE_URL") or "").strip()
     if not url:
-        raise ConfigError("DATABASE_URL obligatoire : les plans vivent dans PostgreSQL")
+        raise ConfigError("DATABASE_URL is required: plans live in PostgreSQL")
     from redline.storage import Database, OperationalStore
     store = OperationalStore(Database(url, application_name="feasibility"))
     today = args.date or dt.date.today()

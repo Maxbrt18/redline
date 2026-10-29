@@ -22,11 +22,10 @@ class Tier:
 
 def ceiling_errors(tiers: tuple[Tier, ...]) -> list[str]:
     """A tier whose file ceilings add up to more than its total, or a file in two tiers."""
-    problems = [f"étage « {tier.name} » : somme des plafonds "
-                f"{sum(words for _, words in tier.files)} > total {tier.total}"
+    problems = [f"tier {tier.name!r}: sum of ceilings {sum(words for _, words in tier.files)} > total {tier.total}"
                 for tier in tiers if sum(words for _, words in tier.files) > tier.total]
     paths = [path for tier in tiers for path, _ in tier.files]
-    problems += [f"{path} est budgété dans deux étages"
+    problems += [f"{path} is budgeted in two tiers"
                  for path in sorted({path for path in paths if paths.count(path) > 1})]
     return problems
 
@@ -70,9 +69,9 @@ class Audit:
     def problems(self) -> list:
         """Each overflow, named with the tier that says how often it is paid."""
         tier_of = {path: tier.name for tier in self.tiers for path, _ in tier.files}
-        lines = [f"{path} : {words} mots > {ceiling} — étage « {tier_of[path]} »"
+        lines = [f"{path}: {words} words > {ceiling} -- tier {tier_of[path]!r}"
                  for path, words, ceiling in self.over]
-        lines += [f"étage « {tier} » : {words} mots > {total}"
+        lines += [f"tier {tier!r}: {words} words > {total}"
                   for tier, words, total in self.over_total]
         return lines
 

@@ -243,7 +243,7 @@ def test_strength_card_renders_every_session_type(tmp_path, kind):
 def test_strength_card_rejects_an_unknown_session(tmp_path):
     process = run_script("chart-strength", {"session": "c"}, tmp_path / "x.png")
     assert process.returncode != 0
-    assert "connues : a, assimilation, b" in process.stderr
+    assert "known: a, assimilation, b" in process.stderr
 
 
 def test_strength_card_refusal_names_the_field(tmp_path):
@@ -251,7 +251,7 @@ def test_strength_card_refusal_names_the_field(tmp_path):
     process = run_script("chart-strength", {"session": "a", "half_dose": "oui"},
                          tmp_path / "x.png")
     assert process.returncode != 0
-    assert "champ « half_dose » : booléen attendu" in process.stderr
+    assert "field 'half_dose': boolean expected" in process.stderr
     assert not (tmp_path / "x.png").exists()
 
 
@@ -261,7 +261,7 @@ def test_a_derogation_must_carry_a_typed_dose(tmp_path):
                          {"session": "a", "add": [{"name": "Gainage", "dose": "3 x 30 s"}]},
                          tmp_path / "x.png")
     assert process.returncode != 0
-    assert "objet attendu" in process.stderr
+    assert "object expected" in process.stderr
 
 
 # ------------------------------------------------------------- the design loop

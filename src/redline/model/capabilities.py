@@ -13,7 +13,7 @@ from . import vault_layout
 from .notes import read_all
 from .schema import Schema, field
 
-CAPABILITY_SCHEMA = Schema("note de capacité", [
+CAPABILITY_SCHEMA = Schema("capability note", [
     field("type", str, choices=("capability",)),
     field("capability_number", int, minimum=1, maximum=9),
     field("aliases", list, required=False, item=field("alias", str)),

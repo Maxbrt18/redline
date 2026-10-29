@@ -4,10 +4,10 @@ Three requirements shape everything here:
 
   - **Every error, not the first one.** Fixing a note blind over six round trips is
     what makes a validator get abandoned.
-  - **Messages in French naming the field and the value.** The athlete reads them in
+  - **Messages naming the field and the value.** The athlete reads them in
     `redline vault-check` output, Claude reads them when a script refuses its input. A
-    message like « champ « dose.measure » : "rep" inconnu (attendus : amrap,
-    contacts, reps, time) » fixes itself; "ValidationError" does not.
+    message like `field 'dose.measure': 'rep' unknown (expected: amrap, contacts, reps,
+    time)` fixes itself; "ValidationError" does not.
   - **Strict by default.** An unknown field is an ERROR. A typo silently swallowed
     is the failure this layer exists to delete.
 
@@ -31,20 +31,19 @@ class SchemaError(InputError):
 
     def __init__(self, problems: Sequence[str]) -> None:
         self.problems = list(problems)
-        super().__init__("\n  - ".join(["donnée invalide :", *self.problems]))
+        super().__init__("\n  - ".join(["invalid data:", *self.problems]))
 
 
 # How each accepted type is named to whoever reads the error.
 TYPE_NAMES = {
-    str: "texte",
-    int: "entier",
-    float: "nombre",
-    bool: "booléen",
-    list: "liste",
-    dict: "objet",
+    str: "text",
+    int: "integer",
+    float: "number",
+    bool: "boolean",
+    list: "list",
+    dict: "object",
     _dt.date: "date",
 }
-FEMININE = {"liste", "date"}   # « date reçue », but « entier reçu »
 
 
 def _name_of(kind: type) -> str:
@@ -52,13 +51,11 @@ def _name_of(kind: type) -> str:
 
 
 def _received(value: Any) -> str:
-    name = _name_of(type(value))
-    return f"{name} reçue" if name in FEMININE else f"{name} reçu"
+    return f"got {_name_of(type(value))}"
 
 
 def _expected(kind: type) -> str:
-    name = _name_of(kind)
-    return f"{name} attendue" if name in FEMININE else f"{name} attendu"
+    return f"{_name_of(kind)} expected"
 
 
 @dataclass(frozen=True)
@@ -99,20 +96,20 @@ class Schema:
     def errors(self, payload: Any, where: str = "") -> list:
         """Every problem, in French, prefixed by `where` (a file path or the
         name of the parent field)."""
-        prefix = f"{where} : " if where else ""
+        prefix = f"{where}: " if where else ""
         if not isinstance(payload, dict):
-            return [f"{prefix}{self.name} : objet attendu, {_received(payload)}"]
+            return [f"{prefix}{self.name}: object expected, {_received(payload)}"]
 
         problems = []
         for name in payload:
             if name not in self._by_name and not self.extra:
                 known = ", ".join(sorted(self._by_name))
-                problems.append(f"{prefix}champ « {name} » inconnu (attendus : {known})")
+                problems.append(f"{prefix}field {name!r} unknown (expected: {known})")
 
         for spec in self.fields:
             if payload.get(spec.name) is None:
                 if spec.required and spec.default is None:
-                    problems.append(f"{prefix}champ « {spec.name} » manquant"
+                    problems.append(f"{prefix}field {spec.name!r} missing"
                                     + (f" — {spec.note}" if spec.note else ""))
                 continue
             problems.extend(_field_errors(spec, payload[spec.name], prefix))
@@ -137,16 +134,16 @@ class Schema:
 
 
 def _field_errors(spec: Field, value: Any, prefix: str) -> list:
-    name = f"{prefix}champ « {spec.name} »"
+    name = f"{prefix}field {spec.name!r}"
 
     # bool before int: in Python True IS an int, and "side: true" must be
     # refused rather than pass for 1.
     if spec.type is not bool and isinstance(value, bool):
-        return [f"{name} : booléen reçu, {_expected(spec.type)}"]
+        return [f"{name}: got boolean, {_expected(spec.type)}"]
     if spec.type is float and isinstance(value, int):
         value = float(value)
     if not isinstance(value, spec.type):
-        return [f"{name} : {_expected(spec.type)}, {_received(value)} ({value!r})"]
+        return [f"{name}: {_expected(spec.type)}, {_received(value)} ({value!r})"]
 
     # Past this line the value IS of `spec.type` -- but `spec.type` is a variable, so
     # no checker can carry that. The rebinding states it instead of pretending.
@@ -154,9 +151,9 @@ def _field_errors(spec: Field, value: Any, prefix: str) -> list:
     problems = []
     if spec.choices is not None and value not in spec.choices:
         allowed = ", ".join(str(choice) for choice in sorted(spec.choices, key=str))
-        problems.append(f"{name} : {value!r} inconnu (attendus : {allowed})")
+        problems.append(f"{name}: {value!r} unknown (expected: {allowed})")
     if spec.pattern is not None and not re.fullmatch(spec.pattern, checked):
-        problems.append(f"{name} : {value!r} ne suit pas le format attendu"
+        problems.append(f"{name}: {value!r} does not follow the expected format"
                         + (f" — {spec.note}" if spec.note else f" ({spec.pattern})"))
 
     # minimum/maximum bound a VALUE for a number, a LENGTH for anything else.
@@ -165,11 +162,11 @@ def _field_errors(spec: Field, value: Any, prefix: str) -> list:
     if spec.minimum is not None or spec.maximum is not None:
         sized = isinstance(checked, (list, dict, str))
         measured = len(checked) if sized else checked
-        what = "longueur" if sized else "valeur"
+        what = "length" if sized else "value"
         if spec.minimum is not None and measured < spec.minimum:
-            problems.append(f"{name} : {what} {measured:g}, minimum {spec.minimum:g}")
+            problems.append(f"{name}: {what} {measured:g}, minimum {spec.minimum:g}")
         if spec.maximum is not None and measured > spec.maximum:
-            problems.append(f"{name} : {what} {measured:g}, maximum {spec.maximum:g}")
+            problems.append(f"{name}: {what} {measured:g}, maximum {spec.maximum:g}")
 
     if isinstance(value, list) and spec.item is not None:
         for index, element in enumerate(value):

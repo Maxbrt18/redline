@@ -48,27 +48,27 @@ def test_a_nonconforming_note_names_the_file_and_every_problem(tmp_path):
     with pytest.raises(notes.NoteError) as caught:
         notes.read(path, EXERCISE)
     message = str(caught.value)
-    assert "calf-bent.md : note invalide" in message
-    assert "champ « name » manquant" in message
-    assert "champ « oops » inconnu" in message
-    assert "champ « sets » : valeur 0, minimum 1" in message
+    assert "calf-bent.md: invalid note" in message
+    assert "field 'name' missing" in message
+    assert "field 'oops' unknown" in message
+    assert "field 'sets': value 0, minimum 1" in message
 
 
 def test_broken_yaml_is_a_readable_refusal_not_a_trace(tmp_path):
     path = note(tmp_path, "---\nname: [unclosed\n---\n")
     with pytest.raises(notes.NoteError) as caught:
         notes.frontmatter(path)
-    assert "frontmatter illisible" in str(caught.value)
+    assert "unreadable frontmatter" in str(caught.value)
     assert "\n" not in str(caught.value)
 
 
 def test_a_note_without_frontmatter_is_refused(tmp_path):
-    with pytest.raises(notes.NoteError, match="pas de frontmatter"):
+    with pytest.raises(notes.NoteError, match="no frontmatter"):
         notes.frontmatter(note(tmp_path, "# Juste de la prose\n"))
 
 
 def test_a_missing_file_is_refused_by_name(tmp_path):
-    with pytest.raises(notes.NoteError, match=r"absent\.md : illisible"):
+    with pytest.raises(notes.NoteError, match=r"absent\.md: unreadable"):
         notes.frontmatter(tmp_path / "absent.md")
 
 

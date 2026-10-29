@@ -36,7 +36,7 @@ def _block(text: str, name: str) -> re.Match:
     start, end = markers(name)
     found = re.search(f"{re.escape(start)}(.*?){re.escape(end)}", text, re.DOTALL)
     if found is None:
-        raise ViewDrift(f"marqueurs « {name} » absents — attendus :\n{start}\n{end}")
+        raise ViewDrift(f"markers {name!r} missing -- expected:\n{start}\n{end}")
     return found
 
 

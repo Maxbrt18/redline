@@ -40,7 +40,7 @@ class ProactiveMessages(StoreBase):
         comparable = ("sent_at", "kind", "angle", "summary")
         if any(existing[key] != values[key] for key in comparable):
             raise StorageError(
-                f"collision d'idempotence pour le message {row['source_key']!r}")
+                f"idempotency collision for message {row["source_key"]!r}")
         return existing["id"]
 
     def add_proactive_message(self, row: dict, *, actor: str = "application") -> uuid.UUID:
@@ -48,7 +48,7 @@ class ProactiveMessages(StoreBase):
             return self.add_proactive_message_in(connection, row, actor=actor)
     def proactive_message_rows(self, *, limit: int = 10) -> list[dict]:
         if limit < 1:
-            raise ValueError("limit doit être positif")
+            raise ValueError("limit must be positive")
         with self.database.engine.connect() as connection:
             return [dict(row) for row in connection.execute(sa.select(
                 proactive_messages).where(

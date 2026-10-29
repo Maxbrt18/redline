@@ -72,6 +72,6 @@ def test_a_faulty_selection_is_refused_and_names_the_field(tmp_path):
     process = carte({"session": "z"}, tmp_path / "ko.html")
     assert process.returncode != 0
     refusal = process.stderr + process.stdout
-    assert "séance" in refusal
+    assert "session" in refusal
     # The accepted values are enumerated: the coach corrects without reading the code.
     assert "a, assimilation, b" in refusal

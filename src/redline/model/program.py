@@ -36,33 +36,28 @@ LOAD_SCHEMA = Schema("charge", [
     field("kg", float, minimum=0, maximum=100),
     field("count", int, minimum=1, maximum=2),
 ])
-PRESCRIBED_LOAD_SCHEMA = Schema("charge prescrite", [field("exercise", str), *LOAD_SCHEMA.fields])
+PRESCRIBED_LOAD_SCHEMA = Schema("prescribed load", [field("exercise", str), *LOAD_SCHEMA.fields])
 DISPLAY_FIELDS = [
     field("cue", str, required=False, minimum=8, maximum=140),
     field("equipment", list, required=False, maximum=5,
-          item=field("matériel", str, minimum=2, maximum=80)),
+          item=field("equipment item", str, minimum=2, maximum=80)),
     field("load", dict, required=False, schema=LOAD_SCHEMA),
 ]
 
-EXERCISE_SCHEMA = Schema("exercice", [
+EXERCISE_SCHEMA = Schema("exercise", [
     *DISPLAY_FIELDS,
     field("type", str, choices=("exercise",)),
     field("name", str, minimum=3, maximum=90,
-          note="tel qu'il s'imprime sur la card, à bout de bras"),
+          note="as it prints on the card, readable at arm's length"),
     field("target", str, required=False, maximum=60,
-          note="la ligne grisée sous le nom, sur la card"),
+          note="the grey line under the name, on the card"),
     field("how", list, required=False, maximum=4,
-          item=field("consigne", str, minimum=8, maximum=110),
-          note="LE GESTE : les consignes d'exécution, une par ligne, telles qu'on "
-               "les relit entre deux séries — pas le pourquoi, qui vit dans le corps. "
-               "Une consigne doit INTERDIRE la mauvaise lecture, pas seulement décrire "
-               "la bonne : le test est « quelqu'un qui ne connaît pas l'exercice "
-               "peut-il en tirer un AUTRE mouvement ? ». Un mot abstrait (« zigzag », "
-               "« raide », « explosif ») échoue à ce test par construction : « en "
-               "zigzag » peut se lire comme des bonds amples d'une jambe sur l'autre"),
+          item=field("cue", str, minimum=8, maximum=110),
+          note=("THE MOVE: the execution cues, one per line, as they are reread between two "
+                "sets -- not the why")),
     field("dose", dict, schema=DOSE_SCHEMA),
     field("since", str, required=False, pattern=WEEK,
-          note="semaine ISO d'entrée au programme, ex. W32"),
+          note="ISO week it entered the program, e.g. W32"),
     field("status", str, required=False, choices=STATUSES, default="active"),
     field("aliases", list, required=False, item=field("alias", str)),
     field("tags", list, required=False, item=field("tag", str)),
@@ -70,13 +65,14 @@ EXERCISE_SCHEMA = Schema("exercice", [
 
 # These keys are the shared contract of the workout notes and of any Obsidian base built
 # on them, so they are validated strictly here.
-SESSION_SCHEMA = Schema("séance", [
+SESSION_SCHEMA = Schema("session", [
     field("type", str, choices=("workout",)),
-    field("title", str, note="le titre imprimé en tête de card"),
+    field("title", str, note="the title printed at the top of the card"),
     field("rule", str, minimum=10, maximum=200,
-          note="la règle imprimée en pied de card — ce que l'athlète lit PENDANT la séance"),
-    field("exercises", list, minimum=1, item=field("exercice", object),
-          note="les slugs, DANS L'ORDRE (il est non négociable)"),
+          note=("the rule printed at the foot of the card -- what the athlete reads DURING the "
+                "session")),
+    field("exercises", list, minimum=1, item=field("exercise", object),
+          note="the slugs, IN ORDER (the order is not negotiable)"),
     field("aliases", list, required=False, item=field("alias", str)),
     field("capabilities", list, required=False, item=field("cap", str)),
     field("target_rpe", int, required=False, minimum=1, maximum=10),
@@ -84,20 +80,20 @@ SESSION_SCHEMA = Schema("séance", [
     field("phase", list, required=False, item=field("phase", str)),
     field("contraindications", list, required=False, item=field("ci", str)),
     field("execution_rule", str, required=False,
-          note="guidage de programmation, pour le coach — pas la règle de la card"),
+          note="programming guidance, for the coach -- not the card's rule"),
     field("variants", dict, required=False,
-          note="les variantes déclarées, ex. degraded"),
+          note="the declared variants, e.g. degraded"),
     field("status", str, required=False, choices=STATUSES),
     field("routine", str, pattern=SLUG_PATTERN,
-          note="l'identifiant de la routine, celui que le programme et le registre citent"),
+          note="the routine's id, the one the program and the ledger cite"),
     field("min_gap_h", dict, required=False,
-          note="écart minimal en heures avec d'autres séances, par type : {long: 48}"),
+          note="minimum gap in hours from other sessions, by type: {long: 48}"),
 ])
 
 # An entry of `exercises:` is a slug, or a slug plus the dose this session
 # prescribes instead. Kept out of SESSION_SCHEMA because it is the one field
 # accepting two shapes -- same treatment as Span in dose.py.
-OVERRIDE_SCHEMA = Schema("exercice de séance", [
+OVERRIDE_SCHEMA = Schema("session exercise", [
     field("exercise", str),
     field("dose", dict, schema=DOSE_SCHEMA),
 ])
@@ -105,8 +101,8 @@ OVERRIDE_SCHEMA = Schema("exercice de séance", [
 # A declared variant of a session -- the degraded version of A, for instance.
 # Data, in the session note, so the coach PICKS one instead of improvising a
 # list of exercises every morning.
-VARIANT_SCHEMA = Schema("variante", [
-    field("when", str, note="la condition qui la déclenche, pour un humain"),
+VARIANT_SCHEMA = Schema("variant", [
+    field("when", str, note="the condition that triggers it, for a human"),
     field("drop", list, required=False, item=field("slug", str)),
     field("add", list, required=False, item=field("slug", str)),
 ])
@@ -120,45 +116,45 @@ VARIANT_SCHEMA = Schema("variante", [
 # The page asks again although the coach already asked in the morning: the link often
 # sits in the phone for hours before the first exercise, and the morning state is not
 # the evening state.
-GATE_SCHEMA = Schema("garde-fou", [
+GATE_SCHEMA = Schema("guardrail", [
     field("zone", str, required=False, pattern=r"[a-z0-9][a-z0-9-]{0,39}",
-          note="la zone surveillée que le seuil regarde ; absente, toutes"),
+          note="the monitored zone the threshold looks at; absent, all of them"),
     field("pain_max", int, minimum=0, maximum=10,
-          note="au-DESSUS de ce chiffre, le garde-fou se déclenche"),
+          note="ABOVE this figure, the guardrail triggers"),
     field("drop", list, required=False, item=field("slug", str),
-          note="les exercices retirés quand il se déclenche"),
+          note="the exercises dropped when it triggers"),
     field("say", str, minimum=10, maximum=200,
-          note="ce que la page affiche, mot pour mot, quand il se déclenche"),
+          note="what the page shows, word for word, when it triggers"),
 ])
 
 # What Claude writes each morning. Small, closed, validated: a SELECTION of the
 # program, never a re-encoding of it.
-SELECTION_SCHEMA = Schema("séance du jour", [
+SELECTION_SCHEMA = Schema("session of the day", [
     field("loads", list, required=False, maximum=20,
           item=field("charge", dict, schema=PRESCRIBED_LOAD_SCHEMA),
-          note="charges prescrites par exercice : {exercise, kg, count}"),
-    field("session", str, note="la routine, telle que sa fiche la déclare (`routine:`)"),
-    field("date", str, required=False, note="le sous-titre de la card"),
-    field("sid", str, required=False, note="identifiant, défaut = nom du PNG"),
-    field("variant", str, required=False, note="une variante DÉCLARÉE par la séance"),
+          note="loads prescribed per exercise: {exercise, kg, count}"),
+    field("session", str, note="the routine, as its note declares it (`routine:`)"),
+    field("date", str, required=False, note="the card's subtitle"),
+    field("sid", str, required=False, note="id, defaults to the PNG name"),
+    field("variant", str, required=False, note="a variant DECLARED by the session"),
     field("half_dose", bool, required=False,
-          note="« demi-dose » : une série en moins partout"),
+          note="half dose: one set fewer everywhere"),
     field("drop", list, required=False, item=field("slug", str),
-          note="retraits ponctuels, ex. la pliométrie après un gros D+"),
-    field("add", list, required=False, item=field("ajout", dict),
-          note="dérogation : un exercice hors programme, dose TYPÉE"),
-    field("note", str, required=False, maximum=300, note="la ligne de bas de card"),
+          note="one-off drops, e.g. plyometrics after a big D+"),
+    field("add", list, required=False, item=field("addition", dict),
+          note="exception: an exercise outside the program, with a TYPED dose"),
+    field("note", str, required=False, maximum=300, note="the card's bottom line"),
     field("duration_min", int, required=False, minimum=5, maximum=120),
     field("gate", dict, required=False, schema=GATE_SCHEMA,
-          note="le garde-fou de douleur du jour : {zone?, pain_max, drop, say}"),
+          note="the day's pain guardrail: {zone?, pain_max, drop, say}"),
 ])
 
-ADDED_SCHEMA = Schema("ajout", [
+ADDED_SCHEMA = Schema("addition", [
     *DISPLAY_FIELDS,
     field("name", str, minimum=3, maximum=90),
     field("target", str, required=False, maximum=60),
     field("how", list, required=False, maximum=4,
-          item=field("consigne", str, minimum=8, maximum=110)),
+          item=field("cue", str, minimum=8, maximum=110)),
     field("dose", dict, schema=DOSE_SCHEMA),
 ])
 
@@ -199,7 +195,7 @@ class Program:
     def session(self, key: str) -> dict:
         if key not in self.sessions:
             known = ", ".join(sorted(self.sessions))
-            raise NoteError(f"séance « {key} » inconnue (connues : {known})")
+            raise NoteError(f'unknown session {key!r} (known: {known})')
         return self.sessions[key]
 
     def prescriptions(self, key: str) -> list:
@@ -213,12 +209,10 @@ class Program:
                 clean = OVERRIDE_SCHEMA.validate(entry, where)
                 slug, dose_data = clean["exercise"], clean["dose"]
             else:
-                raise NoteError(f"{where} : un slug ou un objet "
-                                "{{exercise, dose}} attendu")
+                raise NoteError(f'{where}: a slug or an object {{exercise, dose}} expected')
             if slug not in self.exercises:
                 known = ", ".join(sorted(self.exercises))
-                raise NoteError(f"{where} : exercice « {slug} » introuvable "
-                                f"(connus : {known})")
+                raise NoteError(f"{where}: exercise {slug!r} not found (known: {known})")
             note = self.exercises[slug]
             dose = Dose.read(dose_data, where) if dose_data else Dose.read(note["dose"], slug)
             out.append(Prescription.from_note(slug, note, dose))
@@ -232,7 +226,7 @@ class Program:
         The morning run picks and modulates, it does not retype the exercises and their
         doses. Everything here is validated, and every refusal names what it expected.
         """
-        choice = SELECTION_SCHEMA.validate(selection, "séance du jour")
+        choice = SELECTION_SCHEMA.validate(selection, "session of the day")
         session = self.session(choice["session"])
         prescriptions = self.prescriptions(choice["session"])
 
@@ -242,22 +236,20 @@ class Program:
             name = choice["variant"]
             declared = (session.get("variants") or {})
             if name not in declared:
-                known = ", ".join(sorted(declared)) or "aucune"
-                raise NoteError(f"variante « {name} » non déclarée par la séance "
-                                f"{choice['session']} (déclarées : {known})")
-            variant = VARIANT_SCHEMA.validate(declared[name], f"variante {name}")
+                known = ", ".join(sorted(declared)) or "none"
+                raise NoteError(f"variant {name!r} not declared by session {choice["session"]} (declared: {known})")
+            variant = VARIANT_SCHEMA.validate(declared[name], f"variant {name}")
             drop += variant.get("drop") or []
             extra = variant.get("add") or []
 
         unknown = [slug for slug in drop if slug not in {p.slug for p in prescriptions}]
         if unknown:
-            raise NoteError(f"« drop » : {', '.join(unknown)} n'est pas dans la séance "
-                            f"{choice['session']}")
+            raise NoteError(f"`drop`: {", ".join(unknown)} is not in session {choice["session"]}")
         kept = [p for p in prescriptions if p.slug not in drop]
 
         for slug in extra:
             if slug not in self.exercises:
-                raise NoteError(f"variante : exercice « {slug} » introuvable")
+                raise NoteError(f"variant: exercise {slug!r} not found")
             note = self.exercises[slug]
             kept.append(Prescription.from_note(slug, note, Dose.read(note["dose"], slug)))
 
@@ -274,7 +266,7 @@ class Program:
             clean = PRESCRIBED_LOAD_SCHEMA.validate(entry, "loads")
             slug = clean["exercise"]
             if slug in seen_loads or slug not in {p.slug for p in kept}:
-                raise NoteError(f"loads : exercice absent ou dupliqué : {slug}")
+                raise NoteError(f'loads: exercise missing or duplicated: {slug}')
             seen_loads.add(slug)
             kept = [replace(p, load={"kg": clean["kg"], "count": clean["count"]})
                     if p.slug == slug else p for p in kept]
@@ -286,8 +278,7 @@ class Program:
             unknown = [slug for slug in (gate.get("drop") or [])
                        if slug not in {p.slug for p in kept}]
             if unknown:
-                raise NoteError(f"« gate.drop » : {', '.join(unknown)} n'est pas dans "
-                                f"la séance {choice['session']} telle qu'elle est servie")
+                raise NoteError(f"`gate.drop`: {", ".join(unknown)} is not in session {choice["session"]} as it is served")
 
         return {
             "sid": choice.get("sid") or "",
@@ -306,7 +297,7 @@ class Program:
 
 #: The keys a workout note uses to say what it describes. A strength routine declares
 #: `routine:` (its slug); any other note declares the session `kinds:` it covers.
-NOTE_KINDS_SCHEMA = Schema("fiche de séance", [
+NOTE_KINDS_SCHEMA = Schema("workout note", [
     field("kinds", list, required=False, item=field("type", str, choices=session_kinds.RECORDED)),
     field("routine", str, required=False, pattern=SLUG_PATTERN),
 ], extra=True)
@@ -323,7 +314,7 @@ def _workout_notes(vault: Path) -> list[tuple[Path, dict]]:
             problems.append(f"{path.name} : {exc}")
             continue
         if "routine" in data and "kinds" in data:
-            problems.append(f"{path.name} : une routine est un renfo, elle ne déclare pas kinds")
+            problems.append(f'{path.name}: a routine is a strength session, it declares no kinds')
             continue
         notes.append((path, data))
     if problems:
@@ -365,14 +356,13 @@ def load(vault: Path) -> Program:
             continue
         routine = data["routine"]
         if routine in sessions:
-            problems.append(f"{path.name} : routine « {routine} » déjà déclarée")
+            problems.append(f'{path.name}: routine {routine!r} already declared')
             continue
         gaps = data.get("min_gap_h") or {}
         bad = [f"{kind}: {hours}" for kind, hours in gaps.items()
                if kind not in session_kinds.PLANNED or type(hours) is not int or hours < 1]
         if bad:
-            problems.append(f"{path.name} : min_gap_h attend {{type planifié: heures}} "
-                            f"({', '.join(bad)})")
+            problems.append(f"{path.name}: min_gap_h expects {{planned type: hours}} ({", ".join(bad)})")
             continue
         try:
             sessions[routine] = SESSION_SCHEMA.validate(data, path.name)

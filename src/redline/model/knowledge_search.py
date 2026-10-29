@@ -9,11 +9,10 @@ import unicodedata
 from pathlib import Path
 from typing import TypedDict
 
+from redline.coach.fr import knowledge_search as text
 from redline.model import entrypoint, paths, vault_layout
 
-STOP = frozenset({"avec", "dans", "pour", "plus", "moins", "comment", "quelle",
-                  "quelles", "quel", "quels", "leurs", "notre", "cette", "sont",
-                  "avoir", "faire", "entre", "chez", "depuis", "apres", "avant"})
+STOP = text.STOPWORDS
 
 
 class SearchHit(TypedDict):
@@ -73,16 +72,16 @@ def search(query: str, limit: int = 6, *, root: Path | None = None) -> list[Sear
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--query", required=True, help="sujet à rechercher")
+    parser.add_argument("--query", required=True, help="topic to search")
     parser.add_argument("--limit", type=int, default=6)
     args = parser.parse_args()
     if not 1 <= args.limit <= 12 or not 3 <= len(args.query.strip()) <= 160:
-        parser.error("recherche de 3 à 160 caractères et limite 1 à 12 attendues")
+        parser.error("a query of 3 to 160 characters and a limit of 1 to 12 expected")
     found = search(args.query, args.limit)
     if not found:
-        print("Aucune fiche trouvée ; essaie d'autres termes. Cela ne prouve aucune absence de source.")
+        print(text.NOTHING_FOUND)
         return 0
-    print("Repérage seulement : ouvre et lis la fiche avant de citer un énoncé ou un chiffre.")
+    print(text.SPOTTING_ONLY)
     for row in found:
         print(f"{row['path']}:{row['line']} | score {row['score']} | {row['excerpt']}")
     return 0

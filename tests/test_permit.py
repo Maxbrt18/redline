@@ -25,7 +25,7 @@ def test_a_run_ef_is_compared_to_the_sealed_choice():
                             {tue + dt.timedelta(days=1): 1}, {"w40-mar-ef": 55}, {},
                             today=tue + dt.timedelta(days=2), hr_cap=HR_CAP)
     line = lines[0]
-    assert line.status == "courue"
+    assert line.status == "run"
     assert round(line.gap) == 7 and line.agrees is True
     assert line.next_trace == 1 and line.triggers == []
 
@@ -34,7 +34,7 @@ def test_a_skipped_ef_is_a_valid_choice_not_a_trigger():
     tue = MON + dt.timedelta(days=1)
     lines = permit.evaluate([_choice("w40-mar-ef", tue, 40)], [], {}, {}, {},
                             today=tue + dt.timedelta(days=1), hr_cap=HR_CAP)
-    assert lines[0].status == "sautée" and lines[0].triggers == []
+    assert lines[0].status == "skipped" and lines[0].triggers == []
 
 
 def test_net_trace_envelope_and_heart_rate_trigger_withdrawal():
@@ -47,7 +47,7 @@ def test_net_trace_envelope_and_heart_rate_trigger_withdrawal():
     assert lines[0].triggers == ["trace nette le lendemain"]
     assert len(lines[1].triggers) == 2
     current = permit.state(lines, [], today=thu + dt.timedelta(days=1), period=PERIOD)
-    assert current.phase.startswith("retrait")
+    assert current.phase == "withdrawn"
     assert current.withdrawal_until == thu + dt.timedelta(days=permit.WITHDRAWAL_DAYS)
 
 
@@ -69,7 +69,7 @@ def test_the_grant_is_judged_after_w42_on_five_clean_easy_runs():
     after = permit.week_end(PERIOD.granted_week) + dt.timedelta(days=1)
     lines = permit.evaluate(choices, runs, {}, {}, {}, today=after, hr_cap=HR_CAP)
     current = permit.state(lines, [], today=after, period=PERIOD)
-    assert current.grant["obtenu"] is True and current.phase == "permis"
+    assert current.grant["granted"] is True and current.phase == "granted"
     rendered = "\n".join(permit.render(lines, current))
     assert "OBTENU" in rendered and "parcours neuf" in rendered
 
@@ -79,7 +79,7 @@ def test_before_w42_the_counter_is_shown_and_nothing_is_granted():
     lines = permit.evaluate([_choice("w40-mar-ef", tue, 40)], [_ef(tue, 40)], {}, {}, {},
                             today=tue + dt.timedelta(days=1), hr_cap=HR_CAP)
     current = permit.state(lines, [], today=tue + dt.timedelta(days=1), period=PERIOD)
-    assert current.phase == "conduite accompagnée" and current.grant is None
+    assert current.phase == "supervised" and current.grant is None
     assert any("1 EF courues sur 5" in line for line in permit.render(lines, current))
 
 

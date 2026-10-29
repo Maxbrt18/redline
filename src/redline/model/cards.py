@@ -22,59 +22,59 @@ from .schema import Schema, field
 DATE = r"\d{4}-\d{2}-\d{2}"
 STATUS = ("ok", "warn", "bad")
 
-DAY_SCHEMA = Schema("jour", [
-    field("day", str, note="l'étiquette de colonne, ex. lun"),
+DAY_SCHEMA = Schema("day", [
+    field("day", str, note="the column label, e.g. Mon"),
     field("planned_km", float, required=False, minimum=0),
     field("done_km", float, required=False, minimum=0),
-    field("quality", bool, required=False, note="marque un jour de séance exigeante"),
+    field("quality", bool, required=False, note="marks a demanding session day"),
 ])
 
-WEEK_SCHEMA = Schema("semaine", [
-    field("period", str, required=False, pattern=r"20\d{2}-W\d{2}", note="période canonique du bilan, ex. 2030-W39"),
-    field("week", str, note="le titre court, ex. W30"),
+WEEK_SCHEMA = Schema("week", [
+    field("period", str, required=False, pattern=r"20\d{2}-W\d{2}", note="the review's canonical period, e.g. 2030-W39"),
+    field("week", str, note="the short title, e.g. W30"),
     field("dates", str, required=False),
-    field("days", list, minimum=1, maximum=7, item=field("jour", dict, schema=DAY_SCHEMA),
-          note="du lundi au dimanche"),
+    field("days", list, minimum=1, maximum=7, item=field("day", dict, schema=DAY_SCHEMA),
+          note="Monday to Sunday"),
     field("planned_km", float, required=False, minimum=0),
     field("done_km", float, required=False, minimum=0),
     field("gauge_level", float, required=False, minimum=0,
-          note="la jauge de charge, plafond 85 (coaching/protocols.md)"),
-    field("gauge_ratio", float, required=False, minimum=0, note="le ratio aigu/chronique"),
-    field("pain", str, required=False, note="tendance de la douleur, texte libre"),
+          note="the load gauge, cap 85 (coaching/protocols.md)"),
+    field("gauge_ratio", float, required=False, minimum=0, note="the acute/chronic ratio"),
+    field("pain", str, required=False, note="pain trend, free text"),
     field("pain_flag", str, required=False, choices=STATUS),
     field("enjoyment", float, required=False, minimum=0, maximum=10),
     field("cmj_cm", float, required=False, minimum=0),
 ])
 
-WEEK_TOTAL_SCHEMA = Schema("semaine du mois", [
+WEEK_TOTAL_SCHEMA = Schema("week of the month", [
     field("label", str),
     field("km", float, required=False, minimum=0),
 ])
 
-MONTH_SCHEMA = Schema("mois", [
-    field("period", str, required=False, pattern=r"20\d{2}-\d{2}", note="période canonique du bilan, ex. 2030-09"),
-    field("month", str, note="le titre, ex. Juillet 2030"),
+MONTH_SCHEMA = Schema("month", [
+    field("period", str, required=False, pattern=r"20\d{2}-\d{2}", note="the review's canonical period, e.g. 2030-09"),
+    field("month", str, note="the title, e.g. July 2030"),
     field("km", float, required=False, minimum=0),
     field("dplus", float, required=False, minimum=0),
     field("sessions", int, required=False, minimum=0),
     field("weeks", list, required=False, maximum=6,
-          item=field("semaine", dict, schema=WEEK_TOTAL_SCHEMA)),
+          item=field("week", dict, schema=WEEK_TOTAL_SCHEMA)),
     # Free-form keys: they are the capability LABELS the cockpit prints, and they
     # change with the cockpit, not with the code.
     field("capabilities", dict, required=False,
-          note="nom de capacité -> score, cf. redline fact-read capabilities"),
+          note="capability name -> score, see redline fact-read capabilities"),
     field("cap_scale", float, required=False, minimum=1, default=5),
     field("race_name", str, required=False),
     field("race_date", str, required=False, pattern=DATE),
 ])
 
-RECOVERY_SCHEMA = Schema("récupération", [
+RECOVERY_SCHEMA = Schema("recovery", [
     field("time_s", float, minimum=1),
     # Zero IS allowed here: a standing recovery covers no ground.
     field("dist_m", float, required=False, minimum=0, default=0),
 ])
 
-REP_SCHEMA = Schema("répétition", [
+REP_SCHEMA = Schema("repetition", [
     field("label", str, required=False),
     field("time_s", float, minimum=1),
     # Not `minimum=0`: a zero distance is a division by zero two lines later, and
@@ -82,18 +82,18 @@ REP_SCHEMA = Schema("répétition", [
     field("dist_m", float, minimum=1),
     field("hr", float, required=False, minimum=1),
     field("recovery", dict, required=False, schema=RECOVERY_SCHEMA,
-          note="la récup qui SUIT cette rep, lue sur son tour Strava"),
+          note="the recovery that FOLLOWS this rep, read from its Strava lap"),
 ])
 
-WORKOUT_SCHEMA = Schema("séance de qualité", [
+WORKOUT_SCHEMA = Schema("quality session", [
     field("title", str, required=False),
     field("date", str, required=False),
     field("target_pace", object, required=False,
-          note='"M:SS" en min/km, ou un nombre de secondes par km'),
+          note='"M:SS" in min/km, or a number of seconds per km'),
     field("note", str, required=False,
-          note="ce que l'allure cible ne dit pas (zone, récup) : elle s'affiche déjà"),
+          note="what the target pace does not say (zone, recovery): it is already shown"),
     # Two reps minimum: the card reads a DRIFT between the first and the last, and
     # a single rep has no drift to read.
     field("reps", list, minimum=2, item=field("rep", dict, schema=REP_SCHEMA),
-          note="dans l'ordre couru"),
+          note="in the order run"),
 ])

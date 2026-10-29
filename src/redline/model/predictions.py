@@ -64,8 +64,6 @@ def calibration_lines(rows: Iterable[Mapping[str, Any]], today: dt.date) -> list
         reasons = " · ".join(f"{labels.PREDICTION_REASONS[reason]} {count}"
                              for reason, count in sorted(entry["reasons"].items()))
         lines.append(
-            f"Calibration {entry['domain']} · soldées {entry['resolved']} "
-            f"(dont {entry['observed']} par observation) · void {entry['void']} · "
-            f"échues ouvertes {entry['overdue']} · Brier moyen {brier}"
-            + (f" · motifs : {reasons}" if reasons else ""))
+            labels.CALIBRATION.format(domain=entry["domain"], resolved=entry["resolved"], observed=entry["observed"], void=entry["void"], overdue=entry["overdue"], brier=brier)
+            + (labels.CALIBRATION_REASONS.format(reasons=reasons) if reasons else ""))
     return lines

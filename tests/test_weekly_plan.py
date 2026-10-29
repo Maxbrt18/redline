@@ -123,7 +123,7 @@ def test_location_and_gut_target_are_typed():
     long_run = session("w32-dim-sl", "2026-08-09", "long", start_time="08:00",
                        location_label="Bois de Vincennes", carbs_target_g_h=60)
     assert weekly_plan.validate(plan([long_run]))
-    with pytest.raises(SchemaError, match="cible digestive"):
+    with pytest.raises(SchemaError, match="fuelling target"):
         weekly_plan.validate(plan([session(carbs_target_g_h=60)]))
 
 
@@ -146,7 +146,7 @@ def test_current_schema_owns_strength_modulation():
     strength.pop("strength")
     revision = written_today(sessions=[strength])
 
-    with pytest.raises(SchemaError, match="strength manque"):
+    with pytest.raises(SchemaError, match="strength missing"):
         weekly_plan.validate({"week": "2026-W32", "revisions": [revision]})
 
     strength["strength"] = {}
@@ -157,7 +157,7 @@ def test_active_strength_variant_must_exist_in_the_program():
     strength = session(
         "w32-jeu-a", "2026-08-06", "strength", routine="a", kind="strength",
         demanding=False, strength={"variant": "full"})
-    with pytest.raises(SchemaError, match="variante « full » non déclarée"):
+    with pytest.raises(SchemaError, match="variant 'full' not declared"):
         weekly_plan.validate(plan([strength]), today=dt.date(2026, 8, 4))
 
 
@@ -165,7 +165,7 @@ def test_active_strength_drop_must_name_an_exercise_in_the_program():
     strength = session(
         "w32-jeu-b", "2026-08-06", "strength", routine="b", kind="strength",
         demanding=False, strength={"drop": ["box-drop"]})
-    with pytest.raises(SchemaError, match="box-drop n'est pas dans la séance b"):
+    with pytest.raises(SchemaError, match="box-drop is not in session b"):
         weekly_plan.validate(plan([strength]), today=dt.date(2026, 8, 4))
 
 
@@ -195,13 +195,13 @@ def test_obsolete_plan_fields_are_refused(obsolete):
     candidate = plan()
     target = candidate if obsolete == "active_revision" else candidate["revisions"][0]
     target[obsolete] = 1
-    with pytest.raises(SchemaError, match=f"champ « {obsolete} » inconnu"):
+    with pytest.raises(SchemaError, match=f"field '{obsolete}' unknown"):
         weekly_plan.validate(candidate)
 
 
 def test_target_above_cap_is_refused():
     broken = plan([session(distance_target_km=10.0, distance_cap_km=9.0)])
-    with pytest.raises(SchemaError, match="au-dessus du plafond"):
+    with pytest.raises(SchemaError, match="above the cap"):
         weekly_plan.validate(broken)
 
 
@@ -222,7 +222,7 @@ def test_a_note_that_cites_a_gate_id_is_refused():
         "when": "after",
         "question": "La blessure au réveil, comparé à hier ?",
         "on_fail": "Renfo A reste suspendu."}]
-    with pytest.raises(SchemaError, match="contrôle daté"):
+    with pytest.raises(SchemaError, match="dated gate"):
         weekly_plan.validate(broken)
 
 
@@ -237,12 +237,12 @@ def test_every_revision_shares_the_visible_text_rule():
               "revisions": [revision(
                   sessions=[session(note="SL vallonnee (gate w32-injury)")],
                   gates=[gate(identifier="w32-injury")])]}
-    with pytest.raises(SchemaError, match="contrôle daté"):
+    with pytest.raises(SchemaError, match="dated gate"):
         weekly_plan.validate(broken)
 
 
 def test_a_session_outside_its_iso_week_is_refused():
-    with pytest.raises(SchemaError, match="hors de 2026-W32"):
+    with pytest.raises(SchemaError, match="outside 2026-W32"):
         weekly_plan.validate(plan([session(date="2026-08-10")]))
 
 
@@ -251,13 +251,13 @@ def test_two_real_hard_days_in_a_row_are_refused_but_easy_jogs_are_not():
                                session("mar", "2026-08-04")]))
     hard = [session("lun-sl", "2026-08-03", "long"),
             session("mar-seuil", "2026-08-04", "threshold")]
-    with pytest.raises(SchemaError, match="jours exigeants consécutifs"):
+    with pytest.raises(SchemaError, match="consecutive demanding days"):
         weekly_plan.validate(plan(hard))
 
 
 def test_a_routine_keeps_the_gap_its_note_declares():
     """strength-b.md declares `min_gap_h: {strength: 48, long: 48}`."""
-    with pytest.raises(SchemaError, match="routine b à moins de 48 h d'une séance long"):
+    with pytest.raises(SchemaError, match="routine b less than 48 h from a long session"):
         weekly_plan.validate(plan([
             session("lun-sl", "2026-08-03", "long"),
             session("mar-b", "2026-08-04", "strength", routine="b"),
@@ -297,7 +297,7 @@ def test_a_gate_already_expired_when_written_is_refused():
     broken = plan()
     broken["revisions"][0]["gates"] = [gate(due="2026-08-03")]
     broken["revisions"][0]["computed_at"] = "2026-08-06T17:15:00+02:00"
-    with pytest.raises(SchemaError, match="antérieure au calcul"):
+    with pytest.raises(SchemaError, match="before the revision"):
         weekly_plan.validate(broken)
 
 
@@ -429,7 +429,7 @@ def test_the_current_schema_refuses_a_gate_that_never_chose():
 def test_an_observation_may_not_claim_to_hold_a_session():
     broken = plan([session(status="done")])
     broken["revisions"][0]["gates"] = [observation(holds=["w32-lun-ef"])]
-    with pytest.raises(SchemaError, match="une observation ne retient rien"):
+    with pytest.raises(SchemaError, match="an observation holds nothing"):
         weekly_plan.validate(broken)
 
 
@@ -439,13 +439,13 @@ def test_a_precondition_must_name_what_it_holds():
     that is all a schema can do."""
     broken = plan([session(status="done")])
     broken["revisions"][0]["gates"] = [gate(when="before")]
-    with pytest.raises(SchemaError, match="sans `holds`"):
+    with pytest.raises(SchemaError, match="without `holds`"):
         weekly_plan.validate(broken)
 
 
 def test_a_gate_cannot_hold_a_session_that_does_not_exist():
     broken = week_with_a_later_session([precondition(holds=["w32-jeu-fantome"])])
-    with pytest.raises(SchemaError, match="n'est pas une séance de cette révision"):
+    with pytest.raises(SchemaError, match="is not a session of this revision"):
         weekly_plan.validate(broken)
 
 
@@ -456,7 +456,7 @@ def test_a_gate_cannot_hold_a_session_already_past_when_it_is_asked():
                    session("w32-ven-ef", "2026-08-07")])
     broken["revisions"][0]["gates"] = [precondition(due="2026-08-08",
                                                     holds=["w32-lun-ef"])]
-    with pytest.raises(SchemaError, match="est une observation"):
+    with pytest.raises(SchemaError, match="is an observation"):
         weekly_plan.validate(broken)
 
 
@@ -618,7 +618,7 @@ def test_a_new_precondition_no_longer_holds_a_session():
     """Blocking checks almost never failed their criterion, and most session changes
     came from the athlete. The condition goes in the session."""
     holding = revision(gates=[gate(when="before", holds=["w32-sam-sl"])])
-    assert any("ne retient plus de séance" in problem
+    assert any("no longer holds a session" in problem
                for problem in weekly_plan.written_text_errors(holding))
     assert not any("ne retient plus" in problem
                    for problem in weekly_plan.written_text_errors(revision(gates=[gate()])))
@@ -627,19 +627,19 @@ def test_a_new_precondition_no_longer_holds_a_session():
 def test_a_strength_session_names_its_routine_and_only_it_does():
     strength = session("w32-jeu-a", "2026-08-06", "strength", demanding=False)
     strength.pop("routine")
-    with pytest.raises(SchemaError, match="routine manque"):
+    with pytest.raises(SchemaError, match="routine missing"):
         weekly_plan.validate(plan([strength]))
     easy = session(routine="a")
-    with pytest.raises(SchemaError, match="routine ne vaut que pour une séance strength"):
+    with pytest.raises(SchemaError, match="routine only applies to a strength session"):
         weekly_plan.validate(plan([easy]))
 
 
 def test_a_routine_the_vault_does_not_declare_is_refused():
     strength = session("w32-jeu-z", "2026-08-06", "strength", routine="z", demanding=False)
-    with pytest.raises(SchemaError, match="séance « z » inconnue"):
+    with pytest.raises(SchemaError, match="unknown session 'z'"):
         weekly_plan.validate(plan([strength]), today=dt.date(2026, 8, 3))
 
 
 def test_the_kind_is_the_family_of_the_workout():
-    with pytest.raises(SchemaError, match="kind doit valoir run pour easy"):
+    with pytest.raises(SchemaError, match="kind must be run for easy"):
         weekly_plan.validate(plan([session(kind="bike")]))

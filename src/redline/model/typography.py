@@ -20,6 +20,8 @@ the persisted structure. Only the incoming text is judged; the plan schema stays
 
 from __future__ import annotations
 
+from redline.coach.fr import typography as wording
+
 #: What a phone keyboard cannot type. `src/redline/service/prompts.py` re-exports this
 #: list: the prompt that forbids them and the check that enforces it cannot diverge if
 #: they read the same constant.
@@ -28,24 +30,6 @@ BANNED_GLYPHS = "—–·…«»“”’→•−≥≤⚠⭐"
 #: What to type instead, named so that the error message opens the correct path instead
 #: of merely closing the wrong one (a guard that opens no correct path breeds its own
 #: workaround).
-REPLACEMENTS = {
-    "—": "une virgule, un point, ou deux phrases",
-    "–": "un trait d'union simple (-)",
-    "·": "une virgule ou un point",
-    "…": "trois points (...)",
-    "«": 'un guillemet droit (")',
-    "»": 'un guillemet droit (")',
-    "“": 'un guillemet droit (")',
-    "”": 'un guillemet droit (")',
-    "’": "l'apostrophe droite (')",
-    "→": "« donne », « devient », ou deux phrases",
-    "•": "un tiret simple (-)",
-    "−": "le signe moins du clavier (-)",
-    "≥": "« au moins »",
-    "≤": "« au plus »",
-    "⚠": "rien, ou le mot qui porte l'alerte",
-    "⭐": "rien",
-}
 
 
 def banned_in(text: str) -> list[str]:
@@ -64,8 +48,8 @@ def errors(text: str, where: str, label: str) -> list[str]:
         index = text.find(glyph)
         around = " ".join(text[max(0, index - 40):index + 40].split())
         problems.append(
-            f"{where} : {label} contient « {glyph} », qu'un clavier de téléphone ne "
-            f"porte pas (autour de « {around} »). Ce texte est réinjecté au coach à "
-            f"chaque tour, et title/note partent sur le téléphone de l'athlète. "
-            f"À la place : {REPLACEMENTS.get(glyph, 'un signe du clavier')}.")
+            f"{where}: {label} contains {glyph!r}, which a phone keyboard does not have "
+            f"(around {around!r}). This text is fed back to the coach every turn, and "
+            f"title/note go to the athlete's phone. Instead: "
+            f"{wording.REPLACEMENTS.get(glyph, wording.ANY_KEY)}.")
     return problems

@@ -50,17 +50,17 @@ def frontmatter(path: Path) -> dict:
             return copy.deepcopy(cached[1])
         text = path.read_text(encoding="utf-8")
     except OSError as exc:
-        raise NoteError(f"{path.name} : illisible ({exc})") from exc
+        raise NoteError(f"{path.name}: unreadable ({exc})") from exc
     head, _ = split(text)
     if not head.strip():
-        raise NoteError(f"{path.name} : pas de frontmatter")
+        raise NoteError(f"{path.name}: no frontmatter")
     try:
         data = yaml.safe_load(head)
     except yaml.YAMLError as exc:
         detail = str(exc).replace("\n", " ")
-        raise NoteError(f"{path.name} : frontmatter illisible — {detail}") from exc
+        raise NoteError(f"{path.name}: unreadable frontmatter -- {detail}") from exc
     if not isinstance(data, dict):
-        raise NoteError(f"{path.name} : frontmatter : objet attendu")
+        raise NoteError(f"{path.name}: frontmatter: object expected")
     _PARSED[path] = (state, copy.deepcopy(data))
     return data
 
@@ -75,7 +75,7 @@ def read(path: Path, schema: Schema) -> dict:
     try:
         return schema.validate(data, path.name)
     except SchemaError as exc:
-        raise NoteError("\n  - ".join([f"{path.name} : note invalide :", *exc.problems])) from exc
+        raise NoteError("\n  - ".join([f"{path.name}: invalid note:", *exc.problems])) from exc
 
 
 def read_all(folder: Path, schema: Schema, key: str = "slug") -> dict:

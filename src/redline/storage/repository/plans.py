@@ -38,15 +38,15 @@ class Plans(StoreBase):
 
     def append_plan_revision_in(self, connection: Connection, week: str, revision: dict,
                                 *, actor: str = "application") -> dict:
-        intention_problems = weekly_plan.intention_errors(revision, f"{week}.nouvelle_revision")
+        intention_problems = weekly_plan.intention_errors(revision, f"{week}.new_revision")
         if intention_problems:
             raise StorageError("\n".join(intention_problems))
         forbidden = [session["id"] for session in revision.get("sessions", [])
                      if session.get("status") not in weekly_plan.INTENT_STATUSES]
         if forbidden:
             raise StorageError(
-                "une révision ne porte que l'intention planned/cancelled ; "
-                "l'exécution appartient aux cycles : " + ", ".join(forbidden))
+                ("a revision only carries the planned/cancelled intent; execution belongs to the"
+                 " cycles: ") + ", ".join(forbidden))
         self._enforce_gut_progression(connection, revision.get("sessions", []))
         previous_revision = connection.execute(sa.select(
             plan_revisions.c.id, plan_revisions.c.computed_at,
@@ -74,8 +74,8 @@ class Plans(StoreBase):
                 )).mappings().one_or_none()
                 if prediction is None:
                     raise StorageError(
-                        "hausse de charge bloquée : crée une prédiction direction=increase, "
-                        "puis laisse le contradicteur la challenger avant de réviser")
+                        "load increase blocked: create a prediction direction=increase, then let the "
+                        "challenger challenge it before revising")
                 connection.execute(coach_predictions.update().where(
                     coach_predictions.c.id == prediction["id"]
                 ).values(used_at=dt.datetime.now(dt.UTC)))
@@ -94,8 +94,7 @@ class Plans(StoreBase):
                 end = event["ends_on"] or event["due_on"]
                 if start <= day <= end:
                     raise StorageError(
-                        f"séance exigeante {session['id']} le {day} pendant "
-                        f"l'indisponibilité typée {event['deadline_key']}")
+                        f"demanding session {session["id"]} on {day} during the typed unavailability {event["deadline_key"]}")
         plan_id = connection.execute(pg_insert(weekly_plans).values(
             id=uuid.uuid4(), athlete_id=self.athlete_id, iso_week=week,
         ).on_conflict_do_update(
@@ -152,7 +151,7 @@ class Plans(StoreBase):
         _request_projection(connection)
         loaded = self._load_plan_connection(connection, week)
         if loaded is None:  # impossible after the INSERT, barring transactional corruption
-            raise StorageError(f"programme {week} introuvable après écriture")
+            raise StorageError(f"plan {week} not found after writing")
         return loaded
 
     def active_plans(self) -> dict[str, dict]:
@@ -190,11 +189,11 @@ class Plans(StoreBase):
             return
         if float(last["gut_symptoms"]) > 3:
             raise StorageError(
-                "progression digestive bloquée : la dernière exposition dépasse 3/10")
+                "fuelling progression blocked: the last exposure is above 3/10")
         if highest > baseline + 15:
             raise StorageError(
-                f"progression digestive bloquée : {highest} g/h dépasse le palier "
-                f"autorisé de {baseline + 15} g/h")
+                f"fuelling progression blocked: {highest} g/h is above the allowed step of "
+                f"{baseline + 15} g/h")
 
     @staticmethod
     def _raises_load(previous: dict[str, Any], proposed: list[dict]) -> bool:
@@ -364,7 +363,7 @@ class Plans(StoreBase):
             )).scalar_one_or_none()
             if persisted_at is None:
                 raise StorageError(
-                    f"révision {revision} du programme {week} introuvable")
+                    f"revision {revision} of plan {week} not found")
             year, number = week.split("-W")
             monday = dt.date.fromisocalendar(int(year), int(number), 1)
             sunday = monday + dt.timedelta(days=6)

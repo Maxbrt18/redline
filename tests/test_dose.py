@@ -174,26 +174,26 @@ def test_a_measure_demands_its_own_field():
     with pytest.raises(SchemaError) as caught:
         dose(measure="time", sets=3)
     assert caught.value.problems == [
-        "mesure « time » : le champ « seconds » est obligatoire"]
+        "measure 'time': field 'seconds' is required"]
 
 
 def test_a_field_that_does_not_belong_to_the_measure_is_refused():
     assert DOSE_SCHEMA.errors({"measure": "amrap", "sets": 3, "reps": 8}) == [
-        "mesure « amrap » : le champ « reps » n'a pas de sens ici"]
+        "measure 'amrap': field 'reps' makes no sense here"]
 
 
 def test_an_unknown_measure_lists_the_known_ones():
     assert DOSE_SCHEMA.errors({"measure": "duree"}) == [
-        "champ « measure » : 'duree' inconnu (attendus : amrap, contacts, reps, time)"]
+        "field 'measure': 'duree' unknown (expected: amrap, contacts, reps, time)"]
 
 
 @pytest.mark.parametrize("value,problem", [
-    ("8-10", "champ « reps » : un entier ou une paire [bas, haut] attendu"),
-    ([8, 10, 12], "champ « reps » : un entier ou une paire [bas, haut] attendu"),
-    ([10, 8], "champ « reps » : fourchette 10-8 — le bas doit être inférieur au haut"),
-    ([8, 8], "champ « reps » : fourchette 8-8 — le bas doit être inférieur au haut"),
-    (0, "champ « reps » : hors bornes (1 à 200)"),
-    (500, "champ « reps » : hors bornes (1 à 200)"),
+    ("8-10", "field 'reps': an integer or a pair [low, high] expected"),
+    ([8, 10, 12], "field 'reps': an integer or a pair [low, high] expected"),
+    ([10, 8], "field 'reps': range 10-8 -- the low end must be below the high end"),
+    ([8, 8], "field 'reps': range 8-8 -- the low end must be below the high end"),
+    (0, "field 'reps': out of bounds (1 to 200)"),
+    (500, "field 'reps': out of bounds (1 to 200)"),
 ])
 def test_a_malformed_span_is_refused_with_its_reason(value, problem):
     """The string form is the one that must never come back: it is exactly the
@@ -203,29 +203,29 @@ def test_a_malformed_span_is_refused_with_its_reason(value, problem):
 
 def test_a_block_must_divide_the_contacts():
     assert DOSE_SCHEMA.errors({"measure": "contacts", "contacts": 40, "block": 12}) == [
-        "« block » 12 ne divise pas 40 contacts"]
+        "`block` 12 does not divide 40 contacts"]
 
 
 def test_a_block_only_means_something_for_contacts():
     assert DOSE_SCHEMA.errors({"measure": "reps", "reps": 8, "block": 10}) == [
-        "« block » ne s'emploie qu'avec la mesure « contacts »"]
+        "`block` is only used with the `contacts` measure"]
 
 
 def test_contacts_are_not_counted_in_sets():
     assert DOSE_SCHEMA.errors({"measure": "contacts", "contacts": 40, "sets": 3}) == [
-        "mesure « contacts » : les contacts se comptent en blocs, pas en séries"]
+        "measure `contacts`: contacts are counted in blocks, not sets"]
 
 
 def test_an_unknown_field_is_refused_like_anywhere_else():
     assert DOSE_SCHEMA.errors({"measure": "reps", "reps": 8, "mode": "time"})[0] \
-        .startswith("champ « mode » inconnu")
+        .startswith("field 'mode' unknown")
 
 
 def test_a_rest_out_of_range_is_refused():
     assert DOSE_SCHEMA.errors({"measure": "reps", "reps": 8, "rest_s": 1}) == [
-        "champ « rest_s » : valeur 1, minimum 5"]
+        "field 'rest_s': value 1, minimum 5"]
 
 
 def test_the_side_vocabulary_is_closed():
     assert DOSE_SCHEMA.errors({"measure": "reps", "reps": 8, "side": "gauche"}) == [
-        "champ « side » : 'gauche' inconnu (attendus : both, each)"]
+        "field 'side': 'gauche' unknown (expected: both, each)"]

@@ -666,7 +666,7 @@ def test_the_glyph_rule_reaches_the_data_channel_not_only_the_written_prompts():
             f"{field} n'est pas jugé : ce texte est réinjecté au coach à chaque tour")
     # The message opens the correct path, it does not merely close the wrong one: a
     # guard without a correct path breeds its own workaround.
-    assert any("À la place :" in mistake for mistake in mistakes)
+    assert any("Instead:" in mistake for mistake in mistakes)
 
     clean = {
         "reason": "EF realisee, rien a signaler",

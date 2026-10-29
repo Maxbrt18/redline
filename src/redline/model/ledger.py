@@ -7,6 +7,8 @@ import re
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
+from redline.coach.fr import ledger as text
+
 from . import session_kinds
 from .errors import ConfigError, InputError
 from .schema import Schema, field
@@ -37,18 +39,18 @@ INPUTS = (
     ObservationInput("date", r"\d{4}-\d{2}-\d{2}", required=True),
     ObservationInput("type", "|".join(SESSION_TYPES), required=True),
     ObservationInput("routine", r"[a-z0-9][a-z0-9-]{0,39}",
-                     note="la routine de renfo, telle que sa fiche la déclare"),
+                     note="the strength routine, as its note declares it"),
     ObservationInput("km", r"\d+(\.\d{1,2})?", metric="distance_km", decimals=2),
     ObservationInput("time", r"\d{1,2}:\d{2}(:\d{2})?", metric="duration_s"),
     ObservationInput("pace", r"\d:\d{2}", metric="pace_s_per_km", note="min/km"),
     ObservationInput("hr_avg", r"\d{2,3}", metric="hr_avg_bpm", decimals=0),
     ObservationInput("hr_max", r"\d{2,3}", metric="hr_max_bpm", decimals=0),
     ObservationInput("cadence", r"\d{3}", metric="cadence_spm", decimals=0,
-                     note="pas/min, deux pieds — Strava affiche une jambe"),
+                     note="steps/min, both feet -- Strava shows one leg"),
     ObservationInput("dplus", r"\d+", metric="elevation_gain_m", decimals=0),
     ObservationInput("dminus", r"\d+", metric="elevation_loss_m", decimals=0),
     ObservationInput("wbgt", r"-?\d{1,2}", metric="wbgt_c", decimals=0,
-                     note="°C, charge thermique — jamais un plafond"),
+                     note="°C, thermal load -- never a cap"),
     ObservationInput("rpe", r"(10|\d)(\.\d)?", metric="rpe", decimals=1,
                      unavailable=True),
     ObservationInput("enjoyment", r"10|\d", metric="enjoyment", decimals=0,
@@ -62,7 +64,7 @@ def input_field(name: str) -> ObservationInput:
     for item in INPUTS:
         if item.name == name:
             return item
-    raise KeyError(f"champ d'observation inconnu : {name}")
+    raise KeyError(f"unknown observation field: {name}")
 
 
 def _accepted_pattern(item: ObservationInput) -> str:
@@ -117,7 +119,7 @@ PAIN_COLUMN = "pain"
 #: The columns the athlete declares, in the order they are asked; the others are measured.
 DECLARED_COLUMNS = (PAIN_COLUMN, "rpe", "enjoyment")
 PAIN_PATTERN = r"(10|\d)(\.\d)?"
-PAIN_NOTE = "le pic de la séance, pas la moyenne"
+PAIN_NOTE = "the peak of the session, not the average"
 
 
 def requires_pain(kind: str) -> bool:
@@ -152,22 +154,22 @@ def parse_pains(values: list[str], zones: list[str]) -> dict[str, str]:
         if not sep:
             if len(zones) != 1:
                 raise LedgerError(
-                    "--pain : nomme la zone, ex. --pain knee=2 (zones : "
-                    + (", ".join(zones) or "aucune zone surveillée") + ")")
+                    "--pain: name the zone, e.g. --pain knee=2 (zones: "
+                    + (", ".join(zones) or "no monitored zone") + ")")
             zone, value = zones[0], raw
         zone, value = zone.strip(), value.strip()
         if zone not in zones:
-            raise LedgerError(f"--pain : zone inconnue « {zone} » (zones : "
-                              + (", ".join(zones) or "aucune zone surveillée") + ")")
+            raise LedgerError(f"--pain: unknown zone {zone!r} (zones: "
+                              + (", ".join(zones) or "no monitored zone") + ")")
         if zone in readings:
-            raise LedgerError(f"--pain : zone « {zone} » donnée deux fois")
+            raise LedgerError(f"--pain: zone {zone!r} given twice")
         readings[zone] = value
     return readings
 
 
 def pain_facts(pains: dict[str, dict]) -> list[str]:
     """`douleur knee=2` for each known zone of an observation."""
-    return [f"douleur {zone}={reading['value']}" for zone, reading in sorted(pains.items())
+    return [text.PAIN_READING.format(zone=zone, value=reading["value"]) for zone, reading in sorted(pains.items())
             if reading.get("state") == "known"]
 
 
@@ -193,9 +195,9 @@ def pain_reading(value: str) -> dict:
     try:
         number = Decimal(text).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
     except InvalidOperation:
-        raise LedgerError(f"douleur illisible : {value!r} (0 à 10, au demi-point)") from None
+        raise LedgerError(f"unreadable pain: {value!r} (0 to 10, by half points)") from None
     if not re.fullmatch(PAIN_PATTERN, str(number)):
-        raise LedgerError(f"douleur hors échelle : {value!r} (0 à 10)")
+        raise LedgerError(f"pain off the scale: {value!r} (0 to 10)")
     return {"state": "known", "value": float(number)}
 
 
@@ -271,7 +273,7 @@ def lapsed_observation_fields(observations: list[dict], today: dt.date) -> list[
 
 
 def observation_completeness_errors(observations: list[dict], today: dt.date) -> list[str]:
-    return [f"{gap['date']} {gap['type']} : {', '.join(gap['missing'])} non renseigné(s)"
+    return [text.MISSING_CELLS.format(date=gap["date"], type=gap["type"], join=", ".join(gap["missing"]))
             for gap in lapsed_observation_fields(observations, today)]
 
 

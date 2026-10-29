@@ -23,7 +23,7 @@ def test_the_shipped_example_is_refused_until_filled():
     with pytest.raises(instance.InstanceError) as refused:
         instance.parse((ENGINE_ROOT / instance.EXAMPLE).read_text(encoding="utf-8"))
     message = str(refused.value)
-    assert "encore à remplir" in message
+    assert "is still to be filled in" in message
     assert "athlete.name" in message and "notebook.place" in message
     assert "athlete.hr_rest" in message and "athlete.hr_max" in message
     assert "athlete.timezone" in message
@@ -33,7 +33,7 @@ def test_the_shipped_example_is_refused_until_filled():
 def test_the_time_zone_is_declared_and_checked():
     text = (TEST_VAULT / instance.FILENAME).read_text(encoding="utf-8")
     assert instance.parse(text).timezone.key == "Europe/Paris"
-    with pytest.raises(instance.InstanceError, match="fuseau inconnu « Mars/Olympus »"):
+    with pytest.raises(instance.InstanceError, match="unknown time zone 'Mars/Olympus'"):
         instance.parse(text.replace('"Europe/Paris"', '"Mars/Olympus"'))
     with pytest.raises(instance.InstanceError, match="timezone"):
         instance.parse(text.replace('timezone = "Europe/Paris"\n', ""))
@@ -52,7 +52,7 @@ def test_a_missing_file_says_what_to_do(tmp_path):
 
 @pytest.mark.parametrize("text, expected", [
     ("[athlete]\nname = 'A'\nnickname = 'B'\n", "nickname"),
-    ("[athlete\n", "illisible"),
+    ("[athlete\n", "unreadable"),
 ])
 def test_unknown_or_broken_input_is_refused(text, expected):
     with pytest.raises(instance.InstanceError, match=expected):
@@ -74,14 +74,14 @@ def test_several_zones_are_kept_in_their_declared_order():
 def test_a_zone_declared_twice_is_refused():
     text = (TEST_VAULT / instance.FILENAME).read_text(encoding="utf-8")
     text += '\n[[injuries]]\nslug = "knee"\nlabel = "Encore"\n'
-    with pytest.raises(instance.InstanceError, match="double"):
+    with pytest.raises(instance.InstanceError, match="duplicate"):
         instance.parse(text)
 
 
 def test_a_duplicated_capability_is_refused():
     text = (TEST_VAULT / instance.FILENAME).read_text(encoding="utf-8")
     text += '\n[[capabilities]]\nslug = "cap1-endurance"\nlabel = "Encore"\n'
-    with pytest.raises(instance.InstanceError, match="double"):
+    with pytest.raises(instance.InstanceError, match="duplicate"):
         instance.parse(text)
 
 

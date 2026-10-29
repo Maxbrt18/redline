@@ -42,7 +42,7 @@ def test_the_three_journal_forms_give_unique_keys():
 
 
 @pytest.mark.parametrize("row, message", [
-    ({"correction": "x", "replay": "peut-être"}, "invalide"),
+    ({"correction": "x", "replay": "peut-être"}, "invalid"),
     ({"correction": "x", "replay": "scenario"}, "scenarios"),
     ({"correction": "x", "replay": "code"}, "carriers"),
     ({"correction": "x", "replay": "pending"}, "note"),
@@ -55,7 +55,7 @@ def test_an_incomplete_entry_is_refused(row, message):
 
 def test_a_duplicate_correction_is_refused():
     row = {"correction": "x", "replay": "off-bench", "note": "n"}
-    with pytest.raises(replay.ReplayFormatError, match="double"):
+    with pytest.raises(replay.ReplayFormatError, match="duplicate"):
         replay.load_ledger(json.dumps([row, row]))
 
 
@@ -83,8 +83,8 @@ def test_the_audit_separates_lateness_orphans_broken_references_and_debt(tmp_pat
     assert [c.key for c in found.unregistered] == [KEYS[0]]
     assert found.late == []
     assert found.orphans == ["2026-07-01 — Disparue"]
-    assert found.broken == [f"{KEYS[1]} : scénario inconnu inconnu",
-                            f"{KEYS[2]} : porteur absent absent.py"]
+    assert found.broken == [f"{KEYS[1]}: unknown scenario inconnu",
+                            f"{KEYS[2]}: carrier missing absent.py"]
     assert found.owed == [KEYS[3]]
 
 

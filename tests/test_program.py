@@ -43,9 +43,9 @@ def test_page_setup_is_frozen_and_load_override_is_local_to_selection(program):
 
 def test_load_override_refuses_absent_or_duplicate_exercise(program):
     entry = {"exercise": "rdl-single-leg", "kg": 6, "count": 2}
-    with pytest.raises(NoteError, match="absent ou dupliqué"):
+    with pytest.raises(NoteError, match="missing or duplicated"):
         program.build({"session": "a", "loads": [entry, entry]})
-    with pytest.raises(NoteError, match="absent ou dupliqué"):
+    with pytest.raises(NoteError, match="missing or duplicated"):
         program.build({"session": "b", "loads": [entry]})
 
 
@@ -120,17 +120,17 @@ def test_an_unknown_slug_names_the_ones_that_exist(program):
     # mutates it would break whichever test happens to run next.
     broken = Program(program.exercises,
                        {"a": dict(program.session("a"), exercises=["mollet-fléchi"])})
-    with pytest.raises(NoteError, match="introuvable"):
+    with pytest.raises(NoteError, match="not found"):
         broken.prescriptions("a")
 
 
 def test_an_unknown_session_names_the_ones_that_exist(program):
-    with pytest.raises(NoteError, match="connues : a, assimilation, b"):
+    with pytest.raises(NoteError, match="known: a, assimilation, b"):
         program.prescriptions("c")
 
 
 def test_an_exercise_note_missing_its_dose_is_refused():
-    with pytest.raises(SchemaError, match="champ « dose » manquant"):
+    with pytest.raises(SchemaError, match="field 'dose' missing"):
         EXERCISE_SCHEMA.validate({"type": "exercise", "name": "Mollet"}, "x.md")
 
 
@@ -138,4 +138,4 @@ def test_a_session_without_exercises_is_refused():
     problems = SESSION_SCHEMA.errors(
         {"type": "workout", "title": "T", "rule": "une règle assez longue",
          "exercises": [], "routine": "x"}, "renfo-x.md")
-    assert problems == ["renfo-x.md : champ « exercises » : longueur 0, minimum 1"]
+    assert problems == ["renfo-x.md: field 'exercises': length 0, minimum 1"]

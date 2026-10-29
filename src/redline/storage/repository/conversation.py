@@ -30,7 +30,7 @@ class Conversation(StoreBase):
     def conversation_search(self, psid: str, query: str, limit: int = 6) -> list[dict]:
         """Search past messages, with provenance and the immediately adjacent messages."""
         if not psid or not 3 <= len(query.strip()) <= 160 or not 1 <= limit <= 12:
-            raise ValueError("psid, recherche de 3 à 160 caractères et limite 1 à 12 attendus")
+            raise ValueError("psid, a query of 3 to 160 characters and a limit of 1 to 12 expected")
         french: Any = sa.literal_column("'french'::regconfig")
         document = sa.func.to_tsvector(french, conversation_messages.c.body)
         search = sa.func.websearch_to_tsquery(french, query)
@@ -68,12 +68,12 @@ class Conversation(StoreBase):
         try:
             identifier = uuid.UUID(turn_id)
         except (ValueError, TypeError) as exc:
-            raise ValueError("identifiant de tour invalide") from exc
+            raise ValueError("invalid turn id") from exc
         with self.database.engine.connect() as connection:
             psid = connection.execute(sa.select(turn_scopes.c.psid).where(
                 turn_scopes.c.turn_id == identifier,
                 turn_scopes.c.created_at >= dt.datetime.now(dt.UTC) - dt.timedelta(hours=4),
             )).scalar_one_or_none()
         if psid is None:
-            raise ValueError("tour absent ou expiré")
+            raise ValueError("turn missing or expired")
         return self.conversation_search(psid, query, limit)

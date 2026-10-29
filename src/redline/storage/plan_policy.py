@@ -45,9 +45,9 @@ def enforce_gate_resolution(connection: Connection, athlete_id: str,
         resolution = resolutions.get(gate_id)
         if resolution is None:
             raise StorageError(
-                f"contrôle {gate_id!r} retiré sans résolution typée : ajoute "
-                f"gate:{gate_id}=observation:<clé>, fallback:<motif> ou void:<motif> "
-                "dans evidence")
+                f"gate {gate_id!r} removed without a typed resolution: add "
+                f"gate:{gate_id}=observation:<key>, fallback:<reason> or void:<reason> to "
+                "evidence")
         kind, detail = resolution
         if kind == "observation":
             observation = connection.execute(sa.select(
@@ -57,16 +57,16 @@ def enforce_gate_resolution(connection: Connection, athlete_id: str,
                 )).mappings().one_or_none()
             if observation is None:
                 raise StorageError(
-                    f"contrôle {gate_id!r} : observation canonique inconnue {detail!r}")
+                    f"gate {gate_id!r}: unknown canonical observation {detail!r}")
             if not gate["due_on"] <= observation["occurred_on"] <= computed_on:
                 raise StorageError(
-                    f"contrôle {gate_id!r} : observation du {observation['occurred_on']} "
-                    f"hors fenêtre {gate['due_on']}..{computed_on}")
+                    f"gate {gate_id!r}: observation of {observation["occurred_on"]} outside the window "
+                    f"{gate["due_on"]}..{computed_on}")
         elif kind == "fallback":
             if computed_on < gate["due_on"]:
                 raise StorageError(
-                    f"contrôle {gate_id!r} : fallback avant son échéance {gate['due_on']}")
+                    f"gate {gate_id!r}: fallback before its due date {gate["due_on"]}")
         elif computed_on >= gate["due_on"]:
             raise StorageError(
-                f"contrôle {gate_id!r} : void interdit à partir de son échéance ; "
-                "utilise une observation ou le fallback pré-engagé")
+                f"gate {gate_id!r}: void is forbidden from its due date on; use an observation "
+                "or the pre-committed fallback")

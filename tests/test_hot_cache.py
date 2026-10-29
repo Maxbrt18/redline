@@ -122,8 +122,8 @@ def test_the_state_block_does_not_change_from_one_day_to_the_next():
 def test_refresh_fills_the_state_block_only_where_it_is_declared(tmp_path):
     (tmp_path / "ai").mkdir()
     cache = tmp_path / "ai" / "hot-cache.md"
-    cache.write_text("<!-- FORME_START -->\n<!-- FORME_END -->\n"
-                     "<!-- ETAT_START -->\n<!-- ETAT_END -->\n", encoding="utf-8")
+    cache.write_text("<!-- FORM_START -->\n<!-- FORM_END -->\n"
+                     "<!-- STATE_START -->\n<!-- STATE_END -->\n", encoding="utf-8")
     (tmp_path / "coaching" / "workouts").mkdir(parents=True)
 
     class Store:
