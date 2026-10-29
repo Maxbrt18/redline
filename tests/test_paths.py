@@ -39,7 +39,7 @@ def test_the_service_refuses_to_start_without_a_vault(monkeypatch):
 
 
 def test_the_agent_wrapper_refuses_to_run_without_a_vault():
-    wrapper = (ENGINE_ROOT / "deploy" / "redline-agent-cli").read_text(encoding="utf-8")
+    wrapper = (ENGINE_ROOT / "deploy" / "agent-cli" / "redline-agent-cli").read_text(encoding="utf-8")
     assert "vault=${VAULT_PATH:-}" in wrapper
     assert "VAULT_PATH absent" in wrapper
 

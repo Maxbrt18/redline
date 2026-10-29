@@ -5,7 +5,7 @@
 # Caddy obtains and renews the certificate by itself as long as ports 80 and 443 are
 # open and the domain points here.
 #
-#   sudo cp ~/redline/deploy/Caddyfile /etc/caddy/Caddyfile
+#   sudo cp ~/redline/deploy/caddy/Caddyfile /etc/caddy/Caddyfile
 #   sudo systemctl restart caddy
 #   sudo systemctl status caddy
 

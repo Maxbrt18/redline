@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Inspects or reopens one exact periodic review after an operational incident.
 
-Operator command only: it stays out of `deploy/agent-cli-tools.txt`, so the sandboxed
+Operator command only: it stays out of `deploy/agent-cli/agent-cli-tools.txt`, so the sandboxed
 coach cannot replay an already acknowledged initiative itself.
 """
 

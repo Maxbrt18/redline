@@ -185,15 +185,9 @@ To change a behavior:
   root-owned business CLIs, PostgreSQL transactions per `turn_id`, runtime
   path checks and read-only Git return. `SANDBOX_NEEDS` contains only the
   environment values the business CLIs need.
-- The runtime is never updated from a turn. `VaultRepo.sync()` refuses any incoming
-  commit touching `deploy/`, `src/`, `migrations/`, the hooks, the CI, the
-  dependencies or the assets read at startup.
-- **"Runtime" = the service behaves differently after this commit.** Neither
-  `coaching/exercises/*.md` — data re-read at each call of
-  `redline chart-strength`, and which the coach edits itself — nor `tests/` are runtime:
-  neither requires a restart, and a test pushed with code is held back by the code anyway.
-  Leaving them in would freeze vault synchronization on a perfectly legitimate
-  write.
+- The runtime is never updated from a turn. The vault holds no engine code
+  (`VAULT_PATH` refuses the checkout), and `redline-agent-cli` refuses to run an engine
+  that differs from its deployed commit.
 - **Internal diagnostics stay in the operational logs.** No adapter text
   (watchdog, turn, engine) is shown to the athlete: each failure class has
   a sentence for them, defined once in `bot.py`. If persistence of a reactive turn
@@ -211,7 +205,7 @@ Python 3.12 is required.
 ```bash
 python3.12 -m venv .venv
 .venv/bin/pip install -c requirements.txt -c requirements-dev.txt -e '.[cards,dev]'
-cp deploy/coach-messenger.env.example .env
+cp config/redline.env.example .env
 ```
 
 Create or migrate PostgreSQL with the migration role, then launch from the root:
@@ -229,7 +223,7 @@ Startup refuses:
 - invalid numeric, boolean or time value, or an unusable routing file;
 - unavailable PostgreSQL.
 
-`deploy/coach-messenger.env.example` is the exhaustive reference. Locally, a `.env` at the root is tolerated;
+`config/redline.env.example` is the exhaustive reference. Locally, a `.env` at the root is tolerated;
 in production, the real file lives outside the checkout in
 `/etc/redline/runtime/coach-messenger.env`, readable only by the service user.
 The `AGENT_*` variables are the
@@ -266,7 +260,7 @@ service restarts, because Strava validates the URL immediately:
 
 ```bash
 set -a; . /etc/redline/runtime/coach-messenger.env; set +a
-/home/ubuntu/.venvs/redline-current/bin/python deploy/strava-subscription.py renew
+/home/ubuntu/.venvs/redline-current/bin/python -m redline.cli.strava_subscription renew
 ```
 
 `status` returns 0 if the single subscription points to the expected URL. Neither
@@ -402,7 +396,7 @@ has no configurable end, and no work duration is checked against the end of
 the window.
 `REDLINE_ROUTING` names a TOML file whose `[routing.<ROUTE>]` tables override a row
 (`model`, `effort`, `fallback = { model, effort }`), checked at startup; see
-`deploy/routing.example.toml`. The engine names no model it refuses: what a route may
+`config/routing.example.toml`. The engine names no model it refuses: what a route may
 cost is the operator's choice.
 
 The ordinary session expires according to `SESSION_TTL_HOURS` and stays tied to its provider and
@@ -674,7 +668,7 @@ only) belong to `redline`.
 one-shot `migrate` service (the migrator role upgrades the schema), the service and
 Caddy for HTTPS. The image (`Dockerfile`) holds the engine, its venv and Claude Code,
 owned by root; the service runs as uid 10001. What to prepare is listed at the top of
-`compose.yml` and in `deploy/compose/.env.example`.
+`compose.yml` and in `config/compose.env.example`.
 
 ```bash
 docker compose up -d --build
@@ -695,8 +689,8 @@ prove that the new code is running.
 cd /home/ubuntu/redline
 git pull --ff-only
 sudo systemctl start redline-backup.service
-sudo install -o root -g root -m 0755 deploy/redline-agent-cli /usr/local/bin/redline-agent-cli
-sudo install -D -o root -g root -m 0644 deploy/agent-cli-tools.txt \
+sudo install -o root -g root -m 0755 deploy/agent-cli/redline-agent-cli /usr/local/bin/redline-agent-cli
+sudo install -D -o root -g root -m 0644 deploy/agent-cli/agent-cli-tools.txt \
   /usr/local/share/redline/agent-cli-tools.txt
 sudo install -o root -g root -m 0644 deploy/systemd/coach-messenger.service \
   /etc/systemd/system/coach-messenger.service
@@ -717,7 +711,7 @@ have these steps carried out by a user message or an agent process.
 A new module under `src/redline/cli/` is **refused by default**: automatically making
 every future command executable would turn the whole directory into an implicit capability.
 If it is needed in a Messenger turn, add its name to
-`deploy/agent-cli-tools.txt` and reference it in the relevant prompt. The tests reject
+`deploy/agent-cli/agent-cli-tools.txt` and reference it in the relevant prompt. The tests reject
 a missing, unsorted or nonexistent entry, or a CLI cited by the prompts but left out
 of the manifest. Deployment installs this manifest outside the vault as `root:root`; the
 coach therefore cannot widen its own permissions.

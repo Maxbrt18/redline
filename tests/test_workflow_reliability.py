@@ -629,7 +629,7 @@ def test_rwf017_the_documentation_names_no_removed_mechanism():
                "silence_verdict", "response_review", "règles locales",
                "contrôle de cohérence", "rédaction en branche éphémère")
     documents = [*sorted((ENGINE_ROOT / "docs").glob("*.md")),
-                 ENGINE_ROOT / "deploy" / "coach-messenger.env.example"]
+                 ENGINE_ROOT / "config" / "redline.env.example"]
     stale = [(path.name, name) for path in documents
              for name in removed if name in path.read_text(encoding="utf-8")]
     assert stale == []

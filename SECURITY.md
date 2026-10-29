@@ -24,8 +24,8 @@ What the engine is built to guarantee:
   secrets. The Strava callback is authenticated by a secret URL segment
   (`STRAVA_WEBHOOK_SECRET`); without it, the Strava webhook stays disabled.
 - **The agent is confined to the vault and its commands.** A turn may edit notes in
-  the vault and run the commands listed in `deploy/agent-cli-tools.txt`, through
-  `deploy/redline-agent-cli`, which executes the deployed commit of the engine and
+  the vault and run the commands listed in `deploy/agent-cli/agent-cli-tools.txt`, through
+  `deploy/agent-cli/redline-agent-cli`, which executes the deployed commit of the engine and
   refuses to run if the service account can write the engine's code or its venv.
   - Claude Code runs every call with `--restricted --strict-mcp-config`: no user,
     project or vault settings file, hook or MCP server is loaded, the file tools stay

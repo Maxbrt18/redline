@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Queues a message written outside the service, delivered as is on Messenger.
 
-Operator command only (kept out of `deploy/agent-cli-tools.txt`): it serves when a
+Operator command only (kept out of `deploy/agent-cli/agent-cli-tools.txt`): it serves when a
 review or a reply was drafted elsewhere, from a laptop for instance, and must reach
 the athlete through the normal chain -- 8 min of silence, a trace in conversation memory
 and in proactive messages -- without a model turn. The key makes the send idempotent:

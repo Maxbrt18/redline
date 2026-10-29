@@ -1,11 +1,11 @@
 # Redline on one host: PostgreSQL, the migrations, the service and Caddy.
 #
-#   cp deploy/compose/.env.example .env          # then fill it in
+#   cp config/compose.env.example .env          # then fill it in
 #   docker compose up -d --build
 #
-# Before the first start (see deploy/compose/.env.example):
+# Before the first start (see config/compose.env.example):
 #   - ./secrets/ holds the three PostgreSQL passwords, one per file;
-#   - ./redline.env is the service configuration (deploy/coach-messenger.env.example),
+#   - ./redline.env is the service configuration (config/redline.env.example),
 #     its DATABASE_URL pointing at `postgres` with the `redline_app` password;
 #   - ./vault is a Git clone of the athlete's vault, ./ssh the key that pushes it, both
 #     readable by uid 10001 (the service account of the image).
@@ -70,7 +70,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./deploy/compose/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./deploy/caddy/Caddyfile.compose:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
     depends_on:
       redline:

@@ -33,7 +33,7 @@ from redline.service.routing import RoutingConfig
 TESTS_DIR = Path(__file__).resolve().parent
 ENGINE_ROOT = TESTS_DIR.parent
 #: Units, launcher, allowlist and scripts of a deployment.
-DEPLOY_DIR = ENGINE_ROOT / "deploy"
+AGENT_CLI_DIR = ENGINE_ROOT / "deploy" / "agent-cli"
 # The fictional test vault: `redline.toml` (the only place the fictional athlete's
 # first name is written), the strength program, session sheets, capabilities and the
 # decision log. Nobody real: it exists so that tests reading vault content run in this

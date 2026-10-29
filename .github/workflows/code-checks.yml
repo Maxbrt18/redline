@@ -64,7 +64,7 @@ jobs:
       - name: Shell scripts
         run: |
           shellcheck .githooks/pre-commit templates/vault/.githooks/pre-commit \
-                     deploy/redline-agent-cli deploy/postgres/*.sh
+                     deploy/agent-cli/redline-agent-cli deploy/postgres/*.sh
 
       - name: Database schema
         env:

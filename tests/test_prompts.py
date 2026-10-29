@@ -2,7 +2,7 @@
 
 import datetime
 
-from conftest import DEPLOY_DIR
+from conftest import AGENT_CLI_DIR
 
 from redline.service import prompts
 from redline.service.prompts import (
@@ -832,4 +832,4 @@ def test_a_quality_session_is_judged_on_its_written_criteria_only():
 def test_the_workout_card_is_no_longer_the_models_choice():
     assert "chart-workout" not in " ".join(PROACTIVE_TRIGGERS.values())
     assert "chart-workout" not in STYLE_PROMPT
-    assert "chart-workout" not in (DEPLOY_DIR / "agent-cli-tools.txt").read_text()
+    assert "chart-workout" not in (AGENT_CLI_DIR / "agent-cli-tools.txt").read_text()

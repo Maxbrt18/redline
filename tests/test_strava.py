@@ -186,7 +186,7 @@ def test_a_missing_client_is_named_not_guessed(monkeypatch):
     for name in ("STRAVA_CLIENT_ID", "STRAVA_CLIENT_SECRET", "STRAVA_REFRESH_TOKEN"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(strava, "_read_cache", lambda path: {})
-    with pytest.raises(strava.StravaError, match=r"coach-messenger\.env\.example"):
+    with pytest.raises(strava.StravaError, match=r"config/redline\.env\.example"):
         strava.access_token()
 
 

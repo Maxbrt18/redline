@@ -18,7 +18,8 @@ instructions are not here: they live in each instance's vault (template:
 | `src/redline/cli/` | one thin module per command (`redline week-plan` → `redline.cli.week_plan`) |
 | `src/redline/evaluation/` | offline coaching and conversation benches |
 | `migrations/` | Alembic revisions, frozen once merged |
-| `deploy/` | systemd units, Caddy, host scripts, the agent CLI wrapper and its allowlist |
+| `config/` | the example configuration files an operator copies and fills |
+| `deploy/` | how to run it on a host: `agent-cli/` (the launcher and its allowlist), `systemd/`, `caddy/`, `postgres/` |
 | `tests/` | the suite, with a fictional vault in `tests/fixtures/vault/` |
 
 The engine and the vault are two roots (`redline.model.paths`): code, templates and
@@ -81,8 +82,8 @@ A data migration is rehearsed on a disposable copy before it reaches production.
 
 ## The coach's tools
 
-The agent runs commands only through `deploy/redline-agent-cli`, and only those listed
-in `deploy/agent-cli-tools.txt` (deny by default). Adding a command means a module in
+The agent runs commands only through `deploy/agent-cli/redline-agent-cli`, and only those listed
+in `deploy/agent-cli/agent-cli-tools.txt` (deny by default). Adding a command means a module in
 `src/redline/cli/`, a line in the allowlist and a test.
 
 ## Checks

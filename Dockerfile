@@ -29,8 +29,8 @@ RUN python -m venv /opt/.venvs/redline \
     && /opt/.venvs/redline/bin/pip install -c requirements.txt -e '.[cards]' \
     && /opt/.venvs/redline/bin/python -m playwright install --with-deps chromium \
     && rm -rf /var/lib/apt/lists/* \
-    && install -m 0755 deploy/redline-agent-cli /usr/local/bin/redline-agent-cli \
-    && install -D -m 0644 deploy/agent-cli-tools.txt /usr/local/share/redline/agent-cli-tools.txt \
+    && install -m 0755 deploy/agent-cli/redline-agent-cli /usr/local/bin/redline-agent-cli \
+    && install -D -m 0644 deploy/agent-cli/agent-cli-tools.txt /usr/local/share/redline/agent-cli-tools.txt \
     && useradd --system --uid 10001 --home-dir /var/lib/redline --create-home redline \
     && install -d -o redline -g redline -m 0700 /var/lib/redline/state
 

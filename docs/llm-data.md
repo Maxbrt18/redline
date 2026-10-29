@@ -20,7 +20,7 @@ own account and the provider's data terms. The engine adds no telemetry of its o
 ## Read by the agent on demand
 
 During a turn the agent works in a checkout of the vault with `Read`, `Glob`, `Grep`,
-`Edit` and `Write`, and may run the commands of `deploy/agent-cli-tools.txt`. Whatever it
+`Edit` and `Write`, and may run the commands of `deploy/agent-cli/agent-cli-tools.txt`. Whatever it
 opens is sent to the provider:
 
 - any note of the vault (athlete profile, injury history, goals, decisions, journal);
