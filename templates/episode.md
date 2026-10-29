@@ -1,10 +1,10 @@
 ---
-type: épisode
-source_type: podcast          # podcast / article / livre / vidéo
-podcast: <RunWise / Koopcast / Extramilest Show…>   # pour un article/livre : remplacer par `auteur: <nom>`
+type: episode
+source_type: podcast          # podcast / article / book / video
+podcast: <RunWise / Koopcast / Extramilest Show…>   # pour un article/livre : remplacer par `author: <nom>`
 aliases: [Ep – <titre lisible>]
-invité: <nom>
-rôle: <ex. chercheur physio / coach élite>
+guest: <nom>
+role: <ex. chercheur physio / coach élite>
 date: <AAAA-MM-JJ>
 distances: [<semi, marathon...>]
 source: inbox/<fichier>.txt   # ou l'URL/référence pour un article/livre sans transcript

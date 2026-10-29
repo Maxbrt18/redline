@@ -375,12 +375,12 @@ def check_startup_budget(vault: Vault, report: Report) -> None:
         report.ok("budget de lecture", result.detail)
 
 
-def check_maj_dates(vault: Vault, report: Report) -> None:
-    """`maj:` must not claim a note is fresher than its last real edit: a lying date
+def check_updated_dates(vault: Vault, report: Report) -> None:
+    """`updated:` must not claim a note is fresher than its last real edit: a lying date
     is how a stale file passes for current."""
     stale = []
     for path, text in vault.files.items():
-        updated = (_frontmatter(text) or {}).get("maj")
+        updated = (_frontmatter(text) or {}).get("updated")
         if not isinstance(updated, dt.date):
             continue
         try:
@@ -388,16 +388,16 @@ def check_maj_dates(vault: Vault, report: Report) -> None:
                 ["git", "log", "-1", "--format=%ad", "--date=short", "--", path],
                 cwd=vault.root, capture_output=True, text=True, timeout=10).stdout.strip()
         except (OSError, subprocess.TimeoutExpired):
-            report.skip("dates `maj` honnêtes", "git indisponible")
+            report.skip("dates `updated` honnêtes", "git indisponible")
             return
         if not committed:
             continue  # never committed yet
         if updated.isoformat() > committed and _is_clean(vault.root, path):
-            stale.append(f"{path} : maj {updated} > dernier commit {committed}")
+            stale.append(f"{path} : updated {updated} > dernier commit {committed}")
     if stale:
-        report.fail("dates `maj` honnêtes", stale)
+        report.fail("dates `updated` honnêtes", stale)
     else:
-        report.ok("dates `maj` honnêtes")
+        report.ok("dates `updated` honnêtes")
 
 
 def _is_clean(root: Path, path: str) -> bool:
@@ -698,7 +698,7 @@ CHECKS = (
     check_links,
     check_unique_basenames,
     check_startup_budget,
-    check_maj_dates,
+    check_updated_dates,
     check_decisions_order,
     check_prediction_debt,
     check_capability_notes,

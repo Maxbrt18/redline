@@ -45,7 +45,7 @@ def test_auto_laps_of_a_continuous_run_are_not_reps():
 def test_only_a_quality_session_gets_a_card():
     assert debrief.quality_card(SEUIL_DU_15, {"workout": "easy"}) is None
     assert debrief.quality_card(SEUIL_DU_15, None) is None
-    assert debrief.quality_card(SEUIL_DU_15, {"workout": "long", "transition": "qualite"})
+    assert debrief.quality_card(SEUIL_DU_15, {"workout": "long", "transition": "quality"})
 
 
 def test_contiguous_fast_laps_are_one_rep_and_a_standing_recovery_is_slow():

@@ -46,7 +46,7 @@ def plan(sessions=None):
 def gate(identifier="w32-injury-48h", due="2026-08-08",
          question="trace de douleur encore présente au réveil ?",
          on_fail="repos et recalcul", **overrides):
-    payload = {"id": identifier, "due": due, "when": "apres",
+    payload = {"id": identifier, "due": due, "when": "after",
                "question": question, "on_fail": on_fail}
     payload.update(overrides)
     return payload
@@ -219,7 +219,7 @@ def test_a_note_that_cites_a_gate_id_is_refused():
     broken = with_session(note="Repos. Réévaluation demain (gate w33-renfoa-report).")
     broken["revisions"][0]["gates"] = [{
         "id": "w33-renfoa-report", "due": "2026-08-08",
-        "when": "apres",
+        "when": "after",
         "question": "La blessure au réveil, comparé à hier ?",
         "on_fail": "Renfo A reste suspendu."}]
     with pytest.raises(SchemaError, match="contrôle daté"):
@@ -382,11 +382,11 @@ def test_a_due_gate_still_takes_precedence_over_staleness(capsys):
 
 
 def observation(**overrides):
-    return gate(when="apres", **overrides)
+    return gate(when="after", **overrides)
 
 
 def precondition(holds=("w32-ven-ef",), **overrides):
-    return gate(when="avant", holds=list(holds), **overrides)
+    return gate(when="before", holds=list(holds), **overrides)
 
 
 def week_with_a_later_session(gates):
@@ -438,7 +438,7 @@ def test_a_precondition_must_name_what_it_holds():
     question asking how session A went is a contradiction that cannot be overlooked;
     that is all a schema can do."""
     broken = plan([session(status="done")])
-    broken["revisions"][0]["gates"] = [gate(when="avant")]
+    broken["revisions"][0]["gates"] = [gate(when="before")]
     with pytest.raises(SchemaError, match="sans `holds`"):
         weekly_plan.validate(broken)
 
@@ -477,7 +477,7 @@ def test_a_new_revision_does_not_persist_a_schema_version(monkeypatch, capsys):
             return {"week": week, "revisions": [revision]}
 
     fresh = written_today(number=1, sessions=[session()])
-    fresh["gates"] = [gate(when="apres")]
+    fresh["gates"] = [gate(when="after")]
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(fresh)))
     monkeypatch.delenv("REDLINE_TURN_ID", raising=False)
 
@@ -526,7 +526,7 @@ def test_plan_cli_distinguishes_preview_from_pending_application(command, monkey
     store = MagicMock()
     store.load_plan.return_value = None
     fresh = written_today(number=1, sessions=[session()])
-    fresh["gates"] = [gate(when="apres")]
+    fresh["gates"] = [gate(when="after")]
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(fresh)))
     monkeypatch.setenv("REDLINE_TURN_ID", "01d5be59-401b-4268-a418-e24d56029fbe")
     frozen_clock(monkeypatch, cli)
@@ -562,7 +562,7 @@ def test_a_week_with_a_plan_and_no_journal_gets_one(tmp_path):
     created = ensure_journals(Store(), tmp_path, today=dt.date(2026, 9, 27))
     assert created == [tmp_path / "athlete" / "journal" / "2026-w39.md"]
     text = created[0].read_text(encoding="utf-8")
-    assert text.startswith("---\ntype: bilan\nsemaine: 2026-W39\nmaj: 2026-09-27\n---")
+    assert text.startswith("---\ntype: weekly-review\nweek: 2026-W39\nupdated: 2026-09-27\n---")
     assert "# Bilan 2026-W39 (21-27 septembre)" in text
     assert "<!-- WEEK_PLAN_START -->\n<!-- WEEK_PLAN_END -->" in text
     assert existing.read_text(encoding="utf-8") == "déjà écrit par le bilan"
@@ -617,7 +617,7 @@ def test_the_volume_is_read_back_and_projected():
 def test_a_new_precondition_no_longer_holds_a_session():
     """Blocking checks almost never failed their criterion, and most session changes
     came from the athlete. The condition goes in the session."""
-    holding = revision(gates=[gate(when="avant", holds=["w32-sam-sl"])])
+    holding = revision(gates=[gate(when="before", holds=["w32-sam-sl"])])
     assert any("ne retient plus de séance" in problem
                for problem in weekly_plan.written_text_errors(holding))
     assert not any("ne retient plus" in problem

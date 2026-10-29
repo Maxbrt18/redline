@@ -1,7 +1,7 @@
 ---
-type: bilan
-semaine: AAAA-Wnn
-maj: AAAA-MM-JJ
+type: weekly-review
+week: AAAA-Wnn
+updated: AAAA-MM-JJ
 ---
 
 # Bilan AAAA-Wnn (JJ mois – JJ mois)

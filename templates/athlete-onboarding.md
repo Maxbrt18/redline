@@ -1,5 +1,5 @@
 ---
-type: gabarit
+type: template
 aliases: [anamnèse, onboarding athlète, athlete-onboarding]
 ---
 

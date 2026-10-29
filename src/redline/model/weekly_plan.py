@@ -88,7 +88,7 @@ SESSION_SCHEMA = Schema("séance planifiée", [
     field("sources", list, minimum=1, item=field("source", str)),
 ])
 
-GATE_WHEN = ("avant", "apres")
+GATE_WHEN = ("before", "after")
 
 
 # A dated condition is typed so it cannot be prescribed around once due.
@@ -103,7 +103,7 @@ GATE_WHEN = ("avant", "apres")
 #             without waiting on itself.
 #
 # An observation written as a precondition would hold the very session it asks about.
-# A gate must decide, and "avant" requires a `holds` that NAMES the held sessions.
+# A gate must decide, and "before" requires a `holds` that NAMES the held sessions.
 # Legacy rows were normalized once in the database, so the current model has no
 # historical dialect to interpret.
 GATE_SCHEMA = Schema("contrôle daté", [
@@ -114,7 +114,7 @@ GATE_SCHEMA = Schema("contrôle daté", [
                "apres = observation, ne retient rien"),
     field("holds", list, required=False, item=field("séance", str),
           note="les identifiants de séance que ce contrôle retient — "
-               "obligatoire si when=avant, interdit si when=apres"),
+               "obligatoire si when=before, interdit si when=after"),
     field("question", str, minimum=10, note="ce qu'il faut demander à l'athlète ce jour-là"),
     field("on_fail", str, minimum=3, note="ce que devient le programme si la réponse est mauvaise"),
 ])
@@ -283,12 +283,12 @@ def written_text_errors(revision: dict, where: str = "revision") -> list[str]:
         # criterion, and nearly all session changes came from an athlete message. The
         # condition is written in the session itself, and the logbook's "clear" alert
         # triggers it.
-        if gate.get("when") == "avant":
+        if gate.get("when") == "before":
             problems.append(
                 f"{where}.gate[{gate.get('id', '?')}] : une pré-condition ne retient plus de "
                 "séance. Écris la condition dans la note de la séance (si la trace est nette "
                 "ce matin : repos) ; le carnet alerte sur une trace nette. Un contrôle sert "
-                "seulement à une observation (when=apres).")
+                "seulement à une observation (when=after).")
     for session in revision.get("sessions") or []:
         for label in ("title", "note"):
             if session.get(label):
@@ -412,13 +412,13 @@ def _gate_typing_errors(gate: dict, where: str, sessions: list[dict]) -> list[st
     when = gate["when"]
     holds = gate.get("holds")
 
-    if when == "apres" and holds:
+    if when == "after" and holds:
         problems.append(
-            f"{where} : when=apres avec `holds` — une observation ne retient rien. Sa "
+            f"{where} : when=after avec `holds` — une observation ne retient rien. Sa "
             "réponse arrive APRÈS les séances, elle ne peut pas être leur condition.")
-    if when == "avant" and not holds:
+    if when == "before" and not holds:
         problems.append(
-            f"{where} : when=avant sans `holds` — nomme les séances que ce contrôle "
+            f"{where} : when=before sans `holds` — nomme les séances que ce contrôle "
             "retient. Un contrôle qui retient « tout » retient aussi celle dont il "
             "attend la réponse.")
 
@@ -435,7 +435,7 @@ def _gate_typing_errors(gate: dict, where: str, sessions: list[dict]) -> list[st
             problems.append(
                 f"{where} : retient « {session_id} » du {known[session_id]}, antérieure "
                 f"à l'échéance {gate['due']} — cette séance aura déjà eu lieu. Une "
-                "condition qui arrive après sa séance est une observation (when=apres).")
+                "condition qui arrive après sa séance est une observation (when=after).")
     return problems
 
 
@@ -603,8 +603,8 @@ def split_by_when(gates: list[dict]) -> tuple[list[dict], list[dict]]:
     Merging them lets an observation carry a precondition's ban on prescribing: the coach
     would ask the question AND hold the card of the session it is asked about.
     """
-    return ([gate for gate in gates if gate["when"] == "avant"],
-            [gate for gate in gates if gate["when"] == "apres"])
+    return ([gate for gate in gates if gate["when"] == "before"],
+            [gate for gate in gates if gate["when"] == "after"])
 
 
 def blocking_gates(plan: dict, today: dt.date | None = None) -> list[dict]:
@@ -697,9 +697,9 @@ def render_journal(plan: dict) -> str:
     # (`apres`) is asked and holds nothing. A view that misstates the rule is worse than
     # no view.
     for kind, titre in (
-        ("avant", "**Pré-conditions** (aucune séance retenue ne se prescrit tant "
+        ("before", "**Pré-conditions** (aucune séance retenue ne se prescrit tant "
                   "qu'une révision ne porte pas la réponse) :"),
-        ("apres", "**Observations** (à poser le jour dit ; elles ne retiennent "
+        ("after", "**Observations** (à poser le jour dit ; elles ne retiennent "
                   "aucune séance) :"),
     ):
         due = [gate for gate in gates if gate["when"] == kind]
@@ -729,7 +729,7 @@ def journal_skeleton(week: str, today: dt.date) -> str:
     span = (f"{monday.day}-{dates.day_month(sunday)}" if monday.month == sunday.month
             else f"{dates.day_month(monday)} - {dates.day_month(sunday)}")
     return "\n".join([
-        "---", "type: bilan", f"semaine: {week}", f"maj: {today.isoformat()}", "---", "",
+        "---", "type: weekly-review", f"week: {week}", f"updated: {today.isoformat()}", "---", "",
         f"# Bilan {week} ({span})", "",
         "> Les séances restent dans le registre. Le programme opérationnel est la révision "
         "PostgreSQL",

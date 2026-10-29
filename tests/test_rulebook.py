@@ -65,7 +65,7 @@ def test_the_wake_trace_cutoff_is_a_local_time():
     (("pain_cap = 2", "pain_cap = 2\ncap_douleur = 3"), "inconnu"),
     (("plafond {pain_cap}/10", "plafond {douleur_max}/10"), "seuil inconnu douleur_max"),
     (('id = "n8"', 'id = "n9"'), "absente du règlement : n8"),
-    (('slug = "terrain"', 'slug = "descente"'), "transition en double : descente"),
+    (('slug = "terrain"', 'slug = "descent"'), "transition en double : descent"),
     (("assimilation_weeks = []", 'assimilation_weeks = ["W35"]'), "semaine ISO"),
     (('slug = "terrain"', 'slug = "Terrain neuf"'), "slug"),
     (('wake_trace_until = "14:00"', 'wake_trace_until = "14h"'), "HH:MM"),

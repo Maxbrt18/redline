@@ -27,6 +27,7 @@ from redline.analysis import ledger, signals
 from redline.coach import dates
 from redline.coach.fr import notebook as notebook_text
 from redline.coach.fr import session_labels
+from redline.coach.fr import weather as weather_labels
 from redline.coach.fr.notebook import HR_REASONS, PAIN_SCALE
 from redline.model import (
     debrief,
@@ -695,8 +696,9 @@ class Board:
         limits = self.instance.hr_bounds if self.instance is not None else None
         seconds = session_detail.zone_seconds(s, limits) if s and limits else None
         conditions = (intake or {}).get("weather") or {}
-        weather = {key: conditions.get(key) for key in (
-            "temp", "feels_like", "humidity", "wind", "conditions", "wbgt")} if conditions else None
+        weather = {**{key: conditions.get(key) for key in (
+            "temp", "feels_like", "humidity", "wind", "wbgt")},
+            "conditions": weather_labels.sky(conditions)} if conditions else None
         wbgt = (intake or {}).get("wbgt_value")
         if weather is None and wbgt is not None:
             weather = {"wbgt": float(wbgt)}

@@ -27,7 +27,7 @@ def _problem(**overrides):
         "race_on": RACE, "weeks": tuple(f"2026-W{n}" for n in range(40, 46)),
         "assimilation": frozenset({"2026-W43"}), "taper": TAPER,
         "fixed": {"2026-W40": (LONG_RUN_STEP,)},
-        "required": ("nocturne", "descente", "reconnaissance"),
+        "required": ("night", "descent", "reconnaissance"),
     }
     payload.update(overrides)
     return Problem(**payload)
@@ -38,9 +38,9 @@ def _problem(**overrides):
 def test_a_missed_transition_opens_nothing_but_a_done_or_future_one_does():
     sessions = [
         _session("faite", "2026-09-22", "terrain", status="done"),
-        _session("manquee", "2026-09-24", "nocturne"),
-        _session("annulee", "2026-09-30", "descente", status="cancelled"),
-        _session("a-venir", "2026-10-03", "qualite"),
+        _session("manquee", "2026-09-24", "night"),
+        _session("annulee", "2026-09-30", "descent", status="cancelled"),
+        _session("a-venir", "2026-10-03", "quality"),
     ]
     found = transitions.opened(sessions, dt.date(2026, 10, 1))
     assert [t.session_id for t in found] == ["faite", "a-venir"]
@@ -48,14 +48,14 @@ def test_a_missed_transition_opens_nothing_but_a_done_or_future_one_does():
 
 def test_a_turn_command_carries_dates_not_text():
     """The `stage_command` path returns `date` values: a revision once crashed on them."""
-    sessions = [_session("a-venir", dt.date(2026, 10, 3), "qualite")]
+    sessions = [_session("a-venir", dt.date(2026, 10, 3), "quality")]
     assert [t.day for t in transitions.opened(sessions, dt.date(2026, 10, 1))] == [
         dt.date(2026, 10, 3)]
 
 
 def test_two_transitions_in_one_week_are_refused():
-    sessions = [_session("a", "2026-10-06", "nocturne"),
-                _session("b", "2026-10-08", "descente")]
+    sessions = [_session("a", "2026-10-06", "night"),
+                _session("b", "2026-10-08", "descent")]
     assert transitions.per_week_errors(sessions, "W41")
     sessions[1]["status"] = "cancelled"
     assert transitions.per_week_errors(sessions, "W41") == []
@@ -66,8 +66,8 @@ def test_the_plan_schema_types_the_transition():
 
     with pytest.raises(SchemaError, match="transition"):
         weekly_plan.validate(plan([session(transition="vma")]))
-    weekly_plan.validate(plan([session(transition="nocturne")]))
-    two = [session("w32-mar-ef", "2026-08-04", transition="nocturne"),
+    weekly_plan.validate(plan([session(transition="night")]))
+    two = [session("w32-mar-ef", "2026-08-04", transition="night"),
            session("w32-jeu-ef", "2026-08-06", transition="terrain")]
     with pytest.raises(SchemaError, match="transitions dans la semaine"):
         weekly_plan.validate(plan(two))
@@ -87,7 +87,7 @@ def test_the_three_race_firsts_fit_once_windows_are_gone():
     for week in ("2026-W41", "2026-W42", "2026-W44", "2026-W45"):
         assert len([i for i in schedule.novelties[week] if i != LONG_RUN_STEP]) <= 1
     placed = {i for items in schedule.novelties.values() for i in items}
-    assert {"nocturne", "descente", "reconnaissance"} <= placed
+    assert {"night", "descent", "reconnaissance"} <= placed
 
 
 def test_too_many_firsts_for_the_weeks_left_names_the_levers():
@@ -148,7 +148,7 @@ def test_build_problem_reads_plans_race_and_done_firsts():
 
 def test_a_freed_week_is_planned_again_and_no_race_is_said():
     store = FakeStore(plans={"2026-W40": {"sessions": [
-        _session("w40-nuit", "2026-10-02", "nocturne")]}})
+        _session("w40-nuit", "2026-10-02", "night")]}})
     problem = feasibility.build_problem(store, [], dt.date(2026, 10, 1),
                                         frozenset({"2026-W40"}))
     assert problem.fixed == {}

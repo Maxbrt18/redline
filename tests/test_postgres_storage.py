@@ -588,7 +588,7 @@ def test_a_removed_gate_requires_an_existing_canonical_observation(store):
 
     first = build_revision(
         1, sessions=[], computed_at="2026-08-09T19:10:00+02:00",
-        gates=[{"id": "w33-genou", "due": "2026-08-14", "when": "apres",
+        gates=[{"id": "w33-genou", "due": "2026-08-14", "when": "after",
                 "question": "Comment est la blessure au réveil ce matin ?",
                 "on_fail": "appliquer le repli prévu"}])
     store.append_plan_revision("2026-W33", first)
@@ -618,7 +618,7 @@ def test_a_due_gate_can_close_on_its_precommitted_fallback(store):
 
     first = build_revision(
         1, sessions=[], computed_at="2026-08-09T19:10:00+02:00",
-        gates=[{"id": "w33-genou", "due": "2026-08-14", "when": "apres",
+        gates=[{"id": "w33-genou", "due": "2026-08-14", "when": "after",
                 "question": "Comment est la blessure au réveil ce matin ?",
                 "on_fail": "appliquer le repli prévu"}])
     store.append_plan_revision("2026-W33", first)
@@ -941,21 +941,21 @@ def test_a_typed_gate_survives_the_round_trip_through_postgresql(store):
         "revision": 1, "computed_at": "2026-08-09T19:10:00+02:00", "reason": "test",
         "sessions": [],
         "gates": [
-            {"id": "g-avant", "due": "2026-08-14", "when": "avant",
+            {"id": "g-before", "due": "2026-08-14", "when": "before",
              "holds": ["w33-jeu-b", "w33-ven-ef"],
              "question": "la blessure au réveil ?", "on_fail": "rest"},
-            {"id": "g-apres", "due": "2026-08-15", "when": "apres",
+            {"id": "g-after", "due": "2026-08-15", "when": "after",
              "question": "la cheville a parlé pendant la pliométrie ?",
              "on_fail": "la pliométrie sort de la séance A"},
         ],
     })
     gates = {gate["id"]: gate for gate in store.load_plan("2026-W33")["revisions"][0]["gates"]}
-    assert gates["g-avant"]["when"] == "avant"
-    assert gates["g-avant"]["holds"] == ["w33-jeu-b", "w33-ven-ef"]
-    assert gates["g-apres"]["when"] == "apres"
+    assert gates["g-before"]["when"] == "before"
+    assert gates["g-before"]["holds"] == ["w33-jeu-b", "w33-ven-ef"]
+    assert gates["g-after"]["when"] == "after"
     # Absent, not None: the schema reads a missing `when` as "written before typing",
     # which an explicit None would not say.
-    assert "holds" not in gates["g-apres"]
+    assert "holds" not in gates["g-after"]
 
 
 def test_a_revision_round_trip_has_no_schema_version(store):
@@ -1493,7 +1493,7 @@ def test_a_bad_gate_resolution_is_refused_before_it_can_cancel_same_turn_facts(s
 
     first = build_revision(
         1, sessions=[], computed_at="2026-08-09T19:10:00+02:00",
-        gates=[{"id": "w33-genou", "due": "2026-08-14", "when": "avant",
+        gates=[{"id": "w33-genou", "due": "2026-08-14", "when": "before",
                 "question": "Comment est la blessure au réveil ce matin ?",
                 "on_fail": "appliquer le repli prévu"}])
     store.append_plan_revision("2026-W33", first)
@@ -2020,7 +2020,7 @@ def test_real_plan_preview_leaves_no_revision_and_revise_still_applies(store, mo
     turn_id = str(uuid.uuid4())
     monkeypatch.setenv("REDLINE_TURN_ID", turn_id)
     fresh = written_today(number=1, sessions=[session()])
-    fresh["gates"] = [gate(when="apres")]
+    fresh["gates"] = [gate(when="after")]
     before = store.counts()
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(fresh)))
     assert cli._database_command(store, "preview", "2026-W32", False) == 0
@@ -2227,11 +2227,11 @@ def test_a_typed_transition_round_trips_and_opens_no_window(store):
     from test_weekly_plan import revision as build_revision
     from test_weekly_plan import session
 
-    night = session("w41-jeu-nuit", "2026-10-08", transition="nocturne")
+    night = session("w41-jeu-nuit", "2026-10-08", transition="night")
     store.append_plan_revision("2026-W41", build_revision(
         1, sessions=[night], computed_at="2026-10-04T19:00:00+02:00"))
     loaded = store.load_plan("2026-W41")["revisions"][-1]["sessions"][0]
-    assert loaded["transition"] == "nocturne"
+    assert loaded["transition"] == "night"
     assert store.active_plans()["2026-W41"]["sessions"][0]["id"] == "w41-jeu-nuit"
     store.add_observation({
         "occurred_on": dt.date(2026, 10, 8), "kind": "easy",
@@ -2241,10 +2241,10 @@ def test_a_typed_transition_round_trips_and_opens_no_window(store):
     assert store.active_plans()["2026-W41"]["sessions"][0]["status"] == "done"
 
     # Weeks later, a new transition can be written: the gate decides, not the calendar.
-    descent = session("w44-mar-desc", "2026-10-27", transition="descente")
+    descent = session("w44-mar-desc", "2026-10-27", transition="descent")
     store.append_plan_revision("2026-W44", build_revision(
         1, sessions=[descent], computed_at="2026-10-25T19:00:00+02:00"))
-    assert store.active_plans()["2026-W44"]["sessions"][0]["transition"] == "descente"
+    assert store.active_plans()["2026-W44"]["sessions"][0]["transition"] == "descent"
 
 
 def test_a_staged_revision_with_a_transition_is_applied(store):
@@ -2255,10 +2255,10 @@ def test_a_staged_revision_with_a_transition_is_applied(store):
     turn_id = "0b7d8c1e-3a4f-4e44-9a1e-6f0c2d9b7a11"
     store.stage_command(turn_id, "plan:2026-W41:r1", "plan.revise", {
         "week": "2026-W41", "revision": build_revision(
-            1, sessions=[session("w41-jeu-nuit", "2026-10-08", transition="nocturne")],
+            1, sessions=[session("w41-jeu-nuit", "2026-10-08", transition="night")],
             computed_at="2026-10-04T19:00:00+02:00")})
     assert store.apply_turn_with_receipts(turn_id)[0] == 1
-    assert store.load_plan("2026-W41")["revisions"][0]["sessions"][0]["transition"] == "nocturne"
+    assert store.load_plan("2026-W41")["revisions"][0]["sessions"][0]["transition"] == "night"
 
 
 # ---- Notebook: real SQL rights, real revocation, real HTTP boundaries.

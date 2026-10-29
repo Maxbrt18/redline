@@ -52,9 +52,9 @@ def test_due_gates_reads_the_context_already_loaded():
     precondition from an observation, is declared by the model.
     """
     context = json.dumps({"revision": 3, "gates": [
-        {"id": "g1", "due": "2026-08-12", "when": "avant", "holds": ["s1"],
+        {"id": "g1", "due": "2026-08-12", "when": "before", "holds": ["s1"],
          "question": "la blessure ?", "on_fail": "rest"},
-        {"id": "g2", "due": "2026-08-14", "when": "apres",
+        {"id": "g2", "due": "2026-08-14", "when": "after",
          "question": "plus tard", "on_fail": "rest"},
     ]})
     blocking, observing = due_gates_by_kind(context, today="2026-08-12")
@@ -138,7 +138,7 @@ def plan_context(revision_number=2, gates=None):
 
 
 DUE_GATE = [{"id": "w33-genou", "due": "2000-01-01",
-             "when": "avant", "holds": ["w33-ef"],
+             "when": "before", "holds": ["w33-ef"],
              "question": "La blessure au réveil ce matin, mieux ou pire qu'hier ?",
              "on_fail": "repos à la place de l'EF"}]
 
@@ -285,7 +285,7 @@ def test_an_observation_gate_leaves_the_week_prescriptible():
     from redline.model import weekly_plan
 
     p = plan([session(status="done")])
-    p["revisions"][0]["gates"] = [gate(when="apres")]
+    p["revisions"][0]["gates"] = [gate(when="after")]
     today = dt.date(2026, 8, 8)
     assert weekly_plan.due_gates(p, today=today)          # the question is asked
     assert weekly_plan.blocking_gates(p, today=today) == []   # it closes nothing
@@ -298,9 +298,9 @@ def test_the_two_kinds_reach_the_prompt_as_two_separate_instructions():
     from redline.service.prompts import gate_note
 
     context = json.dumps({"revision": 3, "gates": [
-        {"id": "g1", "due": "2026-08-18", "when": "avant", "holds": ["s1"],
+        {"id": "g1", "due": "2026-08-18", "when": "before", "holds": ["s1"],
          "question": "la blessure au réveil ?", "on_fail": "rest"},
-        {"id": "g2", "due": "2026-08-18", "when": "apres",
+        {"id": "g2", "due": "2026-08-18", "when": "after",
          "question": "la cheville a parlé pendant la pliométrie ?", "on_fail": "on retire"},
     ]})
     blocking, observing = due_gates_by_kind(context, today="2026-08-18")
@@ -321,7 +321,7 @@ def test_the_two_kinds_reach_the_prompt_as_two_separate_instructions():
 def test_a_lone_observation_produces_no_prohibition_at_all():
     from redline.service.prompts import gate_note
 
-    note = gate_note([], [{"id": "g", "due": "2026-08-18", "when": "apres",
+    note = gate_note([], [{"id": "g", "due": "2026-08-18", "when": "after",
                            "question": "la cheville ?", "on_fail": "on retire"}])
     assert "NE PRESCRIS" not in note
     assert gate_note([], []) == ""
