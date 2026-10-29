@@ -607,7 +607,7 @@ def esculier_check(rows: list[Row], zone: str,
                                       f"→ réduction immédiate"))
         after = wake.get(row.date + dt.timedelta(days=1))
         if after is None:
-            if pain > 0 and row.date >= table.COMPLETENESS_FROM:
+            if pain > 0 and row.date >= table.completeness_from():
                 flags.append(EsculierFlag(row.date, "non vérifié",
                                           f"{row.type} à {pain}/10, aucune lecture "
                                           f"« reveil » le lendemain"))
@@ -869,8 +869,8 @@ class Stall:
         line = (f"{head}Plus longue sans nouveau record depuis {self.weeks} semaine(s) "
                 f"close(s) — record {self.record_km:.1f} km en {self.record_week}")
         if self.triggered:
-            line += (" · scénario 9 du pré-mortem : le protocole d'instruction des baisses "
-                     "(goals.md) s'ouvre maintenant, sans attendre son jalon daté")
+            line += (" · règle s9 : le protocole d'instruction des baisses s'ouvre "
+                     "maintenant, sans attendre son jalon daté")
         return line
 
 

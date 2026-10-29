@@ -1,8 +1,8 @@
 """The coach's texts in French.
 
-`prompts/` holds the long instructions as Markdown. A file under `prompts/notes/` is one
-paragraph wrapped for reading: its line breaks are read as spaces. `messages.py` holds
-the short texts that take values.
+`prompts/` holds every text as Markdown, a `{name}` standing for a value the service
+fills in. A file under `prompts/notes/` is one paragraph wrapped for reading: its line
+breaks are read as spaces. `labels.py` holds the short labels looked up by key.
 """
 
 from __future__ import annotations

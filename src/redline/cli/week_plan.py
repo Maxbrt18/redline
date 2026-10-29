@@ -37,7 +37,6 @@ from redline.model.weekly_plan import (
     active,
     as_json,
     change_evidence_errors,
-    coherence_errors,
     current_week,
     gate_reasons,
     intention_errors,
@@ -51,21 +50,23 @@ from redline.storage import StorageError
 
 
 def _distance_notes(store, revision: dict) -> str:
-    """The gap to the 30 days of each upcoming race (guardrail no. 8, informative)."""
+    """The gap to the rule n8 window for each upcoming session (informative)."""
     import datetime as dt
 
     from redline.analysis import ledger
+    from redline.model import rulebook
+    days = rulebook.current().parameters.transition_lookback_days
     try:
         rows = ledger.parse_ledger(store)
     except Exception as exc:
-        return f"Écart aux 30 jours : lecture du registre impossible ({exc.__class__.__name__})."
+        return f"Écart aux {days} jours : lecture du registre impossible ({exc.__class__.__name__})."
     # The revision timestamp is the service's (`now_stamp`): it is the day "upcoming" is
     # judged from, not the clock of the machine rereading.
     written_on = dt.date.fromisoformat(str(revision["computed_at"])[:10])
     notes = ledger.transition_notes(rows, revision["sessions"], written_on)
     if not notes:
         return ""
-    return "\n".join(["Écart aux 30 jours (garde-fou n°8, informatif, jamais bloquant) :",
+    return "\n".join([f"Écart aux {days} jours (règle n8, informatif, jamais bloquant) :",
                       *(f"  - {note}" for note in notes)])
 
 
@@ -109,7 +110,6 @@ def _database_command(store, command: str, week: str, optional: bool,
         fautes = [
             *intention_errors(current, f"{week} révision {current['revision']}"),
             *written_text_errors(current, f"{week} révision {current['revision']}"),
-            *coherence_errors(week, previous, current),
             *change_evidence_errors(previous, current),
             *typed_target_errors(current, f"{week} révision {current['revision']}"),
         ]

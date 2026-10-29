@@ -17,8 +17,8 @@ from redline.service.proactive_messages import (
 @pytest.mark.parametrize("kind,detail,fragment", [
     ("silence", "4", "4 jours"),
     ("ledger_incomplete", json.dumps({
-        "date": "2026-08-22", "type": "easy", "missing": ["RPE", "Dlr"],
-        "markers": ["2026-08-22:easy:RPE", "2026-08-22:easy:Dlr"],
+        "date": "2026-08-22", "type": "easy", "missing": ["rpe", "pain"],
+        "markers": ["2026-08-22:easy:rpe", "2026-08-22:easy:pain"],
     }), "pic de douleur"),
     ("missed_session", '{"title":"EF 7 km"}', "EF 7 km"),
     ("gut_review", '{"title":"SL","target_g_h":60}', "glucides par heure"),
@@ -76,23 +76,23 @@ def test_a_queued_missed_session_is_rechecked_before_delivery(make_bot, store, s
 
 def test_closed_ledger_claim_marks_exactly_the_cells_that_were_delivered(make_bot, store):
     detail = json.dumps({
-        "date": "2026-08-22", "type": "easy", "missing": ["RPE"],
+        "date": "2026-08-22", "type": "easy", "missing": ["rpe"],
         "markers": ["cell-1"],
     })
     bot = make_bot(
         proactive_active_start=dtime(0, 0))
     bot._repo.pending_ledger_cells.return_value = [
-        {"date": "2026-08-22", "type": "easy", "missing": ["RPE"]}]
+        {"date": "2026-08-22", "type": "easy", "missing": ["rpe"]}]
 
     bot._respond_proactive(ProactiveJob(
         psid="4242", kind="ledger_incomplete", prompt="", detail=detail))
 
-    assert store.proactive.marked("asked:2026-08-22:easy:RPE")
+    assert store.proactive.marked("asked:2026-08-22:easy:rpe")
 
 
 def test_a_closed_claim_asks_one_metric_and_marks_only_that_metric():
     rendered = compose_closed_proactive("ledger_incomplete", json.dumps({
-        "date": "2026-09-05", "type": "easy", "missing": ["RPE", "Dlr", "Plaisir"],
+        "date": "2026-09-05", "type": "easy", "missing": ["rpe", "pain", "enjoyment"],
         "markers": ["rpe", "pain", "enjoyment"],
     }))
     assert "pic de douleur" in rendered.text
@@ -102,8 +102,8 @@ def test_a_closed_claim_asks_one_metric_and_marks_only_that_metric():
 
 def test_a_wake_claim_is_never_rendered_as_a_numeric_evening_question():
     rendered = compose_closed_proactive("ledger_incomplete", json.dumps({
-        "date": "2026-09-14", "type": "wake-trace", "missing": ["Dlr"],
-        "markers": ["2026-09-14:wake-trace:Dlr"],
+        "date": "2026-09-14", "type": "wake-trace", "missing": ["pain"],
+        "markers": ["2026-09-14:wake-trace:pain"],
     }))
 
     assert rendered is None
@@ -112,8 +112,8 @@ def test_a_wake_claim_is_never_rendered_as_a_numeric_evening_question():
 def test_a_queued_wake_claim_is_discarded_without_message_or_agent(make_bot, store):
     bot = make_bot(proactive_active_start=dtime(0, 0))
     detail = json.dumps({
-        "date": "2026-09-14", "type": "wake-trace", "missing": ["Dlr"],
-        "markers": ["2026-09-14:wake-trace:Dlr"],
+        "date": "2026-09-14", "type": "wake-trace", "missing": ["pain"],
+        "markers": ["2026-09-14:wake-trace:pain"],
     })
     job_id = "cells:2026-09-15"
     store.proactive.enqueue_job(job_id, "ledger_incomplete", detail, 0)
@@ -130,7 +130,7 @@ def test_a_queued_wake_claim_is_discarded_without_message_or_agent(make_bot, sto
 def test_a_queued_claim_does_not_repeat_a_value_received_since_it_was_queued(make_bot, store):
     bot = make_bot(proactive_active_start=dtime(0, 0))
     bot._repo.pending_ledger_cells.return_value = []
-    detail = json.dumps({"date": "2026-09-05", "type": "easy", "missing": ["RPE"]})
+    detail = json.dumps({"date": "2026-09-05", "type": "easy", "missing": ["rpe"]})
     store.proactive.enqueue_job("cells:test", "ledger_incomplete", detail, 0)
     bot._respond_proactive(ProactiveJob(psid="4242", kind="ledger_incomplete", prompt="",
                                        detail=detail, job_id="cells:test"))
@@ -153,7 +153,7 @@ def test_queued_rotation_check_is_discarded_without_message_or_agent(make_bot):
     ("gut_review", '{"title":"SL"}', True),
     ("gear_alert", '{"name":"Novablast","km":540,"limit":600}', True),
     ("ledger_incomplete", json.dumps({
-        "date": "2026-08-22", "type": "easy", "missing": ["RPE"], "markers": ["m"]}), True),
+        "date": "2026-08-22", "type": "easy", "missing": ["rpe"], "markers": ["m"]}), True),
     # Neither debt nor agenda: social check-in, text written outside the service.
     ("silence", "4", False),
     ("operator_message", '{"text":"Bilan W39 : semaine tenue."}', False),
@@ -218,11 +218,11 @@ def test_with_a_connected_notebook_the_evening_claim_is_a_button_not_a_question(
     bot = make_bot(agent=agent, proactive_active_start=dtime(0, 0))
     _connected_notebook(bot)
     bot._repo.pending_ledger_cells.return_value = [
-        {"date": "2026-10-08", "type": "easy", "missing": ["RPE", "Dlr", "Plaisir"]}]
+        {"date": "2026-10-08", "type": "easy", "missing": ["rpe", "pain", "enjoyment"]}]
 
     bot._respond_proactive(ProactiveJob(
         psid="4242", kind="ledger_incomplete", prompt="", detail=json.dumps(
-            {"date": "2026-10-08", "type": "easy", "missing": ["RPE"]})))
+            {"date": "2026-10-08", "type": "easy", "missing": ["rpe"]})))
 
     assert agent.calls == []
     bot._client.send_burst.assert_not_called()
@@ -231,8 +231,8 @@ def test_with_a_connected_notebook_the_evening_claim_is_a_button_not_a_question(
                     "ton plaisir : un tap dans le carnet.")
     assert url.endswith("#t=jeton") and title == "Ouvrir mon carnet"
     # One reminder per cell: the next day, the safety net does not ask for it again.
-    assert store.proactive.marked("asked:2026-10-08:easy:RPE")
-    assert store.proactive.marked("asked:2026-10-08:easy:Plaisir")
+    assert store.proactive.marked("asked:2026-10-08:easy:rpe")
+    assert store.proactive.marked("asked:2026-10-08:easy:enjoyment")
 
 
 def test_without_a_connected_notebook_the_evening_claim_still_asks_in_messenger(
@@ -240,11 +240,11 @@ def test_without_a_connected_notebook_the_evening_claim_still_asks_in_messenger(
     bot = make_bot(proactive_active_start=dtime(0, 0))
     _connected_notebook(bot, connected=False)
     bot._repo.pending_ledger_cells.return_value = [
-        {"date": "2026-10-08", "type": "easy", "missing": ["RPE"]}]
+        {"date": "2026-10-08", "type": "easy", "missing": ["rpe"]}]
 
     bot._respond_proactive(ProactiveJob(
         psid="4242", kind="ledger_incomplete", prompt="", detail=json.dumps(
-            {"date": "2026-10-08", "type": "easy", "missing": ["RPE"]})))
+            {"date": "2026-10-08", "type": "easy", "missing": ["rpe"]})))
 
     bot._client.send_button.assert_not_called()
     assert "RPE global sur 10" in bot._client.send_burst.call_args.args[1]
@@ -252,7 +252,7 @@ def test_without_a_connected_notebook_the_evening_claim_still_asks_in_messenger(
 
 def test_the_notebook_reminder_never_carries_a_wake_trace():
     assert missing_cells_in_notebook(json.dumps(
-        {"date": "2026-10-08", "type": "wake-trace", "missing": ["Dlr"]})) is None
+        {"date": "2026-10-08", "type": "wake-trace", "missing": ["pain"]})) is None
 
 
 def test_the_carnet_note_reaches_the_turns_that_used_to_ask(make_bot):

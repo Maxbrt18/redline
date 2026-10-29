@@ -16,8 +16,8 @@ from datetime import datetime, timedelta
 
 from . import clock, persona
 from .agent import (
-    HOLDING_MAX_CHARS,
     PROACTIVE_REPLY_SCHEMA,
+    TRIAGE_SCHEMA,
     ActiveRuns,
     AgentActivity,
     FailureKind,
@@ -26,16 +26,16 @@ from .agent import (
     SessionMode,
     Triage,
     live_session,
+    parse_triage,
     structured_reply,
 )
 from .config import Config, sandbox_overrides
-from .prompts import DEFAULT_DEPTH, STYLE_PROMPT, TRIAGE_PROMPT, instruction_digest, with_turn_input
+from .prompts import STYLE_PROMPT, TRIAGE_PROMPT, instruction_digest, with_turn_input
 from .routing import Route
 from .state import StateStore
 
 log = logging.getLogger("redline")
 
-_DEPTH = re.compile(r"\bN[0-3]\b", re.IGNORECASE)
 _RESET_EPOCH = re.compile(r"\|(\d{9,})")
 _RESET_CLOCK = re.compile(r"reset[s]?\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?", re.IGNORECASE)
 
@@ -263,6 +263,7 @@ class ClaudeCodeRunner:
         candidates = (spec or route.primary, *route.fallbacks)
         for attempt, candidate in enumerate(candidates, start=1):
             command = [self._config.claude_bin, "-p", self._personal(TRIAGE_PROMPT + message),
+                       "--output-format", "json", "--json-schema", json.dumps(TRIAGE_SCHEMA),
                        *CONFINEMENT]
             if candidate.model:
                 command += ["--model", candidate.model]
@@ -288,10 +289,11 @@ class ClaudeCodeRunner:
                 log.warning("Triage Claude échoué (%d/%d, code %d)",
                             attempt, len(candidates), proc.returncode)
                 continue
-            parsed = self._parse_triage(proc.stdout or "")
-            if parsed is not None:
-                return parsed
-            log.warning("Triage Claude illisible (%d/%d)", attempt, len(candidates))
+            try:
+                return parse_triage(json.loads(proc.stdout or "{}")["structured_output"])
+            except (ValueError, TypeError, KeyError) as exc:
+                log.warning("Triage Claude illisible (%d/%d, %s)",
+                            attempt, len(candidates), exc)
         log.warning("Triage Claude indisponible après %d profils ; repli sur N1",
                     len(candidates))
         return Triage()
@@ -336,34 +338,6 @@ class ClaudeCodeRunner:
         """Claude Code keeps no process between two turns."""
         for psid in self._runs.psids():
             self.cancel(psid)
-
-    @staticmethod
-    def _parse_triage(raw: str) -> Triage | None:
-        """Parse without hiding a missing result, so the fallback can kick in."""
-        line = next((part.strip() for part in (raw or "").splitlines() if part.strip()), "")
-        fields = [field.strip() for field in line.split("|")]
-        match = _DEPTH.search(fields[0] if fields else "")
-        if not match:
-            log.warning("Triage returned no level (%r): falling back to %s",
-                        line[:80], DEFAULT_DEPTH)
-            return None
-        depth = match.group(0).upper()
-        emotional = len(fields) > 1 and fields[1].upper() == "E"
-        holding = fields[2].strip() if len(fields) > 2 else ""
-        plan_change = len(fields) > 3 and fields[3].upper() == "P"
-        plan_asked = len(fields) > 4 and fields[4].upper() == "D"
-        plan_scope = fields[5].lower() if len(fields) > 5 else (
-            "remaining" if plan_asked else "none")
-        if plan_scope not in {"none", "today", "next", "remaining", "full"}:
-            plan_scope = "remaining" if plan_asked else "none"
-        if plan_asked != (plan_scope != "none"):
-            plan_scope = "remaining" if plan_asked else "none"
-        if len(holding) > HOLDING_MAX_CHARS:
-            log.info("Triage holding line dropped (%d chars): the model answered instead "
-                     "of announcing the wait", len(holding))
-            holding = ""
-        return Triage(
-            depth, emotional, holding or None, plan_change, plan_asked, plan_scope)
 
     @staticmethod
     def _consume(lines: Iterable[str]) -> _Stream:

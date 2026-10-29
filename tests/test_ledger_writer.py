@@ -20,12 +20,12 @@ from redline.model import ledger as table
 # --------------------------------------------------------------- rounding
 
 @pytest.mark.parametrize("column, source, written", [
-    ("FCmoy", "156.61", "157"),      # average_heartrate
-    ("Cad", "168.884", "169"),       # average_cadence x2
-    ("D+", "64.7", "65"),            # elevation_gain
-    ("WBGT", "-3.4", "-3"),          # a winter night, and the sign matters
+    ("hr_avg", "156.61", "157"),      # average_heartrate
+    ("cadence", "168.884", "169"),       # average_cadence x2
+    ("dplus", "64.7", "65"),            # elevation_gain
+    ("wbgt", "-3.4", "-3"),          # a winter night, and the sign matters
     ("km", "6.8396", "6.84"),
-    ("FCmoy", "156,61", "157"),      # a decimal comma comes from the same prose
+    ("hr_avg", "156,61", "157"),      # a decimal comma comes from the same prose
 ])
 def test_strava_rend_des_flottants_et_la_colonne_les_veut_entiers(column, source, written):
     """The source lies about the type, and the rounding lives here."""
@@ -49,10 +49,10 @@ def test_une_cellule_deja_conforme_nest_jamais_retouchee():
         for value in ("", table.UNKNOWN):
             assert table.canonical_value(item.name, value) == value
     conforming = {
-        "Date": "2026-08-10", "Type": "easy", "km": "6.84", "Temps": "0:41:56",
-        "Allure": "6:08", "FCmoy": "157", "FCmax": "168", "Cad": "169",
-        "D+": "65", "D-": "64", "WBGT": "20", "RPE": "2",
-        "Plaisir": "6", "Strava": "90000000003", "Note": "EF du jour",
+        "date": "2026-08-10", "type": "easy", "km": "6.84", "time": "0:41:56",
+        "pace": "6:08", "hr_avg": "157", "hr_max": "168", "cadence": "169",
+        "dplus": "65", "dminus": "64", "wbgt": "20", "rpe": "2",
+        "enjoyment": "6", "strava": "90000000003", "note": "EF du jour",
     }
     for name, value in conforming.items():
         assert table.canonical_value(name, value) == value
@@ -60,8 +60,8 @@ def test_une_cellule_deja_conforme_nest_jamais_retouchee():
 
 def test_ce_qui_nest_pas_un_nombre_nest_pas_inventé():
     """A range ("1-2") has no rounding: data is not fabricated."""
-    assert table.canonical_value("RPE", "1-2") == "1-2"
-    assert table.canonical_value("Type", "footing") == "footing"
+    assert table.canonical_value("rpe", "1-2") == "1-2"
+    assert table.canonical_value("type", "footing") == "footing"
 
 
 # --------------------------------------------------------------- the typed writer
@@ -72,12 +72,12 @@ def test_lecrivain_type_arrondit_ce_que_strava_rend(monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", [
         "ledger-add", "--dry-run",
         "--date", "2026-08-10", "--type", "easy",
-        "--km", "6.8396", "--temps", "0:41:56", "--allure", "6:08", "--fcmoy", "156.61",
-        "--fcmax", "168", "--cad", "168.884", "--dplus", "64.7", "--dmoins", "64",
+        "--km", "6.8396", "--time", "0:41:56", "--pace", "6:08", "--hr-avg", "156.61",
+        "--hr-max", "168", "--cadence", "168.884", "--dplus", "64.7", "--dminus", "64",
         "--wbgt", "20", "--strava", "90000000003", "--note", "EF | du jour"])
     assert add.main() == 0
     captured = capsys.readouterr()
-    assert "'FCmoy': '157'" in captured.out and "'km': '6.84'" in captured.out
+    assert "'hr_avg': '157'" in captured.out and "'km': '6.84'" in captured.out
     assert "EF | du jour" in captured.out  # PostgreSQL keeps the text, pipe included.
 
 
@@ -87,7 +87,7 @@ def test_lecrivain_type_refuse_en_nommant_la_colonne(monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", [
         "ledger-add", "--date", "2026-08-10", "--type", "footing", "--km", "6.84"])
     assert add.main() == 1
-    assert "Type" in capsys.readouterr().err
+    assert "type" in capsys.readouterr().err
 
 
 def _zones(monkeypatch, add, zones=("genou",)):
@@ -118,7 +118,7 @@ def test_le_mot_de_alex_devient_la_valeur(monkeypatch, capsys, word, value):
         "ledger-add", "--dry-run", "--date", "2026-10-11", "--type", "wake-trace",
         "--pain", word])
     assert add.main() == 0
-    assert f"'Dlr': {{'genou': '{value}'}}" in capsys.readouterr().out
+    assert f"'pain': {{'genou': '{value}'}}" in capsys.readouterr().out
 
 
 def test_avec_plusieurs_zones_chaque_douleur_nomme_la_sienne(monkeypatch, capsys):
@@ -128,7 +128,7 @@ def test_avec_plusieurs_zones_chaque_douleur_nomme_la_sienne(monkeypatch, capsys
         "ledger-add", "--dry-run", "--date", "2026-10-11", "--type", "easy",
         "--pain", "talon=2", "--pain", "cheville=?"])
     assert add.main() == 0
-    assert "'Dlr': {'talon': '2', 'cheville': '?'}" in capsys.readouterr().out
+    assert "'pain': {'talon': '2', 'cheville': '?'}" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("given, refused", [
@@ -172,7 +172,7 @@ def test_existing_observation_is_rejected_before_staging(monkeypatch):
     monkeypatch.setattr(redline.storage, "Database", MagicMock())
     monkeypatch.setattr(redline.storage, "OperationalStore", lambda *args: store)
     with pytest.raises(writer.table.LedgerError, match=r"ledger-complete"):
-        writer._write_database("test", {"Date": "2026-09-11", "Type": "easy"}, {},
+        writer._write_database("test", {"date": "2026-09-11", "type": "easy"}, {},
                                "strava:90000000004")
     store.stage_command.assert_not_called()
     store.add_observation.assert_not_called()

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from . import session_kinds
-from .errors import InputError
+from .errors import ConfigError, InputError
 from .schema import Schema, field
 
 UNKNOWN = "?"
@@ -25,7 +25,6 @@ class ObservationInput:
 
     name: str
     pattern: str
-    option: str = ""
     metric: str = ""
     decimals: int | None = None
     required: bool = False
@@ -35,27 +34,27 @@ class ObservationInput:
 
 STRAVA_ID_PATTERN = r"\d{9,12}"
 INPUTS = (
-    ObservationInput("Date", r"\d{4}-\d{2}-\d{2}", required=True),
-    ObservationInput("Type", "|".join(SESSION_TYPES), required=True),
-    ObservationInput("Routine", r"[a-z0-9][a-z0-9-]{0,39}",
+    ObservationInput("date", r"\d{4}-\d{2}-\d{2}", required=True),
+    ObservationInput("type", "|".join(SESSION_TYPES), required=True),
+    ObservationInput("routine", r"[a-z0-9][a-z0-9-]{0,39}",
                      note="la routine de renfo, telle que sa fiche la déclare"),
     ObservationInput("km", r"\d+(\.\d{1,2})?", metric="distance_km", decimals=2),
-    ObservationInput("Temps", r"\d{1,2}:\d{2}(:\d{2})?", metric="duration_s"),
-    ObservationInput("Allure", r"\d:\d{2}", metric="pace_s_per_km", note="min/km"),
-    ObservationInput("FCmoy", r"\d{2,3}", metric="hr_avg_bpm", decimals=0),
-    ObservationInput("FCmax", r"\d{2,3}", metric="hr_max_bpm", decimals=0),
-    ObservationInput("Cad", r"\d{3}", metric="cadence_spm", decimals=0,
+    ObservationInput("time", r"\d{1,2}:\d{2}(:\d{2})?", metric="duration_s"),
+    ObservationInput("pace", r"\d:\d{2}", metric="pace_s_per_km", note="min/km"),
+    ObservationInput("hr_avg", r"\d{2,3}", metric="hr_avg_bpm", decimals=0),
+    ObservationInput("hr_max", r"\d{2,3}", metric="hr_max_bpm", decimals=0),
+    ObservationInput("cadence", r"\d{3}", metric="cadence_spm", decimals=0,
                      note="pas/min, deux pieds — Strava affiche une jambe"),
-    ObservationInput("D+", r"\d+", option="dplus", metric="elevation_gain_m", decimals=0),
-    ObservationInput("D-", r"\d+", option="dmoins", metric="elevation_loss_m", decimals=0),
-    ObservationInput("WBGT", r"-?\d{1,2}", metric="wbgt_c", decimals=0,
+    ObservationInput("dplus", r"\d+", metric="elevation_gain_m", decimals=0),
+    ObservationInput("dminus", r"\d+", metric="elevation_loss_m", decimals=0),
+    ObservationInput("wbgt", r"-?\d{1,2}", metric="wbgt_c", decimals=0,
                      note="°C, charge thermique — jamais un plafond"),
-    ObservationInput("RPE", r"(10|\d)(\.\d)?", metric="rpe", decimals=1,
+    ObservationInput("rpe", r"(10|\d)(\.\d)?", metric="rpe", decimals=1,
                      unavailable=True),
-    ObservationInput("Plaisir", r"10|\d", metric="enjoyment", decimals=0,
+    ObservationInput("enjoyment", r"10|\d", metric="enjoyment", decimals=0,
                      unavailable=True),
-    ObservationInput("Strava", STRAVA_ID_PATTERN),
-    ObservationInput("Note", r".*"),
+    ObservationInput("strava", STRAVA_ID_PATTERN),
+    ObservationInput("note", r".*"),
 )
 
 
@@ -106,15 +105,17 @@ def required_columns(kind: str) -> tuple[str, ...]:
     zone (`requires_pain`)."""
     needed: list[str] = []
     if kind in EFFORT_TYPES:
-        needed.append("RPE")
+        needed.append("rpe")
     if kind in ENJOYMENT_TYPES:
-        needed.append("Plaisir")
+        needed.append("enjoyment")
     return tuple(needed)
 
 
 # ------------------------------------------------------------- pain per zone
-#: The pain column of a zone, as a gap names it: « Dlr:genou ».
-PAIN_COLUMN = "Dlr"
+#: The pain column of a zone, as a gap names it: « pain:genou ».
+PAIN_COLUMN = "pain"
+#: The columns the athlete declares, in the order they are asked; the others are measured.
+DECLARED_COLUMNS = (PAIN_COLUMN, "rpe", "enjoyment")
 PAIN_PATTERN = r"(10|\d)(\.\d)?"
 PAIN_NOTE = "le pic de la séance, pas la moyenne"
 
@@ -129,7 +130,7 @@ def pain_column(zone: str) -> str:
 
 
 def column_base(column: str) -> str:
-    """`Dlr:genou` -> `Dlr`; other columns stay as they are."""
+    """`pain:genou` -> `pain`; other columns stay as they are."""
     return column.split(":", 1)[0]
 
 
@@ -198,13 +199,22 @@ def pain_reading(value: str) -> dict:
     return {"state": "known", "value": float(number)}
 
 
-# Earlier observations were written under a less demanding contract.
-COMPLETENESS_FROM = dt.date(2026, 7, 30)
+def completeness_from() -> dt.date:
+    """The first day whose observations must be complete (`[ledger] complete_from` in
+    `redline.toml`): an instance that adopts the contract late is not asked for its
+    history. Without a readable instance, every day."""
+    from . import instance, paths
+    try:
+        return instance.load(paths.vault_root()).complete_from
+    except ConfigError:
+        return dt.date.min
+
+
 COMPLETION_WINDOW = dt.timedelta(days=2)
 
 METRIC_COLUMNS = {
-    "rpe": "RPE", "enjoyment": "Plaisir",
-    "elevation_gain_m": "D+", "elevation_loss_m": "D-",
+    "rpe": "rpe", "enjoyment": "enjoyment",
+    "elevation_gain_m": "dplus", "elevation_loss_m": "dminus",
 }
 
 
@@ -238,9 +248,10 @@ def missing_observation_fields(observation: dict) -> list[str]:
 def _observation_gaps(observations: list[dict], today: dt.date,
                       *, pending: bool) -> list[dict]:
     gaps = []
+    start = completeness_from()
     for observation in observations:
         day = observation.get("occurred_on")
-        if not isinstance(day, dt.date) or day < COMPLETENESS_FROM:
+        if not isinstance(day, dt.date) or day < start:
             continue
         if (today - day < COMPLETION_WINDOW) != pending:
             continue

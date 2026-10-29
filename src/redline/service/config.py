@@ -88,7 +88,7 @@ def _envbool(name: str, default: bool) -> bool:
         return True
     if value in ("0", "false", "no", "off", "non"):
         return False
-    raise SystemExit(f"{name} invalid: {raw!r} (boolean expected)")
+    raise ConfigError(f"{name} invalid: {raw!r} (boolean expected)")
 
 
 def _envint(name: str, default: int) -> int:
@@ -98,7 +98,7 @@ def _envint(name: str, default: int) -> int:
     try:
         return int(raw)
     except ValueError:
-        raise SystemExit(f"{name} invalid: {raw!r} (integer expected)") from None
+        raise ConfigError(f"{name} invalid: {raw!r} (integer expected)") from None
 
 
 def _envfloat(name: str, default: float) -> float:
@@ -108,7 +108,7 @@ def _envfloat(name: str, default: float) -> float:
     try:
         return float(raw)
     except ValueError:
-        raise SystemExit(f"{name} invalid: {raw!r} (number expected)") from None
+        raise ConfigError(f"{name} invalid: {raw!r} (number expected)") from None
 
 
 def _envtime(name: str, default: str) -> dtime | None:
@@ -120,7 +120,7 @@ def _envtime(name: str, default: str) -> dtime | None:
         hh, _, mm = raw.partition(":")
         return dtime(int(hh), int(mm or 0))
     except ValueError:
-        raise SystemExit(f"{name} invalid: {raw!r} (HH:MM format expected)") from None
+        raise ConfigError(f"{name} invalid: {raw!r} (HH:MM format expected)") from None
 
 
 def _load_instance(vault_path: str) -> Instance:
@@ -134,7 +134,13 @@ def _load_instance(vault_path: str) -> Instance:
         rulebook_model.load(Path(vault_path))
         return instance_model.load(Path(vault_path))
     except (instance_model.InstanceError, rulebook_model.RulebookError) as exc:
-        raise SystemExit(str(exc)) from None
+        raise ConfigError(str(exc)) from None
+
+
+def _routing_file() -> Path | None:
+    """The operator's routing overrides (`REDLINE_ROUTING`), if any."""
+    raw = (os.environ.get("REDLINE_ROUTING") or "").strip()
+    return Path(raw).expanduser() if raw else None
 
 
 @dataclass(frozen=True)
@@ -188,19 +194,16 @@ class Config:
                     "MESSENGER_APP_SECRET", "MESSENGER_ALLOWED_PSID", "VAULT_PATH")
         missing = [key for key in required if not os.environ.get(key)]
         if missing:
-            raise SystemExit(f"Incomplete configuration, missing variables: {', '.join(missing)}")
+            raise ConfigError(f"Incomplete configuration, missing variables: {', '.join(missing)}")
         provider = (os.environ.get("AGENT_PROVIDER") or "codex").strip().lower()
         if provider not in {"claude", "codex"}:
-            raise SystemExit(
+            raise ConfigError(
                 f"AGENT_PROVIDER invalid: {provider!r} (expected claude or codex)")
         agent_timeout = _envint("AGENT_TIMEOUT", 600)
         agent_timeout_deep = _envint("AGENT_TIMEOUT_DEEP", 1800)
         agent_timeout_heavy = _envint("AGENT_TIMEOUT_HEAVY", 5400)
         triage_timeout = _envint("TRIAGE_TIMEOUT", 10)
-        try:
-            vault_path = str(paths.vault_root())
-        except ConfigError as error:
-            raise SystemExit(str(error)) from error
+        vault_path = str(paths.vault_root())
         config = cls(
             page_token=os.environ["MESSENGER_PAGE_TOKEN"],
             verify_token=os.environ["MESSENGER_VERIFY_TOKEN"],
@@ -214,8 +217,8 @@ class Config:
             # None lets the SDK use its pinned runtime: CODEX_BIN is an explicit
             # escape hatch, not the normal path.
             codex_bin=(os.environ.get("CODEX_BIN") or "").strip() or None,
-            routing=RoutingConfig.from_env(
-                provider,
+            routing=RoutingConfig.from_file(
+                provider, _routing_file(),
                 agent_timeout=agent_timeout,
                 agent_timeout_deep=agent_timeout_deep,
                 agent_timeout_heavy=agent_timeout_heavy,
@@ -270,7 +273,7 @@ class Config:
                    "STRAVA_WEBHOOK_SECRET": (self.strava_webhook_secret, False)}
         for name, (value, required) in secrets.items():
             if (value or required) and len(value) < SHARED_SECRET_MIN_LENGTH:
-                raise SystemExit(
+                raise ConfigError(
                     f"{name} trop faible : {SHARED_SECRET_MIN_LENGTH} caractères minimum. "
                     "Génère-le avec python3 -c 'import secrets; "
                     "print(secrets.token_urlsafe(32))'")
@@ -297,16 +300,16 @@ class Config:
             above = maximum is not None and value > maximum
             if below or above:
                 interval = f"{minimum}..{maximum}" if maximum is not None else f"> {minimum}"
-                raise SystemExit(f"{name} invalid: {value!r} (expected {interval})")
+                raise ConfigError(f"{name} invalid: {value!r} (expected {interval})")
         if self.debounce_max_seconds < self.debounce_seconds:
-            raise SystemExit("DEBOUNCE_MAX_SECONDS invalid: must be >= DEBOUNCE_SECONDS")
+            raise ConfigError("DEBOUNCE_MAX_SECONDS invalid: must be >= DEBOUNCE_SECONDS")
         if self.attachment_total_bytes < self.attachment_max_bytes:
-            raise SystemExit(
+            raise ConfigError(
                 "ATTACHMENT_TOTAL_BYTES invalid: must be >= ATTACHMENT_MAX_BYTES")
         if self.routing.provider != self.agent_provider:
-            raise SystemExit(
-                "AGENT_PROVIDER invalid: le routage appartient à "
-                f"{self.routing.provider!r}, pas à {self.agent_provider!r}")
+            raise ConfigError(
+                "AGENT_PROVIDER invalid: the routing belongs to "
+                f"{self.routing.provider!r}, not {self.agent_provider!r}")
         self.routing.validate()
         for route in self.routing.plans:
             plan = self.routing.plan(route)
@@ -315,8 +318,8 @@ class Config:
             for spec in plan.attempts:
                 if spec.timeout < 1:
                     route_name = getattr(route, "value", route)
-                    raise SystemExit(
-                        f"AGENT_{route_name}_TIMEOUT invalid: {spec.timeout!r}")
+                    raise ConfigError(
+                        f"route {route_name}: timeout invalid: {spec.timeout!r}")
 
     @property
     def session_ttl(self) -> float:

@@ -12,7 +12,7 @@ import json
 from dataclasses import dataclass
 
 from redline.coach.fr import initiatives, session_labels
-from redline.model import session_kinds
+from redline.model import ledger, session_kinds
 
 
 @dataclass(frozen=True)
@@ -61,7 +61,7 @@ def _missing_cells(detail: str) -> ClosedProactive | None:
     if data.get("type") == session_kinds.WAKE_TRACE:
         return None
     names = list(data.get("missing", ()))
-    selected = next((name for wanted in ("Dlr", "RPE", "Plaisir") for name in names
+    selected = next((name for wanted in ledger.DECLARED_COLUMNS for name in names
                      if _base(name) == wanted), None)
     if selected is None:
         return ClosedProactive(initiatives.LAST_SESSION)
@@ -75,7 +75,7 @@ def _missing_cells(detail: str) -> ClosedProactive | None:
 
 
 def _base(column: str) -> str:
-    """`Dlr:zone` -> `Dlr` (same rule as `ledger.column_base`)."""
+    """`pain:zone` -> `pain` (same rule as `ledger.column_base`)."""
     return column.split(":", 1)[0]
 
 
@@ -90,7 +90,7 @@ def missing_cells_in_notebook(detail: str) -> ClosedProactive | None:
     data = _object(detail)
     if not data or data.get("type") == session_kinds.WAKE_TRACE:
         return None
-    names = [name for wanted in ("Dlr", "RPE", "Plaisir")
+    names = [name for wanted in ledger.DECLARED_COLUMNS
              for name in data.get("missing", ()) if _base(name) == wanted]
     if not names:
         return None

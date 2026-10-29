@@ -12,7 +12,6 @@ from redline.service.prompts import (
     STYLE_PROMPT,
     TRIAGE_PROMPT,
     TRIAGE_RULES,
-    TRIAGE_STRUCTURED_PROMPT,
 )
 
 
@@ -45,22 +44,15 @@ def test_triage_covers_depth_emotion_waiting_and_plan_change():
 
 def test_triage_separates_a_plan_that_moves_from_a_plan_that_is_asked_for():
     """The two flags answer two different questions; conflating them makes the coach
-    repeat the plan on every message. The output format carries all six fields,
-    otherwise the parser reads a column that does not exist."""
-    assert TRIAGE_PROMPT.splitlines()[1] == (
-        "NIVEAU | E ou - | phrase d'attente | P ou - | D ou - | plan_scope")
+    repeat the plan on every message."""
     assert "D (champ `plan_asked`) si ⟨athlète⟩ DEMANDE son programme" in TRIAGE_PROMPT
     assert "jamais D, même quand c'est P" in TRIAGE_PROMPT
 
 
-def test_the_shared_rules_name_the_json_fields_not_only_the_text_tokens():
-    """`TRIAGE_RULES` is paid by BOTH engines but only described the text protocol:
-    "E", "P", "D" are the tokens of a five-column line that the structured engine must
-    not produce. Its schema expects `emotional`, `plan_change`, `plan_asked`, `holding`,
-    and the mapping must be written somewhere -- notably for the P/D pair, whose
-    confusion makes the coach repeat the plan on every message. A shared rule that only
-    names the text tokens leaves the structured engine guessing.
-    """
+def test_the_rules_name_the_json_fields():
+    """Both engines answer under `TRIAGE_SCHEMA`: the rules must name its fields,
+    notably for the P/D pair, whose confusion makes the coach repeat the plan on every
+    message."""
     for field in ("emotional", "plan_change", "plan_asked", "holding"):
         assert f"`{field}`" in TRIAGE_RULES, (
             f"le champ {field} du schéma Codex n'est nommé nulle part dans la doctrine "
@@ -76,12 +68,11 @@ def test_a_familiar_question_about_a_run_never_lands_on_the_social_rung():
     assert "est un débrief, jamais un message social" in TRIAGE_RULES
 
 
-def test_worked_examples_belong_to_the_text_protocol_only():
-    """The one-line format exists only for the text engine; showing these examples to
-    the structured engine would describe an output its JSON schema forbids."""
-    assert "Je suis encore sur ta réponse." in TRIAGE_PROMPT
-    assert "Exemples de sortie" not in TRIAGE_STRUCTURED_PROMPT
-    assert " | " not in TRIAGE_STRUCTURED_PROMPT
+def test_the_triage_prompt_describes_no_text_protocol():
+    """One output, the JSON schema: a one-line format shown to the model would describe
+    an output its schema forbids."""
+    assert " | " not in TRIAGE_PROMPT
+    assert "selon le schéma JSON fourni" in TRIAGE_PROMPT
 
 
 def test_the_coach_names_its_ai_identity_when_asked_and_never_signs():
@@ -182,7 +173,7 @@ def test_deferred_debrief_is_about_the_morning_after():
     assert "AU RÉVEIL DIRECTEMENT" in deferred
     assert "ne se reporte jamais au soir" in deferred
     assert "`wake-trace`" in deferred
-    assert "capacité n°4" in deferred
+    assert "capacité de nuit" in deferred
 
 
 def test_morning_collects_the_previous_day_wake_reference_immediately():
@@ -299,14 +290,13 @@ def test_the_rating_scales_ride_with_the_levels_where_numbers_are_given():
     either: baked at session level it is invisible to an already open conversation, and
     its budget is full. This test makes removing the pointer a choice, not a side effect.
     """
+    pointer = prompts.pain_scale_pointer()
     for level in ("N1", "N2"):
-        assert prompts.PAIN_SCALE_POINTER in DEPTH_NOTES[level]
-    assert "plafond douleur d'effort = 2" in prompts.PAIN_SCALE_POINTER
-    assert "pas de note /10" in prompts.PAIN_SCALE_POINTER
-    assert "séance entière" in prompts.PAIN_SCALE_POINTER
-    # The "2-3" tolerance is quoted ONLY as a prohibition, nowhere else.
-    assert sum('"2-3 acceptable"' in text for text in DEPTH_NOTES.values()) == 2
-    assert "2-3" not in prompts.STYLE_PROMPT
+        assert pointer in DEPTH_NOTES[level]
+    # The cap is the rulebook's, not a number written in the text.
+    assert "plafond douleur d'effort = 2," in pointer
+    assert "pas de note /10" in pointer
+    assert "séance entière" in pointer
 
 
 def test_the_morning_debrief_never_asks_for_a_mark_out_of_ten():
@@ -343,12 +333,8 @@ def test_the_two_examples_differ_only_by_naming_the_machinery():
 def test_runtime_prompts_stay_within_explicit_context_budgets():
     """These strings are paid in addition to CLAUDE.md; the vault-file budget cannot see them.
 
-    Triage carries TWO budgets because it has two clients. `TRIAGE_RULES` is the
-    doctrine, paid by both engines: drift costs there, so the ceiling is tight. The two
-    prompts that wrap it only add their output protocol: the JSON schema for the
-    structured engine, four worked examples for the text engine, which has nothing else
-    to learn the format from. A single ceiling over the whole would bill that scaffolding
-    at doctrine price and push to cut the examples.
+    Triage carries two budgets: `TRIAGE_RULES` is the doctrine, so the ceiling is tight;
+    the prompt that wraps it only adds the call to the JSON schema.
 
     The style ceiling pays for `TYPOGRAPHY_RULE` and a counter-example: words paid once
     per SESSION are worth more than a one-line instruction the coach breaks at every
@@ -365,8 +351,7 @@ def test_runtime_prompts_stay_within_explicit_context_budgets():
     # triggers no regeneration, so it cannot make the coach loop.
     assert len(STYLE_PROMPT.split()) <= 1040
     assert len(TRIAGE_RULES.split()) <= 300
-    assert len(TRIAGE_PROMPT.split()) <= 430
-    assert len(TRIAGE_STRUCTURED_PROMPT.split()) <= 350
+    assert len(TRIAGE_PROMPT.split()) <= 350
     assert max(len(text.split()) for text in DEPTH_NOTES.values()) <= 180
     assert max(len(text.split()) for text in PROACTIVE_TRIGGERS.values()) <= 520
 
@@ -429,7 +414,7 @@ def test_every_turn_names_its_own_input_file():
 def test_missing_cells_publish_the_real_one_metric_cli_contract():
     note = prompts.missing_cells_note(
         [{"date": "2026-08-30", "type": "long",
-          "missing": ["RPE", "Dlr", "Plaisir"]}], [])
+          "missing": ["rpe", "pain", "enjoyment"]}], [])
 
     assert (f"{prompts.AGENT_CLI} ledger-complete --key <clé> "
             "--metric rpe --value 5") in note
@@ -532,8 +517,8 @@ def test_builder_only_replaces_detail_and_preserves_literal_braces(monkeypatch):
     assert "détail 42" in rendered
 
 
-PENDING = [{"date": "2026-08-04", "type": "strength", "missing": ["RPE"]}]
-LAPSED = [{"date": "2026-08-01", "type": "easy", "missing": ["Plaisir"]}]
+PENDING = [{"date": "2026-08-04", "type": "strength", "missing": ["rpe"]}]
+LAPSED = [{"date": "2026-08-01", "type": "easy", "missing": ["enjoyment"]}]
 
 
 def test_no_missing_cell_means_no_note():
@@ -541,7 +526,7 @@ def test_no_missing_cell_means_no_note():
 
 
 def test_wake_cells_do_not_enter_the_generic_missing_cells_note():
-    wake = [{"date": "2026-09-14", "type": "wake-trace", "missing": ["Dlr"]}]
+    wake = [{"date": "2026-09-14", "type": "wake-trace", "missing": ["pain"]}]
 
     assert prompts.missing_cells_note(wake, wake) == ""
 
@@ -549,7 +534,7 @@ def test_wake_cells_do_not_enter_the_generic_missing_cells_note():
 def test_pending_cells_do_not_force_a_questionnaire_or_block_partial_answers():
     note = prompts.missing_cells_note(
         [{"date": "2026-08-10", "type": "easy",
-          "missing": ["RPE", "Dlr", "Plaisir"]}], []
+          "missing": ["rpe", "pain", "enjoyment"]}], []
     )
     assert "une seule information" in note
     assert "Ne bloque pas sur les autres cellules" in note
@@ -560,7 +545,7 @@ def test_pending_cells_do_not_force_a_questionnaire_or_block_partial_answers():
 
 def test_with_the_notebook_pending_cells_are_left_to_it_except_pain():
     note = prompts.missing_cells_note(
-        [{"date": "2026-10-08", "type": "easy", "missing": ["RPE", "Plaisir"]}], [],
+        [{"date": "2026-10-08", "type": "easy", "missing": ["rpe", "enjoyment"]}], [],
         notebook=True)
     assert "Le carnet les recueille : ne les demande pas" in note
     assert "douleur si le message montre une gêne" in note
@@ -594,11 +579,11 @@ def test_evening_claim_hides_storage_plumbing():
     from redline.service.proactive_messages import compose_closed_proactive
 
     claim = compose_closed_proactive("ledger_incomplete", json.dumps({
-        "date": "2026-09-24", "type": "easy", "missing": ["RPE"],
-        "markers": ["2026-09-24:easy:RPE"]}))
+        "date": "2026-09-24", "type": "easy", "missing": ["rpe"],
+        "markers": ["2026-09-24:easy:rpe"]}))
     assert claim is not None
     assert "registre" not in claim.text and "donnée" not in claim.text
-    assert claim.markers == ("2026-09-24:easy:RPE",)
+    assert claim.markers == ("2026-09-24:easy:rpe",)
 
 
 def test_no_injected_text_types_a_glyph_a_phone_keyboard_does_not_carry():
@@ -615,7 +600,6 @@ def test_no_injected_text_types_a_glyph_a_phone_keyboard_does_not_carry():
     injected = {
         "STYLE_PROMPT": STYLE_PROMPT.replace(prompts.TYPOGRAPHY_RULE, ""),
         "TRIAGE_PROMPT": TRIAGE_PROMPT,
-        "TRIAGE_STRUCTURED_PROMPT": TRIAGE_STRUCTURED_PROMPT,
         "EMOTION_NOTE": EMOTION_NOTE,
         "STALE_VAULT_NOTE": prompts.STALE_VAULT_NOTE,
         "STRENGTH_CARD_POINTER": prompts.STRENGTH_CARD_POINTER,
@@ -635,8 +619,8 @@ def test_no_injected_text_types_a_glyph_a_phone_keyboard_does_not_carry():
         "active_revision_note": prompts.active_revision_note(""),
         "deep_handoff_note": prompts.deep_handoff_note("question puis réponse"),
         "missing_cells_note": prompts.missing_cells_note(
-            [{"date": "2026-08-16", "type": "easy", "missing": ["RPE", "Dlr", "D-"]},
-             {"date": "2026-08-15", "type": "threshold", "missing": ["Plaisir"]}], LAPSED),
+            [{"date": "2026-08-16", "type": "easy", "missing": ["rpe", "pain", "dminus"]},
+             {"date": "2026-08-15", "type": "threshold", "missing": ["enjoyment"]}], LAPSED),
         **{f"DEPTH_NOTES[{level}]": note for level, note in DEPTH_NOTES.items()},
         **{f"PROACTIVE_TRIGGERS[{kind}]": prompts.build_proactive_prompt(kind, "424242")
            for kind in PROACTIVE_TRIGGERS},

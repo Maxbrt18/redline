@@ -272,7 +272,7 @@ class ProactiveScheduler:
                 if entry.get("type") == session_kinds.WAKE_TRACE:
                     continue
                 missing = [column for column in entry["missing"]
-                           if ledger_model.column_base(column) in {"RPE", "Dlr", "Plaisir"}]
+                           if ledger_model.column_base(column) in ledger_model.DECLARED_COLUMNS]
                 if missing:
                     claimable.append({**entry, "missing": missing})
             if claimable:

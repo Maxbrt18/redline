@@ -72,7 +72,7 @@ def main() -> int:
                 context = case['context'] + '\n' + render_memory(
                     case.get('history', []), case.get('questions', []))
                 # Same as `CoachBot`: the reading-depth note, then the dated checks.
-                # Without it the bench would judge a coach lacking PAIN_SCALE_POINTER
+                # Without it the bench would judge a coach lacking the pain scale
                 # and the N2 instruction.
                 context += '\n' + DEPTH_NOTES[case['route']]
                 context += '\n' + gate_note(case.get('gates', []))

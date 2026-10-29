@@ -86,6 +86,49 @@ class Triage:
             self.plan_asked = True
 
 
+#: What a triage call answers, for both providers.
+TRIAGE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "depth": {"type": "string", "enum": ["N0", "N1", "N2", "N3"]},
+        "emotional": {"type": "boolean"},
+        "holding": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+        "plan_change": {"type": "boolean"},
+        "plan_asked": {"type": "boolean"},
+        "plan_scope": {"type": "string", "enum": sorted(PLAN_SCOPES)},
+    },
+    "required": [
+        "depth", "emotional", "holding", "plan_change", "plan_asked", "plan_scope"
+    ],
+    "additionalProperties": False,
+}
+
+
+def parse_triage(data: dict) -> Triage:
+    """A triage answer checked against `TRIAGE_SCHEMA`; raises on any deviation, so the
+    caller falls back to `Triage()`."""
+    depth = data["depth"]
+    holding = data["holding"]
+    if depth not in {"N0", "N1", "N2", "N3"}:
+        raise ValueError(f"niveau de triage invalide : {depth!r}")
+    if holding is not None and not isinstance(holding, str):
+        raise TypeError("holding doit être une chaîne ou null")
+    if not all(isinstance(data[flag], bool)
+               for flag in ("emotional", "plan_change", "plan_asked")):
+        raise TypeError("les indicateurs de triage doivent être booléens")
+    plan_scope = data["plan_scope"]
+    if plan_scope not in PLAN_SCOPES:
+        raise ValueError(f"portée de programme invalide : {plan_scope!r}")
+    if data["plan_asked"] != (plan_scope != "none"):
+        raise ValueError("plan_asked et plan_scope se contredisent")
+    # The small model answering the question instead of announcing the wait.
+    if holding and len(holding) > HOLDING_MAX_CHARS:
+        holding = None
+    return Triage(depth=depth, emotional=data["emotional"], holding=holding or None,
+                  plan_change=data["plan_change"], plan_asked=data["plan_asked"],
+                  plan_scope=plan_scope)
+
+
 @dataclass
 class RunResult:
     """Terminal result, independent of the provider.

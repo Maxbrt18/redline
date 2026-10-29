@@ -15,9 +15,8 @@ from redline.model import paths
 
 from . import persona
 from .agent import (
-    HOLDING_MAX_CHARS,
-    PLAN_SCOPES,
     PROACTIVE_REPLY_SCHEMA,
+    TRIAGE_SCHEMA,
     ActiveRuns,
     AgentActivity,
     FailureKind,
@@ -26,12 +25,13 @@ from .agent import (
     SessionMode,
     Triage,
     live_session,
+    parse_triage,
     structured_reply,
 )
 from .config import Config, sandbox_overrides
 from .prompts import (
     STYLE_PROMPT,
-    TRIAGE_STRUCTURED_PROMPT,
+    TRIAGE_PROMPT,
     instruction_digest,
     with_turn_input,
 )
@@ -57,23 +57,6 @@ NETWORK_OVERRIDE = "sandbox_workspace_write.network_access=true"
 
 def _writable_roots_override() -> str:
     return f"sandbox_workspace_write.writable_roots={json.dumps([str(paths.state_dir())])}"
-
-TRIAGE_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "depth": {"type": "string", "enum": ["N0", "N1", "N2", "N3"]},
-        "emotional": {"type": "boolean"},
-        "holding": {"anyOf": [{"type": "string"}, {"type": "null"}]},
-        "plan_change": {"type": "boolean"},
-        "plan_asked": {"type": "boolean"},
-        "plan_scope": {"type": "string", "enum": sorted(PLAN_SCOPES)},
-    },
-    "required": [
-        "depth", "emotional", "holding", "plan_change", "plan_asked", "plan_scope"
-    ],
-    "additionalProperties": False,
-}
-
 
 class _WatchdogError(RuntimeError):
     pass
@@ -378,9 +361,9 @@ class CodexRunner:
             return Triage()
         candidate = spec or self._config.routing.plan(Route.TRIAGE).primary
         try:
-            raw = self.one_shot(TRIAGE_STRUCTURED_PROMPT + message, spec=candidate,
+            raw = self.one_shot(TRIAGE_PROMPT + message, spec=candidate,
                                 output_schema=TRIAGE_SCHEMA, label="__triage__")
-            return _parse_triage(raw)
+            return parse_triage(json.loads(raw or "{}"))
         except (_WatchdogError, _CancelledError):
             log.warning("Triage Codex expiré après %d s ; repli sur N1", candidate.timeout)
         except Exception as exc:
@@ -388,30 +371,3 @@ class CodexRunner:
                         type(exc).__name__)
         return Triage()
 
-
-def _parse_triage(raw: str) -> Triage:
-    data = json.loads(raw or "{}")
-    depth = data["depth"]
-    holding = data["holding"]
-    if depth not in {"N0", "N1", "N2", "N3"}:
-        raise ValueError(f"niveau de triage invalide : {depth!r}")
-    if holding is not None and not isinstance(holding, str):
-        raise TypeError("holding doit être une chaîne ou null")
-    if not all(isinstance(data[flag], bool)
-               for flag in ("emotional", "plan_change", "plan_asked")):
-        raise TypeError("les indicateurs de triage doivent être booléens")
-    plan_scope = data["plan_scope"]
-    if plan_scope not in PLAN_SCOPES:
-        raise ValueError(f"portée de programme invalide : {plan_scope!r}")
-    if bool(data["plan_asked"]) != (plan_scope != "none"):
-        raise ValueError("plan_asked et plan_scope se contredisent")
-    if holding and len(holding) > HOLDING_MAX_CHARS:
-        holding = None
-    return Triage(
-        depth=depth,
-        emotional=bool(data["emotional"]),
-        holding=holding or None,
-        plan_change=bool(data["plan_change"]),
-        plan_asked=bool(data["plan_asked"]),
-        plan_scope=plan_scope,
-    )

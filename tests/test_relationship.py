@@ -49,7 +49,7 @@ def test_social_and_emotional_turns_do_not_inherit_a_measurement_questionnaire(m
 def test_an_acknowledgement_does_not_mark_all_pending_measurements_as_asked(make_bot, store):
     bot = make_bot()
     bot._repo.pending_ledger_cells.return_value = [{
-        "date": "2026-09-05", "type": "easy", "missing": ["RPE", "Dlr", "Plaisir"]}]
+        "date": "2026-09-05", "type": "easy", "missing": ["rpe", "pain", "enjoyment"]}]
     bot._respond("4242", "Retour sur ma séance")
-    for column in ("RPE", "Dlr", "Plaisir"):
+    for column in ("rpe", "pain", "enjoyment"):
         assert not store.proactive.marked("asked:2026-09-05:easy:" + column)

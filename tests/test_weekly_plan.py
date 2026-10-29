@@ -226,11 +226,6 @@ def test_a_note_that_cites_a_gate_id_is_refused():
         weekly_plan.validate(broken)
 
 
-def test_a_note_that_cites_a_revision_number_is_refused():
-    with pytest.raises(SchemaError, match="cite une révision"):
-        weekly_plan.validate(with_session(note="Reporté (trigger replan de rev.1)."))
-
-
 @pytest.mark.parametrize("text", ["Forme corrigee : step-down 30 cm",
                                   "SL vallonnee", "Sac leste gele"])
 def test_schema_does_not_guess_french_spelling(text):

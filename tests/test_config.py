@@ -15,6 +15,7 @@ from datetime import time as dtime
 import pytest
 from conftest import TEST_VAULT
 
+from redline.model.errors import ConfigError
 from redline.service.config import Config, _load_dotenv
 from redline.service.routing import Route
 
@@ -58,7 +59,7 @@ def test_the_minimal_environment_boots(env):
 
 def test_the_service_refuses_to_start_without_its_instance(env, tmp_path):
     (tmp_path / "redline.toml").unlink()
-    with pytest.raises(SystemExit, match=r"redline\.example\.toml"):
+    with pytest.raises(ConfigError, match=r"redline\.example\.toml"):
         Config.from_env()
 
 
@@ -97,18 +98,8 @@ def test_codex_accepts_the_local_postgres_socket(env):
     assert Config.from_env().database_url.endswith("host=/run/redline-postgres")
 
 
-def test_route_settings_override_provider_defaults(env):
-    env.setenv("AGENT_PROVIDER", "codex")
+def test_environment_variables_no_longer_override_a_route(env):
     env.setenv("AGENT_N1_MODEL", "gpt-6-sol")
-    env.setenv("AGENT_N1_EFFORT", "low")
-
-    config = Config.from_env()
-
-    assert config.routing.plan(Route.N1).primary.model == "gpt-6-sol"
-    assert config.routing.plan(Route.N1).primary.effort == "low"
-
-
-def test_obsolete_flat_settings_cannot_override_a_route(env):
     env.setenv("AGENT_MODEL", "gpt-6-sol")
     env.setenv("AGENT_EFFORT", "max")
     config = Config.from_env()
@@ -118,14 +109,14 @@ def test_obsolete_flat_settings_cannot_override_a_route(env):
 
 def test_an_unknown_agent_provider_stops_startup(env):
     env.setenv("AGENT_PROVIDER", "inconnu")
-    with pytest.raises(SystemExit, match="AGENT_PROVIDER"):
+    with pytest.raises(ConfigError, match="AGENT_PROVIDER"):
         Config.from_env()
 
 
 @pytest.mark.parametrize("name", ["MESSENGER_APP_SECRET", "MESSENGER_ALLOWED_PSID"])
 def test_a_missing_ingress_lock_stops_startup(env, name):
     env.delenv(name)
-    with pytest.raises(SystemExit, match=name):
+    with pytest.raises(ConfigError, match=name):
         Config.from_env()
 
 
@@ -138,7 +129,7 @@ def test_a_missing_ingress_lock_stops_startup(env, name):
 def test_a_guessable_shared_secret_stops_startup(env, name, raw):
     """Production must not run with the example tokens shipped in Git."""
     env.setenv(name, raw)
-    with pytest.raises(SystemExit, match=name):
+    with pytest.raises(ConfigError, match=name):
         Config.from_env()
 
 
@@ -150,26 +141,19 @@ def test_strava_secrets_may_stay_empty(env):
     assert Config.from_env().strava_webhook_secret == "s" * 43
 
 
-def test_an_empty_effort_does_not_reactivate_the_cli_default(env):
-    env.setenv("AGENT_N1_EFFORT", "")
-    env.setenv("AGENT_HEAVY_EFFORT", "")
-    config = Config.from_env()
-    assert config.routing.plan(Route.N1).primary.effort == "high"
-    assert config.routing.plan(Route.HEAVY).primary.effort == "high"
+def test_the_routing_file_is_read_at_startup(env, tmp_path):
+    routing = tmp_path / "routing.toml"
+    routing.write_text('[routing.N1]\neffort = "medium"\n', encoding="utf-8")
+    env.setenv("REDLINE_ROUTING", str(routing))
+    assert Config.from_env().routing.plan(Route.N1).primary.effort == "medium"
 
 
-def test_sol_max_is_rejected_even_when_configured_for_a_fallback(env):
-    env.setenv("AGENT_PROVIDER", "codex")
-    env.setenv("AGENT_N3_FALLBACK_MODEL", "gpt-6-sol")
-    env.setenv("AGENT_N3_FALLBACK_EFFORT", "max")
-    with pytest.raises(SystemExit, match="Sol Max"):
-        Config.from_env()
-
-
-def test_claude_rejects_an_effort_unknown_to_its_cli(env):
+def test_an_unusable_routing_file_stops_startup(env, tmp_path):
     env.setenv("AGENT_PROVIDER", "claude")
-    env.setenv("AGENT_N1_EFFORT", "ultra")
-    with pytest.raises(SystemExit, match="invalid pour claude"):
+    routing = tmp_path / "routing.toml"
+    routing.write_text('[routing.N1]\neffort = "ultra"\n', encoding="utf-8")
+    env.setenv("REDLINE_ROUTING", str(routing))
+    with pytest.raises(ConfigError, match="not a claude effort"):
         Config.from_env()
 
 
@@ -180,14 +164,14 @@ def test_claude_rejects_an_effort_unknown_to_its_cli(env):
 ])
 def test_an_unreadable_integer_stops_startup(env, name, raw):
     env.setenv(name, raw)
-    with pytest.raises(SystemExit) as exit_info:
+    with pytest.raises(ConfigError) as exit_info:
         Config.from_env()
     assert name in str(exit_info.value) and raw in str(exit_info.value)
 
 
 def test_an_unreadable_number_stops_startup(env):
     env.setenv("PROACTIVE_MIN_GAP_HOURS", "quatre")
-    with pytest.raises(SystemExit) as exit_info:
+    with pytest.raises(ConfigError) as exit_info:
         Config.from_env()
     assert "PROACTIVE_MIN_GAP_HOURS" in str(exit_info.value)
 
@@ -197,7 +181,7 @@ def test_an_unreadable_hour_stops_startup(env, raw):
     """The trickiest case: `7h45` is what one naturally writes in French, and silently
     falling back to the default would disable the morning message."""
     env.setenv("PROACTIVE_MORNING", raw)
-    with pytest.raises(SystemExit) as exit_info:
+    with pytest.raises(ConfigError) as exit_info:
         Config.from_env()
     assert "PROACTIVE_MORNING" in str(exit_info.value)
 
@@ -224,7 +208,7 @@ def test_booleans_accept_both_languages(env, raw, expected):
 
 def test_an_unknown_boolean_stops_startup(env):
     env.setenv("PROACTIVE_ENABLED", "peut-être")
-    with pytest.raises(SystemExit, match="PROACTIVE_ENABLED"):
+    with pytest.raises(ConfigError, match="PROACTIVE_ENABLED"):
         Config.from_env()
 
 
@@ -235,21 +219,21 @@ def test_an_unknown_boolean_stops_startup(env):
 ])
 def test_out_of_range_values_stop_startup(env, name, raw):
     env.setenv(name, raw)
-    with pytest.raises(SystemExit, match=name):
+    with pytest.raises(ConfigError, match=name):
         Config.from_env()
 
 
 def test_debounce_max_cannot_be_shorter_than_debounce(env):
     env.setenv("DEBOUNCE_SECONDS", "10")
     env.setenv("DEBOUNCE_MAX_SECONDS", "5")
-    with pytest.raises(SystemExit, match="DEBOUNCE_MAX_SECONDS"):
+    with pytest.raises(ConfigError, match="DEBOUNCE_MAX_SECONDS"):
         Config.from_env()
 
 
 def test_attachment_total_must_cover_one_allowed_file(env):
     env.setenv("ATTACHMENT_MAX_BYTES", "2000")
     env.setenv("ATTACHMENT_TOTAL_BYTES", "1500")
-    with pytest.raises(SystemExit, match="ATTACHMENT_TOTAL_BYTES"):
+    with pytest.raises(ConfigError, match="ATTACHMENT_TOTAL_BYTES"):
         Config.from_env()
 
 

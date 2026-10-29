@@ -99,8 +99,8 @@ def test_un_debrief_complet_passe_la_frontiere_du_tour(store):
     tour = str(uuid.uuid4())
 
     reussit(coach("redline ledger-add", "--date", "2026-08-14", "--type", "easy",
-                  "--km", "6.969", "--temps", "43:05", "--allure", "6:11",
-                  "--fcmoy", "151.3", "--cad", "165", "--dplus", "64.6",
+                  "--km", "6.969", "--time", "43:05", "--pace", "6:11",
+                  "--hr-avg", "151.3", "--cadence", "165", "--dplus", "64.6",
                   "--strava", "90000000002", "--start-local", "2026-08-14T07:15:00",
                   "--session-key", "2026-W33:w33-ven-ef", turn=tour), "ledger-add")
 
@@ -117,7 +117,7 @@ def test_donner_un_rpe_ne_casse_jamais_rien(store):
     # This is the starting point of the gesture under test.
     tour_seance = str(uuid.uuid4())
     reussit(coach("redline ledger-add", "--date", "2026-08-14", "--type", "bike",
-                  "--km", "36.9", "--temps", "1:42:57",
+                  "--km", "36.9", "--time", "1:42:57",
                   "--idempotency-key", "messenger:2026-08-14:velo", turn=tour_seance),
             "ledger-add")
     store.apply_turn_with_receipts(tour_seance)[0]
@@ -142,7 +142,7 @@ def test_completer_sans_connaitre_la_cle_inventee_hier(store):
     poser_le_plan(store)
     tour_seance = str(uuid.uuid4())
     reussit(coach("redline ledger-add", "--date", "2026-08-14", "--type", "bike",
-                  "--km", "36.9", "--temps", "1:42:57",
+                  "--km", "36.9", "--time", "1:42:57",
                   "--idempotency-key", "messenger:2026-08-14:velo-du-padre",
                   turn=tour_seance), "ledger-add sans id Strava")
     store.apply_turn_with_receipts(tour_seance)[0]
@@ -195,7 +195,7 @@ def test_un_programme_perime_reste_lisible_et_le_dit(store):
     poser_le_plan(store)
     tour = str(uuid.uuid4())
     reussit(coach("redline ledger-add", "--date", "2026-08-14", "--type", "easy",
-                  "--km", "7", "--temps", "43:00",
+                  "--km", "7", "--time", "43:00",
                   "--idempotency-key", "messenger:2026-08-14:ef", turn=tour),
             "ledger-add sans révision")
     store.apply_turn_with_receipts(tour)[0]
@@ -240,8 +240,8 @@ def test_le_bilan_du_dimanche_joue_toute_sa_sequence(store):
     # the rehearsal must play a lived week, not a theoretical one.
     tour_seance = str(uuid.uuid4())
     reussit(coach("redline ledger-add", "--date", "2026-08-14", "--type", "easy",
-                  "--km", "7", "--temps", "43:00", "--allure", "6:08",
-                  "--rpe", "3", "--pain", "1", "--plaisir", "7",
+                  "--km", "7", "--time", "43:00", "--pace", "6:08",
+                  "--rpe", "3", "--pain", "1", "--enjoyment", "7",
                   "--idempotency-key", "messenger:2026-08-14:ef-bilan",
                   turn=tour_seance), "séance de la semaine")
     store.apply_turn_with_receipts(tour_seance)[0]
@@ -268,9 +268,9 @@ def test_le_debrief_strava_joue_toute_sa_sequence(store):
     poser_le_plan(store)
     tour = str(uuid.uuid4())
     reussit(coach("redline ledger-add", "--date", "2026-08-14", "--type", "easy",
-                  "--km", "6.969", "--temps", "43:05", "--allure", "6:11",
-                  "--fcmoy", "151.3", "--cad", "165", "--dplus", "64.6",
-                  "--dmoins", "65", "--wbgt", "23", "--strava", "90000000002",
+                  "--km", "6.969", "--time", "43:05", "--pace", "6:11",
+                  "--hr-avg", "151.3", "--cadence", "165", "--dplus", "64.6",
+                  "--dminus", "65", "--wbgt", "23", "--strava", "90000000002",
                   "--start-local", "2026-08-14T07:15:00",
                   "--session-key", "2026-W33:w33-ven-ef",
                   turn=tour), "ledger-add")

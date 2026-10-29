@@ -4,17 +4,32 @@ The bot never knows provider model names. It asks for a profile (triage, N0-N3,
 deep analysis or heavy proactive) and this module supplies the matching attempt
 plan. The Claude and Codex adapters consume the same ``RunSpec``; only their
 default model names differ here.
+
+The operator changes a profile without a release: `REDLINE_ROUTING` names a TOML
+file whose `[routing.<ROUTE>]` tables override the defaults, checked at startup:
+
+    [routing.N2]
+    model = "sonnet"
+    effort = "high"
+    fallback = { model = "opus", effort = "high" }
 """
 
 from __future__ import annotations
 
-import os
+import tomllib
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from enum import StrEnum
+from pathlib import Path
 from types import MappingProxyType
 
+from redline.model.errors import ConfigError
+
 from .agent import RunSpec, SessionMode
+
+
+class RoutingError(ConfigError):
+    """The routing file or a profile it declares is unusable."""
 
 
 class Route(StrEnum):
@@ -34,7 +49,7 @@ class Route(StrEnum):
         if raw not in {
             cls.TRIAGE, cls.N0, cls.N1, cls.N2, cls.N3, cls.DEEP, cls.HEAVY,
         }:
-            raise ValueError(f"route inconnue : {value!r}")
+            raise RoutingError(f"unknown route: {value!r}")
         return cls(raw)
 
 
@@ -83,7 +98,7 @@ class RoutingConfig:
     def __post_init__(self) -> None:
         provider = self.provider.strip().lower()
         if provider not in _PROVIDER_DEFAULTS:
-            raise ValueError(f"fournisseur inconnu : {self.provider!r}")
+            raise RoutingError(f"unknown provider: {self.provider!r}")
         normalized = {}
         for route, plan in self.plans.items():
             normalized_route = Route.normalize(route)
@@ -99,7 +114,7 @@ class RoutingConfig:
             )
         missing = set(_ROUTE_ORDER) - set(normalized)
         if missing:
-            raise ValueError("routes manquantes : " + ", ".join(sorted(missing)))
+            raise RoutingError("missing routes: " + ", ".join(sorted(missing)))
         object.__setattr__(self, "provider", provider)
         object.__setattr__(self, "plans", MappingProxyType(normalized))
 
@@ -111,23 +126,21 @@ class RoutingConfig:
             return self.plan(Route.DEEP)
         try:
             return self.plan(depth)
-        except ValueError:
+        except RoutingError:
             return self.plan(Route.N1)
 
     def describe(self, route: str | Route) -> str:
         plan = self.plan(route)
         primary = _describe_spec(plan.primary)
         fallback = ", ".join(_describe_spec(spec) for spec in plan.fallbacks)
-        return primary if not fallback else f"{primary} (repli : {fallback})"
+        return primary if not fallback else f"{primary} (fallback: {fallback})"
 
     def validate(self) -> None:
-        """Also validate configurations assembled without ``from_env``."""
+        """Also validate configurations assembled without ``from_file``."""
         for route in _ROUTE_ORDER:
             plan = self.plan(route)
             for index, spec in enumerate(plan.attempts):
-                suffix = "" if index == 0 else "FALLBACK_"
-                _validate_target(
-                    self.provider, route, spec, f"AGENT_{route.value}_{suffix}")
+                _validate_target(self.provider, route, spec, fallback=index > 0)
 
     @classmethod
     def default(
@@ -144,7 +157,7 @@ class RoutingConfig:
         try:
             defaults = _PROVIDER_DEFAULTS[normalized_provider]
         except KeyError:
-            raise ValueError(f"fournisseur inconnu : {provider!r}") from None
+            raise RoutingError(f"unknown provider: {provider!r}") from None
         timeouts = {
             Route.TRIAGE: triage_timeout,
             Route.N0: agent_timeout,
@@ -178,16 +191,17 @@ class RoutingConfig:
         return cls(normalized_provider, plans)
 
     @classmethod
-    def from_env(
+    def from_file(
         cls,
         provider: str,
+        path: Path | None,
         *,
         agent_timeout: int,
         agent_timeout_deep: int,
         agent_timeout_heavy: int,
         triage_timeout: int,
     ) -> RoutingConfig:
-        """Build the profiles, then apply the ``AGENT_<ROUTE>_*`` variables."""
+        """The default profiles, overridden by the `[routing.<ROUTE>]` tables of `path`."""
         base = cls.default(
             provider,
             agent_timeout=agent_timeout,
@@ -195,33 +209,56 @@ class RoutingConfig:
             agent_timeout_heavy=agent_timeout_heavy,
             triage_timeout=triage_timeout,
         )
+        overrides = _read_overrides(path) if path else {}
         plans = {}
         for route in _ROUTE_ORDER:
             current = base.plan(route)
-            prefix = f"AGENT_{route.value}_"
-            primary_model = _envtext(prefix + "MODEL", current.primary.model)
-            primary_effort = _envtext(prefix + "EFFORT", current.primary.effort)
-            primary = replace(current.primary, model=primary_model, effort=primary_effort)
-            _validate_target(base.provider, route, primary, prefix)
+            table = overrides.get(route, {})
+            primary = replace(current.primary, model=table.get("model", current.primary.model),
+                              effort=table.get("effort", current.primary.effort))
+            _validate_target(base.provider, route, primary)
             fallbacks: tuple[RunSpec, ...] = ()
             # Triage has no fallback: waiting for a second classifier after a timeout
-            # would leave up to a minute of "seen" with no sign of life. An override
-            # that described one is rejected rather than ignored.
-            if not current.fallbacks:
-                for suffix in ("FALLBACK_MODEL", "FALLBACK_EFFORT"):
-                    if _envtext(prefix + suffix, None) is not None:
-                        raise SystemExit(
-                            f"{prefix}{suffix} invalide : la route {route.value} "
-                            "n'a pas de repli")
+            # would leave up to a minute of "seen" with no sign of life. A file that
+            # describes one is refused rather than ignored.
+            if "fallback" in table and not current.fallbacks:
+                raise RoutingError(f"[routing.{route.value}] fallback: this route has none")
             for fallback_default in current.fallbacks:
-                fallback = replace(
-                    fallback_default,
-                    model=_envtext(prefix + "FALLBACK_MODEL", fallback_default.model),
-                    effort=_envtext(prefix + "FALLBACK_EFFORT", fallback_default.effort))
-                _validate_target(base.provider, route, fallback, prefix + "FALLBACK_")
+                given = table.get("fallback", {})
+                fallback = replace(fallback_default,
+                                   model=given.get("model", fallback_default.model),
+                                   effort=given.get("effort", fallback_default.effort))
+                _validate_target(base.provider, route, fallback, fallback=True)
                 fallbacks += (fallback,)
             plans[route] = RoutePlan(route, primary, fallbacks)
         return cls(base.provider, plans)
+
+
+_TARGET_KEYS = frozenset({"model", "effort"})
+
+
+def _read_overrides(path: Path) -> dict[Route, dict]:
+    try:
+        payload = tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        raise RoutingError(f"REDLINE_ROUTING: {path} unreadable ({exc})") from None
+    unknown = set(payload) - {"routing"}
+    if unknown or not isinstance(payload.get("routing", {}), dict):
+        raise RoutingError(f"{path}: only [routing.<ROUTE>] tables are allowed")
+    overrides = {}
+    for name, table in payload.get("routing", {}).items():
+        route = Route.normalize(name)
+        where = f"[routing.{route.value}]"
+        if not isinstance(table, dict) or set(table) - _TARGET_KEYS - {"fallback"}:
+            raise RoutingError(f"{where}: allowed keys are model, effort and fallback")
+        fallback = table.get("fallback", {})
+        if not isinstance(fallback, dict) or set(fallback) - _TARGET_KEYS:
+            raise RoutingError(f"{where} fallback: allowed keys are model and effort")
+        for key, value in [*table.items(), *fallback.items()]:
+            if key != "fallback" and not (isinstance(value, str) and value.strip()):
+                raise RoutingError(f"{where} {key}: a non-empty string is expected")
+        overrides[route] = table
+    return overrides
 
 
 _ROUTE_ORDER = (
@@ -245,7 +282,6 @@ def _spec(target: _TargetDefault, timeout: int, mode: SessionMode, *, read_only:
     )
 
 
-# Sol is deliberately limited to medium/high: Sol Max is excluded by design.
 # Triage is a fast classifier: low effort and no fallback. A missing verdict falls
 # back to the deterministic default `Triage()`, which locks nothing.
 _PROVIDER_DEFAULTS: dict[str, dict[Route, tuple[_TargetDefault, _TargetDefault | None]]] = {
@@ -291,11 +327,7 @@ _PROVIDER_DEFAULTS: dict[str, dict[Route, tuple[_TargetDefault, _TargetDefault |
 _CLAUDE_EFFORTS = frozenset({"low", "medium", "high", "xhigh", "max"})
 _CODEX_EFFORTS = frozenset(
     {"none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"})
-_CODEX_MODEL_EFFORTS = {
-    "gpt-6-luna": frozenset({"none", "low", "medium", "high", "xhigh", "max"}),
-    # Product policy deliberately excludes the two most expensive levels.
-    "gpt-6-sol": frozenset({"none", "low", "medium", "high", "xhigh"}),
-}
+_EFFORTS = {"claude": _CLAUDE_EFFORTS, "codex": _CODEX_EFFORTS}
 
 
 def default_models(provider: str) -> frozenset[str]:
@@ -307,49 +339,23 @@ def default_models(provider: str) -> frozenset[str]:
         for primary, fallback in _PROVIDER_DEFAULTS[provider.strip().lower()].values()
         for target in (primary, fallback) if target is not None and target.model)
 
-def _envtext(name: str, default: str | None) -> str | None:
-    raw = os.environ.get(name)
-    return default if raw is None or not raw.strip() else raw.strip()
-
-
 def _normalize_spec(spec: RunSpec) -> RunSpec:
     effort = spec.effort.strip().lower() if spec.effort else None
     return replace(spec, effort=effort)
 
 
-def _valid_efforts(provider: str, model: str) -> frozenset[str]:
-    if provider == "claude":
-        return _CLAUDE_EFFORTS
-    normalized_model = model.lower().replace("_", "-")
-    for prefix, efforts in _CODEX_MODEL_EFFORTS.items():
-        if normalized_model == prefix or normalized_model.startswith(prefix + "-"):
-            return efforts
-    return _CODEX_EFFORTS
-
-
-def _validate_target(
-    provider: str, route: Route, spec: RunSpec, prefix: str,
-) -> None:
-    model = (spec.model or "").lower().replace("_", "-")
-    if provider == "codex" and not any(
-            model == allowed or model.startswith(allowed + "-")
-            for allowed in _CODEX_MODEL_EFFORTS):
-        raise SystemExit(
-            f"{prefix}MODEL interdit : seules Luna et Sol sont autorisées "
-            f"pour le bot Codex ({spec.model!r})")
+def _validate_target(provider: str, route: Route, spec: RunSpec, *,
+                     fallback: bool = False) -> None:
     effort = (spec.effort or "").lower()
-    valid_efforts = _valid_efforts(provider, model)
-    if model.startswith("gpt-6-sol") and effort in {"max", "ultra"}:
-        raise SystemExit(
-            f"{prefix}EFFORT interdit : Sol Max est désactivé pour la route "
-            f"{route.value}")
-    if effort and effort not in valid_efforts:
-        raise SystemExit(
-            f"{prefix}EFFORT invalid pour {provider}/{spec.model or 'défaut'} : "
-            f"{spec.effort!r} (attendu : {', '.join(sorted(valid_efforts))})")
+    valid = _EFFORTS[provider]
+    if effort and effort not in valid:
+        where = f"[routing.{route.value}]" + (" fallback" if fallback else "")
+        raise RoutingError(
+            f"{where} effort: {spec.effort!r} is not a {provider} effort "
+            f"(expected {', '.join(sorted(valid))})")
 
 
 def _describe_spec(spec: RunSpec) -> str:
-    model = spec.model or "défaut"
-    effort = spec.effort or "défaut"
+    model = spec.model or "default"
+    effort = spec.effort or "default"
     return f"{model}/{effort}"

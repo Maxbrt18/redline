@@ -1,0 +1,11 @@
+# Routing overrides, read when the service starts (`REDLINE_ROUTING=<this file>`).
+# Every key is optional: a route or field left out keeps the engine's default.
+
+[routing.N2]
+model = "sonnet"
+effort = "high"
+fallback = { model = "opus", effort = "high" }
+
+[routing.DEEP]
+model = "opus"
+effort = "high"

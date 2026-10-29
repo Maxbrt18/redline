@@ -7,9 +7,8 @@ import json
 from collections.abc import Iterable
 from datetime import date, datetime, timedelta
 
+from redline.coach import dates
 from redline.model import weekly_plan as weekly_plan_model
-
-DAYS = ("lun", "mar", "mer", "jeu", "ven", "sam", "dim")
 
 #: A day that empties is named. The prescriptive render filters on `remaining()`,
 #: which drops cancelled sessions: a day whose only session was removed would vanish
@@ -98,7 +97,7 @@ def _full(session: dict) -> str:
 
 
 def _label(day: date) -> str:
-    return f"{DAYS[day.weekday()]} {day:%d/%m}"
+    return f"{dates.weekday(day, 'abbreviated')} {day:%d/%m}"
 
 
 def _day_lines(sessions: list) -> list[str]:

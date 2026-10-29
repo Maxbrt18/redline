@@ -8,6 +8,7 @@ import datetime as dt
 import os
 
 from redline.cards import html, render
+from redline.coach import dates
 from redline.model import entrypoint
 from redline.model.errors import ConfigError, InputError
 from redline.model.weekly_plan import (
@@ -17,8 +18,6 @@ from redline.model.weekly_plan import (
     scheduled,
     validate,
 )
-
-DAYS = ("Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche")
 
 
 def detail(session: dict) -> str:
@@ -51,7 +50,7 @@ def rows(sessions: list) -> str:
                 '</div></li>')
         days.append(
             '<section class="day-group">'
-            f'<h2 class="day-group__title">{html.esc(DAYS[day.weekday()])} {day:%d/%m}</h2>'
+            f'<h2 class="day-group__title">{html.esc(dates.weekday(day).capitalize())} {day:%d/%m}</h2>'
             f'<ol class="day-group__sessions">{"".join(rendered)}</ol>'
             '</section>')
     return '<div class="rows">' + "".join(days) + "</div>"

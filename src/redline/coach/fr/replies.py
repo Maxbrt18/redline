@@ -6,9 +6,8 @@ mechanism, and is sent once.
 
 from __future__ import annotations
 
+from redline.coach.dates import listing
 from redline.model import commands
-
-from .calendar import listing
 
 TIMED_OUT = ("Je n'ai pas réussi à finir ma réponse à temps. Redis-moi l'essentiel en une "
              "phrase et je repars de là.")

@@ -13,12 +13,15 @@ would end up word for word in a message to the athlete.
 
 from __future__ import annotations
 
+import datetime as dt
 import re
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+from babel import Locale, UnknownLocaleError
 
 from . import hr_zones
 from .errors import ConfigError
@@ -31,6 +34,11 @@ EXAMPLE = "redline.example.toml"
 #: An unfilled template value (`[Prénom]`, `[ville]`...). Never a legitimate value here.
 PLACEHOLDER = re.compile(r"\[[^\]]*\]")
 SLUG = r"[a-z0-9][a-z0-9-]{0,39}"
+
+#: The locale of dates and lists (`redline.coach.dates`) when `[athlete]` declares none.
+DEFAULT_LOCALE = "fr_FR"
+#: The languages the coach has texts in (`redline/coach/<language>/`).
+LANGUAGES = ("fr",)
 
 #: The pictograms the notebook draws for a capability (`PAS_ICONS` in `ui.js`).
 CAPABILITY_ICONS = ("run", "descent", "food", "night", "pain", "mind")
@@ -45,6 +53,8 @@ INSTANCE_SCHEMA = Schema("redline.toml", [
               note="la FC max, en bpm, mesurée ou estimée"),
         field("timezone", str, minimum=1, maximum=64,
               note="le fuseau IANA où vit l'athlète, ex. « Europe/Paris »"),
+        field("locale", str, required=False, minimum=2, maximum=20,
+              note="la locale des dates et des listes, ex. « fr_FR » ou « fr_CA »"),
     ])),
     field("notebook", dict, schema=Schema("[notebook]", [
         field("place", str, minimum=1, maximum=80,
@@ -64,6 +74,11 @@ INSTANCE_SCHEMA = Schema("redline.toml", [
             field("icon", str, required=False, choices=CAPABILITY_ICONS,
                   note="le pictogramme de la capacité dans le carnet"),
         ]))),
+    field("ledger", dict, required=False, schema=Schema("[ledger]", [
+        field("complete_from", str, required=False, pattern=r"\d{4}-\d{2}-\d{2}",
+              note="le premier jour dont les séances doivent être complètes ; les "
+                   "précédentes ne sont jamais réclamées"),
+    ])),
     # What `redline vault-check` holds the vault to; without it, nothing is checked for it.
     field("vault", dict, required=False, schema=Schema("[vault]", [
         field("note_types", list, required=False, item=field(
@@ -113,6 +128,9 @@ class Instance:
     #: None when the instance declares no note types.
     note_types: frozenset[str] | None = None
     read_budget: tuple[Tier, ...] = ()
+    locale: str = DEFAULT_LOCALE
+    #: Observations before this day were written under a less demanding contract.
+    complete_from: dt.date = dt.date.min
 
     @property
     def hr_bounds(self) -> tuple[int, ...]:
@@ -159,6 +177,17 @@ def _timezone(name: str) -> ZoneInfo:
                             "ex. « Europe/Paris »)") from None
 
 
+def _locale(name: str) -> str:
+    try:
+        language = Locale.parse(name).language
+    except (UnknownLocaleError, ValueError):
+        raise InstanceError(f"{FILENAME} : locale inconnue « {name} » (ex. « fr_FR »)") from None
+    if language not in LANGUAGES:
+        raise InstanceError(f"{FILENAME} : locale « {name} » sans textes du coach "
+                            f"(langues disponibles : {', '.join(LANGUAGES)})")
+    return name
+
+
 def parse(text: str) -> Instance:
     try:
         payload = tomllib.loads(text)
@@ -182,6 +211,7 @@ def parse(text: str) -> Instance:
     if len(set(zones)) != len(zones):
         raise InstanceError(f"{FILENAME} : zone surveillée en double ({', '.join(zones)})")
     vault = payload.get("vault", {})
+    ledger = payload.get("ledger", {})
     budget = tuple(Tier(tier["tier"], tier["total"],
                         tuple((entry["path"], entry["words"]) for entry in tier["files"]))
                    for tier in vault.get("budget", []))
@@ -200,6 +230,9 @@ def parse(text: str) -> Instance:
         timezone=_timezone(athlete["timezone"]),
         note_types=frozenset(vault["note_types"]) if "note_types" in vault else None,
         read_budget=budget,
+        locale=_locale(athlete.get("locale", DEFAULT_LOCALE)),
+        complete_from=(dt.date.fromisoformat(ledger["complete_from"])
+                       if "complete_from" in ledger else dt.date.min),
     )
 
 

@@ -36,7 +36,7 @@ def test_a_note_is_one_paragraph():
 def test_no_injected_text_keeps_a_placeholder():
     gate = [{"question": "Q ?", "on_fail": "repli", "holds": ["s1"]}]
     texts = [
-        prompts.STYLE_PROMPT, prompts.TRIAGE_PROMPT, prompts.TRIAGE_STRUCTURED_PROMPT,
+        prompts.STYLE_PROMPT, prompts.TRIAGE_PROMPT,
         prompts.strava_snapshot_note({"id": 1}), prompts.gate_note(gate, gate),
         prompts.gate_note([], gate, closing=True),
         *prompts.DEPTH_NOTES.values(),

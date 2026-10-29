@@ -13,7 +13,7 @@ from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping
 from typing import Any
 
-from redline.coach.fr import messages
+from redline.coach.fr import labels
 
 #: Why a prediction was refuted: the decision did worse than predicted, or better.
 REFUTED_REASONS = ("optimistic", "cautious")
@@ -61,7 +61,7 @@ def calibration_lines(rows: Iterable[Mapping[str, Any]], today: dt.date) -> list
     lines = []
     for entry in calibration(rows, today):
         brier = "—" if entry["brier"] is None else f"{entry['brier']:.3f}"
-        reasons = " · ".join(f"{messages.PREDICTION_REASONS[reason]} {count}"
+        reasons = " · ".join(f"{labels.PREDICTION_REASONS[reason]} {count}"
                              for reason, count in sorted(entry["reasons"].items()))
         lines.append(
             f"Calibration {entry['domain']} · soldées {entry['resolved']} "

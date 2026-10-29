@@ -13,6 +13,9 @@ hr_max = "[FC max]"
 # Le fuseau IANA où vit l'athlète : ses journées, les heures de son programme, ses
 # matins. Le stockage reste en UTC.
 timezone = "[Fuseau IANA, ex. Europe/Paris]"
+# La locale des dates et des listes (Babel). Facultative : « fr_FR » par défaut. Seul
+# le français a des textes du coach.
+# locale = "fr_FR"
 
 [notebook]
 # Le lieu de la météo des séances qui n'en déclarent pas (geocodage Open-Meteo).
@@ -42,7 +45,13 @@ slug = "cap2-vitesse"
 label = "Vitesse"
 icon = "run"
 
-# Ce que `vault-check.py` vérifie dans le vault. Facultatif : sans ce bloc, ni le type
+# Le registre : à partir de quel jour les séances doivent être complètes (RPE, douleur,
+# plaisir). Facultatif : sans ce bloc, toutes. Utile pour une instance qui reprend un
+# historique tenu avant ce contrat, qu'on ne veut pas voir réclamé.
+# [ledger]
+# complete_from = "2030-01-01"
+
+# Ce que `redline vault-check` vérifie dans le vault. Facultatif : sans ce bloc, ni le type
 # des notes ni le budget de lecture ne sont contrôlés.
 # [vault]
 # Les valeurs admises du champ `type` du frontmatter.

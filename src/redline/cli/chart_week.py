@@ -40,8 +40,8 @@ def build_tiles(data: dict) -> list[dict]:
     if data.get("pain") is not None:
         tiles.append({"label": "Douleur", "value": str(data["pain"]),
                       "status": data.get("pain_flag"), "kind": "text"})
-    if data.get("plaisir") is not None:
-        tiles.append({"label": "Plaisir", "value": f"{fmt_num(data['plaisir'])} / 10"})
+    if data.get("enjoyment") is not None:
+        tiles.append({"label": "Plaisir", "value": f"{fmt_num(data['enjoyment'])} / 10"})
     if data.get("cmj_cm") is not None:
         tiles.append({"label": "CMJ", "value": f"{fmt_num(data['cmj_cm'])} cm", "sub": "lundi"})
     return tiles

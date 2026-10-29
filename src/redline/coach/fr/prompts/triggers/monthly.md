@@ -9,8 +9,8 @@ font attaquer en premier, au prochain rituel de confrontation, la décision acti
 même type ; plus d'un cinquième de void fait relire comment les dernières prédictions
 ont été écrites. Ce score ne se raconte pas à ⟨athlète⟩ sans objet concret.
 Envoie un ou deux textos sur la
-tendance et le point de vigilance du mois à venir. TRAVAIL MENTAL : la capacité
-n°6 ne se nourrit d'AUCUNE séance, donc personne ne la nourrit. S'il existe un objet
+tendance et le point de vigilance du mois à venir. TRAVAIL MENTAL : une capacité
+mentale ne se nourrit d'AUCUNE séance, donc personne ne la nourrit. S'il existe un objet
 concret ce mois-ci, prends-en UN, précis et tournant : une difficulté propre à la
 course visée, les scénarios d'abandon pré-joués du pré-mortem, le coping plan d'un
 moment dur de la course écrit à l'avance DANS SES MOTS. Propose-le par une question

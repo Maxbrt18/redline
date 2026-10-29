@@ -6,15 +6,17 @@ per-turn reading hints and the workflows the service starts. Their words live in
 command they name runnable.
 """
 
+import datetime as dt
 import hashlib
 import json
 import re
-from collections.abc import Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 
 from redline import cli
-from redline.coach.fr import fill, messages, note, prompt
-from redline.model import agent_input, session_kinds, typography
+from redline.coach import dates
+from redline.coach.fr import fill, labels, note, prompt
+from redline.model import agent_input, rulebook, session_kinds, typography
 from redline.model import ledger as ledger_model
 
 #: Re-exported so the check that no injected text uses them reads the same list as the
@@ -36,8 +38,8 @@ def agent_cli(text: str) -> str:
 
 def turn_input_note(turn_id: str) -> str:
     """The file through which this turn hands a JSON to a CLI (`agent_input.py`)."""
-    return messages.turn_input(str(agent_input.turn_path(turn_id)),
-                               str(agent_input.turn_path(turn_id, "carte")))
+    return fill(note("turn-input"), path=str(agent_input.turn_path(turn_id)),
+                second=str(agent_input.turn_path(turn_id, "carte")))
 
 
 def with_turn_input(message: str, turn_id: str | None) -> str:
@@ -104,14 +106,12 @@ def instruction_digest(vault_path: str | Path) -> str:
 
 STALE_VAULT_NOTE = note("stale-vault")
 
-LABELS = messages.LABELS
-
 #: Set when a notebook is connected: it collects RPE, pain and enjoyment in one tap,
 #: so Messenger does not ask for them.
 NOTEBOOK_NOTE = note("notebook")
 
 #: Cells computed from Strava: fetched by the coach, never asked of the athlete.
-DERIVABLE_COLUMNS = ("D+", "D-")
+DERIVABLE_COLUMNS = ("dplus", "dminus")
 
 
 def _split_cells(entries: list) -> tuple[list, list]:
@@ -129,9 +129,9 @@ def _split_cells(entries: list) -> tuple[list, list]:
 
 
 def _label(column: str) -> str:
-    """`Dlr:knee` reads as the pain label followed by its zone."""
+    """`pain:knee` reads as the pain label followed by its zone."""
     zone = ledger_model.column_zone(column)
-    base = LABELS.get(ledger_model.column_base(column), column)
+    base = labels.CELL_QUESTIONS.get(ledger_model.column_base(column), column)
     return f"{base} ({zone})" if zone else base
 
 
@@ -147,9 +147,31 @@ def missing_cells_note(pending: list, lapsed: list, *, notebook: bool = False) -
     to_fetch += lapsed_fetch
     keys = ", ".join(f"{entry['date']}:{entry['type']}:{column}"
                      for entry in to_ask for column in entry["missing"])
-    return agent_cli(messages.missing_cells(
-        messages.cell_listing(to_ask, _label), keys, messages.cell_listing(to_fetch),
-        messages.cell_listing(lapsed_ask), notebook=notebook))
+    parts = [note("cells-open")]
+    if to_ask:
+        asking = note("cells-ask-notebook" if notebook else "cells-ask-messenger")
+        parts.append(fill(note("cells-ask"), cells=_listing(to_ask, _label), asking=asking))
+        parts.append(fill(note("cells-keys"), keys=keys))
+    if to_fetch:
+        parts.append(fill(note("cells-fetch"), cells=_listing(to_fetch)))
+    if lapsed_ask:
+        parts.append(fill(note("cells-lapsed"), cells=_listing(lapsed_ask)))
+    parts.append(note("cells-close"))
+    return agent_cli("\n".join(parts))
+
+
+def _listing(entries: list, label=None) -> str:
+    """`date (kind) : column, column ; …`, each column through `label` when given."""
+    return " ; ".join(
+        f"{entry['date']} ({entry['type']}) : "
+        + ", ".join((label(column) if label else column) for column in entry["missing"])
+        for entry in entries)
+
+
+def _gate_asks(gates: Sequence) -> str:
+    return " ; ".join(fill(note("gate-ask"), question=gate.get("question", "").strip(),
+                           on_fail=gate.get("on_fail", "").strip())
+                      for gate in gates)
 
 
 def _held_sessions(gates: Sequence) -> str:
@@ -170,10 +192,10 @@ def gate_note(blocking: Sequence, observing: Sequence = (), *,
     parts = []
     if blocking:
         parts.append(fill(note("gate-blocking"), held=_held_sessions(blocking),
-                          asks=messages.gate_asks(blocking)))
+                          asks=_gate_asks(blocking)))
     if observing:
         name = "gate-observing-closing" if closing else "gate-observing"
-        parts.append(fill(note(name), asks=messages.gate_asks(observing)))
+        parts.append(fill(note(name), asks=_gate_asks(observing)))
     return "\n\n".join(parts)
 
 
@@ -188,67 +210,89 @@ def plan_change_note() -> str:
 
 def stale_plan_note(week: str) -> str:
     """An unplanned load waits for a decision; put first, while the coach can act."""
-    return agent_cli(messages.stale_plan(week))
+    return agent_cli(fill(note("stale-plan"), week=week))
 
 
 def today_note(moment) -> str:
     """The date anchor, in front of every turn: the agent's own date is frozen when
     its session opens and names no weekday."""
-    return messages.today(moment)
+    day = moment.date()
+    tomorrow = day + dt.timedelta(days=1)
+    return fill(note("today"), full_date=dates.full_date(day),
+                time=labels.clock_time(moment), today=day.isoformat(),
+                weekday=dates.weekday(day), tomorrow=tomorrow.isoformat(),
+                tomorrow_weekday=dates.weekday(tomorrow))
 
 
 def canonical_plan_note(context: str) -> str:
     """The canonical plan, put in front of a turn allowed to prescribe."""
-    return messages.canonical_plan(context)
+    return fill(prompt("canonical-plan"), context=context or "ABSENT OU INVALIDE")
 
 
 def active_revision_note(context: str) -> str:
     """The same for an initiative, which starts without a message from the athlete."""
-    return messages.active_revision(context)
+    return fill(prompt("active-revision"), context=context or (
+        "ABSENTE OU INVALIDE : ne prescris aucune séance. Une réparation dédiée est "
+        "programmée par le service ; ne la fais pas ici"))
 
 
 def deep_handoff_note(handoff: str) -> str:
     """A previous `/deep` exchange, named as history and not as an order."""
-    return messages.deep_handoff(handoff)
+    return fill(prompt("deep-handoff"), handoff=handoff)
 
 
-PATIENCE_LINES = messages.PATIENCE_LINES
-DEEP_PATIENCE_LINES = messages.DEEP_PATIENCE_LINES
+PATIENCE_LINES = prompt("patience").split("\n")
+DEEP_PATIENCE_LINES = prompt("patience-deep").split("\n")
 
 #: Read by the triage model on every message; the escalation bias lives in the rules.
-TRIAGE_RULES = prompt("triage-rules") + "\n"
+TRIAGE_RULES = prompt("triage-rules")
 
-#: For the text engine only: under a JSON schema these lines would describe an output
-#: the model may not produce.
-EXEMPLES_TRIAGE = "\n" + prompt("triage-examples") + "\n"
+#: Both providers answer under `agent.TRIAGE_SCHEMA`; the message follows on its own line.
+TRIAGE_PROMPT = fill(prompt("triage"), rules=TRIAGE_RULES) + "\n"
 
-TRIAGE_PROMPT = (messages.TRIAGE_HEADER + TRIAGE_RULES + EXEMPLES_TRIAGE + "\n\n"
-                 + messages.TRIAGE_FOOTER)
-
-TRIAGE_STRUCTURED_PROMPT = (messages.TRIAGE_STRUCTURED_HEADER + TRIAGE_RULES + "\n"
-                            + messages.TRIAGE_FOOTER)
-
-CLASSIFY_PREAMBLE = messages.CLASSIFY_PREAMBLE
+CLASSIFY_PREAMBLE = note("classify") + "\n"
 
 EMOTION_NOTE = note("emotion")
 
 #: The rating scales travel in the reading notes, injected on every turn, rather than
 #: in the style baked into the session.
-PAIN_SCALE_POINTER = messages.PAIN_SCALE_POINTER
-STRENGTH_CARD_POINTER = messages.STRENGTH_CARD_POINTER
-SESSION_TIME_POINTER = messages.SESSION_TIME_POINTER
-SESSION_CYCLE_POINTER = agent_cli(messages.SESSION_CYCLE_POINTER)
+STRENGTH_CARD_POINTER = note("strength-card")
+SESSION_TIME_POINTER = note("session-time")
+SESSION_CYCLE_POINTER = agent_cli(note("session-cycle"))
 
-_POINTERS = " ".join((SESSION_TIME_POINTER, SESSION_CYCLE_POINTER, PAIN_SCALE_POINTER,
-                      STRENGTH_CARD_POINTER))
-DEPTH_NOTES = {level: agent_cli(fill(note(f"depth-{level.lower()}"), pointers=_POINTERS))
-               for level in ("N0", "N1", "N2", "N3")}
+
+def pain_scale_pointer() -> str:
+    """The pain scale, at the cap the rulebook applies."""
+    return fill(note("pain-scale"), **rulebook.current().parameters.spoken())
+
+
+class _DepthNotes(Mapping[str, str]):
+    """The reading note of each level, built when read: its pain scale comes from the
+    rulebook in force, which the service rereads without restarting."""
+
+    LEVELS = ("N0", "N1", "N2", "N3")
+
+    def __getitem__(self, level: str) -> str:
+        if level not in self.LEVELS:
+            raise KeyError(level)
+        pointers = " ".join((SESSION_TIME_POINTER, SESSION_CYCLE_POINTER,
+                             pain_scale_pointer(), STRENGTH_CARD_POINTER))
+        return agent_cli(fill(note(f"depth-{level.lower()}"), pointers=pointers))
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self.LEVELS)
+
+    def __len__(self) -> int:
+        return len(self.LEVELS)
+
+
+DEPTH_NOTES = _DepthNotes()
 
 STRENGTH_REPORT_NOTE = agent_cli(note("strength-report"))
 
-CELLS_UNREADABLE_NOTE = messages.CELLS_UNREADABLE
-BATTERY_NOTE = messages.BATTERY_NOTE
-EMPTY_REPLY_NOTE = messages.EMPTY_REPLY_NOTE
+CELLS_UNREADABLE_NOTE = note("cells-unreadable")
+BATTERY_NOTE = note("battery")
+EMPTY_REPLY_NOTE = note("empty-reply")
 
 DEFAULT_DEPTH = "N1"
 
@@ -271,28 +315,42 @@ def debrief_in_reply(detail: str, *, notebook: bool) -> str:
     Two messages (the reply, then the debrief) would repeat each other.
     """
     instructions = PROACTIVE_TRIGGERS["strava_debrief"].replace("{detail}", detail)
-    return agent_cli(messages.debrief_in_reply(detail, NOTEBOOK_NOTE if notebook else "",
-                                               instructions))
+    return agent_cli(fill(prompt("debrief-in-reply"), detail=detail, instructions=instructions,
+                          notebook=NOTEBOOK_NOTE + "\n" if notebook else ""))
 
 
 def build_proactive_prompt(kind: str, detail: str) -> str:
     instructions = PROACTIVE_TRIGGERS[kind].replace("{detail}", detail)
     if kind == "weekly":
-        ending = messages.WEEKLY_ENDING
+        ending = note("ending-weekly")
     elif kind in MUST_SPEAK_KINDS:
-        ending = messages.MUST_SPEAK_ENDING
+        ending = note("ending-must-speak")
     else:
-        ending = messages.MAY_STAY_SILENT_ENDING
-    return agent_cli(messages.initiative(instructions, ending))
+        ending = note("ending-may-stay-silent")
+    return agent_cli(fill(prompt("initiative"), instructions=instructions, ending=ending))
+
+
+#: A reply this late says so.
+LATE_AFTER_SECONDS = 15 * 60
 
 
 def timing_note(age_seconds: float, received_at, *, overtaken: bool) -> str:
     """The real delay between the athlete's message and this reply, when it matters."""
-    return messages.timing(age_seconds, received_at, overtaken=overtaken)
+    parts = []
+    if age_seconds >= LATE_AFTER_SECONDS:
+        parts.append(fill(note("delay-late"), delay=labels.delay(int(age_seconds // 60)),
+                          received=labels.received(received_at)))
+    if overtaken:
+        parts.append(note("delay-overtaken"))
+    return fill(note("delay"), parts=" ".join(parts)) if parts else ""
 
 
 def attachment_prompt(files: Sequence, caption: str, *, ignored_video: bool) -> str:
     """The read-only turn that looks at files the athlete sent."""
-    return messages.attachment(
-        files, json.dumps(caption or messages.NO_CAPTION, ensure_ascii=False),
-        ignored_video)
+    inventory = "\n".join(
+        fill(note("attachment-file"), kind=item.kind, media_type=item.media_type,
+             size=str(item.size), path=str(item.path))
+        for item in files)
+    return fill(prompt("attachment"), inventory=inventory,
+                caption=json.dumps(caption or labels.NO_CAPTION, ensure_ascii=False),
+                ignored="\n" + note("attachment-ignored") if ignored_video else "")

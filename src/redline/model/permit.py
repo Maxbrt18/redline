@@ -16,6 +16,7 @@ import datetime as dt
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 
+from redline.coach import dates
 from redline.model.vocabulary import LifeLoad, Sleep
 
 from . import session_kinds
@@ -34,7 +35,6 @@ WITHDRAWAL_DAYS = 14
 BIG_FORM_THRESHOLD: float | None = None
 #: Waking trace: 2 = clear (none 0, very light 0.5, light 1, clear 2).
 NET_TRACE = 2
-DAYS = ("lun", "mar", "mer", "jeu", "ven", "sam", "dim")
 
 
 @dataclass(frozen=True)
@@ -227,7 +227,7 @@ def render(lines: list[EfLine], current: State, week: str | None = None) -> list
                   f"{agreement} · {trace}{group}" if line.status == "courue"
                   else f"coach {line.coach_minutes} min")
         flags = f" ⇒ {'; '.join(line.triggers)}" if line.triggers else ""
-        out.append(f"- {DAYS[line.date.weekday()]} {line.date:%d/%m} {line.session_key} [{line.status}] : "
+        out.append(f"- {dates.weekday(line.date, 'abbreviated')} {line.date:%d/%m} {line.session_key} [{line.status}] : "
                    f"{detail}{flags}")
     for iso, reasons in sorted(current.restricted_weeks.items()):
         if week is None or iso == week:

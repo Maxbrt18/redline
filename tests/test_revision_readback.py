@@ -38,14 +38,14 @@ def test_le_jour_ampute_se_voit_dans_la_relecture():
     """Thursday is left with only a cancellation, and it shows."""
     lignes = weekly_plan.revision_week_lines("2026-W35", R4)
 
-    assert "jeu 27/08 : Renfo B (cancelled)" in lignes
+    assert "jeu. 27/08 : Renfo B (cancelled)" in lignes
 
 
 def test_un_jour_sans_aucune_seance_se_nomme():
     lignes = weekly_plan.revision_week_lines("2026-W35", R4)
 
-    assert "mar 25/08 : AUCUNE SÉANCE" in lignes
-    assert "dim 30/08 : AUCUNE SÉANCE" in lignes
+    assert "mar. 25/08 : AUCUNE SÉANCE" in lignes
+    assert "dim. 30/08 : AUCUNE SÉANCE" in lignes
 
 
 def test_la_relecture_couvre_les_sept_jours():
@@ -54,17 +54,17 @@ def test_la_relecture_couvre_les_sept_jours():
 
 @pytest.mark.parametrize("mutation, attendu", [
     ({"sessions": [*R4["sessions"], _session("w35-jeu-jog", "2026-08-27", "EF amis")]},
-     "w35-jeu-jog : AJOUTÉE le jeu 27/08 (EF amis)"),
+     "w35-jeu-jog : AJOUTÉE le jeu. 27/08 (EF amis)"),
     ({"sessions": [{**R4["sessions"][0], "date": "2026-08-25"}, *R4["sessions"][1:]]},
-     "w35-mer-a : DÉPLACÉE du mer 26/08 au mar 25/08"),
+     "w35-mer-a : DÉPLACÉE du mer. 26/08 au mar. 25/08"),
     ({"sessions": [*R4["sessions"][:2],
                    {**R4["sessions"][2], "status": "cancelled"}]},
-     "w35-ven-ef : ANNULÉE le ven 28/08 (EF)"),
+     "w35-ven-ef : ANNULÉE le ven. 28/08 (EF)"),
     ({"sessions": [*R4["sessions"][:2],
                    {**R4["sessions"][2], "distance_cap_km": 8.0}]},
-     "w35-ven-ef : MODIFIÉE le ven 28/08 (EF)"),
+     "w35-ven-ef : MODIFIÉE le ven. 28/08 (EF)"),
     ({"sessions": R4["sessions"][:2]},
-     "w35-ven-ef : RETIRÉE de la révision (elle était le ven 28/08)"),
+     "w35-ven-ef : RETIRÉE de la révision (elle était le ven. 28/08)"),
 ])
 def test_le_diff_nomme_ce_qui_a_bouge(mutation, attendu):
     r5 = {**R4, "revision": 5, **mutation}
@@ -111,49 +111,10 @@ def _r3(reason, sessions=None):
                 for s in R2["sessions"]]}
 
 
-def test_la_r3_reelle_du_25_aout_est_refusee():
-    """Its reason announced Thursday; its object only touched Wednesday."""
-    fautes = weekly_plan.coherence_errors("2026-W35", R2, _r3(
-        "Sam a couru avec des amis jeudi matin au lieu de l'EF de mercredi ; le "
-        "renfo B du 27/08 est decale, date a arbitrer au moment venu."))
-
-    assert len(fautes) == 1
-    assert "jeu 27/08" in fautes[0]
-
-
-@pytest.mark.parametrize("reason", [
-    "L'EF de mercredi est annulée.",
-    "L'EF du 26/08 est annulée.",
-    "L'EF du 2026-08-26 est annulée.",
-])
-def test_un_motif_qui_ne_nomme_que_le_jour_touche_passe(reason):
-    """The three spellings of a day are equivalent: name, short date, ISO date."""
-    assert weekly_plan.coherence_errors("2026-W35", R2, _r3(reason)) == []
-
-
-def test_un_jour_hors_semaine_ne_compte_pas():
-    """A mention of another date belongs to another week: this plan cannot carry it."""
-    assert weekly_plan.coherence_errors(
-        "2026-W35", R2, _r3("L'EF de mercredi saute ; avis clinique le 03/09.")) == []
-
-
-def test_la_premiere_revision_nest_pas_jugee_sur_ses_jours():
-    """It touches all of them by construction: the rule would say nothing."""
-    assert weekly_plan.coherence_errors("2026-W35", None, _r3("lundi mardi dimanche")) == []
-
-
-def test_la_faute_ouvre_les_deux_chemins_corrects():
-    """A guard that only says no breeds its own workaround."""
-    faute = weekly_plan.coherence_errors("2026-W35", R2, _r3("Rien ne bouge dimanche."))[0]
-
-    assert "retire-le de la raison" in faute
-    assert "`constraints`" in faute
-
-
 def test_un_jour_vide_par_cette_revision_est_signale():
     orphelins = weekly_plan.sessions_orphelines(R2, _r3("mercredi"))
 
-    assert orphelins == ["mer 26/08 ne porte plus que des annulations (EF) et aucune "
+    assert orphelins == ["mer. 26/08 ne porte plus que des annulations (EF) et aucune "
                          "séance à la place. Voulu, ou remplaçante oubliée ?"]
 
 

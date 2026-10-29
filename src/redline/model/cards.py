@@ -42,7 +42,7 @@ WEEK_SCHEMA = Schema("semaine", [
     field("gauge_ratio", float, required=False, minimum=0, note="le ratio aigu/chronique"),
     field("pain", str, required=False, note="tendance de la douleur, texte libre"),
     field("pain_flag", str, required=False, choices=STATUS),
-    field("plaisir", float, required=False, minimum=0, maximum=10),
+    field("enjoyment", float, required=False, minimum=0, maximum=10),
     field("cmj_cm", float, required=False, minimum=0),
 ])
 

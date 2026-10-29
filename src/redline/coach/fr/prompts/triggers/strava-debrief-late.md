@@ -10,4 +10,4 @@ d'hier annonçait ?"), plus les premiers pas et le test du toucher. Son mot va t
 dans `--pain` (`none`, `very-light`, `light`, `clear`), et tu ne le narres pas.
 La réponse de ⟨athlète⟩ devient une ligne `wake-trace`, distincte de la douleur d'effort. Si
 c'était une sortie nocturne, questionne aussi vigilance, appuis et moral dans le noir,
-qui alimentent la capacité n°4. Ne parle pas du programme du jour ici.
+qui alimentent la capacité de nuit si le cockpit en suit une. Ne parle pas du programme du jour ici.

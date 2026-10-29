@@ -8,3 +8,4 @@ openai-codex>=0.156.1,<1.0.0
 SQLAlchemy==2.0.46
 alembic==1.18.4
 psycopg[binary,pool]==3.3.3
+babel==2.17.0
