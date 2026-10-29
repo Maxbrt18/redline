@@ -17,7 +17,6 @@ from __future__ import annotations
 import argparse
 import os
 import subprocess
-import sys
 from pathlib import Path
 
 from redline import cli
@@ -49,7 +48,7 @@ def run(root: Path | None = None, check: bool = False, *, static_only: bool = Fa
     failed = 0
     generators = STATIC_GENERATORS if static_only else GENERATORS
     for name in generators:
-        command = [sys.executable, "-m", cli.module(name)]
+        command = cli.argv(name)
         if check:
             command.append("--check")
         try:

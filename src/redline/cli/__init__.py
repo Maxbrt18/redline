@@ -20,6 +20,15 @@ def module(command: str) -> str:
     return "redline.cli." + command.replace("-", "_")
 
 
+def argv(command: str, *args: str) -> list[str]:
+    """The arguments that run a command in a new interpreter.
+
+    Commands run inside the vault, which a turn writes: `-P` keeps that working directory
+    off `sys.path`, so a `redline/` folder left there can never shadow the engine.
+    """
+    return [sys.executable, "-P", "-m", module(command), *args]
+
+
 def main() -> int:
     """The `redline` entry point; the console script exits with what it returns."""
     args = sys.argv[1:]

@@ -92,7 +92,8 @@ done
 
 # The script comes from the engine verified above and runs INSIDE the vault
 # (`VAULT_PATH`, as for the service), where the coach left its turn files. The vault
-# is always its own folder.
+# is always its own folder. `-P` keeps that working directory off `sys.path`: a turn
+# writes the vault, and a `redline/` folder there would otherwise replace the engine.
 vault=${VAULT_PATH:-}
 [ -n "$vault" ] || {
   echo "agent-cli: VAULT_PATH absent" >&2
@@ -103,4 +104,4 @@ vault=${VAULT_PATH:-}
   exit 1
 }
 cd "$vault"
-exec "$python_bin" -m "$module" "$@"
+exec "$python_bin" -P -m "$module" "$@"
