@@ -50,10 +50,10 @@ def test_a_refused_write_keeps_the_answer_and_names_what_was_not_recorded(make_b
 
     assert bot._respond("4242", "effort ressenti 7-8/10 et pic de douleur 0/10")
 
-    envoye = _sent(client)
-    assert "EF propre" in envoye
-    assert "je n'ai pas pu enregistrer tes ressentis sur la séance" in envoye
-    assert "mesure déjà connue" not in envoye
+    sent = _sent(client)
+    assert "EF propre" in sent
+    assert "je n'ai pas pu enregistrer tes ressentis sur la séance" in sent
+    assert "mesure déjà connue" not in sent
 
 
 def test_a_refusal_of_internal_commands_only_adds_nothing(make_bot):
@@ -64,9 +64,9 @@ def test_a_refusal_of_internal_commands_only_adds_nothing(make_bot):
 
     bot._respond("4242", "ok")
 
-    envoye = _sent(client)
-    assert "EF propre" in envoye
-    assert "Attention" not in envoye
+    sent = _sent(client)
+    assert "EF propre" in sent
+    assert "Attention" not in sent
 
 
 def test_a_refused_write_drops_the_session_that_now_believes_a_lie(make_bot):
@@ -128,10 +128,10 @@ def test_a_stale_plan_holds_the_prescription_but_not_the_conversation(make_bot):
 
     bot._respond("4242", "et ma sortie de ce matin ?")
 
-    envoye = _sent(client)
-    assert "EF propre" in envoye
+    sent = _sent(client)
+    assert "EF propre" in sent
     client.send_text.assert_not_called()
-    assert "plafond 9 km" not in envoye
+    assert "plafond 9 km" not in sent
 
 
 def test_an_absent_plan_holds_the_sessions_but_never_the_answer(make_bot):
@@ -142,11 +142,11 @@ def test_an_absent_plan_holds_the_sessions_but_never_the_answer(make_bot):
 
     bot._respond("4242", "je fais quoi demain ?")
 
-    envoye = _sent(client)
-    assert "EF propre" in envoye
-    assert "plafond 9 km" not in envoye
-    assert "pas de programme valide pour cette semaine" in envoye
-    assert "absent ou invalide" not in envoye
+    sent = _sent(client)
+    assert "EF propre" in sent
+    assert "plafond 9 km" not in sent
+    assert "pas de programme valide pour cette semaine" in sent
+    assert "absent ou invalide" not in sent
 
 
 def test_a_safety_answer_always_leaves_even_without_a_plan(make_bot):
@@ -159,9 +159,9 @@ def test_a_safety_answer_always_leaves_even_without_a_plan(make_bot):
 
     bot._respond("4242", "douleur nette au genou en courant, j'arrête ?")
 
-    envoye = _sent(client)
-    assert answer in envoye
-    assert "pas de programme valide" not in envoye
+    sent = _sent(client)
+    assert answer in sent
+    assert "pas de programme valide" not in sent
 
 
 def test_the_morning_note_leaves_without_its_sessions_when_the_plan_is_stale(make_bot):
@@ -169,20 +169,20 @@ def test_the_morning_note_leaves_without_its_sessions_when_the_plan_is_stale(mak
     none of that depends on an up-to-date program. Only the sessions line waits until the
     program is set against what was actually done."""
     iso = datetime.now().isocalendar()
-    semaine = f"{iso.year}-W{iso.week:02d}"
+    week_text = f"{iso.year}-W{iso.week:02d}"
     # The default send window (07:30-21:30) is read in WALL-CLOCK time. CI runners run in
     # UTC, so the send could be blocked by the hour and the test would see an empty message.
     # Its subject is not the window: it is opened, otherwise the test checks what it
     # claims only when the clock allows.
     bot, client = _bot(make_bot, PersistenceResult(
-        True, stale=(semaine,)),
+        True, stale=(week_text,)),
         proactive_active_start=dtime(0, 0))
 
     bot._respond_proactive(ProactiveJob(psid="4242", kind="morning", prompt="matin"))
 
-    envoye = _sent(client)
-    assert "EF propre" in envoye
-    assert "plafond 9 km" not in envoye
+    sent = _sent(client)
+    assert "EF propre" in sent
+    assert "plafond 9 km" not in sent
     client.send_text.assert_not_called()
 
 
@@ -195,8 +195,8 @@ def test_a_healthy_turn_speaks_without_any_incident(make_bot):
 
     bot._respond("4242", "c'est quoi mon programme ?")
 
-    envoye = _sent(client)
-    assert "EF propre" in envoye
+    sent = _sent(client)
+    assert "EF propre" in sent
     assert client.send_text.call_count == 1
     assert client.send_text.call_args.args[1].startswith(
         ("Programme", "La suite", "Rien de prévu", "Aujourd'hui", "Changement"))

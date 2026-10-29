@@ -148,9 +148,9 @@ def test_decisions_newest_first_pass(report):
     assert report.failed == 0
 
 
-def correction(date, correctif):
+def correction(date, fix):
     return {"coaching/corrections.md":
-            f"| {date} | affirmé | vrai | à lire | {correctif} |\n"}
+            f"| {date} | affirmé | vrai | à lire | {fix} |\n"}
 
 
 # ------------------------------------------------------------- end to end

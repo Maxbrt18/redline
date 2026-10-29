@@ -36,7 +36,7 @@ KEYS = ["2026-10-04 — Une correction en section",
         "2026-08-02 · Que déplacer la SL au lundi"]
 
 
-def test_les_trois_formes_du_journal_donnent_des_cles_uniques():
+def test_the_three_journal_forms_give_unique_keys():
     assert [entry.key for entry in replay.entries(JOURNAL)] == KEYS
     assert replay.entries(JOURNAL)[3].date == dt.date(2026, 8, 2)
 
@@ -48,12 +48,12 @@ def test_les_trois_formes_du_journal_donnent_des_cles_uniques():
     ({"correction": "x", "replay": "pending"}, "note"),
     ({"correction": "x", "replay": "off-bench"}, "note"),
 ])
-def test_une_entree_incomplete_est_refusee(row, message):
+def test_an_incomplete_entry_is_refused(row, message):
     with pytest.raises(replay.ReplayFormatError, match=message):
         replay.load_ledger(json.dumps([row]))
 
 
-def test_une_correction_en_double_est_refusee():
+def test_a_duplicate_correction_is_refused():
     row = {"correction": "x", "replay": "off-bench", "note": "n"}
     with pytest.raises(replay.ReplayFormatError, match="double"):
         replay.load_ledger(json.dumps([row, row]))
@@ -71,7 +71,7 @@ def _root(tmp_path, ledger):
     return tmp_path
 
 
-def test_l_audit_separe_retard_orphelins_references_cassees_et_dette(tmp_path):
+def test_the_audit_separates_lateness_orphans_broken_references_and_debt(tmp_path):
     root = _root(tmp_path, [
         {"correction": KEYS[1], "replay": "scenario", "scenarios": ["connu", "inconnu"]},
         {"correction": KEYS[2], "replay": "code", "carriers": ["porteur.py", "absent.py"]},
@@ -88,14 +88,14 @@ def test_l_audit_separe_retard_orphelins_references_cassees_et_dette(tmp_path):
     assert found.owed == [KEYS[3]]
 
 
-def test_une_correction_non_classee_passe_au_rouge_apres_deux_bilans(tmp_path):
+def test_an_unclassified_correction_turns_red_after_two_reviews(tmp_path):
     root, journal = _root(tmp_path, []), "## 2026-10-04 — Seule\n"
     assert replay.audit(root, journal, dt.date(2026, 10, 18), root).late == []
     late = replay.audit(root, journal, dt.date(2026, 10, 19), root).late
     assert [c.key for c in late] == ["2026-10-04 — Seule"]
 
 
-def test_vault_check_rouge_sur_reference_cassee_orange_sur_dette(tmp_path):
+def test_vault_check_red_on_broken_reference_amber_on_debt(tmp_path):
     journal = {"coaching/corrections.md": "## 2026-10-04 — Seule\n"}
     report = vault_check.Report(quiet=True)
     root = _root(tmp_path, [{"correction": "2026-10-04 — Seule", "replay": "scenario",
@@ -110,7 +110,7 @@ def test_vault_check_rouge_sur_reference_cassee_orange_sur_dette(tmp_path):
     assert (report.failed, report.warned) == (0, 1)
 
 
-def test_le_registre_reel_respecte_son_schema():
+def test_the_real_register_follows_its_schema():
     """Forme seulement : sa complétude est un contenu, jugé par vault-check."""
     replay.load_ledger((ENGINE_ROOT / "tests/fixtures/corrections-replay.json")
                       .read_text(encoding="utf-8"))

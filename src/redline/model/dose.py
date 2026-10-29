@@ -48,7 +48,7 @@ FATIGUE = "jusqu'à échec technique"
 PER_SIDE = " / jambe"
 
 # Every field that accepts a scalar OR a [low, high] pair, with its ceiling.
-# `sets` is in here because the programme really prescribes ranges of sets --
+# `sets` is in here because the program really prescribes ranges of sets --
 # "2-3× jusqu'à échec technique" (strength.md, exercice 3). Modelling that as a
 # plain int would force the vault to round a prescription to fit the code.
 BOUNDS = {"sets": 12, "reps": 200, "seconds": 3600}
@@ -138,7 +138,7 @@ class Dose:
         )
 
     def but(self, **changes) -> Dose:
-        """A modulation yields a NEW dose: nothing is mutated, and the programme
+        """A modulation yields a NEW dose: nothing is mutated, and the program
         stays what it is for the next session."""
         return replace(self, **changes)
 

@@ -6,7 +6,7 @@ kinds, the kinds that ask for enjoyment, the demanding ones…) is derived here 
 declared attributes; no module lists slugs of its own.
 
 Which strength routine a `strength` session follows is instance data: the routines are
-the workout notes of the vault that declare `routine:` (see `programme.py`).
+the workout notes of the vault that declare `routine:` (see `program.py`).
 Athlete-facing labels live in `src/redline/coach/fr/session_labels.py`.
 """
 

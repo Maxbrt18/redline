@@ -37,19 +37,19 @@ def resolve_key(store, key: str, date: str, kind: str) -> str:
     """
     if key:
         return key
-    candidats = [row for row in store.observation_rows()
+    candidates = [row for row in store.observation_rows()
                  if row["occurred_on"].isoformat() == date
                  and (not kind or row["kind"] == kind)]
-    if not candidats:
+    if not candidates:
         raise InputError(f"aucune observation le {date}"
                          + (f" de type {kind}" if kind else "")
                          + " — vérifie avec `redline fact-read observations`")
-    if len(candidats) > 1:
+    if len(candidates) > 1:
         details = " · ".join(f"{row['kind']} (clé={row['idempotency_key']})"
-                             for row in candidats)
-        raise InputError(f"{len(candidats)} observations le {date} : {details}. "
+                             for row in candidates)
+        raise InputError(f"{len(candidates)} observations le {date} : {details}. "
                          "Précise --type, ou passe --key.")
-    return candidats[0]["idempotency_key"]
+    return candidates[0]["idempotency_key"]
 
 
 def main() -> int:
@@ -97,10 +97,10 @@ def main() -> int:
     # with the right key, and its message goes out intact.
     observation_id = store.observation_id(key)
     if observation_id is None:
-        recents = " · ".join(
+        recent = " · ".join(
             f"{row['occurred_on'].isoformat()} {row['kind']} (clé={row['idempotency_key']})"
             for row in store.observation_rows()[:5])
-        raise InputError(f"observation inconnue : {key}. Récentes — {recents}")
+        raise InputError(f"observation inconnue : {key}. Récentes — {recent}")
     if args.hr_doubt:
         payload = {"idempotency_key": key, "reason": args.hr_doubt, "note": args.cause.strip()}
         if turn_id:

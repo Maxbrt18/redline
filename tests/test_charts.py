@@ -47,7 +47,7 @@ MONTH = {
                      "Ravitaillement": 1, "Mental": 2, "Allure": 3},
     "race_name": "TargetRace", "race_date": "2026-11-26",
 }
-# A SELECTION of the programme, not a session: the exercises and their doses
+# A SELECTION of the program, not a session: the exercises and their doses
 # live in coaching/exercises/ and coaching/workouts/.
 STRENGTH = {
     "session": "a", "date": "mardi 22 juillet", "duration_min": 30,
@@ -256,7 +256,7 @@ def test_strength_card_refusal_names_the_field(tmp_path):
 
 
 def test_a_derogation_must_carry_a_typed_dose(tmp_path):
-    """Off-programme is allowed; a free-form dose string is not."""
+    """Off-program is allowed; a free-form dose string is not."""
     process = run_script("chart-strength",
                          {"session": "a", "add": [{"name": "Gainage", "dose": "3 x 30 s"}]},
                          tmp_path / "x.png")
@@ -323,7 +323,7 @@ def test_the_worst_payload_the_schema_allows_still_gets_a_sidecar(tmp_path):
         "date": "mardi 25 novembre 2026",
         "duration_min": 38,
         "note": "N" * 300,                    # SELECTION_SCHEMA: maximum=300
-        "gate": {"zone": "genou", "pain_max": 2,
+        "gate": {"zone": "knee", "pain_max": 2,
                  "drop": ["plyometrics", "calf-raise-straight"],
                  "say": "S" * 200},           # GATE_SCHEMA: maximum=200
     }

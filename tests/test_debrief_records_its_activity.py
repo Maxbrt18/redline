@@ -22,7 +22,7 @@ from redline.service.agent import RunResult
 from redline.service.proactive import ProactiveJob
 from redline.service.vault import PersistenceResult
 
-ACTIVITE = "90000000001"
+ACTIVITY = "90000000001"
 
 
 @pytest.fixture
@@ -59,7 +59,7 @@ def test_a_debrief_that_speaks_without_recording_is_logged_not_announced(
     bot = _bot(make_bot, client, recorded=False)
 
     bot._respond_proactive(ProactiveJob(psid="4242", kind="strava_debrief",
-                                        prompt="débriefe", detail=ACTIVITE))
+                                        prompt="débriefe", detail=ACTIVITY))
 
     assert client.send_burst.called, "la prose du coach part quand même"
     client.send_text.assert_not_called()
@@ -70,9 +70,9 @@ def test_the_check_asks_about_the_activity_of_this_very_job(make_bot, client):
     bot = _bot(make_bot, client, recorded=False)
 
     bot._respond_proactive(ProactiveJob(psid="4242", kind="strava_debrief",
-                                        prompt="débriefe", detail=ACTIVITE))
+                                        prompt="débriefe", detail=ACTIVITY))
 
-    bot._repo.activity_recorded.assert_called_with(ACTIVITE)
+    bot._repo.activity_recorded.assert_called_with(ACTIVITY)
 
 
 def test_a_recorded_activity_raises_nothing(make_bot, client):
@@ -80,7 +80,7 @@ def test_a_recorded_activity_raises_nothing(make_bot, client):
     bot = _bot(make_bot, client, recorded=True)
 
     bot._respond_proactive(ProactiveJob(psid="4242", kind="strava_debrief",
-                                        prompt="débriefe", detail=ACTIVITE))
+                                        prompt="débriefe", detail=ACTIVITY))
 
     client.send_text.assert_not_called()
 
@@ -89,7 +89,7 @@ def test_the_deferred_debrief_carries_the_same_contract(make_bot, client, caplog
     bot = _bot(make_bot, client, recorded=False)
 
     bot._respond_proactive(ProactiveJob(psid="4242", kind="strava_debrief_late",
-                                        prompt="débriefe", detail=ACTIVITE))
+                                        prompt="débriefe", detail=ACTIVITY))
 
     client.send_text.assert_not_called()
     assert "debrief-non-consigne" in caplog.text

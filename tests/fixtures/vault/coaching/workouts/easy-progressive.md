@@ -7,6 +7,6 @@ phase: [general, specifique-1, specifique-2]
 status: active
 ---
 
-# ef-progressive
+# easy-progressive
 
 Fiche fictive du vault de test.

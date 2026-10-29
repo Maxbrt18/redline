@@ -1,7 +1,7 @@
 """The dose algebra: what it renders, what it refuses, what it hands the page.
 
 Every dose that appears in `coaching/strength.md` is covered below. That list is
-the real contract: if the programme gains a shape the algebra cannot express,
+the real contract: if the program gains a shape the algebra cannot express,
 this file fails before the Saturday morning session does.
 """
 
@@ -19,7 +19,7 @@ def dose(**data) -> Dose:
 
 # Left: the frontmatter. Right: what the athlete reads on the card and on the page.
 #
-# Every entry is transcribed FROM coaching/strength.md, not from memory: the programme
+# Every entry is transcribed FROM coaching/strength.md, not from memory: the program
 # prescribes RANGES OF SETS ("2-3× jusqu'à échec technique") which the algebra must
 # express, and a contract test written from memory tests the memory.
 @pytest.mark.parametrize("data,text", [
@@ -48,7 +48,7 @@ def dose(**data) -> Dose:
     ({"measure": "time", "sets": 3, "seconds": 45, "side": "each"}, "3 × 45 s / jambe"),
     ({"measure": "time", "sets": 2, "seconds": 30}, "2 × 30 s"),
 ])
-def test_every_dose_of_the_programme_renders(data, text):
+def test_every_dose_of_the_program_renders(data, text):
     assert dose(**data).human() == text
 
 
@@ -145,7 +145,7 @@ def test_an_amrap_slot_names_no_target():
 
 # ------------------------------------------------------------------ modulation
 
-def test_a_modulation_yields_a_new_dose_and_leaves_the_programme_alone():
+def test_a_modulation_yields_a_new_dose_and_leaves_the_program_alone():
     full = dose(measure="reps", sets=3, reps=8, side="each")
     assert full.fewer_sets().human() == "2 × 8 / jambe"
     assert full.human() == "3 × 8 / jambe"

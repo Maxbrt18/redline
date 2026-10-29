@@ -4,8 +4,8 @@ These contracts used to live in the docstring of every `chart-*.py`: 58 lines of
 prose that nothing enforced, so a key Claude mistyped in the morning produced a
 wrong card or a KeyError rather than a refusal naming the field.
 
-The strength card is absent on purpose: its input is a SELECTION of the programme,
-already declared as `SELECTION_SCHEMA` in `programme.py` next to what it selects.
+The strength card is absent on purpose: its input is a SELECTION of the program,
+already declared as `SELECTION_SCHEMA` in `program.py` next to what it selects.
 
 WHAT IS BOUNDED HERE, AND WHAT IS NOT. These schemas constrain MEANING: a scale
 that runs 0-10, a distance that cannot be zero because a pace divides by it, the

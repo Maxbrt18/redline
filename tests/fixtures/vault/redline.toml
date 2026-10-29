@@ -11,7 +11,7 @@ timezone = "Europe/Paris"
 place = "Paris"
 
 [[injuries]]
-slug = "genou"
+slug = "knee"
 label = "Genou"
 
 [[capabilities]]
@@ -20,22 +20,22 @@ label = "Endurance"
 icon = "run"
 
 [[capabilities]]
-slug = "cap2-vitesse"
+slug = "cap2-speed"
 label = "Vitesse"
 icon = "run"
 
 [[capabilities]]
-slug = "cap3-ravitaillement"
+slug = "cap3-fueling"
 label = "Ravitaillement"
 icon = "food"
 
 [[capabilities]]
-slug = "cap4-cotes"
+slug = "cap4-hills"
 label = "Côtes"
 icon = "descent"
 
 [[capabilities]]
-slug = "cap5-genou"
+slug = "cap5-knee"
 label = "Genou"
 icon = "pain"
 
@@ -48,7 +48,7 @@ icon = "mind"
 note_types = ["capability", "exercise", "workout"]
 
 [[vault.budget]]
-tier = "par tour"
+tier = "per-turn"
 total = 3600
 files = [{ path = "CLAUDE.md", words = 2200 }, { path = "ai/hot-cache.md", words = 1400 }]
 

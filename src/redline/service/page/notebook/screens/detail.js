@@ -418,11 +418,11 @@ function sdPrevious(data) {
   return add(el('section', null, 'n-dsec'), sdHead(title, dm(before.date)), card);
 }
 function sdConditions(data) {
-  const grid = el('div', null, 'n-dtiles two'), meteo = data.weather;
-  if (meteo && meteo.temp != null) {
-    const sub = [meteo.conditions, meteo.feels_like != null ? 'ressenti ' + fmt(meteo.feels_like, 0) + ' °C' : null, meteo.wbgt != null ? 'WBGT ' + fmt(meteo.wbgt, 0) : null].filter(Boolean).join(' · ');
-    grid.append(sdTile('Météo au départ', 'cloud', fmt(meteo.temp, 0), '°C', el('small', sub)));
-  } else if (meteo && meteo.wbgt != null) grid.append(sdTile('Météo au départ', 'cloud', fmt(meteo.wbgt, 0), '°C WBGT', el('small', 'température au thermomètre-globe')));
+  const grid = el('div', null, 'n-dtiles two'), weather = data.weather;
+  if (weather && weather.temp != null) {
+    const sub = [weather.conditions, weather.feels_like != null ? 'ressenti ' + fmt(weather.feels_like, 0) + ' °C' : null, weather.wbgt != null ? 'WBGT ' + fmt(weather.wbgt, 0) : null].filter(Boolean).join(' · ');
+    grid.append(sdTile('Météo au départ', 'cloud', fmt(weather.temp, 0), '°C', el('small', sub)));
+  } else if (weather && weather.wbgt != null) grid.append(sdTile('Météo au départ', 'cloud', fmt(weather.wbgt, 0), '°C WBGT', el('small', 'température au thermomètre-globe')));
   else grid.append(sdTile('Météo au départ', 'cloud', '—', null, el('small', 'non relevée'), 'todo'));
   const gear = data.gear;
   if (gear) {

@@ -108,7 +108,7 @@ def test_rwf002_a_safety_answer_leaves_even_when_the_week_is_unreadable(make_bot
     assert "vérifier le programme" not in sent
 
 
-def test_rwf002_a_programme_request_without_a_valid_week_gets_one_precise_line(make_bot):
+def test_rwf002_a_program_request_without_a_valid_week_gets_one_precise_line(make_bot):
     agent = FakeAgent(result=RunResult(full_text="Je regarde ça."), plan_scope="today")
     bot = make_bot(agent=agent)
     bot._repo.weekly_plan_context.return_value = ""
@@ -481,7 +481,7 @@ def test_rwf016_a_turn_is_traceable_by_structured_events_without_text(make_bot, 
     assert shape["prose_chars"] == len("Réponse privée sur la blessure")
     turn_ids = {event["turn_id"] for event in events if "turn_id" in event}
     assert len(turn_ids) == 1
-    assert all("genou" not in json.dumps(event) and "privée" not in json.dumps(event)
+    assert all("knee" not in json.dumps(event) and "privée" not in json.dumps(event)
                for event in events)
 
 

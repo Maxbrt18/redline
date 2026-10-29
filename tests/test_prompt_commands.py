@@ -31,7 +31,7 @@ SCRIPT = re.compile(
 
 def _prompts() -> dict[str, str]:
     """All the texts injected into the coach, gathered under a readable name."""
-    textes = {
+    texts = {
         "STYLE_PROMPT": prompts.STYLE_PROMPT,
         "TRIAGE_RULES": prompts.TRIAGE_RULES,
         "EMOTION_NOTE": prompts.EMOTION_NOTE,
@@ -45,96 +45,96 @@ def _prompts() -> dict[str, str]:
             [{"date": "2026-08-18", "type": "easy", "missing": ["rpe", "dminus"]}],
             [{"date": "2026-08-12", "type": "easy", "missing": ["enjoyment"]}]),
     }
-    textes.update({f"DEPTH_NOTES[{k}]": v for k, v in prompts.DEPTH_NOTES.items()})
-    textes.update({f"PROACTIVE_TRIGGERS[{k}]": v.replace("{detail}", "42")
+    texts.update({f"DEPTH_NOTES[{k}]": v for k, v in prompts.DEPTH_NOTES.items()})
+    texts.update({f"PROACTIVE_TRIGGERS[{k}]": v.replace("{detail}", "42")
                    for k, v in prompts.PROACTIVE_TRIGGERS.items()})
-    return textes
+    return texts
 
 
-def _commandes() -> list[tuple[str, str, str, tuple[str, ...]]]:
+def _commands() -> list[tuple[str, str, str, tuple[str, ...]]]:
     """(origin, script, subcommands, options) for each cited command.
 
     Splitting on pipes matters: without it, the `--dplus` of `descent` would be
     attributed to `strava` in a debrief pipe, and the test would blame the wrong
     script for ignoring an option it never had.
     """
-    trouvees = []
-    for origine, texte in _prompts().items():
-        plat = " ".join(texte.split())
-        for span in SPAN.findall(plat):
+    found = []
+    for origin, text_out in _prompts().items():
+        flat = " ".join(text_out.split())
+        for span in SPAN.findall(flat):
             for segment in span.split("|"):
-                correspondance = SCRIPT.search(segment)
-                if not correspondance:
+                found_match = SCRIPT.search(segment)
+                if not found_match:
                     continue
-                script = correspondance.group(1)
-                suite = correspondance.group(2)
+                script = found_match.group(1)
+                suite = found_match.group(2)
                 options = tuple(sorted(set(re.findall(r"(--[a-z][a-z-]+)", segment))))
-                trouvees.append((origine, script, suite.strip(), options))
-    return trouvees
+                found.append((origin, script, suite.strip(), options))
+    return found
 
 
-COMMANDES = _commandes()
+COMMANDS = _commands()
 
 
-def test_les_prompts_citent_bien_des_commandes():
+def test_the_prompts_do_cite_commands():
     """Guard of the guard: if the extraction breaks, the whole file would pass green
     while checking nothing."""
-    assert len(COMMANDES) >= 10
-    scripts = {script for _, script, _, _ in COMMANDES}
+    assert len(COMMANDS) >= 10
+    scripts = {script for _, script, _, _ in COMMANDS}
     assert "strava" in scripts
     assert "week-plan" in scripts
 
 
-@pytest.mark.parametrize("origine,script,suite,options", COMMANDES,
-                         ids=[f"{o}:{s}" for o, s, _, _ in COMMANDES])
-def test_chaque_commande_citee_est_executable(origine, script, suite, options):
-    commande = cli_command(script.removeprefix("scripts/").removesuffix(".py"))
-    assert importlib.util.find_spec(commande[-1]), f"{origine} cite {script}, qui n'existe pas"
+@pytest.mark.parametrize("origin,script,suite,options", COMMANDS,
+                         ids=[f"{o}:{s}" for o, s, _, _ in COMMANDS])
+def test_every_cited_command_is_executable(origin, script, suite, options):
+    cited_command = cli_command(script.removeprefix("scripts/").removesuffix(".py"))
+    assert importlib.util.find_spec(cited_command[-1]), f"{origin} cite {script}, qui n'existe pas"
 
-    aide = subprocess.run([*commande, "--help"], cwd=ENGINE_ROOT,
+    aide = subprocess.run([*cited_command, "--help"], cwd=ENGINE_ROOT,
                           capture_output=True, text=True, check=False)
     assert aide.returncode == 0, (
-        f"{origine} cite {script}, dont --help échoue : {aide.stderr[:200]}")
+        f"{origin} cite {script}, dont --help échoue : {aide.stderr[:200]}")
 
-    texte_aide = aide.stdout + aide.stderr
-    for sous_commande in suite.split():
+    help_text = aide.stdout + aide.stderr
+    for subcommand in suite.split():
         # `show/check` and the like are written out in full in the prompts; a
         # subcommand absent from the help is a command the coach cannot run.
-        assert sous_commande in texte_aide, (
-            f"{origine} cite `{script} {sous_commande}`, absent de son aide")
+        assert subcommand in help_text, (
+            f"{origin} cite `{script} {subcommand}`, absent de son aide")
 
     for option in options:
-        detaillee = subprocess.run(
-            [*commande, *suite.split(), "--help"], cwd=ENGINE_ROOT,
+        detailed = subprocess.run(
+            [*cited_command, *suite.split(), "--help"], cwd=ENGINE_ROOT,
             capture_output=True, text=True, check=False)
-        aide_complete = texte_aide + detaillee.stdout + detaillee.stderr
+        aide_complete = help_text + detailed.stdout + detailed.stderr
         assert option in aide_complete, (
-            f"{origine} cite `{option}` pour {script}, qui ne la connaît pas")
+            f"{origin} cite `{option}` pour {script}, qui ne la connaît pas")
 
 
-def test_toute_commande_passe_par_le_lanceur_autorise():
+def test_every_command_goes_through_the_allowed_launcher():
     """The prompt and ``dontAsk`` must describe exactly the same path.
 
     If the doctrine says ``redline ledger-add`` while Bash only allows
     ``redline-agent-cli``, the refusal gets reported as a save outage. Every mention of a
     business CLI is therefore normalised, not only the examples that carry options.
     """
-    fautes = []
-    for origine, texte in _prompts().items():
-        plat = " ".join(texte.split())
-        for span in SPAN.findall(plat):
+    mistakes = []
+    for origin, text_out in _prompts().items():
+        flat = " ".join(text_out.split())
+        for span in SPAN.findall(flat):
             for segment in span.split("|"):
                 if re.match(r"(?:python3? )?redline [a-z]", segment.strip()) \
                         or (re.search(r"\bscripts/|\b[a-z-]+\.py\b", segment) \
                         and "coaching/" not in segment):
-                    fautes.append(f"{origine} : `{span[:90]}`")
-    assert not fautes, "commandes hors lanceur :\n  " + "\n  ".join(fautes)
+                    mistakes.append(f"{origin} : `{span[:90]}`")
+    assert not mistakes, "commandes hors lanceur :\n  " + "\n  ".join(mistakes)
 
 
-def test_toute_commande_citee_est_dans_la_politique_du_lanceur():
-    autorisees = {
+def test_every_cited_command_is_in_the_launcher_policy():
+    allowed_commands = {
         line for line in (ENGINE_ROOT / "deploy" / "agent-cli" / "agent-cli-tools.txt").read_text().splitlines()
         if line and not line.startswith("#")
     }
-    citees = {script.removeprefix("scripts/") for _, script, _, _ in COMMANDES}
-    assert citees <= autorisees
+    cited = {script.removeprefix("scripts/") for _, script, _, _ in COMMANDS}
+    assert cited <= allowed_commands

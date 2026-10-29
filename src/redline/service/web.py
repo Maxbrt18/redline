@@ -132,7 +132,7 @@ def _exercise_cues(vault: Path) -> dict:
     does not appear and the session runs as usual.
     """
     try:
-        from redline.model.programme import load
+        from redline.model.program import load
         notes = load(vault).exercises
     except Exception as exc:
         log.warning("Consignes d'exécution non chargées (%s) : %s", type(exc).__name__, exc)

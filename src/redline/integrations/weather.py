@@ -58,7 +58,7 @@ HOURLY = ("temperature_2m,apparent_temperature,relative_humidity_2m,"
 
 # Beyond this gap between the start and the middle of the route, the start weather no
 # longer describes the session and the summary flags it.
-ECART_SIGNIFICATIF_C = 2.0
+MIDPOINT_GAP_C = 2.0
 
 
 # ---------------------------------------------------------------------------
@@ -495,7 +495,7 @@ def get_weather(lat, lon, when):
     return out
 
 
-def format_summary(w, when, milieu=None):
+def format_summary(w, when, midpoint=None):
     parts = [sky(w)]
     if w["temp"] is not None:
         s = f"{w['temp']:.0f} °C"
@@ -516,12 +516,12 @@ def format_summary(w, when, milieu=None):
     # The start is only one point. When the middle of the route differs markedly
     # (hillsides to town, valley floor to ridge), the start weather no longer
     # describes the session and would be wrongly quoted as the weather of the run.
-    if milieu and milieu["temp"] is not None and w["temp"] is not None:
-        ecart = milieu["temp"] - w["temp"]
-        if abs(ecart) >= ECART_SIGNIFICATIF_C:
+    if midpoint and midpoint["temp"] is not None and w["temp"] is not None:
+        gap = midpoint["temp"] - w["temp"]
+        if abs(gap) >= MIDPOINT_GAP_C:
             out += (
-                f" ⚠ Mi-parcours {milieu['temp']:.0f} °C "
-                f"({ecart:+.0f} °C) : le départ ne résume pas ce run."
+                f" ⚠ Mi-parcours {midpoint['temp']:.0f} °C "
+                f"({gap:+.0f} °C) : le départ ne résume pas ce run."
             )
     return out
 
@@ -542,7 +542,7 @@ def main():
     ap.add_argument("--json", action="store_true", help="Sortie JSON brute.")
     args = ap.parse_args()
 
-    milieu_pt = None
+    midpoint_point = None
     if args.polyline:
         try:
             pts = decode_polyline(args.polyline)
@@ -552,7 +552,7 @@ def main():
             raise InputError("Polyline vide ou illisible.")
         lat, lon = pts[0]
         if len(pts) >= 3:
-            milieu_pt = pts[len(pts) // 2]
+            midpoint_point = pts[len(pts) // 2]
     elif args.lat is not None and args.lon is not None:
         lat, lon = args.lat, args.lon
     else:
@@ -563,10 +563,10 @@ def main():
     except ValueError as exc:
         raise InputError(str(exc)) from exc
 
-    fuseau = None
+    zone_name = None
     if args.local:
         try:
-            when, fuseau = resolve_offset(lat, lon, when)
+            when, zone_name = resolve_offset(lat, lon, when)
         except Exception as exc:
             raise ExternalError(f"Fuseau du lieu de départ indéterminable : {exc}") from exc
 
@@ -575,21 +575,21 @@ def main():
     except Exception as exc:
         raise ExternalError(f"Météo indisponible : {exc}") from exc
 
-    milieu = None
-    if milieu_pt:
+    midpoint = None
+    if midpoint_point:
         try:
-            milieu = get_weather(milieu_pt[0], milieu_pt[1], when)
+            midpoint = get_weather(midpoint_point[0], midpoint_point[1], when)
         except Exception:
             # The second point is a convenience, not the data: its failure must never
             # deprive the coach of the start weather.
-            milieu = None
+            midpoint = None
 
     if args.json:
-        payload = {"lat": lat, "lon": lon, "timezone": fuseau, **w, "conditions": sky(w)}
-        if milieu:
-            payload["midpoint"] = {"lat": milieu_pt[0], "lon": milieu_pt[1], **milieu,
-                                   "conditions": sky(milieu)}
+        payload = {"lat": lat, "lon": lon, "timezone": zone_name, **w, "conditions": sky(w)}
+        if midpoint:
+            payload["midpoint"] = {"lat": midpoint_point[0], "lon": midpoint_point[1], **midpoint,
+                                   "conditions": sky(midpoint)}
         print(json.dumps(payload, ensure_ascii=False))
     else:
-        print(format_summary(w, when, milieu))
+        print(format_summary(w, when, midpoint))
 

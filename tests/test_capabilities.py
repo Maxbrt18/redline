@@ -56,11 +56,11 @@ def test_every_broken_note_is_reported_not_just_the_first(tmp_path):
     """Fixing a folder blind, one file per run, is how a validator gets abandoned."""
     root = capability(tmp_path, FRONTMATTER.replace("capability_number: 1", "capability_number: nope"))
     capability(root, FRONTMATTER.replace("capability_number: 1", "capability_number: 99"),
-               "cap2-vitesse.md")
+               "cap2-speed.md")
     with pytest.raises(NoteError) as caught:
         load(root)
     assert "cap1-endurance.md" in str(caught.value)
-    assert "cap2-vitesse.md" in str(caught.value)
+    assert "cap2-speed.md" in str(caught.value)
 
 
 def test_the_real_analysis_notes_conform_without_operational_state():

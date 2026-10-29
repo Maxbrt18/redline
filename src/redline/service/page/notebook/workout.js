@@ -56,7 +56,7 @@ export function openWorkout(token, motion = true) {
   startSession(token).then(() => { $('bar-title').textContent = $('title').textContent; barState(true); });
 }
 
-function closeSeance() {
+function closeSession() {
   if (!app.workout) return;
   if (app.standalone) { stopSession(); location.replace('/carnet'); return; }
   // The descending session is a frozen copy; the notebook is already in place beneath.
@@ -108,7 +108,7 @@ addEventListener('hashchange', () => { if (app.standalone) startSession(linkToke
 
 $('workout-close').addEventListener('click', () => {
   if (sessionUnfinished()) present($('leave-sheet'), '#leave-stay');
-  else closeSeance();
+  else closeSession();
 });
-$('leave-confirm').addEventListener('click', () => { dismiss(true); closeSeance(); });
+$('leave-confirm').addEventListener('click', () => { dismiss(true); closeSession(); });
 $('workout-sound').addEventListener('click', () => { renderSoundSettings(); present($('sound-sheet')); });

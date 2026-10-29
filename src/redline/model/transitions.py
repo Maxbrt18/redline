@@ -79,7 +79,7 @@ class Transition:
 
 
 def opened(sessions: list[dict], as_of: dt.date) -> list[Transition]:
-    """The transitions of a revision that count: done, or still on the programme.
+    """The transitions of a revision that count: done, or still on the program.
 
     A past session that was not done (still `planned` after its date) did not happen;
     neither did a cancelled one.

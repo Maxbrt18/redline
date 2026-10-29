@@ -28,7 +28,7 @@ def test_strength_artifact_derives_identity_and_session_from_the_plan(monkeypatc
         "redline.service.strength_artifact.strength_card.snapshot",
         lambda built, root: {"sid": built["sid"], "exercises": [{"slug": "x"}]})
     session = {
-        "id": "jeu-renfo-a", "workout": "strength", "routine": "a",
+        "id": "jeu-strength-a", "workout": "strength", "routine": "a",
         "strength": {"half_dose": True},
     }
 
@@ -38,7 +38,7 @@ def test_strength_artifact_derives_identity_and_session_from_the_plan(monkeypatc
     assert target.name == "strength-2026-08-27.png"
     assert captured == {
         "session": "a", "date": "2026-08-27",
-        "sid": "jeu-renfo-a-2026-08-27", "half_dose": True,
+        "sid": "jeu-strength-a-2026-08-27", "half_dose": True,
     }
     assert target.with_name(target.name + ".link").exists()
 
@@ -49,7 +49,7 @@ def test_morning_card_is_rendered_by_the_service_not_the_agent(
     context = json.dumps({
         "revision": 3,
         "sessions": [{
-            "id": "renfo-a", "title": "Renfo A", "date": today,
+            "id": "strength-a", "title": "Renfo A", "date": today,
             "kind": "strength", "workout": "strength", "routine": "a", "status": "planned",
             "demanding": False, "strength": {}, "sources": ["strength.md"],
         }],
@@ -76,6 +76,6 @@ def test_morning_card_is_rendered_by_the_service_not_the_agent(
         psid="4242", kind="strength_card", prompt="", job_id=row["id"],
         detail=row["detail"], priority=True))
 
-    assert rendered == [("renfo-a", today)]
+    assert rendered == [("strength-a", today)]
     assert len(agent.calls) == 1
     assert "chart-strength" not in agent.calls[0]["message"]

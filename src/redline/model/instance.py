@@ -87,7 +87,7 @@ INSTANCE_SCHEMA = Schema("redline.toml", [
         field("budget", list, required=False, item=field(
             "étage", dict, schema=Schema("[[vault.budget]]", [
                 field("tier", str, minimum=1, maximum=40,
-                      note="quand ces fichiers se paient, ex. « par tour »"),
+                      note="quand ces fichiers se paient, ex. « per-turn »"),
                 field("total", int, minimum=1, maximum=100_000),
                 field("files", list, minimum=1, item=field(
                     "fichier", dict, schema=Schema("files", [
@@ -152,7 +152,7 @@ class Instance:
 
 
 def derived_label(slug: str) -> str:
-    """`cap2-descente` -> `Descente`: readable even without a declaration."""
+    """`cap2-descent` -> `Descent`: readable even without a declaration."""
     return slug.split("-", 1)[-1].capitalize()
 
 

@@ -22,8 +22,8 @@ def test_a_duration_cap_hidden_behind_a_distance_is_never_a_gap():
     """"57 min for 55" was reproached on a cap that no message had given, the rendering
         omitting the duration as soon as a distance is committed."""
     row = Row(date=dt.date(2026, 10, 15), type="threshold", km=9.2, hours=0.95)
-    seuil = {"distance_cap_km": 9.0, "duration_cap_min": 55}
-    assert debrief.gaps(row, seuil, None) == ["distance 9,2 km pour un plafond de 9 (+0,2)"]
+    threshold = {"distance_cap_km": 9.0, "duration_cap_min": 55}
+    assert debrief.gaps(row, threshold, None) == ["distance 9,2 km pour un plafond de 9 (+0,2)"]
     ef = {"duration_cap_min": 50}
     assert debrief.gaps(row, ef, None) == ["durée 57 min pour un plafond de 50 (+7)"]
 

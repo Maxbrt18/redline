@@ -158,7 +158,7 @@ def test_an_unreadable_context_renders_nothing_rather_than_half_a_plan(repo, mon
     assert repo.weekly_plan_message("2026-W33") == ""
 
 
-def test_un_jour_quon_vide_se_nomme_au_lieu_de_disparaitre(repo, monkeypatch):
+def test_an_emptied_day_is_named_instead_of_vanishing(repo, monkeypatch):
     """The only rendering the athlete reads kept silent on the amputated day.
 
     The coach cancels a strength session and forgets to create the outing meant to
@@ -166,17 +166,17 @@ def test_un_jour_quon_vide_se_nomme_au_lieu_de_disparaitre(repo, monkeypatch):
     invisible on BOTH sides, since the coach re-reads the same filtered list before
     writing its reply.
     """
-    ampute = [{**session, "status": "cancelled"} if session["date"] == "2026-08-16"
+    shortened = [{**session, "status": "cancelled"} if session["date"] == "2026-08-16"
               else session for session in SESSIONS]
     monkeypatch.setattr(repo, "weekly_plan_context",
-                        lambda week: json.dumps({"revision": 4, "sessions": ampute}))
+                        lambda week: json.dumps({"revision": 4, "sessions": shortened}))
 
     message = repo.weekly_plan_message("2026-W33", since="2026-08-11")
 
     assert "dim. 16/08 : rien de prévu" in message
 
 
-def test_un_jour_retenu_par_un_controle_ne_se_dit_pas_vide(repo):
+def test_a_day_held_by_a_check_is_not_called_empty(repo):
     """The check question goes out in the same turn: it already says what is awaited.
 
     Announcing "nothing planned" instead would be a prescription, and a false one.
@@ -187,19 +187,19 @@ def test_un_jour_retenu_par_un_controle_ne_se_dit_pas_vide(repo):
     assert "dim. 16/08" not in message
 
 
-def test_un_jour_deja_couru_ne_se_dit_pas_vide(repo, monkeypatch):
+def test_a_day_already_run_is_not_called_empty(repo, monkeypatch):
     """A day behind us has nothing left to prescribe, and is not a gap."""
-    couru = [{**session, "status": "done"} if session["date"] == "2026-08-11"
+    ran = [{**session, "status": "done"} if session["date"] == "2026-08-11"
              else session for session in SESSIONS]
     monkeypatch.setattr(repo, "weekly_plan_context",
-                        lambda week: json.dumps({"revision": 5, "sessions": couru}))
+                        lambda week: json.dumps({"revision": 5, "sessions": ran}))
 
     message = repo.weekly_plan_message("2026-W33", since="2026-08-11")
 
     assert "mar. 11/08" not in message
 
 
-def test_une_semaine_entierement_vide_reste_une_phrase(repo, monkeypatch):
+def test_a_fully_empty_week_stays_one_sentence(repo, monkeypatch):
     """Seven "nothing planned" lines would say the same thing worse."""
     monkeypatch.setattr(repo, "weekly_plan_context",
                         lambda week: json.dumps({"revision": 6, "sessions": [

@@ -8,7 +8,7 @@ from pathlib import Path
 
 from redline.cards import html, render
 from redline.model import paths, strength_log, vault_layout
-from redline.model.programme import load
+from redline.model.program import load
 
 
 def exercise_row(index: int, prescription) -> str:

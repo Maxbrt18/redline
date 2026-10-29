@@ -14,7 +14,7 @@ from redline.model import (
 )
 from redline.model.errors import InputError
 from redline.model.notes import NoteError
-from redline.model.programme import load
+from redline.model.program import load
 from redline.model.strength_tables import refresh, target
 
 
@@ -25,11 +25,11 @@ def main() -> None:
     args = parser.parse_args()
 
     try:
-        programme = load(paths.vault_root())
+        program = load(paths.vault_root())
     except NoteError as exc:
         raise InputError(f"Programme illisible :\n{exc}") from exc
 
-    drifted = refresh(paths.vault_root(), programme, check=args.check)
+    drifted = refresh(paths.vault_root(), program, check=args.check)
     if not drifted:
         print("Tables à jour.")
         return

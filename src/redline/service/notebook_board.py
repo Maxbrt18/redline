@@ -32,7 +32,7 @@ from redline.coach.fr.notebook import HR_REASONS, PAIN_SCALE
 from redline.model import (
     debrief,
     local_time,
-    programme,
+    program,
     rulebook,
     session_cycle,
     session_kinds,
@@ -340,7 +340,7 @@ class Board:
         strength = [s for s in live if s["kind"] == "strength"]
         instruments = ledger.load_instruments(self.ops).get(week.label, ledger.Instruments())
         _, level, _ = ledger.equivalent_hours(week.rows, instruments,
-                                              programme.rpe_targets(self.root))
+                                              program.rpe_targets(self.root))
         return {
             "km_done": round(volume.km_run, 2),
             "km_target": (week.revision or {}).get("volume_target_km"),

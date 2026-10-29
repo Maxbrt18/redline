@@ -15,7 +15,7 @@ import sys
 from conftest import ENGINE_ROOT, VAULT_ROOT, load_script
 
 from redline import cli
-from redline.model import hot_cache, programme, strength_tables, views, weekly_plan
+from redline.model import hot_cache, program, strength_tables, views, weekly_plan
 from redline.service.vault import VaultRepo
 
 MARKER = re.compile(r"<!-- ([A-Z_]+)_START -->")
@@ -43,7 +43,7 @@ class TestTheEntryPoint:
         owned = {hot_cache.BLOCK, hot_cache.STATE_BLOCK,
                  weekly_plan.BLOCK,
                  strength_tables.LOG_BLOCK,
-                 *strength_tables.blocks(programme.load(VAULT_ROOT))}
+                 *strength_tables.blocks(program.load(VAULT_ROOT))}
         found = {name for note in ENGINE_ROOT.rglob("*.md")
                  if ".git" not in note.parts
                  for name in MARKER.findall(note.read_text(encoding="utf-8"))}

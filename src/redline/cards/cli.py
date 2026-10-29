@@ -36,7 +36,7 @@ def parse_args(description: str) -> argparse.Namespace:
 
 def read_input(path: str | None) -> dict:
     """The raw payload, for the caller that validates it itself -- chart-strength
-    fills `sid` from the PNG name before the programme's own schema runs.
+    fills `sid` from the PNG name before the program's own schema runs.
 
     A coach turn hands it over with `--input`, never with `<` (agent_input.py)."""
     try:

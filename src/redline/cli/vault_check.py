@@ -35,7 +35,7 @@ from redline.model import instance as instance_model
 from redline.model import startup_budget as budget
 from redline.model.vocabulary import ThreadStatus
 
-# The programme layer needs PyYAML to read a note's frontmatter, which a bare vault
+# The program layer needs PyYAML to read a note's frontmatter, which a bare vault
 # checkout on the Mac may not have. `model.ledger` above has no dependency at all:
 # the ledger stays checkable everywhere, which is the point of it being typed.
 try:
@@ -45,7 +45,7 @@ try:
     from redline.model import hot_cache, weekly_plan
     from redline.model.capabilities import load as load_capabilities
     from redline.model.notes import NoteError
-    from redline.model.programme import load as load_programme
+    from redline.model.program import load as load_program
     from redline.model.strength_tables import refresh
     from redline.model.views import ViewDrift
 except ImportError as exc:
@@ -512,7 +512,7 @@ def check_corrections_replay(vault: Vault, report: Report) -> None:
     report.ok("corrections rejouables")
 
 
-def check_echeances(vault: Vault, report: Report) -> None:
+def check_deadlines(vault: Vault, report: Report) -> None:
     """An échéance past its date and still open (⬜) makes noise on its own, rather
     than waiting for someone to reread a throwaway cache."""
     rows = _read_postgres(report, "échéances tenues", lambda store: store.deadline_rows())
@@ -624,7 +624,7 @@ def check_weekly_plans(vault: Vault, report: Report) -> None:
 
 def check_generated_views(vault: Vault, report: Report) -> None:
     """The generated views: `strength.md` exercise tables, the hot-cache form block, the
-    cockpit table, **and the programme blocks projected from PostgreSQL**. Fails if one
+    cockpit table, **and the program blocks projected from PostgreSQL**. Fails if one
     was edited by hand instead of regenerated. NEVER repairs: a check that repairs
     silently is not a check.
 
@@ -644,7 +644,7 @@ def check_generated_views(vault: Vault, report: Report) -> None:
     try:
         problems += [f"{name} a dérivé — régénère avec "
                      f"`redline strength-tables`"
-                     for name in refresh(vault.root, load_programme(vault.root),
+                     for name in refresh(vault.root, load_program(vault.root),
                                          check=True)]
         store = ledger_gauge.open_store()
         rows = ledger_gauge.parse_ledger(store)
@@ -667,7 +667,7 @@ def check_generated_views(vault: Vault, report: Report) -> None:
 
 
 def _plan_view_drift(vault: Vault) -> tuple:
-    """(problems, number of programme blocks actually opened).
+    """(problems, number of program blocks actually opened).
 
     The count is returned rather than guessed: the success message cites it, so that the
     announced coverage is the observed coverage. A missing database is handled by the
@@ -705,14 +705,14 @@ CHECKS = (
     check_cockpit_freshness,
     check_weekly_plans,
     check_corrections_replay,
-    check_echeances,
+    check_deadlines,
     check_threads,
     check_generated_views,
 )
 
 OPERATIONAL_CHECKS = frozenset({
     check_postgres_storage, check_observations, check_prediction_debt,
-    check_cockpit_freshness, check_weekly_plans, check_echeances, check_threads,
+    check_cockpit_freshness, check_weekly_plans, check_deadlines, check_threads,
     check_generated_views,
 })
 

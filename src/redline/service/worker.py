@@ -715,7 +715,7 @@ class TurnWorker:
             triage = self._triage(psid, text, message_ids, strength_report=strength_report)
             if deep_request:
                 # /deep fixes the epistemic rung; the cheap triage still earns its keep
-                # for emotion and the programme flags. `replace` and not a positional
+                # for emotion and the program flags. `replace` and not a positional
                 # rebuild: a new triage field would otherwise be lost here in silence.
                 triage = replace(triage, depth="N3")
             # An emotional message keeps its rung (it may well be an N2) but loses the

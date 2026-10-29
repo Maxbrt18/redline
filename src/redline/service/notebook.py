@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 
 from redline.cards import archive, strength_card
 from redline.model.instance import Instance
-from redline.model.programme import load
+from redline.model.program import load
 from redline.storage.database import StorageError
 from redline.storage.notebook import NotebookStore
 

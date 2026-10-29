@@ -1,13 +1,13 @@
 ---
 type: workout
-kinds: [easy]
-capabilities: [endurance]
+kinds: [bike]
+capabilities: [endurance, genou]
 target_rpe: 3
-duration_min: 45
+duration_min: 75
 phase: [base, general, specifique-1, specifique-2]
 status: active
 ---
 
-# ef
+# bike-z2
 
 Fiche fictive du vault de test.

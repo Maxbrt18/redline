@@ -35,7 +35,7 @@ from typing import Protocol
 from redline.model import (
     daily,
     paths,
-    programme,
+    program,
     rulebook,
     session_kinds,
 )
@@ -300,7 +300,7 @@ def row_weight(row: Row, targets: dict) -> tuple[float, bool]:
     missed = False
     if row.type in QUALITY_TYPES:
         weighted += 0.5
-        target = programme.target_for(targets, row.type, row.routine)
+        target = program.target_for(targets, row.type, row.routine)
         missed = bool(row.rpe and target and row.rpe > target)
         if missed:
             weighted += 0.5
@@ -329,7 +329,7 @@ def over_target(rows: list[Row], targets: dict) -> list[TargetFlag]:
     """
     flags = []
     for row in sorted(rows, key=lambda r: r.date):
-        target = programme.target_for(targets, row.type, row.routine)
+        target = program.target_for(targets, row.type, row.routine)
         if row.rpe is not None and target is not None and row.rpe > target:
             flags.append(TargetFlag(row.date, row.type, row.rpe, target))
     return flags
@@ -1140,7 +1140,7 @@ def main() -> int:
         raise InputError(f"Registre illisible — {exc}") from exc
     instruments = load_instruments(store)
     # Targets come from the session sheets, never from a hard-coded table.
-    targets = programme.rpe_targets(args.root)
+    targets = program.rpe_targets(args.root)
 
     if args.csv:
         sys.stdout.write(_export_csv(rows, pain_zones(store)))

@@ -172,7 +172,7 @@ def test_clear_drops_the_session_handoff_and_queued_deep(make_bot, store):
     assert not bot.has_pending_inbound()
 
 
-def test_text_that_merely_mentions_renfo_is_not_a_command():
+def test_text_that_merely_mentions_the_strength_command_is_not_a_command():
     queue = WorkQueue(0, 0)
     queue.submit_inbound("4242", "Tu peux m'expliquer la renfo de demain ?", "mid")
 
@@ -181,7 +181,7 @@ def test_text_that_merely_mentions_renfo_is_not_a_command():
     assert job.text == "Tu peux m'expliquer la renfo de demain ?"
 
 
-def test_exact_renfo_command_is_deterministic_and_idempotent(
+def test_exact_strength_command_is_deterministic_and_idempotent(
         make_bot, monkeypatch, tmp_path):
     from redline.service.outbox import Outbox
 
@@ -189,7 +189,7 @@ def test_exact_renfo_command_is_deterministic_and_idempotent(
     context = json.dumps({
         "revision": 4,
         "sessions": [{
-            "id": "w36-renfo-a", "title": "Renfo A", "date": today,
+            "id": "w36-strength-a", "title": "Renfo A", "date": today,
             "kind": "strength", "workout": "strength", "routine": "a", "status": "planned",
             "demanding": False, "strength": {}, "sources": ["[[strength]]"],
         }],
@@ -218,7 +218,7 @@ def test_exact_renfo_command_is_deterministic_and_idempotent(
     assert client.send_image.call_count == 1
 
 
-def test_renfo_command_never_translates_an_invalid_plan_to_no_session(make_bot):
+def test_strength_command_never_translates_an_invalid_plan_to_no_session(make_bot):
     client = MagicMock()
     from redline.service.messenger import DeliveryResult
     client.send_text.return_value = DeliveryResult.success()
@@ -233,19 +233,19 @@ def test_renfo_command_never_translates_an_invalid_plan_to_no_session(make_bot):
     assert "Aucune séance" not in message
 
 
-def test_renfo_command_names_a_held_session_instead_of_denying_it(make_bot):
+def test_strength_command_names_a_held_session_instead_of_denying_it(make_bot):
     today = __import__("datetime").date.today().isoformat()
     context = json.dumps({
         "revision": 4,
         "sessions": [{
-            "id": "w36-renfo-a", "title": "Renfo A", "date": today,
+            "id": "w36-strength-a", "title": "Renfo A", "date": today,
             "kind": "strength", "workout": "strength", "routine": "a", "status": "planned",
             "demanding": False, "strength": {}, "sources": ["[[strength]]"],
         }],
         "gates": [{
-            "id": "w36-renfo-a-reveil", "due": today, "when": "before",
+            "id": "w36-strength-a-reveil", "due": today, "when": "before",
             "question": "Comment est la blessure au réveil ?",
-            "on_fail": "Retirer la séance.", "holds": ["w36-renfo-a"],
+            "on_fail": "Retirer la séance.", "holds": ["w36-strength-a"],
         }],
     })
     client = MagicMock()

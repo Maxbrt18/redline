@@ -5,7 +5,7 @@ Exit codes of `check` and `show`; the distinction carries everything else:
 
 - ``0`` prescribable;
 - ``2`` valid but AWAITING AN ANSWER FROM THE ATHLETE: a dated check is due. The
-  programme is intact, `show` still prints it on stdout, and the right move is to ASK the
+  program is intact, `show` still prints it on stdout, and the right move is to ASK the
   check's question (it is on stderr), not to repair anything;
 - ``3`` valid but TO BE REVIEWED: an activity not attached to a planned session appeared
   since the plan was computed. Intact and printed as well; the right move is to arbitrate
@@ -14,7 +14,7 @@ Exit codes of `check` and `show`; the distinction carries everything else:
 
 Confusing 2 with 1 suppresses the morning message on check days. Confusing 3 with 1 is
 worse: the CLI reports "invalid" with an EMPTY stdout while the service reports "stale,
-you may answer", so the coach concludes the programme is broken although it is in its
+you may answer", so the coach concludes the program is broken although it is in its
 prompt.
 """
 
@@ -107,14 +107,14 @@ def _database_command(store, command: str, week: str, optional: bool,
         # same rule applied to the whole plan would refuse today's revision because of
         # yesterday's text.
         previous = existing["revisions"][-1] if existing else None
-        fautes = [
+        mistakes = [
             *intention_errors(current, f"{week} révision {current['revision']}"),
             *written_text_errors(current, f"{week} révision {current['revision']}"),
             *change_evidence_errors(previous, current),
             *typed_target_errors(current, f"{week} révision {current['revision']}"),
         ]
-        if fautes:
-            raise SchemaError(fautes)
+        if mistakes:
+            raise SchemaError(mistakes)
         candidate = {"week": week, "revisions": [*(existing or {}).get("revisions", []), current]}
         validate(candidate)
         # The readback goes to stdout in BOTH paths. The Messenger turn goes through
@@ -167,10 +167,10 @@ def _database_command(store, command: str, week: str, optional: bool,
               file=sys.stderr)
         return EXIT_AWAITING_GATE
     if stale:
-        # The programme is INTACT: it simply no longer describes the week. It is printed,
+        # The program is INTACT: it simply no longer describes the week. It is printed,
         # as for a dated check, and only the prescription waits. Raising a NoteError before
         # printing would give exit code 1 and an empty stdout, and a coach running `show`
-        # would conclude the programme is broken.
+        # would conclude the program is broken.
         print(f"{week} : arbitrage obligatoire, activité non rattachée apparue depuis "
               "la révision — le programme reste lisible, mais rien ne se prescrit "
               "avant une révision",

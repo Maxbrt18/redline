@@ -13,7 +13,7 @@
 # Rule n8: a transition is a session whose KIND has been absent for this many days.
 # It is also the window of the longest recent outing, the reference for a long-run step.
 transition_lookback_days = 30
-# Rule n8: at most this many transitions per week, checked when the programme is written.
+# Rule n8: at most this many transitions per week, checked when the program is written.
 transitions_per_week = 1
 # The gate: an easy increase may be added if each zone's weekly effort peak stays at or
 # below this level...
@@ -39,7 +39,7 @@ assimilation_weeks = []
 
 # ------------------------------------------------------------------ transitions
 
-# The session KINDS a transition may carry. The slug is what the programme records; the
+# The session KINDS a transition may carry. The slug is what the program records; the
 # label, what the logbook and the review display. `race_first`: a first time the race
 # requires before the taper (the backward solver places it). `quality`: the session is
 # debriefed as a quality session, repetition by repetition.

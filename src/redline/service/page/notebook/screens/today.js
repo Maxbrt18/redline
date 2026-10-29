@@ -163,7 +163,7 @@ function cellsCard(ask, target) {
 // A step of the thread: its dot, its role in small caps, its title, preceded by its family
 // pill when it is a session.
 const CHECK = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 5.2l2 2 4-4.4"/></svg>';
-export function filStep(phase, kicker, title, small, icon) {
+export function feedStep(phase, kicker, title, small, icon) {
   const node = el('i', null, 'n-node');
   if (phase === 'done') node.innerHTML = CHECK;
   const body = el('div', null, 'n-sbody');
@@ -173,8 +173,8 @@ export function filStep(phase, kicker, title, small, icon) {
 }
 // A day's thread: the morning point, overdue questions, what is done, then what remains.
 // The first expected gesture takes the red dot.
-function dayFil(data, items, extras, options) {
-  const fil = el('div', null, 'n-fil');
+function dayFeed(data, items, extras, options) {
+  const feed = el('div', null, 'n-feed');
   const used = new Set();
   let red = false, compact = Boolean(options.compact);
   const take = () => { if (red) return 'next'; red = true; return 'now'; };
@@ -183,8 +183,8 @@ function dayFil(data, items, extras, options) {
     const card = morning(wakes);
     if (card) {
       wakes.forEach(ask => used.add(ask.id)); compact = true;
-      const [node, body] = filStep(take(), 'Ce matin', 'Comment tu te réveilles ?', true);
-      fil.append(add(node, add(body, card)));
+      const [node, body] = feedStep(take(), 'Ce matin', 'Comment tu te réveilles ?', true);
+      feed.append(add(node, add(body, card)));
     }
   }
   const runs = items.filter(item => item.kind !== 'strength'), strengths = items.filter(item => item.kind === 'strength');
@@ -200,17 +200,17 @@ function dayFil(data, items, extras, options) {
       if (ask.type !== 'hr' && ask.type !== 'cells') return;
       used.add(ask.id);
       const what = ask.type === 'hr' ? kindName.easy : kindName[ask.kind] || ask.kind;
-      const [node, body] = filStep(take(), 'À compléter', what + ' de ' + dayNumber(ask.date) + (ask.km ? ' · ' + fmt(ask.km) + ' km' : ''), true, kindIcon(ask.type === 'hr' ? 'easy' : ask.kind));
-      fil.append(add(node, add(body, ask.type === 'hr' ? hrCard(ask) : cellsCard(ask))));
+      const [node, body] = feedStep(take(), 'À compléter', what + ' de ' + dayNumber(ask.date) + (ask.km ? ' · ' + fmt(ask.km) + ' km' : ''), true, kindIcon(ask.type === 'hr' ? 'easy' : ask.kind));
+      feed.append(add(node, add(body, ask.type === 'hr' ? hrCard(ask) : cellsCard(ask))));
     });
   done.forEach(item => {
     const fact = item.fact || {};
     if (item.kind === 'strength') {
-      const [node] = filStep('done', 'Fait' + (fact.duration_min != null ? ' · ' + fact.duration_min + ' min' : ''), item.title, true, 'str');
-      fil.append(node); return;
+      const [node] = feedStep('done', 'Fait' + (fact.duration_min != null ? ' · ' + fact.duration_min + ' min' : ''), item.title, true, 'str');
+      feed.append(node); return;
     }
     const kicker = ['Fait', startedAt(fact), item.extra ? 'hors programme' : null].filter(Boolean).join(' · ');
-    const [node, body] = filStep('done', kicker, item.extra ? kindName[fact.kind] || fact.kind : item.title, false, item.extra ? kindIcon(fact.kind) : kindIcon(item.kind, item.workout));
+    const [node, body] = feedStep('done', kicker, item.extra ? kindName[fact.kind] || fact.kind : item.title, false, item.extra ? kindIcon(fact.kind) : kindIcon(item.kind, item.workout));
     add(body, tiles(factCells(item)), item.extra ? null : overLine(item));
     if (fact.observation_id) {
       const title = item.extra ? kindName[fact.kind] || fact.kind : item.title;
@@ -220,7 +220,7 @@ function dayFil(data, items, extras, options) {
     if (hr) { body.append(hrCard(hr)); used.add(hr.id); }
     const cells = data.asks.find(ask => ask.id === 'cell:' + fact.observation_id);
     if (cells && options.today) body.append(cellsCard(cells, item.targets));
-    fil.append(node);
+    feed.append(node);
   });
   pending.forEach((item, index) => {
     const phase = options.today ? take() : 'next';
@@ -228,7 +228,7 @@ function dayFil(data, items, extras, options) {
     const started = strength && options.today && data.strength && data.strength.status === 'ready' ? savedProgress(data.strength.session) : null;
     const role = started ? 'En cours' : phase === 'now' ? 'À faire' : index > 0 ? 'Puis' : options.today ? 'Ensuite' : null;
     const kicker = [role, started ? 'commencée à ' + hm(clockText(started.startedAt)) : item.start_time ? hm(item.start_time) : null, item.location].filter(Boolean).join(' · ');
-    const [node, body] = filStep(phase, kicker, item.title, strength || compact, kindIcon(item.kind, item.workout));
+    const [node, body] = feedStep(phase, kicker, item.title, strength || compact, kindIcon(item.kind, item.workout));
     if (item.status === 'held') body.append(el('p', 'Une question t’attend dans Messenger avant cette séance.', 'n-meta'));
     else if (strength) {
       if (item.note && !compact) body.append(el('p', item.note, 'n-meta'));
@@ -239,23 +239,23 @@ function dayFil(data, items, extras, options) {
       if (item.note && !compact) body.append(el('p', item.note, 'n-meta'));
       body.append(prep(item, {today: options.today, compact}));
     }
-    fil.append(node);
+    feed.append(node);
   });
-  return fil;
+  return feed;
 }
 // On a rest day, tomorrow is the screen's subject: one line for today, then its full
 // card, weather included.
-function restFil(data) {
-  const fil = dayFil(data, [], [], {today: true});
-  const [node, body] = filStep('rest', null, null);
+function restFeed(data) {
+  const feed = dayFeed(data, [], [], {today: true});
+  const [node, body] = feedStep('rest', null, null);
   if (data.plan.status === 'invalid') add(body, el('h2', 'Programme en préparation'), el('p', data.plan.message, 'n-meta'));
   else body.append(add(el('p', null, 'n-restline'), el('b', 'Repos aujourd’hui.'), ' Rien à faire.'));
-  fil.append(node);
-  const box = add(el('div'), fil), next = data.tomorrow, real = next.sessions.filter(item => item.kind !== 'rest');
+  feed.append(node);
+  const box = add(el('div'), feed), next = data.tomorrow, real = next.sessions.filter(item => item.kind !== 'rest');
   const compact = data.asks.some(ask => ask.type === 'wake' || ask.type === 'daily');
-  if (real.length) add(box, el('p', 'Demain · ' + dayNumber(next.date), 'n-day'), dayFil(data, real, [], {compact}));
+  if (real.length) add(box, el('p', 'Demain · ' + dayNumber(next.date), 'n-day'), dayFeed(data, real, [], {compact}));
   else if (next.plan === 'invalid') box.append(el('p', 'Le programme de la semaine arrive avec le bilan.', 'n-meta'));
-  else if (next.next.length) add(box, el('p', capital(dayNumber(next.next[0].date)), 'n-day'), dayFil(data, next.next, [], {compact: true}));
+  else if (next.next.length) add(box, el('p', capital(dayNumber(next.next[0].date)), 'n-day'), dayFeed(data, next.next, [], {compact: true}));
   return [box, real.length ? next.date : next.next.length ? next.next[0].date : null];
 }
 // What is coming: one line per day, as in the Week tab; weather for tomorrow only.
@@ -374,9 +374,9 @@ export function renderToday(data) {
   if (data.plan.status === 'stale') content.append(el('p', data.plan.message, 'n-banner'));
   const items = data.sessions.filter(item => item.kind !== 'rest');
   const seen = new Set([data.date]);
-  if (items.length || data.extra.length) content.append(dayFil(data, items, data.extra, {today: true}));
+  if (items.length || data.extra.length) content.append(dayFeed(data, items, data.extra, {today: true}));
   else {
-    const [box, heroDate] = restFil(data);
+    const [box, heroDate] = restFeed(data);
     content.append(box);
     if (heroDate) seen.add(heroDate);
   }

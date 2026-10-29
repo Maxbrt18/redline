@@ -42,19 +42,19 @@ def _row(date, kind, key, identifier=1):
             "kind": kind, "idempotency_key": key}
 
 
-VELO = _row("2026-08-13", "bike", "messenger:2026-08-13:velo-remplace-renfob")
-REVEIL = _row("2026-08-13", "wake-trace", "messenger:abc:reveil", identifier=2)
+BIKE = _row("2026-08-13", "bike", "messenger:2026-08-13:velo-remplace-renfob")
+WAKE = _row("2026-08-13", "wake-trace", "messenger:abc:reveil", identifier=2)
 
 
 def test_a_date_resolves_the_key_the_coach_cannot_guess():
     """The coach has the date, not a key invented the day before."""
     cli = _cli()
-    assert cli.resolve_key(_Store([VELO]), "", "2026-08-13", "") == VELO["idempotency_key"]
+    assert cli.resolve_key(_Store([BIKE]), "", "2026-08-13", "") == BIKE["idempotency_key"]
 
 
 def test_an_explicit_key_still_wins():
     cli = _cli()
-    assert cli.resolve_key(_Store([VELO]), "clé-explicite", "2026-08-13", "") == "clé-explicite"
+    assert cli.resolve_key(_Store([BIKE]), "clé-explicite", "2026-08-13", "") == "clé-explicite"
 
 
 def test_an_ambiguous_date_lists_the_candidates_with_their_keys():
@@ -62,24 +62,24 @@ def test_an_ambiguous_date_lists_the_candidates_with_their_keys():
         keys so it can decide. An error that does not expose the way out forces a second
         guess."""
     cli = _cli()
-    with pytest.raises(InputError) as refus:
-        cli.resolve_key(_Store([VELO, REVEIL]), "", "2026-08-13", "")
-    message = str(refus.value)
+    with pytest.raises(InputError) as refusal:
+        cli.resolve_key(_Store([BIKE, WAKE]), "", "2026-08-13", "")
+    message = str(refusal.value)
     assert "bike" in message and "wake-trace" in message
-    assert VELO["idempotency_key"] in message
+    assert BIKE["idempotency_key"] in message
     assert "--type" in message
 
 
 def test_a_type_disambiguates_without_needing_the_key():
     cli = _cli()
-    assert cli.resolve_key(_Store([VELO, REVEIL]), "", "2026-08-13",
-                           "wake-trace") == REVEIL["idempotency_key"]
+    assert cli.resolve_key(_Store([BIKE, WAKE]), "", "2026-08-13",
+                           "wake-trace") == WAKE["idempotency_key"]
 
 
 def test_a_date_without_any_observation_names_where_to_look():
     cli = _cli()
     with pytest.raises(InputError, match=r"fact-read observations"):
-        cli.resolve_key(_Store([VELO]), "", "2026-08-01", "")
+        cli.resolve_key(_Store([BIKE]), "", "2026-08-01", "")
 
 
 def test_the_key_is_published_by_the_reader_that_the_coach_runs():
@@ -87,11 +87,11 @@ def test_the_key_is_published_by_the_reader_that_the_coach_runs():
         it. Not displaying it amounted to asking for a secret identifier."""
     from redline.cli import fact_read
 
-    rows = [{**VELO, "measurements": {"rpe": {"state": "pending"},
+    rows = [{**BIKE, "measurements": {"rpe": {"state": "pending"},
                                       "pain": {"state": "pending"}},
              "note": "vélo avec le padre"}]
-    lignes = fact_read.observations(_Store(rows), 10)
+    lines = fact_read.observations(_Store(rows), 10)
 
-    assert any(VELO["idempotency_key"] in ligne for ligne in lignes)
+    assert any(BIKE["idempotency_key"] in line for line in lines)
     # And what remains to be completed, otherwise the coach does not know what to ask for.
-    assert any("à compléter : pain, rpe" in ligne for ligne in lignes)
+    assert any("à compléter : pain, rpe" in line for line in lines)

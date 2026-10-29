@@ -58,8 +58,8 @@ def test_the_walk_share_uses_the_gauge_formula_not_a_copy_of_it():
 
 
 def test_a_quiet_week_carries_no_red_verdict():
-    rows = [Row(dt.date(2026, 3, 2), "easy", km=8.0, hours=0.8, pains={"genou": 0.0}),
-            Row(dt.date(2026, 3, 4), "easy", km=8.0, hours=0.8, pains={"genou": 0.0})]
+    rows = [Row(dt.date(2026, 3, 2), "easy", km=8.0, hours=0.8, pains={"knee": 0.0}),
+            Row(dt.date(2026, 3, 4), "easy", km=8.0, hours=0.8, pains={"knee": 0.0})]
     block = hot_cache.render(ledger, rows, {"2026-W10": Instruments()}, RPE_TARGETS)
     assert "au rouge" not in block
     assert "% de marche" not in block   # zero hiking: the mention has no reason to appear
@@ -131,19 +131,19 @@ def test_refresh_fills_the_state_block_only_where_it_is_declared(tmp_path):
             return []
 
         def latest_capabilities(self):
-            return [{"slug": "genou", "score": 3, "scale": 5}]
+            return [{"slug": "knee", "score": 3, "scale": 5}]
 
         def prediction_rows(self):
             return [{"status": "open", "due_on": dt.date(2026, 9, 1)}]
 
         def pain_zones(self):
-            return [{"slug": "genou", "label": "Genou", "active": True}]
+            return [{"slug": "knee", "label": "Genou", "active": True}]
 
     rows = [Row(dt.date(2026, 9, 20), "long", km=10.8, hours=1.3)]
     assert hot_cache.refresh(tmp_path, ledger, rows, {}, store=Store(),
                              today=dt.date(2026, 9, 27))
     text = cache.read_text(encoding="utf-8")
-    assert "genou 3/5" in text and "Prédictions à solder** : 1" in text
+    assert "knee 3/5" in text and "Prédictions à solder** : 1" in text
     assert not hot_cache.refresh(tmp_path, ledger, rows, {}, store=Store(),
                                  today=dt.date(2026, 9, 27), check=True)
 

@@ -34,25 +34,25 @@ R4 = {
 }
 
 
-def test_le_jour_ampute_se_voit_dans_la_relecture():
+def test_the_shortened_day_shows_in_the_readback():
     """Thursday is left with only a cancellation, and it shows."""
-    lignes = weekly_plan.revision_week_lines("2026-W35", R4)
+    lines = weekly_plan.revision_week_lines("2026-W35", R4)
 
-    assert "jeu. 27/08 : Renfo B (cancelled)" in lignes
-
-
-def test_un_jour_sans_aucune_seance_se_nomme():
-    lignes = weekly_plan.revision_week_lines("2026-W35", R4)
-
-    assert "mar. 25/08 : AUCUNE SÉANCE" in lignes
-    assert "dim. 30/08 : AUCUNE SÉANCE" in lignes
+    assert "jeu. 27/08 : Renfo B (cancelled)" in lines
 
 
-def test_la_relecture_couvre_les_sept_jours():
+def test_a_day_without_any_session_is_named():
+    lines = weekly_plan.revision_week_lines("2026-W35", R4)
+
+    assert "mar. 25/08 : AUCUNE SÉANCE" in lines
+    assert "dim. 30/08 : AUCUNE SÉANCE" in lines
+
+
+def test_the_readback_covers_the_seven_days():
     assert len(weekly_plan.revision_week_lines("2026-W35", R4)) == 7
 
 
-@pytest.mark.parametrize("mutation, attendu", [
+@pytest.mark.parametrize("mutation, expected", [
     ({"sessions": [*R4["sessions"], _session("w35-jeu-jog", "2026-08-27", "EF amis")]},
      "w35-jeu-jog : AJOUTÉE le jeu. 27/08 (EF amis)"),
     ({"sessions": [{**R4["sessions"][0], "date": "2026-08-25"}, *R4["sessions"][1:]]},
@@ -66,32 +66,32 @@ def test_la_relecture_couvre_les_sept_jours():
     ({"sessions": R4["sessions"][:2]},
      "w35-ven-ef : RETIRÉE de la révision (elle était le ven. 28/08)"),
 ])
-def test_le_diff_nomme_ce_qui_a_bouge(mutation, attendu):
+def test_the_diff_names_what_moved(mutation, expected):
     r5 = {**R4, "revision": 5, **mutation}
 
-    assert attendu in weekly_plan.revision_diff(R4, r5)
+    assert expected in weekly_plan.revision_diff(R4, r5)
 
 
-def test_une_revision_qui_ne_change_rien_le_dit_franchement():
+def test_a_revision_that_changes_nothing_says_so_plainly():
     """The most dangerous case: the coach thinks it recorded, the object is identical."""
-    texte = weekly_plan.revision_readback("2026-W35", R4, {**R4, "revision": 5})
+    text_out = weekly_plan.revision_readback("2026-W35", R4, {**R4, "revision": 5})
 
-    assert "AUCUNE séance ajoutée, annulée, déplacée ni modifiée" in texte
-
-
-def test_la_premiere_revision_na_pas_de_predecesseur():
-    texte = weekly_plan.revision_readback("2026-W35", None, R4)
-
-    assert "rien (première révision)" in texte
-    assert "w35-mer-a : AJOUTÉE" in texte
+    assert "AUCUNE séance ajoutée, annulée, déplacée ni modifiée" in text_out
 
 
-def test_la_relecture_reclame_une_relecture():
+def test_the_first_revision_has_no_predecessor():
+    text_out = weekly_plan.revision_readback("2026-W35", None, R4)
+
+    assert "rien (première révision)" in text_out
+    assert "w35-mer-a : AJOUTÉE" in text_out
+
+
+def test_the_readback_asks_for_a_reread():
     """A rendering the model skims is useless: it carries its own instruction."""
-    texte = weekly_plan.revision_readback("2026-W35", R4, {**R4, "revision": 5})
+    text_out = weekly_plan.revision_readback("2026-W35", R4, {**R4, "revision": 5})
 
-    assert "RELIS LA SEMAINE AVANT DE RÉPONDRE" in texte
-    assert "Chaque fait du message de l'athlète doit se retrouver ci-dessus" in texte
+    assert "RELIS LA SEMAINE AVANT DE RÉPONDRE" in text_out
+    assert "Chaque fait du message de l'athlète doit se retrouver ci-dessus" in text_out
 
 
 R2 = {
@@ -111,18 +111,18 @@ def _r3(reason, sessions=None):
                 for s in R2["sessions"]]}
 
 
-def test_un_jour_vide_par_cette_revision_est_signale():
-    orphelins = weekly_plan.sessions_orphelines(R2, _r3("mercredi"))
+def test_a_day_emptied_by_this_revision_is_reported():
+    orphans = weekly_plan.orphan_sessions(R2, _r3("mercredi"))
 
-    assert orphelins == ["mer. 26/08 ne porte plus que des annulations (EF) et aucune "
+    assert orphans == ["mer. 26/08 ne porte plus que des annulations (EF) et aucune "
                          "séance à la place. Voulu, ou remplaçante oubliée ?"]
 
 
-def test_un_jour_deja_vide_a_la_revision_precedente_ne_se_resignale_pas():
+def test_a_day_already_empty_in_the_previous_revision_is_not_reported_again():
     """The signal is about what THIS revision does, not about an inherited state."""
-    deja = _r3("mercredi")
+    already = _r3("mercredi")
 
-    assert weekly_plan.sessions_orphelines(deja, {**deja, "revision": 4}) == []
+    assert weekly_plan.orphan_sessions(already, {**already, "revision": 4}) == []
 
 
 def test_a_future_change_requires_exact_evidence_rule_and_fields():
@@ -201,7 +201,7 @@ def test_an_unknown_rule_id_is_refused_by_the_schema():
     assert weekly_plan.CHANGE_SCHEMA.errors(entry["changes"][0], "c")
 
 
-@pytest.mark.parametrize("before, after, attendu", [
+@pytest.mark.parametrize("before, after, expected", [
     ({"distance_cap_km": 10.0}, {"distance_cap_km": 8.0}, "plafond de distance abaissé"),
     ({"distance_target_km": 10.0}, {"distance_target_km": 10.0, "distance_cap_km": 8.0},
      "plafond de distance abaissé"),
@@ -211,9 +211,9 @@ def test_an_unknown_rule_id_is_refused_by_the_schema():
     ({"strength": {}}, {"strength": {"drop": ["rdl"]}}, "exercice retiré du renfo"),
     ({"strength": {}}, {"strength": {"half_dose": True}}, "renfo en demi-dose"),
 ])
-def test_every_kind_of_cut_is_a_restriction(before, after, attendu):
+def test_every_kind_of_cut_is_a_restriction(before, after, expected):
     old = {**_session("s", "2026-08-26"), **before}
-    assert weekly_plan.restrictions(old, {**old, **after}) == [attendu]
+    assert weekly_plan.restrictions(old, {**old, **after}) == [expected]
 
 
 @pytest.mark.parametrize("before, after", [
@@ -265,10 +265,10 @@ def test_change_fields_must_match_the_actual_object():
     assert any("attendu ['status']" in error for error in errors)
 
 
-def test_une_annulation_remplacee_le_meme_jour_ne_se_signale_pas():
-    remplace = _r3("mercredi", sessions=[
+def test_a_cancellation_replaced_the_same_day_is_not_reported():
+    replaced = _r3("mercredi", sessions=[
         *[{**s, "status": "cancelled"} if s["id"] == "w35-mer-ef" else s
           for s in R2["sessions"]],
         _session("w35-mer-jog", "2026-08-26", "EF amis")])
 
-    assert weekly_plan.sessions_orphelines(R2, remplace) == []
+    assert weekly_plan.orphan_sessions(R2, replaced) == []
