@@ -12,11 +12,14 @@ messages nor signs the links.
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 from conftest import ENGINE_ROOT, OPERATOR_TOOLS
 
+from redline import cli
 from redline.service.config import SANDBOX_NEEDS, sandbox_overrides
+from redline.service.vault import VaultRepo
 
 
 def test_the_messenger_credentials_never_reach_the_agent():
@@ -267,7 +270,7 @@ def test_root_owned_launcher_refuses_a_cli_modified_during_the_turn(tmp_path):
         [launcher, "ledger", "--week", "2026-W35"],
         env=environment, text=True, capture_output=True, check=False)
     assert split.returncode == 0
-    assert "-m\nredline.cli.ledger" in split.stdout
+    assert "-P\n-m\nredline.cli.ledger" in split.stdout
     assert f"cwd={vault.resolve()}" in split.stdout
 
     read_only(script_dir, mode=0o755)
@@ -281,3 +284,53 @@ def test_root_owned_launcher_refuses_a_cli_modified_during_the_turn(tmp_path):
         folder.chmod(0o755)
     assert dirty.returncode == 1
     assert "runtime différent du commit déployé" in dirty.stderr
+
+
+def _plant_engine(vault: Path) -> Path:
+    """What a turn can write with its file tools: a `redline` package in the vault."""
+    marker = vault / "planted-code-ran"
+    package = vault / "redline"
+    package.mkdir()
+    (package / "__init__.py").write_text(f"open({str(marker)!r}, 'w').close()\n",
+                                         encoding="utf-8")
+    return marker
+
+
+def test_an_engine_command_never_imports_what_a_turn_left_in_the_vault(tmp_path):
+    marker = _plant_engine(tmp_path)
+
+    # The threat is real: started from the vault, a plain `-m` imports the planted package.
+    subprocess.run([sys.executable, "-m", cli.module("regen-views"), "--help"],
+                   cwd=tmp_path, capture_output=True, check=False)
+    assert marker.exists()
+    marker.unlink()
+
+    done = subprocess.run(cli.argv("regen-views", "--help"), cwd=tmp_path,
+                          capture_output=True, text=True, check=False)
+    assert done.returncode == 0, done.stderr
+    assert not marker.exists()
+
+
+def test_every_engine_command_keeps_the_vault_off_its_import_path():
+    """`cli.argv` is the one way the engine starts itself; the shell launchers say `-P`."""
+    by_hand = [f"{path.relative_to(ROOT)}:{number}"
+               for path in PACKAGE.rglob("*.py") if path != PACKAGE / "cli" / "__init__.py"
+               for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
+               if "sys.executable" in line]
+    assert by_hand == []
+    for script in (ROOT / "deploy" / "agent-cli" / "redline-agent-cli",
+                   ROOT / "templates" / "vault" / ".githooks" / "pre-commit"):
+        launches = [line for line in script.read_text(encoding="utf-8").splitlines()
+                    if re.search(r"\s-m\s", line) and not line.lstrip().startswith("#")]
+        assert launches, script
+        assert all(" -P -m " in line for line in launches), launches
+
+
+def test_the_views_never_see_the_service_secrets(git_repo, monkeypatch):
+    """A view reads PostgreSQL and renders a card: the page token stays in the service."""
+    monkeypatch.setenv("MESSENGER_PAGE_TOKEN", "EAAG-secret")
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://redline_app@/redline")
+    probe = ("import os, sys; sys.exit(os.environ['MESSENGER_PAGE_TOKEN'] != '' "
+             "or os.environ['DATABASE_URL'] == '')")
+    VaultRepo(str(git_repo), "origin", "main",
+              regen_command=(sys.executable, "-c", probe)).regenerate_views()

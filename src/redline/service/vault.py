@@ -9,7 +9,6 @@ import json
 import logging
 import os
 import subprocess
-import sys
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -17,6 +16,7 @@ from pathlib import Path
 
 from sqlalchemy import exc as sa_exc
 
+from redline import cli
 from redline.model import agent_input, session_cycle, vault_layout
 from redline.model import ledger as ledger_model
 from redline.model import paths as engine_paths
@@ -26,12 +26,13 @@ from redline.storage.database import StorageError
 from redline.storage.repository import OperationalStore
 
 from . import clock
+from .config import sandbox_overrides
 from .plans import PlanStatus, render_plan_message
 
 log = logging.getLogger("redline")
 
 #: How the service regenerates the vault's views after delivery (`publish`).
-REGEN_COMMAND = (sys.executable, "-m", "redline.cli.regen_views")
+REGEN_COMMAND = tuple(cli.argv("regen-views"))
 PROCESS_TIMEOUT = 120
 GIT_TIMEOUT = 60
 # A command already validated during the turn must survive a PostgreSQL restart:
@@ -101,9 +102,27 @@ def _transient(error: StorageError) -> bool:
         getattr(cause, "connection_invalidated", False))
 
 
+# What a later process executes rather than reads: Python that an interpreter would
+# import, the vault's Git hooks and its CI. A turn writes notes, never code; scripts
+# without a suffix are recognised by their execute bit (`VaultRepo._scripts`).
+EXECUTABLE_SUFFIXES = frozenset({".py", ".pyc", ".pth"})
+EXECUTABLE_FOLDERS = (".githooks/", ".github/")
+
+
 def forbidden_in_turn(path: str) -> bool:
-    """What a coach turn may never modify in the vault."""
-    return path in CANONICAL_PROJECTIONS or path.startswith(f"{vault_layout.CAPABILITIES}/")
+    """What a coach turn may never modify in the vault, judged by its path alone."""
+    return (path in CANONICAL_PROJECTIONS
+            or path.startswith((f"{vault_layout.CAPABILITIES}/", *EXECUTABLE_FOLDERS))
+            or Path(path).suffix in EXECUTABLE_SUFFIXES)
+
+
+def _view_environment() -> dict[str, str]:
+    """The service environment without its secrets.
+
+    A view reads PostgreSQL and renders a card; it never posts a message nor calls a
+    model, so it gets what the agent's commands get and nothing more.
+    """
+    return {**os.environ, **sandbox_overrides()}
 
 
 class VaultRepo:
@@ -319,7 +338,10 @@ class VaultRepo:
             # judged like the rest, then committed by the service.
             log.warning("Commit de l'agent pendant le tour : repris dans le commit du service")
             self._git("reset", "--soft", base_head)
-        forbidden = sorted(path for path in self._changed_paths() if forbidden_in_turn(path))
+        changed = self._changed_paths()
+        scripts = self._scripts(changed)
+        forbidden = sorted(path for path in changed
+                           if forbidden_in_turn(path) or path in scripts)
         if not forbidden:
             return ()
         known = set(self._git("ls-tree", "-r", "--name-only", "HEAD", "--", *forbidden,
@@ -337,6 +359,20 @@ class VaultRepo:
         self._alert(ALERT_WRITE, "fichiers interdits restaurés pendant un tour coach : "
                     + ", ".join(forbidden))
         return tuple(forbidden)
+
+    def _scripts(self, paths: list[str]) -> set[str]:
+        """The paths among ``paths`` that are executable at HEAD or in the worktree."""
+        if not paths:
+            return set()
+        listed = self._git("ls-tree", "-r", "-z", "HEAD", "--", *paths,
+                           log_errors=False).stdout
+        scripts = {entry.split("\t", 1)[1] for entry in listed.split("\0")
+                   if entry.startswith("100755 ")}
+        for path in paths:
+            full = os.path.join(self._path, path)
+            if os.path.isfile(full) and os.access(full, os.X_OK):
+                scripts.add(path)
+        return scripts
 
     def _apply(self, turn_id: str) -> tuple[int, tuple[dict, ...]]:
         if not turn_id:
@@ -541,13 +577,13 @@ class VaultRepo:
         outbox = engine_paths.outbox_dir()
         outbox.mkdir(parents=True, exist_ok=True)
         target = str(outbox / f"plan-{week.lower()}-r{revision}.png")
-        command = [sys.executable, "-m", "redline.cli.chart_plan", "--week", week, "-o", target]
+        command = cli.argv("chart-plan", "--week", week, "-o", target)
         if today:
             command += ["--today", today]
         try:
             process = subprocess.run(
-                command, cwd=self._path, capture_output=True, text=True,
-                timeout=PROCESS_TIMEOUT)
+                command, cwd=self._path, env=_view_environment(), capture_output=True,
+                text=True, timeout=PROCESS_TIMEOUT)
         except subprocess.TimeoutExpired:
             log.error("carte du plan %s non générée : timeout", week)
             return False
@@ -564,8 +600,8 @@ class VaultRepo:
         target = str(outbox / f"workout-{activity_id}.png")
         try:
             process = subprocess.run(
-                [sys.executable, "-m", "redline.cli.chart_workout", "-o", target],
-                cwd=self._path,
+                cli.argv("chart-workout", "-o", target),
+                cwd=self._path, env=_view_environment(),
                 input=json.dumps(card, ensure_ascii=False), capture_output=True,
                 text=True, timeout=PROCESS_TIMEOUT)
         except subprocess.TimeoutExpired:
@@ -591,8 +627,8 @@ class VaultRepo:
         if not self._regen_command:
             return
         process = subprocess.run(
-            list(self._regen_command), cwd=self._path, capture_output=True,
-            text=True, timeout=PROCESS_TIMEOUT)
+            list(self._regen_command), cwd=self._path, env=_view_environment(),
+            capture_output=True, text=True, timeout=PROCESS_TIMEOUT)
         if process.returncode != 0:
             detail = (process.stderr or process.stdout).strip()[:300]
             log.error("régénération des vues échouée (%d) : %s",

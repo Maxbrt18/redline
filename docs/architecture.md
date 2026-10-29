@@ -107,7 +107,8 @@ An agent turn is one model call, wrapped in a transaction:
 5. After the call, all the staged commands are applied in **one PostgreSQL
    transaction**, retried three times on a transient failure. An invalid command
    cancels the batch. A projection or capability note edited during the turn is
-   restored file by file, without losing the other notes or the commands.
+   restored file by file, without losing the other notes or the commands; so is code
+   (Python, a script, the vault's Git hooks or CI), which a turn never writes.
 6. The weeks the reply depends on are reread and validated. The vault notes are
    committed locally, without network.
 7. `TurnWorker` decides whether the canonical plan goes with the prose.

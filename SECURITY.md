@@ -33,6 +33,10 @@ What the engine is built to guarantee:
     turn cannot plant something the next call would execute.
   - Codex runs its commands in its workspace sandbox (bubblewrap on Linux): writes are
     limited to the vault and `REDLINE_STATE_DIR`; `.git` and `.codex` stay read-only.
+  - Nothing in the vault is executed. The engine starts its commands from the vault
+    with `python -P`, so a `redline/` folder there never shadows the engine, and the
+    views run without the service secrets. Code a turn writes anyway (Python, a script,
+    the vault's Git hooks or CI) is removed before the notes are committed.
   - The reference unit runs the service as a dedicated account without sudo, with a
     read-only file system outside its state directory.
 - **Received content is data.** Messages and attachments are never treated as

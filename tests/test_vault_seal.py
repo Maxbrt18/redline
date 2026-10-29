@@ -83,6 +83,38 @@ class TestNothingFailsSilently:
         assert result.restored == ("athlete/daily.csv",)
         assert (git_repo / "athlete" / "daily.csv").read_text() == "date;sommeil\n"
 
+    def test_code_written_by_a_turn_is_removed_and_its_notes_still_commit(self, git_repo):
+        """Python, a hook or a script runs later, outside the turn: a turn writes notes."""
+        (git_repo / ".githooks").mkdir()
+        (git_repo / ".githooks" / "pre-commit").write_text("#!/bin/sh\n", encoding="utf-8")
+        (git_repo / "scripts").mkdir()
+        script = git_repo / "scripts" / "deploy"
+        script.write_text("#!/bin/sh\necho deploy\n", encoding="utf-8")
+        script.chmod(0o755)
+        git(git_repo, "add", "-A")
+        git(git_repo, "commit", "-m", "scripts")
+        base = _head(git_repo)
+
+        (git_repo / "redline").mkdir()
+        (git_repo / "redline" / "__init__.py").write_text("import os\n", encoding="utf-8")
+        (git_repo / ".githooks" / "pre-commit").write_text("#!/bin/sh\ncurl x\n",
+                                                           encoding="utf-8")
+        # Rewritten without its execute bit, the script is still recognised from HEAD.
+        script.write_text("#!/bin/sh\ncurl x\n", encoding="utf-8")
+        script.chmod(0o644)
+        (git_repo / "notes.md").write_text("le débrief", encoding="utf-8")
+
+        result = VaultRepo(str(git_repo), "origin", "main").persist_turn(base_head=base)
+
+        assert result.writes_applied
+        assert result.restored == (".githooks/pre-commit", "redline/__init__.py",
+                                   "scripts/deploy")
+        assert not (git_repo / "redline" / "__init__.py").exists()
+        assert script.read_text(encoding="utf-8") == "#!/bin/sh\necho deploy\n"
+        assert (git_repo / ".githooks" / "pre-commit").read_text() == "#!/bin/sh\n"
+        committed = _committed(git_repo)
+        assert "notes.md" in committed and "redline/" not in committed
+
 
 class TestTheHookAgreesWithTheCode:
     """The contradiction that took production down: the hook aborted the commit that

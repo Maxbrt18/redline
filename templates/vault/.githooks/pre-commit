@@ -13,7 +13,8 @@ set -e
 cd "$(git rev-parse --show-toplevel)"
 
 # The Python that has the engine installed: on the server the service puts its venv
-# first on PATH.
+# first on PATH. It runs from the vault root with `-P`, so that nothing in the vault is
+# imported in place of the engine.
 RUNTIME_PYTHON=${REDLINE_PYTHON:-python3}
 
 # NON-BLOCKING, by policy. `redline/vault.py` (`regenerate_views`) states that a
@@ -36,7 +37,7 @@ REGEN_OPTIONS=""
 if [ -z "${DATABASE_URL:-}" ]; then
     REGEN_OPTIONS="--static-only"
 fi
-"$RUNTIME_PYTHON" -m redline.cli.regen_views $REGEN_OPTIONS >/dev/null || \
+"$RUNTIME_PYTHON" -P -m redline.cli.regen_views $REGEN_OPTIONS >/dev/null || \
     echo "pre-commit : régénération des vues en échec, commit maintenu (bloc périmé)."
 # The list of produced files is read from disk, never copied from GENERATORS: a copy
 # can go stale and miss a generated file.
