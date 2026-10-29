@@ -23,6 +23,6 @@ def deterministic_triage(text: str) -> Triage | None:
     if SOCIAL.fullmatch(value.strip(" .!?,;:")):
         return Triage("N0")
     # Any open phrase needs its meaning in context. Words like "finally", "pain" or
-    # "I doubt" are neither a decision to change the programme nor a write
+    # "I doubt" are neither a decision to change the program nor a write
     # authorization.
     return None

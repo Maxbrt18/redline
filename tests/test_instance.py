@@ -9,8 +9,8 @@ from redline.model import instance
 def test_the_fixture_instance_loads():
     loaded = instance.load(TEST_VAULT)
     assert loaded.athlete_name == "Sam"
-    assert loaded.capability_label("cap5-genou") == "Genou"
-    assert loaded.capability_icon("cap5-genou") == "pain"
+    assert loaded.capability_label("cap5-knee") == "Genou"
+    assert loaded.capability_icon("cap5-knee") == "pain"
     assert loaded.capability_icon("unknown") == "run"
 
 
@@ -61,19 +61,19 @@ def test_unknown_or_broken_input_is_refused(text, expected):
 
 def test_an_athlete_without_injury_declares_none():
     text = (TEST_VAULT / instance.FILENAME).read_text(encoding="utf-8")
-    text = text.replace('[[injuries]]\nslug = "genou"\nlabel = "Genou"\n', "")
+    text = text.replace('[[injuries]]\nslug = "knee"\nlabel = "Genou"\n', "")
     assert instance.parse(text).injuries == ()
 
 
 def test_several_zones_are_kept_in_their_declared_order():
     text = (TEST_VAULT / instance.FILENAME).read_text(encoding="utf-8")
     text += '\n[[injuries]]\nslug = "cheville"\nlabel = "Cheville"\n'
-    assert [zone.slug for zone in instance.parse(text).injuries] == ["genou", "cheville"]
+    assert [zone.slug for zone in instance.parse(text).injuries] == ["knee", "cheville"]
 
 
 def test_a_zone_declared_twice_is_refused():
     text = (TEST_VAULT / instance.FILENAME).read_text(encoding="utf-8")
-    text += '\n[[injuries]]\nslug = "genou"\nlabel = "Encore"\n'
+    text += '\n[[injuries]]\nslug = "knee"\nlabel = "Encore"\n'
     with pytest.raises(instance.InstanceError, match="double"):
         instance.parse(text)
 

@@ -1,4 +1,4 @@
-"""The strength programme: what an exercise note holds, what a session holds.
+"""The strength program: what an exercise note holds, what a session holds.
 
 Two note shapes, both already native to the vault (`coaching/capabilities/cap*.md`
 and `coaching/workouts/*.md` do the same thing):
@@ -132,7 +132,7 @@ GATE_SCHEMA = Schema("garde-fou", [
 ])
 
 # What Claude writes each morning. Small, closed, validated: a SELECTION of the
-# programme, never a re-encoding of it.
+# program, never a re-encoding of it.
 SELECTION_SCHEMA = Schema("séance du jour", [
     field("loads", list, required=False, maximum=20,
           item=field("charge", dict, schema=PRESCRIBED_LOAD_SCHEMA),
@@ -192,7 +192,7 @@ class Prescription:
                 "dose": self.dose.human(), "rest_s": self.dose.rest_s}
 
 
-class Programme:
+class Program:
     def __init__(self, exercises: dict, sessions: dict) -> None:
         self.exercises, self.sessions = exercises, sessions
 
@@ -227,7 +227,7 @@ class Programme:
     # ------------------------------------------------------------- selection
 
     def build(self, selection: dict) -> dict:
-        """A selection of the programme -> the session of the day, resolved.
+        """A selection of the program -> the session of the day, resolved.
 
         The morning run picks and modulates, it does not retype the exercises and their
         doses. Everything here is validated, and every refusal names what it expected.
@@ -354,9 +354,9 @@ def target_for(targets: dict[tuple[str, str | None], float], kind: str,
     return targets.get((kind, routine if kind == session_kinds.STRENGTH else None))
 
 
-def load(vault: Path) -> Programme:
+def load(vault: Path) -> Program:
     """Every exercise and routine note, validated. Raises NoteError listing every
-    broken note -- never a partial programme."""
+    broken note -- never a partial program."""
     exercises = read_all(vault / vault_layout.EXERCISES, EXERCISE_SCHEMA)
     sessions = {}
     problems = []
@@ -382,4 +382,4 @@ def load(vault: Path) -> Programme:
             problems.append(f"{path.name} : {exc}")
     if problems:
         raise NoteError("\n".join(problems))
-    return Programme(exercises, sessions)
+    return Program(exercises, sessions)

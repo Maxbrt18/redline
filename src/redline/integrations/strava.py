@@ -459,38 +459,38 @@ def build_parser() -> argparse.ArgumentParser:
     # without this parent, and its error does not say where the flag belongs.
     # SUPPRESS makes both orders compatible: without it, the subcommand's default
     # would overwrite a `--json` already set up front.
-    commun = argparse.ArgumentParser(add_help=False)
-    commun.add_argument("--json", action="store_true", default=argparse.SUPPRESS,
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--json", action="store_true", default=argparse.SUPPRESS,
                         help="sortie machine")
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    activity = subparsers.add_parser("activity", parents=[commun],
+    activity = subparsers.add_parser("activity", parents=[common],
                                      help="le détail distillé d'une activité")
     activity.add_argument("id")
 
-    laps = subparsers.add_parser("laps", parents=[commun],
+    laps = subparsers.add_parser("laps", parents=[common],
                                  help="chaque répétition, une par une")
     laps.add_argument("id")
 
-    activities = subparsers.add_parser("activities", parents=[commun],
+    activities = subparsers.add_parser("activities", parents=[common],
                                        help="les activités récentes")
     activities.add_argument("--limit", type=int, default=10)
     activities.add_argument("--after", help="AAAA-MM-JJ")
 
-    streams = subparsers.add_parser("streams", parents=[commun],
+    streams = subparsers.add_parser("streams", parents=[common],
                                     help="les flux, prêts pour redline descent")
     streams.add_argument("id")
     streams.add_argument("--keys", default="altitude",
                          help="altitude, heartrate, cadence, velocity_smooth, distance, time")
 
-    subparsers.add_parser("zones", parents=[commun],
+    subparsers.add_parser("zones", parents=[common],
                           help="les zones de FC de l'athlète (TTL 180 j dans athlete.md)")
-    subparsers.add_parser("gear", parents=[commun],
+    subparsers.add_parser("gear", parents=[common],
                           help="les chaussures et leur kilométrage Strava frais")
-    subparsers.add_parser("check", parents=[commun],
+    subparsers.add_parser("check", parents=[common],
                           help="vérifie que l'accès Strava fonctionne")
-    subparsers.add_parser("login", parents=[commun],
+    subparsers.add_parser("login", parents=[common],
                           help="autorise l'application et écrit les jetons (une fois)")
     return parser
 

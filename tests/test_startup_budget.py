@@ -10,7 +10,7 @@ from conftest import TEST_VAULT
 from redline.model import instance
 from redline.model import startup_budget as budget
 
-PER_TURN = budget.Tier("par tour", 3600, (("CLAUDE.md", 2200), ("ai/hot-cache.md", 1400)))
+PER_TURN = budget.Tier("per-turn", 3600, (("CLAUDE.md", 2200), ("ai/hot-cache.md", 1400)))
 N2 = budget.Tier("N2", 2800, (("athlete/athlete.md", 2800),))
 TIERS = (PER_TURN, N2)
 
@@ -23,7 +23,7 @@ def test_an_overflow_names_its_file_and_its_tier():
     result = budget.audit(TIERS, {"CLAUDE.md": _words(4000)})
     assert [name for name, _, _ in result.over] == ["CLAUDE.md"]
     assert "4000" in result.problems()[0]
-    assert "par tour" in result.problems()[0]
+    assert "per-turn" in result.problems()[0]
 
 
 def test_one_file_never_pays_for_another():
@@ -39,7 +39,7 @@ def test_the_two_tiers_never_compensate():
 
 def test_a_missing_file_counts_as_zero():
     result = budget.audit(TIERS, {})
-    assert result.totals == {"par tour": 0, "N2": 0}
+    assert result.totals == {"per-turn": 0, "N2": 0}
     assert not result.over and not result.over_total
 
 

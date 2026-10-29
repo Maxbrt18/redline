@@ -137,7 +137,7 @@ def plan_context(revision_number=2, gates=None):
                        "gates": gates or []})
 
 
-DUE_GATE = [{"id": "w33-genou", "due": "2000-01-01",
+DUE_GATE = [{"id": "w33-knee", "due": "2000-01-01",
              "when": "before", "holds": ["w33-ef"],
              "question": "La blessure au réveil ce matin, mieux ou pire qu'hier ?",
              "on_fail": "repos à la place de l'EF"}]

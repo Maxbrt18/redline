@@ -12,7 +12,7 @@ partial merge would let two versions of the same rule coexist, the very fault th
 exists to prevent.
 
 It is the SINGLE SOURCE of the thresholds the code applies (`redline ledger`,
-`redline feasibility`, `transitions.py`) and of the transition kinds a programme may
+`redline feasibility`, `transitions.py`) and of the transition kinds a program may
 carry. A threshold cited in a rule's text (`{pain_cap}`) is rendered from the same value:
 what the coach reads is what the code applies.
 """
@@ -36,7 +36,7 @@ SLUG = r"[a-z0-9][a-z0-9-]{0,39}"
 WEEK = r"\d{4}-W(0[1-9]|[1-4]\d|5[0-3])"
 
 #: Rules the engine enforces itself: the coach must read them, otherwise the code would
-#: reject from the programme what the injected rulebook does not state.
+#: reject from the program what the injected rulebook does not state.
 ENFORCED = ("n2", "n7", "n8", "po", "s9")
 
 RULEBOOK_SCHEMA = Schema("rulebook.toml", [

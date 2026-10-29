@@ -58,11 +58,11 @@ def sandbox_overrides(environ: Mapping[str, str] | None = None, *,
                       keep: tuple[str, ...] = ()) -> dict[str, str]:
     """Return secrets to blank; ``keep`` declares provider-specific exceptions."""
     source: Mapping[str, str] = os.environ if environ is None else environ
-    autorise = SANDBOX_NEEDS.union(keep)
+    allowed = SANDBOX_NEEDS.union(keep)
     return {
         name: ""
         for name in source
-        if name not in autorise
+        if name not in allowed
         and (name in EXTRA_SECRETS or any(marker in name for marker in SECRET_MARKERS))
     }
 

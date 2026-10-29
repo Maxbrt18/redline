@@ -13,7 +13,7 @@ import datetime as dt
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from . import programme, vault_layout
+from . import program, vault_layout
 from .views import apply
 
 if TYPE_CHECKING:
@@ -88,7 +88,7 @@ def render(ledger, rows: list, instruments: dict, targets: dict,
     walk_note = (f", dont **{walk_share} % de marche**" if walk_share >= 25 else "")
 
     short = label.split("-")[-1]          # « 2030-W30 » -> « W30 »
-    sorties = f"{runs} sortie" + ("s" if runs > 1 else "")
+    runs_label = f"{runs} sortie" + ("s" if runs > 1 else "")
     # A week is "bouclée" only once it is CLOSED: mid-week the missing days would fake a
     # collapse in volume and ratio.
     day = today or dt.date.today()
@@ -100,7 +100,7 @@ def render(ledger, rows: list, instruments: dict, targets: dict,
     else:
         state = f"{short} bouclée"
     return (
-        f"- **Forme** : **{state}** — {_round(run_km)} km courus ({sorties})"
+        f"- **Forme** : **{state}** — {_round(run_km)} km courus ({runs_label})"
         + (f" + {_round(walk_km)} km marchés" if walk_km else "")
         + f". **Tendance douleur, au PIC hebdo** (jamais la médiane), "
         f"**effort/repos** : {trend}. "
@@ -185,7 +185,7 @@ def refresh(vault: Path, ledger, rows: list, instruments: dict,
     a store is provided.
     """
     day = today or dt.date.today()
-    targets = programme.rpe_targets(vault)
+    targets = program.rpe_targets(vault)
     zones = ledger.pain_zones(store) if store is not None else []
     drifted = apply(target(vault), BLOCK,
                     render(ledger, rows, instruments, targets, today=day, zones=zones),

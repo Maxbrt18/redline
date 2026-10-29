@@ -6,6 +6,6 @@ phase: [general, specifique-1, specifique-2]
 status: active
 ---
 
-# repetition-mentale
+# mental-rehearsal
 
 Fiche fictive du vault de test.

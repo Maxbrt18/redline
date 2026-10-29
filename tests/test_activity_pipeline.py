@@ -50,7 +50,7 @@ def test_objective_enrichments_are_finished_before_the_packet_is_returned():
         store,
         activity_fetch=lambda activity_id: activity(),
         stream_fetch=lambda activity_id: [250, 310, 230],
-        weather_fetch=lambda meteo: 21.4,
+        weather_fetch=lambda weather_reading: 21.4,
     )
 
     result = pipeline.run(42)
@@ -213,7 +213,7 @@ def test_computed_gaps_reach_the_snapshot(monkeypatch):
     monkeypatch.setattr(weekly_plan, "active", lambda plan: plan)
     result = ActivityPipeline(Linked(), activity_fetch=lambda activity_id: activity(),
                               stream_fetch=lambda activity_id: [250, 310],
-                              weather_fetch=lambda meteo: 20.0).run(42)
+                              weather_fetch=lambda weather_reading: 20.0).run(42)
     assert "FC moyenne 164 pour un plafond de 157 (+7)" in result["snapshot"]["gaps"]
 
 
@@ -225,7 +225,7 @@ def test_a_gap_failure_never_blocks_the_debrief():
 
     result = ActivityPipeline(Linked(), activity_fetch=lambda activity_id: activity(),
                               stream_fetch=lambda activity_id: [250, 310],
-                              weather_fetch=lambda meteo: 20.0).run(42)
+                              weather_fetch=lambda weather_reading: 20.0).run(42)
     assert "gaps" not in result["snapshot"]
     assert result["snapshot"]["activity"]["name"] == "easy"
 
@@ -241,9 +241,9 @@ def test_a_quality_session_carries_its_reps_into_the_snapshot(monkeypatch):
         {"name": "Lap 3", "distance": 647, "moving_time": 182, "average_heartrate": 178},
         {"name": "Lap 4", "distance": 1621, "moving_time": 597, "average_heartrate": 154},
     ]
-    seuil = {"workout": "threshold", "title": "Seuil doux en côte"}
+    threshold = {"workout": "threshold", "title": "Seuil doux en côte"}
     monkeypatch.setattr(ActivityPipeline, "_gaps",
-                        lambda self, a, o: ([], seuil, dt.date(2026, 10, 15)))
+                        lambda self, a, o: ([], threshold, dt.date(2026, 10, 15)))
     snapshot = ActivityPipeline(Store(), activity_fetch=lambda _: raw,
                                 stream_fetch=lambda _: [1, 2],
                                 weather_fetch=lambda _: None).run(42)["snapshot"]

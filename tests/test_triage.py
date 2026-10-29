@@ -152,12 +152,12 @@ def test_depth_selects_the_declared_profile(make_bot, depth, model, effort):
 
 def test_the_reactive_path_passes_a_route_plan_instead_of_raw_settings():
     """The bot passes the common abstraction, never scattered parameters."""
-    reactif = (TurnWorker._respond_turn, TurnWorker._run_proactive_agent)
-    for fonction in reactif:
-        tree = ast.parse(textwrap.dedent(inspect.getsource(fonction)))
+    reactive = (TurnWorker._respond_turn, TurnWorker._run_proactive_agent)
+    for function in reactive:
+        tree = ast.parse(textwrap.dedent(inspect.getsource(function)))
         named = [keyword.arg for node in ast.walk(tree) if isinstance(node, ast.Call)
                  for keyword in node.keywords]
-        assert "plan" in named, f"aucun plan de route dans {fonction.__name__}"
+        assert "plan" in named, f"aucun plan de route dans {function.__name__}"
 
 
 @pytest.mark.parametrize("depth", ["N0", "N1", "N2", "N3"])
@@ -170,7 +170,7 @@ def test_depth_note_is_prepended_to_the_prompt(make_bot, depth):
 
 
 @pytest.mark.parametrize("depth", ["N0", "N1", "N2", "N3"])
-def test_la_date_du_jour_ouvre_le_prompt_a_tous_les_niveaux(make_bot, depth):
+def test_todays_date_opens_the_prompt_at_every_level(make_bot, depth):
     """A message about today's rest and tomorrow's strength work arrives at N0 as at N2,
     and N0 is where the coach reads the least. The anchor therefore comes before the
     reading level."""
@@ -266,7 +266,7 @@ def test_the_n2_note_covers_any_change_of_plan_not_only_an_increase():
     assert "charge de la preuve inversée" in DEPTH_NOTES["N2"]
 
 
-def test_un_message_qui_touche_au_programme_le_dit_au_coach(make_bot):
+def test_a_message_about_the_plan_tells_the_coach(make_bot):
     """The "plan change" flag was computed on every message and never reached the coach.
 
     It was only used to load the program, which N1 and N2 already do, and the only text
@@ -278,19 +278,19 @@ def test_un_message_qui_touche_au_programme_le_dit_au_coach(make_bot):
     agent._plan_change = True
     bot._respond("4242", "Finalement aujourd'hui repos, je fais le renfo demain")
 
-    envoye = agent.calls[0]["message"]
-    assert "CE MESSAGE TOUCHE AU PROGRAMME" in envoye
-    assert "n'impose ni révision ni question automatique" in envoye
+    sent = agent.calls[0]["message"]
+    assert "CE MESSAGE TOUCHE AU PROGRAMME" in sent
+    assert "n'impose ni révision ni question automatique" in sent
 
 
-def test_un_message_ordinaire_ne_porte_pas_lobligation(make_bot):
+def test_an_ordinary_message_carries_no_obligation(make_bot):
     bot, agent = _bot(make_bot, "N2")
     bot._respond("4242", "c'était quoi déjà ma FC max")
 
     assert "CE MESSAGE TOUCHE AU PROGRAMME" not in agent.calls[0]["message"]
 
 
-def test_un_tour_plan_change_sans_revision_laisse_une_trace(make_bot, caplog):
+def test_a_plan_change_turn_without_revision_leaves_a_trace(make_bot, caplog):
     """The service sees the signature of a plan-change turn without a revision, and says so."""
     bot, agent = _bot(make_bot, "N2")
     agent._plan_change = True

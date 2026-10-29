@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 from redline.analysis import feasibility, ledger, permit_report, signals
 from redline.model import predictions as prediction_model
-from redline.model import programme
+from redline.model import program
 
 if TYPE_CHECKING:
     from redline.storage import OperationalStore
@@ -33,7 +33,7 @@ def render(store: OperationalStore, root: Path, week: str, today: dt.date) -> st
     """The dossier for week `week` (the one that CLOSES), seen from `today`."""
     rows = ledger.parse_ledger(store)
     instruments = ledger.load_instruments(store)
-    targets = programme.rpe_targets(root)
+    targets = program.rpe_targets(root)
     lines = ["[DOSSIER DU BILAN, calculé par le service avant ce tour, invisible pour "
              "l'athlète. Ces chiffres sont déjà calculés par les mêmes fonctions que les CLI : "
              "cite-les, ne les recalcule pas ; relance une CLI seulement pour vérifier un "

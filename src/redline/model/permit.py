@@ -92,7 +92,7 @@ class Window:
     """The supervised period: from the Monday of the first sealed choice to the judgment."""
 
     start: dt.date
-    obtention_week: str
+    granted_week: str
 
 
 def window(choices: Iterable[dict]) -> Window | None:
@@ -150,7 +150,7 @@ class State:
     phase: str
     withdrawal_until: dt.date | None
     restricted_weeks: dict[str, list[str]]
-    obtention: dict | None
+    grant: dict | None
     window: Window
 
 
@@ -183,26 +183,26 @@ def state(lines: list[EfLine], daily: Iterable[dict], today: dt.date,
             restricted.setdefault(iso_week(line.date), []).append(
                 f"sortie de groupe le {line.date:%d/%m}")
 
-    obtention = None
-    judged_on = week_end(period.obtention_week)
+    grant = None
+    judged_on = week_end(period.granted_week)
     if today > judged_on:
         judged = [line for line in lines if line.date <= judged_on]
         run = [line for line in judged if line.status == "courue"]
         agreements = sum(1 for line in run if line.agrees)
         failures = [f"{line.session_key} : {', '.join(line.triggers)}"
                     for line in judged if line.triggers]
-        obtention = {"courues": len(run), "accords": agreements, "retraits": failures,
+        grant = {"courues": len(run), "accords": agreements, "retraits": failures,
                      "obtenu": len(run) >= MIN_EF and not failures}
 
     if withdrawal_until is not None and today <= withdrawal_until:
         phase = "retrait : conduite accompagnée"
-    elif obtention is None:
+    elif grant is None:
         phase = "conduite accompagnée"
-    elif obtention["obtenu"]:
+    elif grant["obtenu"]:
         phase = "permis"
     else:
         phase = "conduite accompagnée (obtention refusée)"
-    return State(phase, withdrawal_until, restricted, obtention, period)
+    return State(phase, withdrawal_until, restricted, grant, period)
 
 
 def _fmt_minutes(value: float | None) -> str:
@@ -232,16 +232,16 @@ def render(lines: list[EfLine], current: State, week: str | None = None) -> list
     for iso, reasons in sorted(current.restricted_weeks.items()):
         if week is None or iso == week:
             out.append(f"Restriction {iso} : {'; '.join(reasons)}.")
-    if current.obtention is not None:
-        verdict = current.obtention
-        out.append(f"Obtention ({current.window.obtention_week}) : {verdict['courues']} EF courues "
+    if current.grant is not None:
+        verdict = current.grant
+        out.append(f"Obtention ({current.window.granted_week}) : {verdict['courues']} EF courues "
                    f"(≥{MIN_EF} requises), {verdict['accords']} accords à ±{TOLERANCE_MIN} min, "
                    f"retraits : {len(verdict['retraits'])} ⇒ "
                    f"{'OBTENU' if verdict['obtenu'] else 'NON OBTENU'}.")
     else:
         run = sum(1 for line in lines if line.status == "courue")
         out.append(f"Compteur d'obtention : {run} EF courues sur {MIN_EF} requises "
-                   f"d'ici la fin de {current.window.obtention_week}.")
+                   f"d'ici la fin de {current.window.granted_week}.")
     out.append("Non détectés automatiquement : parcours neuf ; grosse forme "
                + ("(seuil non fixé, se lit sur « FC à allure » de redline signals)."
                   if BIG_FORM_THRESHOLD is None else f"(seuil {BIG_FORM_THRESHOLD})."))

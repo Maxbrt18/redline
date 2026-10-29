@@ -4,8 +4,8 @@
 Deliberately NOT a chart: this is a checklist you keep open on your phone between
 sets, so legibility at arm's length beats any visual cleverness.
 
-Input: SELECTION_SCHEMA in src/redline/model/programme.py, from --input (stdin outside a
-turn). What arrives is a SELECTION of the programme -- exercises, doses, title and
+Input: SELECTION_SCHEMA in src/redline/model/program.py, from --input (stdin outside a
+turn). What arrives is a SELECTION of the program -- exercises, doses, title and
 footer rule all live in `coaching/exercises/*.md` and `coaching/workouts/renfo-*.md`,
 and the caller picks and modulates rather than retyping every exercise.
 

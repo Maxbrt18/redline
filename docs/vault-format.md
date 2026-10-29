@@ -105,7 +105,7 @@ dose:
   reps: 8              # per set; `seconds` for time, `contacts` and `block` for contacts
   side: each           # each | both
   rest_s: 90
-since: W32             # ISO week it entered the programme, optional
+since: W32             # ISO week it entered the program, optional
 status: active
 ---
 ```

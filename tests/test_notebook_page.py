@@ -27,13 +27,13 @@ def ef(identifier, date, status='planned', fact=None):
             'targets': {'duration_cap_min': 55, 'rpe_min': 2, 'rpe_max': 3, 'hr_cap_bpm': 157}}
 
 
-RENFO = {'id': 'w41-ven-renfo', 'date': '2026-10-09', 'title': 'Renfo, séance unique',
+STRENGTH = {'id': 'w41-ven-renfo', 'date': '2026-10-09', 'title': 'Renfo, séance unique',
          'kind': 'strength', 'workout': 'strength', 'routine': 'a', 'status': 'planned', 'start_time': None,
          'location': None, 'note': None, 'planned': [], 'fact': None, 'entry_id': None,
          'transition': None, 'targets': {}}
 DONE = ef('w41-mar-ef', '2026-10-06', 'done', {
     'km': 8.35, 'duration_min': 48, 'hr_avg': 162, 'rpe': 3,
-    'pains': [{'zone': 'genou', 'label': 'Genou', 'value': 0.5}],
+    'pains': [{'zone': 'knee', 'label': 'Genou', 'value': 0.5}],
     'enjoyment': 8, 'started_at': '2026-10-06T07:10:00+02:00', 'over': ['hr_avg']})
 TOTALS = {'km_done': 14.06, 'km_target': 41, 'runs_done': 2, 'runs_planned': 5, 'dplus': 27,
           'strength_done': 1, 'strength_planned': 2, 'load': 25}
@@ -43,14 +43,14 @@ STRIP = [{'date': f'2026-10-{day:02d}', 'letter': letter, 'abbr': 'easy', 'today
          for day, letter in zip(range(5, 12), 'LMMJVSD', strict=True)]
 TODAY = {
     'date': '2026-10-09', 'week': '2026-W41', 'plan': {'status': 'valid', 'message': ''},
-    'sessions': [ef('w41-ven-ef', '2026-10-09'), RENFO], 'extra': [],
+    'sessions': [ef('w41-ven-ef', '2026-10-09'), STRENGTH], 'extra': [],
     'tomorrow': {'date': '2026-10-10', 'plan': 'valid', 'sessions': [], 'next': []},
     'ahead': [],
     'strip': STRIP, 'totals': TOTALS,
     'asks': [{'id': 'cell:6b0f3c1e-1d1a-4a39-9e0d-5c1b0b5d2f10', 'type': 'cells',
-              'date': '2026-10-07', 'kind': 'easy', 'km': 5.71, 'fields': ['pain:genou', 'rpe'],
-              'labels': {'pain:genou': 'Genou'}}],
-    'pain': {'cap': 2.0, 'zones': [{'zone': 'genou', 'label': 'Genou', 'weeks': [
+              'date': '2026-10-07', 'kind': 'easy', 'km': 5.71, 'fields': ['pain:knee', 'rpe'],
+              'labels': {'pain:knee': 'Genou'}}],
+    'pain': {'cap': 2.0, 'zones': [{'zone': 'knee', 'label': 'Genou', 'weeks': [
         {'week': '2026-W40', 'peak': 1.5}, {'week': '2026-W41', 'peak': 1.0}]}]},
     'race': {'name': 'TargetRace', 'date': '2026-11-26', 'days': 50, 'start_time': '09:00',
              'distance_km': 45},
@@ -59,9 +59,9 @@ TODAY = {
 }
 WEEK = {'week': '2026-W41', 'monday': '2026-10-05', 'current': '2026-W41',
         'plan': {'status': 'valid', 'message': '', 'revision': 3},
-        'sessions': [DONE, ef('w41-ven-ef', '2026-10-09'), RENFO], 'extra': [],
+        'sessions': [DONE, ef('w41-ven-ef', '2026-10-09'), STRENGTH], 'extra': [],
         'totals': TOTALS, 'strip': STRIP, 'review': None, 'cards': [ENTRY]}
-INJURY = {'zone': 'genou', 'label': 'Genou', 'zones': [{'zone': 'genou', 'label': 'Genou'}],
+INJURY = {'zone': 'knee', 'label': 'Genou', 'zones': [{'zone': 'knee', 'label': 'Genou'}],
           'cap': 2.0, 'start': '2026-09-28', 'today': '2026-10-09', 'week': '2026-W41',
           'points': [{'date': '2026-10-03', 'pain': 1.5, 'kind': 'long', 'long': True},
                      {'date': '2026-10-06', 'pain': 0.5, 'kind': 'easy', 'long': False},
@@ -167,7 +167,7 @@ def test_today_week_and_course_fit_a_phone_and_keep_text_inert(browser, width):
     tab.get_by_role('button', name='Course', exact=True).click()
     tab.get_by_role('heading', name='J-50').wait_for()
     # The volume against its target, the long run below; the current week uses the
-    # programme long run until it has been run.
+    # program long run until it has been run.
     assert tab.locator('.n-vchart .vl').all_text_contents() == ['39,7/40', '14,1/41']
     assert tab.locator('.n-vchart .slv').all_text_contents() == ['15,8', '16']
     assert tab.locator('.n-vchart .sls').all_text_contents() == ['prévue dim.']
@@ -189,7 +189,7 @@ def test_an_answer_is_one_tap_and_says_when_the_coach_takes_over(browser):
     tab.get_by_role('heading', name='EF de mercredi 7 · 5,7 km').wait_for()
     tab.locator('.n-check').first.get_by_role('button', name='2,5', exact=True).click()
     tab.get_by_text('Le coach te répond dans Messenger').wait_for()
-    assert answers == [{'ask': 'cell:6b0f3c1e-1d1a-4a39-9e0d-5c1b0b5d2f10:pain:genou', 'value': 2.5}]
+    assert answers == [{'ask': 'cell:6b0f3c1e-1d1a-4a39-9e0d-5c1b0b5d2f10:pain:knee', 'value': 2.5}]
     tab.close()
 
 
@@ -351,7 +351,7 @@ def test_tabs_are_prepared_while_today_is_read_and_shown_without_waiting(browser
 def test_the_morning_comes_first_and_a_high_heart_rate_asks_why(browser):
     """Before noon, the morning check-in comes before the session; a high HR asks its question."""
     morning = {**TODAY, 'asks': [
-        {'id': 'wake:2026-10-09:injury', 'type': 'wake', 'zone': 'genou', 'label': 'Genou',
+        {'id': 'wake:2026-10-09:injury', 'type': 'wake', 'zone': 'knee', 'label': 'Genou',
          'date': '2026-10-09'},
         {'id': 'daily:2026-10-09', 'type': 'daily', 'date': '2026-10-09', 'fields': ['sleep', 'life_load']},
         {'id': 'hr:2026-10-07', 'type': 'hr', 'date': '2026-10-07', 'hr': 157, 'reference': 151,
@@ -411,7 +411,7 @@ def test_the_weather_answers_what_to_wear_and_whether_night_falls_during_the_run
     the session; the status bar keeps the theme background."""
     tab = browser.new_page(viewport={'width': 390, 'height': 844})
     serve(tab)
-    start = {**TODAY, 'asks': [], 'sessions': [{**TODAY['sessions'][0], 'start_time': '17:00'}, RENFO]}
+    start = {**TODAY, 'asks': [], 'sessions': [{**TODAY['sessions'][0], 'start_time': '17:00'}, STRENGTH]}
     sky = {**SKY, 'sunrise': '07:55', 'hours': [
         {'hour': 17, 'temp': 16, 'feels': 15, 'rain': 0, 'wind': 12, 'code': 2, 'day': True},
         {'hour': 18, 'temp': 15, 'feels': 13, 'rain': 10, 'wind': 14, 'code': 3, 'day': True}]}
@@ -729,7 +729,7 @@ def replying(data):
 
 def test_every_value_of_a_scale_is_visible_without_scrolling(browser):
     """One question at a time: pain on one line, RPE and enjoyment on two."""
-    for fields, shape in ((['pain:genou', 'rpe'], [7, True, 1]), (['rpe'], [10, True, 2]), (['enjoyment'], [11, True, 2])):
+    for fields, shape in ((['pain:knee', 'rpe'], [7, True, 1]), (['rpe'], [10, True, 2]), (['enjoyment'], [11, True, 2])):
         tab = browser.new_page(viewport={'width': 320, 'height': 700})
         serve(tab)
         data = {**TODAY, 'asks': [{**TODAY['asks'][0], 'fields': fields}]}
@@ -868,9 +868,9 @@ def test_the_red_point_moves_from_the_run_to_the_strength_once_done(browser):
     done = ef('w41-ven-ef', '2026-10-09', 'done', {
         'km': 8.35, 'duration_min': 48, 'hr_avg': 162, 'rpe': None, 'pains': [], 'enjoyment': None,
         'started_at': '2026-10-09T07:10:00+02:00', 'over': ['hr_avg'], 'observation_id': 'obs'})
-    after = {**TODAY, 'sessions': [done, RENFO], 'asks': [
+    after = {**TODAY, 'sessions': [done, STRENGTH], 'asks': [
         {'id': 'cell:obs', 'type': 'cells', 'date': '2026-10-09', 'kind': 'easy', 'km': 8.35,
-         'fields': ['pain:genou', 'rpe', 'enjoyment'], 'labels': {'pain:genou': 'Genou'}}]}
+         'fields': ['pain:knee', 'rpe', 'enjoyment'], 'labels': {'pain:knee': 'Genou'}}]}
     tab = browser.new_page(viewport={'width': 393, 'height': 852})
     answers = []
     serve(tab, answers)
@@ -886,7 +886,7 @@ def test_the_red_point_moves_from_the_run_to_the_strength_once_done(browser):
     assert tab.locator('.n-step.done .n-chips button').count() == 7
     tab.locator('.n-step.done .n-chips').get_by_role('button', name='0,5', exact=True).click()
     tab.get_by_text('Noté').wait_for()
-    assert answers == [{'ask': 'cell:obs:pain:genou', 'value': 0.5}]
+    assert answers == [{'ask': 'cell:obs:pain:knee', 'value': 0.5}]
     tab.locator('.n-tile', has_text='TargetRace').click()
     tab.get_by_role('heading', name='J-50').wait_for()
     tab.close()

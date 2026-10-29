@@ -13,7 +13,7 @@ from conftest import RPE_TARGETS, VAULT_ROOT, ZONE, zoned
 from redline.analysis import ledger
 from redline.analysis.ledger import Instruments, Row
 from redline.model import ledger as table
-from redline.model import programme, session_kinds
+from redline.model import program, session_kinds
 from redline.model.notes import NoteError
 
 
@@ -66,17 +66,17 @@ def test_a_bike_carries_no_elevation_term():
     has neither. The ENERGY cost of elevation is comparable between the two, but it is
     not what the formula bills ([[src-minetti-cout-pente]]).
     """
-    velo = Row(dt.date(2026, 8, 13), "bike", hours=1.716, dplus=647.5, dminus=648)
-    assert ledger.row_weight(velo, RPE_TARGETS)[0] == pytest.approx(0.858, abs=0.01)
+    bike = Row(dt.date(2026, 8, 13), "bike", hours=1.716, dplus=647.5, dminus=648)
+    assert ledger.row_weight(bike, RPE_TARGETS)[0] == pytest.approx(0.858, abs=0.01)
 
 
 def test_a_hilly_run_keeps_its_full_elevation_term():
     """The negative control: removing the term on a bike removes it from nothing else.
     On a loop (D- = D+), the change of reading moves nothing -- that is the point."""
     course = Row(dt.date(2026, 8, 16), "long", km=10.3, hours=1.152, dplus=600, dminus=600)
-    rando = Row(dt.date(2026, 7, 21), "hike", hours=4.0, dplus=600, dminus=600)
+    hike = Row(dt.date(2026, 7, 21), "hike", hours=4.0, dplus=600, dminus=600)
     assert ledger.row_weight(course, RPE_TARGETS)[0] == pytest.approx(2.152, abs=0.01)
-    assert ledger.row_weight(rando, RPE_TARGETS)[0] == pytest.approx(2.5, abs=0.01)
+    assert ledger.row_weight(hike, RPE_TARGETS)[0] == pytest.approx(2.5, abs=0.01)
 
 
 def test_only_running_and_walking_carry_a_descent_weight():
@@ -93,7 +93,7 @@ def test_the_targets_come_from_the_workout_notes():
     entries and missing notes meant a strength session above its target triggered
     nothing. The numbers now exist once. This is the only test in the suite that really
     reads the notes: it tells that the literal table in conftest has not fallen behind."""
-    assert programme.rpe_targets(VAULT_ROOT) == RPE_TARGETS
+    assert program.rpe_targets(VAULT_ROOT) == RPE_TARGETS
 
 
 def test_a_workout_note_declaring_an_unknown_kind_is_refused(tmp_path):
@@ -103,7 +103,7 @@ def test_a_workout_note_declaring_an_unknown_kind_is_refused(tmp_path):
     (workouts / "ef.md").write_text("---\ntype: workout\nkinds: [EF]\ntarget_rpe: 3\n---\n",
                                     encoding="utf-8")
     with pytest.raises(NoteError, match=r"ef\.md"):
-        programme.rpe_targets(tmp_path)
+        program.rpe_targets(tmp_path)
 
 
 def test_a_session_above_its_target_is_flagged_whatever_its_type():
@@ -126,9 +126,9 @@ def test_the_gauge_penalty_stays_restricted_to_quality_sessions():
     assert ledger.over_target(over, RPE_TARGETS)      # but the flag does go out
 
 
-def test_rando_is_half_weighted():
-    rando = [Row(dt.date(2026, 3, 2), "hike", km=20, hours=4.0, dplus=600, dminus=600)]
-    h_eq, _, _ = ledger.equivalent_hours(rando, Instruments(), RPE_TARGETS)
+def test_a_hike_is_half_weighted():
+    hike = [Row(dt.date(2026, 3, 2), "hike", km=20, hours=4.0, dplus=600, dminus=600)]
+    h_eq, _, _ = ledger.equivalent_hours(hike, Instruments(), RPE_TARGETS)
     assert h_eq == 4.0 * 0.5 + (600 / 600) * 0.5     # 2.0 + 0.5 = 2.5
 
 
@@ -504,11 +504,11 @@ def test_the_old_three_against_three_verdict_reads_a_stall_as_a_rise():
     the record, yet the 3-against-3 verdict still shows about +11 %. The stall counter
     tells the truth; it triggers as soon as the week closes without a record."""
     rows = _long_runs({**SEPTEMBER, "2026-W40": 11.0})
-    bilan_w40 = dt.date(2026, 10, 4)
-    verdict = ledger.trajectory_verdict(ledger.trajectory(rows, bilan_w40))
+    review_w40 = dt.date(2026, 10, 4)
+    verdict = ledger.trajectory_verdict(ledger.trajectory(rows, review_w40))
     longest_line = next(line for line in verdict if line.startswith("Plus longue"))
     assert "+11 %" in longest_line
-    stall = ledger.long_run_stall(rows, bilan_w40)
+    stall = ledger.long_run_stall(rows, review_w40)
     assert stall is not None and stall.weeks == 2 and not stall.triggered
     stall = ledger.long_run_stall(rows, dt.date(2026, 10, 5))
     assert stall is not None and stall.triggered

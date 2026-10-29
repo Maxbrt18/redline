@@ -28,7 +28,7 @@ def ef(day: dt.date, hr: int) -> dict:
             "measurements": {"distance_km": known(8.0), "duration_s": known(48 * 60),
                              "hr_avg_bpm": known(hr), "elevation_gain_m": known(20),
                              "rpe": known(2), "enjoyment": known(8)},
-            "pains": {"genou": known(0.5)}}
+            "pains": {"knee": known(0.5)}}
 
 
 class Ops:
@@ -51,7 +51,7 @@ class Ops:
         return []
 
     def pain_zones(self):
-        return [{"slug": "genou", "label": "Genou", "active": True}]
+        return [{"slug": "knee", "label": "Genou", "active": True}]
 
     def session_cycle_status(self, week):
         return []

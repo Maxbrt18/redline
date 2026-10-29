@@ -58,10 +58,10 @@ def test_the_cli_refuses_an_angle_outside_a_turn(monkeypatch, capsys):
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://x/y")
     monkeypatch.setattr("sys.argv", ["fact-write", "angle", "titre Strava"])
 
-    with pytest.raises(InputError) as refus:
+    with pytest.raises(InputError) as refusal:
         fact_write.main()
 
-    assert "tour" in str(refus.value)
+    assert "tour" in str(refusal.value)
 
 
 def test_the_angle_is_a_turn_command_so_a_refused_turn_takes_it_along():
@@ -75,6 +75,6 @@ def test_both_paths_that_ask_for_an_angle_also_name_where_it_goes():
         it at the exact place where the choice is made.
 
     """
-    enveloppe = build_proactive_prompt("strava_debrief", "90000000010")
-    assert "fact-write angle" in enveloppe
+    envelope = build_proactive_prompt("strava_debrief", "90000000010")
+    assert "fact-write angle" in envelope
     assert "fact-write angle" in PROACTIVE_TRIGGERS["strava_debrief"]

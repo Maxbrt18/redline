@@ -52,7 +52,7 @@ def deadline_row(**overrides) -> dict:
     return {**row, **overrides}
 
 
-def test_patch_ne_touche_que_le_champ_cite():
+def test_patch_touches_only_the_cited_field():
     existing = deadline_row()
     args = parse("deadline", "--key", "d-1", "--patch", "--due-on", "2026-08-23")
     _, _, payload = fact_write._payload(args, existing)
@@ -63,7 +63,7 @@ def test_patch_ne_touche_que_le_champ_cite():
     assert payload["status"] == "todo"
 
 
-def test_le_payload_reste_complet_donc_la_mise_en_file_garde_son_contrat():
+def test_the_payload_stays_complete_so_the_queue_keeps_its_contract():
     """A payload with holes would break `apply_turn_with_receipts` silently."""
     args = parse("deadline", "--key", "d-1", "--patch", "--due-on", "2026-08-23")
     _, kind, payload = fact_write._payload(args, deadline_row())
@@ -73,7 +73,7 @@ def test_le_payload_reste_complet_donc_la_mise_en_file_garde_son_contrat():
                             "ends_on", "context", "athlete_label"}
 
 
-def test_patch_sur_un_fil_preserve_le_corps():
+def test_patch_on_a_thread_keeps_its_body():
     existing = {"thread_key": "t-1", "opened_on": dt.date(2026, 8, 11),
                 "kind": "promise", "body": "corps très long", "status": "open",
                 "follow_up_on": dt.date(2026, 8, 12)}
@@ -85,17 +85,17 @@ def test_patch_sur_un_fil_preserve_le_corps():
     assert payload["follow_up_on"] == dt.date(2026, 8, 12)
 
 
-def test_sans_patch_un_champ_obligatoire_manquant_est_refuse_et_nomme():
+def test_without_patch_a_missing_required_field_is_refused_and_named():
     """The obligation lives outside argparse: if it is not tested, it disappears."""
     args = parse("deadline", "--key", "d-1", "--due-on", "2026-08-23")
-    with pytest.raises(InputError) as refus:
+    with pytest.raises(InputError) as refusal:
         fact_write._payload(args, None)
-    message = str(refus.value)
+    message = str(refusal.value)
     assert "--item" in message and "--fact-owner" in message and "--status" in message
     assert "--due-on" not in message
 
 
-def test_sans_patch_la_forme_complete_ecrit_toute_la_ligne():
+def test_without_patch_the_full_form_writes_the_whole_row():
     args = parse("deadline", "--key", "d-1", "--due-on", "2026-08-23",
                  "--item", "neuf", "--fact-owner", "`coaching/strength.md`",
                  "--status", "todo")
@@ -104,7 +104,7 @@ def test_sans_patch_la_forme_complete_ecrit_toute_la_ligne():
     assert payload["blocks"] is None and payload["completed_on"] is None
 
 
-def test_patch_sur_une_cle_inexistante_refuse_au_lieu_de_creer_a_trous():
+def test_patch_on_a_missing_key_refuses_instead_of_creating_holes():
     class Store:
         def deadline_rows(self):
             return [deadline_row(deadline_key="autre")]
@@ -113,7 +113,7 @@ def test_patch_sur_une_cle_inexistante_refuse_au_lieu_de_creer_a_trous():
         fact_write._existing(Store(), "deadline", "d-1")
 
 
-def test_une_valeur_vide_citee_ecrase_vraiment():
+def test_a_cited_empty_value_really_overwrites():
     """`--blocks ''` is a value, not an absence -- otherwise nothing could be emptied."""
     args = parse("deadline", "--key", "d-1", "--patch", "--blocks", "")
     _, _, payload = fact_write._payload(args, deadline_row())
@@ -136,7 +136,7 @@ def test_exposure_carries_intent_separately_from_the_observed_cadence():
     assert payload["target_value"] == 172
 
 
-def test_le_libelle_du_carnet_survit_au_patch_et_se_retire_par_une_chaine_vide():
+def test_the_notebook_label_survives_a_patch_and_an_empty_string_removes_it():
     """A deadline keeps its label when its date is shifted."""
     existing = deadline_row(athlete_label="Acheter la frontale")
     args = parse("deadline", "--key", "d-1", "--patch", "--due-on", "2026-08-23")
@@ -147,7 +147,7 @@ def test_le_libelle_du_carnet_survit_au_patch_et_se_retire_par_une_chaine_vide()
     assert payload["athlete_label"] is None
 
 
-def test_une_correction_n_entre_en_base_qu_ecrite_au_journal(tmp_path, monkeypatch):
+def test_a_correction_enters_the_database_only_once_written_to_the_journal(tmp_path, monkeypatch):
     # Corrections must also exist in the vault file, within reach of the owners check and
     # the replay registry.
     entry = "2026-09-17 — Une distance disponible sur Strava dite invérifiable"
@@ -163,14 +163,14 @@ def test_une_correction_n_entre_en_base_qu_ecrite_au_journal(tmp_path, monkeypat
                                   "--entry", "2026-09-17 — inventée"))
 
 
-def test_une_prediction_soldee_se_rectifie_avec_son_motif():
+def test_a_settled_prediction_is_corrected_with_its_reason():
     _, _, payload = fact_write._payload(parse("prediction", "--key", "w40", "--rectify",
                                               "condition non tenue"))
     assert payload == {"prediction_key": "w40", "operation": "rectify",
                        "reason": "condition non tenue"}
 
 
-def test_une_prediction_corps_se_rattache_au_reveil_qui_la_tranche():
+def test_a_body_prediction_attaches_to_the_wake_reading_that_settles_it():
     base = ("prediction", "--key", "w42-sl", "--domain", "corps", "--statement", "trace",
             "--probability", "0.75", "--due-on", "2026-10-19")
     _, _, payload = fact_write._payload(parse(*base, "--resolves", "wake-trace", "--resolves-on",

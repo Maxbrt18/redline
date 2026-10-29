@@ -302,9 +302,9 @@ def test_the_rating_scales_ride_with_the_levels_where_numbers_are_given():
 def test_the_morning_debrief_never_asks_for_a_mark_out_of_ten():
     """The morning-after wake reading is "completely different and hard to rate". The
     trigger carries the wording, not only the prohibition."""
-    differe = PROACTIVE_TRIGGERS["strava_debrief_late"]
-    assert "NE DEMANDE PAS UNE NOTE SUR 10" in differe
-    assert "(aucune, très légère, légère, nette)" in _flat(differe)
+    differs = PROACTIVE_TRIGGERS["strava_debrief_late"]
+    assert "NE DEMANDE PAS UNE NOTE SUR 10" in differs
+    assert "(aucune, très légère, légère, nette)" in _flat(differs)
 
 
 def test_the_two_examples_differ_only_by_naming_the_machinery():
@@ -318,16 +318,16 @@ def test_the_two_examples_differ_only_by_naming_the_machinery():
     This test keeps the one thing that makes the pair work: at comparable length, the
     only visible difference is that one of the two names its machinery.
     """
-    lignes = {debut: ligne.split(":", 1)[1].strip()
-              for ligne in STYLE_PROMPT.splitlines()
-              for debut in ("NON", "OUI") if ligne.strip().startswith(debut + " :")}
-    assert set(lignes) == {"NON", "OUI"}, "la paire d'exemples a disparu du style"
-    non, oui = len(lignes["NON"].split()), len(lignes["OUI"].split())
-    assert abs(non - oui) <= 3, (
-        f"NON {non} mots, OUI {oui} : un écart de longueur fait porter au contraste "
+    lines = {start: line.split(":", 1)[1].strip()
+              for line in STYLE_PROMPT.splitlines()
+              for start in ("NON", "OUI") if line.strip().startswith(start + " :")}
+    assert set(lines) == {"NON", "OUI"}, "la paire d'exemples a disparu du style"
+    no, yes = len(lines["NON"].split()), len(lines["OUI"].split())
+    assert abs(no - yes) <= 3, (
+        f"NON {no} mots, OUI {yes} : un écart de longueur fait porter au contraste "
         "une leçon de brièveté au lieu de la règle qu'il illustre")
-    assert "batterie" in lignes["NON"].lower()
-    assert "batterie" not in lignes["OUI"].lower()
+    assert "batterie" in lines["NON"].lower()
+    assert "batterie" not in lines["OUI"].lower()
 
 
 def test_runtime_prompts_stay_within_explicit_context_budgets():
@@ -560,7 +560,7 @@ def test_walking_is_never_asked():
     for level in ("N1", "N2"):
         assert "jamais la marche, il signale une gêne" in DEPTH_NOTES[level]
     note = prompts.gate_note([{
-        "id": "genou", "holds": ["threshold"],
+        "id": "knee", "holds": ["threshold"],
         "question": "Trace habituelle et marche inchangée ?",
         "on_fail": "remplacer le seuil",
     }])
@@ -659,16 +659,16 @@ def test_the_glyph_rule_reaches_the_data_channel_not_only_the_written_prompts():
                    "on_fail": "la semaine démarre sans sortie longue"}],
         "sessions": [{"id": "s1", "title": "EF", "note": "allure libre · plat"}],
     }
-    fautes = weekly_plan.written_text_errors(sale, "r7")
-    champs = {"reason", "constraints[0]", "question", "note"}
-    for champ in champs:
-        assert any(champ in faute for faute in fautes), (
-            f"{champ} n'est pas jugé : ce texte est réinjecté au coach à chaque tour")
+    mistakes = weekly_plan.written_text_errors(sale, "r7")
+    fields = {"reason", "constraints[0]", "question", "note"}
+    for field in fields:
+        assert any(field in mistake for mistake in mistakes), (
+            f"{field} n'est pas jugé : ce texte est réinjecté au coach à chaque tour")
     # The message opens the correct path, it does not merely close the wrong one: a
     # guard without a correct path breeds its own workaround.
-    assert any("À la place :" in faute for faute in fautes)
+    assert any("À la place :" in mistake for mistake in mistakes)
 
-    propre = {
+    clean = {
         "reason": "EF realisee, rien a signaler",
         "constraints": ["plafond a 1200 m de D-"],
         "gates": [{"id": "g1", "due": "2026-08-23",
@@ -676,7 +676,7 @@ def test_the_glyph_rule_reaches_the_data_channel_not_only_the_written_prompts():
                    "on_fail": "la semaine demarre sans sortie longue"}],
         "sessions": [{"id": "s1", "title": "EF", "note": "allure libre, plat"}],
     }
-    assert weekly_plan.written_text_errors(propre, "r7") == []
+    assert weekly_plan.written_text_errors(clean, "r7") == []
 
 
 def test_both_guards_read_the_same_list_of_glyphs():
@@ -692,9 +692,9 @@ def test_the_write_guard_is_wired_into_the_revise_path_not_merely_available():
     source = (ENGINE_ROOT / "src" / "redline" / "cli" / "week_plan.py").read_text()
     assert "written_text_errors(current" in source, (
         "le garde-fou typographique n'est pas appelé sur la révision neuve")
-    avant = source.index("written_text_errors(current")
-    apres = source.index("validate(candidate)")
-    assert avant < apres, (
+    before = source.index("written_text_errors(current")
+    after = source.index("validate(candidate)")
+    assert before < after, (
         "le texte doit être jugé avant le plan qui le contient : sinon une révision "
         "sale est acceptée dès que le plan, lui, valide")
 

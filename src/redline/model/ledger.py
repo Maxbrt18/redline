@@ -112,7 +112,7 @@ def required_columns(kind: str) -> tuple[str, ...]:
 
 
 # ------------------------------------------------------------- pain per zone
-#: The pain column of a zone, as a gap names it: « pain:genou ».
+#: The pain column of a zone, as a gap names it: « pain:knee ».
 PAIN_COLUMN = "pain"
 #: The columns the athlete declares, in the order they are asked; the others are measured.
 DECLARED_COLUMNS = (PAIN_COLUMN, "rpe", "enjoyment")
@@ -130,7 +130,7 @@ def pain_column(zone: str) -> str:
 
 
 def column_base(column: str) -> str:
-    """`pain:genou` -> `pain`; other columns stay as they are."""
+    """`pain:knee` -> `pain`; other columns stay as they are."""
     return column.split(":", 1)[0]
 
 
@@ -140,7 +140,7 @@ def column_zone(column: str) -> str | None:
 
 
 def parse_pains(values: list[str], zones: list[str]) -> dict[str, str]:
-    """`--pain genou=2 --pain cheville=?` -> {zone: raw value}.
+    """`--pain knee=2 --pain ankle=?` -> {zone: raw value}.
 
     A value without a zone is allowed only when a single zone is watched: guessing which
     of several would file the pain of one zone under another. An unknown zone, a zone
@@ -152,7 +152,7 @@ def parse_pains(values: list[str], zones: list[str]) -> dict[str, str]:
         if not sep:
             if len(zones) != 1:
                 raise LedgerError(
-                    "--pain : nomme la zone, ex. --pain genou=2 (zones : "
+                    "--pain : nomme la zone, ex. --pain knee=2 (zones : "
                     + (", ".join(zones) or "aucune zone surveillée") + ")")
             zone, value = zones[0], raw
         zone, value = zone.strip(), value.strip()
@@ -166,7 +166,7 @@ def parse_pains(values: list[str], zones: list[str]) -> dict[str, str]:
 
 
 def pain_facts(pains: dict[str, dict]) -> list[str]:
-    """`douleur genou=2` for each known zone of an observation."""
+    """`douleur knee=2` for each known zone of an observation."""
     return [f"douleur {zone}={reading['value']}" for zone, reading in sorted(pains.items())
             if reading.get("state") == "known"]
 
@@ -178,7 +178,7 @@ def pending_pains(pains: dict[str, dict]) -> list[str]:
 
 
 def strength_pain_facts(pains: dict[str, dict]) -> list[str]:
-    """`genou 1->2/10`: the pain of a strength session, before then after."""
+    """`knee 1->2/10`: the pain of a strength session, before then after."""
     def shown(value: object) -> str:
         return "?" if value is None else str(value)
     return [f"{zone} {shown(moments.get('before'))}->{shown(moments.get('after'))}/10"

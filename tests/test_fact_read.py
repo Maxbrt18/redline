@@ -32,19 +32,19 @@ class Store:
         ]
 
 
-def test_due_ne_rend_que_les_predictions_ouvertes_arrivees_a_echeance():
+def test_due_returns_only_open_predictions_that_reached_their_date():
     lines = fact_read.predictions(Store(), due=True, today=dt.date(2026, 8, 24))
     assert lines[0] == "Prédictions échues (1)"
     assert "due-open" in lines[1]
     assert all("future" not in line and "closed" not in line for line in lines)
 
 
-def test_strength_publie_le_fait_canonique_sans_le_reconstruire():
+def test_strength_publishes_the_canonical_fact_without_rebuilding_it():
     class StrengthStore:
         def strength_history(self):
             return [{
                 "performed_on": dt.date(2026, 8, 26), "workout": "a",
-                "duration_minutes": 60, "pains": {"genou": {"before": 0, "after": 1}},
+                "duration_minutes": 60, "pains": {"knee": {"before": 0, "after": 1}},
                 "session_key": "w35-mer-ef-2026-08-26",
                 "note": "Une série de planche faite sur les deux pieds.",
                 "exercises": [{
@@ -58,12 +58,12 @@ def test_strength_publie_le_fait_canonique_sans_le_reconstruire():
 
     text = "\n".join(lines)
     assert "w35-mer-ef-2026-08-26" in text
-    assert "douleur genou 0->1/10" in text
+    assert "douleur knee 0->1/10" in text
     assert "plank-toe · difficulté 8/10 · séries both=30" in text
     assert "Une série de planche faite sur les deux pieds" in text
 
 
-def test_corrections_accepte_les_dates_deja_normalisees_par_le_depot():
+def test_corrections_accepts_dates_already_normalised_by_the_repository():
     class CorrectionStore:
         def correction_rows(self):
             return [{
@@ -81,7 +81,7 @@ def test_corrections_accepte_les_dates_deja_normalisees_par_le_depot():
     ]
 
 
-def test_une_correction_jamais_annoncee_dans_sa_semaine_le_dit():
+def test_a_correction_never_announced_in_its_week_says_so():
     class CorrectionStore:
         def correction_rows(self):
             return [
@@ -100,7 +100,7 @@ def test_une_correction_jamais_annoncee_dans_sa_semaine_le_dit():
     assert lines[2] == "recente · à annoncer · Nouvelle."
 
 
-def test_expositions_ne_rend_par_defaut_que_les_faits_confirmes():
+def test_exposures_returns_only_confirmed_facts_by_default():
     class ExposureStore:
         def exposure_rows(self, confirmed_only=False):
             assert confirmed_only
@@ -118,7 +118,7 @@ def test_expositions_ne_rend_par_defaut_que_les_faits_confirmes():
     assert "voluntary" in text and "172 spm" in text
 
 
-def test_la_calibration_par_domaine_montre_ce_qui_echappe_au_score():
+def test_calibration_by_domain_shows_what_the_score_misses():
     lines = fact_read.predictions(Store(), today=dt.date(2026, 8, 25))
     assert "se solde au réveil du 2026-07-31 si <=1" in lines[3]
     assert lines[-2:] == [

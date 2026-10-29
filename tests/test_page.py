@@ -275,7 +275,7 @@ def test_a_side_is_not_a_set_and_takes_no_rest(open_session):
 
 
 def test_the_page_shows_what_the_last_session_banked(open_session):
-    """The whole progression of the programme rests on "more than last time, or not", and
+    """The whole progression of the program rests on "more than last time, or not", and
     the page used to reopen identical every week. The line is rendered vault-side
     (`strength_log.human`): the page formats nothing, it displays."""
     banked = exercise("Mollet", measure="amrap", sets=2, side="each")
@@ -379,7 +379,7 @@ def test_progress_survives_a_reload(open_session):
 # ---------------------------------------------------------------- the layout
 
 @pytest.mark.parametrize("width", [320, 375])
-def test_no_dose_of_the_programme_runs_to_three_lines(open_session, width):
+def test_no_dose_of_the_program_runs_to_three_lines(open_session, width):
     """The layout guardrail.
 
     The cards have one (`cards/render.py` refuses a card whose text overflows); the page,
@@ -387,7 +387,7 @@ def test_no_dose_of_the_programme_runs_to_three_lines(open_session, width):
     "3 min" onto two lines and "40 contacts, in blocks of 10" onto three: the dose lived in a
     right-hand column, like on the card, except the card is 1080 px wide and the phone 375.
 
-    **Two lines, not one**: the longest dose of the programme (37 characters) needs 265 px
+    **Two lines, not one**: the longest dose of the program (37 characters) needs 265 px
     for 265 px available at 375 px wide. Fitting it on one line would mean dropping to 12 px,
     which contradicts the rule governing this whole page: legibility at arm's length before
     any visual finesse. What is forbidden is the third line.
@@ -735,7 +735,7 @@ def test_a_page_without_cues_still_runs(browser):
 # ------------------------------------------------------- the opening and the injury
 
 # The watched zone that the page asks for before and after, as the server serves it.
-ZONES = [{"zone": "genou", "label": "Genou"}]
+ZONES = [{"zone": "knee", "label": "Genou"}]
 GATE = {"pain_max": 2, "drop": ["plyometrics"],
         "say": "Douleur au-dessus de 2 : on saute la pliométrie et on garde le reste léger."}
 
@@ -752,9 +752,9 @@ def pick(tab, value: int) -> None:
 def gated_session(*extra):
     plyo = exercise("Pliométrie", measure="contacts", contacts=40, block=10)
     plyo["slug"] = "plyometrics"
-    mollet = exercise("Mollet", measure="reps", sets=1, reps=8)
-    mollet["slug"] = "calf-raise-bent"
-    return session(mollet, plyo, *extra, gate=GATE, sid="gate")
+    calf = exercise("Mollet", measure="reps", sets=1, reps=8)
+    calf["slug"] = "calf-raise-bent"
+    return session(calf, plyo, *extra, gate=GATE, sid="gate")
 
 
 def test_a_session_without_a_gate_never_asks(open_session):
@@ -825,7 +825,7 @@ def test_both_readings_reach_the_report(open_session):
     with tab.expect_request("**/strength-report") as caught:
         send(tab)
     body = json.loads(caught.value.post_data)
-    assert body["report"]["pains"] == {"genou": {"before": 1, "after": 3}}
+    assert body["report"]["pains"] == {"knee": {"before": 1, "after": 3}}
 
 
 def test_the_gate_sentence_does_not_eat_the_session_note(open_session):

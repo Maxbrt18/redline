@@ -73,7 +73,7 @@ def client():
 CANONICAL = ("Programme", "Aujourd'hui", "Prochaine séance", "La suite de la semaine", "Changement", "Rien de prévu")
 
 
-def programmes(client):
+def programs(client):
     """Canonical texts actually sent, technical failures excluded."""
     return [call.args[1] for call in client.send_text.call_args_list
             if call.args[1].startswith(CANONICAL)]
@@ -86,7 +86,7 @@ def current_week(bot):
 
 # ---------------------------------------------------------------- staying silent
 
-def test_a_whole_conversation_about_one_bike_ride_repeats_no_programme(repo, client,
+def test_a_whole_conversation_about_one_bike_ride_repeats_no_program(repo, client,
                                                                        make_bot):
     """A conversation replayed as is.
 
@@ -105,7 +105,7 @@ def test_a_whole_conversation_about_one_bike_ride_repeats_no_programme(repo, cli
         bot._respond("4242", message)
 
     assert client.send_burst.call_count == 3, "le coach doit répondre à chaque fois"
-    assert programmes(client) == []
+    assert programs(client) == []
 
 
 def test_the_reactive_path_never_renders_the_plan_card(repo, client, make_bot):
@@ -124,7 +124,7 @@ def test_the_reactive_path_never_renders_the_plan_card(repo, client, make_bot):
                                      depth="N2", plan_change=True))
     bot._respond("4242", "je peux pas jeudi finalement")
 
-    assert programmes(client), "une vraie révision doit partir"
+    assert programs(client), "une vraie révision doit partir"
     repo.render_weekly_plan_card.assert_not_called()
 
 
@@ -141,7 +141,7 @@ def test_a_new_revision_leaves_once_and_only_once(repo, client, make_bot):
     bot._respond("4242", "je peux pas jeudi finalement")
     bot._respond("4242", "ok ça me va")
 
-    assert len(programmes(client)) == 1
+    assert len(programs(client)) == 1
 
 
 def test_a_revision_that_only_records_the_past_says_nothing(repo, client, make_bot):
@@ -162,11 +162,11 @@ def test_a_revision_that_only_records_the_past_says_nothing(repo, client, make_b
                                      depth="N1", plan_change=True))
     bot._respond("4242", "RPE 3-4, pic de douleur 0.75-1, plaisir 7")
 
-    assert programmes(client) == []
+    assert programs(client) == []
     assert client.send_burst.call_count == 1, "le coach débriefe quand même"
 
 
-def test_alex_asking_for_his_programme_gets_it_even_unchanged(repo, client, make_bot):
+def test_alex_asking_for_his_program_gets_it_even_unchanged(repo, client, make_bot):
     """The indispensable counterweight: without "D", tightening the send made the coach
     MUTE on "what do I do tomorrow?" -- the prose may not prescribe, and "P" does not
     fire on a question that changes nothing."""
@@ -175,7 +175,7 @@ def test_alex_asking_for_his_programme_gets_it_even_unchanged(repo, client, make
                                      depth="N1", plan_scope="next"))
     bot._respond("4242", "je fais quoi demain ?")
 
-    assert len(programmes(client)) == 1
+    assert len(programs(client)) == 1
 
 
 def test_asking_twice_answers_twice(repo, client, make_bot):
@@ -187,7 +187,7 @@ def test_asking_twice_answers_twice(repo, client, make_bot):
     bot._respond("4242", "c'est quoi demain ?")
     bot._respond("4242", "et le reste de la semaine ?")
 
-    assert len(programmes(client)) == 2
+    assert len(programs(client)) == 2
 
 
 def test_morning_initiative_does_not_repeat_a_revision_already_shown_today(
@@ -197,16 +197,16 @@ def test_morning_initiative_does_not_repeat_a_revision_already_shown_today(
         repo=repo, client=client,
         agent=FakeAgent(result=RunResult(full_text="Voilà"), plan_scope="today"))
     bot._respond("4242", "je fais quoi aujourd'hui ?")
-    assert len(programmes(client)) == 1
+    assert len(programs(client)) == 1
 
     bot._respond_proactive(ProactiveJob(psid="4242", kind="morning", prompt="bonjour"))
 
-    assert len(programmes(client)) == 1
+    assert len(programs(client)) == 1
 
 
 # ---------------------------------------------------------------- the debt
 
-def test_a_programme_lost_in_transport_is_still_owed_on_the_next_turn(repo, client,
+def test_a_program_lost_in_transport_is_still_owed_on_the_next_turn(repo, client,
                                                                       make_bot):
     """The only case where an unchanged program is sent again, and the reason for a debt.
 
@@ -226,14 +226,14 @@ def test_a_programme_lost_in_transport_is_still_owed_on_the_next_turn(repo, clie
     client.send_text.return_value = DeliveryResult.success()
     bot._respond("4242", "tu disais ?")     # neither "P" nor "D": the debt speaks
 
-    sent = programmes(client)
+    sent = programs(client)
     assert len(sent) == 2
     assert sent[0].startswith("Changement au programme")
     assert "suite de la semaine" in sent[1]
     assert bot._state.plan_owed("4242") == ("", 0)
 
 
-def test_a_settled_programme_leaves_nothing_owed(repo, client, make_bot):
+def test_a_settled_program_leaves_nothing_owed(repo, client, make_bot):
     repo.weekly_plan_context.side_effect = [context(5), context(6)]
     bot = make_bot(repo=repo, client=client,
                    agent=FakeAgent(result=RunResult(full_text="Je décale ton renfo"),
@@ -251,7 +251,7 @@ def test_a_debt_owed_for_another_week_never_replays_here(repo, client, make_bot)
     bot._state.owe_plan("4242", "1999-W01", 5)
     bot._respond("4242", "salut")
 
-    assert programmes(client) == []
+    assert programs(client) == []
 
 
 # ------------------------------------------------------ what "P" commands
@@ -293,7 +293,7 @@ def test_a_gate_still_holds_the_prescription_even_on_a_fresh_revision(repo, clie
         True, awaiting=(current_week(bot),))
     bot._respond("4242", "je peux pas jeudi finalement")
 
-    assert programmes(client) == []
+    assert programs(client) == []
 
 
 def test_an_invalid_week_prescribes_nothing_at_all(repo, client, make_bot):
@@ -306,7 +306,7 @@ def test_an_invalid_week_prescribes_nothing_at_all(repo, client, make_bot):
                                      depth="N1", plan_asked=True))
     bot._respond("4242", "je fais quoi demain ?")
 
-    assert programmes(client) == []
+    assert programs(client) == []
     burst = " ".join(call.args[1] for call in client.send_burst.call_args_list)
     lines = " ".join(call.args[1] for call in client.send_text.call_args_list)
     assert "Je regarde ta semaine." in burst
@@ -327,7 +327,7 @@ def test_applied_facts_do_not_open_the_gate_when_the_plan_is_invalid(
 
     bot._respond("4242", "je fais quoi demain ?")
 
-    assert programmes(client) == []
+    assert programs(client) == []
     lines = " ".join(call.args[1] for call in client.send_text.call_args_list)
     assert "pas de programme valide pour cette semaine" in lines
 
@@ -377,4 +377,4 @@ def test_deep_keeps_the_triage_flags_it_did_not_decide(repo, client, make_bot):
                                      depth="N1", plan_asked=True))
     bot._respond("4242", "explique moi", deep_request=True)
 
-    assert len(programmes(client)) == 1
+    assert len(programs(client)) == 1

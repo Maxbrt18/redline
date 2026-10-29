@@ -14,21 +14,21 @@ TODAY = dt.date(2026, 10, 9)
 def board(rows, observations=()):
     view = Board(None, None, Path('.'), TODAY, dt.datetime(2026, 10, 9, 9, tzinfo=dt.UTC))
     view._rows, view._observations = list(rows), list(observations)
-    view._zones = [PainZone("genou", "Genou")]
+    view._zones = [PainZone("knee", "Genou")]
     return view
 
 
 def test_injury_counts_each_calendar_week_even_without_a_note():
-    rows = [Row(dt.date(2026, 9, 8), 'easy', pains={'genou': 0.5}), Row(dt.date(2026, 9, 13), 'long', pains={'genou': 1.0}),
-            Row(dt.date(2026, 9, 18), 'wake-trace', pains={'genou': 1.0}), Row(dt.date(2026, 10, 3), 'long', pains={'genou': 1.5}),
-            Row(dt.date(2026, 10, 7), 'easy', pains={'genou': 1.0}), Row(dt.date(2026, 10, 7), 'easy'),
-            Row(dt.date(2026, 8, 30), 'easy', pains={'genou': 2.5})]
+    rows = [Row(dt.date(2026, 9, 8), 'easy', pains={'knee': 0.5}), Row(dt.date(2026, 9, 13), 'long', pains={'knee': 1.0}),
+            Row(dt.date(2026, 9, 18), 'wake-trace', pains={'knee': 1.0}), Row(dt.date(2026, 10, 3), 'long', pains={'knee': 1.5}),
+            Row(dt.date(2026, 10, 7), 'easy', pains={'knee': 1.0}), Row(dt.date(2026, 10, 7), 'easy'),
+            Row(dt.date(2026, 8, 30), 'easy', pains={'knee': 2.5})]
     observations = [{'kind': 'wake-trace', 'occurred_on': dt.date(2026, 10, 7), 'measurements': {},
-                     'pains': {'genou': {'state': 'pending'}}},
+                     'pains': {'knee': {'state': 'pending'}}},
                     {'kind': 'wake-trace', 'occurred_on': dt.date(2026, 10, 8),
-                     'measurements': {}, 'pains': {'genou': {'state': 'known', 'value': 0}}},
+                     'measurements': {}, 'pains': {'knee': {'state': 'known', 'value': 0}}},
                     {'kind': 'wake-trace', 'occurred_on': dt.date(2026, 9, 20), 'measurements': {},
-                     'pains': {'genou': {'state': 'pending'}}}]
+                     'pains': {'knee': {'state': 'pending'}}}]
     view = board(rows, observations).injury_view()
     assert view['start'] == '2026-09-07' and view['cap'] == 2.0
     assert [(w['week'][-3:], w['peak'], w['n'], w['wake']) for w in view['weeks']] == [

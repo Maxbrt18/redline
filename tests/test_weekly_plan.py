@@ -52,18 +52,18 @@ def gate(identifier="w32-injury-48h", due="2026-08-08",
     return payload
 
 
-LE_JOUR_DE_LECRITURE = "2026-08-04T09:00:00+02:00"
+WRITTEN_ON = "2026-08-04T09:00:00+02:00"
 
 
 def written_today(**overrides):
     overrides.setdefault("volume_target_km", 30.0)
-    return revision(computed_at=LE_JOUR_DE_LECRITURE, **overrides)
+    return revision(computed_at=WRITTEN_ON, **overrides)
 
 
 def frozen_clock(monkeypatch, week_plan):
     """`revise` timestamps itself: without a frozen clock, a test revision for W32
     would be judged written today, and its dated checks stale."""
-    monkeypatch.setattr(week_plan, "now_stamp", lambda: LE_JOUR_DE_LECRITURE)
+    monkeypatch.setattr(week_plan, "now_stamp", lambda: WRITTEN_ON)
 
 
 def with_session(**session_overrides):
@@ -153,7 +153,7 @@ def test_current_schema_owns_strength_modulation():
     assert weekly_plan.validate({"week": "2026-W32", "revisions": [revision]})
 
 
-def test_active_strength_variant_must_exist_in_the_programme():
+def test_active_strength_variant_must_exist_in_the_program():
     strength = session(
         "w32-jeu-a", "2026-08-06", "strength", routine="a", kind="strength",
         demanding=False, strength={"variant": "full"})
@@ -161,7 +161,7 @@ def test_active_strength_variant_must_exist_in_the_programme():
         weekly_plan.validate(plan([strength]), today=dt.date(2026, 8, 4))
 
 
-def test_active_strength_drop_must_name_an_exercise_in_the_programme():
+def test_active_strength_drop_must_name_an_exercise_in_the_program():
     strength = session(
         "w32-jeu-b", "2026-08-06", "strength", routine="b", kind="strength",
         demanding=False, strength={"drop": ["box-drop"]})
@@ -169,7 +169,7 @@ def test_active_strength_drop_must_name_an_exercise_in_the_programme():
         weekly_plan.validate(plan([strength]), today=dt.date(2026, 8, 4))
 
 
-def test_a_closed_week_is_not_judged_against_todays_strength_programme():
+def test_a_closed_week_is_not_judged_against_todays_strength_program():
     """An exercise `drop` removed from the program after the fact must not empty the archive."""
     strength = session(
         "w32-jeu-b", "2026-08-06", "strength", routine="b", kind="strength",
@@ -256,7 +256,7 @@ def test_two_real_hard_days_in_a_row_are_refused_but_easy_jogs_are_not():
 
 
 def test_a_routine_keeps_the_gap_its_note_declares():
-    """renfo-b.md declares `min_gap_h: {strength: 48, long: 48}`."""
+    """strength-b.md declares `min_gap_h: {strength: 48, long: 48}`."""
     with pytest.raises(SchemaError, match="routine b à moins de 48 h d'une séance long"):
         weekly_plan.validate(plan([
             session("lun-sl", "2026-08-03", "long"),
@@ -286,7 +286,7 @@ def test_a_gate_is_lifted_only_by_a_new_revision_without_it():
     assert weekly_plan.gate_reasons(current, today=dt.date(2026, 8, 8)) == []
 
 
-def test_a_gate_beyond_sunday_belongs_to_the_echeancier():
+def test_a_gate_beyond_sunday_belongs_to_the_schedule():
     broken = plan()
     broken["revisions"][0]["gates"] = [gate(due="2026-08-11")]
     with pytest.raises(SchemaError, match=r"fact-write deadline"):
@@ -349,13 +349,13 @@ def test_a_week_to_review_still_prints_its_plan_and_exits_three(capsys):
 
     code = cli._database_command(store, "show", "2026-W32", False)
 
-    sortie = capsys.readouterr()
+    output = capsys.readouterr()
     assert code == cli.EXIT_STALE
     assert code != cli.EXIT_INVALID
-    assert "w32-lun-ef" in sortie.out, "le programme doit rester lisible"
-    assert "arbitrage obligatoire" in sortie.err
-    assert "activité non rattachée" in sortie.err
-    assert "reste lisible" in sortie.err
+    assert "w32-lun-ef" in output.out, "le programme doit rester lisible"
+    assert "arbitrage obligatoire" in output.err
+    assert "activité non rattachée" in output.err
+    assert "reste lisible" in output.err
 
 
 def test_a_due_gate_still_takes_precedence_over_staleness(capsys):

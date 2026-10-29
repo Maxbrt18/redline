@@ -62,14 +62,14 @@ def test_declared_life_load_and_group_restrict_the_week():
     assert any("groupe" in reason for reason in reasons)
 
 
-def test_obtention_is_judged_after_w42_on_five_clean_efs():
+def test_the_grant_is_judged_after_w42_on_five_clean_easy_runs():
     days = [MON + dt.timedelta(days=offset) for offset in (1, 3, 8, 10, 15)]
     choices = [_choice(f"ef-{index}", day, 40) for index, day in enumerate(days)]
     runs = [_ef(day, 42) for day in days]
-    after = permit.week_end(PERIOD.obtention_week) + dt.timedelta(days=1)
+    after = permit.week_end(PERIOD.granted_week) + dt.timedelta(days=1)
     lines = permit.evaluate(choices, runs, {}, {}, {}, today=after, hr_cap=HR_CAP)
     current = permit.state(lines, [], today=after, period=PERIOD)
-    assert current.obtention["obtenu"] is True and current.phase == "permis"
+    assert current.grant["obtenu"] is True and current.phase == "permis"
     rendered = "\n".join(permit.render(lines, current))
     assert "OBTENU" in rendered and "parcours neuf" in rendered
 
@@ -79,7 +79,7 @@ def test_before_w42_the_counter_is_shown_and_nothing_is_granted():
     lines = permit.evaluate([_choice("w40-mar-ef", tue, 40)], [_ef(tue, 40)], {}, {}, {},
                             today=tue + dt.timedelta(days=1), hr_cap=HR_CAP)
     current = permit.state(lines, [], today=tue + dt.timedelta(days=1), period=PERIOD)
-    assert current.phase == "conduite accompagnée" and current.obtention is None
+    assert current.phase == "conduite accompagnée" and current.grant is None
     assert any("1 EF courues sur 5" in line for line in permit.render(lines, current))
 
 

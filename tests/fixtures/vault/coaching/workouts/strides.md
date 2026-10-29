@@ -1,13 +1,13 @@
 ---
 type: workout
-kinds: [bike]
-capabilities: [endurance, genou]
+kinds: [strides]
+capabilities: [genou]
 target_rpe: 3
-duration_min: 75
+duration_min: 40
 phase: [base, general, specifique-1, specifique-2]
 status: active
 ---
 
-# velo-z2
+# strides
 
 Fiche fictive du vault de test.

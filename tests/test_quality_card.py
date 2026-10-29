@@ -3,7 +3,7 @@
 from redline.model import debrief
 from redline.model.activity import Lap
 
-SEUIL = {"workout": "threshold", "title": "Seuil doux en côte, calibration"}
+THRESHOLD = {"workout": "threshold", "title": "Seuil doux en côte, calibration"}
 
 
 def _laps(*rows):
@@ -17,7 +17,7 @@ def _laps(*rows):
 
 # Laps of a sample activity: warm-up, 4 x 3 min uphill, jog recoveries, cool-down
 # faster than the recoveries.
-SEUIL_DU_15 = _laps(
+THRESHOLD_ON_THE_15TH = _laps(
     ("17:42", 2.453, 155.7), ("3:04", 0.654, 178.6), ("3:26", 0.498, 159.6),
     ("3:02", 0.647, 178.0), ("4:43", 0.683, 158.7), ("3:01", 0.652, 178.7),
     ("4:49", 0.675, 154.2), ("3:06", 0.667, 177.4), ("4:24", 0.664, 154.1),
@@ -25,7 +25,7 @@ SEUIL_DU_15 = _laps(
 
 
 def test_the_threshold_of_the_15th_gives_four_reps_and_three_recoveries():
-    card = debrief.quality_card(SEUIL_DU_15, SEUIL, "15/10")
+    card = debrief.quality_card(THRESHOLD_ON_THE_15TH, THRESHOLD, "15/10")
     assert card["title"] == "Seuil doux en côte, calibration"
     assert card["date"] == "15/10"
     assert [(rep["label"], rep["time_s"], rep["dist_m"]) for rep in card["reps"]] == [
@@ -43,9 +43,9 @@ def test_auto_laps_of_a_continuous_run_are_not_reps():
 
 
 def test_only_a_quality_session_gets_a_card():
-    assert debrief.quality_card(SEUIL_DU_15, {"workout": "easy"}) is None
-    assert debrief.quality_card(SEUIL_DU_15, None) is None
-    assert debrief.quality_card(SEUIL_DU_15, {"workout": "long", "transition": "quality"})
+    assert debrief.quality_card(THRESHOLD_ON_THE_15TH, {"workout": "easy"}) is None
+    assert debrief.quality_card(THRESHOLD_ON_THE_15TH, None) is None
+    assert debrief.quality_card(THRESHOLD_ON_THE_15TH, {"workout": "long", "transition": "quality"})
 
 
 def test_contiguous_fast_laps_are_one_rep_and_a_standing_recovery_is_slow():
@@ -75,7 +75,7 @@ from redline.service.outbox import Outbox  # noqa: E402
 from redline.service.proactive import ProactiveJob, ProactiveScheduler  # noqa: E402
 from redline.service.vault import PersistenceResult  # noqa: E402
 
-CARD = debrief.quality_card(SEUIL_DU_15, SEUIL, "15/10")
+CARD = debrief.quality_card(THRESHOLD_ON_THE_15TH, THRESHOLD, "15/10")
 
 
 def _bot(make_bot, tmp_path):

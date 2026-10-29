@@ -305,7 +305,7 @@ def git_clone(tmp_path, git_repo):
 
 # The watched zone of the fictional instance (`[[injuries]]` in redline.toml): pain
 # tests read this zone, never a pain without a zone.
-ZONE = "genou"
+ZONE = "knee"
 
 
 def zoned(value):

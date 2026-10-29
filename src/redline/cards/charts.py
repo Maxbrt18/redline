@@ -177,7 +177,7 @@ def ribbon(segments: list, *, width: int = CONTENT_W) -> str:
              f'viewBox="0 0 {width} {total_h}" xmlns="http://www.w3.org/2000/svg">']
     pace_cls = "ribbon__pace ribbon__pace--compact" if compact else "ribbon__pace"
     gap_cls = "ribbon__gap ribbon__gap--compact" if compact else "ribbon__gap"
-    centres = []
+    centers = []
     x = 0.0
     for seg, w in zip(segments, widths, strict=True):
         cx = x + w / 2
@@ -191,7 +191,7 @@ def ribbon(segments: list, *, width: int = CONTENT_W) -> str:
             parts.append(_text(cx, floor - RIBBON_BASE / 2, gap_text(seg.get("gap")), gap_cls))
             parts.append(_text(cx, floor + AXIS_BAND / 2 + 4, str(seg.get("label", "")),
                                "plot__cat"))
-            centres.append(cx)
+            centers.append(cx)
         else:
             parts.append(f'<rect x="{x:.1f}" y="{floor - REST_H}" width="{w:.1f}" '
                          f'height="{REST_H}" rx="{REST_H / 2}" class="plot__ghost"/>')
@@ -205,7 +205,7 @@ def ribbon(segments: list, *, width: int = CONTENT_W) -> str:
         lo, hi = min(hrs) - 4, max(hrs) + 2
         def hy(v: float) -> float:
             return top + HR_H - (v - lo) / (hi - lo) * HR_H
-        points = [(cx, hy(v), v) for cx, v in zip(centres, hrs, strict=True)]
+        points = [(cx, hy(v), v) for cx, v in zip(centers, hrs, strict=True)]
         parts.append(_text(0, top - 46, "fréquence cardiaque, bpm", "plot__note", anchor="start"))
         parts.append('<polyline points="' + " ".join(f"{px:.1f},{py:.1f}" for px, py, _ in points)
                      + '" class="ribbon__hr"/>')

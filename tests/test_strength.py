@@ -32,7 +32,7 @@ SESSION = {
 }
 
 
-ZONES = {"genou": "Genou"}
+ZONES = {"knee": "Genou"}
 
 
 def parsed(report: dict, session: dict = SESSION) -> dict:
@@ -106,7 +106,7 @@ def test_sidecar_absent_or_not_a_session(tmp_path):
 def test_parser_refuses_out_of_range_numbers_instead_of_forging_bounds():
     with pytest.raises(strength.ReportError):
         strength.parse_report({
-            "pains": {"genou": {"after": 99}}, "minutes": -5, "note": "ok",
+            "pains": {"knee": {"after": 99}}, "minutes": -5, "note": "ok",
             "exercises": [{"i": 1, "score": 42, "reps": [12, -3, "x", 9999]}],
         }, SESSION["exercises"], ZONES)
 
@@ -131,7 +131,7 @@ def test_parser_refuses_junk():
 
 def test_format_message_reads_like_the_athlete_wrote_it():
     message = strength.format_message(SESSION, parsed({
-        "pains": {"genou": {"after": 1}}, "minutes": 32,
+        "pains": {"knee": {"after": 1}}, "minutes": 32,
         "note": "Le soléaire a lâché avant le gastroc.",
         "exercises": [
             {"i": 0, "score": 3},
@@ -249,7 +249,7 @@ def test_the_two_readings_never_get_merged(report, said):
     """The ledger keeps two series that never mix: the rest reading and the effort peak.
     A single figure answered neither -- "2/10 after" means nothing without what it was
     before."""
-    assert said in strength.format_message(SESSION, parsed({"pains": {"genou": report}}))
+    assert said in strength.format_message(SESSION, parsed({"pains": {"knee": report}}))
 
 
 def test_each_zone_is_reported_under_its_own_name():

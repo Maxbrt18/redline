@@ -12,7 +12,7 @@ from test_claude_stream import assistant, consume, text
 
 from redline.service.textutils import BURST_MAX, burst_parts
 
-TROIS_PARAGRAPHES = """D'après ce que tu décris, c'est pas juste "plus douloureux", \
+THREE_PARAGRAPHS = """D'après ce que tu décris, c'est pas juste "plus douloureux", \
 c'est un changement de nature du signal.
 
 Ce soir tu ne fais pas le renfo A, même en isométrique. Donne-moi un chiffre sur 10 \
@@ -26,7 +26,7 @@ def _wire_then_burst(message: str) -> list:
 
 
 def test_a_paragraph_is_a_bubble():
-    parts = burst_parts(TROIS_PARAGRAPHES)
+    parts = burst_parts(THREE_PARAGRAPHS)
     assert len(parts) == 3
     assert parts[0].startswith("D'après ce que tu décris")
     assert parts[1].startswith("Ce soir tu ne fais pas")
@@ -35,7 +35,7 @@ def test_a_paragraph_is_a_bubble():
 
 
 def test_the_wire_path_cuts_identically():
-    assert _wire_then_burst(TROIS_PARAGRAPHES) == burst_parts(TROIS_PARAGRAPHES)
+    assert _wire_then_burst(THREE_PARAGRAPHS) == burst_parts(THREE_PARAGRAPHS)
 
 
 def test_a_paragraph_arriving_in_pieces_is_not_cut_early():

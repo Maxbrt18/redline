@@ -1,4 +1,4 @@
-"""The exercise tables of `coaching/strength.md`, rendered from the programme.
+"""The exercise tables of `coaching/strength.md`, rendered from the program.
 
 Lives here rather than in `redline strength-tables` so that both consumers can
 simply import it: the CLI that regenerates the tables, and the `redline vault-check`
@@ -10,22 +10,22 @@ from __future__ import annotations
 from pathlib import Path
 
 from . import strength_log, vault_layout
-from .programme import Programme
+from .program import Program
 from .views import apply, table
 
 #: Each routine's table sits between the markers of its own block in `strength.md`.
 BLOCK_PREFIX = "RENFO_"
 
 
-def blocks(programme: Programme) -> dict[str, str]:
+def blocks(program: Program) -> dict[str, str]:
     """Block name -> routine, one per routine the vault declares."""
     return {BLOCK_PREFIX + routine.upper().replace("-", "_"): routine
-            for routine in programme.sessions}
+            for routine in program.sessions}
 
 
 HEADERS = ["#", "Exercice", "Dose", "Repos", "Depuis"]
 
-# The log view: what was ACTUALLY done, set against the programme.
+# The log view: what was ACTUALLY done, set against the program.
 LOG_BLOCK = "RENFO_JOURNAL"
 LOG_HEADERS = ["Exercice", "Total, 3 dernières séances", "Écart G/D", "Score"]
 LOG_SESSIONS = 3
@@ -40,9 +40,9 @@ def target(vault: Path) -> Path:
     return vault / vault_layout.STRENGTH
 
 
-def render(programme: Programme, key: str) -> str:
+def render(program: Program, key: str) -> str:
     rows, dated = [], False
-    for index, prescription in enumerate(programme.prescriptions(key)):
+    for index, prescription in enumerate(program.prescriptions(key)):
         rest = f"{prescription.dose.rest_s} s" if prescription.dose.rest_s else "—"
         # The pipe is written plain: table() escapes it once, which is what Obsidian
         # needs to read a wikilink alias inside a table cell.
@@ -72,10 +72,10 @@ def _gap(row: dict) -> str:
     return f"D {right} / G {left} ({percent:+.0f} %){flag}"
 
 
-def render_log(programme: Programme, path: Path) -> str:
+def render_log(program: Program, path: Path) -> str:
     """What the latest sessions banked, exercise by exercise.
 
-    One line per exercise, in programme order, with the set totals of the last three
+    One line per exercise, in program order, with the set totals of the last three
     sessions (oldest -> newest). Set-by-set detail stays in the CSV: this view answers the
     only two questions asked of it, is it progressing and do both legs keep up.
     """
@@ -94,8 +94,8 @@ def render_log(programme: Programme, path: Path) -> str:
     # Sets taken to technical FAILURE: their difficulty score is not an instrument. See
     # the Score column below.
     amrap = set()
-    for key in blocks(programme).values():
-        for prescription in programme.prescriptions(key):
+    for key in blocks(program).values():
+        for prescription in program.prescriptions(key):
             if prescription.slug not in order:
                 order.append(prescription.slug)
             if prescription.dose.measure == "amrap":
@@ -113,7 +113,7 @@ def render_log(programme: Programme, path: Path) -> str:
             right, left, plain = _totals(session)
             total = right + left + plain
             totals.append("—" if session.get("skipped") else (str(total) if total else "fait"))
-        note = programme.exercises.get(slug)
+        note = program.exercises.get(slug)
         # The pipe is written plain: table() escapes it once, which Obsidian needs to
         # read a wikilink alias inside a cell.
         name = f"[[{slug}|{note['name']}]]" if note else slug
@@ -129,16 +129,16 @@ def render_log(programme: Programme, path: Path) -> str:
     return table(LOG_HEADERS, table_rows)
 
 
-def refresh(vault: Path, programme: Programme, *, check: bool = False) -> list:
+def refresh(vault: Path, program: Program, *, check: bool = False) -> list:
     """Names of the blocks whose table had drifted.
 
     With `check`, nothing is written: a control that silently repairs what it
     should flag is not a control.
     """
     path = target(vault)
-    drifted = [name for name, key in blocks(programme).items()
-               if apply(path, name, render(programme, key), check=check)]
-    log = render_log(programme, vault / vault_layout.STRENGTH_LOG_CSV)
+    drifted = [name for name, key in blocks(program).items()
+               if apply(path, name, render(program, key), check=check)]
+    log = render_log(program, vault / vault_layout.STRENGTH_LOG_CSV)
     if apply(path, LOG_BLOCK, log, check=check):
         drifted.append(LOG_BLOCK)
     return drifted

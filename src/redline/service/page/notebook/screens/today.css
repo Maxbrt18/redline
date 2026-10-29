@@ -8,9 +8,9 @@
 /* Today, the day's thread: the day's steps linked by a rule, then what is coming, then the
  * landmarks. The red dot is the current step: a solid disc, no halo or pulse. A done step
  * is ticked in ink; rest is a dimmed dot. */
-.n-fil { margin-top: 20px; }
+.n-feed { margin-top: 20px; }
 .n-day { font: 600 12px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--red); margin: 26px 0 14px; }
-.n-day + .n-fil { margin-top: 0; }
+.n-day + .n-feed { margin-top: 0; }
 .n-step { display: grid; grid-template-columns: 24px minmax(0, 1fr); position: relative; padding-bottom: 26px; }
 .n-step:last-child { padding-bottom: 4px; }
 .n-step::before { content: ""; position: absolute; left: 5px; top: 18px; bottom: 2px; width: 2px; border-radius: 1px; background: var(--grid); }

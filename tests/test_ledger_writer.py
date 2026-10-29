@@ -27,19 +27,19 @@ from redline.model import ledger as table
     ("km", "6.8396", "6.84"),
     ("hr_avg", "156,61", "157"),      # a decimal comma comes from the same prose
 ])
-def test_strava_rend_des_flottants_et_la_colonne_les_veut_entiers(column, source, written):
+def test_strava_returns_floats_and_the_column_wants_integers(column, source, written):
     """The source lies about the type, and the rounding lives here."""
     assert table.canonical_value(column, source) == written
 
 
-def test_la_douleur_d_une_zone_s_arrondit_au_dixieme():
+def test_a_zone_pain_is_rounded_to_the_tenth():
     assert table.pain_reading("1.55") == {"state": "known", "value": 1.6}
     assert table.pain_reading("?") == {"state": "unavailable"}
     with pytest.raises(table.LedgerError):
         table.pain_reading("11")
 
 
-def test_une_cellule_deja_conforme_nest_jamais_retouchee():
+def test_a_cell_already_valid_is_never_rewritten():
     """The invariant that allows running this function over the whole row.
 
     "A known measure is immutable" (a ledger rule, now enforced by a PostgreSQL trigger)
@@ -58,7 +58,7 @@ def test_une_cellule_deja_conforme_nest_jamais_retouchee():
         assert table.canonical_value(name, value) == value
 
 
-def test_ce_qui_nest_pas_un_nombre_nest_pas_inventé():
+def test_what_is_not_a_number_is_not_invented():
     """A range ("1-2") has no rounding: data is not fabricated."""
     assert table.canonical_value("rpe", "1-2") == "1-2"
     assert table.canonical_value("type", "footing") == "footing"
@@ -66,7 +66,7 @@ def test_ce_qui_nest_pas_un_nombre_nest_pas_inventé():
 
 # --------------------------------------------------------------- the typed writer
 
-def test_lecrivain_type_arrondit_ce_que_strava_rend(monkeypatch, capsys):
+def test_the_typed_writer_rounds_what_strava_returns(monkeypatch, capsys):
     """The clean path: RAW values go in, a conforming row comes out."""
     add = _load_writer()
     monkeypatch.setattr(sys, "argv", [
@@ -81,7 +81,7 @@ def test_lecrivain_type_arrondit_ce_que_strava_rend(monkeypatch, capsys):
     assert "EF | du jour" in captured.out  # PostgreSQL keeps the text, pipe included.
 
 
-def test_lecrivain_type_refuse_en_nommant_la_colonne(monkeypatch, capsys):
+def test_the_typed_writer_refuses_and_names_the_column(monkeypatch, capsys):
     """What no rounding can fix is refused BEFORE any write."""
     add = _load_writer()
     monkeypatch.setattr(sys, "argv", [
@@ -90,14 +90,14 @@ def test_lecrivain_type_refuse_en_nommant_la_colonne(monkeypatch, capsys):
     assert "type" in capsys.readouterr().err
 
 
-def _zones(monkeypatch, add, zones=("genou",)):
+def _zones(monkeypatch, add, zones=("knee",)):
     """The monitored zones live in the database: the CLI reads them, the test fixes them."""
     monkeypatch.setenv("DATABASE_URL", "postgresql://test")
     monkeypatch.setattr(add, "_active_zones", lambda url: list(zones))
 
 
 @pytest.mark.parametrize("trace", ["", "?"])
-def test_un_reveil_sans_trace_ne_sécrit_pas(monkeypatch, capsys, trace):
+def test_a_wake_reading_without_a_trace_is_not_written(monkeypatch, capsys, trace):
     """Without `--pain`, the measure used to be born `pending` silently and the athlete's
     answer lived only in the note. The gate never read it."""
     add = _load_writer()
@@ -111,17 +111,17 @@ def test_un_reveil_sans_trace_ne_sécrit_pas(monkeypatch, capsys, trace):
 
 @pytest.mark.parametrize("word, value", [("none", "0"), ("Light", "1"), ("light", "1"),
                                          ("very light", "0.5"), ("clear", "2")])
-def test_le_mot_de_alex_devient_la_valeur(monkeypatch, capsys, word, value):
+def test_the_athletes_word_becomes_the_value(monkeypatch, capsys, word, value):
     add = _load_writer()
     _zones(monkeypatch, add)
     monkeypatch.setattr(sys, "argv", [
         "ledger-add", "--dry-run", "--date", "2026-10-11", "--type", "wake-trace",
         "--pain", word])
     assert add.main() == 0
-    assert f"'pain': {{'genou': '{value}'}}" in capsys.readouterr().out
+    assert f"'pain': {{'knee': '{value}'}}" in capsys.readouterr().out
 
 
-def test_avec_plusieurs_zones_chaque_douleur_nomme_la_sienne(monkeypatch, capsys):
+def test_with_several_zones_each_pain_names_its_own(monkeypatch, capsys):
     add = _load_writer()
     _zones(monkeypatch, add, ("talon", "cheville"))
     monkeypatch.setattr(sys, "argv", [
@@ -134,7 +134,7 @@ def test_avec_plusieurs_zones_chaque_douleur_nomme_la_sienne(monkeypatch, capsys
 @pytest.mark.parametrize("given, refused", [
     (["2"], "nomme la zone"), (["hanche=1"], "zone inconnue"),
     (["talon=1", "talon=2"], "deux fois")])
-def test_une_douleur_sans_zone_claire_est_refusee(monkeypatch, capsys, given, refused):
+def test_a_pain_without_a_clear_zone_is_refused(monkeypatch, capsys, given, refused):
     add = _load_writer()
     _zones(monkeypatch, add, ("talon", "cheville"))
     argv = ["ledger-add", "--dry-run", "--date", "2026-10-11", "--type", "easy"]
@@ -145,7 +145,7 @@ def test_une_douleur_sans_zone_claire_est_refusee(monkeypatch, capsys, given, re
     assert refused in capsys.readouterr().err
 
 
-def test_un_reveil_exige_une_trace_par_zone(monkeypatch, capsys):
+def test_a_wake_reading_requires_a_trace_per_zone(monkeypatch, capsys):
     add = _load_writer()
     _zones(monkeypatch, add, ("talon", "cheville"))
     monkeypatch.setattr(sys, "argv", [

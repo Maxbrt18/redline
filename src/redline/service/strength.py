@@ -296,7 +296,7 @@ def log_entries(session: dict, clean: dict, day: str) -> list:
         item = clean["items"].get(index)
         slug = _clean_text(exercise.get("slug"))[:60] if isinstance(exercise, dict) else ""
         # No slug, no identity: a one-off derogation (`add` in the morning
-        # selection) is not a programme exercise, and there is nothing next week
+        # selection) is not a program exercise, and there is nothing next week
         # will compare it against. The name is prose and moves; it is not a key.
         if not item or not slug:
             continue

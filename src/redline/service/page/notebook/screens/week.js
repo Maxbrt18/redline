@@ -74,7 +74,7 @@ function factLines(fact, shown) {
   if (feel.length) lines.push(el('p', feel.join(' · ')));
   return lines;
 }
-// A day: its programmed sessions and what was run outside the programme.
+// A day: its programmed sessions and what was run outside the program.
 function dayRow(date, items, extras, todayIso) {
   const live = items.filter(item => item.kind !== 'rest');
   const runs = live.filter(item => item.kind !== 'strength');
@@ -222,7 +222,7 @@ export function renderWeek(data, root) {
     days.append(dayRow(iso, data.sessions.filter(item => item.date === iso), data.extra.filter(item => item.date === iso), todayIso));
   }
   content.append(days);
-  // The next week as soon as its programme exists: on Sunday, that is the one being
+  // The next week as soon as its program exists: on Sunday, that is the one being
   // organised.
   if (root && data.next) {
     const node = section('Semaine prochaine'), next = data.next;

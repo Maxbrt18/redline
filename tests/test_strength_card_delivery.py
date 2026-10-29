@@ -26,7 +26,7 @@ def context(sessions, gates=()):
     return json.dumps({"revision": 3, "sessions": sessions, "gates": list(gates)})
 
 
-def renfo(status="planned", date=None):
+def strength_text(status="planned", date=None):
     return {"id": "w34-mar-a", "title": "Renfo A, séance complète",
             "date": date or TODAY, "kind": "strength", "workout": "strength", "routine": "a",
             "status": status, "demanding": False,
@@ -44,16 +44,16 @@ def ef():
 # --------------------------------------------------- 1. recognise the strength day
 
 def test_a_strength_session_due_today_is_recognised():
-    assert strength_due(context([ef(), renfo()]), TODAY)["id"] == "w34-mar-a"
+    assert strength_due(context([ef(), strength_text()]), TODAY)["id"] == "w34-mar-a"
 
 
 def test_a_strength_session_already_done_asks_for_nothing():
-    assert strength_due(context([renfo(status="done")]), TODAY) is None
-    assert strength_due(context([renfo(status="cancelled")]), TODAY) is None
+    assert strength_due(context([strength_text(status="done")]), TODAY) is None
+    assert strength_due(context([strength_text(status="cancelled")]), TODAY) is None
 
 
 def test_a_strength_session_on_another_day_asks_for_nothing():
-    assert strength_due(context([renfo(date="2026-01-01")]), TODAY) is None
+    assert strength_due(context([strength_text(date="2026-01-01")]), TODAY) is None
     assert strength_due(context([ef()]), TODAY) is None
     assert strength_due("pas du json", TODAY) is None
 
@@ -92,7 +92,7 @@ def _morning(make_bot, sessions, gates=(), reply="Bonne séance ce matin.",
 
 
 def test_the_morning_does_not_delegate_the_card_to_the_agent(make_bot):
-    agent, _ = _morning(make_bot, [renfo()], produced=["strength-2026-08-18.png"])
+    agent, _ = _morning(make_bot, [strength_text()], produced=["strength-2026-08-18.png"])
     message = agent.calls[0]["message"]
     assert "SÉANCE DE RENFO AUJOURD'HUI" not in message
     assert "chart-strength" not in message
@@ -106,7 +106,7 @@ def test_a_day_without_strength_gets_no_such_instruction(make_bot):
 def test_the_scheduler_materializes_a_typed_due_session_without_an_agent(make_bot):
     agent = FakeAgent()
     bot = make_bot(agent=agent)
-    bot._repo.weekly_plan_context.return_value = context([renfo()])
+    bot._repo.weekly_plan_context.return_value = context([strength_text()])
 
     assert bot.materialize_strength_card("4242", dt.datetime.now().astimezone()) is True
 
@@ -118,19 +118,19 @@ def test_the_scheduler_materializes_a_typed_due_session_without_an_agent(make_bo
 # ------------------------------------------ 3. and the service checks behind the agent
 
 def test_a_morning_arms_the_card_without_technical_text(make_bot):
-    agent, client = _morning(make_bot, [renfo()], produced=[])
+    agent, client = _morning(make_bot, [strength_text()], produced=[])
     client.send_text.assert_not_called()
     assert client.send_burst.called
     assert len(agent.calls) == 1
 
 
 def test_a_morning_that_produced_its_card_says_nothing(make_bot):
-    _, client = _morning(make_bot, [renfo()], produced=["strength-2026-08-18.png"])
+    _, client = _morning(make_bot, [strength_text()], produced=["strength-2026-08-18.png"])
     client.send_text.assert_not_called()
 
 
 def test_another_card_is_not_reused_as_the_strength_card(make_bot):
     """The debt is typed; no file prefix triggers it."""
-    _, client = _morning(make_bot, [renfo()], produced=["week-34.png"])
+    _, client = _morning(make_bot, [strength_text()], produced=["week-34.png"])
     client.send_text.assert_not_called()
     assert client.send_burst.called

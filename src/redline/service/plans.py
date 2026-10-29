@@ -15,7 +15,7 @@ from redline.model import weekly_plan as weekly_plan_model
 #: from the list instead of showing as empty, leaving a gap neither reader can see.
 #: The render claims "here is what remains", so it must speak of EVERY day in the
 #: period it announces, including to say there is nothing.
-RIEN = "rien de prévu"
+NOTHING = "rien de prévu"
 
 
 class PlanStatus(enum.Enum):
@@ -126,19 +126,19 @@ def _covered_lines(shown: list, every: list, span: Iterable[date],
     behind us has nothing left to prescribe. A cancelled day is named: it is exactly
     the gap the render must make visible.
     """
-    par_jour: dict[str, list] = {}
+    by_day: dict[str, list] = {}
     for session in shown:
-        par_jour.setdefault(session["date"], []).append(session)
-    retenus = {session["date"] for session in every if session.get("id") in excluded}
-    faits = {session["date"] for session in every if session.get("status") == "done"}
+        by_day.setdefault(session["date"], []).append(session)
+    held = {session["date"] for session in every if session.get("id") in excluded}
+    facts = {session["date"] for session in every if session.get("status") == "done"}
     lines = []
     for day in span:
         stamp = day.isoformat()
-        if stamp in par_jour:
+        if stamp in by_day:
             lines.append(f"{_label(day)} : "
-                         + " + ".join(_short(s) for s in par_jour[stamp]))
-        elif stamp not in retenus and stamp not in faits:
-            lines.append(f"{_label(day)} : {RIEN}")
+                         + " + ".join(_short(s) for s in by_day[stamp]))
+        elif stamp not in held and stamp not in facts:
+            lines.append(f"{_label(day)} : {NOTHING}")
     return lines
 
 
@@ -239,7 +239,7 @@ def render_plan_delta(before_raw: str, after_raw: str, week: str, *, today: str,
         changed.append(f"{_label(date.fromisoformat(session['date']))} : {session['title']} retiré")
     if not changed:
         return ""
-    # No revision number nor ISO week: the athlete reads a programme, not a ledger.
+    # No revision number nor ISO week: the athlete reads a program, not a ledger.
     if len(changed) == 1:
         return f"Changement au programme : {changed[0]}."
     return "\n".join(["Changements au programme :", *(f"{line}." for line in changed)])

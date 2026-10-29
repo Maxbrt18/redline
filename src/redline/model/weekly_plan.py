@@ -14,9 +14,9 @@ from redline.coach import dates
 from redline.coach.fr import session_labels
 
 from . import paths, rulebook, session_kinds, transitions, typography
-from . import programme as strength_programme
+from . import program as strength_program
 from .notes import NoteError
-from .programme import GATE_SCHEMA as STRENGTH_GATE_SCHEMA
+from .program import GATE_SCHEMA as STRENGTH_GATE_SCHEMA
 from .schema import Schema, SchemaError, field
 
 WEEK_RE = r"20\d{2}-W(?:0[1-9]|[1-4]\d|5[0-3])"
@@ -42,7 +42,7 @@ HARD_WORKOUTS = session_kinds.DEMANDING
 
 STRENGTH_SPEC_SCHEMA = Schema("modulation de renforcement", [
     field("loads", list, required=False, maximum=20,
-          item=field("charge", dict, schema=strength_programme.PRESCRIBED_LOAD_SCHEMA)),
+          item=field("charge", dict, schema=strength_program.PRESCRIBED_LOAD_SCHEMA)),
     field("variant", str, required=False,
           note="une variante déclarée par la fiche de séance"),
     field("half_dose", bool, required=False),
@@ -378,8 +378,8 @@ def _session_errors(session: dict, where: str) -> list[str]:
     return problems
 
 
-def _strength_programme_errors(session: dict, where: str) -> list[str]:
-    """Resolve a strength prescription against its real programme.
+def _strength_program_errors(session: dict, where: str) -> list[str]:
+    """Resolve a strength prescription against its real program.
 
     The schema proves the shape of ``strength``; only ``Programme.build`` can prove that
     its variant and exercises exist. Only the active revision is validated: append-only
@@ -395,7 +395,7 @@ def _strength_programme_errors(session: dict, where: str) -> list[str]:
         **(session.get("strength") or {}),
     }
     try:
-        strength_programme.load(paths.vault_root()).build(selection)
+        strength_program.load(paths.vault_root()).build(selection)
     except Exception as exc:
         return [f"{where}.strength : prescription impossible — {exc}"]
     return []
@@ -447,8 +447,8 @@ def semantic_errors(plan: dict, where: str = "weekly_plan",
         return problems
     week = plan["week"]
     allowed = _week_dates(week)
-    # Strength resolves against the current programme: this is a prescription guard.
-    # A closed week has nothing left to prescribe, and the programme may have changed since
+    # Strength resolves against the current program: this is a prescription guard.
+    # A closed week has nothing left to prescribe, and the program may have changed since
     # -- judging it that way would make its archive unreadable.
     prescribable = dt.date.fromisocalendar(int(week[:4]), int(week[-2:]), 7) \
         >= (today or dt.date.today())
@@ -472,7 +472,7 @@ def semantic_errors(plan: dict, where: str = "weekly_plan",
                     f"{prefix}.{session['id']} : date {session['date']} hors de {week}")
             problems.extend(_session_errors(session, f"{prefix}.{session['id']}"))
             if revision is revisions[-1] and prescribable:
-                problems.extend(_strength_programme_errors(
+                problems.extend(_strength_program_errors(
                     session, f"{prefix}.{session['id']}"))
             for label in ("title", "note"):
                 if session.get(label):
@@ -512,9 +512,9 @@ def semantic_errors(plan: dict, where: str = "weekly_plan",
 def _spacing_errors(sessions: list[dict], prefix: str) -> list[str]:
     """The gaps each strength routine declares (`min_gap_h`), checked day by day."""
     try:
-        routines = strength_programme.load(paths.vault_root()).sessions
+        routines = strength_program.load(paths.vault_root()).sessions
     except NoteError:
-        return []   # the programme error itself is reported by _strength_programme_errors
+        return []   # the program error itself is reported by _strength_program_errors
     active = [s for s in sessions if s["status"] != "cancelled"]
     problems, seen = [], set()
     for session in active:
@@ -546,7 +546,7 @@ def active(plan: dict) -> dict:
 
 
 def scheduled(sessions: list[dict]) -> list[dict]:
-    """What is on the programme: everything except what was cancelled.
+    """What is on the program: everything except what was cancelled.
 
     DESCRIPTIVE view -- it tells the week's story, completed sessions included. It is the
     one used by the journal, the card and the hot-cache.
@@ -696,7 +696,7 @@ def render_journal(plan: dict) -> str:
     # The journal must not claim that ALL gates refuse the program: an observation
     # (`apres`) is asked and holds nothing. A view that misstates the rule is worse than
     # no view.
-    for kind, titre in (
+    for kind, title in (
         ("before", "**Pré-conditions** (aucune séance retenue ne se prescrit tant "
                   "qu'une révision ne porte pas la réponse) :"),
         ("after", "**Observations** (à poser le jour dit ; elles ne retiennent "
@@ -705,7 +705,7 @@ def render_journal(plan: dict) -> str:
         due = [gate for gate in gates if gate["when"] == kind]
         if not due:
             continue
-        lines += ["", titre, ""]
+        lines += ["", title, ""]
         lines.extend(f"- **{gate['due'][8:]}/{gate['due'][5:7]}** : {gate['question']} "
                      f"→ à défaut, {gate['on_fail']}" for gate in due)
     attention = revision.get("constraints") or []
@@ -927,75 +927,75 @@ def change_evidence_errors(previous: dict | None, current: dict) -> list[str]:
 
 def revision_diff(previous: dict | None, current: dict) -> list[str]:
     """What moved between two revisions, one line per touched session."""
-    avant, apres = _revision_index(previous), _revision_index(current)
-    lignes = []
-    for session_id, session in apres.items():
-        old = avant.get(session_id)
+    before, after = _revision_index(previous), _revision_index(current)
+    lines = []
+    for session_id, session in after.items():
+        old = before.get(session_id)
         if old is None:
-            lignes.append(f"{session_id} : AJOUTÉE le {_day_label(session['date'])} "
+            lines.append(f"{session_id} : AJOUTÉE le {_day_label(session['date'])} "
                           f"({session['title']})")
         elif old["date"] != session["date"]:
-            lignes.append(f"{session_id} : DÉPLACÉE du {_day_label(old['date'])} "
+            lines.append(f"{session_id} : DÉPLACÉE du {_day_label(old['date'])} "
                           f"au {_day_label(session['date'])}")
         elif session["status"] == "cancelled" and old["status"] != "cancelled":
-            lignes.append(f"{session_id} : ANNULÉE le {_day_label(session['date'])} "
+            lines.append(f"{session_id} : ANNULÉE le {_day_label(session['date'])} "
                           f"({session['title']})")
         elif _comparable(old) != _comparable(session):
-            lignes.append(f"{session_id} : MODIFIÉE le {_day_label(session['date'])} "
+            lines.append(f"{session_id} : MODIFIÉE le {_day_label(session['date'])} "
                           f"({session['title']})")
-    for session_id, session in avant.items():
-        if session_id not in apres:
-            lignes.append(f"{session_id} : RETIRÉE de la révision "
+    for session_id, session in before.items():
+        if session_id not in after:
+            lines.append(f"{session_id} : RETIRÉE de la révision "
                           f"(elle était le {_day_label(session['date'])})")
-    return lignes
+    return lines
 
 
 def revision_week_lines(week: str, revision: dict) -> list[str]:
     """The resulting week, one day per line, empty and cancelled days included."""
     monday = dt.date.fromisocalendar(int(week[:4]), int(week[-2:]), 1)
-    par_jour: dict[str, list[dict]] = {}
+    by_day: dict[str, list[dict]] = {}
     for session in revision.get("sessions", []):
-        par_jour.setdefault(session["date"], []).append(session)
-    lignes = []
+        by_day.setdefault(session["date"], []).append(session)
+    lines = []
     for offset in range(7):
         day = monday + dt.timedelta(days=offset)
-        same = par_jour.get(day.isoformat(), [])
+        same = by_day.get(day.isoformat(), [])
         if not same:
-            lignes.append(f"{_day_label(day.isoformat())} : AUCUNE SÉANCE")
+            lines.append(f"{_day_label(day.isoformat())} : AUCUNE SÉANCE")
             continue
-        lignes.append(f"{_day_label(day.isoformat())} : " + " + ".join(
+        lines.append(f"{_day_label(day.isoformat())} : " + " + ".join(
             s["title"] + ("" if s["status"] == "planned" else f" ({s['status']})")
             for s in same))
-    return lignes
+    return lines
 
 
 def revision_readback(week: str, previous: dict | None, current: dict) -> str:
     """What the CLI returns to the coach: the diff, then the week as it is."""
-    depuis = f"r{previous['revision']}" if previous else "rien (première révision)"
+    since_day = f"r{previous['revision']}" if previous else "rien (première révision)"
     diff = revision_diff(previous, current) or [
         "AUCUNE séance ajoutée, annulée, déplacée ni modifiée. Si le message de l'athlète "
         "demandait un changement, cette révision ne le porte pas."]
     bloc = [
         f"{week} révision {current['revision']} enregistrée et validée.",
         "",
-        f"Ce qui change depuis {depuis} :",
-        *(f"- {ligne}" for ligne in diff),
+        f"Ce qui change depuis {since_day} :",
+        *(f"- {line}" for line in diff),
         "",
         "RELIS LA SEMAINE AVANT DE RÉPONDRE. Elle est maintenant :",
-        *(f"- {ligne}" for ligne in revision_week_lines(week, current)),
+        *(f"- {line}" for line in revision_week_lines(week, current)),
     ]
     if current.get("volume_target_km") is not None:
         bloc.append(f"- Volume couru visé : ~{current['volume_target_km']:g} km")
-    orphelins = sessions_orphelines(previous, current)
-    if orphelins:
-        bloc += ["", "ATTENTION :", *(f"- {ligne}" for ligne in orphelins)]
+    orphans = orphan_sessions(previous, current)
+    if orphans:
+        bloc += ["", "ATTENTION :", *(f"- {line}" for line in orphans)]
     bloc += ["", "Chaque fait du message de l'athlète doit se retrouver ci-dessus. Un jour "
                  "marqué AUCUNE SÉANCE est un oubli tant que tu n'as pas vérifié qu'il "
                  "est voulu."]
     return "\n".join(bloc)
 
 
-def sessions_orphelines(previous: dict | None, current: dict) -> list[str]:
+def orphan_sessions(previous: dict | None, current: dict) -> list[str]:
     """The days THIS revision leaves with nothing to do.
 
     Not a fault: giving up a session is an ordinary coaching decision. But it is easy to
@@ -1003,19 +1003,19 @@ def sessions_orphelines(previous: dict | None, current: dict) -> list[str]:
     message, the card and the hot-cache. The coach therefore receives it named, with the
     accompanying question.
     """
-    avant = _revision_index(previous)
-    par_jour: dict[str, list[dict]] = {}
+    before = _revision_index(previous)
+    by_day: dict[str, list[dict]] = {}
     for session in current.get("sessions", []):
-        par_jour.setdefault(session["date"], []).append(session)
-    orphelins = []
-    for stamp, same in sorted(par_jour.items()):
+        by_day.setdefault(session["date"], []).append(session)
+    orphans = []
+    for stamp, same in sorted(by_day.items()):
         if any(s["status"] != "cancelled" for s in same):
             continue
-        neuves = [s for s in same
-                  if avant.get(s["id"], {}).get("status") != "cancelled"]
-        if neuves:
-            orphelins.append(
+        fresh = [s for s in same
+                  if before.get(s["id"], {}).get("status") != "cancelled"]
+        if fresh:
+            orphans.append(
                 f"{_day_label(stamp)} ne porte plus que des annulations "
-                f"({', '.join(s['title'] for s in neuves)}) et aucune séance à la "
+                f"({', '.join(s['title'] for s in fresh)}) et aucune séance à la "
                 "place. Voulu, ou remplaçante oubliée ?")
-    return orphelins
+    return orphans

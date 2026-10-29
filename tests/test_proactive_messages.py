@@ -25,7 +25,7 @@ from redline.service.proactive_messages import (
     ("gear_alert", '{"name":"Novablast","km":540.2,"limit":600}', "540.2 km"),
     ("operator_message", '{"text":"Bilan W39 : semaine tenue."}', "Bilan W39"),
 ])
-def test_closed_proactives_are_rendered_from_their_typed_detail(kind, detail, fragment):
+def test_closed_initiatives_are_rendered_from_their_typed_detail(kind, detail, fragment):
     rendered = compose_closed_proactive(kind, detail)
 
     assert rendered is not None
@@ -46,7 +46,7 @@ def test_only_explicitly_closed_kinds_skip_judgement():
     ("gear_alert", '{"name":"Novablast","km":540,"limit":600}'),
     ("operator_message", '{"text":"Bilan W39 : semaine tenue."}'),
 ])
-def test_bot_delivers_closed_proactives_without_waking_the_agent(
+def test_bot_delivers_closed_initiatives_without_waking_the_agent(
         make_bot, store, kind, detail):
     agent = FakeAgent()
     bot = make_bot(
@@ -255,7 +255,7 @@ def test_the_notebook_reminder_never_carries_a_wake_trace():
         {"date": "2026-10-08", "type": "wake-trace", "missing": ["pain"]})) is None
 
 
-def test_the_carnet_note_reaches_the_turns_that_used_to_ask(make_bot):
+def test_the_notebook_note_reaches_the_turns_that_used_to_ask(make_bot):
     from redline.service.prompts import NOTEBOOK_NOTE
 
     bot = make_bot()

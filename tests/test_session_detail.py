@@ -33,7 +33,7 @@ def lap(moving, km, hr, dplus, cadence):
                hr_avg_bpm=hr, elevation_gain_m=dplus, cadence_spm=cadence)
 
 
-SEUIL_LAPS = [
+THRESHOLD_LAPS = [
     lap("15:36", 2.284, 150.4, 17.1, 164.2), lap("3:01", 0.62, 179.5, 28.7, 166.6),
     lap("3:41", 0.585, 162.5, 0.1, 164.2), lap("3:01", 0.597, 184.0, 28.3, 171.6),
     lap("3:46", 0.635, 165.4, 0.1, 162.4), lap("3:02", 0.612, 183.0, 28.8, 165.6),
@@ -68,7 +68,7 @@ def test_the_zones_are_karvonen_on_the_instance_heart_rates():
 
 
 def test_the_threshold_reads_four_reps_and_no_final_acceleration():
-    read = session_detail.quality(SEUIL_LAPS, None)
+    read = session_detail.quality(THRESHOLD_LAPS, None)
     assert [phase["kind"] for phase in read["phases"]] == [
         "warmup", "rep", "recovery", "rep", "recovery", "rep", "recovery", "rep", "cooldown"]
     reps = read["reps"]
@@ -81,7 +81,7 @@ def test_the_threshold_reads_four_reps_and_no_final_acceleration():
 
 
 def test_a_last_rep_faster_than_all_the_others_is_a_final_acceleration():
-    laps = list(SEUIL_LAPS)
+    laps = list(THRESHOLD_LAPS)
     laps[7] = dataclasses.replace(laps[7], moving_s=170)
     assert session_detail.quality(laps, None)["reading"]["final_acceleration"] is True
 
@@ -116,7 +116,7 @@ def test_reps_sit_on_the_lap_timestamps_not_on_strava_s_stream_indices():
              "elapsed_time": seconds, "start_index": start - 170 if start else 0}
             for start, seconds in zip(starts, elapsed, strict=True)]
     flow = {"t": list(range(3105)), "lap_times": session_detail.lap_times(laps)}
-    reps = session_detail.quality(SEUIL_LAPS, flow)["reps"]
+    reps = session_detail.quality(THRESHOLD_LAPS, flow)["reps"]
     assert [(rep["start"], rep["end"]) for rep in reps] == [
         (935, 1116), (1337, 1518), (1744, 1925), (2142, 2329)]
     assert session_detail.lap_times([{"elapsed_time": 10}]) == []
@@ -167,7 +167,7 @@ def store():
         connection.execute(sa.text("INSERT INTO redline.athletes(id) VALUES ('athlete')"))
         # The watched zone of the fictitious instance, as the service synchronises it.
         connection.execute(sa.text(
-            "INSERT INTO redline.pain_zones(athlete_id, slug, label) VALUES ('athlete', 'genou', 'Genou')"))
+            "INSERT INTO redline.pain_zones(athlete_id, slug, label) VALUES ('athlete', 'knee', 'Genou')"))
     yield OperationalStore(database)
     database.dispose()
 
@@ -182,7 +182,7 @@ def seed_threshold(store):
         id=90000000006, sport="Run", name="Fractionné seuil en côte",
         start_local="2026-10-26T10:19:53", distance_m=8655.0, moving_s=3073,
         elevation_gain_m=151.7, hr_avg_bpm=163.2, hr_max_bpm=195.0, cadence_spm=163.8,
-        laps=tuple(SEUIL_LAPS)))
+        laps=tuple(THRESHOLD_LAPS)))
     if observation_of(store, 90000000006) is None:
         store.match_session("2026-W44:w44-lun-seuil", 90000000006)
     return observation_of(store, 90000000006)
