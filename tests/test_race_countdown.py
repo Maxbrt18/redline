@@ -34,6 +34,6 @@ def test_only_the_contradictory_checkpoint_uses_the_heavy_premortem():
 def test_generic_checkpoints_check_a_date_instead_of_imposing_a_session():
     """A J-45 countdown required a race rehearsal that the plan places around J-25."""
     stages = {stage.key: stage for stage in STAGES}
-    for key in ("systemes", "simulation"):
+    for key in ("systems", "simulation"):
         assert stages[key].action.startswith("Vérifier que")
     assert "datée" in stages["simulation"].evidence

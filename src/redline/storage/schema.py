@@ -599,7 +599,7 @@ planned_session_sources = sa.Table(
 
 # The two kinds of dated check. A PostgreSQL ENUM rather than free text: the value is
 # closed in the model, so it must be closed here too.
-gate_when = sa.Enum("avant", "apres", name="gate_when", schema="redline")
+gate_when = sa.Enum("before", "after", name="gate_when", schema="redline")
 
 plan_gates = sa.Table(
     "plan_gates", metadata,
@@ -622,9 +622,9 @@ plan_gates = sa.Table(
     sa.CheckConstraint("length(question) >= 10", name="ck_plan_gates_question"),
     sa.CheckConstraint("length(on_fail) >= 3", name="ck_plan_gates_on_fail"),
     sa.CheckConstraint(
-        "(applies_when = 'avant' AND jsonb_typeof(holds) = 'array' "
+        "(applies_when = 'before' AND jsonb_typeof(holds) = 'array' "
         "AND jsonb_array_length(holds) > 0) OR "
-        "(applies_when = 'apres' AND holds IS NULL)",
+        "(applies_when = 'after' AND holds IS NULL)",
         name="ck_plan_gates_holds"),
 )
 

@@ -44,16 +44,16 @@ assimilation_weeks = []
 # requires before the taper (the backward solver places it). `quality`: the session is
 # debriefed as a quality session, repetition by repetition.
 [[transitions]]
-slug = "qualite"
+slug = "quality"
 label = "1re qualité"
 quality = true
 
 [[transitions]]
-slug = "descente"
+slug = "descent"
 label = "1er bloc descente"
 
 [[transitions]]
-slug = "nocturne"
+slug = "night"
 label = "1re nocturne"
 
 [[transitions]]

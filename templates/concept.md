@@ -1,16 +1,16 @@
 ---
 type: concept
 aliases: [<terme français principal, synonymes, ex. seuil, travail au seuil>]
-statut: en-accumulation      # en-accumulation → consolidé (après la passe transversale) → à-resynthétiser (si une nouvelle source contredit la Synthèse, cf. CLAUDE.md)
-preuve_couverture: non-évaluée        # non-évaluée | partielle | complète — uniquement après relecture des sources
-transposition_couverture: non-évaluée # non-évaluée | partielle | explicite — population de preuve vs l'athlète
+status: accumulating      # accumulating → consolidated (après la passe transversale) → to-resynthesize (si une nouvelle source contredit la Synthèse, cf. CLAUDE.md)
+evidence_coverage: not-assessed   # not-assessed | partial | complete — uniquement après relecture des sources
+transfer_coverage: not-assessed   # not-assessed | partial | explicit — population de preuve vs l’athlète
 ---
 <!-- fichier : <nom-anglais-kebab>.md, ex. lactate-threshold.md -->
 
 
 ## Synthèse
 (remplie en passe transversale : le consensus ET les points de dispute ; si un point de
-friction arrive après consolidation, une ligne `⚠ post-consolidation : …` ici + statut à-resynthétiser)
+friction arrive après consolidation, une ligne `⚠ post-consolidation : …` ici + `status: to-resynthesize`)
 
 ## Ce qu'en disent les sources
 <!-- Une seule liste toutes provenances confondues, CHAQUE puce nomme sa source (wikilink) —

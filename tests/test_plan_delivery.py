@@ -114,7 +114,7 @@ def test_the_reactive_path_never_renders_the_plan_card(repo, client, make_bot):
     It stays on Sunday, where it publishes a whole week and is the message. Reactively,
     a revision touches one or two days: the text message is enough.
     """
-    due_gate = {"id": "g1", "due": "2000-01-01", "when": "avant",
+    due_gate = {"id": "g1", "due": "2000-01-01", "when": "before",
                 "holds": ["w33-r1-jour-ef"],
                 "question": "La blessure ?", "on_fail": "rest"}
     repo.weekly_plan_context.side_effect = [context(5), context(
@@ -279,7 +279,7 @@ def test_a_replan_announced_in_one_line_still_validates_its_week(repo, client, m
 def test_a_gate_still_holds_the_prescription_even_on_a_fresh_revision(repo, client,
                                                                       make_bot):
     """An overdue dated check holds the session line, fresh revision or not."""
-    due_gate = {"id": "g1", "due": TODAY.isoformat(), "when": "avant",
+    due_gate = {"id": "g1", "due": TODAY.isoformat(), "when": "before",
                 "holds": ["w33-r1-jour-ef"], "question": "la blessure ?",
                 "on_fail": "rest"}
     repo.weekly_plan_context.side_effect = [

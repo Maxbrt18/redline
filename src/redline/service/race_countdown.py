@@ -39,7 +39,7 @@ STAGES = (
     # would schedule the rehearsal at a fixed offset the plan may contradict. Two
     # owners of the race calendar means a milestone pushing a session the plan
     # forbids. The plan decides the date.
-    Stage("systemes", 60, "Systèmes en conditions réelles",
+    Stage("systems", 60, "Systèmes en conditions réelles",
           "Vérifier que durée, terrain, nuit, nutrition, digestion et chaussures ont chacun une "
           "répétition représentative datée dans le plan ou une échéance typée, ou déjà faite.",
           "Chaque système a une répétition datée ou une mesure déjà exploitable."),
@@ -48,7 +48,7 @@ STAGES = (
           "eu lieu, comparer le scénario prédit au scénario observé.",
           "La répétition est datée, ou ses écarts pacing, digestif, matériel et mental sont "
           "écrits avec leur correction."),
-    Stage("gel-v1", 30, "Gel du plan de course v1",
+    Stage("freeze-v1", 30, "Gel du plan de course v1",
           "Figer pacing, marche, nutrition, matériel et plan mental ; ne laisser ouvertes que les preuves manquantes.",
           "Une fiche v1 cohérente existe et chaque case encore ouverte nomme sa dernière preuve."),
     Stage("premortem", 21, "Pré-mortem contradictoire",
@@ -58,16 +58,16 @@ STAGES = (
     Stage("taper", 14, "Entrée dans l'affûtage",
           "Protéger la fraîcheur : supprimer les nouveautés et vérifier que la dernière charge utile est derrière.",
           "Aucun stimulus nouveau n'est nécessaire pour se rassurer."),
-    Stage("preuve", 7, "Semaine de preuve",
+    Stage("proof", 7, "Semaine de preuve",
           "Vérifier sommeil, météo, transport, dossard, batteries, tenue et matériel obligatoire.",
           "Chaque élément logistique est physiquement présent ou attribué à un achat daté."),
-    Stage("carburant", 3, "Carburant et horaires",
+    Stage("fuel", 3, "Carburant et horaires",
           "Exécuter seulement le protocole alimentaire et de sommeil déjà testé, avec les heures réelles du départ.",
           "Le déroulé de J-2 à l'arrivée tient sur une page sans décision nouvelle."),
     Stage("brief", 1, "Brief d'exécution",
           "Réduire toute la stratégie à cinq décisions observables pour le départ et les moments critiques.",
           "La carte finale nomme départ, marche, nutrition, incident digestif et drapeaux d'arrêt."),
-    Stage("jour-j", 0, "Jour J",
+    Stage("race-day", 0, "Jour J",
           "Restituer le plan déjà décidé ; aucune optimisation, aucun test, aucune nouvelle consigne.",
           "⟨athlète⟩ sait quoi faire dans la première heure et au premier imprévu."),
 )

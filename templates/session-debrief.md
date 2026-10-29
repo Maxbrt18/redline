@@ -1,6 +1,6 @@
 ---
-type: gabarit
-aliases: [débrief séance, debrief-seance]
+type: template
+aliases: [débrief séance, session-debrief]
 ---
 
 <!-- Après CHAQUE séance. < 60 s. Chaque champ a une destination : le registre

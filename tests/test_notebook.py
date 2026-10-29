@@ -64,7 +64,7 @@ def test_current_never_launches_a_stale_or_held_plan(monkeypatch):
     repo.weekly_plan_context.return_value = json.dumps({'revision': 1, 'sessions': [{
         'id': 'a', 'date': '2026-10-02', 'kind': 'strength', 'workout': 'strength', 'routine': 'a',
         'status': 'planned', 'strength': {}}], 'gates': [{
-            'id':'hold', 'due':'2026-10-02', 'when':'avant', 'holds':['a'],
+            'id':'hold', 'due':'2026-10-02', 'when':'before', 'holds':['a'],
             'question':'Comment va la blessure ?', 'on_fail':'Repos'}]})
     assert service.current()['status'] == 'blocked'
     assert service.launch('4242', 'old') is None

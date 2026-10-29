@@ -47,7 +47,7 @@ import urllib.parse
 import urllib.request
 from datetime import UTC, datetime, timedelta, timezone
 
-from redline.coach.fr.weather import FLAGS
+from redline.coach.fr.weather import FLAGS, sky
 from redline.model.errors import ExternalError, InputError
 
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
@@ -59,20 +59,6 @@ HOURLY = ("temperature_2m,apparent_temperature,relative_humidity_2m,"
 # Beyond this gap between the start and the middle of the route, the start weather no
 # longer describes the session and the summary flags it.
 ECART_SIGNIFICATIF_C = 2.0
-
-# WMO codes -> French label (subset useful for running).
-WMO = {
-    0: "ciel dégagé", 1: "plutôt dégagé", 2: "partiellement nuageux", 3: "couvert",
-    45: "brouillard", 48: "brouillard givrant",
-    51: "bruine légère", 53: "bruine", 55: "bruine dense",
-    56: "bruine verglaçante", 57: "bruine verglaçante dense",
-    61: "pluie faible", 63: "pluie", 65: "pluie forte",
-    66: "pluie verglaçante", 67: "pluie verglaçante forte",
-    71: "neige faible", 73: "neige", 75: "neige forte", 77: "grésil",
-    80: "averses faibles", 81: "averses", 82: "averses violentes",
-    85: "averses de neige", 86: "averses de neige fortes",
-    95: "orage", 96: "orage avec grêle", 99: "orage avec forte grêle",
-}
 
 
 # ---------------------------------------------------------------------------
@@ -491,7 +477,7 @@ def get_weather(lat, lon, when):
         "pressure": at("surface_pressure"),
         "radiation": at("shortwave_radiation"),
         "direct_radiation": at("direct_radiation"),
-        "conditions": WMO.get(at("weather_code"), "conditions inconnues"),
+        "weather_code": at("weather_code"),
     }
 
     # WBGT is a reading convenience, not the data: if an input is missing or the
@@ -510,7 +496,7 @@ def get_weather(lat, lon, when):
 
 
 def format_summary(w, when, milieu=None):
-    parts = [f"{w['conditions']}"]
+    parts = [sky(w)]
     if w["temp"] is not None:
         s = f"{w['temp']:.0f} °C"
         if w["feels_like"] is not None and abs(w["feels_like"] - w["temp"]) >= 1:
@@ -599,9 +585,10 @@ def main():
             milieu = None
 
     if args.json:
-        payload = {"lat": lat, "lon": lon, "timezone": fuseau, **w}
+        payload = {"lat": lat, "lon": lon, "timezone": fuseau, **w, "conditions": sky(w)}
         if milieu:
-            payload["midpoint"] = {"lat": milieu_pt[0], "lon": milieu_pt[1], **milieu}
+            payload["midpoint"] = {"lat": milieu_pt[0], "lon": milieu_pt[1], **milieu,
+                                   "conditions": sky(milieu)}
         print(json.dumps(payload, ensure_ascii=False))
     else:
         print(format_summary(w, when, milieu))
