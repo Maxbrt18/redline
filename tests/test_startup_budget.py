@@ -45,10 +45,10 @@ def test_a_missing_file_counts_as_zero():
 
 def test_ceilings_never_exceed_their_tier_total():
     assert budget.ceiling_errors((budget.Tier("t", 10, (("a.md", 8), ("b.md", 8))),)) == [
-        "étage « t » : somme des plafonds 16 > total 10"]
+        "tier 't': sum of ceilings 16 > total 10"]
     assert budget.ceiling_errors((budget.Tier("t", 10, (("a.md", 5),)),
                                   budget.Tier("u", 10, (("a.md", 5),)))) == [
-        "a.md est budgété dans deux étages"]
+        "a.md is budgeted in two tiers"]
 
 
 def test_the_instance_declares_its_tiers():
@@ -58,5 +58,5 @@ def test_the_instance_declares_its_tiers():
 def test_an_incoherent_budget_is_refused():
     text = (TEST_VAULT / "redline.toml").read_text(encoding="utf-8").replace(
         "total = 2800", "total = 100")
-    with pytest.raises(instance.InstanceError, match="somme des plafonds"):
+    with pytest.raises(instance.InstanceError, match="sum of ceilings"):
         instance.parse(text)

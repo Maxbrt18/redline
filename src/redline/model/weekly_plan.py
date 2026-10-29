@@ -11,7 +11,7 @@ import re
 from itertools import pairwise
 
 from redline.coach import dates
-from redline.coach.fr import session_labels
+from redline.coach.fr import plan as text
 
 from . import paths, rulebook, session_kinds, transitions, typography
 from . import program as strength_program
@@ -40,11 +40,11 @@ SETTLED_STATUSES = frozenset({"done", "cancelled"})
 HARD_WORKOUTS = session_kinds.DEMANDING
 
 
-STRENGTH_SPEC_SCHEMA = Schema("modulation de renforcement", [
+STRENGTH_SPEC_SCHEMA = Schema("strength modulation", [
     field("loads", list, required=False, maximum=20,
-          item=field("charge", dict, schema=strength_program.PRESCRIBED_LOAD_SCHEMA)),
+          item=field("load", dict, schema=strength_program.PRESCRIBED_LOAD_SCHEMA)),
     field("variant", str, required=False,
-          note="une variante déclarée par la fiche de séance"),
+          note="a variant declared by the workout note"),
     field("half_dose", bool, required=False),
     field("drop", list, required=False, item=field("slug", str)),
     field("note", str, required=False, maximum=300),
@@ -52,18 +52,18 @@ STRENGTH_SPEC_SCHEMA = Schema("modulation de renforcement", [
     field("gate", dict, required=False, schema=STRENGTH_GATE_SCHEMA),
 ])
 
-SESSION_SCHEMA = Schema("séance planifiée", [
+SESSION_SCHEMA = Schema("planned session", [
     field("id", str, pattern=r"[a-z0-9][a-z0-9-]+"),
     # Human-facing text is part of the persisted transaction. Renderers must
     # never maintain a second, incomplete taxonomy of workout labels.
     field("title", str, minimum=1),
-    field("date", str, pattern=DATE_RE, note="AAAA-MM-JJ"),
+    field("date", str, pattern=DATE_RE, note="YYYY-MM-DD"),
     field("start_time", str, required=False, pattern=TIME_RE,
-          note="HH:MM, heure locale de l'athlète ; absent si le créneau n'est pas fixé"),
+          note="HH:MM, the athlete's local time; absent when no slot is set"),
     field("kind", str, choices=KINDS),
     field("workout", str, choices=WORKOUTS),
     field("routine", str, required=False, pattern=r"[a-z0-9][a-z0-9-]{0,39}",
-          note="la routine de renfo, telle que sa fiche la déclare ; seulement pour strength"),
+          note="the strength routine, as its note declares it; strength only"),
     field("status", str, choices=STATUSES),
     field("distance_target_km", float, required=False, minimum=0),
     field("distance_cap_km", float, required=False, minimum=0),
@@ -72,18 +72,18 @@ SESSION_SCHEMA = Schema("séance planifiée", [
     field("rpe_max", int, required=False, minimum=0, maximum=10),
     field("hr_zone", str, required=False),
     field("hr_cap_bpm", int, required=False, minimum=80, maximum=220,
-          note="plafond de FC MOYENNE de la séance, en bpm : le chiffre que hr_zone "
-               "annonce en texte ; obligatoire à l'écriture avec hr_zone"),
+          note="cap on the session's AVERAGE heart rate, in bpm: the figure hr_zone "
+               "states in words; required on write with hr_zone"),
     field("cadence_target", int, required=False, minimum=120, maximum=220),
     field("demanding", bool),
     field("transition", str, required=False, pattern=rulebook.SLUG,
-          note="nature absente de la fenêtre de la règle n8, l'une de celles "
-               "du règlement ; absent pour une séance déjà connue"),
+          note="a kind absent from the window of rule n8, one of the rulebook's; "
+               "absent for a session already known"),
     field("location_label", str, required=False),
     field("carbs_target_g_h", int, required=False, minimum=0, maximum=150,
-          note="cible digestive expérimentale en grammes de glucides par heure"),
+          note="experimental fuelling target in grams of carbohydrate per hour"),
     field("strength", dict, required=False, schema=STRENGTH_SPEC_SCHEMA,
-          note="modulations typées ; la séance et les exercices viennent du workout"),
+          note="typed modulations; the session and its exercises come from the workout"),
     field("note", str, required=False),
     field("sources", list, minimum=1, item=field("source", str)),
 ])
@@ -96,9 +96,9 @@ GATE_WHEN = ("before", "after")
 # `when` is the central question and is asked at write time. A dated gate is one of two
 # very different things:
 #
-#   avant  -- a PRECONDITION. Its answer exists before the sessions it holds, and while
+#   before -- a PRECONDITION. Its answer exists before the sessions it holds, and while
 #             it is missing those sessions are not prescribed.
-#   apres  -- an OBSERVATION. Its answer exists only once the session is done. It
+#   after  -- an OBSERVATION. Its answer exists only once the session is done. It
 #             informs what follows and holds nothing, because it cannot hold anything
 #             without waiting on itself.
 #
@@ -106,17 +106,17 @@ GATE_WHEN = ("before", "after")
 # A gate must decide, and "before" requires a `holds` that NAMES the held sessions.
 # Legacy rows were normalized once in the database, so the current model has no
 # historical dialect to interpret.
-GATE_SCHEMA = Schema("contrôle daté", [
+GATE_SCHEMA = Schema("dated gate", [
     field("id", str, pattern=r"[a-z0-9][a-z0-9-]+"),
-    field("due", str, pattern=DATE_RE, note="AAAA-MM-JJ"),
+    field("due", str, pattern=DATE_RE, note="YYYY-MM-DD"),
     field("when", str, choices=GATE_WHEN,
-          note="avant = pré-condition, retient les séances de `holds` ; "
-               "apres = observation, ne retient rien"),
-    field("holds", list, required=False, item=field("séance", str),
-          note="les identifiants de séance que ce contrôle retient — "
-               "obligatoire si when=before, interdit si when=after"),
-    field("question", str, minimum=10, note="ce qu'il faut demander à l'athlète ce jour-là"),
-    field("on_fail", str, minimum=3, note="ce que devient le programme si la réponse est mauvaise"),
+          note="before = precondition, holds the sessions of `holds`; "
+               "after = observation, holds nothing"),
+    field("holds", list, required=False, item=field("session", str),
+          note="the ids of the sessions this gate holds -- "
+               "required when when=before, forbidden when when=after"),
+    field("question", str, minimum=10, note="what to ask the athlete that day"),
+    field("on_fail", str, minimum=3, note="what becomes of the plan if the answer is bad"),
 ])
 
 CHANGE_FIELDS = (
@@ -150,57 +150,57 @@ def _known_rule(restriction: dict) -> list[str]:
     """The named rule exists in the instance rulebook, read at validation time."""
     if restriction["rule"] in restriction_rules():
         return []
-    return [f"champ « rule » : {restriction['rule']!r} inconnu "
-            f"(attendus : {', '.join(restriction_rules())})"]
+    return [f"field `rule`: {restriction['rule']!r} unknown "
+            f"(expected: {', '.join(restriction_rules())})"]
 
 
-RESTRICTION_SCHEMA = Schema("prémisse d'une restriction", [
+RESTRICTION_SCHEMA = Schema("restriction premise", [
     field("rule", str, minimum=1,
-          note="l'identifiant du règlement qui impose la restriction, ou request"),
+          note="the id of the rulebook rule that imposes the restriction, or request"),
     field("fact", str, minimum=3,
-          note="une entrée exacte de evidence : le fait qui déclenche la règle"),
+          note="an exact entry of evidence: the fact that triggers the rule"),
 ], check=_known_rule)
 
-CHANGE_SCHEMA = Schema("preuve d'un changement de séance", [
+CHANGE_SCHEMA = Schema("session change evidence", [
     field("session_id", str, pattern=r"[a-z0-9][a-z0-9-]+"),
     field("fields", list, minimum=1,
-          item=field("champ", str, choices=CHANGE_FIELDS)),
+          item=field("field", str, choices=CHANGE_FIELDS)),
     field("trigger", str, minimum=3,
-          note="une entrée exacte de evidence qui déclenche ce changement"),
+          note="an exact entry of evidence that triggers this change"),
     field("context", str, minimum=3,
-          note="le contexte ou l'intention confirmée qui donne son sens à la preuve"),
+          note="the context or confirmed intent that gives the evidence its meaning"),
     field("rule", str, minimum=3,
-          note="la règle de coaching appliquée à cette preuve"),
+          note="the coaching rule applied to this evidence"),
     # Optional on read: older revisions do not carry it.
     # Required on write for any restriction (`change_evidence_errors`).
     field("restriction", dict, required=False, schema=RESTRICTION_SCHEMA,
-          note="obligatoire si la séance est retirée, annulée ou réduite"),
+          note="required when the session is removed, cancelled or reduced"),
 ])
 
-REVISION_SCHEMA = Schema("révision hebdomadaire", [
+REVISION_SCHEMA = Schema("weekly revision", [
     field("revision", int, minimum=1),
-    field("computed_at", str, pattern=STAMP_RE, note="date-heure ISO 8601"),
+    field("computed_at", str, pattern=STAMP_RE, note="ISO 8601 date-time"),
     field("reason", str, minimum=3),
-    field("evidence", list, minimum=1, item=field("preuve", str)),
-    field("constraints", list, item=field("contrainte", str)),
+    field("evidence", list, minimum=1, item=field("evidence", str)),
+    field("constraints", list, item=field("constraint", str)),
     # Optional so history can be read; required at the `revise` boundary as soon as a
     # future prescription changes (see `change_evidence_errors`).
     field("changes", list, required=False,
-          item=field("changement", dict, schema=CHANGE_SCHEMA)),
+          item=field("change", dict, schema=CHANGE_SCHEMA)),
     # Optional: older revisions carry none, and a week that conditions nothing on a date
     # is the normal case.
     field("gates", list, required=False,
-          item=field("contrôle", dict, schema=GATE_SCHEMA)),
+          item=field("gate", dict, schema=GATE_SCHEMA)),
     # Optional on read: older revisions do not carry it.
     # Required on write once the week is running (`typed_target_errors`).
     field("volume_target_km", float, required=False, minimum=1, maximum=200,
-          note="volume couru visé sur la semaine entière, en km"),
+          note="running volume targeted over the whole week, in km"),
     field("sessions", list, minimum=1,
           item=field("session", dict, schema=SESSION_SCHEMA)),
 ])
 
-WEEKLY_PLAN_SCHEMA = Schema("plan hebdomadaire", [
-    field("week", str, pattern=WEEK_RE, note="AAAA-WNN"),
+WEEKLY_PLAN_SCHEMA = Schema("weekly plan", [
+    field("week", str, pattern=WEEK_RE, note="YYYY-WNN"),
     field("revisions", list, minimum=1,
           item=field("revision", dict, schema=REVISION_SCHEMA)),
 ])
@@ -247,9 +247,9 @@ def _text_errors(text: str, where: str, label: str, gate_ids: list[str]) -> list
     for gate_id in gate_ids:
         if gate_id in text:
             problems.append(
-                f"{where} : {label} cite le contrôle daté « {gate_id} » — ce texte part "
-                "sur le téléphone de l'athlète et sur la carte, la machinerie interne "
-                "reste dans reason/evidence")
+                f"{where}: {label} cites the dated gate `{gate_id}` -- this text goes to "
+                "the athlete's phone and to the card; the internal machinery stays in "
+                "reason/evidence")
     return problems
 
 
@@ -285,10 +285,10 @@ def written_text_errors(revision: dict, where: str = "revision") -> list[str]:
         # triggers it.
         if gate.get("when") == "before":
             problems.append(
-                f"{where}.gate[{gate.get('id', '?')}] : une pré-condition ne retient plus de "
-                "séance. Écris la condition dans la note de la séance (si la trace est nette "
-                "ce matin : repos) ; le carnet alerte sur une trace nette. Un contrôle sert "
-                "seulement à une observation (when=after).")
+                f"{where}.gate[{gate.get('id', '?')}]: a precondition no longer holds a "
+                "session. Write the condition in the session's note (if the trace is clear "
+                "this morning: rest); the notebook alerts on a clear trace. A gate is only "
+                "for an observation (when=after).")
     for session in revision.get("sessions") or []:
         for label in ("title", "note"):
             if session.get(label):
@@ -305,8 +305,8 @@ def intention_errors(revision: dict, where: str = "revision") -> list[str]:
     or cancelled, never what happened.
     """
     return [
-        f"{where}.{session.get('id', '?')} : status=done appartient au cycle de "
-        "séance. Garde status=planned ; le rendu ajoute 'fait' depuis PostgreSQL."
+        f"{where}.{session.get('id', '?')}: status=done belongs to the session "
+        "cycle. Keep status=planned; the rendering adds 'done' from PostgreSQL."
         for session in revision.get("sessions") or []
         if session.get("status") not in INTENT_STATUSES
     ]
@@ -324,16 +324,16 @@ def typed_target_errors(revision: dict, where: str = "revision") -> list[str]:
             if session.get("kind") == "run" and session.get("status") != "cancelled"]
     problems = []
     if runs and revision.get("volume_target_km") is None:
-        problems.append(f"{where}.volume_target_km : manquant — le volume couru visé de "
-                        "la semaine entière, en km (séances déjà faites comprises), celui "
-                        "que les contraintes annoncent en prose")
+        problems.append(f"{where}.volume_target_km: missing -- the running volume targeted "
+                        "over the whole week, in km (sessions already done included), the "
+                        "one the constraints state in prose")
     # Same for HR: "Z1-Z2, 130-157 bpm" is readable but not comparable. The logbook sets
     # the fact (Strava average HR) against this cap. It stays out of CHANGE_FIELDS: it
     # duplicates `hr_zone`, whose every change already requires evidence, and the first
     # addition on an existing session is not a new prescription.
     problems.extend(
-        f"{where}.{session.get('id', '?')}.hr_cap_bpm : manquant — le plafond de FC "
-        f"MOYENNE en bpm que hr_zone « {session['hr_zone']} » annonce en texte"
+        f"{where}.{session.get('id', '?')}.hr_cap_bpm: missing -- the AVERAGE heart "
+        f"rate cap in bpm that hr_zone `{session['hr_zone']}` states in words"
         for session in revision.get("sessions") or []
         if session.get("status") != "cancelled" and session.get("hr_zone")
         and session.get("hr_cap_bpm") is None)
@@ -344,44 +344,44 @@ def _session_errors(session: dict, where: str) -> list[str]:
     problems = []
     target, cap = session.get("distance_target_km"), session.get("distance_cap_km")
     if target is not None and cap is not None and target > cap:
-        problems.append(f"{where} : cible {target:g} km au-dessus du plafond {cap:g} km")
+        problems.append(f"{where}: target {target:g} km above the cap {cap:g} km")
     lo, hi = session.get("rpe_min"), session.get("rpe_max")
     if lo is not None and hi is not None and lo > hi:
-        problems.append(f"{where} : RPE minimum {lo} au-dessus du maximum {hi}")
+        problems.append(f"{where}: minimum RPE {lo} above the maximum {hi}")
     workout = session.get("workout")
     duration = session.get("duration_cap_min", 0)
     if workout in session_kinds.BY_SLUG and session.get("kind") != session_kinds.family(workout):
-        problems.append(f"{where} : kind doit valoir {session_kinds.family(workout)} "
-                        f"pour {workout}")
+        problems.append(f"{where}: kind must be {session_kinds.family(workout)} "
+                        f"for {workout}")
     expected_hard = (workout in HARD_WORKOUTS
                      or (workout == session_kinds.EASY and duration > 75))
     if session.get("demanding") != expected_hard:
         problems.append(
-            f"{where} : demanding doit valoir {str(expected_hard).lower()} pour {workout}")
+            f"{where}: demanding must be {str(expected_hard).lower()} for {workout}")
     if session.get("kind") == "run" and target is None and cap is None and duration == 0:
-        problems.append(f"{where} : une course exige une cible, un plafond ou une durée")
+        problems.append(f"{where}: a run requires a target, a cap or a duration")
     if session.get("transition") and session.get("kind") == "rest":
-        problems.append(f"{where} : un repos n'est pas une transition")
+        problems.append(f"{where}: a rest day is not a transition")
     if session.get("carbs_target_g_h") is not None and workout not in session_kinds.FUELLED:
-        problems.append(f"{where} : une cible digestive ne se teste que sur "
-                        + " ou ".join(sorted(session_kinds.FUELLED)))
+        problems.append(f"{where}: a fuelling target is only tested on "
+                        + " or ".join(sorted(session_kinds.FUELLED)))
     is_strength = workout == session_kinds.STRENGTH
     for name in ("strength", "routine"):
         if session.get(name) is not None and not is_strength:
-            problems.append(f"{where} : {name} ne vaut que pour une séance strength")
+            problems.append(f"{where}: {name} only applies to a strength session")
     if is_strength and session.get("routine") is None:
-        problems.append(f"{where} : routine manque — la routine de renfo que sa fiche déclare")
+        problems.append(f"{where}: routine missing -- the strength routine its note declares")
     if is_strength and session.get("strength") is None:
         problems.append(
-            f"{where} : strength manque. Même sans modulation, écris strength={{}} "
-            "pour figer la prescription de carte")
+            f"{where}: strength missing. Even without a modulation, write strength={{}} "
+            "to freeze the card's prescription")
     return problems
 
 
 def _strength_program_errors(session: dict, where: str) -> list[str]:
     """Resolve a strength prescription against its real program.
 
-    The schema proves the shape of ``strength``; only ``Programme.build`` can prove that
+    The schema proves the shape of ``strength``; only ``Program.build`` can prove that
     its variant and exercises exist. Only the active revision is validated: append-only
     history may hold an old error that can no longer be fixed, but a new revision must
     never activate it.
@@ -397,7 +397,7 @@ def _strength_program_errors(session: dict, where: str) -> list[str]:
     try:
         strength_program.load(paths.vault_root()).build(selection)
     except Exception as exc:
-        return [f"{where}.strength : prescription impossible — {exc}"]
+        return [f"{where}.strength: cannot be prescribed -- {exc}"]
     return []
 
 
@@ -414,28 +414,28 @@ def _gate_typing_errors(gate: dict, where: str, sessions: list[dict]) -> list[st
 
     if when == "after" and holds:
         problems.append(
-            f"{where} : when=after avec `holds` — une observation ne retient rien. Sa "
-            "réponse arrive APRÈS les séances, elle ne peut pas être leur condition.")
+            f"{where}: when=after with `holds` -- an observation holds nothing. Its "
+            "answer comes AFTER the sessions; it cannot be their condition.")
     if when == "before" and not holds:
         problems.append(
-            f"{where} : when=before sans `holds` — nomme les séances que ce contrôle "
-            "retient. Un contrôle qui retient « tout » retient aussi celle dont il "
-            "attend la réponse.")
+            f"{where}: when=before without `holds` -- name the sessions this gate "
+            "holds. A gate that holds everything also holds the one whose answer it "
+            "waits for.")
 
     known = {session["id"]: session["date"] for session in sessions}
     for session_id in holds or []:
         if session_id not in known:
             problems.append(
-                f"{where} : `holds` cite « {session_id} », qui n'est pas une séance de "
-                "cette révision")
+                f"{where}: `holds` cites `{session_id}`, which is not a session of "
+                "this revision")
             continue
         # Holding a session already past when the question is asked has no effect: it
         # happened. That signals an observation was intended.
         if known[session_id] < gate["due"]:
             problems.append(
-                f"{where} : retient « {session_id} » du {known[session_id]}, antérieure "
-                f"à l'échéance {gate['due']} — cette séance aura déjà eu lieu. Une "
-                "condition qui arrive après sa séance est une observation (when=after).")
+                f"{where}: holds `{session_id}` of {known[session_id]}, before the due "
+                f"date {gate['due']} -- that session will already have happened. A "
+                "condition that comes after its session is an observation (when=after).")
     return problems
 
 
@@ -455,7 +455,7 @@ def semantic_errors(plan: dict, where: str = "weekly_plan",
     revisions = plan["revisions"]
     numbers = [revision["revision"] for revision in revisions]
     if numbers != list(range(1, len(numbers) + 1)):
-        problems.append(f"{where} : révisions non contiguës ({numbers})")
+        problems.append(f"{where}: revisions not contiguous ({numbers})")
     for revision in revisions:
         prefix = f"{where}.revision[{revision['revision']}]"
         gates = revision.get("gates") or []
@@ -464,12 +464,12 @@ def semantic_errors(plan: dict, where: str = "weekly_plan",
         sessions = revision["sessions"]
         ids = [session["id"] for session in sessions]
         if len(ids) != len(set(ids)):
-            problems.append(f"{prefix} : identifiants de séance dupliqués")
+            problems.append(f"{prefix}: duplicate session ids")
         problems.extend(transitions.per_week_errors(sessions, prefix))
         for session in sessions:
             if session["date"] not in allowed:
                 problems.append(
-                    f"{prefix}.{session['id']} : date {session['date']} hors de {week}")
+                    f"{prefix}.{session['id']}: date {session['date']} outside {week}")
             problems.extend(_session_errors(session, f"{prefix}.{session['id']}"))
             if revision is revisions[-1] and prescribable:
                 problems.extend(_strength_program_errors(
@@ -482,7 +482,7 @@ def semantic_errors(plan: dict, where: str = "weekly_plan",
             problems.extend(_spacing_errors(sessions, prefix))
 
         if len(gate_ids) != len(set(gate_ids)):
-            problems.append(f"{prefix} : identifiants de contrôle daté dupliqués")
+            problems.append(f"{prefix}: duplicate dated gate ids")
         for gate in gates:
             where_gate = f"{prefix}.gate[{gate['id']}]"
             # A gate belongs to the week that carries it. A condition landing past Sunday
@@ -491,13 +491,13 @@ def semantic_errors(plan: dict, where: str = "weekly_plan",
             # over.
             if gate["due"] not in allowed:
                 problems.append(
-                    f"{where_gate} : échéance {gate['due']} hors de {week} — "
-                    "une condition au-delà du dimanche va dans PostgreSQL via "
+                    f"{where_gate}: due date {gate['due']} outside {week} -- "
+                    "a condition beyond Sunday goes to PostgreSQL through "
                     "redline fact-write deadline")
             if gate["due"] < written_on:
                 problems.append(
-                    f"{where_gate} : échéance {gate['due']} antérieure au calcul "
-                    f"de la révision ({written_on})")
+                    f"{where_gate}: due date {gate['due']} before the revision "
+                    f"was computed ({written_on})")
             problems.extend(_gate_typing_errors(gate, where_gate, sessions))
 
         hard_days = sorted({dt.date.fromisoformat(s["date"]) for s in sessions
@@ -505,7 +505,7 @@ def semantic_errors(plan: dict, where: str = "weekly_plan",
         for first, second in pairwise(hard_days):
             if (second - first).days == 1:
                 problems.append(
-                    f"{prefix} : jours exigeants consécutifs {first} et {second}")
+                    f"{prefix}: consecutive demanding days {first} and {second}")
     return problems
 
 
@@ -527,8 +527,8 @@ def _spacing_errors(sessions: list[dict], prefix: str) -> list[str]:
                 continue
             if abs((dt.date.fromisoformat(other["date"]) - day).days) * 24 < hours:
                 seen.add(pair)
-                problems.append(f"{prefix} : routine {session['routine']} à moins de "
-                                f"{hours} h d'une séance {other['workout']} ({other['date']})")
+                problems.append(f"{prefix}: routine {session['routine']} less than "
+                                f"{hours} h from a {other['workout']} session ({other['date']})")
     return problems
 
 
@@ -620,10 +620,8 @@ def blocking_gates(plan: dict, today: dt.date | None = None) -> list[dict]:
 
 def gate_reasons(plan: dict, today: dt.date | None = None) -> list[str]:
     """The text of the due gates, as served to the coach."""
-    return [f"contrôle daté du {gate['due']} non levé — DEMANDE À L'ATHLÈTE AVANT "
-            f"TOUTE PRESCRIPTION : {gate['question']} ; à défaut : {gate['on_fail']}. "
-            "Le contrôle ne se lève qu'en enregistrant une révision dont la raison "
-            "porte SA réponse, jamais en le retirant du programme."
+    return [text.GATE_REASON.format(due=gate["due"], question=gate["question"],
+                                    on_fail=gate["on_fail"])
             for gate in blocking_gates(plan, today)]
 
 
@@ -642,13 +640,13 @@ def distance_of(session: dict) -> str:
     """
     target, cap = session.get("distance_target_km"), session.get("distance_cap_km")
     if target is not None and cap is not None:
-        return f"cible {target:g} km, plafond {cap:g} km"
+        return text.DISTANCE_TARGET_AND_CAP.format(target=f"{target:g}", cap=f"{cap:g}")
     if cap is not None:
-        return f"plafond {cap:g} km"
+        return text.DISTANCE_CAP.format(cap=f"{cap:g}")
     if target is not None:
-        return f"cible {target:g} km"
+        return text.DISTANCE_TARGET.format(target=f"{target:g}")
     if session.get("duration_cap_min"):
-        return f"plafond {session['duration_cap_min']} min"
+        return text.DURATION_CAP.format(minutes=session["duration_cap_min"])
     return ""
 
 
@@ -663,13 +661,13 @@ def details_of(session: dict, *, cadence_unit: str = "") -> list[str]:
     details = [distance_of(session)]
     if session.get("rpe_min") is not None:
         high = session.get("rpe_max", session["rpe_min"])
-        details.append(f"RPE {session['rpe_min']}-{high}")
+        details.append(text.RPE.format(low=session["rpe_min"], high=high))
     if session.get("hr_zone"):
         details.append(session["hr_zone"])
     if session.get("cadence_target"):
-        details.append(f"cadence ~{session['cadence_target']}{cadence_unit}")
+        details.append(text.CADENCE.format(cadence=session["cadence_target"], unit=cadence_unit))
     if session.get("carbs_target_g_h") is not None:
-        details.append(f"glucides {session['carbs_target_g_h']} g/h")
+        details.append(text.CARBS.format(grams=session["carbs_target_g_h"]))
     if session.get("note"):
         details.append(session["note"])
     return [part for part in details if part]
@@ -678,40 +676,36 @@ def details_of(session: dict, *, cadence_unit: str = "") -> list[str]:
 def _session_line(session: dict) -> str:
     day = dt.date.fromisoformat(session["date"])
     label = dates.weekday(day).capitalize()
-    suffix = " · ".join(details_of(session, cadence_unit=" pas/min"))
-    status = "fait" if session["status"] == "done" else session["status"]
+    suffix = " · ".join(details_of(session, cadence_unit=text.CADENCE_UNIT))
+    status = text.DONE if session["status"] == "done" else session["status"]
     if session.get("transition"):
-        status += ", transition " + transitions.label(session["transition"])
-    return f"- **{label} {day:%d/%m}** : {session['title']} ({status})" + (f" · {suffix}" if suffix else "")
+        status += text.WITH_TRANSITION.format(label=transitions.label(session["transition"]))
+    line = text.SESSION_LINE.format(day=label, date=f"{day:%d/%m}", title=session["title"],
+                                    status=status)
+    return line + (f" · {suffix}" if suffix else "")
 
 
 def render_journal(plan: dict) -> str:
     revision = active(plan)
-    lines = [f"## Programme actif — révision {revision['revision']}", "",
-             f"Calculé le `{revision['computed_at']}` · Motif : {revision['reason']}", ""]
+    lines = [text.JOURNAL_TITLE.format(revision=revision["revision"]), "",
+             text.JOURNAL_COMPUTED.format(computed_at=revision["computed_at"],
+                                          reason=revision["reason"]), ""]
     if revision.get("volume_target_km") is not None:
-        lines += [f"Volume couru visé : ~{revision['volume_target_km']:g} km", ""]
+        lines += [text.VOLUME_TARGET.format(km=f"{revision['volume_target_km']:g}"), ""]
     lines.extend(_session_line(session) for session in revision["sessions"])
     gates = revision.get("gates") or []
-    # The journal must not claim that ALL gates refuse the program: an observation
-    # (`apres`) is asked and holds nothing. A view that misstates the rule is worse than
-    # no view.
-    for kind, title in (
-        ("before", "**Pré-conditions** (aucune séance retenue ne se prescrit tant "
-                  "qu'une révision ne porte pas la réponse) :"),
-        ("after", "**Observations** (à poser le jour dit ; elles ne retiennent "
-                  "aucune séance) :"),
-    ):
+    for kind in GATE_WHEN:
         due = [gate for gate in gates if gate["when"] == kind]
         if not due:
             continue
-        lines += ["", title, ""]
-        lines.extend(f"- **{gate['due'][8:]}/{gate['due'][5:7]}** : {gate['question']} "
-                     f"→ à défaut, {gate['on_fail']}" for gate in due)
+        lines += ["", text.GATE_SECTIONS[kind], ""]
+        lines.extend(text.GATE_LINE.format(day=gate["due"][8:], month=gate["due"][5:7],
+                                           question=gate["question"], on_fail=gate["on_fail"])
+                     for gate in due)
     attention = revision.get("constraints") or []
     if attention:
-        lines += ["", "**Points d'attention** : " + " · ".join(attention)]
-    lines += ["", "Ce bloc est généré depuis le programme typé canonique. Ne pas l'éditer à la main."]
+        lines += ["", text.ATTENTION + " · ".join(attention)]
+    lines += ["", text.GENERATED]
     return "\n".join(lines)
 
 
@@ -728,17 +722,9 @@ def journal_skeleton(week: str, today: dt.date) -> str:
     sunday = monday + dt.timedelta(days=6)
     span = (f"{monday.day}-{dates.day_month(sunday)}" if monday.month == sunday.month
             else f"{dates.day_month(monday)} - {dates.day_month(sunday)}")
-    return "\n".join([
-        "---", "type: weekly-review", f"week: {week}", f"updated: {today.isoformat()}", "---", "",
-        f"# Bilan {week} ({span})", "",
-        "> Les séances restent dans le registre. Le programme opérationnel est la révision "
-        "PostgreSQL",
-        f"> `{week}` ; ce journal recevra la lecture de fin de semaine.", "",
-        f"<!-- {BLOCK}_START -->", f"<!-- {BLOCK}_END -->", "",
-        "## Intention d'ouverture", "",
-        "## Ressenti de l'athlète", "",
-        "## Bilan de clôture", "",
-        "## Lecture du coach", ""])
+    frontmatter = f"---\ntype: weekly-review\nweek: {week}\nupdated: {today.isoformat()}\n---\n\n"
+    return frontmatter + text.JOURNAL_SKELETON.format(
+        week=week, span=span, block=f"<!-- {BLOCK}_START -->\n<!-- {BLOCK}_END -->")
 
 
 def render_hot_cache(plan: dict) -> str:
@@ -746,11 +732,11 @@ def render_hot_cache(plan: dict) -> str:
     sessions = scheduled(revision["sessions"])
     compact = "; ".join(
         f"{dates.weekday(dt.date.fromisoformat(s['date']), 'abbreviated')} {s['title']}"
-        + (f" ≤{s['distance_cap_km']:g} km" if s.get("distance_cap_km") is not None else "")
+        + (text.HOT_CACHE_CAP.format(cap=f"{s['distance_cap_km']:g}")
+           if s.get("distance_cap_km") is not None else "")
         for s in sessions)
-    return (f"- **Semaine en cours — {plan['week']} · plan typé r{revision['revision']}** : "
-            f"{compact}. PostgreSQL → `athlete/journal/{plan['week'].lower()}.md`. "
-            "Macro-plan jamais prescriptible.")
+    return text.HOT_CACHE.format(week=plan["week"], revision=revision["revision"],
+                                 sessions=compact, file=plan["week"].lower())
 
 
 #: A revision is read back before it is narrated.
@@ -814,30 +800,29 @@ def restrictions(old: dict, new: dict | None) -> list[str]:
     if old.get("status") == "cancelled":
         return []
     if new is None:
-        return ["retirée"]
+        return ["removed"]
     if new.get("status") == "cancelled":
-        return ["annulée"]
+        return ["cancelled"]
     found = []
     old_cap, new_cap = old.get("distance_cap_km"), new.get("distance_cap_km")
     if new_cap is not None and (
             (old_cap is not None and new_cap < old_cap)
             or (old_cap is None and old.get("distance_target_km") is not None
                 and new_cap < old["distance_target_km"])):
-        found.append("plafond de distance abaissé")
+        found.append("distance cap lowered")
     old_target, new_target = old.get("distance_target_km"), new.get("distance_target_km")
     if old_target is not None and new_target is not None and new_target < old_target:
-        found.append("cible de distance abaissée")
+        found.append("distance target lowered")
     old_minutes, new_minutes = old.get("duration_cap_min"), new.get("duration_cap_min")
     if old_minutes is not None and new_minutes is not None and new_minutes < old_minutes:
-        found.append("plafond de durée abaissé")
+        found.append("duration cap lowered")
     if old.get("workout") in HARD_WORKOUTS and new.get("workout") not in HARD_WORKOUTS:
-        found.append(f"{session_labels.short(old['workout'])} remplacée par "
-                     f"{session_labels.short(new['workout'])}")
+        found.append(f"{old['workout']} replaced by {new['workout']}")
     old_strength, new_strength = old.get("strength") or {}, new.get("strength") or {}
     if set(new_strength.get("drop") or []) - set(old_strength.get("drop") or []):
-        found.append("exercice retiré du renfo")
+        found.append("exercise dropped from strength")
     if new_strength.get("half_dose") and not old_strength.get("half_dose"):
-        found.append("renfo en demi-dose")
+        found.append("strength at half dose")
     return found
 
 
@@ -846,22 +831,22 @@ def _restriction_errors(session_id: str, entry: dict, cuts: list[str],
     restriction = entry.get("restriction")
     if not restriction:
         return [
-            f"changes.{session_id}.restriction : restriction ({', '.join(cuts)}) sans "
-            "prémisse typée. Nomme la règle du règlement qui l'impose (`rule` : "
-            f"{', '.join(restriction_rules())}) et le fait qui la déclenche (`fact` : une "
-            "entrée exacte de evidence). Sans prémisse, la séance reste."]
+            f"changes.{session_id}.restriction: restriction ({', '.join(cuts)}) without a "
+            "typed premise. Name the rulebook rule that imposes it (`rule`: "
+            f"{', '.join(restriction_rules())}) and the fact that triggers it (`fact`: an "
+            "exact entry of evidence). Without a premise, the session stays."]
     fact = restriction.get("fact") or ""
     if fact not in evidence:
-        return [f"changes.{session_id}.restriction.fact doit recopier exactement une "
-                "entrée de evidence."]
+        return [f"changes.{session_id}.restriction.fact must copy an entry of evidence "
+                "exactly."]
     if restriction.get("rule") == REQUEST_RULE:
         if not _REQUEST_TRIGGER.match(fact):
-            return [f"changes.{session_id}.restriction : rule=request exige un message de "
-                    "l'athlète (messenger:, request:, availability:)."]
+            return [f"changes.{session_id}.restriction: rule=request requires a message from "
+                    "the athlete (messenger:, request:, availability:)."]
     elif not _FACT_TRIGGER.match(fact):
-        return [f"changes.{session_id}.restriction : rule={restriction.get('rule')} s'applique à "
-                "un fait observé (observation:, strava:, medical:, gate:, exposure:, "
-                "incident:, strength:), pas à une intention."]
+        return [f"changes.{session_id}.restriction: rule={restriction.get('rule')} applies to "
+                "an observed fact (observation:, strava:, medical:, gate:, exposure:, "
+                "incident:, strength:), not to an intent."]
     return []
 
 
@@ -879,41 +864,41 @@ def change_evidence_errors(previous: dict | None, current: dict) -> list[str]:
     expected = _changed_session_fields(previous, current, as_of)
     entries = current.get("changes")
     if not expected:
-        return ["changes : aucune prescription future ne change ; retire ces justifications."] \
+        return ["changes: no future prescription changes; remove these justifications."] \
             if entries else []
     if not isinstance(entries, list) or not entries:
         return [
-            "changes obligatoire : chaque séance future modifiée doit nommer les champs "
-            "touchés, une preuve exacte de evidence (`trigger`) et la règle appliquée."]
+            "changes required: every modified future session names the fields it touches, "
+            "an exact entry of evidence (`trigger`) and the rule applied."]
     problems: list[str] = []
     before, after = _revision_index(previous), _revision_index(current)
     by_session: dict[str, dict] = {}
     for entry in entries:
         session_id = entry.get("session_id") if isinstance(entry, dict) else None
         if not session_id or session_id in by_session:
-            problems.append(f"changes : session_id absent ou dupliqué ({session_id!r}).")
+            problems.append(f"changes: session_id missing or duplicated ({session_id!r}).")
             continue
         by_session[session_id] = entry
     for session_id, fields in expected.items():
         entry = by_session.get(session_id)
         if entry is None:
-            problems.append(f"changes : justification absente pour {session_id}.")
+            problems.append(f"changes: no justification for {session_id}.")
             continue
         declared = set(entry.get("fields") or [])
         if declared != fields:
             problems.append(
-                f"changes.{session_id}.fields : attendu {sorted(fields)}, reçu {sorted(declared)}.")
+                f"changes.{session_id}.fields: expected {sorted(fields)}, got {sorted(declared)}.")
         trigger = entry.get("trigger") or ""
         if trigger not in (current.get("evidence") or []):
             problems.append(
-                f"changes.{session_id}.trigger doit recopier exactement une entrée de evidence.")
+                f"changes.{session_id}.trigger must copy an entry of evidence exactly.")
         elif not _AUTHORITATIVE_TRIGGER.match(trigger):
             problems.append(
-                f"changes.{session_id}.trigger n'est pas une preuve autoritative typée.")
+                f"changes.{session_id}.trigger is not a typed authoritative piece of evidence.")
         if not str(entry.get("rule") or "").strip():
-            problems.append(f"changes.{session_id}.rule est vide.")
+            problems.append(f"changes.{session_id}.rule is empty.")
         if not str(entry.get("context") or "").strip():
-            problems.append(f"changes.{session_id}.context est vide.")
+            problems.append(f"changes.{session_id}.context is empty.")
         cuts = restrictions(before[session_id], after.get(session_id)) \
             if session_id in before else []
         if cuts:
@@ -921,7 +906,7 @@ def change_evidence_errors(previous: dict | None, current: dict) -> list[str]:
                                       current.get("evidence") or [])
     extras = sorted(set(by_session) - set(expected))
     if extras:
-        problems.append("changes : aucune modification future pour " + ", ".join(extras) + ".")
+        problems.append("changes: no future change for " + ", ".join(extras) + ".")
     return problems
 
 
@@ -931,22 +916,20 @@ def revision_diff(previous: dict | None, current: dict) -> list[str]:
     lines = []
     for session_id, session in after.items():
         old = before.get(session_id)
+        values = {"session": session_id, "day": _day_label(session["date"]),
+                  "title": session["title"]}
         if old is None:
-            lines.append(f"{session_id} : AJOUTÉE le {_day_label(session['date'])} "
-                          f"({session['title']})")
+            lines.append(text.DIFF["added"].format(**values))
         elif old["date"] != session["date"]:
-            lines.append(f"{session_id} : DÉPLACÉE du {_day_label(old['date'])} "
-                          f"au {_day_label(session['date'])}")
+            lines.append(text.DIFF["moved"].format(**values, old_day=_day_label(old["date"])))
         elif session["status"] == "cancelled" and old["status"] != "cancelled":
-            lines.append(f"{session_id} : ANNULÉE le {_day_label(session['date'])} "
-                          f"({session['title']})")
+            lines.append(text.DIFF["cancelled"].format(**values))
         elif _comparable(old) != _comparable(session):
-            lines.append(f"{session_id} : MODIFIÉE le {_day_label(session['date'])} "
-                          f"({session['title']})")
+            lines.append(text.DIFF["modified"].format(**values))
     for session_id, session in before.items():
         if session_id not in after:
-            lines.append(f"{session_id} : RETIRÉE de la révision "
-                          f"(elle était le {_day_label(session['date'])})")
+            lines.append(text.DIFF["removed"].format(session=session_id,
+                                                     day=_day_label(session["date"])))
     return lines
 
 
@@ -960,39 +943,34 @@ def revision_week_lines(week: str, revision: dict) -> list[str]:
     for offset in range(7):
         day = monday + dt.timedelta(days=offset)
         same = by_day.get(day.isoformat(), [])
-        if not same:
-            lines.append(f"{_day_label(day.isoformat())} : AUCUNE SÉANCE")
-            continue
-        lines.append(f"{_day_label(day.isoformat())} : " + " + ".join(
-            s["title"] + ("" if s["status"] == "planned" else f" ({s['status']})")
-            for s in same))
+        sessions = " + ".join(
+            s["title"] + ("" if s["status"] == "planned"
+                          else text.SESSION_STATUS.format(status=s["status"]))
+            for s in same) or text.NO_SESSION
+        lines.append(text.WEEK_DAY.format(day=_day_label(day.isoformat()), sessions=sessions))
     return lines
 
 
 def revision_readback(week: str, previous: dict | None, current: dict) -> str:
     """What the CLI returns to the coach: the diff, then the week as it is."""
-    since_day = f"r{previous['revision']}" if previous else "rien (première révision)"
-    diff = revision_diff(previous, current) or [
-        "AUCUNE séance ajoutée, annulée, déplacée ni modifiée. Si le message de l'athlète "
-        "demandait un changement, cette révision ne le porte pas."]
-    bloc = [
-        f"{week} révision {current['revision']} enregistrée et validée.",
+    since = f"r{previous['revision']}" if previous else text.FIRST_REVISION
+    diff = revision_diff(previous, current) or [text.NOTHING_CHANGED]
+    block = [
+        text.READBACK_SAVED.format(week=week, revision=current["revision"]),
         "",
-        f"Ce qui change depuis {since_day} :",
+        text.READBACK_CHANGES.format(since=since),
         *(f"- {line}" for line in diff),
         "",
-        "RELIS LA SEMAINE AVANT DE RÉPONDRE. Elle est maintenant :",
+        text.READBACK_WEEK,
         *(f"- {line}" for line in revision_week_lines(week, current)),
     ]
     if current.get("volume_target_km") is not None:
-        bloc.append(f"- Volume couru visé : ~{current['volume_target_km']:g} km")
+        block.append(text.READBACK_VOLUME.format(km=f"{current['volume_target_km']:g}"))
     orphans = orphan_sessions(previous, current)
     if orphans:
-        bloc += ["", "ATTENTION :", *(f"- {line}" for line in orphans)]
-    bloc += ["", "Chaque fait du message de l'athlète doit se retrouver ci-dessus. Un jour "
-                 "marqué AUCUNE SÉANCE est un oubli tant que tu n'as pas vérifié qu'il "
-                 "est voulu."]
-    return "\n".join(bloc)
+        block += ["", text.READBACK_ATTENTION, *(f"- {line}" for line in orphans)]
+    block += ["", text.READBACK_CHECK]
+    return "\n".join(block)
 
 
 def orphan_sessions(previous: dict | None, current: dict) -> list[str]:
@@ -1014,8 +992,6 @@ def orphan_sessions(previous: dict | None, current: dict) -> list[str]:
         fresh = [s for s in same
                   if before.get(s["id"], {}).get("status") != "cancelled"]
         if fresh:
-            orphans.append(
-                f"{_day_label(stamp)} ne porte plus que des annulations "
-                f"({', '.join(s['title'] for s in fresh)}) et aucune séance à la "
-                "place. Voulu, ou remplaçante oubliée ?")
+            orphans.append(text.ORPHAN_DAY.format(
+                day=_day_label(stamp), titles=", ".join(s["title"] for s in fresh)))
     return orphans

@@ -132,8 +132,8 @@ def test_with_several_zones_each_pain_names_its_own(monkeypatch, capsys):
 
 
 @pytest.mark.parametrize("given, refused", [
-    (["2"], "nomme la zone"), (["hanche=1"], "zone inconnue"),
-    (["talon=1", "talon=2"], "deux fois")])
+    (["2"], "name the zone"), (["hanche=1"], "unknown zone"),
+    (["talon=1", "talon=2"], "given twice")])
 def test_a_pain_without_a_clear_zone_is_refused(monkeypatch, capsys, given, refused):
     add = _load_writer()
     _zones(monkeypatch, add, ("talon", "cheville"))

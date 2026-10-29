@@ -32,6 +32,7 @@ from itertools import pairwise
 from pathlib import Path
 from typing import Protocol
 
+from redline.coach.fr import ledger as text
 from redline.model import (
     daily,
     paths,
@@ -147,7 +148,7 @@ def zone_prefix(zone: PainZone, zones: list[PainZone]) -> str:
 def open_store() -> LedgerStore:
     url = (os.environ.get("DATABASE_URL") or "").strip()
     if not url:
-        raise RuntimeError("DATABASE_URL obligatoire : aucun registre de secours n'existe")
+        raise RuntimeError("DATABASE_URL is required: there is no fallback ledger")
     from redline.storage import Database, OperationalStore
     return OperationalStore(Database(url, application_name="ledger-gauge"))
 
@@ -317,8 +318,7 @@ class TargetFlag:
     target: float
 
     def __str__(self) -> str:
-        return (f"{self.date} {self.kind} — RPE {self.rpe:g} déclaré "
-                f"pour une cible de {self.target:g}")
+        return (text.OVER_TARGET.format(date=self.date, kind=self.kind, rpe=self.rpe, target=self.target))
 
 
 def over_target(rows: list[Row], targets: dict) -> list[TargetFlag]:
@@ -348,23 +348,23 @@ def equivalent_hours(rows: list[Row], instr: Instruments,
         if not weighted:
             continue
         if missed:
-            trace.append(f"{row.date} {row.type} séance RATÉE (+0.5)")
+            trace.append(text.TRACE_MISSED.format(date=row.date, type=row.type))
         base += weighted
-        trace.append(f"{row.date} {row.type} → {weighted:.2f} h-éq")
+        trace.append(text.TRACE_SESSION.format(date=row.date, type=row.type, weighted=weighted))
 
     multiplier = 1.0
     if _two_hard_days_in_a_row(rows):
         multiplier *= 1.15
-        trace.append("×1.15 deux jours exigeants consécutifs")
+        trace.append(text.TRACE_TWO_HARD_DAYS)
     if instr.sleep == WeekSleep.BAD_WEEK:
         multiplier *= 1.20
-        trace.append("×1.20 sommeil dégradé toute la semaine")
+        trace.append(text.TRACE_BAD_SLEEP_WEEK)
     elif instr.sleep == WeekSleep.BAD_NIGHTS:
         multiplier *= 1.10
-        trace.append("×1.10 2-3 mauvaises nuits")
+        trace.append(text.TRACE_BAD_NIGHTS)
     if instr.life_load == WeekLifeLoad.HIGH:
         multiplier *= 1.10
-        trace.append("×1.10 grosse charge de vie")
+        trace.append(text.TRACE_HIGH_LIFE_LOAD)
 
     h_eq = base * multiplier
     return h_eq, round(h_eq * POINTS_PER_EQ_HOUR), trace
@@ -395,7 +395,7 @@ def normalize_week(text: str, known: list[str]) -> str:
     raw = text.strip().upper().replace(" ", "")
     match = re.fullmatch(r"(?:(\d{4})-?)?W?(\d{1,2})", raw)
     if not match:
-        raise ValueError(f"semaine illisible : « {text} » (attendu 2030-W30, W30 ou 30)")
+        raise ValueError(f"unreadable week: {text!r} (expected 2030-W30, W30 or 30)")
     year, week = match.group(1), int(match.group(2))
     if year:
         label = f"{year}-W{week:02d}"
@@ -405,11 +405,11 @@ def normalize_week(text: str, known: list[str]) -> str:
         # which one was kept.
         candidates = [lab for lab in known if lab.endswith(f"W{week:02d}")]
         if not candidates:
-            raise ValueError(f"semaine W{week:02d} absente du registre")
+            raise ValueError(f"week W{week:02d} is not in the ledger")
         label = max(candidates)
     if label not in known:
-        span = f"{min(known)} → {max(known)}" if known else "registre vide"
-        raise ValueError(f"{label} n'a aucune ligne au registre ({span})")
+        span = f"{min(known)} → {max(known)}" if known else "empty ledger"
+        raise ValueError(f"{label} has no row in the ledger ({span})")
     return label
 
 
@@ -464,7 +464,7 @@ class PainSeries:
     def __str__(self) -> str:
         if not self.n:
             return "—"
-        return f"pic {self.peak} · médiane {self.median} (n={self.n})"
+        return text.PAIN_SERIES.format(peak=self.peak, median=self.median, n=self.n)
 
 
 @dataclass
@@ -475,8 +475,8 @@ class PainWeek:
     wake: PainSeries        # sub-series of morning readings -- the Esculier judge
 
     def __str__(self) -> str:
-        return (f"{self.week} : effort {self.effort} · repos {self.rest}"
-                + (f" · réveil {self.wake}" if self.wake.n else ""))
+        return (text.PAIN_WEEK.format(week=self.week, effort=self.effort, rest=self.rest)
+                + (text.PAIN_WEEK_WAKE.format(wake=self.wake) if self.wake.n else ""))
 
 
 def _series(values: list[float]) -> PainSeries:
@@ -562,9 +562,9 @@ def rest_baseline(rows: list[Row], before: dt.date, zone: str) -> str:
     """
     window = _rest_window(rows, before, zone)
     if not window:
-        return "aucun historique de repos sur 8 sem"
+        return text.NO_REST_HISTORY
     series = _series(window)
-    return f"repos 8 sem : {series}"
+    return text.REST_BASELINE.format(series=series)
 
 
 def esculier_check(rows: list[Row], zone: str,
@@ -602,15 +602,13 @@ def esculier_check(rows: list[Row], zone: str,
         if row.type not in table.EFFORT_TYPES or pain is None:
             continue
         if pain > ESCULIER_CAP:
-            flags.append(EsculierFlag(row.date, "AU-DESSUS DU PLAFOND",
-                                      f"{row.type} à {pain}/10 > {ESCULIER_CAP} "
-                                      f"→ réduction immédiate"))
+            flags.append(EsculierFlag(row.date, text.ESCULIER_OVER_CAP,
+                                      text.ESCULIER_OVER_CAP_DETAIL.format(type=row.type, pain=pain, esculier_cap=ESCULIER_CAP)))
         after = wake.get(row.date + dt.timedelta(days=1))
         if after is None:
             if pain > 0 and row.date >= table.completeness_from():
-                flags.append(EsculierFlag(row.date, "non vérifié",
-                                          f"{row.type} à {pain}/10, aucune lecture "
-                                          f"« reveil » le lendemain"))
+                flags.append(EsculierFlag(row.date, text.ESCULIER_UNCHECKED,
+                                          text.ESCULIER_UNCHECKED_DETAIL.format(type=row.type, pain=pain)))
         else:
             morning = row.date + dt.timedelta(days=1)
             # The reference is its own rest series, never the previous day's effort peak.
@@ -618,10 +616,8 @@ def esculier_check(rows: list[Row], zone: str,
             # `rest_baseline` itself says it comes out without a reference.
             reference = rest_peak(past, morning, zone)
             if after > (reference if reference is not None else 0.0):
-                flags.append(EsculierFlag(row.date, "TRACE AU RÉVEIL",
-                                          f"{after}/10 au réveil après {row.type} "
-                                          f"à {pain}/10 — "
-                                          f"{rest_baseline(past, morning, zone)}"))
+                flags.append(EsculierFlag(row.date, text.ESCULIER_WAKE_TRACE,
+                                          text.ESCULIER_WAKE_TRACE_DETAIL.format(after=after, type=row.type, pain=pain, rest_baseline=rest_baseline(past, morning, zone))))
     return flags
 
 
@@ -635,27 +631,26 @@ def _pain_gate_cases(rows: list[Row], label: str, previous: str,
     now, before = peak(label), peak(previous)
     cases = []
     if now is None:
-        cases.append(("?", "pic d'effort : aucune course chiffrée"))
+        cases.append(("?", text.GATE_NO_EFFORT_PEAK))
     else:
         ceiling = rulebook.current().parameters.gate_effort_peak
         cases.append(("✓" if now <= ceiling else "✗",
-                      f"pic d'effort {now:g}/10 (au plus {ceiling:g})"))
+                      text.GATE_EFFORT_PEAK.format(now=now, ceiling=ceiling)))
     if now is None or before is None:
-        cases.append(("?", f"tendance : {previous} {before if before is not None else '—'} "
-                           f"→ {label} {now if now is not None else '—'}"))
+        cases.append(("?", text.GATE_TREND_PARTIAL.format(previous=previous, before=before if before is not None else "—", label=label, now=now if now is not None else "—")))
     else:
         cases.append(("✓" if now <= before else "✗",
-                      f"tendance : {before:g} → {now:g}"))
+                      text.GATE_TREND.format(before=before, now=now)))
     wakes = [row for row in rows if row.week == label and row.type == session_kinds.WAKE_TRACE]
     measured = [(row.date, value) for row in wakes
                 if (value := row.pain_at(zone)) is not None]
     base = rest_peak(rows, _week_start(label), zone)
     above = [(day, value) for day, value in measured
              if value > (base if base is not None else 0.0)]
-    detail = (f"réveils : {len(measured)} chiffré(s) sur {len(wakes)}"
-              + (f", référence 8 sem {base:g}" if base is not None else ""))
+    detail = (text.GATE_WAKES.format(measured=len(measured), wakes=len(wakes))
+              + (text.GATE_WAKES_REFERENCE.format(base=base) if base is not None else ""))
     if above:
-        cases.append(("✗", detail + " · au-dessus : "
+        cases.append(("✗", detail + text.GATE_WAKES_ABOVE
                       + ", ".join(f"{day:%d/%m} {value:g}" for day, value in above)))
     elif not measured or len(measured) < len(wakes):
         cases.append(("?", detail))
@@ -685,17 +680,17 @@ def gate(rows: list[Row], label: str, instr: Instruments,
               if _week_label(drift.date) in (previous, label)
               and drift.delta >= signals.HR_DRIFT_BPM]
     if drifts:
-        cases.append(("✗", "FC des footings haute : " + ", ".join(
+        cases.append(("✗", text.GATE_HR_HIGH + ", ".join(
             f"{drift.date:%d/%m} {drift.delta:+.0f}" for drift in drifts)))
     else:
-        cases.append(("✓", "FC des footings normale"))
+        cases.append(("✓", text.GATE_HR_NORMAL))
     if instr.sleep is None:
-        cases.append(("?", "sommeil non déclaré"))
+        cases.append(("?", text.GATE_SLEEP_UNDECLARED))
     else:
-        cases.append(("✗" if instr.sleep != WeekSleep.OK else "✓", f"sommeil {instr.sleep}"))
+        cases.append(("✗" if instr.sleep != WeekSleep.OK else "✓", text.GATE_SLEEP.format(sleep=instr.sleep)))
     marks = {mark for mark, _ in cases}
-    verdict = "rouge" if "✗" in marks else "incomplète" if "?" in marks else "verte"
-    return [f"Porte (règle po, calculée) : {verdict}"] + [f"  {mark} {text}"
+    verdict = text.GATE_RED if "✗" in marks else text.GATE_INCOMPLETE if "?" in marks else text.GATE_GREEN
+    return [text.GATE_VERDICT.format(verdict=verdict)] + [f"  {mark} {text}"
                                                            for mark, text in cases]
 
 
@@ -723,9 +718,9 @@ class Volume:
     dminus: int
 
     def __str__(self) -> str:
-        out = f"{self.km_run:.2f} km courus ({self.runs} sortie{'s' if self.runs > 1 else ''})"
+        out = text.VOLUME_RUN.format(km_run=self.km_run, outings=text.outings(self.runs))
         if self.km_walk:
-            out += f" + {self.km_walk:.2f} km marchés ({self.walks})"
+            out += text.VOLUME_WALK.format(km_walk=self.km_walk, walks=self.walks)
         # D- is not repeated here: it has its own line just below, which states that it
         # does not count in the gauge. One fact, one place.
         return out + f" · D+ {self.dplus} m"
@@ -773,9 +768,9 @@ class WeekTrace:
         return self.elapsed is not None
 
     def __str__(self) -> str:
-        line = f"{self.label}  {self.km:6.1f} km   plus longue {self.longest:5.1f}"
+        line = text.TRAJECTORY_WEEK.format(label=self.label, km=self.km, longest=self.longest)
         if self.open:
-            line += f"   ⧗ en cours, {self.elapsed} j sur 7 — hors verdict"
+            line += text.TRAJECTORY_OPEN_WEEK.format(elapsed=self.elapsed)
         return line
 
 
@@ -834,18 +829,16 @@ def trajectory_verdict(traces: list[WeekTrace]) -> list[str]:
     """
     closed = [trace for trace in traces if not trace.open]
     if len(closed) < 2 * TRAJECTORY_HALF:
-        return [f"pente non calculable — {len(closed)} semaine(s) close(s) sur "
-                f"les {2 * TRAJECTORY_HALF} qu'il faut"]
+        return [text.SLOPE_UNAVAILABLE.format(closed=len(closed), needed=2 * TRAJECTORY_HALF)]
     recent, before = closed[-TRAJECTORY_HALF:], closed[-2 * TRAJECTORY_HALF:-TRAJECTORY_HALF]
     lines = []
     for name, now, then in (
-            ("Volume", sum(t.km for t in recent) / TRAJECTORY_HALF,
+            (text.SLOPE_VOLUME, sum(t.km for t in recent) / TRAJECTORY_HALF,
              sum(t.km for t in before) / TRAJECTORY_HALF),
-            ("Plus longue", max(t.longest for t in recent),
+            (text.SLOPE_LONGEST, max(t.longest for t in recent),
              max(t.longest for t in before))):
         change = f"{(now / then - 1) * 100:+.0f} %" if then else "—"
-        lines.append(f"{name} : {now:.1f} contre {then:.1f} sur les "
-                     f"{TRAJECTORY_HALF} d'avant — {change}")
+        lines.append(text.SLOPE_LINE.format(name=name, now=now, then=then, trajectory_half=TRAJECTORY_HALF, change=change))
     return lines
 
 
@@ -863,14 +856,11 @@ class Stall:
 
     def __str__(self) -> str:
         if not self.weeks:
-            return (f"Plus longue : record de {self.record_km:.1f} km battu en "
-                    f"{self.record_week}, la dernière semaine close")
+            return (text.STALL_RECORD_BEATEN.format(record_km=self.record_km, record_week=self.record_week))
         head = "🔴 " if self.triggered else ""
-        line = (f"{head}Plus longue sans nouveau record depuis {self.weeks} semaine(s) "
-                f"close(s) — record {self.record_km:.1f} km en {self.record_week}")
+        line = (text.STALL.format(head=head, weeks=self.weeks, record_km=self.record_km, record_week=self.record_week))
         if self.triggered:
-            line += (" · règle s9 : le protocole d'instruction des baisses s'ouvre "
-                     "maintenant, sans attendre son jalon daté")
+            line += (text.STALL_RULE_S9)
         return line
 
 
@@ -988,33 +978,26 @@ def transition_notes(rows: list[Row], sessions: list[dict], today: dt.date) -> l
             continue
         longest = longest_recent(rows, day)
         if longest is None:
-            notes.append(f"{session['id']} {float(planned):.1f} km : aucune course dans "
-                         "les 30 j, écart non calculable")
+            notes.append(text.PLANNED_NO_RECENT_RUN.format(session=session["id"], planned=float(planned)))
             continue
-        notes.append(f"{session['id']} {float(planned):.1f} km = "
-                     f"{(float(planned) / longest - 1) * 100:+.0f} % de {longest:.1f} km "
-                     "(plus longue des 30 j)")
+        notes.append(text.PLANNED_GAP.format(session=session["id"], planned=float(planned), gap=(float(planned) / longest - 1) * 100, longest=longest))
     return notes
 
 
 def projection_lines(projection: Projection, target_km: float | None = None) -> list[str]:
-    lines = [f"Course du {projection.race_on:%d/%m} : {len(projection.weeks)} semaine(s) "
-             f"utile(s) avant l'affûtage ({projection.taper_from}), depuis "
-             f"{projection.start_km:.1f} km (plus longue des 30 j)."]
+    lines = [text.PROJECTION.format(race_on=projection.race_on, weeks=len(projection.weeks), taper_from=projection.taper_from, start_km=projection.start_km)]
     if not target_km:
-        lines.append("Cible de sortie longue non fournie (--long-run-target KM) : rythme "
-                     "nécessaire non calculé.")
+        lines.append(text.PROJECTION_NO_TARGET)
         return lines
     parts = []
     for lost in (0, 1, 2):
         growth = projection.required_growth(target_km, lost)
-        label = ("toutes les semaines" if not lost
-                 else f"{lost} semaine(s) sans hausse")
-        parts.append(f"{label} : " + ("impossible" if growth is None
-                                      else f"+{(growth - 1) * 100:.0f} %/sem"))
-    lines.append(f"Pour {target_km:.1f} km avant l'affûtage, il faut en moyenne "
-                 + " ; ".join(parts) + ". Un rythme, pas une règle : il se juge sur la "
-                 "tolérance observée et l'historique.")
+        label = (text.PROJECTION_EVERY_WEEK if not lost
+                 else text.PROJECTION_WEEKS_LOST.format(lost=lost))
+        parts.append(f"{label} : " + (text.PROJECTION_IMPOSSIBLE if growth is None
+                                      else text.PROJECTION_GROWTH.format(percent=(growth - 1) * 100)))
+    lines.append(text.PROJECTION_REQUIRED.format(target_km=target_km)
+                 + " ; ".join(parts) + text.PROJECTION_REQUIRED_NOTE)
     return lines
 
 
@@ -1040,35 +1023,33 @@ def week_report(store: LedgerStore, rows: list[Row], instruments: dict, targets:
     instr = instruments.get(label, Instruments())
     h_eq, level, trace = equivalent_hours(week_rows, instr, targets)
     ratio = acute_chronic_ratio(per_week, label)
-    lines = [f"Semaine {label}", ""]
+    lines = [text.REPORT_WEEK.format(label=label), ""]
     # Volume before the gauge: it is the figure the athlete hears most often, and the only
     # one they can recount themselves. It comes from here or not at all.
-    lines.append(f"Volume : {week_volume(week_rows)}")
-    lines.append("(le registre, pas le plan — `Vol. cible` de current-plan.md est une "
-                 "intention, pas un fait)")
+    lines.append(text.REPORT_VOLUME.format(week_volume=week_volume(week_rows)))
+    lines.append(text.REPORT_VOLUME_SOURCE)
     lines.append("")
     lines.extend(f"  {line}" for line in trace)
     over_level = " 🔴" if level > LEVEL_CAP else ""
     over_ratio = " 🔴" if ratio and ratio > RATIO_CAP else ""
     lines.append("")
-    lines.append(f"Jauge : {h_eq:.2f} h-éq ({level}/100{over_level}) · "
-                 f"ratio {ratio if ratio is not None else '—'}{over_ratio}")
-    lines.append(f"(sommeil={instr.sleep or 'non déclaré'}, "
-                 f"charge_vie={instr.life_load or 'non déclarée'})")
+    lines.append(text.REPORT_GAUGE.format(h_eq=h_eq, level=level, over_level=over_level, ratio=ratio if ratio is not None else "—", over_ratio=over_ratio))
+    lines.append(text.REPORT_INSTRUMENTS.format(sleep=instr.sleep or text.SLEEP_UNDECLARED,
+                                                life_load=instr.life_load or text.LIFE_LOAD_UNDECLARED))
     dminus = week_descent(week_rows)
     if dminus:
-        lines.append(f"D− de la semaine : {dminus} m — c'est LUI que compte la jauge")
+        lines.append(text.REPORT_DESCENT.format(dminus=dminus))
     zones = pain_zones(store)
     for zone in zones:
         pain = pain_trend(week_rows, 1, zone.slug)
         if pain:
-            lines.append(f"Douleur {zone.label} : {pain[0]}")
-        lines.extend(f"⚠ Esculier {zone_prefix(zone, zones)}{flag}"
+            lines.append(text.REPORT_PAIN.format(label=zone.label, trend=pain[0]))
+        lines.extend(text.REPORT_ESCULIER.format(zone_prefix=zone_prefix(zone, zones), flag=flag)
                      for flag in esculier_check(week_rows, zone.slug, history=rows))
     lines.extend(gate(rows, label, instr, zones))
-    lines.extend(f"⚠ au-dessus de la cible — {overshoot}"
+    lines.extend(text.REPORT_OVER_TARGET.format(overshoot=overshoot)
                  for overshoot in over_target(week_rows, targets))
-    lines.extend(f"⚠ ligne incomplète — {problem}"
+    lines.extend(text.REPORT_INCOMPLETE.format(problem=problem)
                  for problem in week_completeness(store, label, today))
 
     # The slope comes after the week: a preparation is not judged on seven days.
@@ -1080,7 +1061,7 @@ def week_report(store: LedgerStore, rows: list[Row], instruments: dict, targets:
     traces = trajectory(rows, slope_day)
     if traces:
         lines.append("")
-        lines.append(f"Trajectoire — {len(traces)} dernières semaines")
+        lines.append(text.REPORT_TRAJECTORY.format(weeks=len(traces)))
         lines.extend(f"  {week_trace}" for week_trace in traces)
         lines.extend(trajectory_verdict(traces))
         stall = long_run_stall(rows, slope_day)
@@ -1088,15 +1069,13 @@ def week_report(store: LedgerStore, rows: list[Row], instruments: dict, targets:
             lines.append(str(stall))
         longest = longest_recent(rows, reference)
         if longest is not None:
-            lines.append(f"Plus longue des 30 j : {longest:.1f} km — repère, pas un plafond "
-                         "(aucun pourcentage fixe)")
+            lines.append(text.REPORT_LONGEST.format(longest=longest))
         race_on = next_race_date(store, today)
         projection = race_projection(rows, today, race_on) if race_on else None
         if projection:
             lines.extend(projection_lines(projection, target_km))
         elif race_on is None:
-            lines.append("Projection course : aucune course typée (redline fact-write deadline "
-                         "--kind race) — rien à projeter.")
+            lines.append(text.REPORT_NO_RACE)
     return lines
 
 
@@ -1126,18 +1105,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--root", default=paths.vault_root(), type=Path)
-    parser.add_argument("--week", dest="week", help="ex. 2030-W30")
+    parser.add_argument("--week", dest="week", help="e.g. 2030-W30")
     parser.add_argument("--pain-trend", dest="pain_weeks", type=int, metavar="N")
-    parser.add_argument("--csv", action="store_true", help="export normalisé sur stdout")
+    parser.add_argument("--csv", action="store_true", help="normalised export on stdout")
     parser.add_argument("--long-run-target", dest="target_km", type=float, metavar="KM",
-                        help="distance de sortie longue à atteindre avant l'affûtage")
+                        help="long-run distance to reach before the taper")
     args = parser.parse_args()
 
     try:
         store = open_store()
         rows = parse_ledger(store)
     except table.LedgerError as exc:
-        raise InputError(f"Registre illisible — {exc}") from exc
+        raise InputError(f"unreadable ledger -- {exc}") from exc
     instruments = load_instruments(store)
     # Targets come from the session sheets, never from a hard-coded table.
     targets = program.rpe_targets(args.root)
@@ -1147,12 +1126,11 @@ def main() -> int:
         return 0
 
     if args.pain_weeks:
-        print("Tendance douleur — le PIC fait foi (le déclaratif est biaisé bas).")
-        print("Deux séries : douleur PENDANT l'effort, douleur AU REPOS. "
-              "Le n compte : un max sur 7 lectures\nn'est pas comparable à un max sur 3.\n")
+        print(text.TREND_TITLE)
+        print(text.TREND_SERIES)
         zones = pain_zones(store)
         if not zones:
-            print("Aucune zone surveillée ([[injuries]] de redline.toml) : rien à suivre.")
+            print(text.TREND_NO_ZONE)
         for zone in zones:
             print(f"{zone.label}")
             weeks = pain_trend(rows, args.pain_weeks, zone.slug)
@@ -1160,23 +1138,23 @@ def main() -> int:
                 print(f"  {week}")
             recent = [row for row in rows if weeks and row.week >= weeks[0].week]
             flags = esculier_check(recent, zone.slug, history=rows)
-            print("\n  Règle Esculier (≤2/10, pas pire le lendemain) :")
+            print(text.TREND_ESCULIER)
             for flag in flags:
                 print(f"    {flag}")
             if not flags:
-                print("    rien à signaler")
+                print(text.TREND_NOTHING)
             print()
         return 0
 
     per_week = eq_hours_per_week(rows, instruments, targets)
     if not per_week:
-        print("Registre vide.")
+        print(text.EMPTY_LEDGER)
         return 0
     if args.week:
         try:
             label = normalize_week(args.week, sorted(per_week))
         except ValueError as exc:
-            raise InputError(f"Semaine refusée — {exc}") from exc
+            raise InputError(f"week refused -- {exc}") from exc
     else:
         label = max(per_week)
 

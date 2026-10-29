@@ -20,7 +20,7 @@ PERSON = Schema("personne", [
 def only(payload, schema=PERSON):
     """The single problem raised, or a failure naming what came instead."""
     problems = schema.errors(payload)
-    assert len(problems) == 1, f"attendu 1 problème, reçu {problems}"
+    assert len(problems) == 1, f"expected 1 problem, got {problems}"
     return problems[0]
 
 
@@ -32,7 +32,7 @@ def test_a_valid_payload_has_no_problem():
 
 
 def test_a_missing_required_field_names_itself():
-    assert only({}) == "champ « name » manquant"
+    assert only({}) == "field 'name' missing"
 
 
 def test_an_optional_field_may_be_absent_or_null():
@@ -42,7 +42,7 @@ def test_an_optional_field_may_be_absent_or_null():
 def test_an_unknown_field_is_an_error_not_a_shrug():
     """A typo silently swallowed is the silent failure this package deletes."""
     assert only({"name": "Sam", "aeg": 33}) == \
-        "champ « aeg » inconnu (attendus : age, name, rank)"
+        "field 'aeg' unknown (expected: age, name, rank)"
 
 
 def test_extra_true_tolerates_the_unknown():
@@ -51,12 +51,12 @@ def test_extra_true_tolerates_the_unknown():
 
 
 def test_the_wrong_type_shows_what_was_received():
-    assert only({"name": 42}) == "champ « name » : texte attendu, entier reçu (42)"
+    assert only({"name": 42}) == "field 'name': text expected, got integer (42)"
 
 
 def test_a_boolean_never_passes_for_an_integer():
     """In Python True IS an int; letting it through would type-check a nonsense."""
-    assert only({"name": "Sam", "age": True}) == "champ « age » : booléen reçu, entier attendu"
+    assert only({"name": "Sam", "age": True}) == "field 'age': got boolean, integer expected"
 
 
 def test_an_integer_is_accepted_where_a_float_is_expected():
@@ -68,24 +68,24 @@ def test_an_integer_is_accepted_where_a_float_is_expected():
 
 def test_choices_list_what_was_expected():
     assert only({"name": "Sam", "rank": "z"}) == \
-        "champ « rank » : 'z' inconnu (attendus : a, b)"
+        "field 'rank': 'z' unknown (expected: a, b)"
 
 
 def test_bounds_say_value_for_a_number():
-    assert only({"name": "Sam", "age": 200}) == "champ « age » : valeur 200, maximum 130"
-    assert only({"name": "Sam", "age": -1}) == "champ « age » : valeur -1, minimum 0"
+    assert only({"name": "Sam", "age": 200}) == "field 'age': value 200, maximum 130"
+    assert only({"name": "Sam", "age": -1}) == "field 'age': value -1, minimum 0"
 
 
 def test_bounds_say_length_for_a_list():
-    """« champ « x » : 0, minimum 1 » would read as a value."""
+    """`field 'x': 0, minimum 1` would read as a value."""
     schema = Schema("x", [field("items", list, minimum=1)])
-    assert schema.errors({"items": []}) == ["champ « items » : longueur 0, minimum 1"]
+    assert schema.errors({"items": []}) == ["field 'items': length 0, minimum 1"]
 
 
 def test_a_pattern_falls_back_on_its_note():
-    dated = Schema("x", [field("day", str, pattern=r"\d{4}-\d{2}-\d{2}", note="AAAA-MM-JJ")])
+    dated = Schema("x", [field("day", str, pattern=r"\d{4}-\d{2}-\d{2}", note="YYYY-MM-DD")])
     assert dated.errors({"day": "25/07"}) == \
-        ["champ « day » : '25/07' ne suit pas le format attendu — AAAA-MM-JJ"]
+        ["field 'day': '25/07' does not follow the expected format — YYYY-MM-DD"]
     assert dated.errors({"day": "2026-07-25"}) == []
 
 
@@ -100,8 +100,8 @@ def test_a_default_fills_in_on_validate_but_not_on_errors():
 def test_list_items_are_checked_one_by_one_and_located():
     schema = Schema("x", [field("scores", list, item=field("s", int, maximum=5))])
     assert schema.errors({"scores": [3, 9, 12]}) == [
-        "champ « scores[1] » : valeur 9, maximum 5",
-        "champ « scores[2] » : valeur 12, maximum 5",
+        "field 'scores[1]': value 9, maximum 5",
+        "field 'scores[2]': value 12, maximum 5",
     ]
 
 
@@ -109,7 +109,7 @@ def test_a_nested_object_is_validated_by_its_own_schema():
     inner = Schema("dose", [field("measure", str, choices=("reps",))])
     outer = Schema("exercice", [field("dose", dict, schema=inner)])
     assert outer.errors({"dose": {"measure": "nope"}}, where="mollet.md") == [
-        "mollet.md : dose : champ « measure » : 'nope' inconnu (attendus : reps)"]
+        "mollet.md: dose: field 'measure': 'nope' unknown (expected: reps)"]
 
 
 def test_every_problem_is_reported_not_the_first():
@@ -125,12 +125,12 @@ def test_the_cross_field_check_runs_only_once_the_fields_are_valid():
         "x", [field("a", int), field("b", int, required=False)],
         check=lambda data: ["a et b s'excluent"] if data.get("b") else [])
     assert schema.errors({"a": "pas un entier", "b": 1}) == \
-        ["champ « a » : entier attendu, texte reçu ('pas un entier')"]
+        ["field 'a': integer expected, got text ('pas un entier')"]
     assert schema.errors({"a": 1, "b": 1}) == ["a et b s'excluent"]
 
 
 def test_where_prefixes_every_message():
-    assert PERSON.errors({}, where="athlete/x.md") == ["athlete/x.md : champ « name » manquant"]
+    assert PERSON.errors({}, where="athlete/x.md") == ["athlete/x.md: field 'name' missing"]
 
 
 # ------------------------------------------------------------------- validate
@@ -139,9 +139,9 @@ def test_validate_raises_with_every_problem_attached():
     with pytest.raises(SchemaError) as caught:
         PERSON.validate({"age": 999})
     assert len(caught.value.problems) == 2
-    assert "donnée invalide" in str(caught.value)
+    assert "invalid data" in str(caught.value)
 
 
 def test_a_payload_that_is_not_an_object_is_refused_readably():
-    assert PERSON.errors(["Sam"]) == ["personne : objet attendu, liste reçue"]
-    assert PERSON.errors(None) == ["personne : objet attendu, NoneType reçu"]
+    assert PERSON.errors(["Sam"]) == ["personne: object expected, got list"]
+    assert PERSON.errors(None) == ["personne: object expected, got NoneType"]

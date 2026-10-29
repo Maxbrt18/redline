@@ -19,6 +19,8 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Any, TypeVar
 
+from redline.coach.fr import dose as text
+
 from .schema import Schema, field
 
 MEASURES = ("reps", "time", "amrap", "contacts")
@@ -39,13 +41,13 @@ def _required(value: _T | None, measure: str, name: str) -> _T:
     into a named refusal -- and lets the type checker see the invariant.
     """
     if value is None:
-        raise ValueError(f"dose « {measure} » : champ « {name} » absent")
+        raise ValueError(f"dose {measure!r}: field {name!r} missing")
     return value
 
 # The session vocabulary, in one place: this is what the athlete reads on the card
 # and on the page.
-FATIGUE = "jusqu'à échec technique"
-PER_SIDE = " / jambe"
+FATIGUE = text.TO_FAILURE
+PER_SIDE = text.PER_LEG
 
 # Every field that accepts a scalar OR a [low, high] pair, with its ceiling.
 # `sets` is in here because the program really prescribes ranges of sets --
@@ -201,8 +203,8 @@ class Dose:
         """The dose as the athlete reads it. Nobody ever reads it back."""
         side = PER_SIDE if self.per_side else ""
         if self.measure == "contacts":
-            block = f", en blocs de {self.block}" if self.block else ""
-            return f"{self.contacts} contacts{block}"
+            block = text.IN_BLOCKS.format(block=self.block) if self.block else ""
+            return text.CONTACTS_BLOCKS.format(contacts=self.contacts, block=block)
         sets = self.sets.human()
         if self.measure == "time":
             duration = _duration(_required(self.seconds, self.measure, "seconds"))
@@ -224,13 +226,13 @@ class Dose:
         """
         data: dict = {"measure": self.measure, "text": self.human(), "slots": self.slots}
         if self.measure == "reps":
-            data["current_text"] = f"{_required(self.reps, self.measure, 'reps').human()} répétitions"
+            data["current_text"] = text.REPETITIONS.format(human=_required(self.reps, self.measure, "reps").human())
         elif self.measure == "time":
             data["current_text"] = _duration(_required(self.seconds, self.measure, "seconds"))
         elif self.measure == "contacts":
-            data["current_text"] = f"{self.block or self.contacts} contacts"
+            data["current_text"] = text.CONTACTS.format(value=self.block or self.contacts)
         else:
-            data["current_text"] = "Jusqu’à échec technique"
+            data["current_text"] = text.TO_FAILURE_CAPITAL
         if self.rest_s:
             data["rest_s"] = self.rest_s
         return data
@@ -246,7 +248,7 @@ def _spans(data: dict) -> list:
         value = data.get(name)
         if value is None:
             continue
-        expected = f"champ « {name} » : un entier ou une paire [bas, haut] attendu"
+        expected = f"field {name!r}: an integer or a pair [low, high] expected"
         if isinstance(value, bool) or not isinstance(value, (int, list)):
             problems.append(expected)
             continue
@@ -255,10 +257,10 @@ def _spans(data: dict) -> list:
                 isinstance(item, bool) or not isinstance(item, int) for item in pair):
             problems.append(expected)
         elif any(item < 1 or item > maximum for item in pair):
-            problems.append(f"champ « {name} » : hors bornes (1 à {maximum})")
+            problems.append(f"field {name!r}: out of bounds (1 to {maximum})")
         elif len(pair) == 2 and pair[0] >= pair[1]:
-            problems.append(f"champ « {name} » : fourchette {pair[0]}-{pair[1]} "
-                            f"— le bas doit être inférieur au haut")
+            problems.append(f"field {name!r}: range {pair[0]}-{pair[1]} -- the low end must be below the high "
+                            "end")
     return problems
 
 
@@ -270,18 +272,17 @@ def _consistency(data: dict) -> list:
     required = REQUIRED_BY_MEASURE.get(measure)
     problems = []
     if required and data.get(required) is None:
-        problems.append(f"mesure « {measure} » : le champ « {required} » est obligatoire")
+        problems.append(f"measure {measure!r}: field {required!r} is required")
     for name in ("reps", "seconds", "contacts"):
         if name != required and data.get(name) is not None:
-            problems.append(f"mesure « {measure} » : le champ « {name} » n'a pas de sens ici")
+            problems.append(f"measure {measure!r}: field {name!r} makes no sense here")
     if data.get("block") is not None:
         if measure != "contacts":
-            problems.append("« block » ne s'emploie qu'avec la mesure « contacts »")
+            problems.append("`block` is only used with the `contacts` measure")
         elif data["contacts"] % data["block"]:
-            problems.append(f"« block » {data['block']} ne divise pas "
-                            f"{data['contacts']} contacts")
+            problems.append(f"`block` {data["block"]} does not divide {data["contacts"]} contacts")
     if measure == "contacts" and data.get("sets") not in (None, 1):
-        problems.append("mesure « contacts » : les contacts se comptent en blocs, pas en séries")
+        problems.append("measure `contacts`: contacts are counted in blocks, not sets")
     return problems
 
 
@@ -296,9 +297,9 @@ DOSE_SCHEMA = Schema(
     [
         field("measure", str, choices=MEASURES),
         # object: a scalar or a [low, high] pair, all three checked by _spans.
-        field("sets", object, required=False, note="nombre de séries"),
-        field("reps", object, required=False, note="répétitions par série"),
-        field("seconds", object, required=False, note="durée d'UNE série"),
+        field("sets", object, required=False, note="number of sets"),
+        field("reps", object, required=False, note="repetitions per set"),
+        field("seconds", object, required=False, note="duration of ONE set"),
         field("contacts", int, required=False, minimum=1, maximum=500),
         field("block", int, required=False, minimum=1, maximum=500),
         field("side", str, required=False, choices=SIDES),

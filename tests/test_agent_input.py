@@ -48,7 +48,7 @@ def test_a_turn_reads_its_own_file_and_its_suffixed_second(tmp_path):
     f"{agent_input.DIRECTORY}/{TURN}.txt",
 ])
 def test_a_turn_cannot_hand_over_any_other_file(tmp_path, path):
-    with pytest.raises(agent_input.AgentInputError, match="ce tour ne lit que"):
+    with pytest.raises(agent_input.AgentInputError, match="this turn only reads"):
         agent_input.resolve(path, root=tmp_path, turn_id=TURN)
 
 
@@ -59,7 +59,7 @@ def test_outside_a_turn_the_operator_passes_any_path(tmp_path):
 
 def test_a_missing_file_says_to_write_it_first(monkeypatch):
     monkeypatch.setenv("REDLINE_TURN_ID", TURN)
-    with pytest.raises(agent_input.AgentInputError, match="écris-le avec Write"):
+    with pytest.raises(agent_input.AgentInputError, match="write it with Write"):
         agent_input.read_json(agent_input.turn_path(TURN))
 
 
@@ -109,7 +109,7 @@ def test_a_resumed_claude_turn_names_its_own_file_in_its_message(make_config):
 def test_a_refused_path_says_how_to_succeed_with_write(tmp_path):
     """A refusal, a forbidden `cp`, an authorized revision abandoned."""
     with pytest.raises(agent_input.AgentInputError,
-                       match=f"Réécris le même JSON avec Write dans "
+                       match=f"this turn only reads "
                              f"{agent_input.DIRECTORY}/{TURN}.json"):
         agent_input.resolve(f"{agent_input.DIRECTORY}/{OTHER}.json",
                             root=tmp_path, turn_id=TURN)

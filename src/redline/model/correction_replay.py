@@ -75,20 +75,20 @@ def entries(text: str) -> list[Correction]:
 def load_ledger(text: str) -> dict[str, dict]:
     rows = json.loads(text)
     if not isinstance(rows, list):
-        raise ReplayFormatError("le registre est une liste d'objets")
+        raise ReplayFormatError("the register is a list of objects")
     ledger: dict[str, dict] = {}
     for row in rows:
         key, mode = row.get("correction"), row.get("replay")
         if not key or mode not in MODES:
-            raise ReplayFormatError(f"entrée invalide : {row!r}")
+            raise ReplayFormatError(f"invalid entry: {row!r}")
         if key in ledger:
-            raise ReplayFormatError(f"correction en double : {key}")
+            raise ReplayFormatError(f"duplicate correction: {key}")
         if mode == "scenario" and not row.get("scenarios"):
-            raise ReplayFormatError(f"{key} : `scenarios` manquant")
+            raise ReplayFormatError(f"{key}: `scenarios` missing")
         if mode == "code" and not row.get("carriers"):
-            raise ReplayFormatError(f"{key} : `carriers` manquant")
+            raise ReplayFormatError(f"{key}: `carriers` missing")
         if mode in ("off-bench", "pending") and not row.get("note"):
-            raise ReplayFormatError(f"{key} : `note` manquante")
+            raise ReplayFormatError(f"{key}: `note` missing")
         ledger[key] = row
     return ledger
 
@@ -114,9 +114,9 @@ def audit(vault: Path, corrections_text: str, today: dt.date,
     unregistered = [c for c in corrections if c.key not in ledger]
     broken = []
     for key, row in ledger.items():
-        broken += [f"{key} : scénario inconnu {name}" for name in row.get("scenarios", [])
+        broken += [f"{key}: unknown scenario {name}" for name in row.get("scenarios", [])
                    if name not in scenario_ids]
-        broken += [f"{key} : porteur absent {path}" for path in row.get("carriers", [])
+        broken += [f"{key}: carrier missing {path}" for path in row.get("carriers", [])
                    if not (vault / path).exists() and not (engine / path).exists()]
     return Audit(
         unregistered=unregistered,

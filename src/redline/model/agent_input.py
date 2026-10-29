@@ -35,7 +35,7 @@ class AgentInputError(InputError):
 def turn_path(turn_id: str, suffix: str = "") -> str:
     """The vault-relative path the service announces to the turn."""
     if suffix and not _SUFFIX.match(suffix):
-        raise AgentInputError(f"suffixe de fichier invalide : {suffix!r}")
+        raise AgentInputError(f"invalid file suffix: {suffix!r}")
     return f"{DIRECTORY}/{turn_id}{'-' + suffix if suffix else ''}.json"
 
 
@@ -61,10 +61,9 @@ def resolve(path: str, *, root: Path | None = None, turn_id: str | None = None) 
         # The refusal says how to succeed: `cp` may be denied by the permission mode,
         # while `Write` is always allowed and is the only gesture to make.
         raise AgentInputError(
-            f"--input : ce tour ne lit que {turn_path(turn_id)} "
-            f"(ou {DIRECTORY}/{turn_id}-<nom>.json), reçu {path}. Réécris le même JSON "
-            f"avec Write dans {turn_path(turn_id)}, puis relance la même commande avec "
-            f"--input {turn_path(turn_id)}")
+            f"--input: this turn only reads {turn_path(turn_id)} (or "
+            f"{DIRECTORY}/{turn_id}-<name>.json), got {path}. Rewrite the same JSON with "
+            "Write to that path, then call the CLI again.")
     return candidate
 
 
@@ -76,8 +75,7 @@ def read_text(path: str | None) -> str:
     try:
         return target.read_text(encoding="utf-8")
     except FileNotFoundError:
-        raise AgentInputError(f"--input : fichier absent ({path}) ; écris-le avec Write "
-                              "avant d'appeler la CLI") from None
+        raise AgentInputError(f"--input: file missing ({path}); write it with Write before calling the CLI") from None
 
 
 def read_json(path: str | None) -> Any:

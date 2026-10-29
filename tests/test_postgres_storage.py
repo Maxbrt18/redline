@@ -171,7 +171,7 @@ def test_a_messenger_observation_can_be_linked_to_strava_once(store):
     assert store.link_activity("messenger:m1:ef", 90000000001) == oid
     assert store.link_activity("messenger:m1:ef", 90000000001) == oid
     assert store.activity_recorded(90000000001) is True
-    with pytest.raises(StorageError, match="déjà rattachée"):
+    with pytest.raises(StorageError, match="already attached"):
         store.link_activity("messenger:m1:ef", 90000000009)
 
 
@@ -194,7 +194,7 @@ def test_same_command_key_with_different_payload_is_refused(store):
     turn_id = "f3483ea2-49ac-4c70-bc6a-0b667af5ce4f"
     payload = {**observation(strava=None), "idempotency_key": "commande-stable"}
     store.stage_command(turn_id, "observation:stable", "observation.add", payload)
-    with pytest.raises(StorageError, match="commande"):
+    with pytest.raises(StorageError, match="command"):
         store.stage_command(turn_id, "observation:stable", "observation.add",
                             {**payload, "note": "autre contenu"})
 
@@ -295,7 +295,7 @@ def test_the_purge_removes_markers_but_keeps_command_idempotence(store):
     assert remaining["markers"] == 1        # the fresh one stays
     assert remaining["commandes"] == 2      # applied or pending: both keys stay
     assert remaining["observations"] == 1   # no FACT is touched
-    with pytest.raises(StorageError, match="collision d'idempotence"):
+    with pytest.raises(StorageError, match="idempotency collision"):
         store.stage_command(
             "8f0f98df-a68c-44bd-9dc3-80e240775fa8", "observation:vieille",
             "observation.add",
@@ -595,12 +595,12 @@ def test_a_removed_gate_requires_an_existing_canonical_observation(store):
 
     second = build_revision(
         2, sessions=[], computed_at="2026-08-14T09:10:00+02:00", gates=[])
-    with pytest.raises(StorageError, match="retiré sans résolution typée"):
+    with pytest.raises(StorageError, match="removed without a typed resolution"):
         store.append_plan_revision("2026-W33", second)
 
     second["evidence"] = [
         "gate:w33-knee=observation:messenger:2026-08-14:reveil"]
-    with pytest.raises(StorageError, match="observation canonique inconnue"):
+    with pytest.raises(StorageError, match="unknown canonical observation"):
         store.append_plan_revision("2026-W33", second)
 
     store.add_observation({
@@ -660,7 +660,7 @@ def test_a_load_increase_waits_for_and_consumes_one_challenge(store):
     store.append_plan_revision("2026-W33", first)
     increased = build_revision(2, sessions=[session(distance_target_km=8, distance_cap_km=9)],
                                computed_at="2026-08-10T19:10:00+02:00")
-    with pytest.raises(StorageError, match="hausse de charge bloquée"):
+    with pytest.raises(StorageError, match="load increase blocked"):
         store.append_plan_revision("2026-W33", increased)
 
     store.upsert_prediction({
@@ -682,12 +682,12 @@ def test_a_prediction_resolved_without_its_observation_is_rectified_to_void(stor
     store.upsert_prediction({
         "prediction_key": "w40-dim", "domain": "charge", "statement": "trace à la base",
         "probability": .65, "due_on": dt.date(2026, 10, 5)})
-    with pytest.raises(StorageError, match="seule une prédiction soldée"):
+    with pytest.raises(StorageError, match="only a settled prediction"):
         store.upsert_prediction({"prediction_key": "w40-dim", "operation": "rectify",
                                  "reason": "condition non tenue"})
     store.upsert_prediction({"prediction_key": "w40-dim", "operation": "resolve",
                              "outcome": False})
-    with pytest.raises(StorageError, match="exige son motif"):
+    with pytest.raises(StorageError, match="requires its reason"):
         store.upsert_prediction({"prediction_key": "w40-dim", "operation": "rectify",
                                  "reason": " "})
     store.upsert_prediction({"prediction_key": "w40-dim", "operation": "rectify",
@@ -736,7 +736,7 @@ def test_a_sealed_permit_choice_creates_its_prediction_and_cannot_be_rewritten(s
     prediction = next(row for row in store.prediction_rows()
                       if row["prediction_key"] == "easy-permit-w40-mar-ef")
     assert prediction["domain"] == "easy-permit" and prediction["status"] == "open"
-    with pytest.raises(StorageError, match="ne se corrige pas"):
+    with pytest.raises(StorageError, match="it is not corrected"):
         store.seal_permit_choice({**choice, "coach_minutes": 50})
 
 
@@ -752,7 +752,7 @@ def test_a_typed_unavailability_blocks_a_demanding_session(store):
     })
     candidate = build_revision(1, sessions=[session(
         "w32-mer-sl", "2026-08-05", "long")])
-    with pytest.raises(StorageError, match="indisponibilité typée examens"):
+    with pytest.raises(StorageError, match="typed unavailability examens"):
         store.append_plan_revision("2026-W32", candidate)
 
 
@@ -1189,7 +1189,7 @@ def test_review_rejects_another_persons_answer_and_rolls_back_a_failed_turn(stor
     question = "La blessure au réveil ?"
     _ask(store, state, question, "q")
     state.claim_inbound("foreign", "9999", "text", "aucune gêne")
-    with pytest.raises(ValueError, match="appartenir"):
+    with pytest.raises(ValueError, match="cannot belong"):
         _review_question(store, question, "foreign")
     state.claim_inbound("own", "4242", "text", "aucune gêne")
     payload = _review_question(store, question, "own", "open")
@@ -1304,7 +1304,7 @@ def test_conversation_search_uses_registered_turn_scope(store):
 
     results = store.conversation_search_for_turn(turn_id, "talon")
     assert [row["hit"]["body"] for row in results] == ["Mon talon va mieux"]
-    with pytest.raises(ValueError, match="absent ou expiré"):
+    with pytest.raises(ValueError, match="missing or expired"):
         store.conversation_search_for_turn(str(uuid.uuid4()), "knee")
 
 
@@ -1369,14 +1369,14 @@ def test_same_capability_same_day_is_refused_not_announced(store):
 
     changed = _capability_cli("--next-test", "W44")
     assert changed.returncode != 0
-    assert "une évaluation existe déjà pour la capacité 5 au 2026-10-11" in changed.stderr
+    assert "an evaluation already exists for capability 5 on 2026-10-11" in changed.stderr
     assert "next_test" in changed.stderr and "enregistré." not in changed.stdout
 
     staged = _capability_cli("--next-test", "W44",
                              turn_id="0b7f2d4e-9a51-4c3e-8f6d-2e1a7c9b5d30")
     assert staged.returncode != 0
     assert "préparé pour le tour" not in staged.stdout
-    assert "une évaluation existe déjà" in staged.stderr
+    assert "an evaluation already exists" in staged.stderr
 
     [latest] = store.latest_capabilities()
     assert latest["next_test"] == "W42"
@@ -1453,12 +1453,12 @@ def test_the_cli_refuses_to_patch_a_key_that_does_not_exist(store):
 
 def test_an_unknown_turn_command_is_refused(store):
     turn_id = "01d5be59-401b-4268-a418-e24d56029fbe"
-    with pytest.raises(StorageError, match="PostgreSQL refusée"):
+    with pytest.raises(StorageError, match="PostgreSQL transaction refused"):
         store.stage_command(turn_id, "unknown", "unknown.command", {})
 
 
 def test_retired_turn_kind_is_historical_only(store):
-    with pytest.raises(StorageError, match="PostgreSQL refusée"):
+    with pytest.raises(StorageError, match="PostgreSQL transaction refused"):
         store.stage_command(
             "01d5be59-401b-4268-a418-e24d56029fbe", "retired",
             "proactive_message.add", {})
@@ -1505,7 +1505,7 @@ def test_a_bad_gate_resolution_is_refused_before_it_can_cancel_same_turn_facts(s
     })
     second = build_revision(
         2, sessions=[], computed_at="2026-08-14T09:10:00+02:00", gates=[])
-    with pytest.raises(StorageError, match="retiré sans résolution typée"):
+    with pytest.raises(StorageError, match="removed without a typed resolution"):
         store.stage_command(turn_id, "plan:2026-W33:r2", "plan.revise", {
             "week": "2026-W33", "revision": second})
 
@@ -1900,7 +1900,7 @@ def test_an_invalid_revision_is_still_refused_at_write_time(store):
     """Facts are unconditional, plans are NOT: writing an invalid program remains a write
     fault, reported before the coach's reply."""
     turn_id = "5b2f9d4c-8c2e-4d3b-9e3f-8c3f4d5e6f71"
-    with pytest.raises(StorageError, match="invalide"):
+    with pytest.raises(StorageError, match="invalid"):
         store.stage_command(turn_id, "plan:2026-W33:r1", "plan.revise", {
             "week": "2026-W33",
             "revision": {
@@ -2061,7 +2061,7 @@ def test_a_revision_that_cancels_a_session_without_a_typed_premise_is_refused(
                         evidence=["observation:2026-08-04-reveil"], changes=[change])
     for command in ("preview", "revise"):
         monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(cut)))
-        with pytest.raises(SchemaError, match="sans prémisse typée"):
+        with pytest.raises(SchemaError, match="without a typed premise"):
             cli._database_command(store, command, "2026-W32", False)
     assert len(store.load_plan("2026-W32")["revisions"]) == 1
 
@@ -2456,16 +2456,16 @@ def test_a_wake_prediction_settles_itself_when_the_notebook_writes_the_trace(sto
 def test_a_wake_prediction_is_written_before_its_outcome_and_reads_a_closed_rule(store):
     day = dt.date(2026, 10, 12)
     _wake(store, day, 0.0)
-    with pytest.raises(StorageError, match="existe déjà"):
+    with pytest.raises(StorageError, match="already exists"):
         _bound(store, "trop-tard", day)
-    with pytest.raises(StorageError, match="critère de réussite illisible"):
+    with pytest.raises(StorageError, match="unreadable success criterion"):
         _bound(store, "illisible", day + dt.timedelta(days=1), success_if="peu")
-    with pytest.raises(StorageError, match="observation de solde inconnue"):
+    with pytest.raises(StorageError, match="unknown settling observation"):
         store.upsert_prediction({
             "prediction_key": "inconnue", "domain": "corps", "statement": "x",
             "probability": .5, "due_on": day,
             "resolves_on": {"kind": "seance", "date": day.isoformat(), "success_if": "<=1"}})
-    with pytest.raises(StorageError, match="après l'échéance"):
+    with pytest.raises(StorageError, match="after the prediction's due date"):
         store.upsert_prediction({
             "prediction_key": "apres", "domain": "corps", "statement": "x",
             "probability": .5, "due_on": day,
@@ -2505,9 +2505,9 @@ def test_each_watched_zone_gets_its_own_reading(store):
     assert row["pains"] == {"talon": {"state": "known", "value": 2.5},
                             "knee": {"state": "pending", "value": None}}
     store.complete_measurement(observation_id, "pain", 1.0, zone="knee")
-    with pytest.raises(StorageError, match="déjà connue"):
+    with pytest.raises(StorageError, match="already known"):
         store.complete_measurement(observation_id, "pain", 3.0, zone="talon")
-    with pytest.raises(StorageError, match="nomme la zone"):
+    with pytest.raises(StorageError, match="name the zone"):
         store.complete_measurement(observation_id, "pain", 3.0)
 
 
@@ -2518,7 +2518,7 @@ def test_a_zone_the_instance_no_longer_watches_is_refused_but_its_history_stays(
     store.sync_pain_zones([("talon", "Talon")])
     assert [(zone["slug"], zone["active"]) for zone in store.pain_zones()] == [
         ("talon", True), ("knee", False)]
-    with pytest.raises(StorageError, match="inconnue ou inactive"):
+    with pytest.raises(StorageError, match="unknown or inactive"):
         store.add_observation({
             "occurred_on": dt.date(2026, 10, 13), "kind": "easy",
             "idempotency_key": "zones:new", "measurements": {},
@@ -2540,7 +2540,7 @@ def test_without_a_watched_zone_an_effort_claims_no_pain(store):
 def test_a_wake_prediction_waits_for_the_zone_it_names(store):
     _second_zone(store)
     day = dt.date(2026, 10, 12)
-    with pytest.raises(StorageError, match="nomme sa zone"):
+    with pytest.raises(StorageError, match="names its zone"):
         _bound(store, "sans-zone", day)
     store.upsert_prediction({
         "prediction_key": "talon-calme", "domain": "corps", "statement": "talon calme",

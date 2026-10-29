@@ -145,7 +145,7 @@ class Strength(StoreBase):
         active = self._active_zones_in(connection)
         for zone, moments in (payload.get("pains") or {}).items():
             if zone not in active:
-                raise StorageError(f"zone de douleur inconnue ou inactive : {zone}")
+                raise StorageError(f"unknown or inactive pain zone: {zone}")
             for moment in ("before", "after"):
                 if moments.get(moment) is not None:
                     connection.execute(strength_pain_readings.insert().values(

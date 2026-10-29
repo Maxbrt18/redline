@@ -26,6 +26,8 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
+from redline.coach.fr import rulebook as text
+
 from . import paths
 from .errors import ConfigError
 from .schema import Schema, SchemaError, field
@@ -51,9 +53,9 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
         field("stall_weeks", int, minimum=1, maximum=12),
         field("stall_tolerance_km", float, minimum=0, maximum=5),
         field("wake_trace_until", str, pattern=r"([01]\d|2[0-3]):[0-5]\d",
-              note="heure locale HH:MM"),
-        field("assimilation_weeks", list, item=field("semaine", str, pattern=WEEK,
-                                                     note="semaine ISO, ex. 2030-W35")),
+              note="local time HH:MM"),
+        field("assimilation_weeks", list, item=field("week", str, pattern=WEEK,
+                                                     note="ISO week, e.g. 2030-W35")),
     ])),
     field("transitions", list, minimum=1, maximum=12, item=field(
         "transition", dict, schema=Schema("[[transitions]]", [
@@ -63,7 +65,7 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
             field("quality", bool, required=False),
         ]))),
     field("rules", list, minimum=1, maximum=20, item=field(
-        "règle", dict, schema=Schema("[[rules]]", [
+        "rule", dict, schema=Schema("[[rules]]", [
             field("id", str, pattern=r"[a-z0-9]{1,4}"),
             field("title", str, minimum=1, maximum=40),
             field("text", str, minimum=1, maximum=400),
@@ -155,10 +157,9 @@ class Rulebook:
 
     def render(self) -> str:
         """The block injected to the coach: the rule in force, never its history."""
-        lines = ["[RÈGLEMENT EN VIGUEUR, invisible, ne pas réciter. Il fait foi sur toute "
-                 "formulation plus ancienne ; le raisonnement vit chez le propriétaire.]"]
+        lines = [text.BLOCK_OPEN]
         lines.extend("- " + rule.line() for rule in self.rules)
-        lines.append("[/RÈGLEMENT]")
+        lines.append(text.BLOCK_CLOSE)
         return "\n".join(lines)
 
 
@@ -170,7 +171,7 @@ def parse(text: str, source: Path) -> Rulebook:
     try:
         payload = tomllib.loads(text)
     except tomllib.TOMLDecodeError as exc:
-        raise RulebookError(f"{source} illisible : {exc}") from None
+        raise RulebookError(f"{source} unreadable: {exc}") from None
     try:
         RULEBOOK_SCHEMA.validate(payload, str(source))
     except SchemaError as exc:
@@ -183,20 +184,19 @@ def parse(text: str, source: Path) -> Rulebook:
            for name in ("gate_effort_peak", "hard_min_hours", "stall_tolerance_km")}})
     problems = []
     for what, values in (("transition", [entry["slug"] for entry in payload["transitions"]]),
-                         ("règle", [entry["id"] for entry in payload["rules"]])):
+                         ("rule", [entry["id"] for entry in payload["rules"]])):
         if doubled := _duplicates(values):
-            problems.append(f"{what} en double : {', '.join(doubled)}")
+            problems.append(f"duplicate {what}: {', '.join(doubled)}")
     ids = {entry["id"] for entry in payload["rules"]}
     if missing := [rule for rule in ENFORCED if rule not in ids]:
-        problems.append("règle appliquée par le moteur absente du règlement : "
+        problems.append("rule enforced by the engine missing from the rulebook: "
                         + ", ".join(missing))
     spoken = parameters.spoken()
     rules = []
     for entry in payload["rules"]:
         cited = {name for _, name, _, _ in string.Formatter().parse(entry["text"]) if name}
         if unknown := sorted(cited - spoken.keys()):
-            problems.append(f"règle {entry['id']} : seuil inconnu {', '.join(unknown)} "
-                            f"(connus : {', '.join(sorted(spoken))})")
+            problems.append(f"rule {entry["id"]}: unknown threshold {", ".join(unknown)} (known: {", ".join(sorted(spoken))})")
             continue
         rules.append(Rule(**{**entry, "text": entry["text"].format_map(spoken)}))
     if problems:

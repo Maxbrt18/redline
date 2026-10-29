@@ -69,7 +69,7 @@ def test_the_plan_schema_types_the_transition():
     weekly_plan.validate(plan([session(transition="night")]))
     two = [session("w32-mar-ef", "2026-08-04", transition="night"),
            session("w32-jeu-ef", "2026-08-06", transition="terrain")]
-    with pytest.raises(SchemaError, match="transitions dans la semaine"):
+    with pytest.raises(SchemaError, match="transitions in the week"):
         weekly_plan.validate(plan(two))
 
 

@@ -38,12 +38,12 @@ def test_a_real_note_loads_with_its_identity(tmp_path):
 def test_a_scalar_where_a_list_belongs_is_refused():
     """The exact distinction a regex on the frontmatter cannot make."""
     problems = CAPABILITY_SCHEMA.errors({**VALID, "aliases": "durabilité"}, "cap1")
-    assert any("aliases" in p and "liste attendue" in p for p in problems)
+    assert any("aliases" in p and "list expected" in p for p in problems)
 
 
 def test_an_unknown_field_is_an_error_not_a_shrug():
     problems = CAPABILITY_SCHEMA.errors({**VALID, "score": 2}, "cap1")
-    assert any("score" in p and "inconnu" in p for p in problems)
+    assert any("score" in p and "unknown" in p for p in problems)
 
 
 def test_a_missing_field_is_named(tmp_path):

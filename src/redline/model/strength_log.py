@@ -25,6 +25,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from redline.coach.fr import strength_log as text
+
 from .views import csv_rows as rows
 
 COLUMNS = ("date", "sid", "workout", "slug", "both", "right", "left", "score", "skipped",
@@ -63,18 +65,18 @@ def human(row: dict, limit: int = 64) -> str:
     readable line, and the page formats nothing.
     """
     if row.get("status") == "gated":
-        return "retiré — douleur"
+        return text.GATED
     if row.get("skipped"):
-        return "pas fait"
+        return text.SKIPPED
     parts = []
-    for label, column in (("D", "right"), ("G", "left")):
+    for label, column in ((text.RIGHT, "right"), (text.LEFT, "left")):
         if row.get(column):
             parts.append(f"{label} {'·'.join(str(n) for n in series(row[column]))}")
     if row.get("both"):
         parts.append("·".join(str(n) for n in series(row["both"])))
     line = " · ".join(parts)
     if row.get("status") == "partial":
-        line = f"partiel · {line}" if line else "partiel"
+        line = text.PARTIAL_LINE.format(line=line) if line else text.PARTIAL
     if row.get("score"):
         line = f"{line} — {row['score']}/10" if line else f"{row['score']}/10"
     return line[:limit]

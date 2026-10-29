@@ -46,51 +46,51 @@ CAPABILITY_ICONS = ("run", "descent", "food", "night", "pain", "mind")
 INSTANCE_SCHEMA = Schema("redline.toml", [
     field("athlete", dict, schema=Schema("[athlete]", [
         field("name", str, minimum=1, maximum=40,
-              note="le prénom que le coach emploie dans ses messages"),
+              note="the first name the coach uses in its messages"),
         field("hr_rest", int, minimum=30, maximum=100,
-              note="la FC de repos, en bpm : la base des zones Karvonen"),
+              note="resting heart rate, in bpm: the base of the Karvonen zones"),
         field("hr_max", int, minimum=120, maximum=230,
-              note="la FC max, en bpm, mesurée ou estimée"),
+              note="maximum heart rate, in bpm, measured or estimated"),
         field("timezone", str, minimum=1, maximum=64,
-              note="le fuseau IANA où vit l'athlète, ex. « Europe/Paris »"),
+              note="the IANA time zone the athlete lives in, e.g. Europe/Paris"),
         field("locale", str, required=False, minimum=2, maximum=20,
-              note="la locale des dates et des listes, ex. « fr_FR » ou « fr_CA »"),
+              note="the locale of dates and lists, e.g. fr_FR or fr_CA"),
     ])),
     field("notebook", dict, schema=Schema("[notebook]", [
         field("place", str, minimum=1, maximum=80,
-              note="le lieu de la météo des séances sans lieu déclaré"),
+              note="where the weather is read for sessions without a declared place"),
     ])),
     # Zero or more zones: an athlete with no injury has nothing to declare.
     field("injuries", list, required=False, item=field(
         "zone", dict, schema=Schema("[[injuries]]", [
             field("slug", str, pattern=SLUG),
             field("label", str, minimum=1, maximum=40,
-                  note="le nom affiché de la zone surveillée, ex. « Genou »"),
+                  note="the displayed name of the monitored zone, e.g. Knee"),
         ]))),
     field("capabilities", list, minimum=1, maximum=9, item=field(
-        "capacité", dict, schema=Schema("[[capabilities]]", [
+        "capability", dict, schema=Schema("[[capabilities]]", [
             field("slug", str, pattern=SLUG),
             field("label", str, minimum=1, maximum=30),
             field("icon", str, required=False, choices=CAPABILITY_ICONS,
-                  note="le pictogramme de la capacité dans le carnet"),
+                  note="the capability's pictogram in the notebook"),
         ]))),
     field("ledger", dict, required=False, schema=Schema("[ledger]", [
         field("complete_from", str, required=False, pattern=r"\d{4}-\d{2}-\d{2}",
-              note="le premier jour dont les séances doivent être complètes ; les "
-                   "précédentes ne sont jamais réclamées"),
+              note=("the first day whose sessions must be complete; earlier ones are never asked "
+                    "for")),
     ])),
     # What `redline vault-check` holds the vault to; without it, nothing is checked for it.
     field("vault", dict, required=False, schema=Schema("[vault]", [
         field("note_types", list, required=False, item=field(
             "type", str, minimum=1, maximum=40),
-              note="les valeurs admises du champ `type` d'une note"),
+              note="the allowed values of a note's `type` field"),
         field("budget", list, required=False, item=field(
-            "étage", dict, schema=Schema("[[vault.budget]]", [
+            "tier", dict, schema=Schema("[[vault.budget]]", [
                 field("tier", str, minimum=1, maximum=40,
-                      note="quand ces fichiers se paient, ex. « per-turn »"),
+                      note="when these files are paid for, e.g. per-turn"),
                 field("total", int, minimum=1, maximum=100_000),
                 field("files", list, minimum=1, item=field(
-                    "fichier", dict, schema=Schema("files", [
+                    "file", dict, schema=Schema("files", [
                         field("path", str, minimum=1, maximum=200),
                         field("words", int, minimum=1, maximum=100_000),
                     ]))),
@@ -165,7 +165,7 @@ def placeholders(payload: Any, where: str = "") -> list[str]:
         return [problem for index, value in enumerate(payload)
                 for problem in placeholders(value, f"{where}[{index}]")]
     if isinstance(payload, str) and PLACEHOLDER.search(payload):
-        return [f"champ « {where} » : {payload!r} est encore à remplir"]
+        return [f'field {where!r}: {payload!r} is still to be filled in']
     return []
 
 
@@ -173,18 +173,16 @@ def _timezone(name: str) -> ZoneInfo:
     try:
         return ZoneInfo(name)
     except (ZoneInfoNotFoundError, ValueError):
-        raise InstanceError(f"{FILENAME} : fuseau inconnu « {name} » (nom IANA attendu, "
-                            "ex. « Europe/Paris »)") from None
+        raise InstanceError(f"{FILENAME}: unknown time zone {name!r} (IANA name expected, e.g. Europe/Paris)") from None
 
 
 def _locale(name: str) -> str:
     try:
         language = Locale.parse(name).language
     except (UnknownLocaleError, ValueError):
-        raise InstanceError(f"{FILENAME} : locale inconnue « {name} » (ex. « fr_FR »)") from None
+        raise InstanceError(f"{FILENAME}: unknown locale {name!r} (e.g. fr_FR)") from None
     if language not in LANGUAGES:
-        raise InstanceError(f"{FILENAME} : locale « {name} » sans textes du coach "
-                            f"(langues disponibles : {', '.join(LANGUAGES)})")
+        raise InstanceError(f"{FILENAME}: locale {name!r} has no coach texts (available languages: {", ".join(LANGUAGES)})")
     return name
 
 
@@ -192,12 +190,12 @@ def parse(text: str) -> Instance:
     try:
         payload = tomllib.loads(text)
     except tomllib.TOMLDecodeError as exc:
-        raise InstanceError(f"{FILENAME} illisible : {exc}") from None
+        raise InstanceError(f"{FILENAME} unreadable: {exc}") from None
     # Placeholders first: `hr_max = "[FC max]"` is a field to fill in, not a type error
     # to decipher.
     unfilled = placeholders(payload)
     if unfilled:
-        raise InstanceError("\n  - ".join([f"{FILENAME} incomplet :", *unfilled]))
+        raise InstanceError("\n  - ".join([f"{FILENAME} incomplete:", *unfilled]))
     try:
         INSTANCE_SCHEMA.validate(payload)
     except SchemaError as exc:
@@ -205,11 +203,11 @@ def parse(text: str) -> Instance:
     athlete = payload["athlete"]
     slugs = [entry["slug"] for entry in payload["capabilities"]]
     if len(set(slugs)) != len(slugs):
-        raise InstanceError(f"{FILENAME} : slug de capacité en double ({', '.join(slugs)})")
+        raise InstanceError(f"{FILENAME}: duplicate capability slug ({", ".join(slugs)})")
     injuries = payload.get("injuries", [])
     zones = [entry["slug"] for entry in injuries]
     if len(set(zones)) != len(zones):
-        raise InstanceError(f"{FILENAME} : zone surveillée en double ({', '.join(zones)})")
+        raise InstanceError(f"{FILENAME}: duplicate monitored zone ({", ".join(zones)})")
     vault = payload.get("vault", {})
     ledger = payload.get("ledger", {})
     budget = tuple(Tier(tier["tier"], tier["total"],
@@ -217,7 +215,7 @@ def parse(text: str) -> Instance:
                    for tier in vault.get("budget", []))
     problems = ceiling_errors(budget)
     if problems:
-        raise InstanceError("\n  - ".join([f"{FILENAME} : budget de lecture incohérent :",
+        raise InstanceError("\n  - ".join([f'{FILENAME}: inconsistent reading budget:',
                                              *problems]))
     return Instance(
         athlete_name=athlete["name"],
@@ -241,5 +239,6 @@ def load(vault: Path) -> Instance:
     path = vault / FILENAME
     if not path.is_file():
         raise InstanceError(
-            f"{path} absent : copie {EXAMPLE} du moteur à la racine du vault, puis remplis-le")
+            f'{path} missing: copy {EXAMPLE} from the engine to the vault root, then fill it'
+             " in")
     return parse(path.read_text(encoding="utf-8"))

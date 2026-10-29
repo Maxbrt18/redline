@@ -28,6 +28,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from redline.analysis import ledger as gauge
+from redline.coach.fr import signals as text
 from redline.model import (
     paths,
     session_kinds,
@@ -71,7 +72,7 @@ class Signal:
     detail: str
 
     def __str__(self) -> str:
-        return f"  ⚑ {self.label} — {self.detail}"
+        return text.FLAG.format(label=self.label, detail=self.detail)
 
 
 def _weeks(rows: list, count: int) -> list:
@@ -141,9 +142,7 @@ class HrDrift:
 
     def __str__(self) -> str:
         minutes, seconds = divmod(round(self.pace_s), 60)
-        return (f"{self.date:%d/%m} à {minutes}:{seconds:02d}/km : {self.hr:.0f} bpm "
-                f"contre {self.reference:.0f} (médiane de {self.n} EF voisines, "
-                f"{self.delta:+.0f})")
+        return (text.HR_AT_PACE.format(date=self.date, minutes=minutes, seconds=seconds, hr=self.hr, reference=self.reference, n=self.n, delta=self.delta))
 
 
 def _flat_easy_runs(rows: list) -> list:
@@ -188,18 +187,15 @@ def signals(rows: list, weeks: list, intentional_keys: frozenset[str]) -> list:
         (_, before), (label, now) = cadences[-2], cadences[-1]
         if now - before >= CADENCE_JUMP:
             found.append(Signal(
-                "cadence en hausse à allure facile",
-                f"{before:.0f} → {now:.0f} pas/min ({label}). Cause inconnue : vérifier "
-                "d'abord si la cadence était prescrite ou volontaire, puis le terrain, "
-                "l'allure, la facilité du geste et la douleur"))
+                text.CADENCE_UP,
+                text.CADENCE_UP_DETAIL.format(before=before, now=now, label=label)))
 
     drifts = hr_at_pace(rows)
     recent = [drift for drift in drifts if drift_week(drift) in weeks]
     if len(recent) >= 2 and all(drift.delta >= HR_DRIFT_BPM for drift in recent[-2:]):
         found.append(Signal(
-            "FC haute à allure comparable, deux EF de suite",
-            " ; ".join(str(drift) for drift in recent[-2:]) + ". Vérifier d'abord sommeil, maladie, chaleur "
-            "non mesurée et terrain : un signal n'est pas une cause"))
+            text.HR_HIGH,
+            " ; ".join(str(drift) for drift in recent[-2:]) + text.HR_HIGH_DETAIL))
 
     return found
 
@@ -211,11 +207,11 @@ def drift_week(drift: HrDrift) -> str:
 
 def render(rows: list, weeks: list, intentional_keys: frozenset[str],
            today: dt.date | None = None) -> str:
-    lines = ["", f"  Signaux faibles — {weeks[0]} → {weeks[-1]}", ""]
-    lines.append("  Cadence (EF/SL, pas/min)   " + " · ".join(
+    lines = ["", text.TITLE.format(first=weeks[0], last=weeks[-1]), ""]
+    lines.append(text.CADENCE_ROW + " · ".join(
         f"{label[-3:]} {value:.0f}" if value else f"{label[-3:]} —"
         for label, value, _ in cadence_at_easy_pace(rows, weeks, intentional_keys)))
-    lines.append("  Plus longue (km)           " + " · ".join(
+    lines.append(text.LONGEST_ROW + " · ".join(
         f"{label[-3:]} {value:.1f}" if value else f"{label[-3:]} —"
         for label, value in longest_run(rows, weeks)))
     # The slope: scenario 9 reads on weeks that no longer progress.
@@ -223,14 +219,14 @@ def render(rows: list, weeks: list, intentional_keys: frozenset[str],
     if stall:
         lines.append(f"  {stall}")
     drifts = [drift for drift in hr_at_pace(rows) if drift_week(drift) in weeks]
-    lines.append("  FC à allure (EF plates)    " + (" · ".join(
+    lines.append(text.HR_AT_PACE_ROW + (" · ".join(
         f"{drift.date:%d/%m} {drift.delta:+.0f}" for drift in drifts)
-        or "aucune EF comparable"))
+        or text.NO_COMPARABLE))
     found = signals(rows, weeks, intentional_keys)
     lines += ["", *[str(signal) for signal in found]] if found else [
-        "", "  Rien à signaler sur ces semaines."]
-    lines += ["", "  Les 4 contrôles Strava du § D (allure en descente, parcours écourtés,",
-              "  pauses en fin de sortie, longueur des notes) restent à lire chez Strava.", ""]
+        "", text.NOTHING]
+    lines += ["", text.STRAVA_CHECKS,
+              text.STRAVA_CHECKS_END, ""]
     return "\n".join(lines)
 
 
@@ -246,7 +242,7 @@ def main() -> int:
     intentional = intentional_cadence_keys(store)
     weeks = _weeks(rows, args.weeks)
     if not weeks:
-        print("Registre vide : rien à lire.")
+        print(text.EMPTY_LEDGER)
         return 1
     print(render(rows, weeks, intentional))
     return 0

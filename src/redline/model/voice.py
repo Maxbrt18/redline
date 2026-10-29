@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import re
 
+from redline.coach.fr import voice as wording
+
 EMOJI = re.compile("[\U0001F000-\U0001FAFF☀-➿️‍]")
 _SPACES = re.compile(r"[ \t]{2,}")
 
@@ -22,4 +24,4 @@ def muted(text: str) -> str:
     """The coach message as it is reread: without emoji."""
     plain = EMOJI.sub("", text).strip()
     plain = _SPACES.sub(" ", plain).replace(" .", ".").replace(" ,", ",").strip()
-    return plain[:1].upper() + plain[1:] if plain else "(réaction sans texte)"
+    return plain[:1].upper() + plain[1:] if plain else wording.REACTION_WITHOUT_TEXT

@@ -9,6 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Connection
 
+from redline.coach.fr import gear as gear_text
 from redline.model.vocabulary import ThreadStatus
 
 from ..database import StorageError
@@ -75,9 +76,8 @@ class Facts(StoreBase):
         differing = [key for key in values if existing[key] != values[key]]
         if differing:
             raise StorageError(
-                f"une évaluation existe déjà pour la capacité {values['capability_number']} "
-                f"au {values['evaluated_on']} (champs différents : {', '.join(differing)}) ; "
-                "elle est immuable : date la nouvelle évaluation du jour où elle est faite")
+                f"an evaluation already exists for capability {values["capability_number"]} on "
+                f"{values["evaluated_on"]} (different fields: {", ".join(differing)})")
         return False
 
     def add_thread_in(self, connection: Connection, row: dict,
@@ -151,13 +151,13 @@ class Facts(StoreBase):
         try:
             distance_km = float(row["distance_km"])
         except (KeyError, TypeError, ValueError) as exc:
-            raise StorageError("kilométrage Strava du matériel invalide") from exc
+            raise StorageError("invalid Strava gear mileage") from exc
         if not gear_id or not name or distance_km < 0:
-            raise StorageError("identité ou kilométrage Strava du matériel invalide")
+            raise StorageError("invalid Strava gear identity or mileage")
         now = dt.datetime.now(dt.UTC)
         insert_values = {
             "gear_id": gear_id, "athlete_id": self.athlete_id, "name": name,
-            "role": "à qualifier", "retire_at_km": 650,
+            "role": gear_text.ROLE_UNSET, "retire_at_km": 650,
             "strava_distance_km": distance_km, "distance_synced_at": now,
             "primary": bool(row.get("primary")),
             "status": "retired" if bool(row.get("retired")) else "active",
@@ -215,7 +215,7 @@ class Facts(StoreBase):
                               *RESOLUTION_COLUMNS)
                 if any(_plain(existing[key]) != _plain(values[key]) for key in comparable):
                     raise StorageError(
-                        f"collision d'idempotence pour la prédiction {row['prediction_key']!r}")
+                        f"idempotency collision for prediction {row["prediction_key"]!r}")
                 return
             if values["resolves_kind"] is not None:
                 values["resolves_zone"] = self._prediction_zone_in(
@@ -224,14 +224,14 @@ class Facts(StoreBase):
                     connection, values["resolves_kind"], values["resolves_on"],
                     values["resolves_zone"]) is not None:
                 raise StorageError(
-                    f"l'observation {values['resolves_kind']} du {values['resolves_on']} "
-                    "existe déjà : une prédiction s'écrit avant son issue")
+                    f"observation {values["resolves_kind"]} of {values["resolves_on"]} already exists: a prediction is "
+                    "written before its outcome")
             connection.execute(coach_predictions.insert().values(**values))
             aggregate_id = values["id"]
             action = "prediction.created"
         elif operation == "resolve":
             if existing is None:
-                raise StorageError(f"prédiction inconnue : {row['prediction_key']}")
+                raise StorageError(f"unknown prediction: {row["prediction_key"]}")
             if existing["status"] != "open":
                 return
             now = dt.datetime.now(dt.UTC)
@@ -254,14 +254,14 @@ class Facts(StoreBase):
             # a reason. Never the reverse, and never true <-> false: a score flipped
             # after the fact is no longer a calibration.
             if existing is None:
-                raise StorageError(f"prédiction inconnue : {row['prediction_key']}")
+                raise StorageError(f"unknown prediction: {row["prediction_key"]}")
             if existing["status"] == "void":
                 return
             if existing["status"] != "resolved":
-                raise StorageError("seule une prédiction soldée se rectifie ; "
-                                   "une prédiction ouverte se solde avec --outcome void")
+                raise StorageError("only a settled prediction can be corrected; an open prediction is settled with"
+                                   " --outcome void")
             if not (row.get("reason") or "").strip():
-                raise StorageError("une rectification exige son motif")
+                raise StorageError("a correction requires its reason")
             connection.execute(coach_predictions.update().where(
                 coach_predictions.c.id == existing["id"]).values(
                     status="void", outcome=None, brier_score=None, outcome_reason=None))
@@ -269,14 +269,14 @@ class Facts(StoreBase):
             action = "prediction.rectified"
         elif operation == "challenge":
             if existing is None:
-                raise StorageError(f"prédiction inconnue : {row['prediction_key']}")
+                raise StorageError(f"unknown prediction: {row["prediction_key"]}")
             connection.execute(coach_predictions.update().where(
                 coach_predictions.c.id == existing["id"]).values(
                     challenge=row["challenge"], challenged_at=dt.datetime.now(dt.UTC)))
             aggregate_id = existing["id"]
             action = "prediction.challenged"
         else:
-            raise StorageError(f"opération de prédiction inconnue : {operation}")
+            raise StorageError(f"unknown prediction operation: {operation}")
         _audit(connection, actor, action, "prediction", aggregate_id, _jsonable(row))
 
     def _prediction_zone_in(self, connection: Connection, zone: str | None) -> str:
@@ -285,11 +285,11 @@ class Facts(StoreBase):
         if zone is None:
             if len(active) != 1:
                 raise StorageError(
-                    "une prédiction tranchée par le réveil nomme sa zone ("
-                    + (", ".join(active) or "aucune zone surveillée") + ")")
+                    "a prediction settled by the wake reading names its zone ("
+                    + (", ".join(active) or "no monitored zone") + ")")
             return active[0]
         if zone not in active:
-            raise StorageError(f"zone de douleur inconnue ou inactive : {zone}")
+            raise StorageError(f"unknown or inactive pain zone: {zone}")
         return zone
 
     def _observed_value_in(self, connection: Connection, kind: str,
@@ -384,7 +384,7 @@ class Facts(StoreBase):
         if existing is not None:
             if any(_plain(existing[key]) != _plain(values[key]) for key in values):
                 raise StorageError(
-                    f"choix déjà scellé pour {values['session_key']} : il ne se corrige pas")
+                    f"choice already sealed for {values["session_key"]}: it is not corrected")
             return
         values["id"] = _uuid(row.get("id"))
         connection.execute(permit_choices.insert().values(**values))
@@ -428,7 +428,7 @@ class Facts(StoreBase):
             )).with_for_update()).mappings().all()
             if any(job["status"] == "running" for job in jobs):
                 raise StorageError(
-                    "correction en cours d'annonce : réessaie après sa livraison")
+                    "correction being announced: retry after its delivery")
             connection.execute(correction_deliveries.update().where(
                 correction_deliveries.c.id == existing["id"]).values(
                     summary=row["summary"], registered_at=now, delivered_at=None))

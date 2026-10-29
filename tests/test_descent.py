@@ -30,7 +30,7 @@ def test_the_result_is_never_negative():
 
 
 def test_a_stream_of_one_point_is_refused_not_guessed():
-    with pytest.raises(ValueError, match="deux points"):
+    with pytest.raises(ValueError, match="two points"):
         descent.descent(50.0, [512.0])
 
 

@@ -21,14 +21,14 @@ def expected_schema_revision(config_path: Path) -> str:
     config = Config(str(config_path))
     revision = ScriptDirectory.from_config(config).get_current_head()
     if not revision:
-        raise StorageError("aucune tête Alembic dans le code déployé")
+        raise StorageError("no Alembic head in the deployed code")
     return revision
 
 
 class Database:
     def __init__(self, url: str, *, application_name: str = "redline") -> None:
         if not url.startswith(("postgresql://", "postgresql+psycopg://")):
-            raise StorageError("DATABASE_URL doit désigner PostgreSQL")
+            raise StorageError("DATABASE_URL must point at PostgreSQL")
         self.engine: Engine = sa.create_engine(
             url,
             pool_pre_ping=True,
@@ -50,7 +50,7 @@ class Database:
             with self.engine.begin() as connection:
                 yield connection
         except SQLAlchemyError as exc:
-            raise StorageError(f"transaction PostgreSQL refusée : {exc.__class__.__name__}") from exc
+            raise StorageError(f"PostgreSQL transaction refused: {exc.__class__.__name__}") from exc
 
     def schema_revision(self) -> str | None:
         try:

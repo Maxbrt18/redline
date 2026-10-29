@@ -62,11 +62,11 @@ def test_the_wake_trace_cutoff_is_a_local_time():
 
 
 @pytest.mark.parametrize("change, message", [
-    (("pain_cap = 2", "pain_cap = 2\ncap_douleur = 3"), "inconnu"),
-    (("plafond {pain_cap}/10", "plafond {douleur_max}/10"), "seuil inconnu douleur_max"),
-    (('id = "n8"', 'id = "n9"'), "absente du règlement : n8"),
-    (('slug = "terrain"', 'slug = "descent"'), "transition en double : descent"),
-    (("assimilation_weeks = []", 'assimilation_weeks = ["W35"]'), "semaine ISO"),
+    (("pain_cap = 2", "pain_cap = 2\ncap_douleur = 3"), "unknown"),
+    (("plafond {pain_cap}/10", "plafond {douleur_max}/10"), "unknown threshold douleur_max"),
+    (('id = "n8"', 'id = "n9"'), "missing from the rulebook: n8"),
+    (('slug = "terrain"', 'slug = "descent"'), "duplicate transition: descent"),
+    (("assimilation_weeks = []", 'assimilation_weeks = ["W35"]'), "ISO week"),
     (('slug = "terrain"', 'slug = "Terrain neuf"'), "slug"),
     (('wake_trace_until = "14:00"', 'wake_trace_until = "14h"'), "HH:MM"),
 ])

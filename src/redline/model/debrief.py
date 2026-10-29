@@ -13,18 +13,11 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
+from redline.coach.fr import debrief as text
 from redline.model.vocabulary import HrDoubt
 
 from . import rulebook, session_kinds
 from .activity import Lap
-
-
-def _fr(value: float) -> str:
-    return f"{value:.2f}".rstrip("0").rstrip(".").replace(".", ",")
-
-
-def _signed(value: float) -> str:
-    return ("+" if value > 0 else "") + _fr(value)
 
 
 def planned_vs_done(row: Any, session: dict | None) -> list[str]:
@@ -33,10 +26,9 @@ def planned_vs_done(row: Any, session: dict | None) -> list[str]:
         return []
     out = []
     if row.km is not None:
-        for key, label in (("distance_target_km", "cible"), ("distance_cap_km", "plafond")):
+        for key, label in (("distance_target_km", text.TARGET), ("distance_cap_km", text.CAP)):
             if session.get(key) is not None:
-                out.append(f"distance {_fr(row.km)} km pour un {label} de "
-                           f"{_fr(session[key])} ({_signed(row.km - session[key])})")
+                out.append(text.DISTANCE_GAP.format(done=text.number(row.km), label=label, planned=text.number(session[key]), signed=text.signed(row.km - session[key])))
                 break
     # A duration cap is compared only if it is the one the athlete read: the rendering
     # (`weekly_plan.distance_of`) omits it as soon as a distance is committed.
@@ -45,18 +37,16 @@ def planned_vs_done(row: Any, session: dict | None) -> list[str]:
     if (row.hours is not None and session.get("duration_cap_min") is not None
             and not shown_by_distance):
         minutes = row.hours * 60
-        out.append(f"durée {minutes:.0f} min pour un plafond de {session['duration_cap_min']} "
-                   f"({_signed(round(minutes - session['duration_cap_min']))})")
+        out.append(text.DURATION_GAP.format(minutes=minutes, duration_cap_min=session["duration_cap_min"], signed=text.signed(round(minutes - session["duration_cap_min"]))))
     # HR recorded without the armband is never compared to a cap.
     hr = row.hr_avg if getattr(row, "hr_doubt", None) != HrDoubt.NO_SENSOR else None
     if hr is not None and session.get("hr_cap_bpm") is not None:
-        out.append(f"FC moyenne {hr} pour un plafond de {session['hr_cap_bpm']} "
-                   f"({_signed(hr - session['hr_cap_bpm'])})")
+        out.append(text.HR_GAP.format(hr=hr, hr_cap_bpm=session["hr_cap_bpm"], signed=text.signed(hr - session["hr_cap_bpm"])))
     if row.rpe is not None and session.get("rpe_max") is not None:
         low = session.get("rpe_min")
-        span = f"{_fr(low)}-{_fr(session['rpe_max'])}" if low is not None else \
-            f"au plus {_fr(session['rpe_max'])}"
-        out.append(f"RPE {_fr(row.rpe)} pour une cible {span}")
+        span = f"{text.number(low)}-{text.number(session["rpe_max"])}" if low is not None else \
+            text.AT_MOST.format(high=text.number(session["rpe_max"]))
+        out.append(text.RPE_GAP.format(rpe=text.number(row.rpe), span=span))
     return out
 
 
@@ -64,7 +54,7 @@ def gaps(row: Any, session: dict | None, drift: Any | None) -> list[str]:
     """The gaps of an outing, in the order they are used: planned/done, then HR."""
     out = planned_vs_done(row, session)
     if drift is not None:
-        out.append("FC à allure comparable : " + str(drift))
+        out.append(text.HR_AT_PACE + str(drift))
     return out
 
 
@@ -173,7 +163,7 @@ def quality_card(laps: Sequence[Lap], session: dict | None,
     reps = workout_reps(laps)
     if reps is None:
         return None
-    card: dict[str, Any] = {"title": session.get("title") or "Séance", "reps": reps}
+    card: dict[str, Any] = {"title": session.get("title") or text.SESSION, "reps": reps}
     if date:
         card["date"] = date
     return card

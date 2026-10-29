@@ -89,16 +89,15 @@ def _resolution_rule(rule: dict | None, due_on: dt.date) -> dict:
         return dict.fromkeys(RESOLUTION_COLUMNS)
     kind = rule.get("kind")
     if kind not in RESOLVING_KINDS:
-        raise StorageError(f"observation de solde inconnue : {kind!r} "
-                           f"(attendu : {', '.join(RESOLVING_KINDS)})")
+        raise StorageError(f"unknown settling observation: {kind!r} (expected: {", ".join(RESOLVING_KINDS)})")
     day = rule.get("date")
     day = dt.date.fromisoformat(day) if isinstance(day, str) else day
     if not isinstance(day, dt.date):
-        raise StorageError("une prédiction rattachée nomme la date de son observation")
+        raise StorageError("an attached prediction names the date of its observation")
     if isinstance(due_on, str):
         due_on = dt.date.fromisoformat(due_on)
     if day > due_on:
-        raise StorageError("l'observation qui tranche tombe après l'échéance de la prédiction")
+        raise StorageError("the deciding observation falls after the prediction's due date")
     text = str(rule.get("success_if") or "").replace(" ", "")
     operator = next((op for op in ("<=", ">=", "<", ">", "=") if text.startswith(op)), None)
     try:
@@ -106,11 +105,10 @@ def _resolution_rule(rule: dict | None, due_on: dt.date) -> dict:
     except ValueError:
         threshold = None
     if threshold is None:
-        raise StorageError(f"critère de réussite illisible : {rule.get('success_if')!r} "
-                           "(forme attendue : <=1, <2, =0, >=1)")
+        raise StorageError(f"unreadable success criterion: {rule.get("success_if")!r} (expected form: <=1, <2, =0, >=1)")
     zone = rule.get("zone")
     if zone is not None and not isinstance(zone, str):
-        raise StorageError("la zone d'une prédiction rattachée est un slug")
+        raise StorageError("the zone of an attached prediction is a slug")
     return {"resolves_kind": kind, "resolves_on": day, "resolves_zone": zone,
             "success_op": operator, "success_value": threshold}
 

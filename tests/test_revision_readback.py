@@ -169,9 +169,9 @@ def test_a_restriction_without_a_typed_premise_is_refused():
     """Restrictions without a premise, some of them introduced by a revision."""
     errors = weekly_plan.change_evidence_errors(R2, _cancel(["observation:2026-08-24-ef"]))
 
-    assert any("w35-mer-ef.restriction : restriction (annulée) sans prémisse typée" in error
+    assert any("w35-mer-ef.restriction: restriction (cancelled) without a typed premise" in error
                for error in errors)
-    assert any("Sans prémisse, la séance reste" in error for error in errors)
+    assert any("Without a premise, the session stays" in error for error in errors)
 
 
 def test_a_rule_restriction_must_cite_an_observed_fact():
@@ -181,9 +181,9 @@ def test_a_rule_restriction_must_cite_an_observed_fact():
     absent = _cancel(evidence, {"rule": "n3", "fact": "observation:inventée"})
 
     assert weekly_plan.change_evidence_errors(R2, good) == []
-    assert any("s'applique à un fait observé" in error
+    assert any("applies to an observed fact" in error
                for error in weekly_plan.change_evidence_errors(R2, vague))
-    assert any("restriction.fact doit recopier" in error
+    assert any("restriction.fact must copy" in error
                for error in weekly_plan.change_evidence_errors(R2, absent))
 
 
@@ -191,7 +191,7 @@ def test_a_request_restriction_must_come_from_a_message():
     current = _cancel(["observation:2026-08-24-ef"],
                       {"rule": "request", "fact": "observation:2026-08-24-ef"})
 
-    assert any("rule=request exige un message" in error
+    assert any("rule=request requires a message" in error
                for error in weekly_plan.change_evidence_errors(R2, current))
 
 
@@ -202,14 +202,14 @@ def test_an_unknown_rule_id_is_refused_by_the_schema():
 
 
 @pytest.mark.parametrize("before, after, expected", [
-    ({"distance_cap_km": 10.0}, {"distance_cap_km": 8.0}, "plafond de distance abaissé"),
+    ({"distance_cap_km": 10.0}, {"distance_cap_km": 8.0}, "distance cap lowered"),
     ({"distance_target_km": 10.0}, {"distance_target_km": 10.0, "distance_cap_km": 8.0},
-     "plafond de distance abaissé"),
-    ({"distance_target_km": 12.0}, {"distance_target_km": 9.0}, "cible de distance abaissée"),
-    ({"duration_cap_min": 60}, {"duration_cap_min": 45}, "plafond de durée abaissé"),
-    ({"workout": "long"}, {"workout": "easy"}, "SL remplacée par EF"),
-    ({"strength": {}}, {"strength": {"drop": ["rdl"]}}, "exercice retiré du renfo"),
-    ({"strength": {}}, {"strength": {"half_dose": True}}, "renfo en demi-dose"),
+     "distance cap lowered"),
+    ({"distance_target_km": 12.0}, {"distance_target_km": 9.0}, "distance target lowered"),
+    ({"duration_cap_min": 60}, {"duration_cap_min": 45}, "duration cap lowered"),
+    ({"workout": "long"}, {"workout": "easy"}, "long replaced by easy"),
+    ({"strength": {}}, {"strength": {"drop": ["rdl"]}}, "exercise dropped from strength"),
+    ({"strength": {}}, {"strength": {"half_dose": True}}, "strength at half dose"),
 ])
 def test_every_kind_of_cut_is_a_restriction(before, after, expected):
     old = {**_session("s", "2026-08-26"), **before}
@@ -229,7 +229,7 @@ def test_adding_moving_or_lengthening_is_not_a_restriction(before, after):
 
 
 def test_a_removed_session_is_a_restriction():
-    assert weekly_plan.restrictions(_session("s", "2026-08-26"), None) == ["retirée"]
+    assert weekly_plan.restrictions(_session("s", "2026-08-26"), None) == ["removed"]
 
 
 def test_a_raw_correction_cannot_be_the_trigger_of_a_plan_change():
@@ -246,7 +246,7 @@ def test_a_raw_correction_cannot_be_the_trigger_of_a_plan_change():
     })
 
     errors = weekly_plan.change_evidence_errors(R2, current)
-    assert any("preuve autoritative" in error for error in errors)
+    assert any("typed authoritative piece of evidence" in error for error in errors)
 
 
 def test_change_fields_must_match_the_actual_object():
@@ -262,7 +262,7 @@ def test_change_fields_must_match_the_actual_object():
     })
 
     errors = weekly_plan.change_evidence_errors(R2, current)
-    assert any("attendu ['status']" in error for error in errors)
+    assert any("expected ['status']" in error for error in errors)
 
 
 def test_a_cancellation_replaced_the_same_day_is_not_reported():

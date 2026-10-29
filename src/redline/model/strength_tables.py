@@ -9,12 +9,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from redline.coach.fr import strength_tables as text
+
 from . import strength_log, vault_layout
 from .program import Program
 from .views import apply, table
 
 #: Each routine's table sits between the markers of its own block in `strength.md`.
-BLOCK_PREFIX = "RENFO_"
+BLOCK_PREFIX = "STRENGTH_"
 
 
 def blocks(program: Program) -> dict[str, str]:
@@ -23,11 +25,11 @@ def blocks(program: Program) -> dict[str, str]:
             for routine in program.sessions}
 
 
-HEADERS = ["#", "Exercice", "Dose", "Repos", "Depuis"]
+HEADERS = ["#", text.EXERCISE, text.DOSE, text.REST, text.SINCE]
 
 # The log view: what was ACTUALLY done, set against the program.
-LOG_BLOCK = "RENFO_JOURNAL"
-LOG_HEADERS = ["Exercice", "Total, 3 dernières séances", "Écart G/D", "Score"]
+LOG_BLOCK = "STRENGTH_LOG"
+LOG_HEADERS = [text.EXERCISE, text.LAST_SESSIONS_TOTAL, text.SIDE_GAP, text.SCORE]
 LOG_SESSIONS = 3
 
 # Flag of the calf capacity test (`strength.md` § Instrument). It is only **displayed**,
@@ -69,7 +71,7 @@ def _gap(row: dict) -> str:
         return "—"
     percent = (left - right) / max(right, left) * 100
     flag = " ⚠" if abs(percent) > GAP_FLAG else ""
-    return f"D {right} / G {left} ({percent:+.0f} %){flag}"
+    return text.SIDE_BALANCE.format(right=right, left=left, percent=percent, flag=flag)
 
 
 def render_log(program: Program, path: Path) -> str:
@@ -81,8 +83,7 @@ def render_log(program: Program, path: Path) -> str:
     """
     rows = strength_log.rows(path)
     if not rows:
-        return ("*Aucune séance journalisée pour l'instant — le journal se remplit "
-                "tout seul à chaque compte-rendu de la page de séance.*")
+        return (text.LOG_EMPTY)
 
     by_slug: dict = {}
     for row in rows:
@@ -112,7 +113,7 @@ def render_log(program: Program, path: Path) -> str:
         for session in recent:
             right, left, plain = _totals(session)
             total = right + left + plain
-            totals.append("—" if session.get("skipped") else (str(total) if total else "fait"))
+            totals.append("—" if session.get("skipped") else (str(total) if total else text.DONE))
         note = program.exercises.get(slug)
         # The pipe is written plain: table() escapes it once, which Obsidian needs to
         # read a wikilink alias inside a cell.
@@ -123,7 +124,7 @@ def render_log(program: Program, path: Path) -> str:
         # rule has no object for it (the stopping criterion IS failure). Its progression
         # datum is the COUNT, in the adjacent column. A bare score next to fixed-dose
         # exercises would make them comparable and a 10/10 would read as an alarm.
-        score = "à l'échec" if slug in amrap else (
+        score = text.TO_FAILURE if slug in amrap else (
             f"{last['score']}/10" if last.get("score") else "—")
         table_rows.append([name, " → ".join(totals), _gap(last), score])
     return table(LOG_HEADERS, table_rows)

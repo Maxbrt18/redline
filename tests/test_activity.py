@@ -19,7 +19,7 @@ def test_an_activity_reads_back_exactly_as_it_was_stored():
 
 
 def test_a_stored_activity_with_an_unknown_key_is_refused():
-    with pytest.raises(ActivityError, match="illisible"):
+    with pytest.raises(ActivityError, match="unreadable"):
         Activity.from_json({**_activity().to_json(), "nom": "Morning Run"})
 
 

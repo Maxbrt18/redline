@@ -118,7 +118,7 @@ class Observations(StoreBase):
     def _metric_values(measurements: dict) -> dict:
         unknown = sorted(set(measurements) - set(MEASUREMENT_DEFINITIONS))
         if unknown:
-            raise StorageError("mesure inconnue : " + ", ".join(unknown))
+            raise StorageError("unknown measurement: " + ", ".join(unknown))
         values = {}
         for metric in MEASUREMENT_DEFINITIONS:
             measurement = measurements.get(metric, {"state": "not_applicable"})
@@ -171,9 +171,9 @@ class Observations(StoreBase):
         active = self._active_zones_in(connection)
         unknown = sorted(set(given) - set(active))
         if unknown:
-            raise StorageError("zone de douleur inconnue ou inactive : " + ", ".join(unknown)
-                               + (f" (actives : {', '.join(active)})" if active
-                                  else " (aucune zone surveillée)"))
+            raise StorageError("unknown or inactive pain zone: " + ", ".join(unknown)
+                               + (f" (active: {', '.join(active)})" if active
+                                  else " (no monitored zone)"))
         default = "pending" if ledger.requires_pain(kind) else "not_applicable"
         readings = {}
         for zone in active:
@@ -211,16 +211,16 @@ class Observations(StoreBase):
     def doubt_hr_in(self, connection: Connection, observation_id: uuid.UUID, reason: str,
                     note: str, *, actor: str = "application") -> None:
         if reason not in HR_DOUBTS:
-            raise StorageError(f"motif de FC douteuse inconnu : {reason}")
+            raise StorageError(f"unknown doubtful heart rate reason: {reason}")
         if not note.strip():
-            raise StorageError("une FC douteuse porte la cause déclarée")
+            raise StorageError("a doubtful heart rate carries the declared cause")
         result = connection.execute(observation_metrics.update().where(
             observation_metrics.c.observation_id == observation_id,
             observation_metrics.c.hr_avg_bpm_state == "known",
             observation_metrics.c.hr_doubt.is_(None),
         ).values(hr_doubt=reason))
         if result.rowcount != 1:
-            raise StorageError("FC absente, inconnue ou déjà déclarée douteuse")
+            raise StorageError("heart rate missing, unknown or already declared doubtful")
         _audit(connection, actor, "measurement.hr_doubted", "observation",
                observation_id, {"reason": reason, "note": note.strip()})
         _request_projection(connection)
@@ -234,9 +234,9 @@ class Observations(StoreBase):
                                    unavailable=unavailable, actor=actor)
             return
         if zone is not None:
-            raise StorageError(f"seule la douleur se mesure par zone, pas {metric}")
+            raise StorageError(f"only pain is measured per zone, not {metric}")
         if metric not in MEASUREMENT_DEFINITIONS:
-            raise StorageError(f"mesure inconnue : {metric}")
+            raise StorageError(f"unknown measurement: {metric}")
         state = "unavailable" if unavailable else "known"
         state_column = observation_metrics.c[f"{metric}_state"]
         result = connection.execute(observation_metrics.update().where(
@@ -249,7 +249,7 @@ class Observations(StoreBase):
         ).values({state_column: state,
                   observation_metrics.c[metric]: None if unavailable else value}))
         if result.rowcount != 1:
-            raise StorageError("mesure absente, déjà connue ou ambiguë")
+            raise StorageError("measurement missing, already known or ambiguous")
         _audit(connection, actor, "measurement.completed", "observation", observation_id,
                {"metric": metric, "state": state, "value": value})
         _request_projection(connection)
@@ -262,8 +262,8 @@ class Observations(StoreBase):
             pain_readings.c.observation_id == observation_id)).scalars())
         if zone is None:
             if len(zones) != 1:
-                raise StorageError("douleur : nomme la zone (" + (", ".join(sorted(zones))
-                                   or "aucune zone sur cette observation") + ")")
+                raise StorageError("pain: name the zone (" + (", ".join(sorted(zones))
+                                   or "no zone on this observation") + ")")
             zone = zones[0]
         state = "unavailable" if unavailable else "known"
         result = connection.execute(pain_readings.update().where(
@@ -273,7 +273,7 @@ class Observations(StoreBase):
         ).values(state=state, value=None if unavailable else value,
                  recorded_at=sa.func.now()))
         if result.rowcount != 1:
-            raise StorageError(f"douleur {zone} absente, déjà connue ou ambiguë")
+            raise StorageError(f"pain {zone} missing, already known or ambiguous")
         _audit(connection, actor, "measurement.completed", "observation", observation_id,
                {"metric": "pain", "zone": zone, "state": state, "value": value})
         kind, day = connection.execute(sa.select(
@@ -307,14 +307,14 @@ class Observations(StoreBase):
             observations.c.idempotency_key == idempotency_key,
         ).with_for_update()).one_or_none()
         if row is None:
-            raise StorageError(f"observation inconnue : {idempotency_key}")
+            raise StorageError(f"unknown observation: {idempotency_key}")
         observation_id, current = row
         wanted = int(strava_activity_id)
         if current == wanted:
             return observation_id
         if current is not None:
             raise StorageError(
-                f"observation {idempotency_key} déjà rattachée à l'activité {current}")
+                f"observation {idempotency_key} already attached to activity {current}")
         connection.execute(observations.update().where(
             observations.c.id == observation_id,
         ).values(strava_activity_id=wanted))
@@ -381,7 +381,7 @@ class Observations(StoreBase):
             observations.c.idempotency_key == payload["observation_key"],
         )).scalar_one_or_none()
         if observation_id is None:
-            raise StorageError(f"observation inconnue : {payload['observation_key']}")
+            raise StorageError(f"unknown observation: {payload["observation_key"]}")
         existing = connection.execute(sa.select(session_exposures).where(
             session_exposures.c.athlete_id == self.athlete_id,
             session_exposures.c.exposure_key == key,

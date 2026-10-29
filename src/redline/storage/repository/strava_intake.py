@@ -81,7 +81,7 @@ class StravaIntake(StoreBase):
         """
         activity_id = int(activity.id or 0)
         if activity_id <= 0:
-            raise StorageError("identifiant Strava invalide")
+            raise StorageError("invalid Strava id")
         sport = activity.sport.strip()
         if not sport:
             raise StorageError("sport Strava absent")
@@ -184,7 +184,7 @@ class StravaIntake(StoreBase):
             "wbgt": ("wbgt_c", float),
         }
         if kind not in definitions:
-            raise StorageError(f"enrichissement Strava inconnu : {kind}")
+            raise StorageError(f"unknown Strava enrichment: {kind}")
         metric, cast = definitions[kind]
         state = "failed" if error else "unavailable" if unavailable else "known"
         clean_value = None if state != "known" else cast(value)
@@ -194,13 +194,13 @@ class StravaIntake(StoreBase):
                 strava_activity_intakes.c.athlete_id == self.athlete_id,
             ).with_for_update()).mappings().one_or_none()
             if intake is None:
-                raise StorageError(f"activité Strava non capturée : {activity_id}")
+                raise StorageError(f"Strava activity not captured: {activity_id}")
             current_state = intake[f"{kind}_state"]
             current_value = intake[f"{kind}_value"]
             if current_state == "known":
                 if clean_value is not None and float(current_value) == float(clean_value):
                     return "known"
-                raise StorageError(f"enrichissement {kind} déjà connu avec une autre valeur")
+                raise StorageError(f"{kind} enrichment already known with another value")
             connection.execute(strava_activity_intakes.update().where(
                 strava_activity_intakes.c.activity_id == int(activity_id)).values({
                     f"{kind}_state": state,
@@ -241,7 +241,7 @@ class StravaIntake(StoreBase):
         with self.database.transaction() as connection:
             values = {
                 "activity_id": int(activity_id), "athlete_id": self.athlete_id,
-                "sport": "inconnu", "distilled": {}, "status": "failed",
+                "sport": "unknown", "distilled": {}, "status": "failed",
                 "candidate_session_keys": [], "error": safe_error,
                 "updated_at": sa.func.now(),
             }
@@ -270,7 +270,7 @@ class StravaIntake(StoreBase):
                 strava_activity_intakes.c.athlete_id == self.athlete_id,
             )).mappings().one_or_none()
         if row is None:
-            raise StorageError(f"activité Strava non capturée : {activity_id}")
+            raise StorageError(f"Strava activity not captured: {activity_id}")
         return {key: _plain(value) for key, value in dict(row).items()}
 
     def strava_activity_for_observation(self, observation_id: Any) -> int | None:
@@ -306,7 +306,7 @@ class StravaIntake(StoreBase):
                 strava_activity_intakes.c.athlete_id == self.athlete_id,
             ).values(**values, updated_at=sa.func.now()))
             if updated.rowcount != 1:
-                raise StorageError(f"activité Strava non capturée : {activity_id}")
+                raise StorageError(f"Strava activity not captured: {activity_id}")
             aggregate_id = uuid.uuid5(uuid.NAMESPACE_URL, f"strava:{int(activity_id)}")
             _audit(connection, actor, "strava.detail_kept", "strava_activity",
                    aggregate_id, {"kept": sorted(values)})

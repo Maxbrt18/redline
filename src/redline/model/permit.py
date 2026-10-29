@@ -17,6 +17,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 
 from redline.coach import dates
+from redline.coach.fr import permit as text
 from redline.model.vocabulary import LifeLoad, Sleep
 
 from . import session_kinds
@@ -58,7 +59,7 @@ class EfLine:
     hr_avg: int | None = None
     next_trace: float | None = None
     group: bool | None = None
-    status: str = "à venir"  # à venir · courue · sautée
+    status: str = "upcoming"  # upcoming · run · skipped
     triggers: list[str] = field(default_factory=list)
 
     @property
@@ -126,21 +127,21 @@ def evaluate(choices: Iterable[dict], runs: Iterable[Run], traces: dict[dt.date,
         done = by_day.get(day, [])
         if done:
             run = done[0]
-            line.status = "courue"
+            line.status = "run"
             line.actual_minutes = run.minutes
             line.hr_avg = run.hr_avg
             line.next_trace = traces.get(day + dt.timedelta(days=1))
             if run.strava_id is not None:
                 line.group = groups.get(run.strava_id)
             if line.next_trace is not None and line.next_trace >= NET_TRACE:
-                line.triggers.append("trace nette le lendemain")
+                line.triggers.append(text.TRACE_NEXT_DAY)
             if (line.cap_minutes is not None and line.actual_minutes is not None
                     and line.actual_minutes > line.cap_minutes):
-                line.triggers.append(f"au-delà de l'enveloppe ({line.cap_minutes} min)")
+                line.triggers.append(text.OVER_ENVELOPE.format(cap=line.cap_minutes))
             if line.hr_avg is not None and line.hr_avg > hr_cap:
-                line.triggers.append(f"trop rapide (FC moyenne {line.hr_avg} > {hr_cap})")
+                line.triggers.append(text.TOO_FAST.format(hr_avg=line.hr_avg, hr_cap=hr_cap))
         elif day < today:
-            line.status = "sautée"
+            line.status = "skipped"
         lines.append(line)
     return lines
 
@@ -173,76 +174,78 @@ def state(lines: list[EfLine], daily: Iterable[dict], today: dt.date,
             continue
         reasons = []
         if row.get("life_load") == LifeLoad.HIGH:
-            reasons.append(f"charge de vie élevée déclarée le {day:%d/%m}")
+            reasons.append(text.HIGH_LIFE_LOAD.format(day=day))
         if row.get("sleep") == Sleep.POOR:
-            reasons.append(f"mauvaise nuit déclarée le {day:%d/%m}")
+            reasons.append(text.POOR_NIGHT.format(day=day))
         if reasons:
             restricted.setdefault(iso_week(day), []).extend(reasons)
     for line in lines:
         if line.group:
             restricted.setdefault(iso_week(line.date), []).append(
-                f"sortie de groupe le {line.date:%d/%m}")
+                text.GROUP_RUN.format(day=line.date))
 
     grant = None
     judged_on = week_end(period.granted_week)
     if today > judged_on:
         judged = [line for line in lines if line.date <= judged_on]
-        run = [line for line in judged if line.status == "courue"]
+        run = [line for line in judged if line.status == "run"]
         agreements = sum(1 for line in run if line.agrees)
-        failures = [f"{line.session_key} : {', '.join(line.triggers)}"
+        failures = [text.FAILURE.format(session=line.session_key, triggers=", ".join(line.triggers))
                     for line in judged if line.triggers]
-        grant = {"courues": len(run), "accords": agreements, "retraits": failures,
-                     "obtenu": len(run) >= MIN_EF and not failures}
+        grant = {"run": len(run), "agreements": agreements, "failures": failures,
+                 "granted": len(run) >= MIN_EF and not failures}
 
     if withdrawal_until is not None and today <= withdrawal_until:
-        phase = "retrait : conduite accompagnée"
+        phase = "withdrawn"
     elif grant is None:
-        phase = "conduite accompagnée"
-    elif grant["obtenu"]:
-        phase = "permis"
+        phase = "supervised"
+    elif grant["granted"]:
+        phase = "granted"
     else:
-        phase = "conduite accompagnée (obtention refusée)"
+        phase = "refused"
     return State(phase, withdrawal_until, restricted, grant, period)
 
 
 def _fmt_minutes(value: float | None) -> str:
-    return "—" if value is None else f"{round(value)} min"
+    return "—" if value is None else text.MINUTES.format(minutes=round(value))
 
 
 def render(lines: list[EfLine], current: State, week: str | None = None) -> list[str]:
     """The block the coach reads, at the review or on request."""
     shown = [line for line in lines if week is None or iso_week(line.date) == week]
-    out = [f"Permis EF : {current.phase}."]
+    out = [text.TITLE.format(phase=text.PHASES[current.phase])]
     if current.withdrawal_until is not None:
-        out.append(f"Retrait actif jusqu'au {current.withdrawal_until:%d/%m}.")
+        out.append(text.WITHDRAWAL.format(until=current.withdrawal_until))
     for line in shown:
         gap = line.gap
-        agreement = "" if gap is None else (
-            f", écart {gap:+.0f} min ({'accord' if line.agrees else 'désaccord'})")
-        labels = {0: "aucune", 0.5: "très légère", 1: "légère", 2: "nette"}
-        trace = ("trace J+1 inconnue" if line.next_trace is None
-                 else f"trace J+1 {labels.get(line.next_trace, line.next_trace)}")
-        group = " · en groupe" if line.group else ""
-        detail = (f"coach {line.coach_minutes} min, couru {_fmt_minutes(line.actual_minutes)}"
-                  f"{agreement} · {trace}{group}" if line.status == "courue"
-                  else f"coach {line.coach_minutes} min")
+        agreement = "" if gap is None else text.GAP.format(
+            gap=gap, agreement=text.AGREEMENT if line.agrees else text.DISAGREEMENT)
+        trace = (text.TRACE_UNKNOWN if line.next_trace is None
+                 else text.TRACE.format(trace=text.TRACES.get(line.next_trace, line.next_trace)))
+        group = text.IN_GROUP if line.group else ""
+        detail = (text.DETAIL_RUN.format(coach=line.coach_minutes,
+                                         actual=_fmt_minutes(line.actual_minutes),
+                                         agreement=agreement, trace=trace, group=group)
+                  if line.status == "run" else text.DETAIL.format(coach=line.coach_minutes))
         flags = f" ⇒ {'; '.join(line.triggers)}" if line.triggers else ""
-        out.append(f"- {dates.weekday(line.date, 'abbreviated')} {line.date:%d/%m} {line.session_key} [{line.status}] : "
-                   f"{detail}{flags}")
+        out.append(text.LINE.format(weekday=dates.weekday(line.date, "abbreviated"),
+                                    date=line.date, session=line.session_key,
+                                    status=text.STATUSES[line.status], detail=detail,
+                                    flags=flags))
     for iso, reasons in sorted(current.restricted_weeks.items()):
         if week is None or iso == week:
-            out.append(f"Restriction {iso} : {'; '.join(reasons)}.")
+            out.append(text.RESTRICTION.format(week=iso, reasons="; ".join(reasons)))
     if current.grant is not None:
         verdict = current.grant
-        out.append(f"Obtention ({current.window.granted_week}) : {verdict['courues']} EF courues "
-                   f"(≥{MIN_EF} requises), {verdict['accords']} accords à ±{TOLERANCE_MIN} min, "
-                   f"retraits : {len(verdict['retraits'])} ⇒ "
-                   f"{'OBTENU' if verdict['obtenu'] else 'NON OBTENU'}.")
+        out.append(text.GRANT.format(
+            week=current.window.granted_week, run=verdict["run"], needed=MIN_EF,
+            agreements=verdict["agreements"], tolerance=TOLERANCE_MIN,
+            failures=len(verdict["failures"]),
+            verdict=text.GRANTED if verdict["granted"] else text.NOT_GRANTED))
     else:
-        run = sum(1 for line in lines if line.status == "courue")
-        out.append(f"Compteur d'obtention : {run} EF courues sur {MIN_EF} requises "
-                   f"d'ici la fin de {current.window.granted_week}.")
-    out.append("Non détectés automatiquement : parcours neuf ; grosse forme "
-               + ("(seuil non fixé, se lit sur « FC à allure » de redline signals)."
-                  if BIG_FORM_THRESHOLD is None else f"(seuil {BIG_FORM_THRESHOLD})."))
+        run = sum(1 for line in lines if line.status == "run")
+        out.append(text.COUNTER.format(run=run, needed=MIN_EF,
+                                       week=current.window.granted_week))
+    out.append(text.NOT_DETECTED + (text.BIG_FORM_UNSET if BIG_FORM_THRESHOLD is None
+                                    else text.BIG_FORM.format(threshold=BIG_FORM_THRESHOLD)))
     return out

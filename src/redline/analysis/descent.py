@@ -41,7 +41,7 @@ from redline.model.errors import InputError
 def descent(dplus: float, altitude: list) -> int:
     """The D- in metres, rounded. Flat terrain returns 0, never nothing."""
     if len(altitude) < 2:
-        raise ValueError("flux d'altitude trop court : deux points au minimum")
+        raise ValueError("elevation stream too short: two points at least")
     return max(0, round(dplus + altitude[0] - altitude[-1]))
 
 
@@ -50,8 +50,8 @@ def _altitude(payload: str) -> list:
     if isinstance(data, dict):
         data = data.get("altitude")
     if not isinstance(data, list):
-        raise ValueError("flux d'altitude introuvable : attendu une liste, ou un objet "
-                         "{\"altitude\": [...]} tel que renvoyé par `redline strava streams`")
+        raise ValueError("elevation stream not found: expected a list, or an object "
+                         "{\"altitude\": [...]} as returned by `redline strava streams`")
     return data
 
 
@@ -59,15 +59,15 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--dplus", type=float, required=True,
-                        help="elevation_gain de l'activité, en mètres (Strava)")
-    parser.add_argument("--altitude", help="flux d'altitude JSON (défaut : stdin)")
-    parser.add_argument("--input", help="fichier du flux d'altitude JSON")
+                        help="the activity's elevation_gain, in metres (Strava)")
+    parser.add_argument("--altitude", help="elevation stream as JSON (default: stdin)")
+    parser.add_argument("--input", help="file of the elevation stream as JSON")
     args = parser.parse_args()
 
     try:
         altitude = _altitude(args.altitude or agent_input.read_text(args.input))
         print(descent(args.dplus, altitude))
     except ValueError as exc:
-        raise InputError(f"D− incalculable — {exc}") from exc
+        raise InputError(f"D- cannot be computed -- {exc}") from exc
     return 0
 

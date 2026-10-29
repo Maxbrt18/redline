@@ -46,7 +46,7 @@ class TurnCommands(StoreBase):
             if (row["turn_id"] != _uuid(turn_id) or row["kind"] != kind
                     or row["payload"] != canonical_payload):
                 raise StorageError(
-                    f"collision d'idempotence pour la commande {command_key!r}")
+                    f"idempotency collision for command {command_key!r}")
             dry_run = connection.begin_nested()
             try:
                 self._apply_turn_in(connection, turn_id)
@@ -147,12 +147,12 @@ class TurnCommands(StoreBase):
             payload = dict(row["payload"])
             handler = handlers.get(row["kind"])
             if handler is None:
-                raise StorageError(f"commande de tour inconnue : {row['kind']}")
+                raise StorageError(f"unknown turn command: {row["kind"]}")
             try:
                 revised = handler(connection, payload, f"turn:{turn_id}")
             except (KeyError, TypeError, ValueError) as exc:
                 raise StorageError(
-                    f"commande {row['kind']} invalide : {exc}") from exc
+                    f"invalid {row["kind"]} command: {exc}") from exc
             if revised:
                 revised_weeks.append(revised)
             connection.execute(turn_commands.update().where(
@@ -165,11 +165,11 @@ class TurnCommands(StoreBase):
         for week in revised_weeks:
             plan = self._load_plan_connection(connection, week)
             if plan is None:
-                raise StorageError(f"programme {week} absent après sa révision")
+                raise StorageError(f"plan {week} missing after its revision")
             try:
                 weekly_plan_model.validate(plan)
             except Exception as exc:
-                raise StorageError(f"révision refusée, programme {week} invalide : {exc}") from exc
+                raise StorageError(f"revision refused, plan {week} invalid: {exc}") from exc
         return applied
 
     def _apply_observation(self, connection: Connection, payload: dict,
@@ -191,7 +191,7 @@ class TurnCommands(StoreBase):
             observations.c.idempotency_key == payload["idempotency_key"],
         )).scalar_one_or_none()
         if observation_id is None:
-            raise StorageError(f"observation inconnue : {payload['idempotency_key']}")
+            raise StorageError(f"unknown observation: {payload["idempotency_key"]}")
         self.complete_measurement_in(
             connection, observation_id, payload["metric"], payload.get("value"),
             zone=payload.get("zone"), unavailable=bool(payload.get("unavailable")),
@@ -203,7 +203,7 @@ class TurnCommands(StoreBase):
             observations.c.idempotency_key == payload["idempotency_key"],
         )).scalar_one_or_none()
         if observation_id is None:
-            raise StorageError(f"observation inconnue : {payload['idempotency_key']}")
+            raise StorageError(f"unknown observation: {payload["idempotency_key"]}")
         self.doubt_hr_in(connection, observation_id, payload["reason"], payload["note"],
                          actor=actor)
 
@@ -259,38 +259,38 @@ class TurnCommands(StoreBase):
         """Declaration only; the markers wait for delivery of the exact text."""
         text = payload.get("text")
         if not isinstance(text, str) or not 3 <= len(text.strip()) <= 500:
-            raise ValueError("question attendue entre 3 et 500 caractères")
+            raise ValueError("question expected between 3 and 500 characters")
         cells = payload.get("cells", [])
         if not isinstance(cells, list) or len(cells) > 3:
-            raise ValueError("cells attend au plus trois clés déclaratives")
+            raise ValueError("cells expects at most three declarative keys")
         for key in cells:
             if not isinstance(key, str):
-                raise ValueError("clé de cellule textuelle attendue")
+                raise ValueError("text cell key expected")
             day, kind, column = key.split(":", 2)
             dt.date.fromisoformat(day)
             if not kind or ledger.column_base(column) not in ledger.DECLARED_COLUMNS:
-                raise ValueError("cellule déclarative invalide")
+                raise ValueError("invalid declarative cell")
 
     def _apply_question_review(self, connection: Connection, payload: dict, actor: str) -> None:
         question_id, answer_id = _uuid(payload["question_id"]), _uuid(payload["answer_id"])
         status, note = payload["status"], payload["note"]
         if status not in {"open", "deferred", "answered", "expired"}:
-            raise ValueError("état de question inconnu")
+            raise ValueError("unknown question state")
         if not isinstance(note, str) or not 1 <= len(note.strip()) <= 500:
-            raise ValueError("note de revue attendue entre 1 et 500 caractères")
+            raise ValueError("review note expected between 1 and 500 characters")
         follow_up = payload.get("follow_up_on")
         if follow_up and not isinstance(follow_up, dt.date):
             follow_up = dt.date.fromisoformat(follow_up)
         if follow_up and status != "deferred":
-            raise ValueError("une date de reprise exige deferred")
+            raise ValueError("a resume date requires deferred")
         question = connection.execute(sa.select(conversation_questions).where(
             conversation_questions.c.id == question_id).with_for_update()).mappings().one_or_none()
         answer = connection.execute(sa.select(conversation_messages).where(
             conversation_messages.c.id == answer_id)).mappings().one_or_none()
         if not question or not answer or answer["role"] != "athlete":
-            raise ValueError("question ou message de l'athlète introuvable")
+            raise ValueError("athlete question or message not found")
         if answer["psid"] != question["psid"] or answer["created_at"] < question["asked_at"]:
-            raise ValueError("la réponse ne peut pas appartenir à cette question")
+            raise ValueError("the answer cannot belong to this question")
         connection.execute(conversation_questions.update().where(
             conversation_questions.c.id == question_id).values(
                 status=status, review_note=note, follow_up_on=follow_up,

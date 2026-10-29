@@ -35,3 +35,9 @@ def received(moment: dt.datetime) -> str:
 
 def clock_time(moment: dt.datetime) -> str:
     return f"{moment:%Hh%M}"
+
+CALIBRATION = (
+    "Calibration {domain} · soldées {resolved} (dont {observed} par observation) · void "
+    "{void} · échues ouvertes {overdue} · Brier moyen {brier}")
+
+CALIBRATION_REASONS = " · motifs : {reasons}"

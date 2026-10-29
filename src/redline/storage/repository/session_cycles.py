@@ -29,9 +29,9 @@ class SessionCycles(StoreBase):
         try:
             week, logical_key = session_key.split(":", 1)
         except ValueError as exc:
-            raise StorageError("session_key attendu sous la forme 2030-W34:identifiant") from exc
+            raise StorageError("session_key expected as 2030-W34:identifier") from exc
         if not week or not logical_key:
-            raise StorageError("session_key incomplet")
+            raise StorageError("incomplete session_key")
         return week, logical_key
 
     def _cycle_by_key_in(self, connection: Connection, session_key: str,
@@ -48,7 +48,7 @@ class SessionCycles(StoreBase):
             query = query.with_for_update(of=session_cycles)
         row = connection.execute(query).mappings().one_or_none()
         if row is None:
-            raise StorageError(f"séance inconnue : {session_key}")
+            raise StorageError(f"unknown session: {session_key}")
         return row
 
     def declare_session_start(self, payload: dict, *, actor: str = "application") -> None:
@@ -60,9 +60,9 @@ class SessionCycles(StoreBase):
         cycle = self._cycle_by_key_in(connection, payload["session_key"], lock=True)
         declared_at = payload["declared_at"]
         if declared_at.tzinfo is None:
-            raise StorageError("declared_at doit porter un fuseau horaire")
+            raise StorageError("declared_at must carry a time zone")
         if cycle["declared_started_at"] and cycle["declared_started_at"] != declared_at:
-            raise StorageError("le départ déclaré existe déjà")
+            raise StorageError("the declared start already exists")
         connection.execute(session_cycles.update().where(
             session_cycles.c.id == cycle["id"]).values(
                 declared_started_at=declared_at,
@@ -127,17 +127,17 @@ class SessionCycles(StoreBase):
                 strava_activity_intakes.c.athlete_id == self.athlete_id,
             ).with_for_update()).mappings().one_or_none()
             if intake is None or intake["started_at"] is None:
-                raise StorageError("activité Strava inconnue ou sans heure de départ")
+                raise StorageError("Strava activity unknown or without a start time")
             planned = connection.execute(sa.select(planned_sessions).where(
                 planned_sessions.c.id == cycle["source_session_id"])).mappings().one()
             local_day = intake["started_at"].astimezone(
                 local_time.zone()).date()
             if (local_day != planned["scheduled_on"]
                     or planned["workout"] not in self._compatible_workouts(intake["sport"])):
-                raise StorageError("activité incompatible avec la date ou le type de séance")
+                raise StorageError("activity incompatible with the date or the session type")
             kind = self._observation_kind_for_workout(planned["workout"])
             if kind is None:
-                raise StorageError("ce type de séance ne peut pas recevoir une activité Strava")
+                raise StorageError("this session type cannot receive a Strava activity")
             activity = Activity.from_json(intake["distilled"])
             self.add_observation_in(connection, {
                 "occurred_on": local_day, "started_at": intake["started_at"],
@@ -150,24 +150,24 @@ class SessionCycles(StoreBase):
             }, actor=actor)
             return
         if observation["started_at"] is None:
-            raise StorageError("activité Strava inconnue ou sans heure de départ")
+            raise StorageError("Strava activity unknown or without a start time")
         linked = connection.execute(sa.select(session_cycles.c.id).where(
             session_cycles.c.observation_id == observation["id"],
             session_cycles.c.id != cycle["id"])).scalar_one_or_none()
         if linked:
-            raise StorageError("cette activité est déjà rattachée à une autre séance")
+            raise StorageError("this activity is already attached to another session")
         planned = connection.execute(sa.select(planned_sessions).where(
             planned_sessions.c.id == cycle["source_session_id"])).mappings().one()
         local_day = observation["started_at"].astimezone(local_time.zone()).date()
         if (local_day != planned["scheduled_on"]
                 or self._workout_for_observation(observation["kind"]) != planned["workout"]):
-            raise StorageError("activité incompatible avec la date ou le type de séance")
+            raise StorageError("activity incompatible with the date or the session type")
         self._link_cycle_observation_in(connection, cycle, observation, actor=actor)
 
     def _link_cycle_observation_in(self, connection: Connection,
                                    cycle: Any, observation: Any, *, actor: str) -> None:
         if cycle["observation_id"] and cycle["observation_id"] != observation["id"]:
-            raise StorageError("cette séance est déjà rattachée à une autre observation")
+            raise StorageError("this session is already attached to another observation")
         observed_at = observation["started_at"]
         planned = connection.execute(sa.select(planned_sessions).where(
             planned_sessions.c.id == cycle["source_session_id"])).mappings().one()

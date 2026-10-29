@@ -13,16 +13,19 @@ import datetime as dt
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from redline.coach.fr import hot_cache as text
+from redline.coach.fr import ledger as ledger_text
+
 from . import program, vault_layout
 from .views import apply
 
 if TYPE_CHECKING:
     from redline.storage import OperationalStore
 
-BLOCK = "FORME"
+BLOCK = "FORM"
 #: The second generated block: the state that drives the coming weeks, recomputed on
 #: every projection so that hand-written prose cannot go stale in the file read each turn.
-STATE_BLOCK = "ETAT"
+STATE_BLOCK = "STATE"
 
 
 def target(vault: Path) -> Path:
@@ -43,7 +46,7 @@ def render(ledger, rows: list, instruments: dict, targets: dict,
     """
     per_week = ledger.eq_hours_per_week(rows, instruments, targets)
     if not per_week:
-        return "- **Forme** : registre vide."
+        return text.EMPTY_LEDGER
     # A week whose rows all have zero weight (e.g. a spontaneous reading logged before the
     # first session) has not started yet. Render the latest week with real weight, else
     # (fresh ledger) the most recent one anyway.
@@ -77,38 +80,31 @@ def render(ledger, rows: list, instruments: dict, targets: dict,
         f"{w.week.split('-')[-1]} {peak(w.effort)}/{peak(w.rest)}"
         for w in ledger.pain_trend(rows, 3, zone.slug))) for zone in zones or []]
     trend = (" · ".join(f"{label} {text or '—'}" for label, text in trends) if len(trends) > 1
-             else (trends[0][1] or "—") if trends else "aucune zone surveillée")
+             else (trends[0][1] or "—") if trends else text.NO_ZONE)
 
     red = []
     if level > ledger.LEVEL_CAP:
-        red.append("niveau")
+        red.append(text.LEVEL)
     if ratio and ratio > ledger.RATIO_CAP:
         red.append("ratio")
-    verdict = f" — **{' et '.join(red)} au rouge**" if red else ""
-    walk_note = (f", dont **{walk_share} % de marche**" if walk_share >= 25 else "")
+    verdict = text.RED.format(join=text.AND.join(red)) if red else ""
+    walk_note = (text.WALK_SHARE.format(walk_share=walk_share) if walk_share >= 25 else "")
 
     short = label.split("-")[-1]          # « 2030-W30 » -> « W30 »
-    runs_label = f"{runs} sortie" + ("s" if runs > 1 else "")
-    # A week is "bouclée" only once it is CLOSED: mid-week the missing days would fake a
+    # A week is closed only once it is over: mid-week the missing days would fake a
     # collapse in volume and ratio.
     day = today or dt.date.today()
     iso = day.isocalendar()
     if label == f"{iso.year}-W{iso.week:02d}":
         # Nothing that changes daily: the view is checked against its regeneration, and a
         # current date would make it drift every day.
-        state = f"{short} en cours, semaine ouverte, ratio partiel"
+        state = text.WEEK_OPEN.format(week=short)
     else:
-        state = f"{short} bouclée"
+        state = text.WEEK_CLOSED.format(week=short)
     return (
-        f"- **Forme** : **{state}** — {_round(run_km)} km courus ({runs_label})"
-        + (f" + {_round(walk_km)} km marchés" if walk_km else "")
-        + f". **Tendance douleur, au PIC hebdo** (jamais la médiane), "
-        f"**effort/repos** : {trend}. "
-        f"**Jauge : elle se CALCULE, ne la réécris jamais de tête** — "
-        f"`redline ledger --week <W>`. {short} = "
-        f"**{_round(h_eq)} h-éq · {level}/100 · ratio "
-        f"{_round(ratio) if ratio is not None else '—'}**{verdict}{walk_note}. "
-        f"Faits : PostgreSQL. Bloc **généré** par `redline hot-cache`."
+        text.FORM.format(state=state, run_km=_round(run_km), outings=ledger_text.outings(runs))
+        + (text.FORM_WALK.format(walk_km=_round(walk_km)) if walk_km else "")
+        + text.FORM_TAIL.format(trend=trend, week=short, h_eq=_round(h_eq), level=level, ratio=_round(ratio) if ratio is not None else "—", verdict=verdict, walk_note=walk_note)
     )
 
 
@@ -125,38 +121,36 @@ def _as_date(value: Any) -> dt.date:
 def render_state(ledger, rows: list, *, deadlines: list[dict], capabilities: list[dict],
                  typed_due: int, race_on: dt.date | None,
                  today: dt.date) -> str:
-    """The ÉTAT block: the computed state that drives the coming weeks."""
+    """The STATE block: the computed state that drives the coming weeks."""
     # No current date in the output: it changes only with the facts or the week.
-    lines = ["- **État calculé** depuis PostgreSQL et decisions.md par "
-             "`redline hot-cache`, ne pas l'éditer."]
+    lines = [text.STATE_HEADER]
     trajectory = []
     longest = ledger.longest_recent(rows, today)
     if longest is not None:
-        trajectory.append(f"plus longue des 30 j **{_round(longest)} km**")
+        trajectory.append(text.LONGEST.format(km=_round(longest)))
     stall = ledger.long_run_stall(rows, today)
     if stall is not None and stall.weeks:
-        flag = " 🔴 protocole des baisses ouvert (s9)" if stall.triggered else ""
-        trajectory.append(f"sans nouveau record depuis {stall.weeks} semaine(s) close(s){flag}")
+        flag = text.STALL_PROTOCOL if stall.triggered else ""
+        trajectory.append(text.STALL.format(weeks=stall.weeks, flag=flag))
     if race_on is not None:
         weeks = (ledger._week_start(ledger._week_label(race_on))
                  - ledger._week_start(ledger._week_label(today))).days // 7
-        trajectory.append(f"course le {race_on:%d/%m}, dans {weeks} semaine(s)")
+        trajectory.append(text.RACE.format(race_on=race_on, weeks=weeks))
     if trajectory:
-        lines.append("- **Trajectoire** : " + " · ".join(trajectory) + ".")
+        lines.append(text.TRAJECTORY + " · ".join(trajectory) + ".")
     overdue = [row for row in deadlines
                if row.get("status") != "done" and _as_date(row["due_on"]) < today]
     if overdue:
         shown = " · ".join(f"{row['deadline_key']} ({_as_date(row['due_on']):%d/%m})"
-                           + (f", bloque {_short(row['blocks'])}" if row.get("blocks") else "")
+                           + (text.DEADLINE_BLOCKS.format(blocks=_short(row["blocks"])) if row.get("blocks") else "")
                            for row in overdue[:4])
         more = f" · +{len(overdue) - 4}" if len(overdue) > 4 else ""
-        lines.append(f"- **Échéances échues** : {shown}{more}.")
+        lines.append(text.OVERDUE.format(shown=shown, more=more))
     if capabilities:
-        lines.append("- **Capacités** : " + " · ".join(
+        lines.append(text.CAPABILITIES + " · ".join(
             f"{row['slug']} {row['score']}/{row['scale']}" for row in capabilities) + ".")
     if typed_due:
-        lines.append(f"- **Prédictions à solder** : {typed_due} "
-                     "(`redline fact-read predictions --due`).")
+        lines.append(text.PREDICTIONS_DUE.format(typed_due=typed_due))
     return "\n".join(lines)
 
 
