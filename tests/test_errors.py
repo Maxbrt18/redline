@@ -97,7 +97,7 @@ def test_a_cli_refusal_reaches_the_operator_without_a_traceback():
         cwd=ENGINE_ROOT, env=env, capture_output=True, text=True, check=False)
     assert result.returncode == 1
     assert "Traceback" not in result.stderr
-    assert "tour" in result.stderr
+    assert "turn" in result.stderr
 
 
 

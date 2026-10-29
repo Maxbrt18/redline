@@ -106,7 +106,7 @@ def test_a_wake_reading_without_a_trace_is_not_written(monkeypatch, capsys, trac
             "--note", "Trace légère déclarée par Sam"]
     monkeypatch.setattr(sys, "argv", argv + (["--pain", trace] if trace else []))
     assert add.main() == 1
-    assert "réveil sans trace" in capsys.readouterr().err
+    assert "wake reading without a trace" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("word, value", [("none", "0"), ("Light", "1"), ("light", "1"),
@@ -152,7 +152,7 @@ def test_a_wake_reading_requires_a_trace_per_zone(monkeypatch, capsys):
         "ledger-add", "--dry-run", "--date", "2026-10-11", "--type", "wake-trace",
         "--pain", "talon=aucune"])
     assert add.main() == 1
-    assert "réveil sans trace pour cheville" in capsys.readouterr().err
+    assert "wake reading without a trace for cheville" in capsys.readouterr().err
 
 
 def _load_writer():

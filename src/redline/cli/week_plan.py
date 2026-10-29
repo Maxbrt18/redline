@@ -25,6 +25,7 @@ import json
 import os
 import sys
 
+from redline.coach.fr import plan as wording
 from redline.model import (
     agent_input,
     commands,
@@ -59,14 +60,14 @@ def _distance_notes(store, revision: dict) -> str:
     try:
         rows = ledger.parse_ledger(store)
     except Exception as exc:
-        return f"Écart aux {days} jours : lecture du registre impossible ({exc.__class__.__name__})."
+        return wording.GAP_UNREADABLE.format(days=days, name=exc.__class__.__name__)
     # The revision timestamp is the service's (`now_stamp`): it is the day "upcoming" is
     # judged from, not the clock of the machine rereading.
     written_on = dt.date.fromisoformat(str(revision["computed_at"])[:10])
     notes = ledger.transition_notes(rows, revision["sessions"], written_on)
     if not notes:
         return ""
-    return "\n".join([f"Écart aux {days} jours (règle n8, informatif, jamais bloquant) :",
+    return "\n".join([wording.GAP_TITLE.format(days=days),
                       *(f"  - {note}" for note in notes)])
 
 
@@ -79,7 +80,7 @@ EXIT_STALE = 3
 def _database_store():
     url = (os.environ.get("DATABASE_URL") or "").strip()
     if not url:
-        raise ConfigError("DATABASE_URL obligatoire : le journal ne contient qu'une projection")
+        raise ConfigError("DATABASE_URL is required: the journal only holds a projection")
     from redline.storage import Database, OperationalStore
     return OperationalStore(Database(url, application_name="week-plan"))
 
@@ -93,7 +94,7 @@ def _database_command(store, command: str, week: str, optional: bool,
         existing = store.load_plan(week)
         expected = 1 if existing is None else len(existing["revisions"]) + 1
         if revision.get("revision") != expected:
-            raise SchemaError([f"revision : attendu {expected}, reçu {revision.get('revision')!r}"])
+            raise SchemaError([f"revision: expected {expected}, got {revision.get("revision")!r}"])
         current = dict(revision)
         # The timestamp belongs to the service, not the model. A model that invents the
         # time of day also invents the day the athlete is talking about, and
@@ -108,10 +109,10 @@ def _database_command(store, command: str, week: str, optional: bool,
         # yesterday's text.
         previous = existing["revisions"][-1] if existing else None
         mistakes = [
-            *intention_errors(current, f"{week} révision {current['revision']}"),
-            *written_text_errors(current, f"{week} révision {current['revision']}"),
+            *intention_errors(current, f"{week} revision {current["revision"]}"),
+            *written_text_errors(current, f"{week} revision {current["revision"]}"),
             *change_evidence_errors(previous, current),
-            *typed_target_errors(current, f"{week} révision {current['revision']}"),
+            *typed_target_errors(current, f"{week} revision {current["revision"]}"),
         ]
         if mistakes:
             raise SchemaError(mistakes)
@@ -125,7 +126,7 @@ def _database_command(store, command: str, week: str, optional: bool,
         if command == "preview":
             store.preview_command(commands.PLAN_REVISE,
                                   {"week": week, "revision": current}, turn_id=turn_id)
-            print("SIMULATION VALIDÉE — aucun changement préparé ou enregistré.")
+            print(wording.PREVIEW_VALID)
             print(revision_readback(week, previous, current))
             notes = _distance_notes(store, current)
             if notes:
@@ -135,7 +136,7 @@ def _database_command(store, command: str, week: str, optional: bool,
             store.stage_command(turn_id, f"plan:{week}:r{current['revision']}",
                                 commands.PLAN_REVISE,
                                 {"week": week, "revision": current})
-            print("CHANGEMENT PRÉPARÉ — application en fin de tour encore requise.")
+            print(wording.CHANGE_STAGED)
             print(revision_readback(week, previous, current))
             notes = _distance_notes(store, current)
             if notes:
@@ -150,9 +151,9 @@ def _database_command(store, command: str, week: str, optional: bool,
     plan = store.load_plan(week)
     if plan is None:
         if optional:
-            print(f"{week} : aucun programme")
+            print(wording.NO_PLAN.format(week=week))
             return EXIT_OK
-        raise NoteError(f"{week} : programme hebdomadaire absent dans PostgreSQL")
+        raise NoteError(f"{week}: weekly plan missing in PostgreSQL")
     validate(plan)
     revision = active(plan)
     stale = store.plan_needs_arbitration(week, revision["revision"])
@@ -160,10 +161,10 @@ def _database_command(store, command: str, week: str, optional: bool,
     if command == "show":
         print(as_json(plan))
     else:
-        print(f"{week} : révision {revision['revision']} valide, "
-              f"{len(revision['sessions'])} entrée(s)")
+        print(wording.PLAN_VALID.format(week=week, revision=revision["revision"],
+                                        sessions=len(revision["sessions"])))
     if gates:
-        print("\n  - ".join([f"{week} : en attente de la réponse de l'athlète :", *gates]),
+        print("\n  - ".join([wording.AWAITING_ATHLETE.format(week=week), *gates]),
               file=sys.stderr)
         return EXIT_AWAITING_GATE
     if stale:
@@ -171,9 +172,7 @@ def _database_command(store, command: str, week: str, optional: bool,
         # as for a dated check, and only the prescription waits. Raising a NoteError before
         # printing would give exit code 1 and an empty stdout, and a coach running `show`
         # would conclude the program is broken.
-        print(f"{week} : arbitrage obligatoire, activité non rattachée apparue depuis "
-              "la révision — le programme reste lisible, mais rien ne se prescrit "
-              "avant une révision",
+        print(wording.ARBITRATION_REQUIRED.format(week=week),
               file=sys.stderr)
         return EXIT_STALE
     return EXIT_OK
@@ -184,7 +183,7 @@ def main() -> int:
     parser.add_argument("command", choices=("check", "show", "revise", "preview"))
     parser.add_argument("--week", default=current_week())
     parser.add_argument("--optional", action="store_true")
-    parser.add_argument("--input", help="JSON de revise/preview (défaut : stdin hors tour)")
+    parser.add_argument("--input", help="revise/preview JSON (default: stdin outside a turn)")
     args = parser.parse_args()
     try:
         return _database_command(_database_store(), args.command, args.week, args.optional,

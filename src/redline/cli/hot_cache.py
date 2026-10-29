@@ -30,7 +30,7 @@ def main() -> int:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--root", default=paths.vault_root(), type=Path)
     parser.add_argument("--check", action="store_true",
-                        help="signale une dérive sans rien écrire")
+                        help="report drift without writing anything")
     args = parser.parse_args()
 
     store = ledger.open_store()
@@ -43,11 +43,11 @@ def main() -> int:
         raise InputError(str(exc)) from exc
 
     if not drifted:
-        print("Blocs Forme et État déjà à jour.")
+        print("FORM and STATE blocks already up to date.")
     elif args.check:
-        raise InputError("Blocs du hot-cache dérivés — régénère avec `redline hot-cache`.")
+        raise InputError("hot-cache blocks drifted -- regenerate with `redline hot-cache`.")
     else:
-        print("Blocs Forme et État régénérés.")
+        print("FORM and STATE blocks regenerated.")
     return 0
 
 

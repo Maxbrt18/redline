@@ -24,6 +24,7 @@ from pathlib import Path
 
 import yaml
 
+from redline.coach.fr import vault_check as wording
 from redline.model import (
     correction_replay,
     entrypoint,
@@ -120,6 +121,10 @@ class Vault:
         return self.files.get(relative)
 
 
+def _detail(detail: str) -> str:
+    return wording.DETAIL.format(detail=detail) if detail else ""
+
+
 class Report:
     def __init__(self, quiet: bool) -> None:
         self.failed = 0
@@ -129,20 +134,20 @@ class Report:
 
     def ok(self, label: str, detail: str = "") -> None:
         if not self.quiet:
-            print(f"  \033[32mOK\033[0m   {label}" + (f" — {detail}" if detail else ""))
+            print(f"  \033[32mOK\033[0m   {label}{_detail(detail)}")
 
     def warn(self, label: str, detail: str = "") -> None:
         """Not a failure, but it must not read as a success either: an amber line in a
         wall of green lines is invisible when it is printed with the same OK."""
         self.warned += 1
-        print(f"  \033[33m⚠\033[0m    {label}" + (f" — {detail}" if detail else ""))
+        print(f"  \033[33m⚠\033[0m    {label}{_detail(detail)}")
 
     def skip(self, label: str, detail: str = "") -> None:
         """A check with nothing to look at. It says so instead of staying silent: a
         control that disappears when its target is missing reads exactly like a
         control that passed."""
         self.skipped += 1
-        print(f"  \033[90m--\033[0m   {label}" + (f" — {detail}" if detail else ""))
+        print(f"  \033[90m--\033[0m   {label}{_detail(detail)}")
 
     # Beyond this, the screen scrolls; but a silent cut is what `model/schema.py` was
     # built against ("Every error, not the first one"): you fix, re-run, there are more.
@@ -155,7 +160,7 @@ class Report:
         for line in details[:self.MAX_DETAILS]:
             print(f"         {line}")
         if len(details) > self.MAX_DETAILS:
-            print(f"         … et {len(details) - self.MAX_DETAILS} autre(s)")
+            print(wording.MORE.format(count=len(details) - self.MAX_DETAILS))
 
 
 def markdown_files(root: Path) -> dict:
@@ -184,22 +189,21 @@ def check_frontmatter(vault: Vault, report: Report) -> None:
         try:
             metadata = yaml.safe_load(match.group(1))
         except yaml.YAMLError as exc:
-            problems.append(f"{path} : YAML invalide : {str(exc).splitlines()[0]}")
+            problems.append(wording.YAML_INVALID.format(path=path, error=str(exc).splitlines()[0]))
             continue
         if not isinstance(metadata, dict):
-            problems.append(f"{path} : frontmatter attendu comme objet YAML")
+            problems.append(wording.FRONTMATTER_NOT_OBJECT.format(path=path))
             continue
         note_types = vault.instance.note_types if vault.instance else None
         if note_types is not None and metadata.get("type") not in note_types:
-            problems.append(f"{path} : type {metadata.get('type')!r} non déclaré "
-                            "dans [vault] note_types")
+            problems.append(wording.TYPE_UNDECLARED.format(path=path, type=metadata.get("type")))
         aliases = metadata.get("aliases")
         if aliases is not None and not isinstance(aliases, list):
-            problems.append(f"{path} : aliases doit être une liste YAML")
+            problems.append(wording.ALIASES_NOT_LIST.format(path=path))
     if problems:
-        report.fail("frontmatter et gabarits valides", problems)
+        report.fail(wording.FRONTMATTER, problems)
     else:
-        report.ok("frontmatter et gabarits valides", f"{parsed} bloc(s) YAML")
+        report.ok(wording.FRONTMATTER, wording.YAML_BLOCKS.format(parsed=parsed))
 
 
 # A missing database is reported one way only, by every check that reads PostgreSQL:
@@ -209,7 +213,7 @@ def check_frontmatter(vault: Vault, report: Report) -> None:
 #
 # A missing database is not a degraded mode: the app refuses to start without it and no
 # fallback exists. It is simply not for the content linter to enforce.
-NO_DATABASE = "DATABASE_URL absent — lance-le avec la base pour ces contrôles"
+NO_DATABASE = wording.NO_DATABASE
 
 
 def _read_postgres(report: Report, label: str, read):
@@ -231,8 +235,8 @@ def _read_postgres(report: Report, label: str, read):
         finally:
             database.dispose()
     except Exception as exc:
-        report.fail(label, [f"lecture PostgreSQL impossible : "
-                            f"{exc.__class__.__name__}: {exc}"])
+        report.fail(label,
+                    [wording.POSTGRES_UNREADABLE.format(name=exc.__class__.__name__, exc=exc)])
         return None
 
 
@@ -253,45 +257,45 @@ def check_postgres_storage(vault: Vault, report: Report) -> None:
             )).scalar_one_or_none() or 0)
         return head, current, unpublished, store.counts()
 
-    state = _read_postgres(report, "stockage PostgreSQL canonique", read)
+    state = _read_postgres(report, wording.STORAGE, read)
     if state is None:
         return
     head, current, unpublished, counts = state
     if current != head:
-        report.fail("stockage PostgreSQL canonique", [
-            f"migration active {current or 'absente'}, tête attendue {head}"])
+        report.fail(wording.STORAGE, [
+            wording.STORAGE_MIGRATION.format(current=current or wording.NO_MIGRATION, head=head)])
     elif not counts["observations"]:
-        report.fail("stockage PostgreSQL canonique", ["aucune observation canonique"])
+        report.fail(wording.STORAGE, [wording.NO_OBSERVATION])
     elif unpublished:
-        report.warn("stockage PostgreSQL canonique",
-                    f"schéma {current}, {unpublished} événement(s) à projeter")
+        report.warn(wording.STORAGE,
+                    wording.STORAGE_UNPUBLISHED.format(current=current, unpublished=unpublished))
     else:
-        report.ok("stockage PostgreSQL canonique",
-                  f"schéma {current}, {counts['observations']} observation(s)")
+        report.ok(wording.STORAGE,
+                  wording.STORAGE_OK.format(current=current, observations=counts["observations"]))
 
 
 # ------------------------------------------------------------ observations PostgreSQL
 
 def check_observations(vault: Vault, report: Report) -> None:
     """Business completeness of the canonical ledger, with no intermediate Markdown view."""
-    observations = _read_postgres(report, "observations PostgreSQL",
+    observations = _read_postgres(report, wording.OBSERVATIONS,
                                   lambda store: store.observation_rows())
     if observations is None:
         return
     if not observations:
-        report.fail("observations PostgreSQL", ["aucune observation canonique"])
+        report.fail(wording.OBSERVATIONS, [wording.NO_OBSERVATION])
         return
     dates = [row["occurred_on"] for row in observations]
     problems = []
     if dates != sorted(dates, reverse=True):
-        problems.append("ordre de lecture non antéchronologique")
+        problems.append(wording.OBSERVATIONS_ORDER)
     problems.extend(ledger.observation_completeness_errors(
         observations, dt.date.today()))
     if problems:
-        report.fail("observations PostgreSQL", problems)
+        report.fail(wording.OBSERVATIONS, problems)
     else:
-        report.ok("observations PostgreSQL",
-                  f"{len(observations)} observation(s), contraintes SQL et complétude valides")
+        report.ok(wording.OBSERVATIONS,
+                  wording.OBSERVATIONS_OK.format(observations=len(observations)))
 
 
 # ----------------------------------------------------------------- one fact, one home
@@ -305,11 +309,11 @@ def check_no_duplicate_facts(vault: Vault, report: Report) -> None:
         for sid in set(STRAVA_ID.findall(text)):
             seen.setdefault(sid, []).append(path)
     if seen:
-        report.fail("aucun fait PostgreSQL recopié dans Git",
-                    [f"{sid} dans {', '.join(sorted(paths))}"
+        report.fail(wording.NO_COPIED_FACT,
+                    [wording.COPIED_FACT.format(sid=sid, join=", ".join(sorted(paths)))
                      for sid, paths in sorted(seen.items())])
     else:
-        report.ok("aucun fait PostgreSQL recopié dans Git")
+        report.ok(wording.NO_COPIED_FACT)
 
 
 def check_links(vault: Vault, report: Report) -> None:
@@ -335,10 +339,11 @@ def check_links(vault: Vault, report: Report) -> None:
                 continue
             broken.setdefault(name, []).append(path)
     if broken:
-        report.fail("graphe intact",
-                    [f"[[{n}]] ← {', '.join(sorted(set(p))[:3])}" for n, p in broken.items()])
+        report.fail(wording.GRAPH,
+                    [wording.BROKEN_LINK.format(n=n, join=", ".join(sorted(set(p))[:3]))
+                     for n, p in broken.items()])
     else:
-        report.ok("graphe intact", f"{len(vault.files)} notes, aucun lien cassé")
+        report.ok(wording.GRAPH, wording.GRAPH_OK.format(files=len(vault.files)))
 
 
 def check_unique_basenames(vault: Vault, report: Report) -> None:
@@ -352,27 +357,27 @@ def check_unique_basenames(vault: Vault, report: Report) -> None:
         seen.setdefault(path.rsplit("/", 1)[-1], []).append(path)
     clashes = {n: p for n, p in seen.items() if len(p) > 1}
     if clashes:
-        report.fail("noms de notes uniques",
-                    [f"{n} → {', '.join(sorted(p))} ([[{n[:-3]}]] est ambigu)"
+        report.fail(wording.UNIQUE_NAMES,
+                    [wording.AMBIGUOUS_NAME.format(n=n, join=", ".join(sorted(p)), link=n[:-3])
                      for n, p in sorted(clashes.items())])
     else:
-        report.ok("noms de notes uniques", f"{len(seen)} notes, aucune collision")
+        report.ok(wording.UNIQUE_NAMES, wording.UNIQUE_NAMES_OK.format(seen=len(seen)))
 
 
 def check_startup_budget(vault: Vault, report: Report) -> None:
     """The agent's reading cost, per file and per tier, as `[[vault.budget]]` declares."""
     tiers = vault.instance.read_budget if vault.instance else ()
     if not tiers:
-        report.skip("budget de lecture", "aucun [[vault.budget]] dans redline.toml")
+        report.skip(wording.BUDGET, wording.NO_BUDGET)
         return
     result = budget.audit(tiers, {path: vault.text(path) for tier in tiers
                                   for path, _ in tier.files})
     if result.over or result.over_total:
-        report.fail("budget de lecture", [*result.problems(), result.detail])
+        report.fail(wording.BUDGET, [*result.problems(), result.detail])
     elif result.near_total:
-        report.warn("budget de lecture", f"marge < 5 % sur un étage · {result.detail}")
+        report.warn(wording.BUDGET, wording.BUDGET_NEAR.format(detail=result.detail))
     else:
-        report.ok("budget de lecture", result.detail)
+        report.ok(wording.BUDGET, result.detail)
 
 
 def check_updated_dates(vault: Vault, report: Report) -> None:
@@ -388,16 +393,17 @@ def check_updated_dates(vault: Vault, report: Report) -> None:
                 ["git", "log", "-1", "--format=%ad", "--date=short", "--", path],
                 cwd=vault.root, capture_output=True, text=True, timeout=10).stdout.strip()
         except (OSError, subprocess.TimeoutExpired):
-            report.skip("dates `updated` honnêtes", "git indisponible")
+            report.skip(wording.UPDATED_DATES, wording.NO_GIT)
             return
         if not committed:
             continue  # never committed yet
         if updated.isoformat() > committed and _is_clean(vault.root, path):
-            stale.append(f"{path} : updated {updated} > dernier commit {committed}")
+            stale.append(wording.UPDATED_TOO_LATE.format(path=path, updated=updated,
+                                                         committed=committed))
     if stale:
-        report.fail("dates `updated` honnêtes", stale)
+        report.fail(wording.UPDATED_DATES, stale)
     else:
-        report.ok("dates `updated` honnêtes")
+        report.ok(wording.UPDATED_DATES)
 
 
 def _is_clean(root: Path, path: str) -> bool:
@@ -413,15 +419,15 @@ def check_decisions_order(vault: Vault, report: Report) -> None:
     IS the structure, so it gets checked."""
     text = vault.text(DECISIONS)
     if text is None:
-        report.skip("décisions antéchronologiques", f"{DECISIONS} est introuvable")
+        report.skip(wording.DECISIONS_ORDER, wording.DECISIONS_MISSING.format(decisions=DECISIONS))
         return
     dates = DECISION_HEADING.findall(text)
-    out_of_order = [f"{b} arrive après {a} (l'ordre est antéchronologique)"
+    out_of_order = [wording.DECISION_OUT_OF_ORDER.format(b=b, a=a)
                     for a, b in pairwise(dates) if b > a]
     if out_of_order:
-        report.fail("décisions antéchronologiques", out_of_order)
+        report.fail(wording.DECISIONS_ORDER, out_of_order)
     else:
-        report.ok("décisions antéchronologiques", f"{len(dates)} décisions")
+        report.ok(wording.DECISIONS_ORDER, wording.DECISIONS_COUNT.format(dates=len(dates)))
 
 
 #: Two weekly reviews to settle a due prediction before the check turns red.
@@ -430,7 +436,7 @@ PREDICTION_GRACE_DAYS = 14
 
 def check_prediction_debt(vault: Vault, report: Report) -> None:
     """A due prediction receives its verdict: amber at first, red after two reviews."""
-    rows = _read_postgres(report, "prédictions soldées", lambda store: store.prediction_rows())
+    rows = _read_postgres(report, wording.PREDICTIONS, lambda store: store.prediction_rows())
     if rows is None:
         return
     today = dt.date.today()
@@ -438,35 +444,37 @@ def check_prediction_debt(vault: Vault, report: Report) -> None:
     rows = [{**row, "due_on": dt.date.fromisoformat(str(row["due_on"]))} for row in rows]
     due = sorted((row for row in rows if row["status"] == "open" and row["due_on"] < today),
                  key=lambda row: row["due_on"])
-    lines = [f"{row['prediction_key']} (échue le {row['due_on']}, +"
-             f"{(today - row['due_on']).days} j)" for row in due]
+    lines = [wording.PREDICTION_LATE.format(prediction_key=row["prediction_key"],
+                                            due_on=row["due_on"], days=(today - row["due_on"]).days)
+             for row in due]
     late = [line for row, line in zip(due, lines, strict=True)
             if (today - row["due_on"]).days > PREDICTION_GRACE_DAYS]
     if late:
-        report.fail("prédictions soldées",
-                    [f"{len(late)} prédiction(s) échue(s) depuis plus de "
-                     f"{PREDICTION_GRACE_DAYS} j ; ferme chacune avec "
-                     "`redline fact-write prediction --key <clé> --outcome true|false|void`", *late])
+        report.fail(wording.PREDICTIONS,
+                    [wording.PREDICTIONS_LATE.format(late=len(late),
+                                                     prediction_grace_days=PREDICTION_GRACE_DAYS),
+                     *late])
     elif due:
-        report.warn("prédictions soldées",
-                    f"{len(due)} à fermer au prochain bilan : " + " · ".join(lines[:3]))
+        report.warn(wording.PREDICTIONS,
+                    wording.PREDICTIONS_DUE.format(due=len(due)) + " · ".join(lines[:3]))
     else:
-        report.ok("prédictions soldées")
+        report.ok(wording.PREDICTIONS)
 
 
 def check_threads(vault: Vault, report: Report) -> None:
     """A past follow-up stays visible without a Markdown projection."""
-    rows = _read_postgres(report, "fils ouverts", lambda store: store.thread_rows())
+    rows = _read_postgres(report, wording.THREADS, lambda store: store.thread_rows())
     if rows is None:
         return
     late = [row for row in rows if row["status"] == ThreadStatus.OPEN and row["follow_up_on"]
             and row["follow_up_on"] < dt.date.today()]
     if late:
         first = late[0]
-        report.warn("relances tenues", f"{len(late)} en retard — "
-                    f"{first['follow_up_on']} · {first['body']}")
+        report.warn(wording.FOLLOW_UPS,
+                    wording.FOLLOW_UPS_LATE.format(late=len(late), follow_up_on=first["follow_up_on"],
+                                                   body=first["body"]))
     else:
-        report.ok("relances tenues")
+        report.ok(wording.FOLLOW_UPS)
 
 
 def check_corrections_replay(vault: Vault, report: Report) -> None:
@@ -480,97 +488,105 @@ def check_corrections_replay(vault: Vault, report: Report) -> None:
     """
     text = vault.text(CORRECTIONS)
     if text is None:
-        report.skip("corrections rejouables", f"{CORRECTIONS} est introuvable")
+        report.skip(wording.CORRECTIONS,
+                    wording.CORRECTIONS_MISSING.format(corrections=CORRECTIONS))
         return
     if not (vault.root / vault_layout.CORRECTIONS_REPLAY).is_file():
-        report.skip("corrections rejouables",
-                    f"pas de registre {vault_layout.CORRECTIONS_REPLAY}")
+        report.skip(wording.CORRECTIONS,
+                    wording.NO_REPLAY_REGISTER.format(
+                        corrections_replay=vault_layout.CORRECTIONS_REPLAY))
         return
     try:
         found = correction_replay.audit(vault.root, text, dt.date.today())
     except (OSError, ValueError) as exc:
-        report.fail("corrections rejouables", [f"registre illisible : {exc}"])
+        report.fail(wording.CORRECTIONS, [wording.REGISTER_UNREADABLE.format(exc=exc)])
         return
-    problems = ([f"{c.key} — sans mode de rejeu depuis plus de "
-                 f"{correction_replay.GRACE_DAYS} j" for c in found.late]
-                + [f"{key} — au registre mais absente de {CORRECTIONS}"
+    problems = ([wording.CORRECTION_WITHOUT_MODE.format(key=c.key,
+                                                        grace_days=correction_replay.GRACE_DAYS)
+                 for c in found.late]
+                + [wording.CORRECTION_NOT_IN_JOURNAL.format(key=key, corrections=CORRECTIONS)
                    for key in found.orphans]
                 + found.broken)
     if problems:
-        report.fail("corrections rejouables",
-                    [f"registre : {vault_layout.CORRECTIONS_REPLAY}", *problems])
+        report.fail(wording.CORRECTIONS,
+                    [wording.REGISTER.format(corrections_replay=vault_layout.CORRECTIONS_REPLAY),
+                     *problems])
         return
     pending = [c.key for c in found.unregistered]
     if pending or found.owed:
         detail = []
         if pending:
-            detail.append(f"{len(pending)} à classer ({pending[0]})")
+            detail.append(wording.CORRECTIONS_PENDING.format(pending=len(pending),
+                                                             first=pending[0]))
         if found.owed:
-            detail.append(f"{len(found.owed)} sans scénario (`pending`)")
-        report.warn("corrections rejouables", " · ".join(detail))
+            detail.append(wording.CORRECTIONS_OWED.format(owed=len(found.owed)))
+        report.warn(wording.CORRECTIONS, " · ".join(detail))
         return
-    report.ok("corrections rejouables")
+    report.ok(wording.CORRECTIONS)
 
 
 def check_deadlines(vault: Vault, report: Report) -> None:
     """An échéance past its date and still open (⬜) makes noise on its own, rather
     than waiting for someone to reread a throwaway cache."""
-    rows = _read_postgres(report, "échéances tenues", lambda store: store.deadline_rows())
+    rows = _read_postgres(report, wording.DEADLINES, lambda store: store.deadline_rows())
     if rows is None:
         return
     today = dt.date.today()
-    late = [f"{row['due_on']} — {row['item']} (échéance passée, encore à faire)"
+    late = [wording.DEADLINE_LATE.format(due_on=row["due_on"], item=row["item"])
             for row in rows if row["due_on"] < today and row["status"] == "todo"]
     if late:
-        report.fail("échéances tenues", late)
+        report.fail(wording.DEADLINES, late)
     else:
-        report.ok("échéances tenues")
+        report.ok(wording.DEADLINES)
 
 
 def check_capability_notes(vault: Vault, report: Report) -> None:
     """Analysis notes have a stable identity and carry no operational state."""
     if MODEL_UNAVAILABLE:
-        report.skip("notes de capacité conformes",
-                    f"couche modèle indisponible ({MODEL_UNAVAILABLE})")
+        report.skip(wording.CAPABILITY_NOTES,
+                    wording.MODEL_UNAVAILABLE.format(model_unavailable=MODEL_UNAVAILABLE))
         return
     try:
         capabilities = load_capabilities(vault.root)
     except NoteError as exc:
-        report.fail("notes de capacité conformes", str(exc).splitlines())
+        report.fail(wording.CAPABILITY_NOTES, str(exc).splitlines())
         return
     if capabilities:
-        report.ok("notes de capacité conformes", f"{len(capabilities)} capacité(s)")
+        report.ok(wording.CAPABILITY_NOTES,
+                  wording.CAPABILITIES_COUNT.format(capabilities=len(capabilities)))
     else:
-        report.skip("notes de capacité conformes", f"{CAPABILITIES_DIR}/ est vide")
+        report.skip(wording.CAPABILITY_NOTES,
+                    wording.FOLDER_EMPTY.format(capabilities_dir=CAPABILITIES_DIR))
 
 
 def check_cockpit_freshness(vault: Vault, report: Report) -> None:
     """Checks the freshness of the PostgreSQL source of truth."""
-    capabilities = _read_postgres(report, "cockpit à jour",
+    capabilities = _read_postgres(report, wording.COCKPIT,
                                   lambda store: store.latest_capabilities())
     if capabilities is None:
         return
     if not capabilities:
-        report.fail("cockpit à jour", ["aucune capacité dans PostgreSQL"])
+        report.fail(wording.COCKPIT, [wording.NO_CAPABILITY])
         return
     today = dt.date.today()
-    stale = [f"{data['slug']} : évalué il y a "
-             f"{(today - data['evaluated_on']).days} j "
-             f"(> {CAPABILITY_STALE_DAYS})"
+    stale = [wording.CAPABILITY_STALE.format(slug=data["slug"],
+                                             days=(today - data["evaluated_on"]).days,
+                                             capability_stale_days=CAPABILITY_STALE_DAYS)
              for data in capabilities
              if (today - data["evaluated_on"]).days > CAPABILITY_STALE_DAYS]
     if stale:
-        report.fail("cockpit à jour", stale)
+        report.fail(wording.COCKPIT, stale)
     else:
-        report.ok("cockpit à jour",
-                  f"{len(capabilities)} capacité(s), toutes < {CAPABILITY_STALE_DAYS} j")
+        report.ok(wording.COCKPIT,
+                  wording.COCKPIT_OK.format(capabilities=len(capabilities),
+                                            capability_stale_days=CAPABILITY_STALE_DAYS))
 
 
 def check_weekly_plans(vault: Vault, report: Report) -> None:
     """Every PostgreSQL plan validates and the current week cannot be missing."""
     if MODEL_UNAVAILABLE:
-        report.skip("programme hebdomadaire transactionnel",
-                    f"couche modèle indisponible ({MODEL_UNAVAILABLE})")
+        report.skip(wording.WEEKLY_PLAN,
+                    wording.MODEL_UNAVAILABLE.format(model_unavailable=MODEL_UNAVAILABLE))
         return
     current = weekly_plan.current_week()
 
@@ -586,7 +602,7 @@ def check_weekly_plans(vault: Vault, report: Report) -> None:
         plans = {week: store.load_plan(week) for week in weeks}
         for week, plan in plans.items():
             if plan is None:
-                problems.append(f"{week} : plan introuvable après découverte SQL")
+                problems.append(wording.PLAN_NOT_FOUND.format(week=week))
                 continue
             weekly_plan.validate(plan)
             revision = weekly_plan.active(plan)
@@ -595,10 +611,10 @@ def check_weekly_plans(vault: Vault, report: Report) -> None:
             # is currently prescribable.
             if (week == current
                     and store.plan_needs_arbitration(week, revision["revision"])):
-                problems.append(f"{week} : recalcul obligatoire : données modifiées depuis la révision")
+                problems.append(wording.PLAN_RECOMPUTE.format(week=week))
         return plans, problems
 
-    state = _read_postgres(report, "programme hebdomadaire transactionnel", read)
+    state = _read_postgres(report, wording.WEEKLY_PLAN, read)
     if state is None:
         return
     plans, problems = state
@@ -606,20 +622,20 @@ def check_weekly_plans(vault: Vault, report: Report) -> None:
     waiting: list[str] = []
     current_plan = plans.get(current)
     if current_plan is None:
-        problems.append(f"{current} : programme hebdomadaire absent dans PostgreSQL")
+        problems.append(wording.PLAN_MISSING.format(current=current))
     else:
         # A dated check that is due is not a vault defect: it is a question awaiting an
         # answer. Filing it with the errors teaches readers to ignore the report and to
         # confuse the two.
-        waiting = [f"{current} : {reason}"
+        waiting = [wording.PLAN_REASON.format(current=current, reason=reason)
                    for reason in weekly_plan.gate_reasons(current_plan)]
     if problems:
-        report.fail("programme hebdomadaire transactionnel", problems)
+        report.fail(wording.WEEKLY_PLAN, problems)
     elif waiting:
-        report.warn("programme hebdomadaire transactionnel", " ; ".join(waiting))
+        report.warn(wording.WEEKLY_PLAN, " ; ".join(waiting))
     else:
-        report.ok("programme hebdomadaire transactionnel",
-                  f"{count} semaine(s) typée(s), {current} présente et valide")
+        report.ok(wording.WEEKLY_PLAN,
+                  wording.WEEKLY_PLAN_OK.format(count=count, current=current))
 
 
 def check_generated_views(vault: Vault, report: Report) -> None:
@@ -631,19 +647,18 @@ def check_generated_views(vault: Vault, report: Report) -> None:
     A check's success message is a promise: it names only what it actually opened.
     """
     if MODEL_UNAVAILABLE:
-        report.warn("vues générées à jour",
-                    f"couche modèle indisponible ({MODEL_UNAVAILABLE})")
+        report.warn(wording.VIEWS,
+                    wording.MODEL_UNAVAILABLE.format(model_unavailable=MODEL_UNAVAILABLE))
         return
     if not (os.environ.get("DATABASE_URL") or "").strip():
         # Every view here is regenerated FROM PostgreSQL: without a database there is
         # nothing to compare. Letting the RuntimeError escape the `except` below would
         # abort the whole report with a traceback.
-        report.skip("vues générées à jour", NO_DATABASE)
+        report.skip(wording.VIEWS, NO_DATABASE)
         return
     problems = []
     try:
-        problems += [f"{name} a dérivé — régénère avec "
-                     f"`redline strength-tables`"
+        problems += [wording.STRENGTH_DRIFT.format(name=name)
                      for name in refresh(vault.root, load_program(vault.root),
                                          check=True)]
         store = ledger_gauge.open_store()
@@ -651,19 +666,17 @@ def check_generated_views(vault: Vault, report: Report) -> None:
         instruments = ledger_gauge.load_instruments(store)
         if hot_cache.refresh(vault.root, ledger_gauge, rows, instruments,
                              store=store, check=True):
-            problems.append("blocs Forme/État du hot-cache ont dérivé — régénère avec "
-                            "`redline hot-cache`")
+            problems.append(wording.HOT_CACHE_DRIFT)
         drifted, seen = _plan_view_drift(vault)
         problems += drifted
     except (NoteError, ViewDrift, ledger.LedgerError) as exc:
-        report.fail("vues générées à jour", [str(exc).replace("\n", " ")])
+        report.fail(wording.VIEWS, [str(exc).replace("\n", " ")])
         return
     if problems:
-        report.fail("vues générées à jour", problems)
+        report.fail(wording.VIEWS, problems)
     else:
-        report.ok("vues générées à jour",
-                  "tables de renfo + journal renfo + blocs Forme et État "
-                  f"+ {seen} bloc(s) de programme")
+        report.ok(wording.VIEWS,
+                  wording.VIEWS_OK.format(seen=len(seen)))
 
 
 def _plan_view_drift(vault: Vault) -> tuple:
@@ -684,8 +697,7 @@ def _plan_view_drift(vault: Vault) -> tuple:
         seen = plan_view_count(store, vault.root)
     finally:
         database.dispose()
-    return ([f"{name} : le programme a dérivé de PostgreSQL — régénère avec "
-             f"`redline storage-project`" for name in drifted], seen)
+    return ([wording.PLAN_DRIFT.format(name=name) for name in drifted], seen)
 
 
 # The order IS the reading order of the report. Adding a check means adding it here
@@ -720,23 +732,23 @@ OPERATIONAL_CHECKS = frozenset({
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--root", default=".", type=Path, help="racine du vault (défaut : .)")
-    parser.add_argument("--quiet", action="store_true", help="n'afficher que les échecs")
+    parser.add_argument("--root", default=".", type=Path, help="vault root (default: .)")
+    parser.add_argument("--quiet", action="store_true", help="only show failures")
     parser.add_argument(
         "--static-only", action="store_true",
-        help="contrôles Git seulement ; annonce explicitement que PostgreSQL n'a pas été audité")
+        help="Git checks only; says explicitly that PostgreSQL was not audited")
     args = parser.parse_args()
     root = args.root.resolve()
 
-    print(f"\n  Contrôle du vault — {root}\n")
+    print(wording.TITLE.format(root=root))
     report = Report(args.quiet)
     try:
         loaded = instance_model.load(root)
     except instance_model.InstanceError as exc:
-        report.fail("redline.toml lisible", str(exc).splitlines())
+        report.fail(wording.INSTANCE, str(exc).splitlines())
         loaded = None
     else:
-        report.ok("redline.toml lisible")
+        report.ok(wording.INSTANCE)
     vault = Vault(root, markdown_files(root), loaded)
     selected = [check for check in CHECKS
                 if not args.static_only or check not in OPERATIONAL_CHECKS]
@@ -744,19 +756,15 @@ def main() -> int:
         check(vault, report)
 
     if report.failed:
-        print(f"\n  \033[31m{report.failed} contrôle(s) en échec.\033[0m "
-              "Corrige maintenant : c'est deux minutes cette semaine, une refonte dans un mois.\n")
+        print(wording.FAILED.format(failed=report.failed))
         return 1
     if args.static_only:
-        print("\n  \033[32mAudit statique sain\033[0m ; audit opérationnel PostgreSQL "
-              "non exécuté.\n")
+        print(wording.STATIC_OK)
         return 0
     if report.warned or report.skipped:
-        print(f"\n  \033[32mAudit statique sain\033[0m, "
-              f"{report.warned} vigilance(s), {report.skipped} contrôle(s) non exécuté(s). "
-              "L'audit opérationnel n'est complet que sans ligne --.\n")
+        print(wording.STATIC_OK_WARNED.format(warned=report.warned, skipped=report.skipped))
         return 0
-    print("\n  \033[32mVault sain.\033[0m\n")
+    print(wording.HEALTHY)
     return 0
 
 

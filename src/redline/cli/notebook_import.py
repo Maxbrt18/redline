@@ -15,6 +15,7 @@ from pathlib import Path
 
 import sqlalchemy as sa
 
+from redline.coach.fr import cards as wording
 from redline.service import strength
 from redline.service.config import Config, _load_dotenv
 from redline.service.notebook import period_day, review_period
@@ -50,7 +51,7 @@ def recover(store: NotebookStore, root: Path, psid: str, year: int, apply: bool)
             continue
         data = image.read_bytes()
         if len(data) > 12 * 1024 * 1024:
-            raise ValueError(f"image trop volumineuse : {image.name}")
+            raise ValueError(f"image too large: {image.name}")
         digest = hashlib.sha256(data).hexdigest()
         source = f"recovered:{image.name}:{digest}"
         if store.source_entries(psid, source):
@@ -73,12 +74,12 @@ def recover(store: NotebookStore, root: Path, psid: str, year: int, apply: bool)
                 kind, period = "weekly", f"{week[1] or year}-W{week[2]}"
                 title = f"Weekly · {period}"
             elif re.fullmatch(r"strength-20\d{2}-\d{2}-\d{2}", image.stem):
-                kind, period, title = "strength", image.stem[9:], "Renfo"
+                kind, period, title = "strength", image.stem[9:], wording.STRENGTH
         counts["images"] += 1
         if apply:
             store.save_many(psid, source, [{
                 "slot": image.name, "kind": kind, "period": period,
-                "title": f"{title} · image récupérée",
+                "title": wording.RECOVERED_IMAGE.format(title=title),
                 "occurred_on": period_day(kind, period, created.date()), "created_at": created,
                 "image": data, "image_hash": digest,
                 "image_type": "image/png" if image.suffix.lower() == ".png" else "image/jpeg",
@@ -93,7 +94,7 @@ def main() -> None:
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
     if not 2020 <= args.year <= 2099:
-        parser.error("année d'import invalide")
+        parser.error("invalid import year")
     _load_dotenv(Path("/etc/redline/runtime/coach-messenger.env"))
     config = Config.from_env()
     database = Database(config.database_url, application_name="redline-notebook-import")

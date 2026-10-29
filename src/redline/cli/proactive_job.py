@@ -25,7 +25,7 @@ PERIODIC_KEY = re.compile(
 def _state() -> PostgresStateStore:
     url = (os.environ.get("DATABASE_URL") or "").strip()
     if not url:
-        raise ConfigError("DATABASE_URL obligatoire")
+        raise ConfigError("DATABASE_URL is required")
     return PostgresStateStore(Database(url, application_name="proactive-job"))
 
 
@@ -33,7 +33,7 @@ def _row(state: PostgresStateStore, key: str) -> dict:
     try:
         return next(job for job in state.proactive.jobs() if job["id"] == key)
     except StopIteration:
-        raise InputError(f"job inconnu : {key}") from None
+        raise InputError(f"unknown job: {key}") from None
 
 
 def main() -> int:
@@ -43,25 +43,24 @@ def main() -> int:
     parser.add_argument("--valid-hours", type=float, default=24.0)
     args = parser.parse_args()
     if not PERIODIC_KEY.fullmatch(args.job_key):
-        parser.error("--job-key doit nommer exactement weekly:YYYY-WNN, "
-                     "weekly-repair:YYYY-WNN ou monthly:YYYY-MM")
+        parser.error("--job-key must name exactly weekly:YYYY-WNN, weekly-repair:YYYY-WNN or "
+                     "monthly:YYYY-MM")
     if not 0 < args.valid_hours <= 48:
-        parser.error("--valid-hours doit être dans ]0, 48]")
+        parser.error("--valid-hours must be in ]0, 48]")
 
     state = _state()
     before = _row(state, args.job_key)
     if args.command == "reopen":
         if before["status"] not in {"done", "failed"}:
             raise InputError(
-                f"{args.job_key} : réouverture refusée, statut {before['status']}")
+                f"{args.job_key}: reopening refused, status {before["status"]}")
         now = time.time()
         state.proactive.reopen_job(
             args.job_key, due=now, expire_at=now + args.valid_hours * 3600)
     current = _row(state, args.job_key)
     cause = f" cause={current['last_error']}" if current.get("last_error") else ""
     print(
-        f"{current['id']} : statut={current['status']} "
-        f"tentatives={current['attempts']}{cause}")
+        f"{current["id"]}: status={current["status"]} attempts={current["attempts"]}{cause}")
     return 0
 
 

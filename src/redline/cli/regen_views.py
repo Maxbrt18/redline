@@ -65,9 +65,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--root", default=None, type=Path)
     parser.add_argument("--check", action="store_true",
-                        help="signale une dérive sans rien écrire")
+                        help="report drift without writing anything")
     parser.add_argument("--static-only", action="store_true",
-                        help="ignore les vues qui nécessitent PostgreSQL")
+                        help="skip the views that need PostgreSQL")
     args = parser.parse_args()
     return 1 if run(args.root, check=args.check, static_only=args.static_only) else 0
 

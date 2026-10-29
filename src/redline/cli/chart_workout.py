@@ -20,6 +20,7 @@ Usage:  redline chart-workout -o workout-123.png < data.json
 
 from redline.cards import charts, cli, html, render
 from redline.cards.format import fmt_pace, parse_pace
+from redline.coach.fr import cards as wording
 from redline.model import entrypoint
 from redline.model.cards import WORKOUT_SCHEMA
 
@@ -45,16 +46,17 @@ def main() -> None:
         if recovery:
             segments.append({"kind": "rec", "time_s": recovery["time_s"]})
 
-    legend = [{"kind": "effort", "label": "répétition, plus haut = plus vite que R1"}]
+    legend = [{"kind": "effort", "label": wording.REPETITION_AXIS}]
     if any(seg["kind"] == "rec" for seg in segments):
-        legend.append({"kind": "ghost", "label": "récup"})
+        legend.append({"kind": "ghost", "label": wording.RECOVERY})
 
     subtitle = ", ".join(filter(None, [data.get("date", ""),
-                                       f"cible {fmt_pace(target)}" if target else "",
+                                       wording.TARGET_PACE.format(pace=fmt_pace(target))
+                                       if target else "",
                                        data.get("note", "")]))
     body = (
         '<main id="card">'
-        + html.header(data.get("title", "Séance"), subtitle)
+        + html.header(data.get("title", wording.SESSION), subtitle)
         + html.legend(legend)
         + charts.ribbon(segments)
         + "</main>"

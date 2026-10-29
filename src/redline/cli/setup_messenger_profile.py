@@ -19,28 +19,9 @@ from pathlib import Path
 
 import requests
 
+from redline.coach.fr import messenger_profile as wording
 from redline.model import paths
 from redline.service.config import _load_dotenv
-
-MENU = [
-    {"type": "postback", "title": "Le point sur ma semaine",
-     "payload": "Fais-moi le point sur ma semaine en cours"},
-    {"type": "postback", "title": "Le programme du jour",
-     "payload": "C'est quoi le programme du jour ?"},
-    {"type": "postback", "title": "Mon carnet Redline",
-     "payload": "/carnet"},
-]
-
-ICE_BREAKERS = [
-    {"question": "C'est quoi ma séance aujourd'hui ?",
-     "payload": "C'est quoi ma séance aujourd'hui ?"},
-    {"question": "Fais le point sur ma semaine",
-     "payload": "Fais-moi le point sur ma semaine en cours"},
-    {"question": "Où en est ma prépa TargetRace ?",
-     "payload": "Où en est ma prépa TargetRace ?"},
-    {"question": "Comment va ma blessure ?",
-     "payload": "Fais le point sur ma blessure"},
-]
 
 
 def main() -> None:
@@ -48,7 +29,7 @@ def main() -> None:
     _load_dotenv(external_env if external_env.is_file() else paths.ENGINE_ROOT / ".env")
     token = os.environ.get("MESSENGER_PAGE_TOKEN")
     if not token:
-        sys.exit("MESSENGER_PAGE_TOKEN absent de l'environnement du service.")
+        sys.exit("MESSENGER_PAGE_TOKEN missing from the service environment.")
     version = os.environ.get("GRAPH_API_VERSION", "v21.0")
 
     response = requests.post(
@@ -61,9 +42,9 @@ def main() -> None:
             "persistent_menu": [{
                 "locale": "default",
                 "composer_input_disabled": False,
-                "call_to_actions": MENU,
+                "call_to_actions": wording.MENU,
             }],
-            "ice_breakers": [{"locale": "default", "call_to_actions": ICE_BREAKERS}],
+            "ice_breakers": [{"locale": "default", "call_to_actions": wording.ICE_BREAKERS}],
         },
         timeout=30,
     )

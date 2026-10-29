@@ -61,7 +61,7 @@ def test_the_cli_refuses_an_angle_outside_a_turn(monkeypatch, capsys):
     with pytest.raises(InputError) as refusal:
         fact_write.main()
 
-    assert "tour" in str(refusal.value)
+    assert "turn" in str(refusal.value)
 
 
 def test_the_angle_is_a_turn_command_so_a_refused_turn_takes_it_along():

@@ -9,6 +9,7 @@ import os
 
 from redline.cards import html, render
 from redline.coach import dates
+from redline.coach.fr import cards as wording
 from redline.model import entrypoint
 from redline.model.errors import ConfigError, InputError
 from redline.model.weekly_plan import (
@@ -40,7 +41,7 @@ def rows(sessions: list) -> str:
         day = dt.date.fromisoformat(date_text)
         rendered = []
         for index, session in enumerate(day_sessions, 1):
-            status = " (fait)" if session["status"] == "done" else ""
+            status = wording.DONE if session["status"] == "done" else ""
             rendered.append(
                 '<li class="row">'
                 f'<span class="row__index">{index:02d}</span>'
@@ -65,12 +66,12 @@ def main() -> None:
     args = parser.parse_args()
     database_url = (os.environ.get("DATABASE_URL") or "").strip()
     if not database_url:
-        raise ConfigError("DATABASE_URL obligatoire : le journal ne contient qu'une projection")
+        raise ConfigError("DATABASE_URL is required: the journal only holds a projection")
     from redline.storage import Database, OperationalStore
     store = OperationalStore(Database(database_url, application_name="chart-plan"))
     plan = store.load_plan(args.week)
     if plan is None:
-        raise InputError(f"Programme {args.week} absent dans PostgreSQL")
+        raise InputError(f"plan {args.week} missing in PostgreSQL")
     validate(plan)
     # `--today` dates the session FILTER and the freshness check alike: the card must not
     # decide "needs recalculation" from the clock while displaying another date.
@@ -78,18 +79,19 @@ def main() -> None:
     revision = active(plan)
     stale = gate_reasons(plan, as_of)
     if store.plan_needs_arbitration(args.week, revision["revision"]):
-        stale.append("données de la semaine modifiées depuis le dernier calcul")
+        stale.append("week data changed since the last computation")
     if stale:
-        raise InputError("Plan à recalculer : " + " ; ".join(stale))
+        raise InputError("plan to recompute: " + " ; ".join(stale))
     # Descriptive view: done sessions are marked « (fait) ». Whether a session is cancelled
     # or settled is asked of the model, never reimplemented here.
     sessions = scheduled(revision["sessions"])
     if args.today:
         sessions = [session for session in sessions if session["date"] == args.today]
     body = ('<main id="card">'
-            + html.header(f"{args.week}, révision {revision['revision']}", revision["reason"])
-            + html.section("programme canonique") + rows(sessions)
-            + html.footer("Le total hebdomadaire est une conséquence, jamais une cible à défendre.")
+            + html.header(wording.PLAN_HEADER.format(week=args.week, revision=revision["revision"]),
+                          revision["reason"])
+            + html.section(wording.PLAN_SECTION) + rows(sessions)
+            + html.footer(wording.PLAN_FOOTER)
             + "</main>")
     render.emit(body, args.out, html_only=args.html)
 

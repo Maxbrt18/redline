@@ -13,6 +13,7 @@ import json
 import os
 import sys
 
+from redline.coach.fr import ledger as wording
 from redline.model import (
     commands,
     entrypoint,
@@ -24,7 +25,7 @@ from redline.storage import Database, OperationalStore, StorageError
 
 def _store(url: str) -> OperationalStore:
     if not url:
-        raise StorageError("DATABASE_URL obligatoire")
+        raise StorageError("DATABASE_URL is required")
     return OperationalStore(Database(url, application_name="session-cycle"))
 
 
@@ -33,9 +34,9 @@ def _stage_or_apply(store: OperationalStore, command_key: str, kind: str,
     turn_id = (os.environ.get("REDLINE_TURN_ID") or "").strip()
     if turn_id:
         store.stage_command(turn_id, command_key, kind, payload)
-        return "préparé pour le tour"
+        return wording.STAGED_MASCULINE
     direct()
-    return "enregistré"
+    return wording.RECORDED_MASCULINE
 
 
 def main() -> int:
@@ -79,7 +80,7 @@ def main() -> int:
                 activity = strava.parse_activity(
                     strava.call(f"/activities/{activity_id}"))
                 if args.dry_run:
-                    results.append({"activity_id": activity_id, "status": "a_capturer",
+                    results.append({"activity_id": activity_id, "status": "to_capture",
                                     "start_local": activity.start_local,
                                     "sport": activity.sport})
                 else:
@@ -95,7 +96,7 @@ def main() -> int:
             state = _stage_or_apply(
                 store, f"session-start:{args.session_key}", commands.SESSION_START,
                 payload, lambda: store.declare_session_start(payload, actor="session-cycle"))
-            print(f"Départ facultatif {state}.")
+            print(wording.START_WRITTEN.format(state=state))
         elif args.command == "match":
             payload = {"session_key": args.session_key,
                        "strava_activity_id": args.strava}
@@ -104,10 +105,10 @@ def main() -> int:
                 commands.SESSION_MATCH, payload,
                 lambda: store.match_session(args.session_key, args.strava,
                                             actor="session-cycle"))
-            print(f"Appariement {state}.")
+            print(wording.MATCH_WRITTEN.format(state=state))
         return 0
     except (StorageError, ValueError) as exc:
-        print(f"cycle non écrit : {exc}", file=sys.stderr)
+        print(f"cycle not written: {exc}", file=sys.stderr)
         return 1
 
 

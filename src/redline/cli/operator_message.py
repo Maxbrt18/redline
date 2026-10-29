@@ -29,24 +29,24 @@ VALID_HOURS = 6.0
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--key", required=True, help="identité de l'envoi, ex. bilan-w39")
+    parser.add_argument("--key", required=True, help="identity of the send, e.g. review-w39")
     parser.add_argument("--text", required=True)
     args = parser.parse_args()
     if not KEY.fullmatch(args.key):
-        parser.error("--key : minuscules, chiffres et tirets, 3 à 61 caractères")
+        parser.error("--key: lowercase letters, digits and hyphens, 3 to 61 characters")
     text = args.text.strip()
     if not text:
-        parser.error("--text vide")
+        parser.error("empty --text")
     url = (os.environ.get("DATABASE_URL") or "").strip()
     if not url:
-        raise ConfigError("DATABASE_URL obligatoire")
+        raise ConfigError("DATABASE_URL is required")
     state = PostgresStateStore(Database(url, application_name="operator-message"))
     now = time.time()
     job_key = f"operator:{args.key}"
     queued = state.proactive.enqueue_job(
         job_key, "operator_message", json.dumps({"text": text}, ensure_ascii=False), now,
         expire_at=now + VALID_HOURS * 3600, priority=True)
-    print(f"{job_key} : {'mis en file' if queued else 'déjà en file ou envoyé, rien fait'}")
+    print(f"{job_key}: {"queued" if queued else "already queued or sent, nothing done"}")
     return 0
 
 
