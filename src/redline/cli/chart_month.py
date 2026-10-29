@@ -15,6 +15,7 @@ from pathlib import Path
 
 from redline.cards import archive, charts, cli, html, render
 from redline.cards.format import fmt_num
+from redline.coach.fr import cards as wording
 from redline.model import entrypoint
 from redline.model.cards import MONTH_SCHEMA
 
@@ -24,9 +25,9 @@ def build_tiles(data: dict) -> list[dict]:
     if data.get("km") is not None:
         tiles.append({"label": "Volume", "value": f"{fmt_num(data['km'])} km"})
     if data.get("dplus") is not None:
-        tiles.append({"label": "Dénivelé", "value": f"{fmt_num(data['dplus'])} m D+"})
+        tiles.append({"label": wording.ELEVATION, "value": f"{fmt_num(data["dplus"])} m D+"})
     if data.get("sessions") is not None:
-        tiles.append({"label": "Séances", "value": f"{data['sessions']}"})
+        tiles.append({"label": wording.SESSIONS, "value": f"{data["sessions"]}"})
     return tiles
 
 
@@ -54,7 +55,7 @@ def countdown(data: dict) -> str:
         return ""
     race_day = date.fromisoformat(data["race_date"])
     days_left = (race_day - date.today()).days
-    headline = f"J-{days_left}" if days_left >= 0 else "couru !"
+    headline = wording.DAYS_LEFT.format(days_left=days_left) if days_left >= 0 else wording.RACE_RUN
     sub = ", ".join(filter(None, [data.get("race_name", ""),
                                   race_day.strftime("%d/%m/%Y")]))
     return ('<section class="countdown">'
@@ -71,15 +72,15 @@ def main() -> None:
     caps = data.get("capabilities") or {}
     scale = float(data["cap_scale"])
 
-    parts = ['<main id="card">', html.header(data["month"], "le mois en un coup d'œil"),
+    parts = ['<main id="card">', html.header(data["month"], wording.MONTH_HEADER),
              '<div class="stack">', html.tiles(build_tiles(data)), "</div>"]
     if weeks:
-        parts.append(html.section("km par semaine"))
+        parts.append(html.section(wording.KM_PER_WEEK))
         parts.append(charts.bars(
             [{"label": week.get("label", ""), "value": week.get("km") or 0}
              for week in weeks], height=230, unit="km"))
     if caps:
-        parts.append(html.section(f"capacités course (0-{scale:g})"))
+        parts.append(html.section(wording.CAPABILITIES.format(scale=scale)))
         parts.append(capability_tracks(caps, scale))
     parts.append(countdown(data))
     parts.append("</main>")

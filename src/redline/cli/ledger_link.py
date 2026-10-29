@@ -11,6 +11,7 @@ import argparse
 import os
 import sys
 
+from redline.coach.fr import ledger as wording
 from redline.model import (
     commands,
     entrypoint,
@@ -19,12 +20,12 @@ from redline.model import (
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--key", required=True, help="clé messenger:… de l'observation")
-    parser.add_argument("--strava", required=True, type=int, help="identifiant Strava exact")
+    parser.add_argument("--key", required=True, help="the messenger:... key of the observation")
+    parser.add_argument("--strava", required=True, type=int, help="the exact Strava id")
     parser.add_argument("--database-url", default=os.environ.get("DATABASE_URL", ""))
     args = parser.parse_args()
     if not args.database_url:
-        parser.error("DATABASE_URL obligatoire")
+        parser.error("DATABASE_URL is required")
 
     from redline.storage import Database, OperationalStore, StorageError
 
@@ -35,14 +36,14 @@ def main() -> int:
         store.stage_command(
             turn_id, f"activity-link:{args.key}:{args.strava}",
             commands.ACTIVITY_LINK, payload)
-        print(f"{args.key} -> Strava {args.strava} : rattachement préparé pour le tour.")
+        print(wording.LINK_STAGED.format(key=args.key, strava=args.strava))
         return 0
     try:
         store.link_activity(args.key, args.strava, actor="ledger-link")
     except StorageError as exc:
-        print(f"rattachement refusé : {exc}", file=sys.stderr)
+        print(f"link refused: {exc}", file=sys.stderr)
         return 1
-    print(f"{args.key} -> Strava {args.strava} : observation rattachée.")
+    print(wording.LINK_RECORDED.format(key=args.key, strava=args.strava))
     return 0
 
 

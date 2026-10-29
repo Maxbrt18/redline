@@ -1447,7 +1447,7 @@ def test_the_cli_refuses_to_patch_a_key_that_does_not_exist(store):
     ], cwd=ENGINE_ROOT, env={**os.environ, "DATABASE_URL": URL},
        capture_output=True, text=True, check=False)
     assert refused.returncode != 0
-    assert "clé inexistante" in refused.stderr
+    assert "key that does not exist" in refused.stderr
     assert store.deadline_rows() == []
 
 

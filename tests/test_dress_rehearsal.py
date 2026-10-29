@@ -173,7 +173,7 @@ def test_a_wrong_key_fails_at_once_not_at_the_boundary(store):
     process = coach("redline ledger-complete", "--key", "strava:90000000001",
                     "--metric", "rpe", "--value", "7", turn=str(uuid.uuid4()))
     assert process.returncode != 0, "une clé inexistante doit échouer immédiatement"
-    assert "observation inconnue" in (process.stderr + process.stdout)
+    assert "unknown observation" in (process.stderr + process.stdout)
 
 
 def test_the_daily_state_does_not_make_the_plan_stale(store):

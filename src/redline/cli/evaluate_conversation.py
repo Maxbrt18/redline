@@ -35,7 +35,7 @@ def main() -> int:
                         default=paths.ENGINE_ROOT / 'src/redline/evaluation/conversation-scenarios.json')
     parser.add_argument('--variant', choices=('current', 'contextual'), default='current')
     parser.add_argument('--repeat', type=int, default=1)
-    parser.add_argument('--only', help='Identifiants séparés par des virgules')
+    parser.add_argument("--only", help="comma-separated ids")
     parser.add_argument('--dry-run', action='store_true')
     parser.add_argument('--compare', type=Path, nargs=2, metavar=('CURRENT', 'CANDIDATE'))
     args = parser.parse_args()
@@ -52,21 +52,21 @@ def main() -> int:
         write_json(args.output.with_suffix('.key.json'), key)
         return 0
     if args.repeat < 1:
-        parser.error('--repeat doit être positif')
+        parser.error("--repeat must be positive")
     raw = args.fixtures.read_text(encoding='utf-8')
     cases = json.loads(raw)
     if args.only:
         selected = set(args.only.split(','))
         unknown = selected - {c['id'] for c in cases}
         if unknown:
-            parser.error('Identifiants inconnus : ' + ', '.join(sorted(unknown)))
+            parser.error("unknown ids: " + ", ".join(sorted(unknown)))
         cases = [c for c in cases if c['id'] in selected]
     if not cases:
-        parser.error('Aucun scénario')
+        parser.error("no scenario")
     system = instructions(args.variant, (paths.vault_root() / 'CLAUDE.md').read_text())
     manifest = {'variant': args.variant, 'fixtures_sha256': digest(raw),
                 'instructions_sha256': digest(system), 'instructions': system,
-                'scope': 'Rédaction avec faits fictifs, routes imposées, sans outil.', 'results': []}
+                "scope": "Writing with fictional facts, imposed routes, no tool.", "results": []}
     if args.dry_run:
         manifest['scenarios'] = cases
         manifest['depth_notes'] = DEPTH_NOTES

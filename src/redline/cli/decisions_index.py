@@ -14,6 +14,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from redline.coach.fr import decisions as wording
 from redline.model import entrypoint, paths, vault_layout
 
 #: More matches than this and the search is too broad to read.
@@ -40,16 +41,16 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--root", default=paths.vault_root(), type=Path)
-    parser.add_argument("--find", metavar="TEXTE", required=True)
+    parser.add_argument("--find", metavar="TEXT", required=True)
     args = parser.parse_args()
 
     matches = find((args.root / vault_layout.DECISIONS).read_text(encoding="utf-8"),
                    args.find)
     if not matches:
-        print(f"Aucune décision pour {args.find!r}.", file=sys.stderr)
+        print(wording.NONE_FOUND.format(find=args.find), file=sys.stderr)
         return 1
     if len(matches) > MAX_MATCHES:
-        print(f"{len(matches)} décisions correspondent ; précise la recherche.",
+        print(wording.TOO_MANY.format(matches=len(matches)),
               file=sys.stderr)
         return 2
     print("\n\n---\n\n".join(matches))

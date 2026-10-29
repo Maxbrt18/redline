@@ -80,3 +80,21 @@ READBACK_CHECK = ("Chaque fait du message de l'athlète doit se retrouver ci-des
                   "voulu.")
 ORPHAN_DAY = ("{day} ne porte plus que des annulations ({titles}) et aucune séance à la "
               "place. Voulu, ou remplaçante oubliée ?")
+
+GAP_UNREADABLE = "Écart aux {days} jours : lecture du registre impossible ({name})."
+
+GAP_TITLE = "Écart aux {days} jours (règle n8, informatif, jamais bloquant) :"
+
+PREVIEW_VALID = "SIMULATION VALIDÉE — aucun changement préparé ou enregistré."
+
+CHANGE_STAGED = "CHANGEMENT PRÉPARÉ — application en fin de tour encore requise."
+
+NO_PLAN = "{week} : aucun programme"
+
+PLAN_VALID = "{week} : révision {revision} valide, {sessions} entrée(s)"
+
+AWAITING_ATHLETE = "{week} : en attente de la réponse de l'athlète :"
+
+ARBITRATION_REQUIRED = (
+    "{week} : arbitrage obligatoire, activité non rattachée apparue depuis la révision — "
+    "le programme reste lisible, mais rien ne se prescrit avant une révision")

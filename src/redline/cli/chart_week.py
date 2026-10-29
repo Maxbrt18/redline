@@ -16,6 +16,7 @@ from pathlib import Path
 
 from redline.cards import archive, charts, cli, html, render
 from redline.cards.format import fmt_num
+from redline.coach.fr import cards as wording
 from redline.model import entrypoint
 from redline.model.cards import WEEK_SCHEMA
 
@@ -30,20 +31,22 @@ def build_tiles(data: dict) -> list[dict]:
     done, planned = data.get("done_km"), data.get("planned_km")
     if done is not None:
         tiles.append({"label": "Volume", "value": f"{fmt_num(done)} km",
-                      "sub": f"prévu {fmt_num(planned)} km" if planned is not None else ""})
+                      "sub": (wording.PLANNED_KM.format(km=fmt_num(planned))
+                              if planned is not None else "")})
     if data.get("gauge_level") is not None:
         level, ratio = data["gauge_level"], data.get("gauge_ratio")
         over = level > GAUGE_CAP or (ratio or 0) > RATIO_CAP
-        tiles.append({"label": "Jauge", "value": f"{fmt_num(level)} / {GAUGE_CAP}",
+        tiles.append({"label": wording.GAUGE, "value": f"{fmt_num(level)} / {GAUGE_CAP}",
                       "sub": f"ratio {fmt_num(round(ratio, 2))} / 1,3" if ratio is not None else "",
                       "status": "bad" if over else "ok"})
     if data.get("pain") is not None:
-        tiles.append({"label": "Douleur", "value": str(data["pain"]),
+        tiles.append({"label": wording.PAIN, "value": str(data["pain"]),
                       "status": data.get("pain_flag"), "kind": "text"})
     if data.get("enjoyment") is not None:
-        tiles.append({"label": "Plaisir", "value": f"{fmt_num(data['enjoyment'])} / 10"})
+        tiles.append({"label": wording.ENJOYMENT, "value": f"{fmt_num(data["enjoyment"])} / 10"})
     if data.get("cmj_cm") is not None:
-        tiles.append({"label": "CMJ", "value": f"{fmt_num(data['cmj_cm'])} cm", "sub": "lundi"})
+        tiles.append({"label": "CMJ", "value": f"{fmt_num(data["cmj_cm"])} cm",
+                      "sub": wording.MONDAY})
     return tiles
 
 
@@ -53,16 +56,16 @@ def main() -> None:
 
     columns = [{"label": day.get("day", ""), "value": day.get("done_km") or 0,
                 "planned": day.get("planned_km") or 0,
-                "note": "qualité" if day.get("quality") else ""}
+                "note": wording.QUALITY if day.get("quality") else ""}
                for day in data["days"]]
 
     body = (
         '<main id="card">'
-        + html.header(f"Semaine {data['week']}".strip(), data.get("dates", ""))
-        + html.legend([{"kind": "data", "label": "réalisé"},
-                       {"kind": "ghost", "label": "prévu"}])
+        + html.header(wording.WEEK.format(week=data["week"]).strip(), data.get("dates", ""))
+        + html.legend([{"kind": "data", "label": wording.DONE_KM},
+                       {"kind": "ghost", "label": wording.PLANNED}])
         + charts.bars(columns, height=300, unit="km")
-        + html.section("les instruments de la semaine")
+        + html.section(wording.WEEK_INSTRUMENTS)
         + html.tiles(build_tiles(data))
         + "</main>"
     )

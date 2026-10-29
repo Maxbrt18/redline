@@ -21,10 +21,10 @@ def main() -> int:
     parser.add_argument("--database-url", default=os.environ.get("DATABASE_URL", ""))
     args = parser.parse_args()
     if not args.database_url:
-        parser.error("DATABASE_URL obligatoire")
+        parser.error("DATABASE_URL is required")
     project_all(OperationalStore(Database(
         args.database_url, application_name="storage-project")), args.root)
-    print("Projections Obsidian régénérées depuis PostgreSQL.")
+    print("Obsidian projections regenerated from PostgreSQL.")
     return 0
 
 

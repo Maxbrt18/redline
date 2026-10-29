@@ -12,6 +12,7 @@ import time
 from dataclasses import replace
 from pathlib import Path
 
+from redline.coach.fr import evaluation as wording
 from redline.evaluation.conversation import shape_checks
 from redline.evaluation.review import judge, review_prompt
 from redline.evaluation.runner import bench_runner, check_model
@@ -25,13 +26,13 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--fixtures', type=Path, default=paths.ENGINE_ROOT / correction_replay.SCENARIOS)
-    parser.add_argument('--only', help='Identifiants séparés par des virgules')
+    parser.add_argument("--only", help="comma-separated ids")
     args = parser.parse_args()
     cases = json.loads(args.fixtures.read_text())
     if args.only:
         cases = [c for c in cases if c['id'] in args.only.split(',')]
     if not cases:
-        parser.error('Aucun scénario sélectionné')
+        parser.error("no scenario selected")
     config = Config.from_env()
     runner = bench_runner(config)  # no memory path is used
     # The judge rereads a whole reply against coaching limits: it takes the profile of
@@ -63,11 +64,7 @@ def main() -> int:
             row = {'scenario': case, 'model': spec.model, 'effort': spec.effort}
             try:
                 instructions = STYLE_PROMPT + '\n\n' + (
-                    'ÉVALUATION FICTIVE : les outils sont désactivés. Le contexte fourni remplace '
-                    'les lectures requises ; ne lis aucun fichier et ne tente aucune écriture. '
-                    'Réponds seulement au message comme sur Messenger, sans mentionner cet exercice. '
-                    'Les données manquantes restent inconnues ; aucune action réelle n’a eu lieu. '
-                    'Accueille une émotion si elle est exprimée, sinon ne l’invente pas.\n'
+                    wording.FICTIONAL_EVALUATION
                 ) + (EMOTION_NOTE if case.get('emotional', False) else '')
                 context = case['context'] + '\n' + render_memory(
                     case.get('history', []), case.get('questions', []))

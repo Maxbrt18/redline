@@ -29,7 +29,7 @@ TIMEOUT_S = 30
 def _env(name: str) -> str:
     value = os.environ.get(name, "").strip()
     if not value:
-        raise ConfigError(f"{name} absent de l'environnement")
+        raise ConfigError(f"{name} missing from the environment")
     return value
 
 
@@ -48,17 +48,17 @@ def main() -> int:
         body = response.text[:300]
         for secret in hidden:
             body = body.replace(secret, "[secret]")
-        return ExternalError(f"Strava HTTP {response.status_code} : {body}")
+        return ExternalError(f"Strava HTTP {response.status_code}: {body}")
 
     response = requests.get(API, params=client, timeout=TIMEOUT_S)
     if not response.ok:
         raise fail(response)
     current = response.json()
     for item in current:
-        verdict = "attendu" if item.get("callback_url") == expected else "DIFFÉRENT"
-        print(f"abonnement {item['id']} : callback {verdict}")
+        verdict = "expected" if item.get("callback_url") == expected else "DIFFERENT"
+        print(f"subscription {item["id"]}: callback {verdict}")
     if not current:
-        print("aucun abonnement")
+        print("no subscription")
     in_place = len(current) == 1 and current[0].get("callback_url") == expected
     if action == "status" or in_place:
         return 0 if in_place else 1
@@ -67,12 +67,12 @@ def main() -> int:
         deleted = requests.delete(f"{API}/{item['id']}", params=client, timeout=TIMEOUT_S)
         if deleted.status_code != 204:
             raise fail(deleted)
-        print(f"abonnement {item['id']} supprimé")
+        print(f"subscription {item["id"]} deleted")
     created = requests.post(API, data={**client, "callback_url": expected,
                                        "verify_token": verify_token}, timeout=TIMEOUT_S)
     if not created.ok:
         raise fail(created)
-    print(f"abonnement {created.json()['id']} créé")
+    print(f"subscription {created.json()["id"]} created")
     return 0
 
 

@@ -109,7 +109,7 @@ def test_patch_on_a_missing_key_refuses_instead_of_creating_holes():
         def deadline_rows(self):
             return [deadline_row(deadline_key="autre")]
 
-    with pytest.raises(InputError, match="clé inexistante"):
+    with pytest.raises(InputError, match="key that does not exist"):
         fact_write._existing(Store(), "deadline", "d-1")
 
 
@@ -158,7 +158,7 @@ def test_a_correction_enters_the_database_only_once_written_to_the_journal(tmp_p
     _, kind, payload = fact_write._payload(args)
     assert kind == "correction.register"
     assert payload == {"correction_key": "k", "summary": "s"}
-    with pytest.raises(InputError, match="n'est pas une entrée"):
+    with pytest.raises(InputError, match="is not an entry"):
         fact_write._payload(parse("correction", "--correction-key", "k", "--summary", "s",
                                   "--entry", "2026-09-17 — inventée"))
 
@@ -178,7 +178,7 @@ def test_a_body_prediction_attaches_to_the_wake_reading_that_settles_it():
     assert payload["resolves_on"] == {"kind": "wake-trace", "date": "2026-10-19",
                                       "success_if": "<=1"}
     assert "resolves_on" not in fact_write._payload(parse(*base))[2]
-    with pytest.raises(InputError, match="vont ensemble"):
+    with pytest.raises(InputError, match="go together"):
         fact_write._payload(parse(*base, "--resolves", "wake-trace"))
 
 
@@ -186,9 +186,9 @@ def test_a_prediction_reason_must_fit_its_outcome():
     payload = fact_write._prediction(
         parse("prediction", "--key", "k", "--outcome", "false", "--reason", "optimistic"), None)
     assert payload["reason"] == "optimistic"
-    with pytest.raises(InputError, match="ne va pas avec --outcome void"):
+    with pytest.raises(InputError, match="does not go with --outcome void"):
         fact_write._prediction(
             parse("prediction", "--key", "k", "--outcome", "void", "--reason", "cautious"), None)
-    with pytest.raises(InputError, match="ne va pas avec --outcome true"):
+    with pytest.raises(InputError, match="does not go with --outcome true"):
         fact_write._prediction(
             parse("prediction", "--key", "k", "--outcome", "true", "--reason", "scope"), None)

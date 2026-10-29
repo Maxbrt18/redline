@@ -32,6 +32,7 @@ import re
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, NamedTuple
 
+from redline.coach.fr import fact_write as wording
 from redline.model import (
     commands,
     entrypoint,
@@ -94,8 +95,8 @@ def merge(fields: tuple, args: argparse.Namespace, existing: dict | None) -> dic
                    if required and getattr(args, name, UNSET) is UNSET]
         if missing:
             raise InputError(
-                "champs obligatoires manquants : " + ", ".join(missing)
-                + " — sans --patch, une écriture porte la ligne entière")
+                "required fields missing: " + ", ".join(missing)
+                + " -- without --patch, a write carries the whole row")
     payload = {}
     for key, name, _ in fields:
         value = getattr(args, name, UNSET)
@@ -111,8 +112,8 @@ def _existing(store: Any, command: str, key: str) -> dict:
     found = [row for row in rows if row[field] == key]
     if not found:
         raise InputError(
-            f"--patch sur une clé inexistante : {key!r} — "
-            "créer une ligne demande la forme complète, sans --patch")
+            f"--patch on a key that does not exist: {key!r} -- creating a row takes the full"
+            " form, without --patch")
     return found[0]
 
 
@@ -122,7 +123,7 @@ def day(value: str) -> dt.date:
 
 def week(value: str) -> str:
     if not re.fullmatch(r"20\d{2}-W(?:0[1-9]|[1-4]\d|5[0-3])", value):
-        raise argparse.ArgumentTypeError("semaine ISO attendue : 2030-W33")
+        raise argparse.ArgumentTypeError("ISO week expected: 2030-W33")
     return value
 
 
@@ -157,17 +158,17 @@ def _prediction(args, _) -> dict:
         allowed = {"false": prediction_model.REFUTED_REASONS,
                    "void": prediction_model.VOID_REASONS}.get(args.outcome, ())
         if args.reason is not None and args.reason not in allowed:
-            raise InputError(f"--reason {args.reason} ne va pas avec --outcome {args.outcome}"
-                             + (f" (attendu : {', '.join(allowed)})" if allowed else ""))
+            raise InputError(f"--reason {args.reason} does not go with --outcome {args.outcome}"
+                             + (f" (expected: {", ".join(allowed)})" if allowed else ""))
         return {"prediction_key": args.key, "operation": "resolve",
                 "outcome": args.outcome == "true" if args.outcome != "void" else None,
                 "void": args.outcome == "void", "reason": args.reason}
     if args.reason is not None:
-        raise InputError("--reason accompagne --outcome false ou void")
+        raise InputError("--reason goes with --outcome false or void")
     missing = [name for name in ("domain", "statement", "probability", "due_on")
                if getattr(args, name) is None]
     if missing:
-        raise InputError("création de prédiction : options manquantes " + ", ".join(
+        raise InputError("creating a prediction: missing options " + ", ".join(
             "--" + name.replace("_", "-") for name in missing))
     payload = {"prediction_key": args.key, "operation": "create", "domain": args.domain,
                "statement": args.statement, "probability": args.probability,
@@ -175,14 +176,14 @@ def _prediction(args, _) -> dict:
     rule = (args.resolves, args.resolves_on, args.success_if)
     if any(part is not None for part in rule):
         if None in rule:
-            raise InputError("prédiction rattachée : --resolves, --resolves-on et "
-                             "--success-if vont ensemble")
+            raise InputError("attached prediction: --resolves, --resolves-on and --success-if "
+                             "go together")
         payload["resolves_on"] = {"kind": args.resolves, "date": args.resolves_on.isoformat(),
                                   "success_if": args.success_if}
         if args.resolves_zone:
             payload["resolves_on"]["zone"] = args.resolves_zone
     elif args.resolves_zone:
-        raise InputError("--resolves-zone ne vaut que pour une prédiction rattachée")
+        raise InputError("--resolves-zone only applies to an attached prediction")
     return payload
 
 
@@ -199,18 +200,16 @@ def _correction(args, _) -> dict:
     entry = args.entry.strip()
     if entry not in known:
         raise InputError(
-            f"correction : « {entry} » n'est pas une entrée de {vault_layout.CORRECTIONS}. "
-            "Écris d'abord l'entrée (« ## AAAA-MM-JJ — titre »), puis passe son titre exact "
-            "à --entry.")
+            f"correction: {entry!r} is not an entry of {vault_layout.CORRECTIONS}. Write the "
+            "entry first (`## YYYY-MM-DD — title`), then pass its exact title to --entry.")
     return {"correction_key": args.correction_key, "summary": args.summary}
 
 
 def _permit(args, _) -> dict:
     """The coach's choice for a permit easy run, sealed together with its prediction."""
     sunday = dt.date.fromisocalendar(int(args.week[:4]), int(args.week[-2:]), 7)
-    statement = (f"SCELLÉ, ne pas révéler à l'athlète avant le bilan {args.week}. Choix du coach "
-                 f"pour {args.session_key} du {args.date:%d/%m} : {args.minutes} min. "
-                 f"Prédiction : la durée courue par l'athlète tombe à ±10 min de ce choix.")
+    statement = (wording.SEALED_CHOICE.format(week=args.week, session_key=args.session_key,
+                                              date=args.date, minutes=args.minutes))
     return {"iso_week": args.week, "session_key": args.session_key,
             "scheduled_on": args.date, "coach_minutes": args.minutes,
             "prediction_key": f"easy-permit-{args.session_key}", "statement": statement,
@@ -219,7 +218,7 @@ def _permit(args, _) -> dict:
 
 def _exposure(args, _) -> dict:
     if (args.target_value is None) != (args.target_unit is None):
-        raise InputError("--target-value et --target-unit vont ensemble")
+        raise InputError("--target-value and --target-unit go together")
     return {
         "exposure_key": args.key,
         "observation_key": args.observation_key,
@@ -309,12 +308,12 @@ def _payload(args, existing: dict | None = None) -> tuple[str, str, dict]:
 def _direct(store, command: str, payload: dict) -> object:
     write = COMMANDS[command].write
     if write is None:
-        raise InputError(f"fact-write : « {command} » ne s'écrit que dans un tour")
+        raise InputError(f"fact-write: {command!r} is only written within a turn")
     return write(store, payload)
 
 
-PATCH_HELP = ("--patch : n'écrit que les champs cités, relit les autres depuis la ligne "
-              "existante (clé absente = refus ; ne remet aucun champ à NULL)")
+PATCH_HELP = ("--patch: writes only the cited fields and rereads the others from the existing"
+               " row (missing key = refusal; resets no field to NULL)")
 
 
 def parser() -> argparse.ArgumentParser:
@@ -343,14 +342,15 @@ def parser() -> argparse.ArgumentParser:
     # `thread` and `deadline`: no `required=True` on the fields, otherwise `--patch`
     # would be rejected before being read. The requirement is moved into `merge()`,
     # which NAMES the missing options instead of argparse's terse error.
-    question = commands.add_parser("question", help="Examiner une réponse, sans clôture implicite")
+    question = commands.add_parser("question",
+                                   help="review an answer, without closing it implicitly")
     question.add_argument("--question-id", required=True)
     question.add_argument("--answer-id", required=True)
     question.add_argument("--status", choices=("open", "deferred", "answered", "expired"),
                           required=True)
     question.add_argument("--note", required=True)
     question.add_argument("--follow-up-on", type=day)
-    ask = commands.add_parser("ask", help="Déclarer la question exacte prévue dans ce tour")
+    ask = commands.add_parser("ask", help="declare the exact question planned for this turn")
     ask.add_argument("--text", required=True)
     ask.add_argument("--cell", dest="cells", action="append", default=[])
 
@@ -378,20 +378,21 @@ def parser() -> argparse.ArgumentParser:
     deadline.add_argument("--starts-on", type=day, default=UNSET)
     deadline.add_argument("--ends-on", type=day, default=UNSET)
     deadline.add_argument("--context", type=json.loads, default=UNSET,
-                          help="objet JSON réservé aux détails du scénario")
+                          help="JSON object reserved for the scenario's details")
     deadline.add_argument(
         "--athlete-label", default=UNSET,
-        help="libellé court (3-80 car.) : l'échéance est une action de l'athlète, montrée "
-             "dans son carnet ; une chaîne vide la rend au coach seul")
+        help="short label (3-80 chars): the deadline is an action of the athlete, shown in "
+             "their notebook; an empty string keeps it for the coach alone")
     deadline.add_argument("--patch", action="store_true", help=PATCH_HELP)
 
     # The angle has a FIELD, so it does not belong in prose: without a place to record
     # it, the reasoning about served angles ends up in the message sent to the athlete.
     angle = commands.add_parser(
-        "angle", help="qualifie le message proactif de CE tour (n'a de sens qu'en tour)")
-    angle.add_argument("angle", help="deux ou trois mots, ex. « titre Strava, récit libre »")
+        "angle", help="qualifies THIS turn's proactive message (only makes sense within a turn)")
+    angle.add_argument("angle", help="two or three words, e.g. Strava title, free story")
     permit = commands.add_parser(
-        "permit", help="scelle le choix du coach pour une EF du permis, AVANT que l'athlète décide")
+        "permit", help="seals the coach's choice for an easy run of the permit, BEFORE the athlete "
+                       "decides")
     permit.add_argument("--week", type=week, required=True)
     permit.add_argument("--session-key", required=True)
     permit.add_argument("--date", type=day, required=True)
@@ -415,32 +416,32 @@ def parser() -> argparse.ArgumentParser:
     prediction.add_argument("--outcome", choices=("true", "false", "void"))
     prediction.add_argument(
         "--reason", choices=(*prediction_model.REFUTED_REASONS, *prediction_model.VOID_REASONS),
-        help="pourquoi : optimistic/cautious pour une réfutée (moins bien ou mieux que "
-             "prédit) ; instrument/exposure/scope/superseded pour une void")
+        help="why: optimistic/cautious for a refuted one (worse or better than predicted); "
+             "instrument/exposure/scope/superseded for a void one")
     prediction.add_argument(
         "--resolves", choices=(session_kinds.WAKE_TRACE,),
-        help="observation qui solde seule la prédiction à son écriture (void si la date "
-             "passe sans elle)")
+        help="observation that alone settles the prediction when it is written (void if the "
+             "date passes without it)")
     prediction.add_argument("--resolves-on", type=day, metavar="AAAA-MM-JJ")
     prediction.add_argument(
         "--resolves-zone", metavar="ZONE",
-        help="la zone surveillée dont la trace tranche ; obligatoire s'il y en a plusieurs")
+        help="the monitored zone whose trace decides; required when there are several")
     prediction.add_argument(
-        "--success-if", metavar="CRITÈRE",
-        help="seuil sur la valeur observée, ex. '<=1' (trace au réveil : 0 aucune, "
-             "0.5 très légère, 1 légère, 2 nette)")
+        "--success-if", metavar="CRITERION",
+        help="threshold on the observed value, e.g. '<=1' (wake trace: 0 none, 0.5 very "
+             "light, 1 light, 2 clear)")
     prediction.add_argument("--challenge")
     prediction.add_argument(
         "--rectify", metavar="MOTIF",
-        help="repasse en void une prédiction soldée dont la condition n'a pas été tenue "
-             "ou dont l'observation manque")
+        help="turns back to void a settled prediction whose condition was not met or whose "
+             "observation is missing")
 
     correction = commands.add_parser("correction")
     correction.add_argument("--correction-key", required=True)
     correction.add_argument("--summary", required=True)
     correction.add_argument(
         "--entry", required=True,
-        help="titre exact de l'entrée de coaching/corrections.md, après « ## »")
+        help="exact title of the coaching/corrections.md entry, after `##`")
     exposure = commands.add_parser("exposure")
     exposure.add_argument("--key", required=True)
     exposure.add_argument("--observation-key", required=True)
@@ -466,7 +467,7 @@ def main() -> int:
     args = parser().parse_args()
     turn_id = (os.environ.get("REDLINE_TURN_ID") or "").strip()
     if not args.database_url:
-        raise ConfigError("DATABASE_URL obligatoire : les projections sont en lecture seule")
+        raise ConfigError("DATABASE_URL is required: projections are read-only")
     from redline.storage import Database, OperationalStore, StorageError
 
     store = OperationalStore(Database(args.database_url, application_name="fact-write"))
@@ -476,8 +477,8 @@ def main() -> int:
         args, "patch", False) else None
     if args.command in {"angle", "ask"} and not turn_id:
         raise InputError(
-            "Cette commande qualifie le message du tour en cours : hors d'un tour "
-            "(REDLINE_TURN_ID absent) il n'y a aucun message à qualifier.")
+            "This command qualifies the message of the current turn: outside a turn "
+            "(REDLINE_TURN_ID missing) there is no message to qualify.")
     entity_key, kind, payload = _payload(args, existing)
     canonical = json.dumps(payload, default=lambda value: value.isoformat(),
                            ensure_ascii=False, sort_keys=True, separators=(",", ":"))
@@ -489,14 +490,14 @@ def main() -> int:
     try:
         if turn_id:
             store.stage_command(turn_id, command_key, kind, payload)
-            print(f"{entity_key} préparé pour le tour.")
+            print(wording.STAGED.format(entity_key=entity_key))
             return 0
         written = _direct(store, args.command, payload)
     except StorageError as exc:
-        raise StorageError(f"fact-write : {entity_key} refusé : {exc}") from exc
+        raise StorageError(f"fact-write: {entity_key} refused: {exc}") from exc
     # False = the same row already existed; nothing was written.
-    print(f"{entity_key} déjà enregistré, rien d'écrit." if written is False
-          else f"{entity_key} enregistré.")
+    print(wording.ALREADY_RECORDED.format(entity_key=entity_key) if written is False
+          else wording.RECORDED.format(entity_key=entity_key))
     return 0
 
 

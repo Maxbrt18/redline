@@ -55,9 +55,9 @@ def main() -> None:
         target, built = strength_card.render_card(
             cli.read_input(args.input), out, root=paths.vault_root(), html_only=args.html)
     except (NoteError, SchemaError) as exc:
-        raise InputError(f"Séance non générée — {exc}") from exc
+        raise InputError(f"session not generated -- {exc}") from exc
     except render.CardOverflow as exc:
-        raise InputError(f"Card non générée — {exc}") from exc
+        raise InputError(f"card not generated -- {exc}") from exc
     if not args.html:
         write_link(out, built)
     print(target)

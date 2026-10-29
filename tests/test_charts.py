@@ -193,7 +193,7 @@ def test_the_overflow_guard_actually_fires(tmp_path):
         for i in range(40)])
     process = run_script("chart-strength", payload, tmp_path / "chart.png")
     assert process.returncode != 0
-    assert "Card non générée" in process.stderr
+    assert "card not generated" in process.stderr
     assert "card trop haute" in process.stderr
     assert not (tmp_path / "chart.png").exists(), "aucun PNG ne doit être écrit"
 

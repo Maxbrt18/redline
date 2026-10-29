@@ -181,3 +181,31 @@ def outings(count: int) -> str:
 PAIN_READING = "douleur {zone}={value}"
 
 MISSING_CELLS = "{date} {type} : {join} non renseigné(s)"
+
+ROUNDED = "« {name} » : {raw} → {good} (arrondi)"
+
+STAGED = "préparée pour le tour"
+
+RECORDED = "enregistrée"
+
+OBSERVATION_WRITTEN = "{date} {type} : observation {oid} {state}."
+
+HR_DOUBT_STAGED = "{key} : FC douteuse ({hr_doubt}) préparée pour le tour."
+
+HR_DOUBT_RECORDED = "{key} : FC moyenne déclarée douteuse ({hr_doubt})."
+
+MEASUREMENT_STAGED = "{key} : {metric} préparée pour le tour."
+
+MEASUREMENT_RECORDED = "{key} : {what} complétée."
+
+LINK_STAGED = "{key} -> Strava {strava} : rattachement préparé pour le tour."
+
+LINK_RECORDED = "{key} -> Strava {strava} : observation rattachée."
+
+STAGED_MASCULINE = "préparé pour le tour"
+
+RECORDED_MASCULINE = "enregistré"
+
+START_WRITTEN = "Départ facultatif {state}."
+
+MATCH_WRITTEN = "Appariement {state}."

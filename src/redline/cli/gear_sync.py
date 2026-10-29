@@ -24,7 +24,7 @@ def main() -> int:
         for row in rows:
             store.sync_strava_gear(row)
             print(f"{row['gear_id']} · {row['name']} · {row['distance_km']:.1f} km")
-        print(f"{len(rows)} paire(s) synchronisée(s)")
+        print(f"{len(rows)} pair(s) synchronised")
     finally:
         database.dispose()
     return 0
