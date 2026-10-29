@@ -1,15 +1,41 @@
 [build-system]
-requires = ["setuptools>=69"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
-# The engine installs as the `redline` package, editable (`pip install --no-deps -e .`):
-# the checkout stays the code that runs. Its pinned dependencies live in
-# requirements.txt, which the runtime updater installs into the service venv.
+# The ranges below are what the engine works with; requirements.txt and
+# requirements-dev.txt pin the exact versions tested, and serve as constraints:
+#
+#   pip install -c requirements.txt -c requirements-dev.txt -e '.[cards,dev]'
+#
+# Extras: `codex` for the Codex provider, `cards` for the PNG cards and the notebook
+# tests (then `playwright install chromium`), `dev` for the checks.
 [project]
 name = "redline"
 version = "0.1.0"
+description = "A running coach on a language model, with its memory in a Markdown vault and PostgreSQL."
+readme = "README.md"
+license = "AGPL-3.0-only"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "alembic>=1.18,<2",
+    "babel>=2.17,<3",
+    "flask>=3.1,<4",
+    "psycopg[binary,pool]>=3.3,<4",
+    "pyyaml>=6.0,<7",
+    "requests>=2.32,<3",
+    "SQLAlchemy>=2.0,<2.1",
+    "waitress>=3.0,<4",
+]
+
+[project.optional-dependencies]
+codex = ["openai-codex>=0.156.1,<1.0.0"]
+cards = ["playwright>=1.60,<2"]
+dev = ["mypy", "pytest", "ruff", "types-PyYAML", "types-requests", "vulture"]
+
+[project.urls]
+Repository = "https://github.com/Maxbrt18/redline"
+Issues = "https://github.com/Maxbrt18/redline/issues"
 
 [project.scripts]
 redline = "redline.cli:main"
@@ -52,8 +78,7 @@ known-first-party = ["redline"]
 [tool.vulture]
 # Production code only: tests are left out of the analysis, so a function only its own
 # test calls is reported as dead. A false positive is declared here, by name.
-paths = ["src", "deploy/codex-runtime-smoke.py", "deploy/claude-runtime-smoke.py",
-         "deploy/agent-runtime-update.py"]
+paths = ["src"]
 # The stored vocabularies are reached by iterating their enums (CLI choices, CHECK
 # constraints, the notebook's answers), never member by member.
 exclude = ["*/tests/*", "*/model/vocabulary.py"]

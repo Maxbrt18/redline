@@ -210,8 +210,7 @@ Python 3.12 is required.
 
 ```bash
 python3.12 -m venv .venv
-.venv/bin/pip install -r requirements.txt -r requirements-dev.txt
-.venv/bin/pip install --no-deps -e .
+.venv/bin/pip install -c requirements.txt -c requirements-dev.txt -e '.[cards,dev]'
 cp deploy/coach-messenger.env.example .env
 ```
 
@@ -384,7 +383,7 @@ remain in the bench code (`evaluation/`) and its fixtures.
 | heavy proactive | GPT-6 Sol / high | GPT-6 Luna / max | Opus / high | Sonnet / high | isolated |
 
 On the Claude side, Haiku is pinned to `claude-haiku-5-5`: the stable CLI's `haiku` alias
-still resolves to Haiku 4.5. Sonnet and Opus follow their alias, which the nightly preflight displays.
+still resolves to Haiku 4.5. Sonnet and Opus follow their alias, which a runtime preflight can display.
 N0 to N2 share Sonnet so that the continuous session keeps its cache, which is specific to each
 model, and each fallback changes model so as not to fall back on the same quota.
 
@@ -651,7 +650,7 @@ files, so everything the service can write is something a turn can write:
 
 | Account | Owns | Writes |
 |---|---|---|
-| `ubuntu` (deploy, sudo) | the engine checkout, the venvs, the Claude runtime | deployments, the nightly runtime update |
+| `ubuntu` (deploy, sudo) | the engine checkout, the venvs, the Claude runtime | deployments, runtime updates |
 | `redline` (service, no sudo, no login) | `/var/lib/redline`: the vault, `state/` (outbox, attachments, Strava token), `~/.claude` | notes, cards, sessions |
 
 The unit (`deploy/systemd/coach-messenger.service`) makes the rest of the file system
@@ -669,126 +668,49 @@ sudo -u redline git clone <vault remote> /var/lib/redline/vault
 The vault's Git credentials (a deploy key with write access to the vault repository
 only) belong to `redline`.
 
-### Release
+### With Docker Compose
 
-Deployment is external to the service: prior backup, repository update,
-dependency installation, migrations, checks, systemd restart, verification
-of the commit **actually started**, then post-deployment backup. An HTTP 200
-alone does not prove that the new code is running.
+`compose.yml`, at the checkout root, runs everything on one host: PostgreSQL, a
+one-shot `migrate` service (the migrator role upgrades the schema), the service and
+Caddy for HTTPS. The image (`Dockerfile`) holds the engine, its venv and Claude Code,
+owned by root; the service runs as uid 10001. What to prepare is listed at the top of
+`compose.yml` and in `deploy/compose/.env.example`.
 
-`Type=simple` only confirms that the Python process was launched: Waitress may
-still be opening the port. The unit therefore runs `deploy/wait-ready.sh` in
-`ExecStartPost` and completes the systemd startup only after an HTTP 200 from `/ready`. The
-release verifier reuses the same bounded 90 s delay before checking the
-commit, storage, schema and worker. It also requires the expected commit to be
-an ancestor of the checkout with no runtime difference, and compares the fingerprint of the engine's
-`deploy/`, `src/` and `migrations/` trees to `runtime_tree` from `/health`: a vault commit
-laid on top does not fail the verification, different code does. A slow start waits; a readiness
-that really does not come back fails the startup with the last visible HTTP code.
+```bash
+docker compose up -d --build
+docker compose logs -f redline
+```
 
-The Python service uses `/home/ubuntu/.venvs/redline-current`, a link to the active
-venv. The `redline-agent-runtime-update.timer` timer updates every night at 03:00, Paris
-time, the runtime of the only provider the service reads (`AGENT_PROVIDER`, read like
-systemd: unit then environment file). `deploy/agent-runtime-update.py` carries a single
-transaction and two adapters:
+An update is `git pull`, then the same command: `migrate` runs again before the
+service restarts.
 
-| | Codex | Claude |
-|---|---|---|
-| Target version | latest stable `openai-codex` in `requirements.txt` | Anthropic npm `stable` channel, bounded by `deploy/claude-runtime.txt` |
-| Candidate | venv `~/.venvs/redline-codex-<version>-<empreinte>` | npm prefix `~/.claude-runtimes/claude-code-<version>` |
-| Switched link | `~/.venvs/redline-current` | `~/.claude-runtimes/current`, at the head of the service `PATH` |
-| Preflight | `codex-runtime-smoke.py` | `claude-runtime-smoke.py`, with the service's exact identity and environment (`systemd-run`) |
-| Activation | restart, `/health` and `/ready` | no restart: each turn launches a new `claude` |
+### On the host, with systemd
 
-Candidates are built as `ubuntu`, never as root. Both preflights read the
-models from `redline.routing.default_models`, the repository's only list; the Claude preflight
-displays the identifier each alias resolves to, resumes with the candidate a session
-written by the active one, then requires a coach CLI call (`redline week-plan preview
---input <turn file>`) to pass the exact permissions of an autonomous turn
-(`redline.claude.AUTONOMOUS_PERMISSIONS`). Any failure after the switch restores the previous link. A refused
-update stays visible in `journalctl -u redline-agent-runtime-update.service`; the
-next night retries. Claude Code auto-update is turned off (`DISABLE_AUTOUPDATER=1`)
-: only this transaction promotes a version. Without a managed Claude link, the `PATH` falls back
-to the global npm installation, which then serves only as a seed. The legacy venv
-`redline-3.12` is kept as a fallback.
+Deployment is external to the service: back up, update the checkout, install the
+dependencies, migrate, restart, then check that the commit **actually started**
+(`runtime_tree` of `/health` against the deployed commit). An HTTP 200 alone does not
+prove that the new code is running.
 
 ```bash
 cd /home/ubuntu/redline
-for unit in redline-codex-runtime-update redline-agent-runtime-update; do
-  if systemctl cat "$unit.service" >/dev/null 2>&1; then
-    sudo systemctl stop "$unit.timer"
-    while sudo systemctl is-active --quiet "$unit.service"; do
-      sleep 2
-    done
-  fi
-done
-# One-time migration: the old Codex timer is replaced by the generic timer.
-sudo systemctl disable redline-codex-runtime-update.timer 2>/dev/null || true
-sudo rm -f /etc/systemd/system/redline-codex-runtime-update.{service,timer} \
-  /usr/local/sbin/redline-codex-runtime-update
-git fetch origin main
-git merge --ff-only origin/main
-RELEASE_SHA=$(git rev-parse HEAD)
+git pull --ff-only
 sudo systemctl start redline-backup.service
-sudo systemctl is-failed --quiet redline-backup.service && exit 1
-sudo install -d -o root -g ubuntu -m 0750 /etc/redline/runtime
-test -r /etc/redline/runtime/coach-messenger.env
-sudo install -o root -g root -m 0755 deploy/redline-agent-cli \
-  /usr/local/bin/redline-agent-cli
-sudo install -d -o root -g root -m 0755 /usr/local/share/redline
-sudo install -o root -g root -m 0644 deploy/agent-cli-tools.txt \
+sudo install -o root -g root -m 0755 deploy/redline-agent-cli /usr/local/bin/redline-agent-cli
+sudo install -D -o root -g root -m 0644 deploy/agent-cli-tools.txt \
   /usr/local/share/redline/agent-cli-tools.txt
-sudo install -o root -g root -m 0755 deploy/postgres/export-latest-backup.sh \
-  /usr/local/bin/redline-backup-export
-if [ ! -e /home/ubuntu/.venvs/redline-current ] && \
-   [ ! -L /home/ubuntu/.venvs/redline-current ]; then
-  sudo -u ubuntu ln -s /home/ubuntu/.venvs/redline-3.12 \
-    /home/ubuntu/.venvs/redline-current
-fi
-test -L /home/ubuntu/.venvs/redline-current
-test -x /home/ubuntu/.venvs/redline-current/bin/python
-sudo install -o root -g root -m 0755 deploy/agent-runtime-update.py \
-  /usr/local/sbin/redline-agent-runtime-update
-sudo install -o root -g root -m 0755 deploy/codex-runtime-smoke.py \
-  /usr/local/libexec/redline-codex-runtime-smoke.py
-sudo install -o root -g root -m 0755 deploy/claude-runtime-smoke.py \
-  /usr/local/libexec/redline-claude-runtime-smoke.py
-sudo install -o root -g root -m 0644 deploy/systemd/redline-agent-runtime-update.service \
-  /etc/systemd/system/redline-agent-runtime-update.service
-sudo install -o root -g root -m 0644 deploy/systemd/redline-agent-runtime-update.timer \
-  /etc/systemd/system/redline-agent-runtime-update.timer
 sudo install -o root -g root -m 0644 deploy/systemd/coach-messenger.service \
   /etc/systemd/system/coach-messenger.service
 sudo systemctl daemon-reload
-/home/ubuntu/.venvs/redline-current/bin/python -m pip install \
-  -r requirements.txt
-/home/ubuntu/.venvs/redline-current/bin/python -m pip install --no-deps -e .
-MIGRATOR_DATABASE_URL='postgresql+psycopg://redline_migrator:…@/redline?host=/run/redline-postgres'
-DATABASE_URL="$MIGRATOR_DATABASE_URL" \
-  /home/ubuntu/.venvs/redline-current/bin/alembic upgrade head
-/home/ubuntu/.venvs/redline-current/bin/python -m ruff check .
-/home/ubuntu/.venvs/redline-current/bin/python -m mypy
-/home/ubuntu/.venvs/redline-current/bin/python -m pytest -q
+VENV=/home/ubuntu/.venvs/redline-current
+$VENV/bin/python -m pip install -c requirements.txt -e '.[cards]'
+DATABASE_URL="$MIGRATOR_DATABASE_URL" $VENV/bin/alembic upgrade head
 sudo systemctl restart coach-messenger
-REDLINE_PYTHON=/home/ubuntu/.venvs/redline-current/bin/python \
-  deploy/verify-release.sh "$RELEASE_SHA"
-/home/ubuntu/.venvs/redline-current/bin/python -c \
-  'from importlib.metadata import version; print("openai-codex", version("openai-codex"))'
-sudo systemctl enable --now redline-agent-runtime-update.timer
-sudo systemctl start redline-agent-runtime-update.service
-sudo systemctl is-enabled --quiet redline-agent-runtime-update.timer
-sudo systemctl start redline-backup.service
-sudo systemctl is-failed --quiet redline-backup.service && exit 1
+curl -fsS http://127.0.0.1:8000/ready
 ```
 
-Both backups must produce a valid archive, manifest and checksum.
-In the reference deployment, off-VPS collection is a private GitHub Actions
-workflow: it fetches the archive, does not hold the `age` private key and therefore cannot
-claim to restore it. After a change to the backup chain, then at
-least once a month, the Docker drill described in `docs/storage-architecture.md`
-actually restores the latest archive. Adapt the checkout to the real
-deployment mechanism. Never have these steps carried out by a user message or an
-agent process.
+Claude Code's own updater stays off (`DISABLE_AUTOUPDATER=1`): a new version is
+installed deliberately, checked with a real turn, never in the middle of one. Never
+have these steps carried out by a user message or an agent process.
 
 ### Adding a CLI the coach can use
 
@@ -816,24 +738,6 @@ A false positive is declared by name in `ignore_names`.
 
 PostgreSQL tests run when `TEST_DATABASE_URL` points to a migrated test
 database with an administration role; otherwise they are reported as skipped.
-
-## Host: firewall, updates, SSH
-
-`deploy/host/` carries the machine's configuration (firewalld, automatic
-updates, SSH). `sudo deploy/host/install.sh` validates then installs it,
-without restarting any application service.
-
-- **Firewall**: firewalld, `public` zone (ssh, http, https, dhcpv6-client), a second
-  layer behind the Oracle Security List; the Docker interfaces are in the
-  `docker` zone. Reading: `sudo firewall-cmd --list-all`. `rpcbind` is masked.
-- **Updates**: `unattended-upgrades` also covers Caddy and Docker. Download
-  at 03:20, installation at 03:40, reboot at 04:00 if a kernel requires it: this is the
-  VPS's activity trough. The service, Caddy and Postgres restart on their own.
-- **SSH**: key only (Oracle image), `X11Forwarding no`, `MaxAuthTries 3`,
-  fail2ban active.
-
-Check: `systemctl list-timers 'apt-daily*'`,
-`sudo tail /var/log/unattended-upgrades/unattended-upgrades.log`, `last -x reboot`.
 
 ## Diagnostics
 

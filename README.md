@@ -47,7 +47,7 @@ the facts before it speaks**.
 | `src/redline/model/`, `analysis/`, `integrations/`, `coach/` | The typed domain, the ledger and its reports, Strava and the weather, the coach's words |
 | `src/redline/storage/`, `migrations/` | PostgreSQL schema (Alembic) and repository layer |
 | `src/redline/cards/` | HTML/PNG card renderer (week, month, workout, strength) |
-| `deploy/` | systemd units, Caddy, PostgreSQL (Compose, backups), the agent's command launcher and its allowlist, the runtime updater |
+| `deploy/` | systemd unit, Caddy, PostgreSQL (Compose, backups), the agent's command launcher and its allowlist; `compose.yml` and `Dockerfile` at the root run it all on one host |
 | `templates/` | Note templates for a vault (athlete onboarding, weekly review, debrief…) |
 | `templates/vault/CLAUDE.md` | A **template** of the coach's instruction file, copied into a vault: reading ladder, calibration rule, fact-ownership table |
 | `docs/storage-architecture.md` | Why PostgreSQL owns operational facts and Git owns knowledge |
@@ -90,8 +90,7 @@ runtime.
 
 ```bash
 python3.12 -m venv .venv && . .venv/bin/activate
-pip install -r requirements.txt -r requirements-dev.txt
-pip install --no-deps -e .   # the engine, as the `redline` package
+pip install -c requirements.txt -c requirements-dev.txt -e '.[cards,dev]'
 playwright install chromium   # the page and card tests drive a real browser
 pytest -q
 ```

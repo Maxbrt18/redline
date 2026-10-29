@@ -187,6 +187,8 @@ class Config:
     instance: Instance
     #: Secret segment of the Strava callback URL: the route's only authentication.
     strava_webhook_secret: str = ""
+    #: `127.0.0.1` behind a proxy on the same host; `0.0.0.0` in a container.
+    webhook_host: str = "127.0.0.1"
 
     @classmethod
     def from_env(cls) -> Config:
@@ -211,6 +213,7 @@ class Config:
             allowed_psid=os.environ.get("MESSENGER_ALLOWED_PSID", "").strip(),
             graph_version=os.environ.get("GRAPH_API_VERSION", "v21.0"),
             webhook_port=_envint("WEBHOOK_PORT", 8000),
+            webhook_host=(os.environ.get("WEBHOOK_HOST") or "127.0.0.1").strip(),
             vault_path=vault_path,
             agent_provider=provider,
             claude_bin=os.environ.get("CLAUDE_BIN", "claude"),

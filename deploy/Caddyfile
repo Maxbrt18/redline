@@ -24,8 +24,8 @@ coach.example.com {
 		-Via
 	}
 
-	# /ready queries PostgreSQL on every call: reserved for the VPS (wait-ready.sh,
-	# verify-release.sh and the runtime updater go through 127.0.0.1:8000).
+	# /ready queries PostgreSQL on every call: reserved for the host, through
+	# 127.0.0.1:8000.
 	# /health stays public: in-memory answer, no database.
 	respond /ready 404
 

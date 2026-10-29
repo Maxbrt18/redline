@@ -7,13 +7,12 @@ file name prevents reading the JSON of another turn.
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import subprocess
 from unittest.mock import MagicMock
 
 import pytest
-from conftest import DEPLOY_DIR, ENGINE_ROOT, cli_command
+from conftest import ENGINE_ROOT, cli_command
 
 from redline.model import agent_input
 from redline.service import persona
@@ -127,46 +126,3 @@ def test_every_turn_clears_its_files_whatever_the_outcome():
 
     assert agent.run.call_args.args[1] == "bilan"
     repo.clear_turn_inputs.assert_called_once_with(outcome.turn_id)
-
-
-def _smoke():
-    spec = importlib.util.spec_from_file_location(
-        "claude_runtime_smoke", DEPLOY_DIR / "claude-runtime-smoke.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-def _fake_claude(tmp_path, tool_result: str, denials: list | None = None) -> str:
-    """A binary that replays the stream-json flow of a CLI call."""
-    events = [
-        {"type": "assistant", "message": {"content": [{
-            "type": "tool_use", "id": "t1", "name": "Bash",
-            "input": {"command": "/usr/local/bin/redline-agent-cli week-plan preview "
-                                 "--week 2026-W01 --input .agent-tmp/x.json"}}]}},
-        {"type": "user", "message": {"content": [{
-            "type": "tool_result", "tool_use_id": "t1", "content": tool_result}]}},
-        {"type": "result", "permission_denials": denials or []},
-    ]
-    binary = tmp_path / "claude"
-    binary.write_text("#!/bin/sh\ncat <<'EOF'\n"
-                      + "\n".join(json.dumps(event) for event in events) + "\nEOF\n")
-    binary.chmod(0o755)
-    return str(binary)
-
-
-def test_the_runtime_smoke_accepts_a_cli_call_that_reached_the_launcher(tmp_path):
-    binary = _fake_claude(tmp_path, "Exit code 2\nagent-cli: aucun tour en cours")
-    _smoke()._cli_call_allowed(binary, "haiku", str(tmp_path))
-
-
-@pytest.mark.parametrize("result, denials", [
-    ("Permission to use Bash has been denied because Claude Code is running in "
-     "don't ask mode.", None),
-    ("agent-cli: aucun tour en cours", [{"tool_name": "Bash"}]),
-])
-def test_the_runtime_smoke_refuses_a_version_that_blocks_the_cli_call(
-        tmp_path, result, denials):
-    binary = _fake_claude(tmp_path, result, denials)
-    with pytest.raises(RuntimeError, match="appel de CLI"):
-        _smoke()._cli_call_allowed(binary, "haiku", str(tmp_path))

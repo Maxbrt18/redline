@@ -40,40 +40,17 @@ APPLY_RETRY_PAUSES = (1.0, 3.0, 8.0)
 # A settled session no longer changes the review: done, missed, cancelled or closed.
 SETTLED_CYCLE_STATES = session_cycle.TERMINAL_STATES | {"completed"}
 
-# A live service may synchronize vault content, never executable/runtime files.
-# Deploying those belongs to the service manager, outside a message transaction.
-#
-# "Runtime" means: the service behaves differently after this commit. A file that
-# nothing executes or loads is not runtime, even under `deploy/`. For example
-# `coaching/exercises/*.md` is DATA, reread by a subprocess on each `redline chart-strength`
-# call, never loaded at startup, and edited by the coach itself. Classing it as runtime
-# would freeze vault synchronization on a write the coach is allowed to make.
-RUNTIME_PATHS = (
-    "deploy/",
-    "src/",
-    "migrations/",
-    ".github/",
-    ".githooks/",
-    "alembic.ini",
-    "pyproject.toml",
-)
-
 #: The trees whose fingerprint identifies the deployed code (`/health`, release).
 RUNTIME_TREES = ("deploy", "src", "migrations")
 
 # Technical alert causes. The key avoids duplicating a cause within a single
 # synchronization or persistence pass.
-ALERT_DEPLOY = "deployment"
 ALERT_HISTORY = "history"
 ALERT_PUSH = "push"
 ALERT_COMMIT = "commit"
 ALERT_PROJECTION = "projection"
 ALERT_WRITE = "write"
 
-
-def needs_deployment(path: str) -> bool:
-    """Whether integrating this file would change how the running service behaves."""
-    return path.startswith(RUNTIME_PATHS)
 
 CANONICAL_PROJECTIONS = frozenset(str(path) for path in vault_layout.PROJECTIONS)
 
@@ -126,8 +103,7 @@ def _transient(error: StorageError) -> bool:
 
 def forbidden_in_turn(path: str) -> bool:
     """What a coach turn may never modify in the vault."""
-    return (path in CANONICAL_PROJECTIONS or path.startswith(f"{vault_layout.CAPABILITIES}/")
-            or needs_deployment(path))
+    return path in CANONICAL_PROJECTIONS or path.startswith(f"{vault_layout.CAPABILITIES}/")
 
 
 class VaultRepo:
@@ -152,22 +128,19 @@ class VaultRepo:
     def _alert(self, key: str, text: str) -> None:
         """Queue an incident, once per cause until it is drained.
 
-        `_push()` replays `sync()` before retrying: without this guard, a repository
-        awaiting a deployment would raise the same message twice in one turn.
+        `_push()` replays `sync()` before retrying: without this guard, the same
+        failure would be announced twice in one turn.
         """
         if any(alert.key == key for alert in self._alerts):
             return
         self._alerts.append(VaultAlert(key, text))
 
-    def _pending(self, key: str) -> VaultAlert | None:
-        return next((alert for alert in self._alerts if alert.key == key), None)
-
     def sync(self) -> bool:
-        """Integrate remote vault-only commits and refuse runtime updates.
+        """Integrate the remote vault commits.
 
         Returning ``True`` means HEAD moved, so an existing model session must
-        reread its context. A commit that touches runtime files stays in the remote
-        branch until the normal deployment process restarts the service on it.
+        reread its context. The vault holds no engine code (`paths.vault_root` refuses
+        the checkout), so no commit of it waits for a deployment.
         """
         before = self._head()
         fetched = self._git("fetch", self._remote, self._branch)
@@ -183,16 +156,6 @@ class VaultRepo:
             self._alert(ALERT_HISTORY,
                         "Synchronisation Git refusée : historique distant incompatible")
             return False
-        changed = self._git(
-            "diff", "--name-only", base, incoming, log_errors=False
-        ).stdout.splitlines()
-        runtime = [path for path in changed if needs_deployment(path)]
-        if runtime:
-            detail = ", ".join(runtime[:5])
-            log.warning("Déploiement requis avant synchronisation (%s)", detail)
-            self._alert(ALERT_DEPLOY,
-                        "Une mise à jour du runtime attend un déploiement : " + detail)
-            return False
         if self._git("rebase", "--autostash", incoming).returncode != 0:
             self._git("rebase", "--abort", log_errors=False)
         after = self._head()
@@ -207,7 +170,7 @@ class VaultRepo:
 
         It does not change when the coach commits, and it is read from the engine
         repository, whether the vault is a different one or the same.
-        `deploy/verify-release.sh` recomputes the same value from the deployed SHA.
+        A release check can recompute the same value from the deployed SHA.
         """
         # The engine checkout belongs to the deploy account, not to the service user.
         trees = [self._git("-c", f"safe.directory={self._engine_root}", "rev-parse",
@@ -638,27 +601,13 @@ class VaultRepo:
                 "régénération des vues du vault échouée : " + detail)
 
     def _push(self) -> bool:
-        """Push, and announce only ONE incident: the one that says what to do.
-
-        A push refused while a deployment is pending is not a second incident but the
-        CONSEQUENCE of the first: the remote is ahead by commits that `sync()` refused
-        to integrate. Announcing them separately would give two messages, neither
-        naming the action to take.
-        """
         # If the remote moved in the meantime (a push from the Mac), rebase and retry.
         if self._git("push", self._remote, self._branch).returncode == 0:
             return True
         self.sync()
         if self._git("push", self._remote, self._branch).returncode == 0:
             return True
-        blocked = self._pending(ALERT_DEPLOY)
-        if blocked is not None:
-            self._alerts.remove(blocked)
-            self._alert(ALERT_DEPLOY, blocked.text
-                        + " — d'ici là tes données sont enregistrées en local, "
-                          "mais elles ne partent plus.")
-        else:
-            self._alert(ALERT_PUSH, "Commit enregistré localement mais push Git échoué")
+        self._alert(ALERT_PUSH, "Commit enregistré localement mais push Git échoué")
         return False
 
     def _git(self, *args: str, log_errors: bool = True,

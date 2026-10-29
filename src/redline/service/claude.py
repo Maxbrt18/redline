@@ -76,9 +76,9 @@ def _parse_reset_epoch(detail: str, now: datetime | None = None) -> int | None:
 #: load, nor reach the service's environment file or venv.
 CONFINEMENT = ("--restricted", "--strict-mcp-config")
 
-#: What an autonomous turn may do. Shared with `deploy/claude-runtime-smoke.py`, which
-#: rejects a new Claude Code version if it blocks the exact shape of a coach CLI call
-#: (for instance one that redirects input from a file).
+#: What an autonomous turn may do. A runtime preflight imports it, to reject a new Claude
+#: Code version that blocks the exact shape of a coach CLI call (for instance one that
+#: redirects input from a file).
 AUTONOMOUS_PERMISSIONS = (
     *CONFINEMENT,
     "--permission-mode", "dontAsk",

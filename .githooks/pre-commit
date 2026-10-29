@@ -1,69 +1,28 @@
 #!/bin/sh
-# Regenerates the generated views before every commit, so a stale block is never
-# committed in the first place -- redline vault-check only detects the drift afterwards.
+# The fast half of the CI gate, before a commit that touches Python: ruff and mypy, a
+# few seconds. The test suite stays in the CI, where it runs on every pull request.
+# A vault has its own hook: templates/vault/.githooks/pre-commit.
 #
-# The hook is a SECOND line of defence, not the guarantee: it only runs where
-# someone typed `git config core.hooksPath .githooks`, which a fresh clone (a
-# Claude Code session on the web, for instance) never has. The guarantee lives in
-# the writers themselves -- redline/vault.py regenerates before it commits.
+# Enabled with `git config core.hooksPath .githooks`. Each tool is skipped ALOUD when it
+# is not installed: a silent skip reads like a passing gate.
 set -e
 cd "$(git rev-parse --show-toplevel)"
 
-# The repository venv takes priority over the system Python. On the VPS the service
-# already puts its external venv first on PATH. The fallback keeps note commits
-# non-blocking, but a code change does require Python 3.12.
 if [ -x .venv/bin/python ]; then
-    RUNTIME_PYTHON=.venv/bin/python
-elif command -v python3.12 >/dev/null 2>&1; then
-    RUNTIME_PYTHON=python3.12
+    PYTHON=.venv/bin/python
 else
-    RUNTIME_PYTHON=python3
+    PYTHON=python3
 fi
 
-# NON-BLOCKING, by policy. `redline/vault.py` (`regenerate_views`) states that a
-# failing generator must NEVER prevent a commit: lost session notes are a far worse
-# outage than a stale block. A stale block is repaired by the next commit, and
-# `redline vault-check` reports it in the weekly review; a lost write is never recovered.
-# Off the VPS the PostgreSQL views cannot be computed: running them would raise a
-# false incident on every commit, while static mode covers exactly that case.
-# Fingerprint of every file already modified BEFORE regeneration: only what the
-# generator actually touched is staged afterwards. A blanket `git add -u` would pull
-# every unstaged change into the current commit and break targeted commits.
-fingerprint() {
-    git diff --name-only -z | xargs -0 -I{} sh -c \
-        'printf "%s %s\n" "$(git hash-object -- "$1" 2>/dev/null || echo absent)" "$1"' _ {}
-}
-# Views belong to a vault: the engine checkout has none, and VAULT_PATH refuses it.
-if [ ! -d src/redline ]; then
-    export VAULT_PATH="${VAULT_PATH:-$PWD}"
-    BEFORE=$(fingerprint)
-    REGEN_OPTIONS=""
-    if [ -z "${DATABASE_URL:-}" ]; then
-        REGEN_OPTIONS="--static-only"
-    fi
-    "$RUNTIME_PYTHON" -m redline.cli.regen_views $REGEN_OPTIONS >/dev/null || \
-        echo "pre-commit : régénération des vues en échec, commit maintenu (bloc périmé)."
-# The list of produced files is read from disk, never copied from GENERATORS: a copy
-# can go stale and miss a generated file.
-    fingerprint | while read -r hash path; do
-        printf '%s\n' "$BEFORE" | grep -qxF "$hash $path" || git add -- "$path"
-    done
-fi
-
-# Code touched? Then run the gate the CI runs, here, where the fix is free rather
-# than a red build and a copy-pasted log. Each tool is skipped ALOUD when it is not
-# installed (the VPS has no dev deps): a silent skip reads like a passing gate, and
-# a hook that hard-fails on a missing linter is a hook someone disables.
-if git diff --cached --name-only | grep -qE '\.py$'; then
-    if ! "$RUNTIME_PYTHON" -c 'import sys; raise SystemExit(sys.version_info < (3, 12))'; then
-        echo "pre-commit : Python 3.12+ requis pour valider le code."
-        exit 1
-    fi
-    for tool in ruff mypy vulture pytest; do
-        if "$RUNTIME_PYTHON" -c "import $tool" 2>/dev/null; then
-            "$RUNTIME_PYTHON" -m "$tool" $([ "$tool" = ruff ] && echo "check .") $([ "$tool" = pytest ] && echo "-q -rs")
+git diff --cached --name-only | grep -qE '\.py$' || exit 0
+for tool in ruff mypy; do
+    if "$PYTHON" -c "import $tool" 2>/dev/null; then
+        if [ "$tool" = ruff ]; then
+            "$PYTHON" -m ruff check .
         else
-            echo "pre-commit : $tool absent, non lancé."
+            "$PYTHON" -m mypy
         fi
-    done
-fi
+    else
+        echo "pre-commit : $tool absent, non lancé."
+    fi
+done
