@@ -50,7 +50,7 @@ def render(store: OperationalStore, root: Path, week: str, today: dt.date) -> st
     every = store.prediction_rows()
     typed = [row for row in every
              if row.get("status") == "open" and _as_date(row["due_on"]) <= today]
-    lines += ["", text.PREDICTIONS_DUE.format(typed=typed)]
+    lines += ["", text.PREDICTIONS_DUE.format(typed=len(typed))]
     lines.extend(text.PREDICTION_LINE.format(prediction_key=row["prediction_key"], as_date=_as_date(row["due_on"]), statement=str(row.get("statement", ""))[:160]) for row in typed[:MAX_LISTED])
     calibration = prediction_model.calibration_lines(every, today)
     lines += ["", text.CALIBRATION]
@@ -58,7 +58,7 @@ def render(store: OperationalStore, root: Path, week: str, today: dt.date) -> st
 
     overdue = [row for row in store.deadline_rows()
                if row.get("status") != "done" and _as_date(row["due_on"]) < today]
-    lines += ["", text.DEADLINES_DUE.format(overdue=overdue)]
+    lines += ["", text.DEADLINES_DUE.format(overdue=len(overdue))]
     lines.extend(text.DEADLINE_LINE.format(deadline_key=row["deadline_key"], as_date=_as_date(row["due_on"]), item=row["item"]) + (text.DEADLINE_BLOCKS.format(blocks=row["blocks"]) if row.get("blocks") else "")
                  for row in overdue[:MAX_LISTED])
 

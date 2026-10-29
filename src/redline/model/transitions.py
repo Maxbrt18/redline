@@ -111,7 +111,7 @@ def per_week_errors(sessions: list[dict], where: str) -> list[str]:
     if len(typed) <= allowed:
         return problems
     names = ", ".join(f"{s['id']} ({s['transition']})" for s in typed)
-    return [*problems, f'{where}: {typed} transitions in the week ({names}), rule n8: {allowed} at most']
+    return [*problems, f"{where}: {len(typed)} transitions in the week ({names}), rule n8: {allowed} at most"]
 
 
 # ------------------------------------------------------------------ backward solver
