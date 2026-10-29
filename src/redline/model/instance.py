@@ -7,7 +7,7 @@ that hardcoded one of these values would reintroduce the single-athlete engine t
 file exists to undo.
 
 Closed by default, like the repository's other schemas: an unknown field is an error,
-and so is a `[…]` left as-is from `redline.example.toml` -- a half-filled template
+and so is a `[…]` left as-is from `config/redline.example.toml` -- a half-filled template
 would end up word for word in a message to the athlete.
 """
 
@@ -29,7 +29,7 @@ from .schema import Schema, SchemaError, field
 from .startup_budget import Tier, ceiling_errors
 
 FILENAME = "redline.toml"
-EXAMPLE = "redline.example.toml"
+EXAMPLE = "config/redline.example.toml"
 
 #: An unfilled template value (`[Prénom]`, `[ville]`...). Never a legitimate value here.
 PLACEHOLDER = re.compile(r"\[[^\]]*\]")

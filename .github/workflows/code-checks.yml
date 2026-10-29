@@ -1,22 +1,11 @@
-# The conventions of pyproject.toml only hold while something runs them, and neither
-# a developer machine nor the production bot -- both of which push here -- runs ruff on
-# its own.
-#
-# This workflow owns the code half only. scripts/vault-check.py checks vault content,
-# which the bot rewrites several times a day, so code and content have separate verdicts
-# and the content check deliberately stays out of here.
-#
-# Rule: a test that reads the real vault may only assert what code guarantees (it parses,
-# it conforms to its schema, frozen history is unchanged). Anything that a normal day of
-# coaching can invalidate belongs to vault-check.py.
+# The conventions of pyproject.toml only hold while something runs them. Two jobs: the
+# gate (lint, types, dead code, shell scripts, schema, tests) and the pages (the PNG
+# cards and the notebook, in Chromium), which need a browser the gate does without.
 name: Code checks
 
 on:
   push:
     branches: [main]
-    # Messenger commits coaching facts several times a day. Re-running an unchanged
-    # code gate on those commits is noise. Code changes still run the full gate;
-    # pull requests remain unfiltered so a mixed change cannot hide it.
     paths:
       - ".github/workflows/code-checks.yml"
       - ".python-version"
@@ -27,6 +16,7 @@ on:
       - "deploy/**"
       - "requirements*.txt"
       - "src/**"
+      - "templates/**"
       - "tests/**"
   pull_request:
   workflow_dispatch:
@@ -65,21 +55,16 @@ jobs:
         with:
           python-version-file: ".python-version"
 
-      # Playwright is left out of THIS job on purpose: pulling ~350 MB of Chromium
-      # on every push to re-render four PNGs would make the gate slow enough to stop
-      # being run. It has its own job below, on the paths that can break it. Flask,
-      # on the other hand, is NOT optional here -- without it the webhook and
-      # /strength-report tests skip silently.
+      # Without the `cards` extra: Playwright and its Chromium belong to the pages job.
       - name: Install
         run: |
-          CODEX_REQUIREMENT="$(sed -n '/^openai-codex/p' requirements.txt)"
-          test -n "$CODEX_REQUIREMENT"
-          python -m pip install --quiet pytest ruff mypy vulture pyyaml flask requests \
-                                        SQLAlchemy==2.0.46 alembic==1.18.4 \
-                                        'psycopg[binary,pool]==3.3.3' babel==2.17.0 \
-                                        "$CODEX_REQUIREMENT" \
-                                        types-requests types-PyYAML
-          python -m pip install --quiet --no-deps -e .
+          python -m pip install --quiet -c requirements.txt -c requirements-dev.txt \
+                                        -e '.[codex,dev]'
+
+      - name: Shell scripts
+        run: |
+          shellcheck .githooks/pre-commit templates/vault/.githooks/pre-commit \
+                     deploy/agent-cli/redline-agent-cli deploy/postgres/*.sh
 
       - name: Database schema
         env:
@@ -103,3 +88,22 @@ jobs:
         # -rs prints WHY anything skipped: a module that skips itself for a missing
         # dependency otherwise reads as a passing build.
         run: python -m pytest -q -rs
+
+  pages:
+    name: cards · notebook (Chromium)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install
+        run: |
+          python -m pip install --quiet -c requirements.txt -c requirements-dev.txt \
+                                        -e '.[cards,dev]'
+          python -m playwright install --with-deps chromium
+
+      - name: Pages
+        run: python -m pytest -q -rs tests/test_charts.py tests/test_page.py tests/test_notebook_page.py

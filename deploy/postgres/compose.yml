@@ -1,3 +1,9 @@
+# PostgreSQL alone, for a service that runs on the host under systemd: the socket is
+# shared with the host in /run/redline-postgres (deploy/systemd/redline-postgres.tmpfiles)
+# and the port listens on 127.0.0.1. The compose.yml at the root keeps it on its own
+# network instead. Variables: config/postgres.env.example.
+#
+#   docker compose --env-file /etc/redline/postgres.env -f deploy/postgres/compose.yml up -d
 services:
   postgres:
     build:

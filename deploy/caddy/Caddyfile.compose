@@ -1,0 +1,19 @@
+# The proxy of compose.yml: HTTPS for REDLINE_DOMAIN (Let's Encrypt), the service
+# behind it. The domain must resolve to this host, ports 80 and 443 open.
+{$REDLINE_DOMAIN} {
+	request_body {
+		max_size 1MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+		-Via
+	}
+
+	# /ready queries PostgreSQL on every call: for the health check inside the
+	# network, never from outside. /health stays public: in-memory answer.
+	respond /ready 404
+
+	reverse_proxy redline:8000
+}

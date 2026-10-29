@@ -17,7 +17,7 @@ the facts before it speaks**.
 > The code is organised so that it can be translated, but that work is not done.
 >
 > The engine never names the athlete: the name, the heart rates behind the training
-> zones, the watched injuries and the tracked capabilities come from `redline.toml` (see `redline.example.toml`). The coaching rules,
+> zones, the watched injuries and the tracked capabilities come from `redline.toml` (see `config/redline.example.toml`). The coaching rules,
 > their thresholds and the kinds of transition session come from the vault's
 > `rulebook.toml`, or from the engine's `rulebook.default.toml` when the vault has none.
 > `Sam` is the fictional athlete of the test suite only.
@@ -47,7 +47,8 @@ the facts before it speaks**.
 | `src/redline/model/`, `analysis/`, `integrations/`, `coach/` | The typed domain, the ledger and its reports, Strava and the weather, the coach's words |
 | `src/redline/storage/`, `migrations/` | PostgreSQL schema (Alembic) and repository layer |
 | `src/redline/cards/` | HTML/PNG card renderer (week, month, workout, strength) |
-| `deploy/` | systemd units, Caddy, PostgreSQL (Compose, backups), the agent's command launcher and its allowlist, the runtime updater |
+| `config/` | The files an operator copies and fills: `redline.example.toml` (the instance, at the vault root), `redline.env.example` (the service), `routing.example.toml`, the Compose and PostgreSQL variables |
+| `deploy/` | How to run it on a host: `agent-cli/` (the launcher of the agent's commands and its allowlist), `systemd/`, `caddy/`, `postgres/` (image, roles, backups); `compose.yml` and `Dockerfile` at the root run it all on one host |
 | `templates/` | Note templates for a vault (athlete onboarding, weekly review, debrief…) |
 | `templates/vault/CLAUDE.md` | A **template** of the coach's instruction file, copied into a vault: reading ladder, calibration rule, fact-ownership table |
 | `docs/storage-architecture.md` | Why PostgreSQL owns operational facts and Git owns knowledge |
@@ -84,14 +85,13 @@ temporary copy of it through `VAULT_PATH`, exactly as the service runs on yours.
 ## Running it
 
 See [`docs/deployment.md`](docs/deployment.md) for the full deployment: PostgreSQL via
-Docker Compose, Alembic migrations, environment variables (`deploy/coach-messenger.env.example`), systemd
+Docker Compose, Alembic migrations, environment variables (`config/redline.env.example`), systemd
 units, Caddy. You need your own Strava API application, a Messenger app, and an LLM agent
 runtime.
 
 ```bash
 python3.12 -m venv .venv && . .venv/bin/activate
-pip install -r requirements.txt -r requirements-dev.txt
-pip install --no-deps -e .   # the engine, as the `redline` package
+pip install -c requirements.txt -c requirements-dev.txt -e '.[cards,dev]'
 playwright install chromium   # the page and card tests drive a real browser
 pytest -q
 ```

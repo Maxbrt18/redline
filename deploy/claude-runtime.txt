@@ -1,3 +1,0 @@
-# Range of Claude Code versions the nightly updater may promote from the npm `stable`
-# channel. A major version change stays a manual decision.
-@anthropic-ai/claude-code>=2.1.296,<3.0.0

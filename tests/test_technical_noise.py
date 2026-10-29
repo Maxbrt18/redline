@@ -26,14 +26,14 @@ def test_an_internal_incident_is_logged_without_text(make_bot, caplog):
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
     repo.drain_alerts.return_value = [
-        VaultAlert(vault_module.ALERT_DEPLOY, "Une mise à jour du runtime attend "
-                   "un déploiement : src/redline/service/bot.py")]
+        VaultAlert(vault_module.ALERT_HISTORY,
+                   "Synchronisation Git refusée : historique distant incompatible")]
     bot = make_bot(client=client, repo=repo)
 
     bot._log_vault_alerts()
 
     assert _alerts_sent(client) == []
-    assert caplog.text.count("Incident interne « vault:deployment »") == 1
+    assert caplog.text.count("Incident interne « vault:history »") == 1
 
 
 def test_two_distinct_internal_causes_are_logged_without_text(make_bot, caplog):
@@ -42,7 +42,7 @@ def test_two_distinct_internal_causes_are_logged_without_text(make_bot, caplog):
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
     repo.drain_alerts.side_effect = [
-        [VaultAlert(vault_module.ALERT_DEPLOY, "déploiement en attente"),
+        [VaultAlert(vault_module.ALERT_HISTORY, "historique incompatible"),
          VaultAlert(vault_module.ALERT_PROJECTION, "projection à reprendre")],
     ]
     bot = make_bot(client=client, repo=repo)
@@ -50,5 +50,5 @@ def test_two_distinct_internal_causes_are_logged_without_text(make_bot, caplog):
     bot._log_vault_alerts()
 
     assert _alerts_sent(client) == []
-    assert "vault:deployment" in caplog.text
+    assert "vault:history" in caplog.text
     assert "vault:projection" in caplog.text

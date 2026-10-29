@@ -119,7 +119,7 @@ def _app_identity() -> tuple[str, str]:
     if not client_id or not client_secret:
         raise StravaError(
             "STRAVA_CLIENT_ID et STRAVA_CLIENT_SECRET sont absents de l'environnement : "
-            "ils se renseignent dans l'environnement (cf. deploy/coach-messenger.env.example)."
+            "ils se renseignent dans l'environnement (cf. config/redline.env.example)."
         )
     return client_id, client_secret
 

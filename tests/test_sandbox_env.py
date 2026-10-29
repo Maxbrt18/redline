@@ -156,7 +156,7 @@ def test_production_secret_file_lives_outside_the_agent_workspace():
 
 
 def _agent_tool_policy() -> list[str]:
-    return [line for raw in (ROOT / "deploy" / "agent-cli-tools.txt").read_text(
+    return [line for raw in (ROOT / "deploy" / "agent-cli" / "agent-cli-tools.txt").read_text(
         encoding="utf-8").splitlines() if (line := raw.strip()) and not line.startswith("#")]
 
 
@@ -218,7 +218,7 @@ def test_root_owned_launcher_refuses_a_cli_modified_during_the_turn(tmp_path):
         "REDLINE_REPO": str(repo),
         "REDLINE_TURN_ID": "0f6b1c2e-3a4d-4e5f-8a9b-0c1d2e3f4a5b",
     }
-    launcher = ROOT / "deploy" / "redline-agent-cli"
+    launcher = ROOT / "deploy" / "agent-cli" / "redline-agent-cli"
 
     # Without a turn identity, the coach launcher opens no direct write path.
     # Blanking the variable is not enough to leave the transaction.

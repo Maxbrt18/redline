@@ -1,0 +1,90 @@
+# Redline on one host: PostgreSQL, the migrations, the service and Caddy.
+#
+#   cp config/compose.env.example .env          # then fill it in
+#   docker compose up -d --build
+#
+# Before the first start (see config/compose.env.example):
+#   - ./secrets/ holds the three PostgreSQL passwords, one per file;
+#   - ./redline.env is the service configuration (config/redline.env.example),
+#     its DATABASE_URL pointing at `postgres` with the `redline_app` password;
+#   - ./vault is a Git clone of the athlete's vault, ./ssh the key that pushes it, both
+#     readable by uid 10001 (the service account of the image).
+services:
+  postgres:
+    build:
+      context: deploy/postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: redline
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+      - postgres_app_password
+      - postgres_migrator_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./deploy/postgres/init-roles.sh:/docker-entrypoint-initdb.d/010-roles.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d redline"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  # The schema is created and upgraded by the migrator role, never by the service.
+  migrate:
+    build: .
+    command: ["alembic", "upgrade", "head"]
+    working_dir: /opt/redline
+    environment:
+      DATABASE_URL: ${MIGRATOR_DATABASE_URL:?set in .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  redline:
+    build: .
+    restart: unless-stopped
+    env_file: redline.env
+    volumes:
+      - ./vault:/var/lib/redline/vault
+      - ./ssh:/var/lib/redline/.ssh:ro
+      - redline_state:/var/lib/redline/state
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready')"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 30s
+
+  caddy:
+    image: caddy:2.10
+    restart: unless-stopped
+    environment:
+      REDLINE_DOMAIN: ${REDLINE_DOMAIN:?set in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/caddy/Caddyfile.compose:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      redline:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redline_state:
+  caddy_data:
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password
+  postgres_app_password:
+    file: ./secrets/postgres_app_password
+  postgres_migrator_password:
+    file: ./secrets/postgres_migrator_password

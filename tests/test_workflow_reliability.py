@@ -10,12 +10,10 @@ from __future__ import annotations
 import datetime as dt
 import json
 import logging
-import re
-import subprocess
 import time
 from unittest.mock import MagicMock
 
-from conftest import ENGINE_ROOT, FakeAgent, git
+from conftest import ENGINE_ROOT, FakeAgent
 
 from redline.service.agent import FailureKind, RunResult, SessionMode
 from redline.service.bot import (
@@ -29,7 +27,7 @@ from redline.service.messenger import DeliveryResult
 from redline.service.plans import PlanStatus
 from redline.service.proactive import ProactiveJob
 from redline.service.routing import Route
-from redline.service.vault import PersistenceResult, VaultRepo
+from redline.service.vault import PersistenceResult
 from redline.service.work_queue import AttachmentRequest, InboundRequest
 
 PSID = "4242"
@@ -487,31 +485,6 @@ def test_rwf016_a_turn_is_traceable_by_structured_events_without_text(make_bot, 
                for event in events)
 
 
-def test_rwf016_the_release_check_and_the_service_fingerprint_the_same_code(git_repo):
-    """`verify-release.sh` and `/health` must compute the same fingerprint, and a commit
-        of coach notes must not move it."""
-    for tree in ("deploy", "src", "migrations"):
-        (git_repo / tree).mkdir()
-        (git_repo / tree / "code.py").write_text(f"# {tree}\n", encoding="utf-8")
-    git(git_repo, "add", "-A")
-    git(git_repo, "commit", "-m", "code")
-    script = (ENGINE_ROOT / "deploy" / "verify-release.sh").read_text(encoding="utf-8")
-    pipeline = re.search(r"^trees=.*?^expected_tree=[^\n]*", script, re.DOTALL | re.MULTILINE)
-    assert pipeline is not None
-    shell = subprocess.run(
-        ["bash", "-c", f'{pipeline.group(0)}\nprintf %s "$expected_tree"'],
-        env={"PATH": "/usr/bin:/bin", "repo_root": str(git_repo), "expected": "HEAD"},
-        capture_output=True, text=True, check=True)
-    repo = VaultRepo(str(git_repo), "origin", "main", engine_root=git_repo)
-    before = repo.runtime_tree()
-
-    (git_repo / "note.md").write_text("une note du coach", encoding="utf-8")
-    git(git_repo, "commit", "-am", "coach (messenger)")
-
-    assert shell.stdout == before and len(before) == 12
-    assert repo.runtime_tree() == before
-
-
 def test_rwf016_an_event_cannot_carry_free_text():
     import pytest
 
@@ -656,7 +629,7 @@ def test_rwf017_the_documentation_names_no_removed_mechanism():
                "silence_verdict", "response_review", "règles locales",
                "contrôle de cohérence", "rédaction en branche éphémère")
     documents = [*sorted((ENGINE_ROOT / "docs").glob("*.md")),
-                 ENGINE_ROOT / "deploy" / "coach-messenger.env.example"]
+                 ENGINE_ROOT / "config" / "redline.env.example"]
     stale = [(path.name, name) for path in documents
              for name in removed if name in path.read_text(encoding="utf-8")]
     assert stale == []

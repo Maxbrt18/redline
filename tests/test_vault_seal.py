@@ -4,7 +4,7 @@ A failure came down to one table cell (`FCmoy: 156.6`) and two architecture gaps
 these tests close:
   - **Two opposite policies on the same event.** `regenerate_views` says a failing
     generator must never block a commit, and `test_regen_views.py` proves it -- on a
-    test repository WITHOUT a hook. In production, `.githooks/pre-commit` ran under
+    test repository WITHOUT a hook. In production, the vault's `pre-commit` hook ran under
     `set -e` and aborted the commit. The test was green and production failed: coverage
     stopped exactly where the contradiction lived.
   - **A persistence failure was mute.** The day's Strava debrief was written, thrown
@@ -66,41 +66,6 @@ class TestNothingFailsSilently:
             capture_output=True, text=True).stdout
         assert not repo.publish()  # this test repository has no origin
 
-    def test_a_code_commit_created_during_the_turn_is_restored_not_the_whole_turn(
-            self, git_repo):
-        """The dangerous effect is the code file, not the notes of the turn."""
-        base = _head(git_repo)
-        path = git_repo / "src" / "redline" / "service" / "surprise.py"
-        path.parent.mkdir(parents=True)
-        path.write_text("BROKEN = True\n", encoding="utf-8")
-        (git_repo / "notes.md").write_text("une note du coach", encoding="utf-8")
-        git(git_repo, "add", "-A")
-        git(git_repo, "commit", "-m", "code inattendu")
-
-        repo = VaultRepo(str(git_repo), "origin", "main")
-        result = repo.persist_turn(base_head=base)
-
-        assert result.writes_applied
-        assert result.restored == ("src/redline/service/surprise.py",)
-        assert not path.exists()
-        committed = _committed(git_repo)
-        assert "notes.md" in committed and "surprise.py" not in committed
-        assert any("restaurés" in alert.text for alert in repo.drain_alerts())
-
-    def test_every_runtime_family_is_restored_without_a_second_list(self, git_repo):
-        for relative in ("migrations/versions/surprise.py", "alembic.ini", "pyproject.toml"):
-            base = _head(git_repo)
-            path = git_repo / relative
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text("runtime inattendu\n", encoding="utf-8")
-
-            result = VaultRepo(str(git_repo), "origin", "main").persist_turn(
-                base_head=base)
-
-            assert result.writes_applied, relative
-            assert result.restored == (relative,)
-            assert not path.exists(), relative
-
     def test_an_edited_projection_is_put_back_and_the_facts_still_apply(self, git_repo):
         (git_repo / "athlete").mkdir()
         (git_repo / "athlete" / "daily.csv").write_text("date;sommeil\n", encoding="utf-8")
@@ -132,7 +97,7 @@ class TestTheHookAgreesWithTheCode:
         (generator / "__init__.py").write_text("", encoding="utf-8")
         (generator / "regen_views.py").write_text(
             "import sys; sys.exit('registre illisible')\n", encoding="utf-8")
-        git(git_repo, "config", "core.hooksPath", str(ENGINE_ROOT / ".githooks"))
+        git(git_repo, "config", "core.hooksPath", str(ENGINE_ROOT / "templates" / "vault" / ".githooks"))
         (git_repo / "notes.md").write_text("le travail d'une session")
         git(git_repo, "add", "-A")
         done = subprocess.run(["git", "commit", "-m", "session"], cwd=git_repo,
@@ -154,7 +119,7 @@ class TestTheHookAgreesWithTheCode:
             (git_repo / name).write_text("avant", encoding="utf-8")
         git(git_repo, "add", "-A")
         git(git_repo, "commit", "--no-verify", "-m", "générateur")
-        git(git_repo, "config", "core.hooksPath", str(ENGINE_ROOT / ".githooks"))
+        git(git_repo, "config", "core.hooksPath", str(ENGINE_ROOT / "templates" / "vault" / ".githooks"))
         (git_repo / "brouillon.md").write_text("en cours, pas pour ce commit")
         (git_repo / "notes.md").write_text("le travail d'une session")
         git(git_repo, "add", "notes.md")

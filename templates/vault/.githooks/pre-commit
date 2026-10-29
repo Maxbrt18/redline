@@ -1,0 +1,45 @@
+#!/bin/sh
+# For a VAULT, not the engine: copy this folder to the vault root, then run
+# `git config core.hooksPath .githooks` there.
+#
+# Regenerates the generated views before every commit, so a stale block is never
+# committed in the first place -- redline vault-check only detects the drift afterwards.
+#
+# The hook is a SECOND line of defence, not the guarantee: it only runs where
+# someone typed `git config core.hooksPath .githooks`, which a fresh clone (a
+# Claude Code session on the web, for instance) never has. The guarantee lives in
+# the writers themselves -- redline/vault.py regenerates before it commits.
+set -e
+cd "$(git rev-parse --show-toplevel)"
+
+# The Python that has the engine installed: on the server the service puts its venv
+# first on PATH.
+RUNTIME_PYTHON=${REDLINE_PYTHON:-python3}
+
+# NON-BLOCKING, by policy. `redline/vault.py` (`regenerate_views`) states that a
+# failing generator must NEVER prevent a commit: lost session notes are a far worse
+# outage than a stale block. A stale block is repaired by the next commit, and
+# `redline vault-check` reports it in the weekly review; a lost write is never recovered.
+# Off the VPS the PostgreSQL views cannot be computed: running them would raise a
+# false incident on every commit, while static mode covers exactly that case.
+# Fingerprint of every file already modified BEFORE regeneration: only what the
+# generator actually touched is staged afterwards. A blanket `git add -u` would pull
+# every unstaged change into the current commit and break targeted commits.
+fingerprint() {
+    # shellcheck disable=SC2016  # $1 is expanded by the inner shell, on purpose.
+    git diff --name-only -z | xargs -0 -I{} sh -c \
+        'printf "%s %s\n" "$(git hash-object -- "$1" 2>/dev/null || echo absent)" "$1"' _ {}
+}
+export VAULT_PATH="${VAULT_PATH:-$PWD}"
+BEFORE=$(fingerprint)
+REGEN_OPTIONS=""
+if [ -z "${DATABASE_URL:-}" ]; then
+    REGEN_OPTIONS="--static-only"
+fi
+"$RUNTIME_PYTHON" -m redline.cli.regen_views $REGEN_OPTIONS >/dev/null || \
+    echo "pre-commit : régénération des vues en échec, commit maintenu (bloc périmé)."
+# The list of produced files is read from disk, never copied from GENERATORS: a copy
+# can go stale and miss a generated file.
+fingerprint | while read -r hash path; do
+    printf '%s\n' "$BEFORE" | grep -qxF "$hash $path" || git add -- "$path"
+done

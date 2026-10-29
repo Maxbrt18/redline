@@ -111,7 +111,7 @@ def main() -> None:
                      notebook=notebook, nudge=scheduler.nudge)
     try:
         from waitress import serve
-        serve(app, host="127.0.0.1", port=config.webhook_port, threads=4)
+        serve(app, host=config.webhook_host, port=config.webhook_port, threads=4)
     finally:
         scheduler.stop()
         bot.stop()

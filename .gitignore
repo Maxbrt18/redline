@@ -34,3 +34,9 @@ __pycache__/
 # Runtime state of a running service (`REDLINE_STATE_DIR`, by default here): outbox,
 # attachments, the Strava token cache. Never committed.
 /var/
+
+# compose.yml: the host-side configuration, secrets and data, never in Git.
+/redline.env
+/secrets/
+/vault/
+/ssh/
