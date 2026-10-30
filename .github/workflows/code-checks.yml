@@ -1,6 +1,7 @@
-# The conventions of pyproject.toml only hold while something runs them. Two jobs: the
-# gate (lint, types, dead code, shell scripts, schema, tests) and the pages (the PNG
-# cards and the notebook, in Chromium), which need a browser the gate does without.
+# The conventions of pyproject.toml only hold while something runs them. Three jobs: the
+# gate (lint, types, dead code, shell scripts, schema, tests), the same tests under the
+# service role, and the pages (the PNG cards and the notebook, in Chromium), which need a
+# browser the gate does without.
 name: Code checks
 
 on:
@@ -87,6 +88,59 @@ jobs:
       - name: Tests
         # -rs prints WHY anything skipped: a module that skips itself for a missing
         # dependency otherwise reads as a passing build.
+        run: python -m pytest -q -rs
+
+  service-role:
+    # The gate is a superuser, whom no privilege ever stops. Here the roles are the real
+    # ones: the migrator creates the schema and the tests use the service's rights.
+    name: pytest as redline_app
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: redline-test
+          POSTGRES_DB: redline
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d redline"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://redline_app:app-test@localhost:5432/redline
+      TEST_ADMIN_DATABASE_URL: postgresql+psycopg://postgres:redline-test@localhost:5432/redline
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install
+        run: |
+          python -m pip install --quiet -c requirements.txt -c requirements-dev.txt \
+                                        -e '.[codex,dev]'
+
+      - name: Roles
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: redline
+          PGHOST: localhost
+          PGPASSWORD: redline-test
+        run: |
+          sudo mkdir -p /run/secrets
+          printf app-test | sudo tee /run/secrets/postgres_app_password > /dev/null
+          printf migrator-test | sudo tee /run/secrets/postgres_migrator_password > /dev/null
+          bash deploy/postgres/init-roles.sh
+
+      - name: Database schema
+        env:
+          DATABASE_URL: postgresql+psycopg://redline_migrator:migrator-test@localhost:5432/redline
+        run: alembic upgrade head
+
+      - name: Tests
         run: python -m pytest -q -rs
 
   pages:

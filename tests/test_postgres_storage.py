@@ -11,7 +11,7 @@ import uuid
 
 import pytest
 import sqlalchemy as sa
-from conftest import ENGINE_ROOT, VAULT_ROOT, cli_command
+from conftest import ADMIN_URL, ENGINE_ROOT, VAULT_ROOT, cli_command, reset_database
 
 from redline.model import predictions as prediction_model
 from redline.model.activity import Activity
@@ -50,14 +50,8 @@ def _add_strength_session(store, payload: dict) -> bool:
 
 @pytest.fixture(autouse=True)
 def clean_database():
+    reset_database()
     database = Database(URL, application_name="pytest")
-    with database.engine.begin() as connection:
-        names = ", ".join(f"redline.{table.name}" for table in metadata.sorted_tables)
-        connection.execute(sa.text(f"TRUNCATE TABLE {names} RESTART IDENTITY CASCADE"))
-        connection.execute(sa.text("INSERT INTO redline.athletes(id) VALUES ('athlete')"))
-        # The monitored zone of the fictional instance, as the service syncs it.
-        connection.execute(sa.text(
-            "INSERT INTO redline.pain_zones(athlete_id, slug, label) VALUES ('athlete', 'knee', 'Genou')"))
     yield
     database.dispose()
 
@@ -75,7 +69,7 @@ def service_role_store():
     `postgres`. This isolated database replays the production sequence: roles present,
     migration that grants the rights, operation under the application role.
     """
-    base_url = sa.engine.make_url(URL)
+    base_url = sa.engine.make_url(ADMIN_URL)
     maintenance_url = base_url.set(database="postgres")
     admin = sa.create_engine(maintenance_url, isolation_level="AUTOCOMMIT")
     database_name = f"redline_acl_{uuid.uuid4().hex[:12]}"
@@ -244,6 +238,13 @@ def test_a_metric_never_recorded_can_still_be_filled_later(store):
     # Once filled, it becomes immutable like the others.
     with pytest.raises(StorageError):
         store.complete_measurement(oid, "duration_s", 7000)
+
+
+@pytest.mark.skipif(not os.environ.get("TEST_ADMIN_DATABASE_URL"),
+                    reason="the suite runs as the superuser")
+def test_the_suite_really_runs_as_the_service_role(store):
+    with store.database.engine.connect() as connection:
+        assert connection.execute(sa.text("SELECT current_user")).scalar_one() == "redline_app"
 
 
 def test_the_purge_only_targets_tables_the_service_may_delete_from(service_role_store):

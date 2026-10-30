@@ -12,8 +12,7 @@ import datetime as dt
 import os
 
 import pytest
-import sqlalchemy as sa
-from conftest import ENGINE_ROOT, TEST_VAULT
+from conftest import ENGINE_ROOT, TEST_VAULT, reset_database
 from test_notebook_board import Repo
 from test_weekly_plan import revision, session
 
@@ -158,16 +157,9 @@ pytestmark_db = pytest.mark.skipif(not URL, reason="TEST_DATABASE_URL absent")
 @pytest.fixture
 def store():
     from redline.storage import Database, OperationalStore
-    from redline.storage.schema import metadata
 
+    reset_database()
     database = Database(URL, application_name="pytest")
-    with database.engine.begin() as connection:
-        names = ", ".join(f"redline.{table.name}" for table in metadata.sorted_tables)
-        connection.execute(sa.text(f"TRUNCATE TABLE {names} RESTART IDENTITY CASCADE"))
-        connection.execute(sa.text("INSERT INTO redline.athletes(id) VALUES ('athlete')"))
-        # The watched zone of the fictitious instance, as the service synchronises it.
-        connection.execute(sa.text(
-            "INSERT INTO redline.pain_zones(athlete_id, slug, label) VALUES ('athlete', 'knee', 'Genou')"))
     yield OperationalStore(database)
     database.dispose()
 

@@ -15,11 +15,9 @@ import subprocess
 import uuid
 
 import pytest
-import sqlalchemy as sa
-from conftest import ENGINE_ROOT, cli_command
+from conftest import ENGINE_ROOT, cli_command, reset_database
 
 from redline.storage import Database, OperationalStore
-from redline.storage.schema import metadata
 
 URL = os.environ.get("TEST_DATABASE_URL", "")
 pytestmark = pytest.mark.skipif(not URL, reason="TEST_DATABASE_URL absent")
@@ -27,14 +25,8 @@ pytestmark = pytest.mark.skipif(not URL, reason="TEST_DATABASE_URL absent")
 
 @pytest.fixture(autouse=True)
 def clean_database():
+    reset_database()
     database = Database(URL, application_name="pytest-repetition")
-    with database.engine.begin() as connection:
-        names = ", ".join(f"redline.{table.name}" for table in metadata.sorted_tables)
-        connection.execute(sa.text(f"TRUNCATE TABLE {names} RESTART IDENTITY CASCADE"))
-        connection.execute(sa.text("INSERT INTO redline.athletes(id) VALUES ('athlete')"))
-        # The monitored zone of the fictitious instance, as the service syncs it.
-        connection.execute(sa.text(
-            "INSERT INTO redline.pain_zones(athlete_id, slug, label) VALUES ('athlete', 'knee', 'Genou')"))
     yield
     database.dispose()
 

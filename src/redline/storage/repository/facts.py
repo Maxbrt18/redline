@@ -380,7 +380,7 @@ class Facts(StoreBase):
             permit_choices.c.athlete_id == self.athlete_id,
             permit_choices.c.iso_week == values["iso_week"],
             permit_choices.c.session_key == values["session_key"],
-        ).with_for_update()).mappings().one_or_none()
+        )).mappings().one_or_none()
         if existing is not None:
             if any(_plain(existing[key]) != _plain(values[key]) for key in values):
                 raise StorageError(
