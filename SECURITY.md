@@ -39,6 +39,10 @@ What the engine is built to guarantee:
     the vault's Git hooks or CI) is removed before the notes are committed.
   - The reference unit runs the service as a dedicated account without sudo, with a
     read-only file system outside its state directory.
+- **A local account is not a database account.** The PostgreSQL image of `deploy/postgres/`
+  asks every role for its password, on the shared socket too; `postgres` is reachable
+  only from that account inside the container. The service connects as `redline_app`,
+  which cannot alter the schema nor rewrite the append-only tables.
 - **Received content is data.** Messages and attachments are never treated as
   instructions to the service. Attachments are downloaded by the worker into a private,
   size-bounded, temporary file that is deleted after the turn.

@@ -1,2 +1,3 @@
-# Socket PostgreSQL local partagé par le service et ses outils métier.
-d /run/redline-postgres 1777 root root -
+# Local PostgreSQL socket shared by the service and its tools. The container takes
+# ownership of the directory when it starts.
+d /run/redline-postgres 0755 root root -

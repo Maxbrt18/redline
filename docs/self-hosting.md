@@ -64,6 +64,10 @@ sudo cp config/postgres.env.example /etc/redline/postgres.env      # then edit i
 sudo docker compose --env-file /etc/redline/postgres.env -f deploy/postgres/compose.yml up -d --build
 ```
 
+The image replaces PostgreSQL's default local `trust` with `deploy/postgres/pg_hba.conf`:
+every role gives its password, and `postgres` is reserved to that account inside the
+container, hence `--user postgres` in the commands below.
+
 The `DATABASE_URL` of the service and of the migrator then uses the socket:
 `postgresql+psycopg://redline_app:…@/redline?host=/run/redline-postgres`.
 
@@ -120,11 +124,11 @@ storage will do.
 Alembic revision and its number of observations with the manifest:
 
 ```bash
-docker exec <container> createdb --username postgres redline_restore
+docker exec --user postgres <container> createdb --username postgres redline_restore
 age --decrypt --identity backup-age-key.txt redline-<stamp>.dump.age \
-  | docker exec -i <container> pg_restore --username postgres --dbname redline_restore \
+  | docker exec -i --user postgres <container> pg_restore --username postgres --dbname redline_restore \
       --exit-on-error --no-owner --no-privileges
-docker exec <container> psql --username postgres --dbname redline_restore \
+docker exec --user postgres <container> psql --username postgres --dbname redline_restore \
   -c 'SELECT version_num FROM alembic_version' -c 'SELECT count(*) FROM redline.observations'
 ```
 
