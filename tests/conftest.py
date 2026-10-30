@@ -22,6 +22,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+import sqlalchemy as sa
 
 from redline import cli
 from redline.model import instance as instance_model
@@ -29,6 +30,7 @@ from redline.service.agent import RunResult, RunSpec, Triage
 from redline.service.config import Config
 from redline.service.messenger import DeliveryResult
 from redline.service.routing import RoutingConfig
+from redline.storage.schema import metadata
 
 TESTS_DIR = Path(__file__).resolve().parent
 ENGINE_ROOT = TESTS_DIR.parent
@@ -266,6 +268,23 @@ def load_script(name: str):
 def cli_command(name: str) -> list[str]:
     """How a test runs the command `name` (`week-plan` or `redline week-plan`)."""
     return [sys.executable, "-m", cli.module(name.removeprefix("redline "))]
+
+
+# The suite may run as the service role, which can neither truncate nor create a database.
+ADMIN_URL = os.environ.get("TEST_ADMIN_DATABASE_URL") or os.environ.get("TEST_DATABASE_URL", "")
+
+
+def reset_database():
+    """Back to an empty store, with the monitored zone the service would have synced."""
+    engine = sa.create_engine(ADMIN_URL, poolclass=sa.pool.NullPool)
+    with engine.begin() as connection:
+        names = ", ".join(f"redline.{table.name}" for table in metadata.sorted_tables)
+        connection.execute(sa.text(f"TRUNCATE TABLE {names} RESTART IDENTITY CASCADE"))
+        connection.execute(sa.text("INSERT INTO redline.athletes(id) VALUES ('athlete')"))
+        connection.execute(sa.text(
+            "INSERT INTO redline.pain_zones(athlete_id, slug, label) "
+            "VALUES ('athlete', 'knee', 'Genou')"))
+    engine.dispose()
 
 
 def git(cwd, *args):

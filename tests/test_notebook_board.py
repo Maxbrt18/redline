@@ -12,8 +12,7 @@ import json
 import os
 
 import pytest
-import sqlalchemy as sa
-from conftest import ENGINE_ROOT
+from conftest import ENGINE_ROOT, reset_database
 from test_weekly_plan import revision, session
 
 from redline.model import weekly_plan
@@ -21,7 +20,6 @@ from redline.model.activity import Activity
 from redline.service.notebook_board import AnswerError, Board
 from redline.service.plans import PlanStatus
 from redline.storage import Database, OperationalStore
-from redline.storage.schema import metadata
 
 URL = os.environ.get("TEST_DATABASE_URL", "")
 pytestmark = pytest.mark.skipif(not URL, reason="TEST_DATABASE_URL absent")
@@ -31,14 +29,8 @@ WEEK = "2026-W41"
 
 @pytest.fixture
 def store():
+    reset_database()
     database = Database(URL, application_name="pytest")
-    with database.engine.begin() as connection:
-        names = ", ".join(f"redline.{table.name}" for table in metadata.sorted_tables)
-        connection.execute(sa.text(f"TRUNCATE TABLE {names} RESTART IDENTITY CASCADE"))
-        connection.execute(sa.text("INSERT INTO redline.athletes(id) VALUES ('athlete')"))
-        # The watched zone of the fictitious instance, as the service synchronises it.
-        connection.execute(sa.text(
-            "INSERT INTO redline.pain_zones(athlete_id, slug, label) VALUES ('athlete', 'knee', 'Genou')"))
     yield OperationalStore(database)
     database.dispose()
 
