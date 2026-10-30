@@ -8,8 +8,6 @@ Two rules over every tracked text file:
 - outside `tests/`, no date before 2030. Fixtures, samples and format examples use
   dates from 2030 on, which no coaching history can contain; a real date is history,
   and history belongs in the private vault.
-
-`migrations/` is frozen until the revisions are squashed for the first release.
 """
 
 import hashlib
@@ -23,7 +21,6 @@ FORBIDDEN = {
     "61067a6030809a78", "b49c27ffc717aed8", "0eeb83bd6ea81aaa", "3cbcaece45697b98",
     "76b4b08b00dacd25", "b1a0f1c99f5e843c", "4c0d617c974a763f", "86009cc361823fe7",
 }
-FROZEN = ("migrations/",)
 TOKEN = re.compile(r"[\w-]+")
 PAST_DATE = re.compile(
     r"\b20[0-2]\d-(?:\d\d-\d\d|\d\d\b|W\d\d)"
@@ -35,8 +32,6 @@ def _tracked_texts():
     names = subprocess.run(["git", "ls-files"], cwd=ENGINE_ROOT, check=True,
                            capture_output=True, text=True).stdout.splitlines()
     for name in names:
-        if name.startswith(FROZEN):
-            continue
         try:
             yield name, (ENGINE_ROOT / name).read_text(encoding="utf-8")
         except (UnicodeDecodeError, FileNotFoundError):
