@@ -33,8 +33,9 @@ docker compose logs -f redline
 ```
 
 `migrate` runs `alembic upgrade head` with the migrator role before every start of the
-service. **To update**: `git pull`, then the same `up -d --build`. Operator commands run
-in the service container: `docker compose exec redline redline <command>`.
+service. **To update**: `git pull --ff-only` on `stable`, then the same `up -d --build`.
+Operator commands run in the service container: `docker compose exec redline redline
+<command>`.
 
 Claude Code is pinned by the `CLAUDE_CODE_VERSION` build argument (2.1.296 or later:
 `--restricted` is required). Its own updater is off; a new version is a rebuild.
@@ -73,7 +74,8 @@ The `DATABASE_URL` of the service and of the migrator then uses the socket:
 
 **The service and a release.** Back up, update the checkout, install, migrate, restart,
 then check that the commit actually started: `runtime_tree` in `/health` fingerprints
-the engine's code, so a vault commit does not move it but different code does.
+the engine's code, so a vault commit does not move it but different code does. The
+checkout follows `stable`, which only moves forward to a tagged release.
 
 ```bash
 cd /home/ubuntu/redline && git pull --ff-only
