@@ -1,46 +1,68 @@
-# Redline — a self-hosted AI running coach
-
-[![Code checks](https://github.com/Maxbrt18/redline/actions/workflows/code-checks.yml/badge.svg)](https://github.com/Maxbrt18/redline/actions/workflows/code-checks.yml)
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
-
-Redline is a running coach that lives in Facebook Messenger. It reads your Strava
-activities, keeps an append-only training ledger in PostgreSQL, maintains a revisioned
-weekly plan, debriefs every run, and answers through an LLM agent (Claude Code or Codex)
-that is **forced to read the facts before it speaks**.
-
-> **Published as-is: no support, no roadmap, no guarantees.** This is the engine of a
-> coach used daily, without anything personal: no athlete data, no keys, no private
-> knowledge vault. The coach speaks **French**; the code and its documentation are in
-> English. Redline is an AI, not a medical professional: it gives no diagnosis and no
-> medication advice, and says so.
-
-<p>
-  <img src="docs/cards/week.webp" alt="Weekly card" width="49%">
-  <img src="docs/cards/workout.webp" alt="Workout card" width="49%">
+<p align="center">
+  <img src="docs/assets/banner.webp" alt="Redline" width="100%">
 </p>
 
-## How it works
+<h1 align="center">Redline</h1>
 
-```mermaid
-flowchart LR
-    Athlete((Athlete)) -- Messenger --> Service
-    Strava -- webhook --> Service
-    Service -- "facts, read model" --> PG[(PostgreSQL)]
-    Service -- "one turn" --> Agent[Claude Code / Codex]
-    Agent -- "redline commands" --> PG
-    Agent -- "reads, writes notes" --> Vault[(Markdown vault, Git)]
-    Service -- "checked reply, cards" --> Athlete
-```
+<p align="center">
+  <strong>An AI running coach you host yourself.</strong><br>
+  It lives in Messenger, reads every run on Strava and adapts your week to what really happened.
+</p>
 
-The model writes prose and proposes changes; deterministic code owns everything else.
-Every fact has one owner (PostgreSQL for what happened, the vault for why), the agent
-reads more as a question gets more consequential (N0 to N3), numbers are computed by
-CLIs rather than recalled, and a turn's writes are applied together or not at all.
-[`docs/architecture.md`](docs/architecture.md) describes this harness.
+<p align="center">
+  <a href="https://github.com/Maxbrt18/redline/actions/workflows/code-checks.yml"><img src="https://github.com/Maxbrt18/redline/actions/workflows/code-checks.yml/badge.svg" alt="Code checks"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPL_v3-d40000.svg" alt="License: AGPL v3"></a>
+  <a href="docs/getting-started.md"><img src="https://img.shields.io/badge/Self--hosted-Docker_Compose-2e2725.svg" alt="Self-hosted with Docker Compose"></a>
+</p>
 
-## Try it
+<p align="center">
+  <a href="#get-started"><strong>Get started</strong></a> ·
+  <a href="docs/architecture.md">How it is built</a> ·
+  <a href="docs/getting-started.md">Documentation</a>
+</p>
 
-The cards render without anything else:
+Most AI coaches answer from memory, and a language model's memory is confident and
+often wrong. Redline turns that around: **your history lives in a database, the numbers
+are computed by code, and the model has to read them before it speaks.**
+
+<p align="center">
+  <img src="docs/assets/phones.webp" alt="Three phones: a conversation with the coach in Messenger, today's session in the notebook, and the countdown to a marathon" width="100%">
+</p>
+<p align="center"><sub>Sam is the fictional athlete of the test suite, and this conversation is an illustration. The coach speaks French.</sub></p>
+
+## What your coach does
+
+| | |
+|---|---|
+| **Debriefs every run** | A Strava activity arrives, and the coach reads your splits, heart rate and weather, then asks what the watch cannot know. |
+| **Keeps your week honest** | The plan is revisioned, never overwritten. A session you missed or a sore knee changes it, under rules you can read. |
+| **Watches what hurts** | Pain is tracked by zone, during the effort and on waking, and a limit you set is a limit it holds. |
+| **Lives on your phone** | Messenger for the conversation, and a private web app for today's session, your week and your race. |
+| **Sends real charts** | Weekly, monthly and workout cards, rendered from the ledger rather than described by a model. |
+
+<p align="center">
+  <img src="docs/assets/cards.webp" alt="A weekly card and a workout card, side by side" width="100%">
+</p>
+
+## Why you can trust the numbers
+
+The model reasons and writes; deterministic code owns everything else. It decides what
+to say, and the code decides what is true and what gets recorded.
+
+<p align="center">
+  <img src="docs/assets/turn.webp" alt="One turn in five steps: received, facts first, the model reads, one transaction, checked reply" width="100%">
+</p>
+
+- **One owner per fact.** PostgreSQL holds what happened; a Markdown vault in Git holds why.
+- **Nothing is recalled.** Volume, load and pain come from commands, never from memory.
+- **All or nothing.** A turn's writes apply together, or not at all.
+- **The method is yours.** Your rules, notes and thresholds live in your vault, not in the engine.
+
+[`docs/architecture.md`](docs/architecture.md) describes the whole harness.
+
+## Get started
+
+Try the cards in a minute, with nothing else to set up:
 
 ```bash
 python3.12 -m venv .venv && . .venv/bin/activate
@@ -49,9 +71,9 @@ playwright install chromium
 redline chart-week -o /tmp/week.png < src/redline/cards/samples/week.json
 ```
 
-To run the whole coach on a server you need a Meta app, a Strava API application, a
-Claude (or OpenAI) account, a domain and a vault of your own. Start with
-[`docs/getting-started.md`](docs/getting-started.md); then:
+To run the whole coach you need a server, a domain, a Meta app, a Strava API application,
+a Claude (or OpenAI) account and a vault of your own.
+[`docs/getting-started.md`](docs/getting-started.md) walks through all of it; then:
 
 ```bash
 cp config/compose.env.example .env     # and fill it in, with redline.env and secrets/
@@ -62,24 +84,22 @@ docker compose up -d --build
 
 | | |
 |---|---|
-| [Getting started](docs/getting-started.md) | The first time: the accounts, the vault, the configuration, the first message |
+| [Getting started](docs/getting-started.md) | The accounts, the vault, the configuration, the first message |
 | [Self-hosting](docs/self-hosting.md) | Docker Compose or systemd, backups, updates, diagnostics |
-| [Architecture](docs/architecture.md) | The harness: the turn, the owners of facts, the reading ladder, routing, delivery |
+| [Architecture](docs/architecture.md) | The turn, the owners of facts, the reading ladder, routing, delivery |
 | [Vault format](docs/vault-format.md) | The files and frontmatter the engine reads in a vault |
 | [Configuration](docs/configuration.md) | Every environment variable and configuration file |
 | [What the model receives](docs/llm-data.md) | The data sent to the model provider |
-| [Contributing](AGENTS.md) · [Security](SECURITY.md) · [Changes](CHANGELOG.md) | |
 
-## Development
+## Good to know
 
-```bash
-pytest -q -rs     # tests needing PostgreSQL or Chromium say why they skip
-git config core.hooksPath .githooks
-```
+- **Published as is.** This is the engine of a coach used daily, without anything personal:
+  no athlete data, no keys, no private knowledge vault. There is no support and no roadmap.
+- **The coach speaks French.** The code and its documentation are in English.
+- **It is an AI, not a medical professional.** It gives no diagnosis and no medication
+  advice, and says so.
 
-The suite runs against a fictional athlete, Sam, whose vault is in
-`tests/fixtures/vault/`. PostgreSQL tests need `TEST_DATABASE_URL`; see
-[`AGENTS.md`](AGENTS.md).
+[Contributing](CONTRIBUTING.md) · [Code of conduct](CODE_OF_CONDUCT.md) · [Security](SECURITY.md) · [Changes](CHANGELOG.md)
 
 ## License
 
