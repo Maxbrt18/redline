@@ -59,7 +59,7 @@ def _font_css() -> str:
             f"src:url(data:font/woff2;base64,{payload}) format('woff2');}}"
         )
     if missing:
-        print(f"[cards] polices absentes, repli sur la pile système : "
+        print(f"[cards] fonts missing, falling back on the system stack: "
               f"{', '.join(missing)}", file=sys.stderr)
     return "".join(rules)
 
@@ -81,7 +81,7 @@ def document(body: str, *, width: int = WIDTH) -> str:
 _GUARD_JS = r"""
 ({maxHeight}) => {
   const card = document.getElementById('card');
-  if (!card) return ['aucun élément #card dans le document'];
+  if (!card) return ['no #card element in the document'];
   const box = card.getBoundingClientRect();
   const problems = [];
 
@@ -89,13 +89,13 @@ _GUARD_JS = r"""
     const cls = (el.getAttribute && el.getAttribute('class')) || '';
     const txt = (el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 46);
     return `<${el.tagName.toLowerCase()}${cls ? ' class="' + cls + '"' : ''}>` +
-           (txt ? ` « ${txt} »` : '');
+           (txt ? ` "${txt}"` : '');
   };
 
   if (card.offsetHeight > maxHeight)
-    problems.push(`card trop haute : ${Math.round(card.offsetHeight)} px (plafond ${maxHeight})`);
+    problems.push(`card too tall: ${Math.round(card.offsetHeight)} px (cap ${maxHeight})`);
   if (document.documentElement.scrollWidth > card.offsetWidth + 1)
-    problems.push('la page déborde horizontalement de la card');
+    problems.push('the page overflows the card horizontally');
 
   for (const el of card.querySelectorAll('*')) {
     const r = el.getBoundingClientRect();
@@ -103,25 +103,25 @@ _GUARD_JS = r"""
 
     // 1. nothing may stick out of the card itself
     if (r.right > box.right + 0.5 || r.left < box.left - 0.5)
-      problems.push('sort de la card : ' + name(el));
+      problems.push('outside the card: ' + name(el));
     else if (r.bottom > box.bottom + 0.5)
-      problems.push('dépasse en bas de la card : ' + name(el));
+      problems.push('below the bottom of the card: ' + name(el));
 
     // 2. nothing may stick out of its own <svg> viewport (silently clipped)
     const svg = el.ownerSVGElement;
     if (svg) {
       const sb = svg.getBoundingClientRect();
       if (r.right > sb.right + 0.5 || r.left < sb.left - 0.5)
-        problems.push('sort du graphe : ' + name(el));
+        problems.push('outside the chart: ' + name(el));
       continue;                       // scrollWidth is meaningless inside SVG
     }
 
     // 3. no text may be clipped inside its own box
     if (el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1)
-      problems.push('texte tronqué en largeur : ' + name(el));
+      problems.push('text clipped in width: ' + name(el));
     if (el.clientHeight > 0 && el.scrollHeight > el.clientHeight + 1 &&
         getComputedStyle(el).overflow !== 'visible')
-      problems.push('texte tronqué en hauteur : ' + name(el));
+      problems.push('text clipped in height: ' + name(el));
   }
   return [...new Set(problems)].slice(0, 8);
 }
@@ -160,7 +160,7 @@ def render(body: str, out_path: str, *, width: int = WIDTH, scale: int = SCALE,
 
             problems = page.evaluate(_GUARD_JS, {"maxHeight": max_height})
             if problems:
-                raise CardOverflow("\n  - ".join(["mise en page invalide :", *problems]))
+                raise CardOverflow("\n  - ".join(["invalid layout:", *problems]))
 
             height = page.evaluate("() => document.getElementById('card').offsetHeight")
             page.set_viewport_size({"width": width, "height": math.ceil(height)})
@@ -185,5 +185,5 @@ def emit(body: str, out_path: str, *, html_only: bool = False, **kwargs) -> None
     try:
         render(body, str(target), **kwargs)
     except CardOverflow as exc:
-        raise InputError(f"Card non générée — {exc}") from exc
+        raise InputError(f"Card not rendered: {exc}") from exc
     print(target)

@@ -55,3 +55,7 @@ RECOVERY = "récup"
 SESSION = "Séance"
 
 RECOVERED_IMAGE = "{title} · image récupérée"
+
+REFERENCE = "réf."
+
+HEART_RATE_AXIS = "fréquence cardiaque, bpm"

@@ -24,3 +24,14 @@ def sky(weather: dict) -> str:
     """The sky of a stored weather reading, from its `weather_code`."""
     code = weather.get("weather_code")
     return SKY.get(code, UNKNOWN_SKY) if isinstance(code, int) else UNKNOWN_SKY
+
+
+# `redline weather`, as the coach reads it.
+TEMPERATURE = "{temp:.0f} °C"
+FEELS_LIKE = " (ressenti {feels_like:.0f} °C)"
+HUMIDITY = "humidité {humidity:.0f} %"
+WIND = "vent {wind:.0f} km/h"
+PRECIPITATION = "précip {precip:.1f} mm"
+WBGT = "**WBGT {wbgt:.0f} °C** ({flag})"
+AT_START = "Météo au départ ({local}) : {parts}."
+MIDPOINT = " ⚠ Mi-parcours {temp:.0f} °C ({gap:+.0f} °C) : le départ ne résume pas ce run."

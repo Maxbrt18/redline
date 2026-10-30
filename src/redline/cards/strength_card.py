@@ -1,4 +1,4 @@
-"""Rendu réutilisable d'une sélection de renforcement validée."""
+"""Reusable rendering of a validated strength selection."""
 
 from __future__ import annotations
 

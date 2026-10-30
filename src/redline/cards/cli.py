@@ -27,10 +27,10 @@ def output_path(raw: str) -> str:
 def parse_args(description: str) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument("-o", "--out", required=True, type=output_path,
-                        help="le PNG à produire ; un nom seul le range dans l'outbox")
+                        help="the PNG to produce; a bare name puts it in the outbox")
     parser.add_argument("--html", action="store_true",
-                        help="écrit le HTML autonome au lieu de rendre (boucle de design)")
-    parser.add_argument("--input", help="JSON de la card (défaut : stdin hors tour)")
+                        help="write the standalone HTML instead of rendering (design loop)")
+    parser.add_argument("--input", help="the card JSON (default: stdin outside a turn)")
     return parser.parse_args()
 
 
@@ -42,7 +42,7 @@ def read_input(path: str | None) -> dict:
     try:
         return agent_input.read_json(path)
     except json.JSONDecodeError as exc:
-        raise InputError(f"JSON illisible : {exc}") from exc
+        raise InputError(f"unreadable JSON: {exc}") from exc
     except agent_input.AgentInputError as exc:
         raise InputError(str(exc)) from exc
 
@@ -56,4 +56,4 @@ def read_input_json(schema: Schema, path: str | None) -> dict:
     try:
         return schema.validate(read_input(path), schema.name)
     except SchemaError as exc:
-        raise InputError(f"Card non générée — {exc}") from exc
+        raise InputError(f"Card not rendered: {exc}") from exc

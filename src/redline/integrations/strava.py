@@ -103,13 +103,13 @@ def _refresh(client_id: str, client_secret: str, refresh_token: str) -> dict:
     except urllib.error.HTTPError as exc:
         if exc.code in (400, 401):
             raise StravaError(
-                "Strava refuse le jeton de rafraîchissement (autorisation révoquée ou "
-                "identifiants faux). Il faut ré-autoriser l'application : aucun appel ne "
-                "passera d'ici là."
+                "Strava refuses the refresh token (authorization revoked or wrong "
+                "credentials). Authorize the application again: no call will go through "
+                "until then."
             ) from exc
-        raise StravaError(f"renouvellement du jeton refusé par Strava (HTTP {exc.code})") from exc
+        raise StravaError(f"Strava refused the token refresh (HTTP {exc.code})") from exc
     except urllib.error.URLError as exc:
-        raise StravaError(f"Strava injoignable pendant le renouvellement : {exc.reason}") from exc
+        raise StravaError(f"Strava unreachable during the refresh: {exc.reason}") from exc
 
 
 def _app_identity() -> tuple[str, str]:
@@ -118,8 +118,8 @@ def _app_identity() -> tuple[str, str]:
     client_secret = (os.environ.get("STRAVA_CLIENT_SECRET") or "").strip()
     if not client_id or not client_secret:
         raise StravaError(
-            "STRAVA_CLIENT_ID et STRAVA_CLIENT_SECRET sont absents de l'environnement : "
-            "ils se renseignent dans l'environnement (cf. config/redline.env.example)."
+            "STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET are missing from the environment: "
+            "set them there (see config/redline.env.example)."
         )
     return client_id, client_secret
 
@@ -148,9 +148,9 @@ def access_token(*, force_refresh: bool = False) -> str:
     refresh_token = str(cache.get("refresh_token") or "")
     if not refresh_token:
         raise StravaError(
-            f"aucun jeton dans {path} : l'autorisation n'a jamais été faite sur cette "
-            "machine, ou le cache a été effacé. Lance `redline strava login` "
-            "SUR LA MACHINE QUI FAIT TOURNER LE COACH, et suis les deux étapes."
+            f"no token in {path}: authorization was never done on this machine, or "
+            "the cache was cleared. Run `redline strava login` ON THE MACHINE THAT "
+            "RUNS THE COACH, and follow the two steps."
         )
 
     fresh = _refresh(client_id, client_secret, refresh_token)
@@ -180,18 +180,18 @@ def call(endpoint: str, params: dict | None = None) -> Any:
                 continue  # token stale on Strava's side: refresh and retry ONCE
             if exc.code == 404:
                 raise StravaNotFound(
-                    f"Strava ne connaît pas {endpoint} : activité supprimée, privée, "
-                    "ou identifiant faux."
+                    f"Strava does not know {endpoint}: activity deleted, private, "
+                    "or wrong id."
                 ) from exc
             if exc.code == 429:
                 raise StravaError(
-                    "quota Strava atteint (200 requêtes / 15 min). Réessaie plus tard ; "
-                    "ne conclus pas que la sortie n'existe pas."
+                    "Strava quota reached (200 requests / 15 min). Try again later; "
+                    "do not conclude that the run does not exist."
                 ) from exc
-            raise StravaError(f"Strava a refusé l'appel {endpoint} (HTTP {exc.code})") from exc
+            raise StravaError(f"Strava refused the call {endpoint} (HTTP {exc.code})") from exc
         except urllib.error.URLError as exc:
-            raise StravaError(f"Strava injoignable : {exc.reason}") from exc
-    raise StravaError("Strava a refusé le jeton deux fois de suite")
+            raise StravaError(f"Strava unreachable: {exc.reason}") from exc
+    raise StravaError("Strava refused the token twice in a row")
 
 
 # ------------------------------------------------------------------ reading
@@ -256,7 +256,7 @@ def distill_gear(raw: dict) -> dict:
     """Lifetime counter of a pair, expressed once in kilometres."""
     distance = raw.get("distance")
     if distance is None:
-        raise StravaError("Strava ne rend aucun kilométrage pour cette paire")
+        raise StravaError("Strava returns no distance for this pair")
     return {
         "gear_id": raw.get("id"),
         "name": raw.get("name") or raw.get("nickname"),
@@ -367,26 +367,26 @@ def cmd_login(args) -> Any:
         "approval_prompt": "force",
         "scope": "activity:read_all",
     })
-    print("1. Ouvre cette adresse dans ton navigateur et autorise l'application :\n")
+    print("1. Open this address in your browser and authorize the application:\n")
     print("   " + authorize + "\n")
-    print("2. Tu seras redirigé vers une page d'erreur `localhost` : c'est normal, il")
-    print("   n'y a pas de serveur là. Copie l'URL de ta barre d'adresse et colle-la")
-    print("   ici, puis Entrée.\n")
+    print("2. You will land on a `localhost` error page: that is expected, there is")
+    print("   no server there. Copy the URL from the address bar, paste it here and")
+    print("   press Enter.\n")
     try:
-        pasted = input("URL de redirection (ou le code seul) : ").strip()
+        pasted = input("Redirect URL (or the code alone): ").strip()
     except EOFError:
-        raise StravaError("rien reçu sur l'entrée standard : relance dans un terminal "
-                          "interactif, la commande a besoin de te lire.") from None
+        raise StravaError("nothing received on standard input: run it again in an "
+                          "interactive terminal, the command needs to read you.") from None
 
     code = pasted
     if "code=" in pasted:
         query = urllib.parse.urlparse(pasted).query or pasted.split("?", 1)[-1]
         values = urllib.parse.parse_qs(query).get("code")
         if not values:
-            raise StravaError("aucun paramètre `code` dans cette URL")
+            raise StravaError("no `code` parameter in this URL")
         code = values[0]
     if not code:
-        raise StravaError("code d'autorisation vide")
+        raise StravaError("empty authorization code")
 
     body = urllib.parse.urlencode({
         "client_id": client_id,
@@ -400,11 +400,11 @@ def cmd_login(args) -> Any:
             fresh = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         raise StravaError(
-            f"Strava refuse ce code (HTTP {exc.code}). Un code d'autorisation ne sert "
-            "qu'UNE fois et expire vite : refais l'étape 1 pour en obtenir un neuf."
+            f"Strava refuses this code (HTTP {exc.code}). An authorization code works "
+            "ONCE and expires fast: redo step 1 to get a new one."
         ) from exc
     except urllib.error.URLError as exc:
-        raise StravaError(f"Strava injoignable : {exc.reason}") from exc
+        raise StravaError(f"Strava unreachable: {exc.reason}") from exc
 
     path = _cache_path()
     _write_cache(path, {
@@ -414,11 +414,11 @@ def cmd_login(args) -> Any:
     })
     athlete = fresh.get("athlete") or {}
     return {
-        "autorisation": "enregistrée",
+        "authorization": "recorded",
         "athlete": f"{athlete.get('firstname', '')} {athlete.get('lastname', '')}".strip(),
-        "jetons_écrits_dans": str(path),
-        "rappel": "l'environnement ne doit contenir QUE STRAVA_CLIENT_ID et "
-                  "STRAVA_CLIENT_SECRET : les jetons vivent ici et nulle part ailleurs.",
+        "tokens_written_to": str(path),
+        "reminder": "the environment must hold ONLY STRAVA_CLIENT_ID and "
+                    "STRAVA_CLIENT_SECRET: the tokens live here and nowhere else.",
     }
 
 
@@ -428,10 +428,10 @@ def cmd_check(args) -> Any:
     cache = _read_cache(_cache_path())
     remaining = int(cache.get("expires_at", 0) - time.time())
     return {
-        "accès": "ok",
+        "access": "ok",
         "athlete": f"{athlete.get('firstname', '')} {athlete.get('lastname', '')}".strip(),
         "athlete_id": athlete.get("id"),
-        "jeton_valide_encore_min": max(0, remaining // 60),
+        "token_valid_for_min": max(0, remaining // 60),
     }
 
 
@@ -450,9 +450,9 @@ COMMANDS = {
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=__doc__.splitlines()[0],
-        epilog="Valeurs BRUTES : c'est redline ledger-add qui arrondit, et lui seul.",
+        epilog="RAW values: redline ledger-add does the rounding, and only it.",
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--json", action="store_true", help="sortie machine")
+    parser.add_argument("--json", action="store_true", help="machine output")
 
     # `--json` is accepted both BEFORE and AFTER the subcommand. A caller naturally
     # writes `redline strava activity 42 --json`, which argparse only accepts up front
@@ -461,37 +461,37 @@ def build_parser() -> argparse.ArgumentParser:
     # would overwrite a `--json` already set up front.
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--json", action="store_true", default=argparse.SUPPRESS,
-                        help="sortie machine")
+                        help="machine output")
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     activity = subparsers.add_parser("activity", parents=[common],
-                                     help="le détail distillé d'une activité")
+                                     help="the distilled detail of an activity")
     activity.add_argument("id")
 
     laps = subparsers.add_parser("laps", parents=[common],
-                                 help="chaque répétition, une par une")
+                                 help="each repetition, one by one")
     laps.add_argument("id")
 
     activities = subparsers.add_parser("activities", parents=[common],
-                                       help="les activités récentes")
+                                       help="the recent activities")
     activities.add_argument("--limit", type=int, default=10)
-    activities.add_argument("--after", help="AAAA-MM-JJ")
+    activities.add_argument("--after", help="YYYY-MM-DD")
 
     streams = subparsers.add_parser("streams", parents=[common],
-                                    help="les flux, prêts pour redline descent")
+                                    help="the streams, ready for redline descent")
     streams.add_argument("id")
     streams.add_argument("--keys", default="altitude",
                          help="altitude, heartrate, cadence, velocity_smooth, distance, time")
 
     subparsers.add_parser("zones", parents=[common],
-                          help="les zones de FC de l'athlète (TTL 180 j dans athlete.md)")
+                          help="the athlete's HR zones")
     subparsers.add_parser("gear", parents=[common],
-                          help="les chaussures et leur kilométrage Strava frais")
+                          help="the shoes and their fresh Strava distance")
     subparsers.add_parser("check", parents=[common],
-                          help="vérifie que l'accès Strava fonctionne")
+                          help="check that Strava access works")
     subparsers.add_parser("login", parents=[common],
-                          help="autorise l'application et écrit les jetons (une fois)")
+                          help="authorize the application and write the tokens (once)")
     return parser
 
 
@@ -500,7 +500,7 @@ def main() -> int:
     try:
         emit(COMMANDS[args.command](args), args.json or args.command == "streams")
     except StravaError as exc:
-        print(f"Strava indisponible : {exc}", file=sys.stderr)
+        print(f"Strava unavailable: {exc}", file=sys.stderr)
         return 1
     return 0
 

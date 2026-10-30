@@ -47,6 +47,7 @@ import urllib.parse
 import urllib.request
 from datetime import UTC, datetime, timedelta, timezone
 
+from redline.coach.fr import weather as wording
 from redline.coach.fr.weather import FLAGS, sky
 from redline.model.errors import ExternalError, InputError
 
@@ -194,7 +195,7 @@ def t_globe(tair, rh, pair, speed, solar, fdir, cza):
         if abs(new - prev) < CONVERGENCE:
             return new
         prev = 0.9 * prev + 0.1 * new
-    raise WBGTError("température de globe non convergée")
+    raise WBGTError("globe temperature did not converge")
 
 
 def t_wetbulb(tair, rh, pair, speed, solar, fdir, cza, rad=1):
@@ -228,7 +229,7 @@ def t_wetbulb(tair, rh, pair, speed, solar, fdir, cza, rad=1):
         if abs(new - prev) < CONVERGENCE:
             return new
         prev = 0.9 * prev + 0.1 * new
-    raise WBGTError("bulbe humide non convergé")
+    raise WBGTError("wet bulb did not converge")
 
 
 def sun_position(lat, lon, when):
@@ -320,9 +321,9 @@ def decode_polyline(encoded, precision=5):
                     # Truncated polyline (incomplete copy, eaten shell escape...).
                     # Better to say so than to return a wrong point.
                     raise ValueError(
-                        "polyline tronqué ou mal échappé : la dernière "
-                        "coordonnée est incomplète. Vérifie la copie "
-                        "(les backslashes du JSON doivent rester tels quels)."
+                        "polyline truncated or badly escaped: the last "
+                        "coordinate is incomplete. Check the copy "
+                        "(the JSON backslashes must stay as they are)."
                     )
                 b = ord(encoded[index]) - 63
                 index += 1
@@ -362,19 +363,18 @@ def parse_time(value, local=False):
     if local:
         if dt.tzinfo is not None:
             raise ValueError(
-                f"--local attend une heure SANS fuseau (le `start_local` de "
-                f"Strava, ex. '2030-06-15T19:01:46'), reçu {value!r}. Si "
-                "l'heure porte déjà son fuseau, retire --local."
+                f"--local expects a time WITHOUT a zone (Strava's `start_local`, "
+                f"e.g. '2030-06-15T19:01:46'), got {value!r}. If the time "
+                "already carries its zone, drop --local."
             )
         return dt
 
     if dt.tzinfo is None:
         raise ValueError(
-            f"heure sans fuseau : {value!r}. Strava ne rend qu'une heure "
-            "murale (`start_local`) : passe-la telle quelle avec "
-            "--local, le script résout le décalage depuis les coordonnées. "
-            "N'ajoute JAMAIS un `Z` toi-même — ça la déclare UTC et décale la "
-            "lecture de l'écart entre UTC et l'heure locale."
+            f"time without a zone: {value!r}. Strava only returns a wall-clock "
+            "time (`start_local`): pass it as is with --local, the offset is "
+            "resolved from the coordinates. NEVER add a `Z` yourself: it declares "
+            "the time UTC and shifts the reading by the gap between UTC and local time."
         )
     return dt
 
@@ -405,8 +405,8 @@ def resolve_offset(lat, lon, naive_local):
     offset = data.get("utc_offset_seconds")
     if offset is None:
         raise RuntimeError(
-            "Open-Meteo n'a renvoyé ni nom de fuseau ni décalage pour ces "
-            "coordonnées. Repasse --time avec un offset explicite, sans --local."
+            "Open-Meteo returned neither a zone name nor an offset for these "
+            "coordinates. Pass --time again with an explicit offset, without --local."
         )
     # Offset of today, not of the target date: wrong across a daylight-saving change.
     return naive_local.replace(tzinfo=timezone(timedelta(seconds=offset))), name
@@ -420,10 +420,10 @@ def fetch(url, params):
     except urllib.error.HTTPError as exc:
         if exc.code == 400 and "start_date" in params:
             raise RuntimeError(
-                f"Open-Meteo refuse la plage {params['start_date']} → "
-                f"{params['end_date']} : hors de la fenêtre servie. Le "
-                "prévisionnel ne va qu'à ~16 jours ; une date de course "
-                "lointaine ne se lit pas encore."
+                f"Open-Meteo refuses the range {params['start_date']} → "
+                f"{params['end_date']}: outside the window it serves. The "
+                "forecast only reaches ~16 days; a distant race date cannot "
+                "be read yet."
             ) from exc
         raise
 
@@ -453,8 +453,8 @@ def get_weather(lat, lon, when):
     hourly = data.get("hourly") or {}
     times = hourly.get("time") or []
     if not times:
-        raise RuntimeError("Open-Meteo n'a renvoyé aucune donnée horaire "
-                           "(date trop récente pour l'archive, ou hors couverture ?)")
+        raise RuntimeError("Open-Meteo returned no hourly data "
+                           "(date too recent for the archive, or outside coverage?)")
 
     target = when.astimezone(UTC).replace(tzinfo=None)
     idx, best = 0, None
@@ -498,20 +498,20 @@ def get_weather(lat, lon, when):
 def format_summary(w, when, midpoint=None):
     parts = [sky(w)]
     if w["temp"] is not None:
-        s = f"{w['temp']:.0f} °C"
+        s = wording.TEMPERATURE.format(temp=w["temp"])
         if w["feels_like"] is not None and abs(w["feels_like"] - w["temp"]) >= 1:
-            s += f" (ressenti {w['feels_like']:.0f} °C)"
+            s += wording.FEELS_LIKE.format(feels_like=w["feels_like"])
         parts.append(s)
     if w["humidity"] is not None:
-        parts.append(f"humidité {w['humidity']:.0f} %")
+        parts.append(wording.HUMIDITY.format(humidity=w["humidity"]))
     if w["wind"] is not None:
-        parts.append(f"vent {w['wind']:.0f} km/h")
+        parts.append(wording.WIND.format(wind=w["wind"]))
     if w["precip"] is not None and w["precip"] > 0:
-        parts.append(f"précip {w['precip']:.1f} mm")
+        parts.append(wording.PRECIPITATION.format(precip=w["precip"]))
     if w.get("wbgt") is not None:
-        parts.append(f"**WBGT {w['wbgt']:.0f} °C** ({FLAGS[w["band"]]})")
+        parts.append(wording.WBGT.format(wbgt=w["wbgt"], flag=FLAGS[w["band"]]))
     local = when.strftime("%Y-%m-%d %H:%M %Z")
-    out = f"Météo au départ ({local}) : " + ", ".join(parts) + "."
+    out = wording.AT_START.format(local=local, parts=", ".join(parts))
 
     # The start is only one point. When the middle of the route differs markedly
     # (hillsides to town, valley floor to ridge), the start weather no longer
@@ -519,27 +519,24 @@ def format_summary(w, when, midpoint=None):
     if midpoint and midpoint["temp"] is not None and w["temp"] is not None:
         gap = midpoint["temp"] - w["temp"]
         if abs(gap) >= MIDPOINT_GAP_C:
-            out += (
-                f" ⚠ Mi-parcours {midpoint['temp']:.0f} °C "
-                f"({gap:+.0f} °C) : le départ ne résume pas ce run."
-            )
+            out += wording.MIDPOINT.format(temp=midpoint["temp"], gap=gap)
     return out
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Météo d'un run via Open-Meteo.")
-    ap.add_argument("--polyline", help="Polyline encodé Strava (summary_polyline).")
-    ap.add_argument("--lat", type=float, help="Latitude de départ.")
-    ap.add_argument("--lon", type=float, help="Longitude de départ.")
+    ap = argparse.ArgumentParser(description="The weather of a run, from Open-Meteo.")
+    ap.add_argument("--polyline", help="Strava encoded polyline (summary_polyline).")
+    ap.add_argument("--lat", type=float, help="Start latitude.")
+    ap.add_argument("--lon", type=float, help="Start longitude.")
     ap.add_argument("--time", required=True,
-                    help="Heure de départ ISO 8601. Avec --local : le "
-                         "`start_local` de Strava tel quel, sans fuseau.")
+                    help="ISO 8601 start time. With --local: Strava's "
+                         "`start_local` as is, without a zone.")
     ap.add_argument("--local", action="store_true",
-                    help="--time est l'heure murale au lieu de départ "
-                         "(= `start_local` de redline strava). Le décalage est "
-                         "résolu depuis les coordonnées. N'ajoute jamais un `Z` "
-                         "à la place.")
-    ap.add_argument("--json", action="store_true", help="Sortie JSON brute.")
+                    help="--time is the wall-clock time at the start "
+                         "(= `start_local` of redline strava). The offset is "
+                         "resolved from the coordinates. Never add a `Z` "
+                         "instead.")
+    ap.add_argument("--json", action="store_true", help="Raw JSON output.")
     args = ap.parse_args()
 
     midpoint_point = None
@@ -549,14 +546,14 @@ def main():
         except ValueError as exc:
             raise InputError(str(exc)) from exc
         if not pts:
-            raise InputError("Polyline vide ou illisible.")
+            raise InputError("Empty or unreadable polyline.")
         lat, lon = pts[0]
         if len(pts) >= 3:
             midpoint_point = pts[len(pts) // 2]
     elif args.lat is not None and args.lon is not None:
         lat, lon = args.lat, args.lon
     else:
-        raise InputError("Fournir --polyline, ou --lat et --lon.")
+        raise InputError("Give --polyline, or --lat and --lon.")
 
     try:
         when = parse_time(args.time, local=args.local)
@@ -568,12 +565,12 @@ def main():
         try:
             when, zone_name = resolve_offset(lat, lon, when)
         except Exception as exc:
-            raise ExternalError(f"Fuseau du lieu de départ indéterminable : {exc}") from exc
+            raise ExternalError(f"Time zone of the start cannot be determined: {exc}") from exc
 
     try:
         w = get_weather(lat, lon, when)
     except Exception as exc:
-        raise ExternalError(f"Météo indisponible : {exc}") from exc
+        raise ExternalError(f"Weather unavailable: {exc}") from exc
 
     midpoint = None
     if midpoint_point:
