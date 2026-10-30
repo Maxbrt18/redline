@@ -23,13 +23,16 @@ The vault is the coach's memory: Markdown notes in a Git repository, which you c
 in Obsidian. Start from the fictional one the tests use, then make it yours:
 
 ```bash
-git clone https://github.com/Maxbrt18/redline.git && cd redline
+git clone -b stable https://github.com/Maxbrt18/redline.git && cd redline
 cp -R tests/fixtures/vault vault
 cp templates/vault/CLAUDE.md vault/CLAUDE.md
 cp -R templates/vault/.githooks vault/
 mkdir -p vault/templates && cp templates/*.md vault/templates/
 cd vault && git init && git remote add origin <your vault repository> && cd ..
 ```
+
+`stable` points at the latest release, tagged `v0.x.y`; `main` is where pull requests
+land, and is not meant to be run by an instance.
 
 Then edit, in `vault/`:
 
