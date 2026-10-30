@@ -2640,3 +2640,69 @@ def test_an_athlete_message_cannot_claim_a_model_turn(store):
             "INSERT INTO redline.conversation_messages (id, psid, role, body, source_key, "
             "turn_id) VALUES (:id, '4242', 'athlete', 'Salut', 'test:athlete', :turn)"),
             {"id": str(uuid.uuid4()), "turn": turn_id})
+
+
+def test_revise_records_the_decision_and_the_state_the_engine_measured(store, monkeypatch,
+                                                                       capsys):
+    import io
+    import json
+
+    from conftest import load_script
+    from test_weekly_plan import WRITTEN_ON, frozen_clock, session, written_today
+
+    cli = load_script("week-plan")
+    frozen_clock(monkeypatch, cli)
+    monkeypatch.delenv("REDLINE_TURN_ID", raising=False)
+    store.put_daily({"checked_on": dt.date.fromisoformat(WRITTEN_ON[:10]),
+                     "sleep": "poor", "life_load": None, "desire": None, "note": ""})
+    decision = {"by": "judgment", "alternatives": [
+        {"option": "trois sorties au lieu de quatre", "rejected_because": "volume tenu"}]}
+    payload = written_today(number=1, sessions=[session()], decision=decision)
+    # A snapshot supplied by the model is never kept: the engine measures it.
+    payload["state_snapshot"] = {"as_of": "2026-01-01", "week_km_done": 99.0,
+                                 "pain_max_7d": {}}
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
+    assert cli._database_command(store, "revise", "2026-W32", False) == 0
+
+    saved = store.load_plan("2026-W32")["revisions"][0]
+    assert saved["decision"] == decision
+    assert saved["state_snapshot"]["as_of"] == WRITTEN_ON[:10]
+    assert saved["state_snapshot"]["week_km_done"] == 0
+    assert saved["state_snapshot"]["daily"] == {"on": WRITTEN_ON[:10], "sleep": "poor"}
+
+
+def test_revise_refuses_a_revision_without_its_decision(store, monkeypatch, capsys):
+    import io
+    import json
+
+    from conftest import load_script
+    from test_weekly_plan import frozen_clock, session, written_today
+
+    from redline.model.schema import SchemaError
+
+    cli = load_script("week-plan")
+    frozen_clock(monkeypatch, cli)
+    monkeypatch.delenv("REDLINE_TURN_ID", raising=False)
+    payload = written_today(number=1, sessions=[session()])
+    del payload["decision"]
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
+    with pytest.raises(SchemaError, match="decision: missing"):
+        cli._database_command(store, "revise", "2026-W32", False)
+    assert store.load_plan("2026-W32") is None
+
+
+def test_the_decision_state_counts_only_what_was_visible_that_day(store):
+    from redline.analysis import decision_state
+
+    run = observation(strava=90000000101)
+    run["occurred_on"] = dt.date(2026, 8, 3)
+    store.add_observation(run)
+    later = observation(strava=90000000102)
+    later["occurred_on"] = dt.date(2026, 8, 5)
+    store.add_observation(later)
+    _wake(store, dt.date(2026, 7, 20), 6)
+    _wake(store, dt.date(2026, 8, 2), 3)
+
+    state = decision_state.snapshot(store, dt.date(2026, 8, 4))
+
+    assert state == {"as_of": "2026-08-04", "week_km_done": 7.0, "pain_max_7d": {"knee": 3}}

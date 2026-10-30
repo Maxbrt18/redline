@@ -82,6 +82,8 @@ ORPHAN_DAY = ("{day} ne porte plus que des annulations ({titles}) et aucune séa
               "place. Voulu, ou remplaçante oubliée ?")
 
 GAP_UNREADABLE = "Écart aux {days} jours : lecture du registre impossible ({name})."
+SNAPSHOT_UNREADABLE = ("État au moment de décider : lecture du registre impossible "
+                       "({name}) ; la révision part sans cet instantané.")
 
 GAP_TITLE = "Écart aux {days} jours (règle n8, informatif, jamais bloquant) :"
 

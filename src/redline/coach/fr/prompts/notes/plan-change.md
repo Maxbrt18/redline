@@ -22,6 +22,8 @@ de `evidence` (jamais une mesure brute ni une correction seule), précise le `co
 l'intention confirmée, puis la `rule` appliquée. Une séance retirée, annulée ou réduite
 porte en plus `restriction` : `rule` (identifiant du règlement, ou `request` si ⟨athlète⟩
 l'a demandée) et `fact` (l'entrée de `evidence` qui la déclenche). Sans fait qui déclenche
-une règle, la séance reste. La sortie de `revise` te rend la semaine entière pour ça :
+une règle, la séance reste. La révision porte `decision` : ce qui a tranché (`by` : rule
+et son `rule`, judgment ou request) et `alternatives`, les options écartées avec leur
+raison ; un jugement en nomme au moins une, écrite maintenant. La sortie de `revise` te rend la semaine entière pour ça :
 un jour marqué AUCUNE SÉANCE ou une annulation sans remplaçante est un oubli tant que tu
 ne l'as pas vérifié.]
