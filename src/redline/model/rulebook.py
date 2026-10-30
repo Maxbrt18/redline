@@ -57,6 +57,12 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
               note="local time HH:MM"),
         field("assimilation_weeks", list, item=field("week", str, pattern=WEEK,
                                                      note="ISO week, e.g. 2030-W35")),
+        # Optional: an instance rulebook written before them states no fuelling ceiling,
+        # and none applies until it declares one.
+        field("carbs_cap_g_h", int, required=False, minimum=30, maximum=150,
+              note="highest fuelling target a session may carry, in g/h"),
+        field("carbs_mix_above_g_h", int, required=False, minimum=30, maximum=150,
+              note="above this target, the session names a glucose-fructose mix"),
     ])),
     field("transitions", list, minimum=1, maximum=12, item=field(
         "transition", dict, schema=Schema("[[transitions]]", [
@@ -94,6 +100,8 @@ class Parameters:
     stall_tolerance_km: float
     wake_trace_until: dt.time
     assimilation_weeks: tuple[str, ...]
+    carbs_cap_g_h: int | None = None
+    carbs_mix_above_g_h: int | None = None
 
     def spoken(self) -> dict[str, str]:
         """Thresholds as a rule's text states them: decimal comma."""
@@ -104,7 +112,7 @@ class Parameters:
                 return value.strftime("%H:%M")
             return str(value)
         return {name: said(value) for name, value in vars(self).items()
-                if not isinstance(value, tuple)}
+                if value is not None and not isinstance(value, tuple)}
 
 
 @dataclass(frozen=True)

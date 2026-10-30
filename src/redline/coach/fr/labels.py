@@ -18,6 +18,8 @@ CELL_QUESTIONS = {
     "enjoyment": "le plaisir pris (/10)",
     "dplus": "le D+",
     "dminus": "le D-",
+    "carbs_g_h": "les glucides pris par heure (g/h)",
+    "gut_symptoms": "les troubles digestifs (/10)",
 }
 
 NO_CAPTION = "(aucune légende)"

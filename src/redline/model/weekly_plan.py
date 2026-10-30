@@ -18,7 +18,7 @@ from . import program as strength_program
 from .notes import NoteError
 from .program import GATE_SCHEMA as STRENGTH_GATE_SCHEMA
 from .schema import Schema, SchemaError, field
-from .vocabulary import Decider
+from .vocabulary import CarbMix, Decider
 
 WEEK_RE = r"20\d{2}-W(?:0[1-9]|[1-4]\d|5[0-3])"
 DATE_RE = r"20\d{2}-\d{2}-\d{2}"
@@ -83,6 +83,9 @@ SESSION_SCHEMA = Schema("planned session", [
     field("location_label", str, required=False),
     field("carbs_target_g_h", int, required=False, minimum=0, maximum=150,
           note="experimental fuelling target in grams of carbohydrate per hour"),
+    field("carbs_mix", str, required=False, choices=tuple(CarbMix),
+          note="the sugars the target is taken as; required above the rulebook's mix "
+               "threshold"),
     field("strength", dict, required=False, schema=STRENGTH_SPEC_SCHEMA,
           note="typed modulations; the session and its exercises come from the workout"),
     field("note", str, required=False),
@@ -127,7 +130,7 @@ CHANGE_FIELDS = (
     # `calibration` is no longer written; the name stays valid in the `changes` of
     # existing revisions, which are re-read and validated in full.
     "calibration",
-    "carbs_target_g_h", "location_label", "strength", "note",
+    "carbs_target_g_h", "carbs_mix", "location_label", "strength", "note",
 )
 
 #: A restriction names its premise as a type. A restriction without a premise is the most
@@ -400,6 +403,8 @@ def _session_errors(session: dict, where: str) -> list[str]:
         problems.append(f"{where}: a run requires a target, a cap or a duration")
     if session.get("transition") and session.get("kind") == "rest":
         problems.append(f"{where}: a rest day is not a transition")
+    if session.get("carbs_mix") is not None and session.get("carbs_target_g_h") is None:
+        problems.append(f"{where}: carbs_mix only goes with a carbs_target_g_h")
     if session.get("carbs_target_g_h") is not None and workout not in session_kinds.FUELLED:
         problems.append(f"{where}: a fuelling target is only tested on "
                         + " or ".join(sorted(session_kinds.FUELLED)))
@@ -705,7 +710,9 @@ def details_of(session: dict, *, cadence_unit: str = "") -> list[str]:
     if session.get("cadence_target"):
         details.append(text.CADENCE.format(cadence=session["cadence_target"], unit=cadence_unit))
     if session.get("carbs_target_g_h") is not None:
-        details.append(text.CARBS.format(grams=session["carbs_target_g_h"]))
+        details.append(" ".join(filter(None, (
+            text.CARBS.format(grams=session["carbs_target_g_h"]),
+            text.CARBS_MIX.get(session.get("carbs_mix") or "")))))
     if session.get("note"):
         details.append(session["note"])
     return [part for part in details if part]
@@ -891,6 +898,31 @@ def _restriction_errors(session_id: str, entry: dict, cuts: list[str],
 _AUTHORITATIVE_TRIGGER = re.compile(
     r"^(?:observation|exposure|messenger|medical|availability|gate|request|incident|strength|strava):"
 )
+
+
+def fuelling_errors(revision: dict, where: str = "revision") -> list[str]:
+    """Rule f1 on write: a ceiling, and a named mix above the threshold.
+
+    Judged on the new revision only, like the other write-time checks: an older
+    revision above today's ceiling stays readable. A threshold the instance rulebook
+    does not declare does not apply.
+    """
+    parameters = rulebook.current().parameters
+    cap, mix_above = parameters.carbs_cap_g_h, parameters.carbs_mix_above_g_h
+    problems = []
+    for session in revision.get("sessions") or []:
+        target = session.get("carbs_target_g_h")
+        if target is None or session.get("status") == "cancelled":
+            continue
+        label = f"{where}.{session.get('id', '?')}"
+        if cap is not None and target > cap:
+            problems.append(f"{label}.carbs_target_g_h: {target} g/h is above the ceiling of "
+                            f"{cap} g/h (rule f1)")
+        if (mix_above is not None and target > mix_above
+                and session.get("carbs_mix") != CarbMix.GLUCOSE_FRUCTOSE):
+            problems.append(f"{label}.carbs_mix: {target} g/h is above {mix_above} g/h -- "
+                            f"name the mix `{CarbMix.GLUCOSE_FRUCTOSE}` (rule f1)")
+    return problems
 
 
 def decision_errors(revision: dict, where: str = "revision") -> list[str]:

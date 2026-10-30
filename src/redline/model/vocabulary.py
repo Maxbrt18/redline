@@ -119,6 +119,13 @@ class HrReason(StrEnum):
     NONE = "none"
 
 
+class CarbMix(StrEnum):
+    """The sugars a fuelling target is taken as (`planned_sessions.carbs_mix`)."""
+
+    GLUCOSE = "glucose"
+    GLUCOSE_FRUCTOSE = "glucose_fructose"
+
+
 class Decider(StrEnum):
     """What settled a plan revision (`plan_revisions.decision`).
 

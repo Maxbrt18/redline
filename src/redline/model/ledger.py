@@ -217,7 +217,12 @@ COMPLETION_WINDOW = dt.timedelta(days=2)
 METRIC_COLUMNS = {
     "rpe": "rpe", "enjoyment": "enjoyment",
     "elevation_gain_m": "dplus", "elevation_loss_m": "dminus",
+    "carbs_g_h": "carbs_g_h", "gut_symptoms": "gut_symptoms",
 }
+
+#: Awaited only after a session that tested a fuelling target: linking it marks them
+#: pending (`session_cycles`), and only that marking makes them due.
+FUELLING_METRICS = ("carbs_g_h", "gut_symptoms")
 
 
 def missing_observation_fields(observation: dict) -> list[str]:
@@ -238,6 +243,8 @@ def missing_observation_fields(observation: dict) -> list[str]:
         missing += [pain_column(zone) for zone, reading in sorted(
             (observation.get("pains") or {}).items())
             if reading.get("state") not in {"known", "unavailable"}]
+    missing += [METRIC_COLUMNS[metric] for metric in FUELLING_METRICS
+                if (metrics.get(metric) or {}).get("state") == "pending"]
     if observation.get("strava_activity_id") is not None:
         missing += [
             METRIC_COLUMNS[metric]

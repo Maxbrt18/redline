@@ -42,6 +42,7 @@ from redline.model.weekly_plan import (
     change_evidence_errors,
     current_week,
     decision_errors,
+    fuelling_errors,
     gate_reasons,
     intention_errors,
     now_stamp,
@@ -124,6 +125,7 @@ def _database_command(store, command: str, week: str, optional: bool,
             *change_evidence_errors(previous, current),
             *typed_target_errors(current, f"{week} revision {current["revision"]}"),
             *decision_errors(current, f"{week} revision {current["revision"]}"),
+            *fuelling_errors(current, f"{week} revision {current["revision"]}"),
         ]
         if mistakes:
             raise SchemaError(mistakes)

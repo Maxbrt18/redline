@@ -131,6 +131,7 @@ class Plans(StoreBase):
                 transition=session.get("transition"),
                 location_label=session.get("location_label"),
                 carbs_target_g_h=session.get("carbs_target_g_h"),
+                carbs_mix=session.get("carbs_mix"),
                 strength_spec=session.get("strength"),
                 note=session.get("note"),
             ))
@@ -327,7 +328,7 @@ class Plans(StoreBase):
                         session[key] = float(stored[key])
                 for key in ("routine", "duration_cap_min", "rpe_min", "rpe_max", "hr_zone",
                             "hr_cap_bpm", "cadence_target", "transition", "location_label",
-                            "carbs_target_g_h", "note"):
+                            "carbs_target_g_h", "carbs_mix", "note"):
                     if stored[key] is not None:
                         session[key] = stored[key]
                 if stored["strength_spec"] is not None:

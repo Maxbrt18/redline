@@ -113,3 +113,21 @@ def test_every_rule_names_an_owner_that_exists():
         for owner in rule.owner.split(" ; "):
             path = owner.split(" §")[0].split(" 20")[0].strip()
             assert (VAULT_ROOT / path).exists(), f"{rule.id}: owner missing {path}"
+
+
+def test_a_rulebook_without_fuelling_thresholds_states_no_ceiling(tmp_path):
+    """An instance rulebook written before the thresholds stays valid; none applies."""
+    text = "\n".join(line for line in DEFAULT_TEXT.splitlines()
+                     if not line.startswith(("carbs_cap_g_h", "carbs_mix_above_g_h")))
+    rules = text.split("\n[[rules]]\nid = \"f1\"")[0]
+    book = rulebook.load(_variant(tmp_path, rules + "\n"))
+    assert book.parameters.carbs_cap_g_h is None
+    assert book.parameters.carbs_mix_above_g_h is None
+    assert "carbs_cap_g_h" not in book.parameters.spoken()
+
+
+def test_the_fuelling_rule_cites_the_thresholds_it_applies():
+    book = rulebook.parse(DEFAULT_TEXT, rulebook.DEFAULT)
+    rule = next(rule for rule in book.rules if rule.id == "f1")
+    assert f"au plus {book.parameters.carbs_cap_g_h} g/h" in rule.text
+    assert f"au-delà de {book.parameters.carbs_mix_above_g_h} g/h" in rule.text
