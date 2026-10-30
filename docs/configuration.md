@@ -57,7 +57,7 @@ A test checks that every variable the service reads is in this table.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `AGENT_PROVIDER` | `codex` | `claude` or `codex` |
+| `AGENT_PROVIDER` | required | `claude` or `codex` |
 | `CLAUDE_CODE_OAUTH_TOKEN` | empty | Claude's credentials, from `claude setup-token` |
 | `CLAUDE_BIN` | `claude` | the Claude Code binary, 2.1.296 or later |
 | `CODEX_BIN` | the SDK's | a Codex binary other than the SDK's pinned one |
