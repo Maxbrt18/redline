@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from redline.model.notebook_views import ScaleStep
+
 #: The answers to the question asked after a high heart rate at a comparable pace.
 HR_REASONS = {"sleep": "nuit courte", "cold": "début de rhume",
               "heat": "chaleur ou terrain", "none": "rien de spécial"}
@@ -16,7 +18,7 @@ PLAN_MESSAGES = {
 }
 
 #: Shown beside the pain points so a figure can be read back.
-PAIN_SCALE = [
+PAIN_SCALE: list[ScaleStep] = [
     {"value": 1, "text": "La tension est là, pas gênante."},
     {"value": 2, "text": "Tu commences à douter, tu changerais ta foulée ; le lendemain, conséquences légères."},
     {"value": 3, "text": "« J’en ai fait trop » : 1 à 2 semaines de charge à revoir."},

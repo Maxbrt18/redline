@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 from redline.cards import archive, strength_card
 from redline.coach.fr import notebook as notebook_text
+from redline.model import notebook_views as views
 from redline.model.instance import Instance
 from redline.model.program import load
 from redline.storage.database import StorageError
@@ -69,26 +70,24 @@ class NotebookService:
         return Board(self.operational, self.repo, self.root, clock.today(), clock.now(),
                      self.instance)
 
-    def today(self) -> dict:
-        view = self.board().today_view()
-        view["strength"] = self.current()
-        return view
+    def today(self) -> views.TodayView:
+        return {**self.board().today_view(), "strength": self.current()}
 
-    def week(self, psid: str, label: str) -> dict:
+    def week(self, psid: str, label: str) -> views.WeekView:
         monday = week_monday(label)
         entries = self.store.list_entries(
             psid, limit=100, between=(monday, monday + dt.timedelta(days=6)))
         return self.board().week_view(label, entries)
 
-    def weeks(self, psid: str) -> list[dict]:
+    def weeks(self, psid: str) -> list[views.PastWeek]:
         reviews = {entry["period"]: entry["id"] for entry in
                    self.store.list_entries(psid, kind="weekly", limit=100) if entry.get("period")}
         return self.board().weeks_view(reviews)
 
-    def injury(self, zone: str | None = None) -> dict | None:
+    def injury(self, zone: str | None = None) -> views.InjuryView | None:
         return self.board().injury_view(zone)
 
-    def session(self, observation_id: str) -> dict | None:
+    def session(self, observation_id: str) -> views.SessionView | None:
         """The detail of a completed session; streams and weather are fetched on first display."""
         board = self.board()
         intake = board.ops.strava_detail(uuid.UUID(observation_id))
@@ -98,7 +97,7 @@ class NotebookService:
             intake = session_detail.ensure(board.ops, intake)
         return board.session_view(observation_id, intake)
 
-    def race(self, psid: str) -> dict:
+    def race(self, psid: str) -> views.RaceView:
         archives = [*self.store.list_entries(psid, kind="monthly", limit=12),
                     *self.store.list_entries(psid, kind="weekly", limit=8)]
         return self.board().race_view(archives)
@@ -164,7 +163,7 @@ class NotebookService:
                 "period": period, "occurred_on": period_day(kind, period, clock.today()), "body": body})
         return self.store.save_many(envelope.psid, envelope.source_key, records)
 
-    def current(self) -> dict:
+    def current(self) -> views.StrengthOffer:
         today = clock.today()
         week = today.strftime("%G-W%V")
         status = self.repo.validate_weekly_plan(week)
