@@ -676,7 +676,7 @@ def check_generated_views(vault: Vault, report: Report) -> None:
         report.fail(wording.VIEWS, problems)
     else:
         report.ok(wording.VIEWS,
-                  wording.VIEWS_OK.format(seen=len(seen)))
+                  wording.VIEWS_OK.format(seen=seen))
 
 
 def _plan_view_drift(vault: Vault) -> tuple:

@@ -211,3 +211,21 @@ def test_a_settled_prediction_is_no_debt(report, monkeypatch):
     assert report.failed == 0 and report.warned == 0
 
 
+
+
+def test_views_in_step_report_the_program_blocks_they_opened(monkeypatch, capsys):
+    """The success path names a count: it once called len() on it and crashed the report."""
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://unused")
+    monkeypatch.setattr(vault_check, "refresh", lambda *args, **kwargs: [])
+    monkeypatch.setattr(vault_check, "load_program", lambda root: None)
+    monkeypatch.setattr(vault_check.ledger_gauge, "open_store", lambda: None)
+    monkeypatch.setattr(vault_check.ledger_gauge, "parse_ledger", lambda store: [])
+    monkeypatch.setattr(vault_check.ledger_gauge, "load_instruments", lambda store: {})
+    monkeypatch.setattr(vault_check.hot_cache, "refresh", lambda *args, **kwargs: False)
+    monkeypatch.setattr(vault_check, "_plan_view_drift", lambda vault: ([], 3))
+    report = vault_check.Report(quiet=False)
+
+    vault_check.check_generated_views(vault({}), report)
+
+    assert report.failed == 0
+    assert "3 bloc(s) de programme" in capsys.readouterr().out
