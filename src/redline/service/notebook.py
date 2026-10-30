@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from redline.cards import archive, strength_card
+from redline.coach.fr import notebook as notebook_text
 from redline.model.instance import Instance
 from redline.model.program import load
 from redline.storage.database import StorageError
@@ -50,7 +51,7 @@ def period_day(kind: str, period: str, fallback: dt.date) -> dt.date:
         return dt.date.fromisoformat(period + "-01")
     if kind == "strength":
         return dt.date.fromisoformat(period)
-    raise ValueError("période du carnet invalide")
+    raise ValueError("invalid notebook period")
 
 
 class NotebookService:
@@ -64,7 +65,7 @@ class NotebookService:
 
     def board(self) -> Board:
         if self.operational is None:
-            raise StorageError("registre indisponible pour le carnet")
+            raise StorageError("ledger unavailable for the notebook")
         return Board(self.operational, self.repo, self.root, clock.today(), clock.now(),
                      self.instance)
 
@@ -142,7 +143,7 @@ class NotebookService:
             # The job is the authority on the period even if the agent gave a wrong title.
             if image_kind == kind and kind in {"weekly", "monthly"}:
                 image_period = period
-            title = (snapshot.get("title") if snapshot else metadata.get("title")) or "Carte"
+            title = (snapshot.get("title") if snapshot else metadata.get("title")) or notebook_text.CARD_TITLE
             if image_kind == "weekly" and image_period:
                 title = f"Weekly · {image_period}"
             if image_kind == "monthly" and image_period:
@@ -150,7 +151,7 @@ class NotebookService:
             has_review |= image_kind == kind
             data = part.path.read_bytes()
             if len(data) > 12 * 1024 * 1024:
-                raise ValueError("carte trop volumineuse pour le carnet")
+                raise ValueError("card too large for the notebook")
             records.append({"slot": part.path.name,
                 "kind": image_kind, "title": title, "period": image_period,
                 "occurred_on": period_day(image_kind, image_period, clock.today()),
@@ -169,18 +170,18 @@ class NotebookService:
         status = self.repo.validate_weekly_plan(week)
         if status not in {PlanStatus.VALID, PlanStatus.AWAITING}:
             return {"status": "unavailable", "date": today.isoformat(),
-                    "message": "Le programme doit être vérifié avant de lancer une séance."}
+                    "message": notebook_text.STRENGTH_PLAN_UNCHECKED}
         raw = self.repo.weekly_plan_context(week)
         if not raw:
             return {"status": "unavailable", "date": today.isoformat(),
-                    "message": "Le programme n’est pas disponible pour le moment."}
+                    "message": notebook_text.STRENGTH_PLAN_MISSING}
         session = strength_due(raw, today.isoformat())
         if session is None:
             return {"status": "none", "date": today.isoformat(),
-                    "message": "Aucun renfo à faire aujourd’hui."}
+                    "message": notebook_text.STRENGTH_NONE}
         if session["id"] in blocked_session_ids(raw, today.isoformat()):
             return {"status": "blocked", "date": today.isoformat(),
-                    "message": "Ta séance attend une réponse dans Messenger avant de démarrer."}
+                    "message": notebook_text.STRENGTH_BLOCKED}
         built = load(self.root).build(selection_for(session, today.isoformat()))
         snapshot = strength_card.snapshot(built, root=self.root)
         # The notebook does not offer to redo an already recorded session, even if the
@@ -193,7 +194,7 @@ class NotebookService:
                 strength_report_claims.c.session_key == snapshot["sid"])).scalar_one_or_none()
         if done:
             return {"status": "done", "date": today.isoformat(),
-                    "message": "Ton renfo du jour est enregistré."}
+                    "message": notebook_text.STRENGTH_DONE}
         revision = json.loads(raw)["revision"]
         canonical = json.dumps(snapshot, sort_keys=True, ensure_ascii=False)
         signature = hashlib.sha256(f"{revision}:{canonical}".encode()).hexdigest()

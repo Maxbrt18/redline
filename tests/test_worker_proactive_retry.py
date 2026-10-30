@@ -75,7 +75,7 @@ def test_comeback_after_expiry_is_a_failure_with_its_cause(make_bot, store):
 
     job = _job(store, "morning:test")
     assert job["status"] == "failed"
-    assert "plus pertinent" in job["last_error"]
+    assert "no longer relevant" in job["last_error"]
 
 
 def test_failure_after_work_started_is_failed_not_retried(make_bot, store):

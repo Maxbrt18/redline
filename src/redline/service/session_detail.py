@@ -50,7 +50,7 @@ def compact(raw: dict, laps: list) -> dict:
 
     time = [int(value) for value in data("time")]
     if not time:
-        raise ValueError("flux de temps absent")
+        raise ValueError("no time stream")
     size = len(time)
 
     def aligned(key: str, digits: int | None) -> list | None:
@@ -99,7 +99,7 @@ def weather_at(query: dict) -> dict:
     """Hourly weather at the start point and time (WBGT included when it converges)."""
     points = weather.decode_polyline(query["polyline"])
     if not points:
-        raise ValueError("polyline vide")
+        raise ValueError("empty polyline")
     lat, lon = points[0]
     local = weather.parse_time(query["time"], local=True)
     moment, _ = weather.resolve_offset(lat, lon, local)
@@ -120,14 +120,14 @@ def ensure(store: Any, intake: dict) -> dict:
         try:
             streams = fresh["streams"] = fetch_streams(activity_id)
         except Exception as exc:
-            log.warning("Flux Strava de %s non relevés : %s", activity_id, exc)
+            log.warning("Strava streams of %s not fetched: %s", activity_id, exc)
     stored = intake.get("distilled")
     query = Activity.from_json(stored).weather_query if stored else None
     if conditions is None and query is not None:
         try:
             conditions = fresh["weather"] = weather_at(query)
         except Exception as exc:
-            log.warning("Météo de %s non relevée : %s", activity_id, exc)
+            log.warning("Weather of %s not fetched: %s", activity_id, exc)
     if fresh:
         store.store_strava_detail(activity_id, **fresh)
     return {**intake, "streams": streams, "weather": conditions}

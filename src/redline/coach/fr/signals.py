@@ -38,3 +38,10 @@ STRAVA_CHECKS = "  Les 4 contrôles Strava du § D (allure en descente, parcours
 STRAVA_CHECKS_END = "  pauses en fin de sortie, longueur des notes) restent à lire chez Strava."
 
 EMPTY_LEDGER = "Registre vide : rien à lire."
+
+# The daily signals the service hands the coach in the morning.
+DESIRE_LOW = "envie basse sur les trois dernières lectures"
+
+PREDICTIONS_DUE = "{count} prédiction(s) échue(s) à résoudre"
+
+SESSIONS_MISSED = "{count} séances manquées sur 21 jours"

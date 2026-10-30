@@ -34,7 +34,7 @@ def _write(root, name: str, payload: object = None) -> str:
 
 
 def test_a_turn_reads_its_own_file_and_its_suffixed_second(tmp_path):
-    for name in (f"{TURN}.json", f"{TURN}-carte.json"):
+    for name in (f"{TURN}.json", f"{TURN}-card.json"):
         relative = _write(tmp_path, name)
         assert agent_input.resolve(relative, root=tmp_path, turn_id=TURN) == (
             tmp_path / relative).resolve()
@@ -65,7 +65,7 @@ def test_a_missing_file_says_to_write_it_first(monkeypatch):
 
 def test_clear_removes_only_the_files_of_that_turn(tmp_path):
     _write(tmp_path, f"{TURN}.json")
-    _write(tmp_path, f"{TURN}-carte.json")
+    _write(tmp_path, f"{TURN}-card.json")
     _write(tmp_path, f"{OTHER}.json")
     agent_input.clear(TURN, root=tmp_path)
     assert sorted(p.name for p in (tmp_path / agent_input.DIRECTORY).iterdir()) == [

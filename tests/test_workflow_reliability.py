@@ -490,7 +490,7 @@ def test_rwf016_an_event_cannot_carry_free_text():
 
     from redline.service import events
 
-    with pytest.raises(ValueError, match="non autorisé"):
+    with pytest.raises(ValueError, match="not allowed"):
         events.emit("turn.stage", message="texte de Sam")
 
 

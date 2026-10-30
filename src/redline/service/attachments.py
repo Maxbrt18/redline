@@ -20,6 +20,7 @@ from urllib.parse import urlparse
 
 import requests
 
+from redline.coach.fr import attachments as wording
 from redline.model.errors import ExternalError
 
 MAX_ATTACHMENTS = 4
@@ -79,7 +80,7 @@ def encode_payload(attachments: list[dict], caption: str = "") -> str:
 
 
 def safe_conversation_label(raw: str) -> str:
-    """Trace relationnelle sans URL, nom de fichier ni contenu brut."""
+    """A conversation trace with no URL, file name or raw content."""
     try:
         payload = json.loads(raw)
         kinds = {str(row.get("type") or "") for row in payload.get("attachments", [])}
@@ -87,29 +88,28 @@ def safe_conversation_label(raw: str) -> str:
         kinds = set()
     labels = []
     if "image" in kinds:
-        labels.append("photo")
+        labels.append(wording.PHOTO)
     if "file" in kinds:
-        labels.append("document")
+        labels.append(wording.DOCUMENT)
     if kinds & {"video", "audio"}:
-        labels.append("média non pris en charge")
-    return "[Pièce jointe : " + (" + ".join(labels) or "format inconnu") + "]"
+        labels.append(wording.UNSUPPORTED_MEDIA)
+    return wording.LABEL.format(kinds=" + ".join(labels) or wording.UNKNOWN_FORMAT)
 
 
 def _remote_rows(raw: str) -> tuple[list[RemoteAttachment], str]:
     try:
         payload = json.loads(raw)
     except (TypeError, ValueError) as exc:
-        raise AttachmentError("Cette pièce jointe est illisible. Renvoie-la une fois.") from exc
+        raise AttachmentError(wording.UNREADABLE) from exc
     if not isinstance(payload, dict) or payload.get("version") != 1:
-        raise AttachmentError("Cette pièce jointe utilise un format que je ne reconnais pas.")
+        raise AttachmentError(wording.UNKNOWN_VERSION)
     rows = payload.get("attachments")
     if not isinstance(rows, list) or not rows or len(rows) > MAX_ATTACHMENTS:
-        raise AttachmentError(
-            f"Envoie entre 1 et {MAX_ATTACHMENTS} photos ou documents à la fois.")
+        raise AttachmentError(wording.COUNT.format(max=MAX_ATTACHMENTS))
     parsed = []
     for row in rows:
         if not isinstance(row, dict):
-            raise AttachmentError("Cette pièce jointe est incomplète. Renvoie-la une fois.")
+            raise AttachmentError(wording.INCOMPLETE)
         parsed.append(RemoteAttachment(
             str(row.get("type") or "").lower(), str(row.get("url") or "")))
     return parsed, str(payload.get("caption") or "").strip()[:2000]
@@ -173,13 +173,11 @@ class AttachmentService:
         unknown = [row.kind for row in remotes
                    if row.kind not in {"image", "file", "video", "audio"}]
         if unknown:
-            raise AttachmentError("Ce type de pièce jointe n'est pas pris en charge.")
+            raise AttachmentError(wording.UNKNOWN_KIND)
         if not allowed:
             if ignored_video:
-                raise AttachmentError(
-                    "Je ne traite pas les vidéos ni l'audio : l'analyse serait trop peu "
-                    "précise. Envoie plutôt une photo nette ou un document.")
-            raise AttachmentError("Envoie une photo, un PDF ou un fichier texte.")
+                raise AttachmentError(wording.NO_VIDEO)
+            raise AttachmentError(wording.WHAT_TO_SEND)
 
         self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
         os.chmod(self.directory, 0o700)
@@ -209,9 +207,9 @@ class AttachmentService:
     def _download(self, remote: RemoteAttachment, key: str, index: int, *,
                   remaining: int) -> LocalAttachment:
         if not remote.url or not _safe_host(remote.url):
-            raise AttachmentError("L'adresse de cette pièce jointe n'est pas une URL Meta sûre.")
+            raise AttachmentError(wording.UNSAFE_URL)
         if remaining <= 0:
-            raise AttachmentError("L'ensemble des pièces jointes dépasse la limite autorisée.")
+            raise AttachmentError(wording.TOTAL_TOO_LARGE)
 
         url = remote.url
         response = None
@@ -221,19 +219,18 @@ class AttachmentService:
                     url, stream=True, timeout=(5, 30), allow_redirects=False,
                     headers={"User-Agent": "Redline-Coach/1.0"})
             except requests.RequestException as exc:
-                raise AttachmentError(
-                    "Le téléchargement Meta a échoué. Renvoie le fichier dans un instant.") from exc
+                raise AttachmentError(wording.DOWNLOAD_FAILED) from exc
             if response.status_code not in REDIRECT_CODES:
                 break
             location = response.headers.get("Location", "")
             response.close()
             if not _safe_host(location):
-                raise AttachmentError("La redirection de la pièce jointe n'est pas sûre.")
+                raise AttachmentError(wording.UNSAFE_REDIRECT)
             url = location
         if response is None or response.status_code != 200:
             if response is not None:
                 response.close()
-            raise AttachmentError("Meta ne me laisse plus télécharger ce fichier. Renvoie-le.")
+            raise AttachmentError(wording.DOWNLOAD_REFUSED)
 
         try:
             declared = int(response.headers.get("Content-Length") or 0)
@@ -242,14 +239,14 @@ class AttachmentService:
         limit = min(self.max_bytes, remaining)
         if declared > limit:
             response.close()
-            raise AttachmentError(
-                f"Ce fichier dépasse la limite de {self.max_bytes // (1024 * 1024)} Mo.")
+            raise AttachmentError(wording.TOO_LARGE.format(megabytes=self.max_bytes // (1024 * 1024)))
         content_type = _media_type(response.headers.get("Content-Type", ""))
         allowed_types = ALLOWED_IMAGE_TYPES if remote.kind == "image" else ALLOWED_DOCUMENT_TYPES
         if content_type not in allowed_types:
             response.close()
-            accepted = "JPEG, PNG ou WebP" if remote.kind == "image" else "PDF, TXT ou CSV"
-            raise AttachmentError(f"Format non pris en charge. Formats acceptés : {accepted}.")
+            accepted = (wording.IMAGE_FORMATS if remote.kind == "image"
+                        else wording.DOCUMENT_FORMATS)
+            raise AttachmentError(wording.FORMAT.format(accepted=accepted))
         extension = allowed_types[content_type]
         path = self.directory / f"inbound-{key}-{index}{extension}"
         size = 0
@@ -261,9 +258,8 @@ class AttachmentService:
                         continue
                     size += len(chunk)
                     if size > limit:
-                        raise AttachmentError(
-                            f"Ce fichier dépasse la limite de "
-                            f"{self.max_bytes // (1024 * 1024)} Mo.")
+                        raise AttachmentError(wording.TOO_LARGE.format(
+                            megabytes=self.max_bytes // (1024 * 1024)))
                     handle.write(chunk)
         except Exception:
             path.unlink(missing_ok=True)
@@ -272,9 +268,8 @@ class AttachmentService:
             response.close()
         if size == 0:
             path.unlink(missing_ok=True)
-            raise AttachmentError("Le fichier reçu est vide.")
+            raise AttachmentError(wording.EMPTY)
         if not _content_matches(path, content_type):
             path.unlink(missing_ok=True)
-            raise AttachmentError(
-                "Le contenu réel du fichier ne correspond pas au format annoncé.")
+            raise AttachmentError(wording.MISMATCH)
         return LocalAttachment(remote.kind, path.resolve(), content_type, size)

@@ -118,6 +118,8 @@ log = logging.getLogger("redline")
 # that is the right answer.
 SILENCE_IS_A_FAILURE = frozenset({"strava_debrief", "strava_debrief_late"})
 CONTROL_COMMANDS = frozenset({"/status", "/cancel"})
+#: The motive that sends a plan delta rather than the remaining state.
+PLAN_CHANGED = "the prescription changed"
 # Depths whose business packet already carries the open threads (`context_packet.py`).
 PACKET_THREAD_DEPTHS = frozenset({"N2", "N3"})
 
@@ -219,7 +221,7 @@ class TurnWorker:
         self.reconcile_outbox()
         removed = self._attachments.cleanup()
         if removed:
-            log.warning("Pièces jointes brutes retirées après redémarrage : %d", removed)
+            log.warning("Raw attachments removed after restart: %d", removed)
         if self._thread is not None and self._thread.is_alive():
             return
         self._queue.open()
@@ -246,8 +248,8 @@ class TurnWorker:
         if not leftovers:
             return 0
         names = [path.name for path in leftovers]
-        log.error("Outbox : %d image(s) laissée(s) par un tour mort, jamais envoyée(s) "
-                  "— %s", len(names), ", ".join(names))
+        log.error("Outbox: %d image(s) left by a dead turn, never sent: %s",
+                  len(names), ", ".join(names))
         for path in leftovers:
             self._outbox.archive(path)
         return len(names)
@@ -270,7 +272,7 @@ class TurnWorker:
             self.submit_attachment(psid, text, message_id=message_id)
             return
         else:
-            raise ValueError(f"type d'événement Messenger inconnu : {kind}")
+            raise ValueError(f"unknown Messenger event type: {kind}")
         self._state.complete_inbound((message_id,))
 
     def submit_inbound(self, psid: str, text: str, *, message_id: str = "") -> None:
@@ -291,7 +293,7 @@ class TurnWorker:
         try:
             processed = self._run_command(psid, command, message_ids=message_ids)
         except Exception:
-            log.exception("Commande de contrôle %s impossible", command)
+            log.exception("Control command %s failed", command)
             return
         if processed:
             self._state.complete_inbound(message_ids)
@@ -357,13 +359,13 @@ class TurnWorker:
                 log.exception("Failed to handle a message")
                 if isinstance(job, ProactiveJob):
                     try:
-                        self._buffer_proactive_retry(job, cause="exception du service")
+                        self._buffer_proactive_retry(job, cause="service exception")
                     except Exception:
-                        log.exception("Reprise du proactif %s impossible", job.job_id)
+                        log.exception("Retry of proactive %s failed", job.job_id)
                 else:
                     # A worker failure is never something to ask of the athlete. The inbound message
                     # is durable and will be retried.
-                    self._log_incident("worker", "message entrant non traité")
+                    self._log_incident("worker", "inbound message not handled")
                     processed = False
             finally:
                 self._reactive_since = None
@@ -377,7 +379,7 @@ class TurnWorker:
             except Exception:
                 # The inbound stays `pending`: its reply is already persisted and is never
                 # recomputed on retry.
-                log.exception("Acquittement de l'entrant impossible")
+                log.exception("Acknowledging the inbound message failed")
             if self._publish_due:
                 self._after_turn()
 
@@ -388,7 +390,7 @@ class TurnWorker:
             self._repo.publish()
             self._vault_moved = bool(self._repo.sync()) or self._vault_moved
         except Exception:
-            log.exception("Publication du vault interrompue ; reprise à la maintenance")
+            log.exception("Vault publication interrupted; resumed at maintenance")
         self._log_vault_alerts()
 
     def _maintain(self) -> None:
@@ -399,9 +401,9 @@ class TurnWorker:
             try:
                 expired = self._state.expire_stale_questions(psid)
                 if expired:
-                    log.info("Questions ouvertes fermées sans examen : %d", expired)
+                    log.info("Open questions closed without review: %d", expired)
             except Exception:
-                log.exception("Expiration des questions ouvertes impossible")
+                log.exception("Expiring open questions failed")
 
     def _take_vault_moved(self) -> bool:
         moved, self._vault_moved = self._vault_moved, False
@@ -422,7 +424,7 @@ class TurnWorker:
             # Do not acknowledge: PostgreSQL keeps it ``pending`` and a restart picks it up again,
             # with an age note. This avoids both loss and looping.
             self._log_incident(
-                "entrant-en-attente", f"message conservé après {attempt} tentatives")
+                "inbound-pending", f"message kept after {attempt} attempts")
             return
         delay = self.REACTIVE_RETRY_DELAYS[min(attempt, len(self.REACTIVE_RETRY_DELAYS)) - 1]
         if hint:
@@ -439,7 +441,7 @@ class TurnWorker:
         timer.start()
         events.emit("inbound.retry", inbound_ids=list(ids), attempt=attempt,
                     retry_in_s=int(delay))
-        log.warning("Entrant direct différé après échec : tentative %d dans %.0f s",
+        log.warning("Direct inbound deferred after failure: attempt %d in %.0f s",
                     attempt + 1, delay)
 
     def _notify_outage(self, psid: str, ids: tuple[str, ...]) -> None:
@@ -488,9 +490,9 @@ class TurnWorker:
             return self._deliver_attachment_text(request, str(exc))
         if result.error:
             self._log_incident(
-                "analyse-piece-jointe",
-                f"La pièce jointe a bien été supprimée, mais son analyse a échoué "
-                f"({result.failure}) : {result.error}")
+                "attachment-analysis",
+                f"The attachment was deleted, but its analysis failed "
+                f"({result.failure}): {result.error}")
             if not result.terminal_failure:
                 self._retry_not_before = result.retry_at
                 return False
@@ -499,8 +501,7 @@ class TurnWorker:
             # An analysis that already failed midway is not blindly relaunched: the athlete knows
             # what to resend.
             return self._deliver_attachment_text(request, ATTACHMENT_UNREADABLE)
-        answer = result.full_text.strip() or (
-            "Je n'arrive pas à extraire quelque chose de fiable de cette pièce jointe.")
+        answer = result.full_text.strip() or replies.ATTACHMENT_NOTHING_RELIABLE
         return self._deliver_attachment_text(request, answer)
 
     def _with_freshness(self, psid: str, prompt: str, vault_changed: bool) -> str:
@@ -530,7 +531,7 @@ class TurnWorker:
                      if any(pro.marked("asked:" + ledger_model.cell_key(entry, column))
                             for column in entry["missing"])]
         except StorageError:
-            log.warning("Lecture des ressentis manquants indisponible")
+            log.warning("Reading the missing feelings failed")
             return CELLS_UNREADABLE_NOTE
         return missing_cells_note(
             pending, asked, notebook=bool(psid) and self._notebook_connected(psid))
@@ -545,7 +546,7 @@ class TurnWorker:
         try:
             return self._repo.day_settled(day)
         except StorageError:
-            log.warning("Lecture des séances du jour indisponible ; le bilan garde son heure")
+            log.warning("Reading the day's sessions failed; the review keeps its hour")
             return False
 
     def wake_reminder_due(self, psid: str) -> bool:
@@ -609,7 +610,7 @@ class TurnWorker:
             memory = self._state.relationship_context(psid)
             reply_to = self._state.reply_context(message_ids)
         except Exception:
-            log.exception("Contexte du triage indisponible")
+            log.exception("Triage context unavailable")
             memory, reply_to = "", ""
         classification = (
             CLASSIFY_PREAMBLE
@@ -622,7 +623,7 @@ class TurnWorker:
         try:
             received = self._state.inbound_received_at(message_ids)
         except Exception:
-            log.exception("Heure de réception des messages illisible")
+            log.exception("Message reception time unreadable")
             return ""
         if not received:
             return ""
@@ -665,7 +666,7 @@ class TurnWorker:
                     int(record["detail"]), fresh_words=True)
                 snapshot = capture.get("snapshot")
                 if not isinstance(snapshot, dict) or not snapshot.get("activity"):
-                    raise ValueError("instantané Strava vide après capture")
+                    raise ValueError("empty Strava snapshot after capture")
             except Exception as exc:
                 log.warning("Strava activity %s not folded into the reply (%s): %s",
                             record["detail"], type(exc).__name__, exc)
@@ -691,7 +692,7 @@ class TurnWorker:
                 # The reply did not go out: the debrief returns to its queue, due.
                 self._state.proactive.release_job(record["id"], delay=0)
         except Exception:
-            log.exception("Débrief absorbé %s non soldé", record["id"])
+            log.exception("Absorbed debrief %s not settled", record["id"])
 
     def _respond_turn(self, psid: str, text: str, *, deep_request: bool,
                       message_ids: tuple[str, ...], absorbed: dict) -> bool:
@@ -780,7 +781,7 @@ class TurnWorker:
         log.info("Reply in %.0f s (%s%s, %s, effort %s, timeout %d s, session %s)",
                  time.monotonic() - started, triage.depth,
                  " emotional" if triage.emotional else "",
-                 used_spec.model or "défaut", used_spec.effort or "défaut",
+                 used_spec.model or "default", used_spec.effort or "default",
                  used_spec.timeout, result.session_id or "?")
         events.emit("turn.stage", stage="model", kind="reactive", turn_id=outcome.turn_id,
                     inbound_ids=list(message_ids), route=run_plan.route.value,
@@ -791,8 +792,7 @@ class TurnWorker:
 
         if result.error:
             self._log_incident(
-                "agent", f"La réponse n'a pas pu être produite ({result.failure}) : "
-                         f"{result.error}")
+                "agent", f"The reply could not be produced ({result.failure}): {result.error}")
             self._discard_outbox(outbox_before)
             if not result.terminal_failure:
                 self._retry_not_before = result.retry_at
@@ -809,7 +809,7 @@ class TurnWorker:
 
         persisted = outcome.persistence
         if persisted is None:
-            raise RuntimeError("résultat agent réussi sans résultat de persistance")
+            raise RuntimeError("successful agent result without a persistence result")
         events.emit("turn.stage", stage="apply", kind="reactive", turn_id=outcome.turn_id,
                     outcome="applied" if persisted.writes_applied else "refused",
                     commands_applied=persisted.applied_commands,
@@ -820,8 +820,8 @@ class TurnWorker:
 
         answer = result.full_text.strip()
         if not answer:
-            self._log_incident("reponse-vide", "Le tour n'a produit aucun texte, même "
-                                               "après une relance dans la même session.")
+            self._log_incident("empty-reply", "The turn produced no text, even after a retry "
+                                              "in the same session.")
             answer = EMPTY_REPLY_APPLIED if persisted.applied_commands else EMPTY_REPLY
         lines, canonical, plan_meta = self._reactive_additions(
             psid, week, triage, persisted, plan_context, prescription_before, text)
@@ -869,10 +869,10 @@ class TurnWorker:
         """
         lines: list[str] = []
         if not persisted.writes_applied:
-            failure = persisted.failure.name if persisted.failure else "inconnue"
+            failure = persisted.failure.name if persisted.failure else "unknown"
             self._log_incident(
-                f"ecriture-refusee:{week}",
-                f"{failure} : faits du tour non enregistrés. {persisted.detail}")
+                f"write-refused:{week}",
+                f"{failure}: the turn's facts were not recorded. {persisted.detail}")
             self._log_vault_alerts()
             line = unrecorded_line(persisted.refused)
             if line:
@@ -882,15 +882,15 @@ class TurnWorker:
         if triage.plan_change and revision_after == self._revision_of(before_context):
             # Not a fault in itself: "I slept badly" triggers P and often changes nothing. The
             # warning keeps the message that produced it visible.
-            log.warning("Tour marqué plan_change terminé SANS nouvelle révision de %s "
-                        "(r%s inchangée). Message : %s", week, revision_after or "?",
+            log.warning("Turn flagged plan_change ended WITHOUT a new revision of %s "
+                        "(r%s unchanged). Message: %s", week, revision_after or "?",
                         text[:200])
         if not after:
             if triage.plan_change or triage.plan_scope != "none":
                 self._log_incident(
-                    f"programme-absent:{week}",
-                    "Réponse envoyée sans séance : le programme de la semaine est absent "
-                    "ou invalide. La réparation dédiée est armée par le planificateur.")
+                    f"plan-missing:{week}",
+                    "Reply sent without sessions: the week's plan is missing or invalid. "
+                    "The scheduler arms its dedicated repair.")
                 events.emit("turn.stage", stage="plan_lock", kind="reactive",
                             outcome="held_prose_kept", plan=triage.plan_scope)
             if triage.plan_scope != "none":
@@ -906,7 +906,7 @@ class TurnWorker:
                 prescription_before, prescription_after, revision_after,
                 scope=triage.plan_scope)
         except Exception:
-            log.exception("Bloc canonique de %s impossible à préparer", week)
+            log.exception("Canonical block of %s could not be prepared", week)
             canonical = None
         if canonical is None:
             # Valid plan but render failed: the prose goes out alone, the delivery debt stays set
@@ -914,7 +914,7 @@ class TurnWorker:
             try:
                 self._state.owe_plan(psid, week, revision_after)
             except Exception:
-                log.exception("Dette de livraison du programme non posée")
+                log.exception("Plan delivery debt not set")
             return [], "", None
         return [], canonical, ({"week": week, "revision": revision_after}
                                if canonical else None)
@@ -928,7 +928,7 @@ class TurnWorker:
             # Trace without content (predates envelope storage): recompute.
             self._delivery.discard(source_key)
             return None
-        log.info("Réponse déjà calculée pour %s : reprise sans nouveau tour (%s)",
+        log.info("Reply already computed for %s: resumed without a new turn (%s)",
                  source_key, stored.status)
         return self._finish_reactive(psid, source_key, stored.meta,
                                      self._delivery.resume(stored))
@@ -938,8 +938,8 @@ class TurnWorker:
         """Acknowledge what crossed Meta; memory can no longer cause the turn to be replayed."""
         self._report_uncertain_delivery(source_key, delivery)
         if not delivery.text_ok and not delivery.delivered_any:
-            log.error("Réponse non livrée ; elle sera renvoyée telle quelle (%s)",
-                      delivery.detail or "cause inconnue")
+            log.error("Reply not delivered; it will be resent as is (%s)",
+                      delivery.detail or "unknown cause")
             events.emit("turn.stage", stage="deliver", kind=meta.get("kind"),
                         turn_id=meta.get("turn_id") or None, outcome="failed",
                         delivery="failed")
@@ -964,19 +964,19 @@ class TurnWorker:
                 # the same context every turn.
                 self._state.clear_handoff(psid)
         except Exception:
-            log.exception("Écritures d'après livraison impossibles")
+            log.exception("Post-delivery writes failed")
             self._log_incident(
-                f"memoire-apres-livraison:{source_key}",
-                "La réponse est partie, mais sa trace mémoire n'a pas pu être enregistrée.")
+                f"memory-after-delivery:{source_key}",
+                "The reply went out, but its memory trace could not be recorded.")
         if not delivery.text_ok:
             # Messenger offers no network idempotence: one accepted fragment is enough to
             # acknowledge, as for partially delivered proactives.
-            self._log_incident(f"reponse-partielle:{source_key}",
-                               "La réponse n'a été livrée qu'en partie.")
+            self._log_incident(f"partial-reply:{source_key}",
+                               "The reply was only partly delivered.")
         if not delivery.attachments_ok:
             self._log_incident(
-                "piece-jointe-reactive",
-                "La réponse est partie, mais sa pièce jointe n'a pas pu être envoyée.")
+                "reactive-attachment",
+                "The reply went out, but its attachment could not be sent.")
         self._last_reactive_reply = time.time()
         events.emit("turn.stage", stage="deliver", kind=meta.get("kind"),
                     turn_id=meta.get("turn_id") or None,
@@ -1001,9 +1001,9 @@ class TurnWorker:
                     psid, text, source_key=source_key, resolve_questions=False,
                     platform_messages=self._platform_messages(delivery))
             else:
-                self._log_incident(f"limite-non-livree:{source_key}", delivery.detail)
+                self._log_incident(f"limit-undelivered:{source_key}", delivery.detail)
         except Exception:
-            log.exception("Phrase de limite impossible à livrer")
+            log.exception("Limit sentence could not be delivered")
         return True
 
     def _deliver_holding(self, psid: str, line: str) -> None:
@@ -1030,11 +1030,11 @@ class TurnWorker:
         if not revision:
             return ""
         if after != before:
-            return "la prescription a changé"
+            return PLAN_CHANGED
         if scope != "none":
-            return "demandé par ⟨athlète⟩"
+            return "requested by the athlete"
         if self._state.plan_owed(psid) == (week, revision):
-            return "livraison précédente perdue"
+            return "previous delivery lost"
         return ""
 
     @staticmethod
@@ -1047,14 +1047,14 @@ class TurnWorker:
                          revision: int, *, scope: str) -> str | None:
         """Render a deliverable plan, ``""`` when held, or ``None`` on render failure."""
         if not persisted.writes_applied:
-            log.info("Semaine %s : écritures refusées, aucune prescription ne part", week)
+            log.info("Week %s: writes refused, no prescription goes out", week)
             return ""
         motive = self._plan_delivery_motive(
             psid, week, remaining_before, remaining_after, revision, scope)
         if not motive:
             if revision:
-                log.info("Programme %s r%s inchangé et déjà reçu : le coach répond "
-                         "dessus sans le répéter", week, revision)
+                log.info("Plan %s r%s unchanged and already received: the coach answers "
+                         "on it without repeating it", week, revision)
             return ""
         # The status is re-read at send time, whether or not triage asked for week validation:
         # a dated check or staleness holds the sessions back, whatever message triggered the send.
@@ -1067,25 +1067,24 @@ class TurnWorker:
         excluded: frozenset[str] = frozenset()
         if status is PlanStatus.AWAITING:
             excluded = blocked_session_ids(context, clock.today().isoformat())
-            log.info("Semaine %s : séances retenues par contrôle daté : %s",
+            log.info("Week %s: sessions held by a dated check: %s",
                      week, ", ".join(sorted(excluded)))
             if not prescription_lines(
                     context, clock.today().isoformat(), exclude_ids=excluded):
-                log.info("Semaine %s : toutes les séances restantes sont retenues", week)
+                log.info("Week %s: every remaining session is held", week)
                 return ""
         if status is PlanStatus.STALE:
             # Same treatment as a dated check, different remedy: the plan no longer describes the
             # week, it awaits a revision. The next turn will claim it from the coach, at the head of
             # its prompt.
-            log.info("Semaine %s périmée : le coach parle, la prescription attend "
-                     "une révision", week)
+            log.info("Week %s stale: the coach speaks, the prescription awaits a revision", week)
             return ""
-        log.info("Programme %s r%s envoyé : %s", week, revision, motive)
+        log.info("Plan %s r%s sent: %s", week, revision, motive)
         if scope != "none":
             canonical = render_plan_for_scope(
                 context, week, scope, today=clock.today().isoformat(),
                 exclude_ids=excluded)
-        elif motive == "la prescription a changé":
+        elif motive == PLAN_CHANGED:
             canonical = render_plan_delta(
                 before_context, context, week, today=clock.today().isoformat(),
                 exclude_ids=excluded)
@@ -1097,9 +1096,9 @@ class TurnWorker:
                 exclude_ids=excluded)
         if not canonical:
             self._log_incident(
-                f"rendu-plan:{week}",
-                f"Programme {week} enregistré et valide, mais son rendu a échoué. "
-                "La prose part seule ; le programme reste dû.")
+                f"plan-render:{week}",
+                f"Plan {week} recorded and valid, but its rendering failed. "
+                "The prose goes out alone; the plan stays owed.")
             return None
         # The debt is set BEFORE transport: a lost text must remain owed.
         self._state.owe_plan(psid, week, revision)
@@ -1113,7 +1112,7 @@ class TurnWorker:
     @staticmethod
     def _log_incident(key: str, text: str) -> None:
         """Log an internal incident without turning it into business state."""
-        log.error("Incident interne « %s » : %s", key, text)
+        log.error("Internal incident %s: %s", key, text)
 
     @staticmethod
     def _log_reply_shape(kind: str, prose: str, canonical: str, *, depth: str = "",
@@ -1137,7 +1136,7 @@ class TurnWorker:
         itself is a non-event for the athlete, and it is already in the log."""
         discarded = self._repo.ensure_clean()
         if discarded:
-            log.error("Tour précédent mort sans persister ; %d fichier(s) abandonné(s)",
+            log.error("Previous turn died without persisting; %d file(s) discarded",
                       len(discarded))
 
     @staticmethod
@@ -1162,7 +1161,7 @@ class TurnWorker:
             year_text, week_text = value.split("-W", 1)
             sunday = datetime.fromisocalendar(int(year_text), int(week_text), 7).date()
         except (ValueError, TypeError):
-            log.error("Clé de bilan hebdomadaire illisible : %s", job.job_id)
+            log.error("Unreadable weekly review key: %s", job.job_id)
             return observed
         if observed.date() == sunday:
             # Sent as soon as Sunday is settled: the real time, not the fallback time.
@@ -1214,12 +1213,12 @@ class TurnWorker:
         if job.kind in CLOSED_KINDS:
             closed = compose_closed_proactive(job.kind, job.detail)
             if closed is None:
-                self._fail_job(job, "détail illisible pour un message fermé")
+                self._fail_job(job, "unreadable detail for a closed message")
                 return
             self._deliver_closed_proactive(job, closed)
             return
         if not job.prompt:
-            self._fail_job(job, f"aucun prompt pour le type {job.kind}")
+            self._fail_job(job, f"no prompt for kind {job.kind}")
             return
         self._run_proactive_agent(job)
 
@@ -1237,9 +1236,9 @@ class TurnWorker:
         route = Route.HEAVY if heavy else (Route.N2 if job.quality else Route.N1)
         run_plan = (self._config.routing.plan(route)
                     .with_session_mode(mode).with_structured_reply())
-        log.info("Proactive %s running on %s (effort %s, timeout %d s, %s, tentative %d)",
-                 job.kind, run_plan.primary.model or "défaut",
-                 run_plan.primary.effort or "défaut", run_plan.primary.timeout,
+        log.info("Proactive %s running on %s (effort %s, timeout %d s, %s, attempt %d)",
+                 job.kind, run_plan.primary.model or "default",
+                 run_plan.primary.effort or "default", run_plan.primary.timeout,
                  mode.value, job.attempts)
         # No typing indicator: the athlete is waiting for nothing, and "…" for forty minutes
         # ending in silence only prompted them to write.
@@ -1273,11 +1272,11 @@ class TurnWorker:
                                     f" : {result.error}")
             else:
                 self._buffer_proactive_retry(
-                    job, retry_at=result.retry_at, cause=f"moteur indisponible : {result.error}")
+                    job, retry_at=result.retry_at, cause=f"engine unavailable: {result.error}")
             return
         persisted = outcome.persistence
         if persisted is None:
-            raise RuntimeError("résultat agent réussi sans résultat de persistance")
+            raise RuntimeError("successful agent result without a persistence result")
         if not persisted.writes_applied:
             # An INITIATIVE that fails never speaks as the coach: it is the service that could not
             # do its job, not the coach having something to say. The incident stays in the
@@ -1285,7 +1284,7 @@ class TurnWorker:
             self._discard_outbox(outbox_before)
             self._log_vault_alerts()
             self._buffer_proactive_retry(
-                job, cause=f"écriture refusée : {persisted.detail}")
+                job, cause=f"write refused: {persisted.detail}")
             return
         canonical, retry_cause = self._proactive_canonical(job, persisted, now_for_plan)
         if retry_cause:
@@ -1302,21 +1301,21 @@ class TurnWorker:
             if job.kind in SILENCE_IS_A_FAILURE:
                 # A debrief exists ONLY because an activity just arrived: its silence means the
                 # output was not read. One retry only.
-                cause = "débrief automatique muet"
+                cause = "automatic debrief stayed silent"
                 if job.attempts >= 2:
                     self._fail_job(job, cause)
                 else:
                     self._buffer_proactive_retry(job, cause=cause)
                 return
             if job.kind in MUST_SPEAK_KINDS:
-                self._fail_job(job, "travail terminé sans message")
+                self._fail_job(job, "work finished without a message")
                 return
             log.info("Proactive %s -> silence (nothing useful to say)", job.kind)
             self._complete_job(job)
             return
         if not reply and job.kind in MUST_SPEAK_KINDS:
-            self._log_incident(f"{job.kind}-sans-texte:{job.job_id}",
-                               "Le programme part sans le bilan qui devait l'accompagner.")
+            self._log_incident(f"{job.kind}-without-text:{job.job_id}",
+                               "The plan goes out without the review that should come with it.")
         message = "\n---\n".join(part for part in (reply, canonical) if part)
         self._log_reply_shape(job.kind, reply, canonical, turn_id=outcome.turn_id)
         builder = self._proactive_builder(job)
@@ -1341,8 +1340,8 @@ class TurnWorker:
         if not isinstance(card, dict) or not card.get("reps"):
             return None
         if not self._repo.render_workout_card(card, activity_id or "workout"):
-            self._log_incident(f"carte-seance:{activity_id}",
-                               "Le débrief d'une séance de qualité part sans sa carte.")
+            self._log_incident(f"workout-card:{activity_id}",
+                               "A quality session's debrief goes out without its card.")
             return None
         return card
 
@@ -1369,20 +1368,20 @@ class TurnWorker:
             week = self._iso_week(moment)
             context = self._repo.weekly_plan_context(week)
             if week in persisted.invalid or not context:
-                log.info("Mot du matin sans séance : le programme de %s est absent ou "
-                         "invalide, sa réparation dédiée est armée", week)
+                log.info("Morning note without sessions: the plan of %s is missing or "
+                         "invalid, its dedicated repair is armed", week)
                 self._arm_week_repair(week, moment)
                 return "", ""
             revision = self._revision_of(context)
             already_shown = revision and self._state.proactive.marked(
                 self._plan_shown_marker(week, revision, today))
             if already_shown:
-                log.info("Mot du matin : programme %s r%s déjà montré aujourd'hui",
+                log.info("Morning note: plan %s r%s already shown today",
                          week, revision)
                 return "", ""
             if week in persisted.awaiting:
                 blocked = blocked_session_ids(context, today)
-                log.info("Mot du matin : contrôle daté de %s, séances retenues : %s",
+                log.info("Morning note: dated check on %s, sessions held: %s",
                          week, ", ".join(sorted(blocked)))
                 return render_plan_message(
                     context, week, today=today, exclude_ids=blocked), ""
@@ -1390,37 +1389,37 @@ class TurnWorker:
                 # The morning note goes out anyway: it checks in, revives a thread, asks the
                 # question of the day. Only the sessions line waits for the plan to be put back in
                 # front of what was done.
-                log.info("Mot du matin sans séance : le programme de %s est périmé et "
-                         "attend une révision", week)
+                log.info("Morning note without sessions: the plan of %s is stale and "
+                         "awaits a revision", week)
                 return "", ""
             canonical = self._repo.weekly_plan_message(week, today=today)
             if not canonical:
                 self._log_incident(
-                    f"rendu-plan:{week}",
-                    f"Programme {week} valide mais non rendu : le mot du matin part sans "
-                    "ses séances.")
+                    f"plan-render:{week}",
+                    f"Plan {week} valid but not rendered: the morning note goes out "
+                    "without its sessions.")
             return canonical, ""
         if job.kind == "weekly":
             week = self._iso_week(moment, offset_days=7)
             if week in persisted.invalid:
-                return "", f"semaine {week} toujours absente ou invalide après le bilan"
+                return "", f"week {week} still missing or invalid after the review"
             canonical = self._repo.weekly_plan_message(week)
             if not canonical:
                 self._log_incident(
-                    f"rendu-plan:{week}",
-                    f"Programme {week} valide mais non rendu : le bilan part sans lui.")
+                    f"plan-render:{week}",
+                    f"Plan {week} valid but not rendered: the review goes out without it.")
                 return "", ""
             self._repo.render_weekly_plan_card(week)
             return canonical, ""
         if job.kind == "weekly_repair":
             week = job.detail or self._iso_week(moment)
             if week in persisted.invalid:
-                return "", f"semaine {week} toujours absente ou invalide après la réparation"
+                return "", f"week {week} still missing or invalid after the repair"
             canonical = self._repo.weekly_plan_message(week, today=today)
             if not canonical:
                 self._log_incident(
-                    f"rendu-plan:{week}",
-                    f"Programme {week} réparé mais non rendu : le message part sans lui.")
+                    f"plan-render:{week}",
+                    f"Plan {week} repaired but not rendered: the message goes out without it.")
             return canonical, ""
         return "", ""
 
@@ -1447,7 +1446,7 @@ class TurnWorker:
             return
         now = clock.now()
         if not self._state.proactive.would_pass(now, self._config, ignore_gap=job.priority):
-            log.info("Proactive %s prête mais hors plage ou trop rapprochée : conservée",
+            log.info("Proactive %s ready but outside the window or too close: kept",
                      job.kind)
             self._delivery.prepare(envelope)
             self._release_job(job)
@@ -1475,14 +1474,14 @@ class TurnWorker:
                 self._repo.weekly_plan_context(check["week"])) != check["revision"]:
             # The plan moved since drafting: the text no longer describes the week. Only this
             # deterministic check decides on a rewrite.
-            log.info("Initiative préparée %s périmée : le programme a changé", job.job_id)
+            log.info("Prepared initiative %s stale: the plan changed", job.job_id)
             self._delivery.discard(source_key)
             return False
         now = clock.now()
         if not self._state.proactive.would_pass(now, self._config, ignore_gap=job.priority):
             self._release_job(job)
             return True
-        log.info("Initiative %s déjà rédigée : livraison sans nouveau tour", job.job_id)
+        log.info("Initiative %s already written: delivered without a new turn", job.job_id)
         images: tuple[ImagePart, ...] = ()
         if stored.meta.get("plan_card") or stored.meta.get("workout_card"):
             before = self._outbox.snapshot()
@@ -1501,11 +1500,11 @@ class TurnWorker:
         self._report_uncertain_delivery(source_key, delivery)
         if not delivery.text_ok and not delivery.delivered_any:
             self._log_incident(
-                f"proactif-non-livre:{job.job_id or job.kind}",
-                f"L'envoi « {job.kind} » n'a pas été livré : "
-                f"{delivery.detail or 'cause inconnue'}. Le texte est conservé.")
+                f"proactive-undelivered:{job.job_id or job.kind}",
+                f"The {job.kind} send was not delivered: "
+                f"{delivery.detail or 'unknown cause'}. The text is kept.")
             self._buffer_proactive_retry(
-                job, cause=f"livraison : {delivery.detail or 'cause inconnue'}")
+                job, cause=f"delivery: {delivery.detail or 'unknown cause'}")
             return
         text = (str(meta.get("memory") or "") if delivery.text_ok else "\n".join(
             item.text for item in delivery.messages if item.text))
@@ -1515,16 +1514,16 @@ class TurnWorker:
             questions=tuple(meta.get("questions") or ()))
         if not delivery.text_ok:
             self._log_incident(
-                f"proactif-partiel:{job.job_id or job.kind}",
-                f"L'envoi « {job.kind} » n'a été livré qu'en partie : "
-                f"{delivery.detail or 'cause inconnue'}.")
+                f"proactive-partial:{job.job_id or job.kind}",
+                f"The {job.kind} send was only partly delivered: "
+                f"{delivery.detail or 'unknown cause'}.")
             return
         if not delivery.attachments_ok:
             # The text is already with the athlete. Replaying the job would duplicate it; the
             # refused attachment is quarantined and the incident is explicit.
             self._log_incident(
-                f"piece-jointe-proactive:{job.job_id or job.kind}",
-                f"L'envoi « {job.kind} » est parti sans sa pièce jointe.")
+                f"proactive-attachment:{job.job_id or job.kind}",
+                f"The {job.kind} send went out without its attachment.")
         self._mark_cells_asked(meta.get("markers") or ())
         if meta.get("check_activity"):
             self._check_activity_recorded(job)
@@ -1540,7 +1539,7 @@ class TurnWorker:
         Beyond it, the job becomes `failed` with its cause: never a loop.
         """
         if not job.job_id:
-            self._log_incident(f"proactif-sans-identite:{job.kind}", cause)
+            self._log_incident(f"proactive-without-id:{job.kind}", cause)
             return
         if job.attempts >= self.PROACTIVE_MAX_ATTEMPTS:
             self._fail_job(job, f"{cause} ; {job.attempts} tentatives")
@@ -1552,7 +1551,7 @@ class TurnWorker:
             min(job.attempts, len(self.PROACTIVE_RETRY_DELAYS)) - 1]
         due = max(now + delay, retry_at or 0.0)
         if due >= expire:
-            self._fail_job(job, f"{cause} ; plus pertinent à la reprise")
+            self._fail_job(job, f"{cause}; no longer relevant on retry")
             return
         self._state.proactive.retry_job(job.job_id, due, expire)
         events.emit("proactive.retry", job_id=job.job_id, kind=job.kind,
@@ -1564,8 +1563,8 @@ class TurnWorker:
         """Settle an undelivered job as `failed`, with its cause, distinct from a success."""
         if job.job_id:
             self._state.proactive.fail_job(job.job_id, cause[:500])
-        self._log_incident(f"proactif-echec:{job.job_id or job.kind}",
-                           f"« {job.kind} » abandonné : {cause}")
+        self._log_incident(f"proactive-failed:{job.job_id or job.kind}",
+                           f"{job.kind} abandoned: {cause}")
         events.emit("proactive.failed", job_id=job.job_id or None, kind=job.kind,
                     attempt=job.attempts, cause=cause[:200])
 
@@ -1578,8 +1577,8 @@ class TurnWorker:
         if self._state.proactive.release_job(job.job_id, delay, expire_at=expire):
             log.info("Proactive %s released", job.job_id)
         else:
-            self._log_incident(f"proactif-echec:{job.job_id}",
-                               f"« {job.kind} » expiré avant d'avoir pu partir.")
+            self._log_incident(f"proactive-failed:{job.job_id}",
+                               f"{job.kind} expired before it could go out.")
 
     def _complete_job(self, job: ProactiveJob) -> None:
         if job.job_id:
@@ -1610,8 +1609,8 @@ class TurnWorker:
             f"weekly-repair:{week}", "weekly_repair", week, moment.timestamp(),
             expire_at=max(expires.timestamp(), moment.timestamp() + 3600), priority=True)
         if inserted:
-            self._log_incident(f"programme-absent:{week}",
-                               "Semaine courante sans programme valide : réparation armée.")
+            self._log_incident(f"plan-missing:{week}",
+                               "Current week without a valid plan: repair armed.")
         return inserted
 
     def _schedule_strength_card(self, psid: str, detail: dict) -> None:
@@ -1689,20 +1688,6 @@ class TurnWorker:
                 return "obsolete", today, session
         return "ready", today, session
 
-    # What `/renfo` answers when the card cannot go out, in plain athlete-facing words.
-    STRENGTH_CARD_LIMITS: ClassVar[dict[str, str]] = {
-        "unavailable": (
-            "Je n'ai pas de programme fiable pour aujourd'hui en ce moment, donc je ne "
-            "peux pas te confirmer s'il y a du renfo. Je m'en occupe."),
-        "stale": (
-            "Ta semaine a bougé depuis le dernier programme : je le remets à jour avant "
-            "de t'envoyer la carte de renfo."),
-        "blocked": (
-            "Le renfo du jour est prévu, mais j'attends d'abord ta réponse à ma question "
-            "du jour avant de t'envoyer sa carte."),
-        "none": "Aucune séance de renforcement n'est prescrite aujourd'hui.",
-    }
-
     def _deliver_strength_card(self, psid: str, source_key: str, *,
                                detail: dict | None = None,
                                job: ProactiveJob | None = None) -> bool:
@@ -1710,12 +1695,12 @@ class TurnWorker:
         state, today, session = self._strength_card_context(detail)
         if state != "ready":
             if job:
-                log.info("Carte de renfo %s devenue obsolète", job.job_id)
+                log.info("Strength card %s became obsolete", job.job_id)
                 self._complete_job(job)
                 return True
             envelope = (EnvelopeBuilder(psid, source_key)
-                        .text(self.STRENGTH_CARD_LIMITS.get(
-                            state, self.STRENGTH_CARD_LIMITS["unavailable"]),
+                        .text(replies.STRENGTH_CARD_LIMITS.get(
+                            state, replies.STRENGTH_CARD_LIMITS["unavailable"]),
                               burst=False).build())
             delivery = self._delivery.deliver(envelope)
             return delivery.text_ok or delivery.delivered_any
@@ -1725,26 +1710,26 @@ class TurnWorker:
             target = render_strength_artifact(session, self._outbox, today,
                                               root=Path(self._config.vault_path))
         except Exception as exc:
-            log.exception("Rendu déterministe de la carte de renfo impossible")
+            log.exception("Deterministic strength card rendering failed")
             self._log_incident(
-                f"carte-renfo:{today}",
-                f"La prescription {session.get('id')} est valide mais son rendu a échoué : "
+                f"strength-card:{today}",
+                f"Prescription {session.get('id')} is valid but its rendering failed: "
                 f"{exc.__class__.__name__}.")
             if job:
-                self._buffer_proactive_retry(job, cause="rendu de la carte impossible")
+                self._buffer_proactive_retry(job, cause="card rendering failed")
                 return False
             envelope = (EnvelopeBuilder(psid, source_key)
-                        .text("La séance de renfo est bien prévue, mais je n'arrive pas à "
-                              "générer sa carte pour l'instant.", burst=False).build())
+                        .text(replies.STRENGTH_CARD_FAILED, burst=False).build())
             delivery = self._delivery.deliver(envelope)
             return delivery.text_ok or delivery.delivered_any
 
-        title = str(session.get("title") or "renforcement").strip()
+        title = str(session.get("title") or replies.STRENGTH_TITLE).strip()
+        caption = replies.STRENGTH_CARD.format(title=title)
         if job and self._defer_active_proactive(job):
             self._outbox.archive(target)
             return False
         envelope = (EnvelopeBuilder(psid, source_key)
-                    .text(f"Ta carte de renfo du jour — {title}.", burst=False)
+                    .text(caption, burst=False)
                     .image(self._outbox, target).build())
         delivery = self._delivery.deliver(envelope)
         self._report_uncertain_delivery(source_key, delivery)
@@ -1752,19 +1737,19 @@ class TurnWorker:
         if job:
             if not accepted:
                 self._buffer_proactive_retry(
-                    job, cause=f"livraison : {delivery.detail or 'cause inconnue'}")
+                    job, cause=f"delivery: {delivery.detail or 'unknown cause'}")
                 return False
             self._finish_proactive_delivery(
-                job, clock.now(), f"Ta carte de renfo du jour — {title}.",
+                job, clock.now(), caption,
                 platform_messages=self._platform_messages(delivery))
             if not delivery.attachments_ok:
                 self._log_incident(
-                    f"piece-jointe-proactive:{job.job_id}",
-                    "Le texte de la carte de renfo est parti sans son image.")
+                    f"proactive-attachment:{job.job_id}",
+                    "The strength card's text went out without its image.")
             return True
         if accepted:
             self._state.record_outbound(
-                psid, f"Ta carte de renfo du jour — {title}.", source_key=source_key,
+                psid, caption, source_key=source_key,
                 resolve_questions=False,
                 platform_messages=self._platform_messages(delivery))
         return accepted
@@ -1773,9 +1758,9 @@ class TurnWorker:
         try:
             detail = json.loads(job.detail)
             if not isinstance(detail, dict):
-                raise ValueError("objet JSON attendu")
+                raise ValueError("JSON object expected")
         except (TypeError, ValueError, json.JSONDecodeError):
-            self._fail_job(job, "détail de carte de renfo illisible")
+            self._fail_job(job, "unreadable strength card detail")
             return
         self._deliver_strength_card(
             job.psid, f"proactive:{job.job_id}", detail=detail, job=job)
@@ -1792,7 +1777,7 @@ class TurnWorker:
         # before any delivery, so a wake trace is never asked in the evening as a /10.
         if original.get("type") == session_kinds.WAKE_TRACE:
             self._complete_job(job)
-            log.info("Relance de réveil périmée ignorée : %s", job.job_id or job.kind)
+            log.info("Stale wake follow-up ignored: %s", job.job_id or job.kind)
             return
         current = next((entry for entry in self.pending_ledger_cells(clock.today())
                         if str(entry["date"]) == original.get("date")
@@ -1826,7 +1811,7 @@ class TurnWorker:
         if message.question and self._question_already_asked(job.psid, message.question):
             # Still pending, or just settled (answered, declined): a template lacks the context to
             # pick it up again, the coach has it.
-            log.info("Relance fermée %s ignorée : question déjà posée", job.kind)
+            log.info("Closed follow-up %s ignored: question already asked", job.kind)
             self._complete_job(job)
             return
         builder = self._proactive_builder(job)
@@ -1846,15 +1831,15 @@ class TurnWorker:
         except Exception:
             # An unreadable memory does not prove the question is new, but staying silent would lose
             # a collection: sending keeps its previous behavior.
-            log.exception("Mémoire des questions illisible avant une relance fermée")
+            log.exception("Question memory unreadable before a closed follow-up")
             return False
 
     def _report_uncertain_delivery(self, source_key: str, delivery) -> None:
         if delivery.uncertain:
             self._log_incident(
-                f"livraison-ambigue:{source_key}",
-                "Le service a redémarré pendant un envoi. Pour éviter un doublon, "
-                "il ne l'a pas rejoué ; sa livraison exacte ne peut pas être confirmée.")
+                f"ambiguous-delivery:{source_key}",
+                "The service restarted during a send. To avoid a duplicate it did not "
+                "replay it; its exact delivery cannot be confirmed.")
 
     def _finish_proactive_delivery(self, job: ProactiveJob, sent_at: datetime,
                                    message: str, turn_id: str = "", *,
@@ -1879,7 +1864,7 @@ class TurnWorker:
                 questions=questions)
             self._repo.record_proactive_delivery(job, sent_at, message, turn_id)
         except Exception:
-            log.exception("Trace du proactif livré impossible à enregistrer")
+            log.exception("Delivered proactive trace could not be recorded")
 
     @staticmethod
     def _platform_messages(delivery) -> tuple[tuple[str, str], ...]:
@@ -1934,21 +1919,20 @@ class TurnWorker:
         if recorded is None:
             # "I could not look" is not "it is fine". That is not said to the athlete (they can do
             # nothing about it) but it is not disguised as success either.
-            log.error("Contrôle de consignation non concluant pour l'activité %s : "
-                      "le débrief est parti sans qu'on sache s'il a consigné", job.detail)
+            log.error("Recording check inconclusive for activity %s: the debrief went out "
+                      "without knowing whether it recorded it", job.detail)
             return
         if recorded:
             return
         self._log_incident(
-            f"debrief-non-consigne:{job.detail}",
-            "Le débrief est parti, mais le lien Strava de la sortie est introuvable "
-            "dans le registre : elle peut être consignée sous une autre identité et "
-            "doit être rattachée.")
+            f"debrief-unrecorded:{job.detail}",
+            "The debrief went out, but the activity's Strava link is missing from the "
+            "ledger: it may be recorded under another identity and must be linked.")
 
     def _discard_outbox(self, before: OutboxSnapshot) -> None:
         """Archive the artifacts produced by a turn that will not be delivered."""
         for path in self._outbox.collect_new(before):
-            log.info("Image écartée (sortie textuelle absente) : %s", path.name)
+            log.info("Image discarded (no text output): %s", path.name)
             self._outbox.archive(path)
 
     # ---- commands
@@ -1960,14 +1944,13 @@ class TurnWorker:
         if command in {"/carnet", "/carnet-revoquer"}:
             notebook = self._delivery.notebook
             if notebook is None:
-                result = self._client.send_text(psid, "Le carnet est momentanément indisponible.")
+                result = self._client.send_text(psid, replies.NOTEBOOK_UNAVAILABLE)
             elif command == "/carnet-revoquer":
                 notebook.store.revoke(psid)
-                result = self._client.send_text(psid, "Les accès au carnet sont révoqués. Tape /carnet pour reconnecter ton appareil.")
+                result = self._client.send_text(psid, replies.NOTEBOOK_REVOKED)
             else:
                 result = self._client.send_button(
-                    psid, "Ton carnet : ta séance du jour, ta semaine et ta course.",
-                    notebook.link(psid), "Ouvrir mon carnet")
+                    psid, replies.NOTEBOOK_INVITE, notebook.link(psid), replies.NOTEBOOK_BUTTON)
             return result.ok
         if command == "/renfo":
             return self._deliver_strength_card(psid, source_key)
@@ -1975,16 +1958,14 @@ class TurnWorker:
             text = HELP_TEXT
         elif command == "/clear":
             self._agent_clear(psid)
-            text = "Nouvelle conversation. Je repars du contexte frais du vault au prochain message."
+            text = replies.CLEARED
         elif command == "/status":
             text = self._status_text(psid)
         elif command == "/cancel":
-            text = ("Annulation demandée. Le travail en cours va s'arrêter sans être "
-                    "relancé automatiquement."
-                    if self._agent.cancel(psid)
-                    else "Aucun travail en cours à arrêter.")
+            text = (replies.CANCEL_REQUESTED if self._agent.cancel(psid)
+                    else replies.NOTHING_TO_CANCEL)
         elif command == "/deep":
-            text = "Ajoute la question dans le même message : /deep <ta question>"
+            text = replies.DEEP_WITHOUT_QUESTION
         else:  # pragma: no cover - WorkQueue filters the commands
             return True
         delivery = self._delivery.deliver(
@@ -1994,8 +1975,8 @@ class TurnWorker:
             return True
         if delivery.delivered_any:
             self._log_incident(
-                f"commande-partielle:{source_key}",
-                f"La commande « {command} » n'a été livrée qu'en partie.")
+                f"partial-command:{source_key}",
+                f"Command {command} was only partly delivered.")
             return True
         return False
 
@@ -2007,28 +1988,28 @@ class TurnWorker:
     def _duration(seconds: float) -> str:
         minutes = max(0, int(seconds // 60))
         hours, minutes = divmod(minutes, 60)
-        return f"{hours} h {minutes:02d}" if hours else f"{minutes} min"
+        return (replies.STATUS_HOURS.format(hours=hours, minutes=minutes) if hours
+                else replies.STATUS_MINUTES.format(minutes=minutes))
 
     def _status_text(self, psid: str) -> str:
         activity = self._agent.activity(psid)
         if activity:
             remaining = max(0.0, activity.watchdog_seconds - activity.elapsed)
-            running = (
-                f"Travail en cours : {activity.model or 'modèle par défaut'}/"
-                f"{activity.effort or 'effort par défaut'}, "
-                f"depuis {self._duration(activity.elapsed)}, watchdog dans "
-                f"{self._duration(remaining)}"
-                + (", annulation en cours" if activity.cancelling else "")
-            )
+            running = replies.STATUS_RUNNING.format(
+                model=activity.model or replies.STATUS_DEFAULT_MODEL,
+                effort=activity.effort or replies.STATUS_DEFAULT_EFFORT,
+                elapsed=self._duration(activity.elapsed),
+                watchdog=self._duration(remaining),
+            ) + (replies.STATUS_CANCELLING if activity.cancelling else "")
         else:
-            running = "Aucun travail en cours"
+            running = replies.STATUS_IDLE
         age = self._state.session_age(psid, self._agent.provider)
         ttl = self._config.session_ttl
         if self._state.session_id(psid, self._agent.provider) and age <= ttl:
-            session = (f"Session active, dernier échange il y a {self._duration(age)}, "
-                       f"contexte frais dans {self._duration(ttl - age)}")
+            session = replies.STATUS_SESSION.format(
+                age=self._duration(age), fresh_in=self._duration(ttl - age))
         else:
-            session = "Aucune session active, le prochain message relira le vault"
+            session = replies.STATUS_NO_SESSION
         routes = (
             ("triage", Route.TRIAGE),
             ("N0", Route.N0),
@@ -2036,15 +2017,12 @@ class TurnWorker:
             ("N2", Route.N2),
             ("N3", Route.N3),
             ("/deep", Route.DEEP),
-            ("proactif lourd", Route.HEAVY),
+            (replies.STATUS_HEAVY_ROUTE, Route.HEAVY),
         )
         routing = "\n".join(
-            f"{label} : {self._config.routing.describe(route)}"
+            replies.STATUS_ROUTE.format(label=label,
+                                        route=self._config.routing.describe(route))
             for label, route in routes
         )
-        return (
-            f"Moteur : {self._agent.provider}\n"
-            f"{running}\n"
-            f"{session}\n"
-            f"Routage :\n{routing}"
-        )
+        return replies.STATUS.format(provider=self._agent.provider, running=running,
+                                     session=session, routing=routing)

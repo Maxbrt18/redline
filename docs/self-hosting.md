@@ -193,7 +193,7 @@ In order:
 2. the `redline.events` lines, one JSON object per step and never the text of a message:
    `triage`, `model`, `apply`, `shape` and `deliver` share the `turn_id` of a turn;
    initiatives carry `job_id`, `kind` and `outcome`;
-3. `Incident interne` lines: a projection, a commit or a push that failed;
+3. `Internal incident` lines: a projection, a commit or a push that failed;
 4. `redline week-plan check --week <week>` for the weeks involved;
 5. `redline vault-check`;
 6. read-only, `inbound_messages`, `proactive_jobs` (`failed` and `last_error`) and

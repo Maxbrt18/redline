@@ -379,7 +379,7 @@ def test_failures_carry_technical_detail_never_a_sentence_for_alex(make_config, 
 
     result = runner.run("4242", "question", spec=_spec(runner, Route.N2))
 
-    assert result.error.startswith("panne Codex en cours de tour")
+    assert result.error.startswith("Codex outage during the turn")
     assert "Réessaie" not in result.error and "Il ne sera pas" not in result.error
 
 

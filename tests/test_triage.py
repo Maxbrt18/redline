@@ -298,7 +298,7 @@ def test_a_plan_change_turn_without_revision_leaves_a_trace(make_bot, caplog):
     with caplog.at_level("WARNING", logger="redline"):
         bot._respond("4242", "Finalement aujourd'hui repos")
 
-    assert "terminé SANS nouvelle révision" in caplog.text
+    assert "ended WITHOUT a new revision" in caplog.text
     assert "Finalement aujourd'hui repos" in caplog.text
 
 

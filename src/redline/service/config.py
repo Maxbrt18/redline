@@ -277,8 +277,8 @@ class Config:
         for name, (value, required) in secrets.items():
             if (value or required) and len(value) < SHARED_SECRET_MIN_LENGTH:
                 raise ConfigError(
-                    f"{name} trop faible : {SHARED_SECRET_MIN_LENGTH} caractères minimum. "
-                    "Génère-le avec python3 -c 'import secrets; "
+                    f"{name} too weak: at least {SHARED_SECRET_MIN_LENGTH} characters. "
+                    "Generate it with python3 -c 'import secrets; "
                     "print(secrets.token_urlsafe(32))'")
 
     def _validate(self) -> None:

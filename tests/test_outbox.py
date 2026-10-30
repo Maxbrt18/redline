@@ -217,7 +217,7 @@ def test_the_bot_archives_the_residue_without_waking_the_athlete(make_bot, caplo
     outbox.archive.assert_called_once_with(residue)
     client.send_image.assert_not_called()
     client.send_text.assert_not_called()
-    assert "Outbox : 1 image(s) laissée(s)" in caplog.text
+    assert "Outbox: 1 image(s) left" in caplog.text
 
 
 def test_a_clean_startup_says_nothing(make_bot):

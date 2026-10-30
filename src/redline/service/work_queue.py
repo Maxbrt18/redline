@@ -151,7 +151,7 @@ class WorkQueue:
         PostgreSQL, never recomputed by the model.
         """
         if isinstance(item, (ProactiveJob, MaintenanceRequest)):
-            raise TypeError("seuls les entrants se rejouent par cette file")
+            raise TypeError("only inbound messages are replayed by this queue")
         with self._cv:
             self._retries.append(replace(item, attempts=item.attempts + 1))
             self._cv.notify()

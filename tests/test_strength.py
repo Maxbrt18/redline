@@ -263,7 +263,7 @@ def test_each_zone_is_reported_under_its_own_name():
 
 
 def test_a_zone_the_instance_does_not_watch_is_refused():
-    with pytest.raises(strength.ReportError, match="non surveillée"):
+    with pytest.raises(strength.ReportError, match="not monitored"):
         strength.parse_report({"pains": {"hanche": {"after": 1}}}, SESSION["exercises"], ZONES)
 
 

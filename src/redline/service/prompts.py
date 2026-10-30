@@ -16,6 +16,7 @@ from pathlib import Path
 from redline import cli
 from redline.coach import dates
 from redline.coach.fr import fill, labels, note, prompt
+from redline.coach.fr import plan as plan_text
 from redline.model import agent_input, rulebook, session_kinds, typography
 from redline.model import ledger as ledger_model
 
@@ -39,7 +40,7 @@ def agent_cli(text: str) -> str:
 def turn_input_note(turn_id: str) -> str:
     """The file through which this turn hands a JSON to a CLI (`agent_input.py`)."""
     return fill(note("turn-input"), path=str(agent_input.turn_path(turn_id)),
-                second=str(agent_input.turn_path(turn_id, "carte")))
+                second=str(agent_input.turn_path(turn_id, "card")))
 
 
 def with_turn_input(message: str, turn_id: str | None) -> str:
@@ -226,14 +227,12 @@ def today_note(moment) -> str:
 
 def canonical_plan_note(context: str) -> str:
     """The canonical plan, put in front of a turn allowed to prescribe."""
-    return fill(prompt("canonical-plan"), context=context or "ABSENT OU INVALIDE")
+    return fill(prompt("canonical-plan"), context=context or plan_text.CANONICAL_MISSING)
 
 
 def active_revision_note(context: str) -> str:
     """The same for an initiative, which starts without a message from the athlete."""
-    return fill(prompt("active-revision"), context=context or (
-        "ABSENTE OU INVALIDE : ne prescris aucune séance. Une réparation dédiée est "
-        "programmée par le service ; ne la fais pas ici"))
+    return fill(prompt("active-revision"), context=context or plan_text.ACTIVE_MISSING)
 
 
 def deep_handoff_note(handoff: str) -> str:

@@ -26,10 +26,10 @@ def render_strength_artifact(session: dict, outbox: Outbox, today: str, *,
 def selection_for(session: dict, today: str) -> dict:
     spec = session.get("strength")
     if not isinstance(spec, dict):
-        raise ValueError("prescription strength absente du plan")
+        raise ValueError("no strength prescription in the plan")
     routine = session.get("routine")
     if session.get("workout") != session_kinds.STRENGTH or not routine:
-        raise ValueError(f"séance de renforcement sans routine : {session.get('id')}")
+        raise ValueError(f"strength session without a routine: {session.get('id')}")
     return {
         "session": routine,
         "date": today,

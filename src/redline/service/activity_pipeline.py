@@ -35,7 +35,7 @@ def _altitude(activity_id: int) -> list:
     stream = raw.get("altitude") or {}
     values = stream.get("data") if isinstance(stream, dict) else None
     if not isinstance(values, list):
-        raise ValueError("flux d'altitude absent")
+        raise ValueError("no altitude stream")
     return values
 
 
@@ -94,7 +94,7 @@ class ActivityPipeline:
                 # The run's debrief stays the priority. The next webhook or
                 # gear-sync replays this idempotent refresh.
                 gear_state = "failed"
-                log.warning("Synchronisation du matériel Strava %s échouée : %s",
+                log.warning("Strava gear %s sync failed: %s",
                             gear_id, exc)
         intake = self.store.strava_intake(activity_id)
 
@@ -130,7 +130,7 @@ class ActivityPipeline:
         try:
             fresh = strava.parse_activity(self.activity_fetch(activity.id))
         except Exception as exc:
-            log.warning("Titre Strava de %s non relu, mots capturés gardés : %s",
+            log.warning("Strava title of %s not reread, captured words kept: %s",
                         activity.id, exc)
             return activity
         return replace(activity, name=fresh.name, description=fresh.description)
@@ -142,7 +142,7 @@ class ActivityPipeline:
         try:
             return self.store.observation_feelings(observation_id)
         except Exception as exc:
-            log.warning("Ressentis de l'observation %s illisibles : %s", observation_id, exc)
+            log.warning("Feelings of observation %s unreadable: %s", observation_id, exc)
             return {}
 
     def _gaps(self, activity_id: int,
@@ -175,7 +175,7 @@ class ActivityPipeline:
                           if item.date == row.date and item.hr == row.hr_avg), None)
             return debrief.gaps(row, session, drift), session, row.date
         except Exception as exc:
-            log.warning("Écarts de l'activité %s non calculés : %s", activity_id, exc)
+            log.warning("Gaps of activity %s not computed: %s", activity_id, exc)
             return [], None, None
 
     @staticmethod
@@ -193,8 +193,8 @@ class ActivityPipeline:
         if card is None:
             # A quality session with no readable laps (no lap, continuous pace) has no
             # card: this shows in the log rather than as a silence.
-            log.warning("Séance de qualité %s sans répétitions lisibles dans ses tours : "
-                        "pas de carte", activity_id)
+            log.warning("Quality session %s has no readable repetitions in its laps: "
+                        "no card", activity_id)
         return card
 
     def _captured_intake(self, activity_id: int) -> dict | None:

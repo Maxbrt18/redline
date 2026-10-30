@@ -58,7 +58,7 @@ PLAN_MESSAGES = {PlanStatus[name]: text for name, text in notebook_text.PLAN_MES
 
 
 class AnswerError(InputError):
-    """Une réponse refusée : demande close, valeur hors échelle ou inconnue."""
+    """A refused answer: a closed request, or a value off the scale or unknown."""
 
 
 def week_label(day: dt.date) -> str:
@@ -123,14 +123,14 @@ def observation_fact(observation: dict, session: dict | None = None,
 def _scale(metric: str, value: Any) -> float:
     """The athlete's scales: integer RPE and enjoyment, pain in half points."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise AnswerError("Valeur numérique attendue.")
+        raise AnswerError(notebook_text.NUMBER_EXPECTED)
     number = float(value)
     if not 0 <= number <= 10:
-        raise AnswerError("Valeur attendue entre 0 et 10.")
+        raise AnswerError(notebook_text.OUT_OF_SCALE)
     step = 2 if metric == "pain" else 1
     if number * step != int(number * step):
-        raise AnswerError("Douleur au demi-point près." if metric == "pain"
-                          else "Valeur entière attendue.")
+        raise AnswerError(notebook_text.HALF_POINTS if metric == "pain"
+                          else notebook_text.INTEGER_EXPECTED)
     return number
 
 
@@ -157,13 +157,13 @@ def _planned(session: dict) -> list[str]:
     if session.get("cadence_target"):
         parts.append(f"cadence ~{session['cadence_target']}")
     if session.get("carbs_target_g_h") is not None:
-        parts.append(f"glucides {session['carbs_target_g_h']} g/h")
+        parts.append(notebook_text.CARBS.format(grams=session["carbs_target_g_h"]))
     return parts
 
 
 @dataclass
 class Week:
-    """Une semaine lue une fois : sa révision, ses cycles, son registre."""
+    """A week read once: its revision, its cycles, its ledger."""
 
     label: str
     status: PlanStatus
@@ -245,7 +245,7 @@ class Board:
             strength=[row for row in self.strength_history
                       if week_label(row["performed_on"]) == label])
 
-    # ------------------------------------------------------------ séances
+    # ------------------------------------------------------------ sessions
     def session_item(self, week: Week, session: dict, entries: dict[str, str]) -> dict:
         status = session["status"]
         if status == "planned" and session["id"] in week.held:
@@ -270,8 +270,9 @@ class Board:
         if change:
             stamp = dt.datetime.fromisoformat((week.revision or {})["computed_at"]).astimezone(
                 local_time.zone())
-            verb = "Déplacée" if "date" in change.get("fields", []) else "Modifiée"
-            item["change"] = f"{verb} le {stamp:%d/%m}."
+            moved = "date" in change.get("fields", [])
+            item["change"] = (notebook_text.MOVED if moved
+                              else notebook_text.CHANGED).format(day=stamp)
         link = week.links.get(session["id"]) or {}
         if link.get("observation_id"):
             observation = next((row for row in week.observations
@@ -307,7 +308,7 @@ class Board:
                 for row in week.observations
                 if row["kind"] in MOVING_TYPES and row["id"] not in linked]
 
-    # ------------------------------------------------------------ agrégats
+    # ------------------------------------------------------------ aggregates
     def strip(self, week: Week, sessions: list[dict]) -> list[dict]:
         days = []
         for day in week.days:
@@ -471,7 +472,7 @@ class Board:
 
     @staticmethod
     def _hr_marker(day: dt.date) -> str:
-        return f"FC haute du {day:%d/%m} :"
+        return notebook_text.HR_MARKER.format(day=day)
 
     def hr_asks(self) -> list[dict]:
         """The latest recent easy run whose heart rate exceeds the same-pace reference:
@@ -510,16 +511,16 @@ class Board:
         ask = next((item for item in self.asks()
                     if ask_id == item["id"] or ask_id.startswith(item["id"] + ":")), None)
         if ask is None:
-            raise AnswerError("Cette question est déjà close. Actualise le carnet.")
+            raise AnswerError(notebook_text.QUESTION_CLOSED)
         if ask["type"] == "daily":
             field = ask_id.rsplit(":", 1)[-1]
             if field not in ask["fields"] or value not in DAILY_FIELDS[field]:
-                raise AnswerError("Réponse inattendue. Actualise le carnet.")
+                raise AnswerError(notebook_text.UNEXPECTED_ANSWER)
             self._put_daily(self.today, **{field: value})
             return {"alert": None}
         if ask["type"] == "hr":
             if value not in HR_REASONS:
-                raise AnswerError("Réponse inattendue. Actualise le carnet.")
+                raise AnswerError(notebook_text.UNEXPECTED_ANSWER)
             day = dt.date.fromisoformat(ask["date"])
             note = f"{self._hr_marker(day)} {HR_REASONS[value]}"
             if value == HrReason.SLEEP:
@@ -528,13 +529,12 @@ class Board:
                 self._put_daily(day, note=note)
             alert = None
             if value == HrReason.NONE:
-                alert = (f"Carnet : FC haute à allure comparable le {day:%d/%m} "
-                         f"({ask['hr']} contre {ask['reference']}), sans explication "
-                         "de sommeil, de maladie ni de chaleur.")
+                alert = notebook_text.ALERT_HR.format(day=day, hr=ask["hr"],
+                                                      reference=ask["reference"])
             return {"alert": alert}
         if ask["type"] == "wake":
             if value not in session_cycle.MORNING_TRACES:
-                raise AnswerError("Trace attendue : aucune, très légère, légère ou nette.")
+                raise AnswerError(notebook_text.TRACE_EXPECTED)
             kind, _, key = ask["id"].partition(":")
             trace = session_cycle.MORNING_TRACE_VALUES[value]
             if kind == "wake-cell":
@@ -546,20 +546,18 @@ class Board:
                 self.ops.add_observation({
                     "occurred_on": self.today, "kind": session_kinds.WAKE_TRACE,
                     "idempotency_key": f"notebook:wake-trace:{self.today.isoformat()}",
-                    "note": "trace au réveil déclarée dans le carnet", "source": ACTOR,
+                    "note": notebook_text.WAKE_TRACE_NOTE, "source": ACTOR,
                     "measurements": {},
                     "pains": {ask["zone"]: {"state": "known", "value": trace}},
                 }, actor=ACTOR)
             alert = None
             if value == MorningTrace.CLEAR:
-                where = f" ({ask['label']})" if len(self.zones) > 1 else ""
-                alert = (f"Carnet : trace nette au réveil ce matin{where} "
-                         f"({self.today:%d/%m}). La condition écrite dans la séance du jour "
-                         "s'applique.")
+                where = notebook_text.ZONE.format(label=ask["label"]) if len(self.zones) > 1 else ""
+                alert = notebook_text.ALERT_WAKE_TRACE.format(where=where, today=self.today)
             return {"alert": alert}
         field = ask_id[len(ask["id"]) + 1:]
         if field not in ask["fields"]:
-            raise AnswerError("Cette mesure est déjà renseignée. Actualise le carnet.")
+            raise AnswerError(notebook_text.ALREADY_FILLED)
         metric, _, zone = field.partition(":")
         number = _scale(metric, value)
         observation_id = uuid.UUID(ask["id"].split(":", 1)[1])
@@ -568,16 +566,16 @@ class Board:
         alert = None
         if metric == "pain" and number > ledger.ESCULIER_CAP:
             day = dt.date.fromisoformat(ask["date"])
-            where = f" ({ask['labels'][field]})" if len(self.zones) > 1 else ""
-            alert = (f"Carnet : douleur {number:g}/10 au pic{where} sur la séance "
-                     f"{ask['kind']} du {day:%d/%m}, au-dessus du plafond de "
-                     f"{ledger.ESCULIER_CAP:g}.")
+            where = (notebook_text.ZONE.format(label=ask["labels"][field])
+                     if len(self.zones) > 1 else "")
+            alert = notebook_text.ALERT_PAIN.format(value=number, where=where, kind=ask["kind"],
+                                                    day=day, cap=ledger.ESCULIER_CAP)
         # The run's feelings are complete: its debrief no longer has to wait.
         settled = (self.ops.strava_activity_for_observation(observation_id)
                    if set(ask["fields"]) == {field} else None)
         return {"alert": alert, "activity": settled}
 
-    # ------------------------------------------------------------ détail d'une séance
+    # ------------------------------------------------------------ session detail
     def _observation(self, observation_id: str) -> dict | None:
         return next((row for row in self.observations if str(row["id"]) == observation_id), None)
 
@@ -602,9 +600,9 @@ class Board:
         observation = self._observation(ask_id.split(":", 1)[1])
         if observation is None or self.reserve_ask(
                 observation, self._linked_session(observation)) != ask_id:
-            raise AnswerError("Cette question est déjà close. Actualise le carnet.")
+            raise AnswerError(notebook_text.QUESTION_CLOSED)
         if isinstance(value, bool) or value not in (0, 1):
-            raise AnswerError("Réponse inattendue. Actualise le carnet.")
+            raise AnswerError(notebook_text.UNEXPECTED_ANSWER)
         self.ops.complete_measurement(observation["id"], "reps_in_reserve", value, actor=ACTOR)
         return {"alert": None}
 
@@ -741,7 +739,7 @@ class Board:
             "week": self._week_context(day),
         }
 
-    # ------------------------------------------------------------ écrans
+    # ------------------------------------------------------------ screens
     def ahead(self, week: Week, sessions: list[dict], days: int = 3) -> list[dict]:
         """The sessions of the coming days, across the week boundary if needed."""
         horizon = self.today + dt.timedelta(days=days)
@@ -859,7 +857,7 @@ class Board:
                                "kind": "deadline", "overdue": row["due_on"] < self.today})
         race = self.race()
         if race:
-            milestones.append({"date": race["date"], "label": "Départ", "kind": "race",
+            milestones.append({"date": race["date"], "label": notebook_text.RACE_START, "kind": "race",
                                "start_time": race.get("start_time")})
         milestones.sort(key=lambda item: item["date"])
         capabilities = sorted(

@@ -44,7 +44,7 @@ class Outbox:
     def target(self, filename: str) -> Path:
         """Path of a new artifact, without letting its producer choose elsewhere."""
         if not filename or Path(filename).name != filename:
-            raise ValueError("nom d'artefact invalide")
+            raise ValueError("invalid artifact name")
         return self._root / filename
 
     def leftovers(self) -> list[Path]:

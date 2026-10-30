@@ -27,13 +27,13 @@ def test_an_internal_incident_is_logged_without_text(make_bot, caplog):
     repo.ledger_cells.return_value = ([], [])
     repo.drain_alerts.return_value = [
         VaultAlert(vault_module.ALERT_HISTORY,
-                   "Synchronisation Git refusée : historique distant incompatible")]
+                   "Git sync refused: incompatible remote history")]
     bot = make_bot(client=client, repo=repo)
 
     bot._log_vault_alerts()
 
     assert _alerts_sent(client) == []
-    assert caplog.text.count("Incident interne « vault:history »") == 1
+    assert caplog.text.count("Internal incident vault:history") == 1
 
 
 def test_two_distinct_internal_causes_are_logged_without_text(make_bot, caplog):

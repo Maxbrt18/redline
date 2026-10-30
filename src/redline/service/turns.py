@@ -65,13 +65,13 @@ class TurnExecutor:
                 # A failed attempt may have left a file or a prepared command despite
                 # its error. The transaction and the worktree are reset to their
                 # initial state before trying the fallback profile.
-                log.warning("Route %s en échec ; tentative de repli %d/%d",
+                log.warning("Route %s failed; fallback attempt %d/%d",
                             plan.route, attempt + 2, len(plan.attempts))
                 self._reset_for_retry(turn_id, base_head)
                 if spec.session_mode is SessionMode.CONTINUE:
                     self._state.clear_session(psid, self._agent.provider)
             if result is None or used_spec is None:  # pragma: no cover - route is never empty
-                raise RuntimeError("route agent vide")
+                raise RuntimeError("empty agent route")
             if (not result.full_text.strip() and not result.silent
                     and not used_spec.structured_reply
                     and used_spec.session_mode is SessionMode.CONTINUE):
@@ -81,15 +81,15 @@ class TurnExecutor:
                 if not continuation.error and continuation.full_text.strip():
                     result = continuation
                 else:
-                    log.warning("Tour %s sans texte final, même après relance", turn_id)
+                    log.warning("Turn %s without final text, even after a retry", turn_id)
             try:
                 persisted = self._repo.persist_turn(
                     required_weeks=required_weeks, base_head=base_head, turn_id=turn_id)
             except Exception as exc:
-                log.exception("Échec inattendu à la frontière de persistance")
+                log.exception("Unexpected failure at the persistence boundary")
                 persisted = PersistenceResult(
                     False,
-                    detail=f"échec interne de persistance : {exc.__class__.__name__}",
+                    detail=f"internal persistence failure: {exc.__class__.__name__}",
                     failure=PersistenceFailure.WRITE_REFUSED,
                 )
             return TurnOutcome(result, persisted, base_head, turn_id, used_spec, calls)
@@ -122,10 +122,10 @@ class TurnExecutor:
                     return last
                 if not last.allows_fallback:
                     return last
-                log.warning("Analyse en lecture seule %s en échec ; repli %d/%d",
+                log.warning("Read-only analysis %s failed; fallback %d/%d",
                             plan.route, attempt + 2, len(plan.attempts))
                 self._reset_for_retry(actual_turn_id, base_head)
-            return last or RunResult(error="Aucun profil de lecture disponible")
+            return last or RunResult(error="No read profile available")
         finally:
             self._repo.discard_turn(actual_turn_id)
             self._repo.clear_turn_inputs(actual_turn_id)

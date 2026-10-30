@@ -13,6 +13,7 @@ from flask import Flask, jsonify, request
 from sqlalchemy.exc import SQLAlchemyError
 
 from redline.cards import render
+from redline.coach.fr import notebook as notebook_text
 from redline.coach.fr import session_labels
 from redline.storage.database import StorageError
 from redline.storage.notebook import DEVICE_SECONDS
@@ -76,24 +77,24 @@ def register(app: Flask, notebook: NotebookService, psid: str,
         request.max_content_length = 2048
         if request.method == "POST":
             if not request.is_json or request.headers.get("Origin", expected_origin) != expected_origin:
-                return jsonify(error="Accès refusé."), 403
+                return jsonify(error=notebook_text.ERRORS["forbidden"]), 403
             if request.headers.get("Sec-Fetch-Site") == "cross-site":
-                return jsonify(error="Accès refusé."), 403
+                return jsonify(error=notebook_text.ERRORS["forbidden"]), 403
         if request.path == "/notebook-api/connect":
             return None
         try:
             authenticated = notebook.store.authenticate(psid, request.cookies.get(COOKIE, ""))
         except (StorageError, SQLAlchemyError):
-            return jsonify(error="Carnet temporairement indisponible. Réessaie dans un instant."), 503
+            return jsonify(error=notebook_text.ERRORS["unavailable"]), 503
         if not authenticated:
-            return jsonify(error="Ouvre un nouveau lien avec /carnet dans Messenger."), 401
+            return jsonify(error=notebook_text.ERRORS["signed_out"]), 401
         return None
 
     @app.errorhandler(StorageError)
     @app.errorhandler(SQLAlchemyError)
     def notebook_database_error(error):
-        app.logger.error("Stockage indisponible : %s", type(error).__name__)
-        return jsonify(error="Stockage temporairement indisponible."), 503
+        app.logger.error("Storage unavailable: %s", type(error).__name__)
+        return jsonify(error=notebook_text.ERRORS["storage"]), 503
 
     @app.get("/carnet")
     def notebook_page():
@@ -108,7 +109,7 @@ def register(app: Flask, notebook: NotebookService, psid: str,
 
     @app.get("/carnet-manifest.json")
     def notebook_manifest():
-        return jsonify(name="Carnet Redline", short_name="Redline", lang="fr",
+        return jsonify(name=notebook_text.APP_NAME, short_name="Redline", lang="fr",
                        start_url="/carnet", scope="/", id="/carnet", display="standalone",
                        background_color="#f7f5f2", theme_color="#f7f5f2",
                        icons=[{"src": "/carnet-install-icon.png", "sizes": "512x512", "type": "image/png"}])
@@ -141,13 +142,13 @@ def register(app: Flask, notebook: NotebookService, psid: str,
     def notebook_connect():
         body = request.get_json(silent=True)
         if not isinstance(body, dict) or set(body) != {"token"} or not isinstance(body["token"], str):
-            return jsonify(error="Lien invalide."), 400
+            return jsonify(error=notebook_text.ERRORS["bad_link"]), 400
         # An old notification stays openable on an already connected device.
         if notebook.store.authenticate(psid, request.cookies.get(COOKIE, "")):
             return jsonify(status="ok")
         device = notebook.store.exchange(psid, body["token"])
         if not device:
-            return jsonify(error="Ce lien a expiré ou a déjà servi. Tape /carnet dans Messenger."), 401
+            return jsonify(error=notebook_text.ERRORS["link_used"]), 401
         response = jsonify(status="ok")
         response.set_cookie(COOKIE, device, secure=True, httponly=True, samesite="Strict",
                             max_age=DEVICE_SECONDS, path="/")
@@ -167,7 +168,7 @@ def register(app: Flask, notebook: NotebookService, psid: str,
             if not 0 <= offset <= 100000:
                 raise ValueError
         except ValueError:
-            return jsonify(error="Page invalide."), 400
+            return jsonify(error=notebook_text.ERRORS["bad_page"]), 400
         rows = notebook.store.list_entries(psid, offset=offset, limit=41)
         return jsonify(entries=rows[:40], next_offset=offset + 40 if len(rows) > 40 else None,
                        latest=[item for kind in ("weekly", "monthly")
@@ -184,7 +185,7 @@ def register(app: Flask, notebook: NotebookService, psid: str,
     @app.get("/notebook-api/week/<label>")
     def notebook_week(label):
         if not WEEK.fullmatch(label):
-            return jsonify(error="Semaine invalide."), 400
+            return jsonify(error=notebook_text.ERRORS["bad_week"]), 400
         return jsonify(notebook.week(psid, label))
 
     @app.get("/notebook-api/weeks")
@@ -195,19 +196,19 @@ def register(app: Flask, notebook: NotebookService, psid: str,
     def notebook_injury():
         zone = request.args.get("zone") or None
         if zone is not None and not ZONE.fullmatch(zone):
-            return jsonify(error="Zone invalide."), 400
+            return jsonify(error=notebook_text.ERRORS["bad_zone"]), 400
         view = notebook.injury(zone)
         if view is None:
-            return jsonify(error="Aucune zone surveillée."), 404
+            return jsonify(error=notebook_text.ERRORS["no_zone"]), 404
         return jsonify(view)
 
     @app.get("/notebook-api/session/<observation_id>")
     def notebook_session(observation_id):
         if not UUID.fullmatch(observation_id):
-            return jsonify(error="Séance invalide."), 400
+            return jsonify(error=notebook_text.ERRORS["bad_session"]), 400
         view = notebook.session(observation_id)
         if view is None:
-            return jsonify(error="Séance introuvable."), 404
+            return jsonify(error=notebook_text.ERRORS["no_session"]), 404
         return jsonify(view)
 
     @app.get("/notebook-api/race")
@@ -220,11 +221,11 @@ def register(app: Flask, notebook: NotebookService, psid: str,
         where = (request.args.get("place") or "").strip() or place
         if not DAY.fullmatch(day) or (start and not CLOCK.fullmatch(start)) \
                 or not PLACE.fullmatch(where):
-            return jsonify(error="Demande invalide."), 400
+            return jsonify(error=notebook_text.ERRORS["bad_request"]), 400
         try:
             when = dt.date.fromisoformat(day)
         except ValueError:
-            return jsonify(error="Date invalide."), 400
+            return jsonify(error=notebook_text.ERRORS["bad_date"]), 400
         return jsonify(weather.forecast(where, when, start, clock.now()) or {})
 
     @app.post("/notebook-api/answer")
@@ -232,7 +233,7 @@ def register(app: Flask, notebook: NotebookService, psid: str,
         body = request.get_json(silent=True)
         if (not isinstance(body, dict) or set(body) != {"ask", "value"}
                 or not isinstance(body["ask"], str) or not ASK.fullmatch(body["ask"])):
-            return jsonify(error="Réponse invalide."), 400
+            return jsonify(error=notebook_text.ERRORS["bad_answer"]), 400
         try:
             result = notebook.board().answer(body["ask"], body["value"])
         except AnswerError as error:
@@ -241,29 +242,29 @@ def register(app: Flask, notebook: NotebookService, psid: str,
             try:
                 alert(result["alert"], "notebook:" + body["ask"])
             except Exception:
-                app.logger.exception("Alerte du carnet non transmise au coach")
+                app.logger.exception("Notebook alert not passed to the coach")
         if result.get("activity") and settled is not None:
             try:
                 settled(int(result["activity"]))
             except Exception:
-                app.logger.exception("Débrief de la sortie non avancé")
+                app.logger.exception("The run's debrief was not brought forward")
         return jsonify(status="ok", alert=bool(result["alert"]))
 
     @app.post("/notebook-api/launch")
     def notebook_launch():
         body = request.get_json(silent=True)
         if not isinstance(body, dict) or set(body) != {"signature"} or not isinstance(body["signature"], str):
-            return jsonify(error="Demande invalide."), 400
+            return jsonify(error=notebook_text.ERRORS["bad_request"]), 400
         url = notebook.launch(psid, body["signature"])
         if not url:
-            return jsonify(error="La séance a changé ou n’est plus disponible. Actualise le carnet."), 409
+            return jsonify(error=notebook_text.ERRORS["session_changed"]), 409
         return jsonify(url=url)
 
     @app.get("/notebook-api/entries/<entry_id>")
     def notebook_entry(entry_id):
         entry = notebook.store.get(psid, entry_id)
         if entry is None:
-            return jsonify(error="Carte introuvable."), 404
+            return jsonify(error=notebook_text.ERRORS["no_card"]), 404
         entry["related"] = (notebook.store.list_entries(psid, kind="weekly", month=entry["period"], limit=100)
                             if entry["kind"] == "monthly" and entry["period"] else [])
         entry["report"] = None
