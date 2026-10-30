@@ -19,7 +19,7 @@ from conftest import ENGINE_ROOT, cli_command
 
 
 def succeeds(process: subprocess.CompletedProcess, cue: str) -> subprocess.CompletedProcess:
-    assert process.returncode == 0, f"{cue} a échoué : {process.stderr or process.stdout}"
+    assert process.returncode == 0, f"{cue} failed: {process.stderr or process.stdout}"
     return process
 
 

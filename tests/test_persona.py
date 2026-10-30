@@ -68,4 +68,4 @@ def test_no_name_is_written_in_the_engine():
         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             if re.search(r"\bSam\b", line):
                 offenders.append(f"{relative}:{number}")
-    assert not offenders, "prénom écrit en dur : " + ", ".join(offenders)
+    assert not offenders, "first name hard-coded: " + ", ".join(offenders)

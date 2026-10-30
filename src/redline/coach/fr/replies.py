@@ -122,3 +122,6 @@ STATUS_MINUTES = "{minutes} min"
 NOTEBOOK_ARCHIVE = "Tes cartes et bilans restent dans ton carnet."
 
 SESSION_BUTTON_TEXT = "Ta séance"
+
+#: What a /deep turn leaves for the next ordinary turn to read.
+DEEP_HANDOFF = "QUESTION /deep : {question}\nRÉPONSE : {answer}"

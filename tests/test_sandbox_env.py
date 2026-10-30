@@ -139,8 +139,8 @@ def test_every_variable_a_script_reads_survives_the_sandbox():
             continue
         hidden = sorted(sandbox_overrides(dict.fromkeys(names, "valeur")))
         assert not hidden, (
-            f"{source.relative_to(ROOT)} lit {hidden}, que le bac à sable vide. "
-            "Ajoute-les à SANDBOX_NEEDS en justifiant l'appel, ou cesse de les lire.")
+            f"{source.relative_to(ROOT)} reads {hidden}, which the sandbox empties. "
+            "Add them to SANDBOX_NEEDS with the reason for the call, or stop reading them.")
 
 
 def test_the_scan_actually_finds_something():
@@ -173,7 +173,7 @@ def test_agent_cli_policy_is_sorted_unique_and_points_to_tracked_scripts():
         tracked = subprocess.run(
             ["git", "ls-files", "--error-unmatch", source],
             cwd=ROOT, capture_output=True, check=False)
-        assert tracked.returncode == 0, f"{tool} n'est pas suivi par Git"
+        assert tracked.returncode == 0, f"{tool} is not tracked by Git"
 
 
 def test_every_cli_named_to_the_live_agent_is_in_the_root_owned_policy():

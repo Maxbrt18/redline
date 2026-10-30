@@ -1,4 +1,4 @@
-"""Mémoire relationnelle : peu de texte, aucune question fantôme."""
+"""Relational memory: little text, no ghost question."""
 
 from redline.service.relationship import question_fingerprint, render_memory
 

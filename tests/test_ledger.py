@@ -439,7 +439,7 @@ def test_an_unknown_week_is_refused_never_answered_with_zero():
             ledger.normalize_week(bad, known)
         except ValueError:
             continue
-        raise AssertionError(f"« {bad} » accepté au lieu d'être refusé")
+        raise AssertionError(f"{bad!r} accepted instead of refused")
 
 
 def _week_of_runs(monday: dt.date, kms: list[float]) -> list[Row]:
@@ -521,7 +521,7 @@ def test_a_stall_counts_closed_weeks_only_and_a_record_resets_it():
     # On a Sunday the current week is open, so only one week is closed after the record.
     stall = ledger.long_run_stall(rows, dt.date(2026, 9, 27))
     assert stall is not None and stall.weeks == 1 and not stall.triggered
-    # Lundi 28/09 : W39 close, deux semaines sans record.
+    # Monday 28/09: W39 closes, two weeks without a record.
     assert ledger.long_run_stall(rows, dt.date(2026, 9, 28)).weeks == 2
     # A real record clears the counter; 11.6 against 11.53 is GPS noise.
     noisy = _long_runs({**SEPTEMBER, "2026-W40": 11.6})

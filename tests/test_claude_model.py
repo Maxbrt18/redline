@@ -283,7 +283,7 @@ def test_the_bench_follows_the_production_provider(make_config):
     config = make_config()
     assert isinstance(bench_runner(config), ClaudeCodeRunner)
     check_model(config, config.routing.plan(Route.N2).primary)
-    with pytest.raises(ValueError, match="non autorisé"):
+    with pytest.raises(ValueError, match="not allowed"):
         check_model(config, RunSpec("gpt-6-sol", "high", 60))
 
 

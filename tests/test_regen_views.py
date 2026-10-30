@@ -47,8 +47,8 @@ class TestTheEntryPoint:
         found = {name for note in ENGINE_ROOT.rglob("*.md")
                  if ".git" not in note.parts
                  for name in MARKER.findall(note.read_text(encoding="utf-8"))}
-        assert found, "aucun marqueur trouvé : le test ne prouverait rien"
-        assert found <= owned, f"bloc sans générateur : {sorted(found - owned)}"
+        assert found, "no marker found: the test would prove nothing"
+        assert found <= owned, f"block without a generator: {sorted(found - owned)}"
 
     def test_check_reports_a_drift_without_repairing_it(self, tmp_path):
         """`--check` must never repair what it is supposed to report. On a throwaway

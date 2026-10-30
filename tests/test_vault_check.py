@@ -31,7 +31,7 @@ def vault(files, root=None, loaded=None):
 def test_a_long_failure_says_how_much_it_hid(report, capsys):
     """`model/schema.py` exists against the "fix, rerun, some are left" cycle:
     truncating at 8 without saying so recreates exactly that cycle."""
-    report.fail("un contrôle", [f"problème {i}" for i in range(20)])
+    report.fail("a check", [f"problème {i}" for i in range(20)])
     out = capsys.readouterr().out
     assert "problème 7" in out
     assert "problème 8" not in out
@@ -39,7 +39,7 @@ def test_a_long_failure_says_how_much_it_hid(report, capsys):
 
 
 def test_a_short_failure_adds_no_footer(report, capsys):
-    report.fail("un contrôle", ["seul problème"])
+    report.fail("a check", ["seul problème"])
     assert "autre(s)" not in capsys.readouterr().out
 
 
@@ -175,7 +175,7 @@ def test_every_check_is_in_the_registry():
     second list: a check that is written but never registered never runs."""
     defined = {name for name in dir(vault_check) if name.startswith("check_")}
     registered = {check.__name__ for check in vault_check.CHECKS}
-    assert defined == registered, f"jamais lancé : {sorted(defined - registered)}"
+    assert defined == registered, f"never run: {sorted(defined - registered)}"
 
 
 # ------------------------------------------------- prediction debt

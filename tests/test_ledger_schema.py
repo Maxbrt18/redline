@@ -22,7 +22,7 @@ def test_every_session_type_is_classified():
         kind for kind in table.SESSION_TYPES
         if kind not in table.EFFORT_TYPES and kind not in table.REST_TYPES
     } - explicitly_metric_free
-    assert not unclassified, f"types sans famille : {sorted(unclassified)}"
+    assert not unclassified, f"kinds without a family: {sorted(unclassified)}"
 
 
 def test_input_requires_a_date_and_a_known_type():

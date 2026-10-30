@@ -112,4 +112,4 @@ def test_every_rule_names_an_owner_that_exists():
     for rule in rulebook.current().rules:
         for owner in rule.owner.split(" ; "):
             path = owner.split(" §")[0].split(" 20")[0].strip()
-            assert (VAULT_ROOT / path).exists(), f"{rule.id} : propriétaire absent {path}"
+            assert (VAULT_ROOT / path).exists(), f"{rule.id}: owner missing {path}"

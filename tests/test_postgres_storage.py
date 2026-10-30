@@ -254,7 +254,7 @@ def test_the_purge_only_targets_tables_the_service_may_delete_from(service_role_
             assert connection.execute(sa.text(
                 "SELECT has_table_privilege(current_user, :table, 'DELETE')"),
                 {"table": f"redline.{table}"}).scalar_one(), (
-                    f"redline_app ne peut pas purger {table}")
+                    f"redline_app cannot purge {table}")
     assert service_role_store.purge_expired() == {}
 
 
@@ -990,7 +990,7 @@ def test_a_stale_plan_projection_is_detected_without_being_repaired(store, tmp_p
             "distance_cap_km": 9.0, "sources": ["[[current-plan]]"]}]})
 
     assert plan_drift(store, tmp_path) == ["athlete/journal/2026-w33.md"]
-    assert "périmé" in page.read_text(encoding="utf-8"), "le contrôle n'écrit pas"
+    assert "périmé" in page.read_text(encoding="utf-8"), "the check does not write"
 
     project_plans(store, tmp_path)
     assert plan_drift(store, tmp_path) == []
@@ -1434,7 +1434,7 @@ def test_the_cli_patch_keeps_the_long_text_it_was_not_given(store):
     assert patched.returncode == 0, patched.stderr
 
     rows = [row for row in store.deadline_rows() if row["deadline_key"] == "cli-patch"]
-    assert len(rows) == 1, "un patch ne doit jamais dédoubler la ligne"
+    assert len(rows) == 1, "a patch must never duplicate the row"
     assert rows[0]["due_on"] == dt.date(2026, 8, 23)
     assert rows[0]["item"] == long_item
     assert rows[0]["blocks"] == "dose W34"

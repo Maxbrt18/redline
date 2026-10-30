@@ -85,7 +85,7 @@ def test_a_known_enrichment_is_not_fetched_again_on_a_replay():
     store = Store(elevation="known", wbgt="known")
 
     def forbidden(_):
-        raise AssertionError("un enrichissement connu ne se recalcule pas")
+        raise AssertionError("a known enrichment is never recomputed")
 
     ActivityPipeline(
         store,
@@ -106,7 +106,7 @@ def test_a_persisted_capture_survives_a_restart_without_refetching_strava():
     })
 
     def forbidden(_):
-        raise AssertionError("l'activité persistée ne doit jamais être rappelée")
+        raise AssertionError("the persisted activity must never be fetched again")
 
     result = ActivityPipeline(
         store, activity_fetch=forbidden, gear_fetch=forbidden).run(42)

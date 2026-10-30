@@ -41,9 +41,9 @@ def test_a_turn_reads_its_own_file_and_its_suffixed_second(tmp_path):
 
 
 @pytest.mark.parametrize("path", [
-    f"{agent_input.DIRECTORY}/{OTHER}.json",   # le JSON d'un autre tour
-    "/tmp/x.json",                              # l'ancienne forme
-    f"{agent_input.DIRECTORY}/../{TURN}.json",  # hors du dossier
+    f"{agent_input.DIRECTORY}/{OTHER}.json",   # another turn's JSON
+    "/tmp/x.json",                              # the old form
+    f"{agent_input.DIRECTORY}/../{TURN}.json",  # outside the directory
     f"{agent_input.DIRECTORY}/{TURN}-.json",
     f"{agent_input.DIRECTORY}/{TURN}.txt",
 ])

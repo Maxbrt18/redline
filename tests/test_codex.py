@@ -204,7 +204,7 @@ def test_a_thread_opened_under_other_instructions_is_never_resumed(make_config, 
 
     runner.run("4242", "suite")
 
-    assert client.calls[0][0] == "start", "un fil aux vieilles instructions ne reprend pas"
+    assert client.calls[0][0] == "start", "a thread under old instructions is not resumed"
     assert store.session_prompt("4242", "codex") == instruction_digest(".")
 
 

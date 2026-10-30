@@ -198,7 +198,7 @@ def test_a_valid_cached_token_is_reused_without_calling_strava(monkeypatch):
                         lambda path: {"access_token": "vivant", "expires_at": 99999})
 
     def refuse(*args, **kwargs):
-        raise AssertionError("un jeton valide ne se renouvelle pas")
+        raise AssertionError("a valid token is not refreshed")
 
     monkeypatch.setattr(strava, "_refresh", refuse)
     assert strava.access_token() == "vivant"
@@ -243,7 +243,7 @@ def test_the_environment_is_never_a_second_owner_of_the_token(monkeypatch):
     monkeypatch.setenv("STRAVA_REFRESH_TOKEN", "amorce-qui-ne-doit-plus-servir")
     monkeypatch.setattr(strava, "_read_cache", lambda path: {})
     monkeypatch.setattr(strava, "_refresh", lambda *a: pytest.fail(
-        "l'amorce de .env a été utilisée : le jeton a de nouveau deux propriétaires"))
+        "the .env seed was used: the token has two owners again"))
     with pytest.raises(strava.StravaError, match="login"):
         strava.access_token()
 

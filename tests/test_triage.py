@@ -157,7 +157,7 @@ def test_the_reactive_path_passes_a_route_plan_instead_of_raw_settings():
         tree = ast.parse(textwrap.dedent(inspect.getsource(function)))
         named = [keyword.arg for node in ast.walk(tree) if isinstance(node, ast.Call)
                  for keyword in node.keywords]
-        assert "plan" in named, f"aucun plan de route dans {function.__name__}"
+        assert "plan" in named, f"no route plan in {function.__name__}"
 
 
 @pytest.mark.parametrize("depth", ["N0", "N1", "N2", "N3"])

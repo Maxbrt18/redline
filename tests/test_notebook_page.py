@@ -749,8 +749,8 @@ PNG = bytes.fromhex('89504e470d0a1a0a0000000d4948445200000001000000010806000000'
 
 
 FROZEN_GAP = """() => {
-    // Pendant la transition, la copie figée doit se poser au pixel près sur l'original :
-    // le moindre écart se voit comme un saut quand elle disparaît.
+    // During the transition, the frozen copy must sit on the original to the pixel:
+    // the slightest gap shows as a jump when it disappears.
     const layer = document.querySelector('.n-move:not(.under)');
     layer.style.transition = 'none'; layer.style.transform = 'none';
     const copy = layer.firstElementChild, page = document.getElementById('page');

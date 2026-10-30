@@ -94,7 +94,7 @@ def _scan(src: str, pos: int, out: list, inside: bool) -> int:
             out.append(("regex", "", pos))
         else:
             match = PUNCT.match(src, pos)
-            assert match, f"caractère inattendu {char!r} en {pos}"
+            assert match, f"unexpected character {char!r} at {pos}"
             value = match.group()
             depth += (value == "{") - (value == "}")
             out.append(("punct", value, pos))
@@ -174,8 +174,8 @@ def test_a_module_imports_exactly_what_it_borrows(bundle):
         used = {value for value, _ in references(toks)}
         for borrowed in sorted(used - set(names)):
             if borrowed in owner and owner[borrowed] != name and imported.get(borrowed) != owner[borrowed]:
-                problems.append(f"{name} emploie {borrowed} sans l'importer de {owner[borrowed]}")
-        problems += [f"{name} importe {item} sans s'en servir" for item in imported if item not in used]
+                problems.append(f"{name} uses {borrowed} without importing it from {owner[borrowed]}")
+        problems += [f"{name} imports {item} without using it" for item in imported if item not in used]
     assert not problems, "\n".join(problems)
 
 
@@ -187,7 +187,7 @@ def test_a_module_never_reassigns_an_import(bundle):
             after = toks[index + 1][1] if index + 1 < len(toks) else None
             before = toks[index - 1][1] if index else None
             if value in imported and (after in ASSIGN or before in ("++", "--")):
-                problems.append(f"{name} réassigne {value} (importé de {imported[value]})")
+                problems.append(f"{name} reassigns {value} (imported from {imported[value]})")
     assert not problems, "\n".join(problems)
 
 
