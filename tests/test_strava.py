@@ -77,7 +77,7 @@ def test_the_local_time_survives_the_guard_that_weather_actually_applies():
     query = strava.parse_activity(RUN).weather_query
     parsed = weather.parse_time(query["time"], local=True)
     assert (parsed.hour, parsed.minute) == (7, 32)
-    with pytest.raises(ValueError, match="SANS fuseau"):
+    with pytest.raises(ValueError, match="WITHOUT a zone"):
         weather.parse_time(RUN["start_date_local"], local=True)
 
 
@@ -300,7 +300,7 @@ def test_login_reads_the_code_from_stdin_never_from_the_command_line(monkeypatch
     assert "grant_type=authorization_code" in exchanged["body"]
     assert "code=abc123" in exchanged["body"]
     assert exchanged["refresh_token"] == "r"
-    assert out["autorisation"] == "enregistrée"
+    assert out["authorization"] == "recorded"
     # The authorisation URL is printed, and never carries the secret.
     printed = capsys.readouterr().out
     assert "strava.com/oauth/authorize" in printed
@@ -352,7 +352,7 @@ def test_a_reused_authorisation_code_says_to_start_over(monkeypatch):
         raise urllib.error.HTTPError("u", 400, "Bad Request", {}, None)
 
     monkeypatch.setattr(strava.urllib.request, "urlopen", refuse)
-    with pytest.raises(strava.StravaError, match="refais l'étape 1"):
+    with pytest.raises(strava.StravaError, match="redo step 1"):
         strava.cmd_login(_login_args())
 
 
@@ -365,7 +365,7 @@ def test_a_revoked_authorisation_says_what_to_do(monkeypatch):
         raise urllib.error.HTTPError("u", 400, "Bad Request", {}, None)
 
     monkeypatch.setattr(strava.urllib.request, "urlopen", refuse)
-    with pytest.raises(strava.StravaError, match="ré-autoriser"):
+    with pytest.raises(strava.StravaError, match="Authorize the application again"):
         strava._refresh("1", "2", "3")
 
 
@@ -408,5 +408,5 @@ def test_a_failure_is_reported_without_ever_printing_a_secret(monkeypatch, capsy
     monkeypatch.setattr("sys.argv", ["strava", "check"])
     assert strava.main() == 1
     captured = capsys.readouterr()
-    assert "Strava indisponible" in captured.err
+    assert "Strava unavailable" in captured.err
     assert "token" not in captured.err.lower()

@@ -194,7 +194,7 @@ def test_the_overflow_guard_actually_fires(tmp_path):
     process = run_script("chart-strength", payload, tmp_path / "chart.png")
     assert process.returncode != 0
     assert "card not generated" in process.stderr
-    assert "card trop haute" in process.stderr
+    assert "card too tall" in process.stderr
     assert not (tmp_path / "chart.png").exists(), "aucun PNG ne doit être écrit"
 
 
@@ -207,7 +207,7 @@ def test_invalid_json_fails_cleanly(tmp_path):
         input="not json", capture_output=True, text=True,
     )
     assert process.returncode != 0
-    assert "JSON illisible" in process.stderr
+    assert "unreadable JSON" in process.stderr
     assert not (tmp_path / "x.png").exists()
 
 

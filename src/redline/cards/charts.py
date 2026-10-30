@@ -13,6 +13,8 @@ line but the gridlines. No reference lines, no dashes, no ticks: a threshold is
 said by the colour of the bar that crossed it, anything else in words.
 """
 
+from redline.coach.fr import cards as text
+
 from .format import fmt_num, fmt_pace, fmt_rest, nice_ticks
 from .html import esc
 
@@ -128,7 +130,7 @@ def _widths(times: list, minimums: list, room: float) -> list:
 def gap_text(gap: int | None) -> str:
     """A rep's pace against R1's, in s/km, signed like a split: −3 s is faster."""
     if gap is None:
-        return "réf."
+        return text.REFERENCE
     if gap == 0:
         return "0 s"
     return f"−{-gap} s" if gap < 0 else f"+{gap} s"
@@ -206,7 +208,7 @@ def ribbon(segments: list, *, width: int = CONTENT_W) -> str:
         def hy(v: float) -> float:
             return top + HR_H - (v - lo) / (hi - lo) * HR_H
         points = [(cx, hy(v), v) for cx, v in zip(centers, hrs, strict=True)]
-        parts.append(_text(0, top - 46, "fréquence cardiaque, bpm", "plot__note", anchor="start"))
+        parts.append(_text(0, top - 46, text.HEART_RATE_AXIS, "plot__note", anchor="start"))
         parts.append('<polyline points="' + " ".join(f"{px:.1f},{py:.1f}" for px, py, _ in points)
                      + '" class="ribbon__hr"/>')
         for px, py, v in points:
