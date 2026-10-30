@@ -56,7 +56,7 @@ def coach(command: str, *arguments: str, turn: str = "") -> subprocess.Completed
 
 
 def succeeds(process: subprocess.CompletedProcess, cue: str) -> subprocess.CompletedProcess:
-    assert process.returncode == 0, f"{cue} a échoué : {process.stderr or process.stdout}"
+    assert process.returncode == 0, f"{cue} failed: {process.stderr or process.stdout}"
     return process
 
 
@@ -132,7 +132,7 @@ def test_giving_an_rpe_never_breaks_anything(store):
 
     plan = coach("redline week-plan", "check", "--week", "2026-W33")
     assert plan.returncode == 0, (
-        "compléter une mesure ne doit pas périmer le programme : "
+        "completing a measurement must not make the plan stale: "
         + (plan.stderr or plan.stdout))
 
 
@@ -150,7 +150,7 @@ def test_completing_without_knowing_yesterdays_invented_key(store):
     lecture = succeeds(coach("redline fact-read", "observations", "--limit", "5"),
                       "fact-read")
     assert "clé=messenger:2026-08-14:velo-du-padre" in lecture.stdout, (
-        "la clé exigée par ledger-complete doit être publiée par le lecteur")
+        "the key ledger-complete requires must be published by the reader")
 
     tour_lien = str(uuid.uuid4())
     succeeds(coach(
@@ -172,7 +172,7 @@ def test_a_wrong_key_fails_at_once_not_at_the_boundary(store):
     poser_le_plan(store)
     process = coach("redline ledger-complete", "--key", "strava:90000000001",
                     "--metric", "rpe", "--value", "7", turn=str(uuid.uuid4()))
-    assert process.returncode != 0, "une clé inexistante doit échouer immédiatement"
+    assert process.returncode != 0, "an unknown key must fail immediately"
     assert "unknown observation" in (process.stderr + process.stdout)
 
 
@@ -201,8 +201,8 @@ def test_a_stale_plan_stays_readable_and_says_so(store):
     store.apply_turn_with_receipts(tour)[0]
 
     process = coach("redline week-plan", "show", "--week", "2026-W33")
-    assert process.returncode == 3, "périmé = 3, jamais 1"
-    assert "w33-ven-ef" in process.stdout, "le programme doit rester lisible"
+    assert process.returncode == 3, "stale = 3, never 1"
+    assert "w33-ven-ef" in process.stdout, "the plan must stay readable"
     assert "révision" in process.stderr
 
 

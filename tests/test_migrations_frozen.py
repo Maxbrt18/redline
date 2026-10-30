@@ -23,7 +23,7 @@ def test_no_revision_reads_the_live_schema_declaration():
                 node, ast.Import | ast.ImportFrom) else []
             if module.startswith("redline") or any(name.startswith("redline") for name in names):
                 offenders.append(f"{path.name}:{node.lineno}")
-    assert not offenders, "révision qui relit le schéma courant : " + ", ".join(offenders)
+    assert not offenders, "revision that reads the current schema: " + ", ".join(offenders)
 
 
 def test_the_control_sees_the_revisions():

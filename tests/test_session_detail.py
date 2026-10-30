@@ -253,7 +253,7 @@ def test_the_route_serves_the_detail_and_refuses_what_is_not_an_identifier(
     view = client.get(f"/notebook-api/session/{observation_id}").json
     assert view["series"]["hr"] and view["reps"]
     # The streams fetched on first display are kept: the second one does not ask for them again.
-    monkeypatch.setattr(session_detail, "fetch_streams", lambda _: pytest.fail("relevé deux fois"))
+    monkeypatch.setattr(session_detail, "fetch_streams", lambda _: pytest.fail("fetched twice"))
     assert client.get(f"/notebook-api/session/{observation_id}").status_code == 200
     answer = client.post("/notebook-api/answer", json={"ask": view["reserve_ask"], "value": 0})
     assert answer.json == {"status": "ok", "alert": False}

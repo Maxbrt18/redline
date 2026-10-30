@@ -91,7 +91,7 @@ def test_every_unilateral_dose_says_so(program):
     for slug, note in program.exercises.items():
         name = note["name"].lower()
         if any(word in name for word in ("unipodal", "unijambiste", "bulgare")):
-            assert Dose.read(note["dose"], slug).per_side, f"{slug} : côté manquant"
+            assert Dose.read(note["dose"], slug).per_side, f"{slug}: side missing"
 
 
 def test_a_session_may_override_a_dose_and_only_that_session_sees_it(program):

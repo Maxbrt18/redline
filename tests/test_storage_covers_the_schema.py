@@ -42,10 +42,10 @@ def _missing(schema, table, renames):
 def test_every_gate_field_has_a_column():
     missing = _missing(GATE_SCHEMA, plan_gates, GATE_COLUMNS)
     assert not missing, (
-        f"{missing} : déclaré sur le contrôle daté, rangé nulle part dans "
-        "redline.plan_gates. Une révision partirait valide et reviendrait mutilée. "
-        "Ajoute la colonne par une migration, sa lecture et son écriture dans "
-        "src/redline/storage/repository/plans.py, et son renommage éventuel ci-dessus.")
+        f"{missing}: declared on the dated check, stored nowhere in "
+        "redline.plan_gates. A revision would go out valid and come back truncated. "
+        "Add the column with a migration, its read and its write in "
+        "src/redline/storage/repository/plans.py, and its renaming above if any.")
 
 
 def test_every_session_field_has_a_column():
@@ -64,10 +64,10 @@ def test_every_revision_field_has_a_column():
     """
     missing = set(_missing(REVISION_SCHEMA, plan_revisions, REVISION_COLUMNS))
     assert missing <= REVISION_ELSEWHERE, (
-        f"{sorted(missing - REVISION_ELSEWHERE)} : déclaré sur la révision, rangé nulle "
-        "part dans redline.plan_revisions. Ajoute la colonne par une migration, sa "
-        "lecture et son écriture dans src/redline/storage/repository/plans.py, et son renommage "
-        "éventuel ci-dessus -- ou nomme-le dans REVISION_ELSEWHERE en disant où il vit.")
+        f"{sorted(missing - REVISION_ELSEWHERE)}: declared on the revision, stored nowhere "
+        "in redline.plan_revisions. Add the column with a migration, its read and its "
+        "write in src/redline/storage/repository/plans.py, and its renaming above if any "
+        "-- or name it in REVISION_ELSEWHERE, saying where it lives.")
 
 
 def test_the_comparison_is_not_vacuous():

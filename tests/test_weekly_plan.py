@@ -352,7 +352,7 @@ def test_a_week_to_review_still_prints_its_plan_and_exits_three(capsys):
     output = capsys.readouterr()
     assert code == cli.EXIT_STALE
     assert code != cli.EXIT_INVALID
-    assert "w32-lun-ef" in output.out, "le programme doit rester lisible"
+    assert "w32-lun-ef" in output.out, "the plan must stay readable"
     assert "arbitrage obligatoire" in output.err
     assert "activité non rattachée" in output.err
     assert "reste lisible" in output.err
@@ -499,7 +499,7 @@ def test_a_new_revision_may_no_longer_carry_an_untyped_gate(monkeypatch):
             return None
 
         def append_plan_revision(self, week, revision, actor=""):
-            raise AssertionError("une révision invalide ne doit jamais être écrite")
+            raise AssertionError("an invalid revision must never be written")
 
     fresh = written_today(number=1, sessions=[session()])
     untyped = gate()

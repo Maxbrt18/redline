@@ -418,7 +418,7 @@ def test_no_dose_of_the_program_runs_to_three_lines(open_session, width):
                                     / parseFloat(getComputedStyle(node).lineHeight))}))""")
     assert len(laid_out) == len(doses)
     broken = [item["text"] for item in laid_out if item["lines"] > 2]
-    assert not broken, f"dose(s) sur 3 lignes ou plus à {width} px : {broken}"
+    assert not broken, f"dose(s) on 3 lines or more at {width} px: {broken}"
 
     # And nothing overflows in width: a page that scrolls horizontally is a page that cannot
     # be used with one hand.

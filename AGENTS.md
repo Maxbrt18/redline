@@ -36,11 +36,17 @@ neither appears as a literal in the engine.
 ## Language
 
 - Everything developer-facing is English: identifiers, file names, comments, docstrings,
-  test names, developer documentation.
-- The coach speaks French. Athlete-facing text lives under `src/redline/coach/fr/`, the
-  rule texts of `rulebook.default.toml`, the notebook UI strings and `templates/`.
-- Some log and error messages and argparse `help=` strings are still French: new ones
-  are English.
+  test names and failure messages, logs, exceptions, argparse `help=`, operator output,
+  developer documentation.
+- The coach speaks French. What the coach or the athlete reads lives under
+  `src/redline/coach/fr/`, and the code calls it by name (`wording.DONE.format(...)`).
+  So do the rule texts of `rulebook.default.toml` and the vault templates in `templates/`.
+- The notebook page (`src/redline/service/page/`) is the athlete's interface: its words
+  stay inline, in French, next to the code that shows them. There is no string catalogue
+  for it; the day the page gets a second language, it moves to a standard i18n setup
+  (one message file per locale, a library, a lint rule against literal strings).
+- `tests/test_language.py` (string literals and test failure messages) and
+  `tests/test_conventions.py` (comments and docstrings) enforce these rules.
 
 ## Comments
 

@@ -104,7 +104,7 @@ def test_a_whole_conversation_about_one_bike_ride_repeats_no_program(repo, clien
                     "peut être demain"):
         bot._respond("4242", message)
 
-    assert client.send_burst.call_count == 3, "le coach doit répondre à chaque fois"
+    assert client.send_burst.call_count == 3, "the coach must answer every time"
     assert programs(client) == []
 
 
@@ -124,7 +124,7 @@ def test_the_reactive_path_never_renders_the_plan_card(repo, client, make_bot):
                                      depth="N2", plan_change=True))
     bot._respond("4242", "je peux pas jeudi finalement")
 
-    assert programs(client), "une vraie révision doit partir"
+    assert programs(client), "a real revision must go out"
     repo.render_weekly_plan_card.assert_not_called()
 
 
@@ -163,7 +163,7 @@ def test_a_revision_that_only_records_the_past_says_nothing(repo, client, make_b
     bot._respond("4242", "RPE 3-4, pic de douleur 0.75-1, plaisir 7")
 
     assert programs(client) == []
-    assert client.send_burst.call_count == 1, "le coach débriefe quand même"
+    assert client.send_burst.call_count == 1, "the coach debriefs anyway"
 
 
 def test_alex_asking_for_his_program_gets_it_even_unchanged(repo, client, make_bot):

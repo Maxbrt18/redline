@@ -195,7 +195,7 @@ def test_the_overflow_guard_actually_fires(tmp_path):
     assert process.returncode != 0
     assert "card not generated" in process.stderr
     assert "card too tall" in process.stderr
-    assert not (tmp_path / "chart.png").exists(), "aucun PNG ne doit être écrit"
+    assert not (tmp_path / "chart.png").exists(), "no PNG may be written"
 
 
 # --------------------------------------------------------------- input errors
@@ -229,7 +229,7 @@ def test_a_malformed_payload_is_refused_by_name(tmp_path, script, payload, expec
     process = run_script(script, payload, out)
     assert process.returncode != 0
     assert expected in process.stderr, process.stderr
-    assert not out.exists(), "un payload refusé ne doit produire aucun PNG"
+    assert not out.exists(), "a refused payload must produce no PNG"
 
 
 @pytest.mark.parametrize("kind", ["a", "b", "assimilation"])

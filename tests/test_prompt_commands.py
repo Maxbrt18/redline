@@ -89,19 +89,19 @@ def test_the_prompts_do_cite_commands():
                          ids=[f"{o}:{s}" for o, s, _, _ in COMMANDS])
 def test_every_cited_command_is_executable(origin, script, suite, options):
     cited_command = cli_command(script.removeprefix("scripts/").removesuffix(".py"))
-    assert importlib.util.find_spec(cited_command[-1]), f"{origin} cite {script}, qui n'existe pas"
+    assert importlib.util.find_spec(cited_command[-1]), f"{origin} cites {script}, which does not exist"
 
     aide = subprocess.run([*cited_command, "--help"], cwd=ENGINE_ROOT,
                           capture_output=True, text=True, check=False)
     assert aide.returncode == 0, (
-        f"{origin} cite {script}, dont --help échoue : {aide.stderr[:200]}")
+        f"{origin} cites {script}, whose --help fails: {aide.stderr[:200]}")
 
     help_text = aide.stdout + aide.stderr
     for subcommand in suite.split():
         # `show/check` and the like are written out in full in the prompts; a
         # subcommand absent from the help is a command the coach cannot run.
         assert subcommand in help_text, (
-            f"{origin} cite `{script} {subcommand}`, absent de son aide")
+            f"{origin} cites `{script} {subcommand}`, missing from its help")
 
     for option in options:
         detailed = subprocess.run(
@@ -109,7 +109,7 @@ def test_every_cited_command_is_executable(origin, script, suite, options):
             capture_output=True, text=True, check=False)
         aide_complete = help_text + detailed.stdout + detailed.stderr
         assert option in aide_complete, (
-            f"{origin} cite `{option}` pour {script}, qui ne la connaît pas")
+            f"{origin} cites `{option}` for {script}, which does not know it")
 
 
 def test_every_command_goes_through_the_allowed_launcher():

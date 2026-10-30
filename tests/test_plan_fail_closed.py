@@ -342,4 +342,4 @@ def test_a_cell_is_marked_asked_only_when_a_message_really_leaves(make_bot):
     markers = bot._state.proactive
     assert not any(markers.marked("asked:2026-08-10:easy:" + column)
                    for column in entry["missing"]), \
-        "cellules classées « demandées » alors qu'aucun message n'est parti"
+        "cells marked as asked although no message went out"

@@ -849,7 +849,7 @@ class TurnWorker:
             kind="reactive", turn_id=outcome.turn_id,
             memory="\n---\n".join(part for part in (answer, *lines, canonical) if part),
             plan=plan_meta,
-            handoff=(f"QUESTION /deep : {text}\nRÉPONSE : {result.full_text}"
+            handoff=(replies.DEEP_HANDOFF.format(question=text, answer=result.full_text)
                      if deep_request else ""),
             clear_handoff=bool(handoff) and not deep_request)
         envelope = builder.build()

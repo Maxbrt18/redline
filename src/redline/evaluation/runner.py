@@ -38,4 +38,4 @@ def check_model(config: Config, spec: RunSpec) -> None:
 
     allowed = default_models(config.agent_provider)
     if spec.model not in allowed:
-        raise ValueError(f"Modèle non autorisé pour {config.agent_provider} : {spec.model}")
+        raise ValueError(f"model not allowed for {config.agent_provider}: {spec.model}")

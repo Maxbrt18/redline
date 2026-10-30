@@ -61,7 +61,7 @@ def test_a_debrief_that_speaks_without_recording_is_logged_not_announced(
     bot._respond_proactive(ProactiveJob(psid="4242", kind="strava_debrief",
                                         prompt="débriefe", detail=ACTIVITY))
 
-    assert client.send_burst.called, "la prose du coach part quand même"
+    assert client.send_burst.called, "the coach's prose goes out anyway"
     client.send_text.assert_not_called()
     assert "debrief-unrecorded" in caplog.text
 

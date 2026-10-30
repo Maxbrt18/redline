@@ -30,7 +30,7 @@ def test_bot_does_not_call_the_classifier_for_a_closed_case(make_bot):
         provider = "claude"
 
         def classify(self, message):
-            raise AssertionError("le classifieur ne devait pas être réveillé")
+            raise AssertionError("the classifier should not have been woken")
 
         def run(self, psid, message, **kwargs):
             from redline.service.agent import RunResult

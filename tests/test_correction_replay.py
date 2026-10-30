@@ -111,6 +111,6 @@ def test_vault_check_red_on_broken_reference_amber_on_debt(tmp_path):
 
 
 def test_the_real_register_follows_its_schema():
-    """Forme seulement : sa complétude est un contenu, jugé par vault-check."""
+    """Shape only: its completeness is content, judged by vault-check."""
     replay.load_ledger((ENGINE_ROOT / "tests/fixtures/corrections-replay.json")
                       .read_text(encoding="utf-8"))

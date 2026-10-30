@@ -55,8 +55,8 @@ def test_the_rules_name_the_json_fields():
     message."""
     for field in ("emotional", "plan_change", "plan_asked", "holding"):
         assert f"`{field}`" in TRIAGE_RULES, (
-            f"le champ {field} du schéma Codex n'est nommé nulle part dans la doctrine "
-            "partagée : le moteur structuré doit deviner la correspondance")
+            f"the Codex schema field {field} is named nowhere in the shared doctrine: "
+            "the structured engine would have to guess the mapping")
 
 
 def test_a_familiar_question_about_a_run_never_lands_on_the_social_rung():
@@ -321,11 +321,11 @@ def test_the_two_examples_differ_only_by_naming_the_machinery():
     lines = {start: line.split(":", 1)[1].strip()
               for line in STYLE_PROMPT.splitlines()
               for start in ("NON", "OUI") if line.strip().startswith(start + " :")}
-    assert set(lines) == {"NON", "OUI"}, "la paire d'exemples a disparu du style"
+    assert set(lines) == {"NON", "OUI"}, "the pair of examples is gone from the style"
     no, yes = len(lines["NON"].split()), len(lines["OUI"].split())
     assert abs(no - yes) <= 3, (
-        f"NON {no} mots, OUI {yes} : un écart de longueur fait porter au contraste "
-        "une leçon de brièveté au lieu de la règle qu'il illustre")
+        f"NON {no} words, OUI {yes}: a length gap makes the contrast teach brevity "
+        "instead of the rule it illustrates")
     assert "batterie" in lines["NON"].lower()
     assert "batterie" not in lines["OUI"].lower()
 
@@ -631,8 +631,8 @@ def test_no_injected_text_types_a_glyph_a_phone_keyboard_does_not_carry():
     for name, text in injected.items():
         for glyph in prompts.BANNED_GLYPHS:
             assert glyph not in text, (
-                f"« {glyph} » dans {name} : le prompt démontre ce qu'il interdit, "
-                f"autour de « {text[max(0, text.find(glyph) - 50):][:110]} »")
+                f"{glyph!r} in {name}: the prompt shows what it forbids, "
+                f"around {text[max(0, text.find(glyph) - 50):][:110]!r}")
 
 
 def test_the_glyph_rule_reaches_the_data_channel_not_only_the_written_prompts():
@@ -663,7 +663,7 @@ def test_the_glyph_rule_reaches_the_data_channel_not_only_the_written_prompts():
     fields = {"reason", "constraints[0]", "question", "note"}
     for field in fields:
         assert any(field in mistake for mistake in mistakes), (
-            f"{field} n'est pas jugé : ce texte est réinjecté au coach à chaque tour")
+            f"{field} is not judged: this text goes back to the coach every turn")
     # The message opens the correct path, it does not merely close the wrong one: a
     # guard without a correct path breeds its own workaround.
     assert any("Instead:" in mistake for mistake in mistakes)
@@ -691,12 +691,12 @@ def test_the_write_guard_is_wired_into_the_revise_path_not_merely_available():
     from conftest import ENGINE_ROOT
     source = (ENGINE_ROOT / "src" / "redline" / "cli" / "week_plan.py").read_text()
     assert "written_text_errors(current" in source, (
-        "le garde-fou typographique n'est pas appelé sur la révision neuve")
+        "the typography guard is not called on the new revision")
     before = source.index("written_text_errors(current")
     after = source.index("validate(candidate)")
     assert before < after, (
-        "le texte doit être jugé avant le plan qui le contient : sinon une révision "
-        "sale est acceptée dès que le plan, lui, valide")
+        "the text must be judged before the plan that holds it: otherwise a dirty "
+        "revision is accepted as soon as the plan itself is valid")
 
 
 def test_tentative_logistics_does_not_inherit_a_plan_change_obligation():
