@@ -2706,3 +2706,63 @@ def test_the_decision_state_counts_only_what_was_visible_that_day(store):
     state = decision_state.snapshot(store, dt.date(2026, 8, 4))
 
     assert state == {"as_of": "2026-08-04", "week_km_done": 7.0, "pain_max_7d": {"knee": 3}}
+
+
+def test_the_fuelling_answer_is_awaited_recorded_and_drives_the_progression(store):
+    """The gut review asks two figures; the coach must be able to record them, and the
+    progression guard reads them."""
+    from test_weekly_plan import revision as build_revision
+    from test_weekly_plan import session
+
+    from redline.model import ledger as ledger_model
+
+    long_run = session("w33-dim-sl", "2026-08-16", "long", carbs_target_g_h=60)
+    store.append_plan_revision("2026-W33", build_revision(
+        1, sessions=[long_run], computed_at="2026-08-09T19:10:00+02:00"))
+    store.add_observation({
+        "occurred_on": dt.date(2026, 8, 16), "kind": "long",
+        "started_at": dt.datetime(2026, 8, 16, 8, 0, tzinfo=dt.UTC),
+        "idempotency_key": "strava:4243", "strava_activity_id": 4243,
+        "note": "", "measurements": {},
+        "session_key": "2026-W33:w33-dim-sl"})
+    row = next(row for row in store.observation_rows()
+               if row["idempotency_key"] == "strava:4243")
+    assert {"carbs_g_h", "gut_symptoms"} <= set(ledger_model.missing_observation_fields(row))
+
+    env = {**os.environ, "DATABASE_URL": URL}
+    env.pop("REDLINE_TURN_ID", None)
+    for metric, value in (("carbs_g_h", "55"), ("gut_symptoms", "2")):
+        done = subprocess.run([*cli_command("ledger-complete"), "--key", "strava:4243",
+                               "--metric", metric, "--value", value],
+                              cwd=ENGINE_ROOT, env=env, capture_output=True, text=True,
+                              check=False)
+        assert done.returncode == 0, done.stderr
+    row = next(row for row in store.observation_rows()
+               if row["idempotency_key"] == "strava:4243")
+    assert not {"carbs_g_h", "gut_symptoms"} & set(ledger_model.missing_observation_fields(row))
+
+    following = session("w34-dim-sl", "2026-08-23", "long", carbs_target_g_h=80)
+    with pytest.raises(StorageError, match="above the allowed step of 75"):
+        store.append_plan_revision("2026-W34", build_revision(
+            1, sessions=[following], computed_at="2026-08-17T19:10:00+02:00"))
+
+
+def test_a_session_without_a_fuelling_target_awaits_no_fuelling_figure(store):
+    from redline.model import ledger as ledger_model
+
+    store.add_observation(observation(strava=90000000103))
+    row = next(row for row in store.observation_rows()
+               if row["idempotency_key"] == "test:90000000103")
+    assert not {"carbs_g_h", "gut_symptoms"} & set(ledger_model.missing_observation_fields(row))
+
+
+def test_a_named_sugar_mix_is_stored_and_read_back(store):
+    from test_weekly_plan import revision as build_revision
+    from test_weekly_plan import session
+
+    long_run = session("w33-dim-sl", "2026-08-16", "long", carbs_target_g_h=70,
+                       carbs_mix="glucose_fructose")
+    store.append_plan_revision("2026-W33", build_revision(
+        1, sessions=[long_run], computed_at="2026-08-09T19:10:00+02:00"))
+    stored = store.load_plan("2026-W33")["revisions"][0]["sessions"][0]
+    assert (stored["carbs_target_g_h"], stored["carbs_mix"]) == (70, "glucose_fructose")

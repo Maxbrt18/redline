@@ -36,6 +36,10 @@ stall_tolerance_km = 0.1
 wake_trace_until = "14:00"
 # Rule n2: the planned assimilation weeks (ISO weeks). Nothing new is placed in them.
 assimilation_weeks = []
+# Rule f1: no fuelling target above this ceiling (g/h): no gain is shown beyond it.
+carbs_cap_g_h = 90
+# Rule f1: above this target (g/h), the session names a glucose-fructose mix.
+carbs_mix_above_g_h = 60
 
 # ------------------------------------------------------------------ transitions
 
@@ -153,3 +157,11 @@ text = "plus longue sortie sans nouveau record sur {stall_weeks} semaines closes
 grade = "règle de coaching"
 owner = "athlete/goals.md"
 enforced_by = "redline ledger --week (bloc Trajectoire)"
+
+[[rules]]
+id = "f1"
+title = "Carburant"
+text = "cible au plus {carbs_cap_g_h} g/h ; au-delà de {carbs_mix_above_g_h} g/h, mélange glucose-fructose nommé sur la séance. Jamais de cible de boisson en mL/h."
+grade = "consensus (Plews et al. ; Martinez et al. pour l'entraînement digestif)"
+owner = "coaching/current-plan.md"
+enforced_by = "redline week-plan revise (champs carbs_target_g_h et carbs_mix)"

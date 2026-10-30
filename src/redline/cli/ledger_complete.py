@@ -27,7 +27,7 @@ from redline.model.vocabulary import HrDoubt
 
 METRICS = ("rpe", "pain", "enjoyment", "distance_km", "duration_s", "pace_s_per_km",
            "hr_avg_bpm", "hr_max_bpm", "cadence_spm", "elevation_gain_m",
-           "elevation_loss_m", "wbgt_c")
+           "elevation_loss_m", "wbgt_c", "carbs_g_h", "gut_symptoms")
 
 
 def resolve_key(store, key: str, date: str, kind: str) -> str:

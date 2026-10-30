@@ -44,6 +44,9 @@ def plan_digest(session: dict) -> str:
         "distance_target_km", "distance_cap_km", "duration_cap_min",
         "rpe_min", "rpe_max", "hr_zone", "cadence_target", "note",
     )}
+    # Added only when present, so the cycles stored before the field keep their print.
+    if session.get("carbs_mix") is not None:
+        visible["carbs_mix"] = session["carbs_mix"]
     canonical = json.dumps(visible, ensure_ascii=False, sort_keys=True,
                            separators=(",", ":"), default=str)
     return hashlib.sha256(canonical.encode()).hexdigest()

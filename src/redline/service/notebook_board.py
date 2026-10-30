@@ -170,7 +170,9 @@ def _planned(session: dict) -> list[str]:
     if session.get("cadence_target"):
         parts.append(f"cadence ~{session['cadence_target']}")
     if session.get("carbs_target_g_h") is not None:
-        parts.append(notebook_text.CARBS.format(grams=session["carbs_target_g_h"]))
+        parts.append(" ".join(filter(None, (
+            notebook_text.CARBS.format(grams=session["carbs_target_g_h"]),
+            notebook_text.CARBS_MIX.get(session.get("carbs_mix") or "")))))
     return parts
 
 

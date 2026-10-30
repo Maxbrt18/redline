@@ -679,3 +679,41 @@ def test_a_rule_decision_names_a_rule_of_the_rulebook():
 
 def test_history_without_a_decision_stays_readable():
     weekly_plan.validate({"week": "2026-W32", "revisions": [revision()]})
+
+
+def _fuelled(target, mix=None):
+    long_run = session("w32-dim-sl", "2026-08-09", "long", carbs_target_g_h=target)
+    if mix:
+        long_run["carbs_mix"] = mix
+    return written_today(sessions=[long_run])
+
+
+def test_a_fuelling_target_above_the_ceiling_is_refused():
+    problems = weekly_plan.fuelling_errors(_fuelled(100, "glucose_fructose"))
+    assert len(problems) == 1 and "above the ceiling of 90 g/h" in problems[0]
+    assert weekly_plan.fuelling_errors(_fuelled(90, "glucose_fructose")) == []
+
+
+def test_above_the_mix_threshold_the_session_names_a_glucose_fructose_mix():
+    assert "name the mix" in weekly_plan.fuelling_errors(_fuelled(70))[0]
+    assert "name the mix" in weekly_plan.fuelling_errors(_fuelled(70, "glucose"))[0]
+    assert weekly_plan.fuelling_errors(_fuelled(70, "glucose_fructose")) == []
+    assert weekly_plan.fuelling_errors(_fuelled(60)) == []
+
+
+def test_a_mix_without_a_target_is_refused():
+    lone = session("w32-dim-sl", "2026-08-09", "long", carbs_mix="glucose")
+    with pytest.raises(SchemaError, match="carbs_mix only goes with"):
+        weekly_plan.validate({"week": "2026-W32", "revisions": [written_today(sessions=[lone])]})
+
+
+def test_a_threshold_the_rulebook_does_not_declare_does_not_apply(monkeypatch):
+    from dataclasses import replace
+
+    from redline.model import rulebook
+
+    book = rulebook.current()
+    bare = replace(book, parameters=replace(book.parameters, carbs_cap_g_h=None,
+                                            carbs_mix_above_g_h=None))
+    monkeypatch.setattr(weekly_plan.rulebook, "current", lambda: bare)
+    assert weekly_plan.fuelling_errors(_fuelled(120)) == []

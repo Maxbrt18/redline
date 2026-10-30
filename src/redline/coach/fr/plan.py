@@ -16,6 +16,8 @@ RPE = "RPE {low}-{high}"
 CADENCE = "cadence ~{cadence}{unit}"
 CADENCE_UNIT = " pas/min"
 CARBS = "glucides {grams} g/h"
+#: How a named sugar mix reads after the target.
+CARBS_MIX = {"glucose": "glucose", "glucose_fructose": "glucose-fructose"}
 
 DONE = "fait"
 WITH_TRANSITION = ", transition {label}"

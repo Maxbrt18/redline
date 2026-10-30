@@ -466,6 +466,7 @@ planned_sessions = sa.Table(
     sa.Column("calibration", sa.Boolean, nullable=False, server_default=sa.false()),
     sa.Column("location_label", sa.Text),
     sa.Column("carbs_target_g_h", sa.SmallInteger),
+    sa.Column("carbs_mix", sa.Text),
     # For optional JSONB, a business absence is an SQL NULL. The SQLAlchemy JSONB default
     # otherwise turns Python None into JSON `null`: `IS NULL` becomes false and conditional
     # constraints take an absence for a present object. The PostgreSQL CI covers this
@@ -508,6 +509,10 @@ planned_sessions = sa.Table(
                        name="ck_planned_sessions_hr_cap"),
     sa.CheckConstraint("carbs_target_g_h IS NULL OR carbs_target_g_h BETWEEN 0 AND 150",
                        name="ck_planned_sessions_carbs_target"),
+    sa.CheckConstraint(
+        f"carbs_mix IS NULL OR (carbs_target_g_h IS NOT NULL "
+        f"AND carbs_mix IN ({voc.sql_values(voc.CarbMix)}))",
+        name="ck_planned_sessions_carbs_mix"),
     sa.CheckConstraint(
         "strength_spec IS NULL OR jsonb_typeof(strength_spec) = 'object'",
         name="ck_planned_sessions_strength_spec"),

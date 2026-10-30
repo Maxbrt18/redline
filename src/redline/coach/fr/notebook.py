@@ -25,6 +25,8 @@ PAIN_SCALE: list[ScaleStep] = [
 ]
 
 CARBS = "glucides {grams} g/h"
+#: How a named sugar mix reads after the target.
+CARBS_MIX = {"glucose": "glucose", "glucose_fructose": "glucose-fructose"}
 
 MOVED = "Déplacée le {day:%d/%m}."
 
