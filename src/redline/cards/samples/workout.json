@@ -1,0 +1,64 @@
+{
+  "title": "6 x 400 m",
+  "date": "jeudi 25 juillet",
+  "target_pace": "3:45",
+  "note": "SV2, récup 1'30",
+  "reps": [
+    {
+      "label": "R1",
+      "time_s": 91,
+      "dist_m": 400,
+      "hr": 168,
+      "recovery": {
+        "time_s": 90,
+        "dist_m": 230
+      }
+    },
+    {
+      "label": "R2",
+      "time_s": 90,
+      "dist_m": 400,
+      "hr": 172,
+      "recovery": {
+        "time_s": 90,
+        "dist_m": 230
+      }
+    },
+    {
+      "label": "R3",
+      "time_s": 91,
+      "dist_m": 400,
+      "hr": 175,
+      "recovery": {
+        "time_s": 90,
+        "dist_m": 0
+      }
+    },
+    {
+      "label": "R4",
+      "time_s": 89,
+      "dist_m": 400,
+      "hr": 178,
+      "recovery": {
+        "time_s": 90,
+        "dist_m": 230
+      }
+    },
+    {
+      "label": "R5",
+      "time_s": 88,
+      "dist_m": 400,
+      "hr": 181,
+      "recovery": {
+        "time_s": 90,
+        "dist_m": 230
+      }
+    },
+    {
+      "label": "R6",
+      "time_s": 84,
+      "dist_m": 400,
+      "hr": 186
+    }
+  ]
+}

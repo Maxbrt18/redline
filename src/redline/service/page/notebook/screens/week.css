@@ -1,0 +1,71 @@
+/* Week: one figure, one bar, seven lines; the detail unfolds, one day at a time. */
+.n-ksum { margin: 14px 0 0; }
+.n-ksum b { font: 700 56px/0.9 var(--display); }
+.n-ksum span { font-size: 17px; color: var(--muted); margin-left: 6px; }
+.n-kmeter { height: 6px; background: var(--ghost); border-radius: 3px; margin: 14px 0 0; overflow: hidden; }
+.n-kmeter i { display: block; height: 100%; background: var(--data); border-radius: 3px; }
+.n-ksub { color: var(--muted); font-size: 14px; margin: 10px 0 18px; }
+/* The week's bars: solid = done, dashed = planned, hairline = rest. */
+.n-chart { margin: 0 0 22px; }
+.n-strip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 26px; align-items: end; height: 104px; }
+.n-sday { display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+.n-bar { width: 100%; border-radius: 4px; background: var(--data); position: relative; }
+.n-bar.plan { background: transparent; border: 1.5px dashed var(--faint); }
+.n-bar.long { border-color: var(--ink); }
+.n-bar.flat { height: 3px !important; background: var(--grid); border: 0; }
+.n-bar small { position: absolute; top: -18px; left: -4px; right: -4px; text-align: center; font-size: 11px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.n-bar.long small { color: var(--ink); }
+.n-letters { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 6px; text-align: center; font-size: 12px; color: var(--muted); }
+/* Today in red, like its number in the list and its letter in the tile. */
+.n-letters span.today { color: var(--red); font-weight: 700; }
+.n-pending { color: var(--muted); }
+.n-pending small { color: var(--faint); }
+.n-letters em { display: block; font-style: normal; font-size: 10.5px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.n-ksub b { color: var(--ink); font-weight: 600; }
+.n-kdays { border-top: 1px solid var(--grid); }
+.n-kday { border-bottom: 1px solid var(--grid); }
+.n-krow { display: grid; grid-template-columns: 50px 1fr auto; align-items: baseline; gap: 10px; width: 100%; padding: 15px 0;
+  background: none; border: 0; text-align: left; color: var(--ink); font: inherit; }
+.n-kd { font-size: 12.5px; color: var(--muted); line-height: 1.15; }
+.n-kd b { display: block; font: 700 20px/1 var(--display); color: var(--ink); }
+.n-krow.today .n-kd, .n-krow.today .n-kd b { color: var(--red); }
+.n-kt { font-size: 16px; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.n-kt small { display: block; font-size: 13px; font-weight: 400; color: var(--over); margin-top: 3px; }
+.n-kv { font-size: 15px; font-weight: 600; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.n-kchev { transition: transform .15s; }
+.n-kday.open .n-kchev { transform: rotate(90deg); }
+.n-krow.plan .n-kt, .n-krow.plan .n-kv { color: var(--muted); font-weight: 500; }
+.n-krow.rest .n-kt { color: var(--faint); font-weight: 400; }
+.n-krow.skip .n-kt { color: var(--faint); font-weight: 400; text-decoration: line-through; }
+.n-kmore { margin: -6px 0 0 60px; padding: 0 0 16px; }
+.n-kmore p { margin: 0 0 4px; font-size: 13.5px; color: var(--muted); }
+.n-kmore .n-gauges { margin: 10px 0 4px; }
+.n-gauges { display: grid; gap: 9px; margin-top: 12px; }
+.n-g { display: grid; grid-template-columns: 58px 1fr 74px; align-items: center; gap: 10px; font-size: 12.5px; }
+.n-g > span:first-child { color: var(--muted); }
+.n-rail { position: relative; height: 6px; border-radius: 3px; background: var(--ghost); }
+.n-rail i { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 3px; background: var(--data); }
+.n-rail i.out { background: var(--over); border-radius: 0 3px 3px 0; }
+.n-rail u { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--ink); }
+.n-rail u.floor { background: var(--faint); }
+.n-cross { display: inline-block; margin-left: 8px; padding: 2px 6px 3px; border-radius: 6px; vertical-align: 2px; white-space: nowrap;
+  background: color-mix(in oklab, var(--over) 12%, transparent); color: var(--over); font: 600 11.5px/1.2 var(--sans); }
+.n-kday.open .n-cross { display: none; }
+.n-gv { text-align: right; white-space: nowrap; }
+.n-gv b { font-weight: 600; font-size: 13.5px; }
+.n-gv span { color: var(--muted); margin-left: 5px; font-size: 12px; }
+
+/* Past weeks: the name, the dates, the fact against the target. */
+.n-wrow { display: grid; grid-template-columns: 1fr 100px 14px; gap: 12px; align-items: center; width: 100%; background: none; border: 0;
+  border-bottom: 1px solid var(--grid); padding: 13px 0; text-align: left; font-size: 15.5px; }
+.n-wrow:last-child { border-bottom: 0; }
+.n-wrow small { display: block; color: var(--muted); font-size: 13px; }
+.n-wfig small { text-align: right; margin-top: 4px; }
+.n-wmeter { display: block; height: 6px; border-radius: 3px; background: var(--ghost); overflow: hidden; }
+.n-wmeter i { display: block; height: 100%; background: var(--data); }
+.n-shortcut { width: 100%; background: none; border: 0; padding: 0; text-align: left; }
+@media (max-width: 360px) { .n-ksum b { font-size: 46px; } }
+/* The family pill in front of the session; two sessions, two pills. */
+.n-krow { align-items: center; }
+.n-kt { display: flex; align-items: center; gap: 10px; }
+.n-kt > span:last-child { min-width: 0; }

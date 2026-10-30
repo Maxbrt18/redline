@@ -1,0 +1,28 @@
+#!/bin/sh
+# The fast half of the CI gate, before a commit that touches Python: ruff and mypy, a
+# few seconds. The test suite stays in the CI, where it runs on every pull request.
+# A vault has its own hook: templates/vault/.githooks/pre-commit.
+#
+# Enabled with `git config core.hooksPath .githooks`. Each tool is skipped ALOUD when it
+# is not installed: a silent skip reads like a passing gate.
+set -e
+cd "$(git rev-parse --show-toplevel)"
+
+if [ -x .venv/bin/python ]; then
+    PYTHON=.venv/bin/python
+else
+    PYTHON=python3
+fi
+
+git diff --cached --name-only | grep -qE '\.py$' || exit 0
+for tool in ruff mypy; do
+    if "$PYTHON" -c "import $tool" 2>/dev/null; then
+        if [ "$tool" = ruff ]; then
+            "$PYTHON" -m ruff check .
+        else
+            "$PYTHON" -m mypy
+        fi
+    else
+        echo "pre-commit : $tool absent, non lancé."
+    fi
+done

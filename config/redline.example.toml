@@ -1,0 +1,66 @@
+# Configuration d'une instance Redline. À copier à la racine du vault sous le nom
+# `redline.toml`, puis à remplir : le service refuse de démarrer tant qu'une valeur
+# entre crochets reste telle quelle.
+
+[athlete]
+# Le prénom que le coach emploie dans ses messages.
+name = "[Prénom]"
+# FC de repos et FC max, en bpm : les zones Karvonen en dérivent (Z2 à 60 % de la
+# réserve, Z3 à 70 %…), et le haut de la Z2 plafonne les EF. Une FC max estimée se
+# dit telle au coach, dans le profil de l'athlète.
+hr_rest = "[FC de repos]"
+hr_max = "[FC max]"
+# Le fuseau IANA où vit l'athlète : ses journées, les heures de son programme, ses
+# matins. Le stockage reste en UTC.
+timezone = "[Fuseau IANA, ex. Europe/Paris]"
+# La locale des dates et des listes (Babel). Facultative : « fr_FR » par défaut. Seul
+# le français a des textes du coach.
+# locale = "fr_FR"
+
+[notebook]
+# Le lieu de la météo des séances qui n'en déclarent pas (geocodage Open-Meteo).
+place = "[Ville]"
+
+# Les zones que le coach surveille, une par bloc : la douleur se note et se suit zone
+# par zone, jamais mélangée. Sans bloc [[injuries]], aucune. Le slug est l'identité
+# stable de la zone en base ; le libellé, ce que le carnet et les messages affichent.
+# [[injuries]]
+# slug = "genou"
+# label = "Genou"
+#
+# [[injuries]]
+# slug = "cheville"
+# label = "Cheville"
+
+# Les capacités que le cockpit suit, dans l'ordre d'affichage. Le slug est celui que
+# `fact-write.py capability` enregistre ; le libellé est ce que le carnet affiche ;
+# l'icône, facultative, est l'une de run, descent, food, night, pain, mind.
+[[capabilities]]
+slug = "cap1-endurance"
+label = "Endurance"
+icon = "run"
+
+[[capabilities]]
+slug = "cap2-vitesse"
+label = "Vitesse"
+icon = "run"
+
+# Le registre : à partir de quel jour les séances doivent être complètes (RPE, douleur,
+# plaisir). Facultatif : sans ce bloc, toutes. Utile pour une instance qui reprend un
+# historique tenu avant ce contrat, qu'on ne veut pas voir réclamé.
+# [ledger]
+# complete_from = "2030-01-01"
+
+# Ce que `redline vault-check` vérifie dans le vault. Facultatif : sans ce bloc, ni le type
+# des notes ni le budget de lecture ne sont contrôlés.
+# [vault]
+# Les valeurs admises du champ `type` du frontmatter.
+# note_types = ["concept", "episode", "exercise"]
+#
+# Le coût de lecture de l'agent, en mots, par étage : un étage dit quand ses fichiers
+# se paient (à chaque message, ou seulement quand un jugement s'engage), et deux étages
+# ne se compensent jamais. La somme des plafonds d'un étage ne dépasse pas son total.
+# [[vault.budget]]
+# tier = "par tour"
+# total = 3600
+# files = [{ path = "CLAUDE.md", words = 2200 }, { path = "ai/hot-cache.md", words = 1400 }]

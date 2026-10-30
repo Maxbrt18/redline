@@ -1,0 +1,67 @@
+[Unit]
+Description=Redline coach (Codex or Claude Code on the vault, Messenger webhook)
+After=network-online.target
+Wants=network-online.target
+# Bound crash loops. Deployment is external; Restart=always only recovers runtime
+# failures and does not update the checkout.
+StartLimitBurst=5
+StartLimitIntervalSec=120
+
+[Service]
+Type=simple
+# --- Adapt these lines to your VPS ---
+# The service runs as `redline`, a system account without sudo that owns nothing but
+# its state (/var/lib/redline: the vault, the outbox, the Claude sessions). The engine
+# checkout, its venv and the agent runtime belong to the deploy account (`ubuntu` here):
+# the service reads them, a turn can never rewrite them.
+User=redline
+Group=redline
+WorkingDirectory=/home/ubuntu/redline
+EnvironmentFile=/etc/redline/runtime/coach-messenger.env
+StateDirectory=redline
+StateDirectoryMode=0700
+Environment=HOME=/var/lib/redline
+Environment=REDLINE_STATE_DIR=/var/lib/redline/state
+# VAULT_PATH (environment file) points inside the state directory, for instance
+# /var/lib/redline/vault: the only tree outside it that the service may write is none.
+# PATH must contain `node` and, when selected, `claude` (here a runtime installed under
+# ~/.claude-runtimes/current, ahead of a global npm install). The venv comes FIRST on
+# purpose: it holds the engine (installed editable from this checkout) and
+# playwright, and the coach's commands run with the `python` resolved here. The venv
+# lives OUTSIDE the repo -- the bot does `git add -A`, and a venv inside the working
+# tree would get committed.
+Environment=PATH=/home/ubuntu/.venvs/redline-current/bin:/home/ubuntu/.claude-runtimes/current/node_modules/.bin:/home/ubuntu/.local/bin:/usr/local/bin:/usr/bin:/bin
+# Claude Code must not update itself: a new version is installed deliberately, after a
+# preflight, never in the middle of a turn.
+Environment=DISABLE_AUTOUPDATER=1
+# The service sets its own time zone from the vault's redline.toml.
+
+# Sandbox: the whole file system is read-only except the state directory. No new
+# privilege, no device, no kernel tunable. The agent runtimes need nothing more:
+# Node's JIT rules out MemoryDenyWriteExecute, and the Codex sandbox (bubblewrap) needs
+# user namespaces, which rules out RestrictNamespaces.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+UMask=0077
+
+ExecStartPre=/usr/bin/test -S /run/redline-postgres/.s.PGSQL.5432
+ExecStartPre=/usr/bin/test -x /usr/local/bin/redline-agent-cli
+ExecStartPre=/usr/bin/test -r /usr/local/share/redline/agent-cli-tools.txt
+ExecStart=/home/ubuntu/.venvs/redline-current/bin/python -m redline
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

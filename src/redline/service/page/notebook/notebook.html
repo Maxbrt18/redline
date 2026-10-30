@@ -1,0 +1,98 @@
+<div class="n-app">
+  <p id="notice" class="n-notice" role="status" aria-live="polite">Ouverture de ton carnet…</p>
+  <section id="locked" hidden>
+    <h1>Ton carnet privé</h1>
+    <p>Ta séance du jour, ta semaine et ta course, sans remonter la conversation.</p>
+    <p>Pour te connecter, envoie <strong>/carnet</strong> dans Messenger et ouvre le bouton reçu sur cet appareil.</p>
+  </section>
+  <section id="handoff" hidden>
+    <h1>Ouvre ton carnet dans Safari</h1>
+    <p>Le navigateur de Messenger ne garde pas la connexion. Ce lien n’a pas encore servi : ouvre-le dans ton navigateur habituel pour y connecter ton carnet.</p>
+    <a id="handoff-safari" class="n-action" href="#">Ouvrir dans Safari</a>
+    <p><button id="handoff-copy" type="button" class="n-quiet">Copier le lien</button></p>
+    <p class="n-meta">Sinon : menu ⋯ en haut à droite, puis « Ouvrir dans le navigateur ». Le lien ne vaut que pour un appareil.</p>
+    <p><button id="handoff-here" type="button" class="n-quiet">Me connecter ici quand même</button></p>
+  </section>
+  <div id="connected" hidden>
+    <header id="bar" class="n-topbar">
+      <div class="n-topbar-in">
+        <div class="l"><button id="workout-close" type="button" class="n-glass n-round n-sv" aria-label="Fermer la séance"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg></button><button id="back" type="button" class="n-glass n-round" aria-label="Retour" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button><button id="viewer-close" type="button" class="n-round n-vw" aria-label="Fermer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg></button></div>
+        <div id="bar-title" class="c" aria-hidden="true"></div>
+        <div class="r"><button id="workout-sound" type="button" class="n-glass n-round n-sv" aria-label="Son" aria-haspopup="dialog" aria-controls="sound-sheet"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="on" d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.8 7.8 0 0 1 0 11"/><path class="off" d="M16 9.5l5 5M21 9.5l-5 5"/></svg></button><button id="viewer-share" type="button" class="n-round n-vw" aria-label="Partager"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3.5M8 7.5l4-4 4 4"/><path d="M8.5 10.5H7a2 2 0 0 0-2 2V19a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6.5a2 2 0 0 0-2-2h-1.5"/></svg></button><button id="settings" type="button" class="n-glass n-round" aria-label="Réglages" aria-haspopup="dialog" aria-controls="sheet"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.18 10.22 L21.50 10.65 L21.50 13.35 L19.18 13.78 L18.34 15.82 L19.68 17.76 L17.76 19.68 L15.82 18.34 L13.78 19.18 L13.35 21.50 L10.65 21.50 L10.22 19.18 L8.18 18.34 L6.24 19.68 L4.32 17.76 L5.66 15.82 L4.82 13.78 L2.50 13.35 L2.50 10.65 L4.82 10.22 L5.66 8.18 L4.32 6.24 L6.24 4.32 L8.18 5.66 L10.22 4.82 L10.65 2.50 L13.35 2.50 L13.78 4.82 L15.82 5.66 L17.76 4.32 L19.68 6.24 L18.34 8.18Z"/><circle cx="12" cy="12" r="3.1"/></svg></button></div>
+      </div>
+    </header>
+    <div id="ptr" class="n-ptr" aria-hidden="true"><i></i></div>
+    <div id="page" class="n-page">
+      <div id="screen">
+        <div class="n-lt"><h1 id="lt-title"></h1><p id="lt-sub"></p></div>
+        <p id="offline" class="n-offline" role="status" hidden></p>
+        <main id="content" aria-live="polite"></main>
+      </div>
+    </div>
+    <div id="workout" hidden>
+      <main class="p-app" id="app" hidden>
+        <header>
+          <div class="n-lt"><h1 id="title"></h1><p id="meta"></p></div>
+          <p class="p-note" id="note" hidden></p>
+          <p class="p-note p-note--gate" id="gate" hidden></p>
+        </header>
+        <details class="p-prep" id="prep">
+          <summary>Préparer la séance</summary>
+          <div id="prep-content"></div>
+        </details>
+        <section class="p-open" id="open" hidden></section>
+        <ol class="p-steps" id="steps"></ol>
+        <p class="p-rule" id="rule"></p>
+        <section class="p-review" id="review" hidden></section>
+        <p class="p-status" id="storage-status" hidden></p>
+      </main>
+      <section class="p-boot" id="boot">
+        <p class="p-boot__title" id="boot-title">Un instant</p>
+        <p class="p-boot__msg" id="boot-msg">Ouverture de la séance…</p>
+      </section>
+    </div>
+    <nav class="n-nav n-glass" aria-label="Rubriques du carnet">
+      <div class="n-tabs">
+        <button type="button" data-tab="today" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/><circle cx="12" cy="15.2" r="1.9" class="dot"/></svg>Aujourd’hui</button>
+        <button type="button" data-tab="week"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20v-5M8 20v-8M12 20v-3M16 20v-10M20 20V6"/></svg>Semaine</button>
+        <button type="button" data-tab="course"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21V4"/><path class="flag" d="M6 4.5h11.5l-2.6 4 2.6 4H6"/></svg>Course</button>
+      </div>
+    </nav>
+  </div>
+  <div id="sheet" class="n-sheetwrap" hidden>
+    <div class="n-scrim" data-close></div>
+    <div class="n-sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+      <div class="n-grab" aria-hidden="true"></div>
+      <div class="n-sheet-head"><span></span><h2 id="sheet-title">Réglages</h2><button type="button" class="n-glass n-round" data-close aria-label="Fermer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg></button></div>
+      <div class="n-group"><div class="n-cell n-theme" role="group" aria-label="Thème"><span>Thème</span><div class="n-seg">
+        <button type="button" data-theme-choice="auto">Auto</button><button type="button" data-theme-choice="light">Clair</button><button type="button" data-theme-choice="dark">Sombre</button>
+      </div></div></div>
+      <div id="install"></div>
+      <div id="device" class="n-group">
+        <button id="logout" type="button" class="n-cell n-danger">Déconnecter cet appareil</button>
+      </div>
+      <p id="stamp" class="n-small"></p>
+    </div>
+  </div>
+  <div id="sound-sheet" class="n-sheetwrap" hidden>
+    <div class="n-scrim" data-close></div>
+    <div class="n-sheet" role="dialog" aria-modal="true" aria-labelledby="sound-title">
+      <div class="n-grab" aria-hidden="true"></div>
+      <div class="n-sheet-head"><span></span><h2 id="sound-title">Son</h2><button type="button" class="n-glass n-round" data-close aria-label="Fermer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg></button></div>
+      <div id="sound-panel"></div>
+    </div>
+  </div>
+  <div id="leave-sheet" class="n-sheetwrap" hidden>
+    <div class="n-scrim" data-close></div>
+    <div class="n-sheet" role="alertdialog" aria-modal="true" aria-labelledby="leave-title" aria-describedby="leave-text">
+      <div class="n-grab" aria-hidden="true"></div>
+      <div class="n-sheet-head"><span></span><h2 id="leave-title">Quitter la séance ?</h2><span></span></div>
+      <p id="leave-text" class="n-leave">Rien n’est perdu : ta progression reste sur ce téléphone, et tu reprendras là où tu en es.</p>
+      <div class="n-group"><button id="leave-stay" type="button" class="n-cell" data-close>Continuer la séance</button><button id="leave-confirm" type="button" class="n-cell">Quitter</button></div>
+    </div>
+  </div>
+  <div id="viewer" class="n-viewer" role="dialog" aria-modal="true" aria-label="Carte agrandie" hidden>
+    <div class="n-viewer-stage"><img id="viewer-img" alt="" draggable="false"></div>
+  </div>
+  <p id="toast" class="n-toast" role="status" aria-live="polite" hidden></p>
+</div>

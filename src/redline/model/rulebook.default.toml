@@ -1,0 +1,155 @@
+# The engine's default rulebook: the guardrails IN FORCE and the thresholds the code
+# applies. An instance that wants its own copies this file to its vault root as
+# `rulebook.toml`: it then replaces this one entirely, never in part.
+#
+# The rulebook compiles what was decided; it decides nothing. Changing the MEANING of a
+# rule is a coaching decision: a dated entry in `coaching/decisions.md`, then the rule's
+# owner, then this file, in the same commit. A rule's history lives with its owner, never
+# here: an old version resurfacing is exactly what this file exists to prevent.
+
+# ------------------------------------------------------------------ applied thresholds
+
+[parameters]
+# Rule n8: a transition is a session whose KIND has been absent for this many days.
+# It is also the window of the longest recent outing, the reference for a long-run step.
+transition_lookback_days = 30
+# Rule n8: at most this many transitions per week, checked when the program is written.
+transitions_per_week = 1
+# The gate: an easy increase may be added if each zone's weekly effort peak stays at or
+# below this level...
+gate_effort_peak = 1.5
+# ... over this many weeks without an increase.
+gate_trend_weeks = 2
+# Rule n3: pain cap during effort, on its table.
+pain_cap = 2
+# Rule n7: a session at least this long (in hours) counts as a hard day.
+hard_min_hours = 1.25
+# The taper covers the last N weeks, race week included.
+taper_weeks = 3
+# A longest outing with no new record over this many CLOSED weeks opens the protocol that
+# investigates drops.
+stall_weeks = 3
+# Below this gap (km), two outings are "the same" longest one: GPS noise.
+stall_tolerance_km = 0.1
+# The waking trace is collected in the morning: after this local time the logbook stops
+# asking for it and the reminder is no longer sent.
+wake_trace_until = "14:00"
+# Rule n2: the planned assimilation weeks (ISO weeks). Nothing new is placed in them.
+assimilation_weeks = []
+
+# ------------------------------------------------------------------ transitions
+
+# The session KINDS a transition may carry. The slug is what the program records; the
+# label, what the logbook and the review display. `race_first`: a first time the race
+# requires before the taper (the backward solver places it). `quality`: the session is
+# debriefed as a quality session, repetition by repetition.
+[[transitions]]
+slug = "quality"
+label = "1re qualité"
+quality = true
+
+[[transitions]]
+slug = "descent"
+label = "1er bloc descente"
+
+[[transitions]]
+slug = "night"
+label = "1re nocturne"
+
+[[transitions]]
+slug = "terrain"
+label = "terrain neuf"
+
+[[transitions]]
+slug = "reconnaissance"
+label = "reconnaissance du tracé"
+race_first = true
+
+# ------------------------------------------------------------------ rules
+
+# One line per rule, injected to the coach every turn: short, without history. `text` may
+# cite a threshold in braces (`{pain_cap}`): the applied value and the value told to the
+# coach are thus the same. `owner` names the vault file holding the reasoning;
+# `enforced_by`, what applies the rule.
+#
+# Rules n2, n7, n8, po and s9 are enforced by the engine: they are mandatory.
+
+[[rules]]
+id = "n1"
+title = "Qualité"
+text = "une par semaine au plus, introduite seulement porte ouverte. Zéro VMA."
+grade = "règle de coaching"
+owner = "coaching/current-plan.md"
+enforced_by = "le coach"
+
+[[rules]]
+id = "n2"
+title = "Assimilation"
+text = "-25 à -30 % toutes les 3-4 semaines, fréquence gardée ; on n'y ajoute rien."
+grade = "règle de coaching"
+owner = "coaching/current-plan.md"
+enforced_by = "le coach ; redline feasibility (semaines d'assimilation)"
+
+[[rules]]
+id = "n3"
+title = "Douleur"
+text = "plafond {pain_cap}/10 à l'effort, zone par zone ; au-dessus ou foulée modifiée : arrêt. Persistante > 48 h : -30 %, puis paliers 50/70/85 % et 2 semaines sans qualité."
+grade = "règle de coaching"
+owner = "coaching/current-plan.md"
+enforced_by = "le coach"
+
+[[rules]]
+id = "n4"
+title = "Sommeil et FC"
+text = "2-3 mauvaises nuits consécutives ou FC anormalement haute en footing : qualité supprimée, semaine traitée en assimilation."
+grade = "règle de coaching"
+owner = "coaching/current-plan.md"
+enforced_by = "le coach ; FC à allure calculée par redline signals"
+
+[[rules]]
+id = "n5"
+title = "Pas de rattrapage"
+text = "une séance manquée ne se rattrape jamais."
+grade = "règle de coaching"
+owner = "coaching/philosophy.md"
+enforced_by = "le coach"
+
+[[rules]]
+id = "n6"
+title = "Dernier intervalle"
+text = "une qualité finit dans sa bande RPE, une répétition en réserve ; un all-in final la rate. Allures comparées au sein de la séance seulement."
+grade = "règle de coaching"
+owner = "coaching/current-plan.md"
+enforced_by = "le coach"
+
+[[rules]]
+id = "n7"
+title = "Espacement"
+text = "jamais deux jours exigeants consécutifs (qualité, sortie longue, EF > {hard_min_hours} h). Une semaine à contrainte se réduit, elle ne se condense pas."
+grade = "règle de coaching"
+owner = "coaching/current-plan.md"
+enforced_by = "redline week-plan revise (champ demanding)"
+
+[[rules]]
+id = "n8"
+title = "Transition"
+text = "séance dont la nature sort des {transition_lookback_days} derniers jours (1re qualité, 1er bloc descente, terrain neuf). {transitions_per_week} par semaine au plus, sous-dosée, plafond écrit avant."
+grade = "pari"
+owner = "coaching/current-plan.md"
+enforced_by = "redline week-plan revise (champ transition) ; redline feasibility (à rebours)"
+
+[[rules]]
+id = "po"
+title = "Porte"
+text = "une hausse facile (palier de SL sans pourcentage fixe, EF allongée, sortie de plus) s'ajoute si le pic d'effort hebdo reste au plus {gate_effort_peak}/10 sans hausse sur {gate_trend_weeks} semaines, réveils à la base ; elles se cumulent. Case rouge : semaine suivante figée ; deux : un cran en arrière."
+grade = "règle de coaching"
+owner = "coaching/current-plan.md § La porte"
+enforced_by = "le coach ; écart aux 30 jours affiché par redline week-plan et redline ledger"
+
+[[rules]]
+id = "s9"
+title = "Arrivée à vide"
+text = "plus longue sortie sans nouveau record sur {stall_weeks} semaines closes : le protocole d'instruction des baisses s'ouvre, sans attendre le jalon daté."
+grade = "règle de coaching"
+owner = "athlete/goals.md"
+enforced_by = "redline ledger --week (bloc Trajectoire)"

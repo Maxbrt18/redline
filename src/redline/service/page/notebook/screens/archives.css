@@ -1,0 +1,6 @@
+/* An open archive card. */
+.n-imagebtn { display: block; width: 100%; padding: 0; margin: 14px 0 10px; border: 0; background: none; }
+.n-image { display: block; width: 100%; height: auto; border-radius: 4px; }
+.n-share { margin: 4px 0 8px; }
+.n-prose { white-space: pre-wrap; overflow-wrap: anywhere; }
+.n-more { display: block; margin: 24px auto; border: 0; border-radius: 8px; padding: 12px 20px; min-height: 48px; background: var(--panel); }

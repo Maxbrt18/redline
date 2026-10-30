@@ -1,0 +1,155 @@
+/* A session's facts or cues, in three or four cells between two rules. */
+.n-facts { display: grid; grid-template-columns: repeat(4, 1fr); margin: 12px 0 0; border-top: 1px solid var(--grid); border-bottom: 1px solid var(--grid); }
+.n-facts.three { grid-template-columns: repeat(3, 1fr); }
+.n-facts div { padding: 10px 0 9px; min-width: 0; }
+.n-facts b { display: block; font: 700 26px/1 var(--display); }
+.n-facts small { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; }
+
+/* Today, the day's thread: the day's steps linked by a rule, then what is coming, then the
+ * landmarks. The red dot is the current step: a solid disc, no halo or pulse. A done step
+ * is ticked in ink; rest is a dimmed dot. */
+.n-feed { margin-top: 20px; }
+.n-day { font: 600 12px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--red); margin: 26px 0 14px; }
+.n-day + .n-feed { margin-top: 0; }
+.n-step { display: grid; grid-template-columns: 24px minmax(0, 1fr); position: relative; padding-bottom: 26px; }
+.n-step:last-child { padding-bottom: 4px; }
+.n-step::before { content: ""; position: absolute; left: 5px; top: 18px; bottom: 2px; width: 2px; border-radius: 1px; background: var(--grid); }
+.n-step:last-child::before { display: none; }
+.n-node { display: block; position: relative; z-index: 1; width: 12px; height: 12px; margin-top: 1px; border-radius: 50%; background: var(--bg); box-shadow: inset 0 0 0 2px var(--faint); }
+.n-step.now .n-node { background: var(--red); box-shadow: none; }
+.n-step.done .n-node { display: grid; place-items: center; background: var(--data); box-shadow: none; }
+.n-step.rest .n-node { background: var(--ghost); box-shadow: none; }
+.n-node svg { width: 8px; height: 8px; fill: none; stroke: var(--bg); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.n-step.bare .n-node { margin-top: 6px; }
+.n-skick { font: 600 12px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.n-step.now .n-skick { color: var(--red); }
+.n-step h2 { font: 700 26px/1.08 var(--display); margin: 7px 0 0; overflow-wrap: anywhere; }
+.n-step.small h2 { font-size: 22px; }
+.n-step.bare h2 { margin-top: 0; }
+.n-step .n-meta { font-size: 14px; line-height: 1.45; text-wrap: pretty; }
+.n-restline { margin: 0; font-size: 15px; color: var(--muted); }
+.n-restline b { color: var(--ink); font-weight: 600; }
+.n-overline { color: var(--over); font-size: 14px; margin: 8px 0 0; }
+
+/* Strength: the solid button, the exercise list unfolded under it. */
+.n-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; margin: 14px 0 0; }
+.n-acts .n-action { margin: 0; border-radius: 12px; }
+.n-toggle { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0; background: none; border: 0; font-size: 14.5px; font-weight: 500; color: var(--ink); }
+.n-toggle::after { content: ""; width: 7px; height: 12px; background: var(--faint); -webkit-mask: var(--chevron); mask: var(--chevron); transition: transform .15s; }
+.n-toggle[aria-expanded="true"]::after { transform: rotate(90deg); }
+.n-acts + .n-exercises { margin-top: 6px; }
+
+/* One question at a time in a panel: the whole scale, its rank, what follows. */
+.n-check { background: var(--panel); border-radius: 16px; padding: 14px; margin: 14px 0 0; }
+.n-check-title { margin: 0 0 10px; font-size: 14.5px; }
+.n-check-title small, .n-field > span small { display: block; color: var(--muted); font-size: 12.5px; font-weight: 400; margin-top: 3px; }
+.n-check-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 0 0 10px; font-size: 14.5px; font-weight: 500; }
+.n-check-head small { color: var(--muted); font-size: 12.5px; font-weight: 400; margin-left: 6px; }
+.n-of { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.n-field { margin-top: 12px; }
+.n-field:first-child { margin-top: 0; }
+.n-field > span { display: block; font-size: 14px; font-weight: 500; margin-bottom: 7px; }
+.n-field > span small { display: inline; margin: 0 0 0 4px; }
+.n-choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.n-choices.two { grid-template-columns: repeat(2, 1fr); }
+.n-choices button { background: var(--bg); border: 0; border-radius: 10px; min-height: 44px; padding: 4px 6px; font-size: 14.5px; font-weight: 500; }
+.n-choices button:active, .n-chips button:active { background: var(--ink); color: var(--bg); }
+.n-chips { display: grid; grid-template-columns: repeat(var(--cols, 5), minmax(0, 1fr)); gap: 6px; }
+.n-chips button { background: var(--bg); border: 0; border-radius: 12px; min-height: 44px; padding: 4px 0; font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.n-note { color: var(--muted); font-size: 12.5px; margin: 11px 0 0; text-wrap: pretty; }
+
+/* Before leaving: the sky, the night and the watch as pill lines on one column. No block
+ * for the weather: the colour comes from the pictogram and its sky-tinted pill; the text
+ * stays in ink. */
+.n-prep { margin: 14px 0 0; }
+.n-wrows { display: grid; gap: 8px; }
+.n-wslot { min-height: 84px; }
+.n-wslot.line { min-height: 38px; }
+.n-prow { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 12px; align-items: center; font-size: 14.5px; line-height: 1.35; }
+.n-wrows + .n-prow { margin-top: 8px; }
+.n-wrows:empty + .n-prow { margin-top: 0; }
+.n-prow b { font-weight: 600; }
+.n-prow small { display: block; color: var(--muted); font-size: 13.5px; }
+.n-pill { --tint: #3b82f6; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: color-mix(in oklab, var(--tint) 18%, var(--bg)); }
+.n-pill[data-sky="partly"] { --tint: #5b8fd0; }
+.n-pill[data-sky="cloud"] { --tint: #7c8796; }
+.n-pill[data-sky="rain"] { --tint: #4a6c93; }
+.n-pill[data-sky="storm"] { --tint: #545a66; }
+.n-pill[data-sky="snow"] { --tint: #8aa0b8; }
+.n-pill[data-sky="night"] { --tint: #5a5fc8; }
+.n-pill[data-sky="watch"] { background: color-mix(in oklab, var(--ink) 6%, var(--bg)); }
+.n-pill .n-sky { width: 22px; height: 22px; }
+.n-pill[data-sky="watch"] .n-sky { width: 21px; height: 21px; stroke-width: 1.6; }
+.n-pill .n-sky .s-cloud { fill: color-mix(in oklab, var(--tint) 18%, var(--bg)); }
+.n-wx { display: flex; align-items: center; gap: 10px; }
+.n-wx > b { font: 700 30px/1 var(--display); }
+.n-wx small { display: block; color: var(--muted); font-size: 13.5px; }
+.n-sky { width: 34px; height: 34px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 auto; overflow: visible; }
+.n-sky .s-sun { fill: #f0b400; stroke: #f0b400; }
+.n-sky .s-ray { stroke: #f0b400; }
+.n-sky .s-cloud { fill: var(--bg); stroke: var(--muted); }
+.n-sky .s-moon { fill: #8b8fe8; stroke: #8b8fe8; }
+.n-sky .s-drop { stroke: #3b82f6; stroke-width: 2; }
+.n-sky .s-snow { stroke: var(--muted); stroke-width: 3; }
+.n-sky .s-bolt { stroke: #f0b400; stroke-width: 2; }
+.n-sky .s-fog { stroke: var(--muted); }
+
+.n-arow { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; gap: 10px; align-items: baseline; padding: 13px 0; border-bottom: 1px solid var(--grid); }
+.n-arow:last-child { border-bottom: 0; }
+.n-at { min-width: 0; font-size: 15.5px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+.n-at small { display: block; margin-top: 3px; font-size: 13px; font-weight: 400; color: var(--muted); }
+.n-at small .n-sky { width: 16px; height: 16px; margin-right: 4px; vertical-align: -3px; }
+.n-av { font-size: 15px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--muted); }
+/* The landmarks (one wide tile, two half tiles): the week full width, pain and running
+ * below; the bottom of each half tile aligns. */
+.n-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.n-tile { display: flex; flex-direction: column; align-items: stretch; min-width: 0; padding: 12px 14px 13px; overflow: hidden;
+  border: 0; border-radius: 16px; background: var(--panel); color: var(--ink); text-align: left; font: inherit; }
+.n-tile.wide { grid-column: 1 / -1; display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 18px; align-items: end; }
+.n-tlab { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 6px; min-width: 0;
+  font-size: 13px; font-weight: 600; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.n-tvalue { display: block; margin-top: 10px; font: 700 32px/1 var(--display); white-space: nowrap; }
+.n-tile.wide .n-tvalue { margin-top: 4px; font-size: 38px; }
+.n-tvalue span { margin-left: 3px; font: 600 15px var(--display); color: var(--muted); }
+.n-tile small { display: block; margin-top: 4px; font-size: 12.5px; line-height: 1.3; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.n-tile small b { font-weight: 600; color: var(--ink); }
+.n-tfoot { display: block; margin-top: auto; padding-top: 12px; }
+/* Solid = run, dashed = planned (bolder for the long run), hairline = rest. */
+.n-mini { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; align-items: end; margin-top: 6px; }
+.n-mini > span { display: flex; flex-direction: column; justify-content: flex-end; height: 70px; min-width: 0; }
+.n-mini i { display: block; align-self: center; box-sizing: border-box; width: 64%; max-width: 18px; border-radius: 3px; background: var(--data); }
+.n-mini i.plan { background: transparent; border: 1.4px dashed var(--faint); }
+.n-mini i.plan.long { border-color: var(--muted); }
+.n-mini i.flat { height: 2px; border-radius: 1px; background: var(--grid); }
+.n-mini em { display: block; margin-bottom: 3px; font: 600 10.5px/1 var(--sans); font-style: normal; text-align: center; white-space: nowrap;
+  font-variant-numeric: tabular-nums; color: var(--muted); }
+.n-mini em.plan { font-weight: 500; color: var(--faint); }
+.n-mini small, .n-mini b { display: block; margin-top: 5px; font: 500 10.5px/1 var(--sans); text-align: center; color: var(--faint); }
+.n-mini b { font-weight: 700; color: var(--red); }
+/* The peak per week against the ceiling, dashed like the Injury screen. */
+.n-plot { display: block; width: 100%; height: auto; overflow: visible; }
+.n-plot .base { stroke: var(--grid); stroke-width: 1; }
+.n-plot .cap { stroke: var(--over); stroke-width: 1.2; stroke-dasharray: 3 3; }
+.n-plot .capl { font: 600 10px var(--sans); fill: var(--over); }
+.n-plot circle { fill: var(--muted); }
+.n-plot circle.now { fill: var(--ink); }
+.n-plot circle.out { fill: var(--over); }
+.n-plot .v { font: 500 10.5px var(--sans); fill: var(--muted); }
+.n-plot .w { font: 500 10px var(--sans); fill: var(--faint); }
+.n-plot .now { font-weight: 700; fill: var(--ink); }
+.n-plot .v.out { fill: var(--over); }
+.n-choices button.n-picked, .n-chips button.n-picked { background: var(--ink); color: var(--bg); opacity: 1; }
+@media (max-width: 360px) { .n-facts b { font-size: 22px; } .n-tvalue { font-size: 27px; } .n-tile.wide .n-tvalue { font-size: 32px; } }
+/* A session in the thread carries its family pill in front of its title. */
+.n-step h2 { display: flex; align-items: center; gap: 10px; }
+.n-step h2 > .n-pas { margin-top: -2px; }
+/* The landmarks on sand (the "Sable" palette): one neutral warm background for all three,
+ * the label in ink; only the pill tells the family. With no tinted card, red keeps its
+ * meaning everywhere: the day's letter, the ceiling crossed. */
+.n-tile.week { --h: var(--h-run); }
+.n-tile.pain { --h: var(--h-pain); }
+.n-tile.race { --h: var(--h-race); }
+.n-tile.week, .n-tile.pain, .n-tile.race { background: var(--sand); }
+.n-tlab .l { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.n-tile .n-tlab .l { color: var(--ink); }
+.n-tile .n-pas { background: color-mix(in oklab, var(--h) var(--tile-pas-mix), var(--sand)); }

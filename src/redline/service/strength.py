@@ -1,0 +1,427 @@
+"""The strength-session link: one immutable snapshot, a card and a page to follow.
+
+Links carry only an opaque capability (`/s#t=<token>`). The exact prescription lives
+in PostgreSQL and the raw token never does.
+
+Leaf module: standard library only, imports nothing from the package. The card script
+uses it to write a snapshot sidecar, while the service alone mints capabilities.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import re
+import secrets
+import time
+from datetime import date
+from pathlib import Path
+from typing import Any
+
+from redline.coach.fr import strength_report as wording
+from redline.model import strength_log
+from redline.model.errors import InputError
+
+PAGE_PATH = "/s"
+SIDECAR_SUFFIX = ".link"
+BUTTON_TITLE = wording.BUTTON_TITLE
+
+NOTE_MAX = 300          # a free-text note the coach will read, not an essay
+REPS_MAX_SETS = 24
+LINK_TTL_SECONDS = 7 * 24 * 60 * 60
+TOKEN_BYTES = 24             # 192 bits; the URL itself is the capability
+TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{32}$")
+_CONTROL = re.compile(r"[\x00-\x1f\x7f]+")
+ROUTINE = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")
+
+
+class ReportError(InputError):
+    """The report does not respect the page contract."""
+
+
+class ExpiredLink(InputError):
+    """The capability has outlived its validity period."""
+
+
+# ------------------------------------------------------------------------ URL
+
+def new_token() -> str:
+    """Capability put in the fragment; only its SHA-256 digest is persisted."""
+    token = secrets.token_urlsafe(TOKEN_BYTES)
+    if not TOKEN_RE.fullmatch(token):  # guards a future stdlib behaviour change
+        raise RuntimeError("session token produced in an unexpected format")
+    return token
+
+
+def token_digest(token: str) -> str:
+    """Stable lookup key, or an empty string for a malformed capability."""
+    if not TOKEN_RE.fullmatch(token or ""):
+        return ""
+    return hashlib.sha256(token.encode("ascii")).hexdigest()
+
+
+def token_url(base_url: str, token: str) -> str:
+    if not base_url or not token_digest(token):
+        raise ValueError("invalid session URL or token")
+    return f"{base_url.rstrip('/')}{PAGE_PATH}#t={token}"
+
+
+def expiring_snapshot(session: dict, *, now: int | None = None) -> dict:
+    """Freeze a JSON-safe prescription and add the server-owned expiration."""
+    try:
+        snapshot = json.loads(json.dumps(session, ensure_ascii=False))
+    except (TypeError, ValueError) as exc:
+        raise ReportError(f"session not serializable: {exc}") from exc
+    snapshot["expires_at"] = (int(time.time()) if now is None else now) + LINK_TTL_SECONDS
+    validate_session(snapshot, now=now)
+    return snapshot
+
+
+def sidecar_enabled() -> bool:
+    """The card script only needs to know whether the service has a public base URL.
+
+    The service, not the sandboxed agent, owns token generation and persistence.
+    """
+    return bool((os.environ.get("COACH_BASE_URL") or "").strip())
+
+
+# -------------------------------------------------------------------- sidecar
+
+def sidecar_for(image: Path) -> Path:
+    """The link file riding alongside a card in the outbox."""
+    return image.with_name(image.name + SIDECAR_SUFFIX)
+
+
+def write_sidecar(image: Path, text: str, session: dict) -> Path:
+    """The bubble text and exact prescription awaiting server-side token issuance.
+
+    The bot turns it into a button only after the image has been delivered, so Claude
+    never receives the capability and cannot create a valid link by itself.
+    """
+    path = sidecar_for(image)
+    path.write_text(json.dumps({"text": text, "session": session}, ensure_ascii=False),
+                    encoding="utf-8")
+    return path
+
+
+def read_sidecar(image: Path) -> tuple | None:
+    """(text, session snapshot), or None if there is no usable sidecar."""
+    try:
+        data = json.loads(sidecar_for(image).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    session = data.get("session")
+    if not isinstance(session, dict) or not session.get("sid"):
+        return None
+    if not isinstance(session.get("exercises"), list) or not session["exercises"]:
+        return None
+    return str(data.get("text") or wording.DEFAULT_TEXT), session
+
+
+# --------------------------------------------------------------------- report
+
+def validate_session(session: dict, *, now: int | None = None) -> None:
+    """Refuse a snapshot that is expired or foreign to the generator contract."""
+    sid = session.get("sid")
+    workout = session.get("session")
+    exercises = session.get("exercises")
+    expires_at = session.get("expires_at")
+    if not isinstance(sid, str) or not sid.strip() or len(sid) > 64:
+        raise ReportError("invalid session.sid")
+    if not isinstance(workout, str) or not ROUTINE.fullmatch(workout):
+        raise ReportError("invalid session.session")
+    if not isinstance(exercises, list) or not exercises or len(exercises) > 20:
+        raise ReportError("invalid session.exercises")
+    if type(expires_at) is not int:
+        raise ReportError("invalid session.expires_at")
+    if expires_at < (int(time.time()) if now is None else now):
+        raise ExpiredLink("this session link has expired")
+    for index, exercise in enumerate(exercises):
+        if not isinstance(exercise, dict):
+            raise ReportError(f"invalid session.exercises[{index}]")
+        slug = exercise.get("slug")
+        if slug is not None and (not isinstance(slug, str) or len(slug) > 60):
+            raise ReportError(f"invalid session.exercises[{index}].slug")
+
+
+def _optional_int(value, low: int, high: int, field: str) -> int | None:
+    if value is None:
+        return None
+    if type(value) is not int or not low <= value <= high:
+        raise ReportError(f"{field}: integer expected between {low} and {high}")
+    return value
+
+
+def _clean_text(value) -> str:
+    text = _CONTROL.sub(" ", str(value or ""))
+    return " ".join(text.split())[:NOTE_MAX]
+
+
+def _sides_of(exercise) -> list:
+    """The side of each slot, in the order the page walks them: ["d", "g", "d", ...].
+
+    Read off the session -- which the route already holds -- rather than trusted
+    from the report. The page posts its counts POSITIONALLY, blanks included, and
+    that position is the only thing that says which leg a number belongs to.
+    """
+    dose = exercise.get("dose") if isinstance(exercise, dict) else None
+    slots = dose.get("slots") if isinstance(dose, dict) else None
+    if not isinstance(slots, list):
+        return []      # no slots, no sides: every count lands in the sideless bucket
+    return [str(slot.get("s") or "") for slot in slots if isinstance(slot, dict)]
+
+
+def parse_report(report: dict, exercises: list, zones: dict[str, str] | None = None) -> dict:
+    """Validate then normalize the contract posted by the page.
+
+    An out-of-range value is an invalid request, not a value to fix silently:
+    turning 99 into pain 10 or ``"false"`` into true would fabricate a medical fact
+    the athlete never entered. Pain arrives per monitored zone (`zones`:
+    {slug: label}); a zone the instance does not monitor is refused.
+    """
+    exercise_count = len(exercises)
+    if not isinstance(report, dict):
+        raise ReportError("report: JSON object expected")
+    allowed = {"performed_on", "pains", "minutes", "note", "exercises"}
+    unknown = sorted(set(report) - allowed)
+    if unknown:
+        raise ReportError("champs inconnus : " + ", ".join(unknown))
+    performed_on = report.get("performed_on")
+    if performed_on is not None:
+        if not isinstance(performed_on, str):
+            raise ReportError("performed_on: ISO date expected")
+        try:
+            date.fromisoformat(performed_on)
+        except ValueError as exc:
+            raise ReportError("performed_on: ISO date expected") from exc
+    note = report.get("note", "")
+    if not isinstance(note, str):
+        raise ReportError("note: text expected")
+    raw_exercises = report.get("exercises", [])
+    if not isinstance(raw_exercises, list) or len(raw_exercises) > exercise_count:
+        raise ReportError("exercises: list too long or invalid")
+    items = {}
+    for entry_position, entry in enumerate(raw_exercises):
+        if not isinstance(entry, dict):
+            raise ReportError(f"exercises[{entry_position}]: object expected")
+        entry_unknown = sorted(set(entry) - {"i", "score", "skipped", "gated", "reps", "status", "note"})
+        if entry_unknown:
+            raise ReportError(f"exercises[{entry_position}] : champs inconnus : "
+                              + ", ".join(entry_unknown))
+        # An index outside the session is refused, never clamped into range: fixing
+        # it would silently file "exercise 99" under a real exercise.
+        raw_index = entry.get("i")
+        if type(raw_index) is not int:
+            raise ReportError(f"exercises[{entry_position}].i: integer expected")
+        index = raw_index
+        if not 0 <= index < exercise_count or index in items:
+            raise ReportError(f"exercises[{entry_position}].i: invalid or duplicate index")
+        raw_reps = entry.get("reps", [])
+        if not isinstance(raw_reps, list) or len(raw_reps) > REPS_MAX_SETS:
+            raise ReportError(f"exercises[{entry_position}].reps: invalid list")
+        reps = [_optional_int(rep, 0, 999, f"exercises[{entry_position}].reps")
+                for rep in raw_reps]
+        slots = (exercises[index].get("dose") or {}).get("slots") or []
+        if slots and len(reps) > len(slots):
+            raise ReportError(f"exercises[{entry_position}].reps: too many sets")
+        for flag in ("skipped", "gated"):
+            if flag in entry and type(entry[flag]) is not bool:
+                raise ReportError(f"exercises[{entry_position}].{flag}: boolean expected")
+        status = entry.get("status")
+        if status is None:
+            status = ("gated" if entry.get("gated") else
+                      "partial" if entry.get("skipped") and reps else
+                      "skipped" if entry.get("skipped") else
+                      "completed" if slots and len(reps) == len(slots) else
+                      "partial" if reps else "unknown")
+        if status not in {"completed", "partial", "skipped", "gated", "unknown"}:
+            raise ReportError(f"exercises[{entry_position}].status: invalid status")
+        if ((status in {"skipped", "gated"} and reps)
+                or (status == "partial" and not reps)
+                or (status == "completed" and slots and len(reps) != len(slots))):
+            raise ReportError(f"exercises[{entry_position}].status: inconsistent sets")
+        exercise_note = entry.get("note", "")
+        if not isinstance(exercise_note, str) or len(exercise_note) > NOTE_MAX:
+            raise ReportError(f"exercises[{entry_position}].note: text of at most 300 characters")
+        # An unspoken left/right gap is a flag of the calf capacity test (>10 %,
+        # coaching/strength.md), and it disappears the moment the two sides are
+        # poured into one list. Hence the split, done here where the doses are.
+        sides = _sides_of(exercises[index])
+        banked: dict = {"": [], "d": [], "g": []}
+        for slot_position, value in enumerate(reps):
+            if value is None:
+                continue
+            side = sides[slot_position] if slot_position < len(sides) else ""
+            banked.setdefault(side, []).append(value)
+        items[index] = {
+            "score": _optional_int(entry.get("score"), 0, 10,
+                                   f"exercises[{entry_position}].score"),
+            "reps": [rep for rep in reps if rep is not None],
+            "slot_values": reps,
+            "sides": banked,
+            "skipped": status in {"skipped", "gated"},
+            "gated": status == "gated",
+            "status": status,
+            "completed_slots": len(reps),
+            "note": _clean_text(exercise_note),
+        }
+    return {
+        "items": items,
+        # Two readings that never mix: the one before is at rest, the one after
+        # carries the effort.
+        "performed_on": performed_on,
+        "pains": _parse_pains(report.get("pains"), zones or {}),
+        "minutes": _optional_int(report.get("minutes"), 0, 300, "minutes"),
+        "note": _clean_text(note),
+    }
+
+
+def log_entries(session: dict, clean: dict, day: str) -> list:
+    """The normalized exercise facts the PostgreSQL repository receives.
+
+    Built from the SAME parsed report the message is built from, so the typed
+    log and the sentence the coach reads can never disagree. Written by the route
+    rather than retyped by the model out of prose: code must never read prose to
+    derive a fact, and here producer and consumer live in the same commit.
+    """
+    exercises = session.get("exercises") or []
+    sid = str(session.get("sid") or "")[:64]
+    if not sid:
+        return []
+
+    entries = []
+    for index, exercise in enumerate(exercises):
+        item = clean["items"].get(index)
+        slug = _clean_text(exercise.get("slug"))[:60] if isinstance(exercise, dict) else ""
+        # No slug, no identity: a one-off derogation (`add` in the morning
+        # selection) is not a program exercise, and there is nothing next week
+        # will compare it against. The name is prose and moves; it is not a key.
+        if not item or not slug:
+            continue
+        row = {"date": day, "sid": sid,
+               "workout": _clean_text(session.get("session"))[:20], "slug": slug}
+        row.update(status=item["status"], completed_slots=item["completed_slots"],
+                   note=item["note"])
+        if item["skipped"]:
+            row["skipped"] = strength_log.YES
+        else:
+            sides = item["sides"]
+            if sides.get("d") or sides.get("g"):
+                for column, key in (("right", "d"), ("left", "g")):
+                    if sides.get(key):
+                        row[column] = "|".join(str(value) for value in sides[key])
+            elif sides.get(""):
+                row["both"] = "|".join(str(value) for value in sides[""])
+            if item["score"] is not None:
+                row["score"] = item["score"]
+        entries.append(row)
+    return entries
+
+
+def _parse_pains(raw: Any, zones: dict[str, str]) -> dict[str, dict]:
+    """{zone: {before, after}}: before at rest, after the effort, never mixed."""
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise ReportError("pains: object {zone: {before, after}} expected")
+    unknown = sorted(set(raw) - set(zones))
+    if unknown:
+        raise ReportError("pains: zone not monitored: " + ", ".join(unknown))
+    pains = {}
+    for zone, label in zones.items():
+        moments = raw.get(zone)
+        if moments is None:
+            continue
+        if not isinstance(moments, dict) or set(moments) - {"before", "after"}:
+            raise ReportError(f"pains.{zone}: object {{before, after}} expected")
+        before = _optional_int(moments.get("before"), 0, 10, f"pains.{zone}.before")
+        after = _optional_int(moments.get("after"), 0, 10, f"pains.{zone}.after")
+        if before is not None or after is not None:
+            pains[zone] = {"label": label, "before": before, "after": after}
+    return pains
+
+
+def format_message(session: dict, clean: dict) -> str:
+    """The parsed report, written out as the message the athlete would have typed.
+
+    It travels as a durable postback so the coach can react to the debrief. The
+    structured facts are already stored in the same transaction; the model never
+    has to recover them from this prose.
+    """
+    exercises = session.get("exercises") or []
+
+    head = session.get("title") or wording.HEAD.format(type=session.get("type", "")).strip()
+    when = session.get("date") or ""
+    duration = (wording.DURATION.format(minutes=clean["minutes"])
+                if clean["minutes"] is not None else "")
+    lines = [wording.DONE.format(what=", ".join(x for x in [head, when] if x),
+                                 duration=duration)]
+
+    detail = []
+    for index, exercise in enumerate(exercises):
+        item = clean["items"].get(index)
+        if not item:
+            continue
+        name = _clean_text(exercise.get("name"))[:80]
+        if item["gated"]:
+            # "Removed by the guard rail" is not "not done": the coach would read a
+            # non-compliance where its own rule applied.
+            remark = wording.REMARK_SUFFIX.format(note=item["note"]) if item["note"] else ""
+            detail.append(wording.GATED.format(name=name, remark=remark))
+            continue
+        if item["skipped"]:
+            remark = wording.REMARK_SUFFIX.format(note=item["note"]) if item["note"] else ""
+            detail.append(wording.SKIPPED.format(name=name, remark=remark))
+            continue
+        bits = []
+        if item["status"] == "partial":
+            bits.append(wording.PARTIAL.format(slots=item["completed_slots"]))
+        if item["score"] is not None:
+            bits.append(wording.SCORE.format(score=item["score"]))
+        sides = item["sides"]
+        if sides.get("d") or sides.get("g"):
+            # The two sides are read separately or not at all: their gap is a flag
+            # (>10 %) and it disappears as soon as they are mixed.
+            told = [f"{label} {', '.join(str(rep) for rep in sides[key])}"
+                    for label, key in ((wording.RIGHT, "d"), (wording.LEFT, "g"))
+                    if sides.get(key)]
+            bits.append(" · ".join(told))
+        elif item["reps"]:
+            bits.append(wording.SETS + ", ".join(str(rep) for rep in item["reps"]))
+        if item["note"]:
+            bits.append(wording.REMARK.format(note=item["note"]))
+        detail.append(wording.EXERCISE.format(
+            name=name, bits=" — ".join(bits) if bits else wording.EXERCISE_DONE))
+    if detail:
+        lines.append("")
+        # Naming what the number IS matters as much here as on the page: read out
+        # of context, "7/10" on an exercise reads like a performance mark.
+        lines.append(wording.DIFFICULTY)
+        lines.extend(detail)
+
+    tail = []
+    # The two readings are told SEPARATELY, each named: the ledger keeps two series
+    # that never mix, the first at rest, the second after the effort. A single
+    # figure would answer neither question.
+    for reading in clean["pains"].values():
+        before, after, label = reading["before"], reading["after"], reading["label"]
+        if before is not None and after is not None:
+            move = (wording.STABLE if before == after
+                    else wording.UP if after > before else wording.DOWN)
+            tail.append(wording.PAIN_BOTH.format(label=label, before=before, after=after,
+                                                 move=move))
+        elif after is not None:
+            tail.append(wording.PAIN_AFTER.format(label=label, after=after))
+        elif before is not None:
+            tail.append(wording.PAIN_BEFORE.format(label=label, before=before))
+    if clean["note"]:
+        # Quoted, and named as such: the free-text field is the only thing here
+        # that is not a bounded number.
+        tail.append(wording.ATHLETE_NOTE.format(note=clean["note"]))
+    if tail:
+        lines.append("")
+        lines.extend(tail)
+    return "\n".join(lines)

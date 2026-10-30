@@ -1,0 +1,43 @@
+/* Course */
+.n-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
+.n-head h1 { margin: 0; font-size: 44px; }
+.n-head .goal { text-align: right; }
+.n-head .goal b { font: 700 26px/1 var(--display); }
+/* Volume and long run: the fact against its target, the long run in figures below. */
+.n-vchart { display: block; width: 100%; height: auto; margin-top: 14px; overflow: visible; }
+.n-vchart .track { fill: var(--ghost); }
+.n-vchart .done { fill: var(--data); }
+.n-vchart .axis { stroke: var(--faint); stroke-width: 1; }
+.n-vchart .sep { stroke: var(--grid); stroke-width: 1; }
+.n-vchart .vl { font: 700 12px var(--sans); fill: var(--ink); }
+.n-vchart .vl .t { font-weight: 500; font-size: 10.5px; fill: var(--faint); }
+.n-vchart .wl { font: 500 10.5px var(--sans); fill: var(--faint); }
+.n-vchart .wl.now { font-weight: 700; fill: var(--ink); }
+.n-vchart .cap { font: 600 10.5px var(--sans); letter-spacing: .07em; text-transform: uppercase; fill: var(--muted); }
+.n-vchart .slv { font: 700 17px var(--display); fill: var(--ink); }
+.n-vchart .slv.plan { fill: var(--faint); }
+.n-vchart .sls { font: 500 10px var(--sans); fill: var(--faint); }
+.n-vleg { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 10px 0 0; font-size: 12px; color: var(--muted); }
+.n-vleg i { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 2px; vertical-align: -1px; }
+.n-vleg i.done { background: var(--data); }
+.n-vleg i.track { background: var(--ghost); }
+.n-timeline { position: relative; margin: 14px 0 4px; padding-left: 18px; }
+.n-timeline::before { content: ""; position: absolute; left: 5px; top: 6px; bottom: 6px; width: 2px; background: var(--grid); }
+.n-tl { position: relative; padding: 0 0 12px; }
+.n-tl::before { content: ""; position: absolute; left: -17px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--bg); border: 2px solid var(--faint); }
+.n-tl.now::before { background: var(--red); border-color: var(--red); }
+.n-tl.goal::before { background: var(--ink); border-color: var(--ink); }
+.n-tl p { margin: 0; }
+.n-tl .w { font-size: 12px; color: var(--muted); }
+.n-tl .w.n-over { color: var(--over); }
+.n-tl .x { font-size: 14.5px; font-weight: 500; }
+.n-cp:first-of-type { margin-top: 6px; }
+.n-cp { display: grid; grid-template-columns: 96px 1fr 30px; gap: 10px; align-items: center; padding: 7px 0; }
+.n-cp span { font-size: 14px; }
+.n-pips { display: flex; gap: 3px; }
+.n-pips i { flex: 1; height: 7px; border-radius: 2px; background: var(--ghost); }
+.n-pips i.f { background: var(--data); }
+.n-cp b { font: 700 16px/1 var(--display); text-align: right; }
+/* Each capability carries its pill; the injury ones keep their purple. */
+.n-cp { grid-template-columns: 128px 1fr 30px; }
+.n-cp > span { display: flex; align-items: center; gap: 8px; }

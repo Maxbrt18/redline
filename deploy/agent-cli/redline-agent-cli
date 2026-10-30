@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+# Launcher installed root:root outside the vault for the CLIs allowed to the 24/7 coach.
+# The executed code must be exactly that of the deployed commit: a turn may edit the
+# notes, never rewrite a CLI and then run it with the service secrets.
+set -euo pipefail
+
+repo=${REDLINE_REPO:-/home/ubuntu/redline}
+name=${1:-}
+launcher_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+if [ "$launcher_dir" = /usr/local/bin ]; then
+  policy=/usr/local/share/redline/agent-cli-tools.txt
+else
+  policy="$launcher_dir/agent-cli-tools.txt"
+fi
+
+[[ "$name" =~ ^[a-z0-9][a-z0-9-]*$ ]] || {
+  echo "agent-cli: nom de commande invalide" >&2
+  exit 2
+}
+[ -r "$policy" ] || {
+  echo "agent-cli: politique root-owned absente" >&2
+  exit 1
+}
+grep -Fxq -- "$name" "$policy" || {
+  echo "agent-cli: commande absente de l'allowlist" >&2
+  exit 2
+}
+shift
+
+# This launcher only serves coach turns, and every tooled turn carries its identity:
+# without it the CLIs would write directly, outside the turn transaction that an
+# abort discards. Clearing the variable must therefore not open a write path.
+# (Operator commands run with the service environment, outside this launcher.)
+uuid='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+[[ "${REDLINE_TURN_ID:-}" =~ $uuid ]] || {
+  echo "agent-cli: aucun tour en cours (REDLINE_TURN_ID absent ou invalide)" >&2
+  exit 2
+}
+
+# `week-plan` is the command named by the instructions; `redline.cli.week_plan` is the
+# module that implements it.
+module="redline.cli.${name//-/_}"
+source_file="src/redline/cli/${name//-/_}.py"
+
+cd "$repo"
+[ -f "$source_file" ] || {
+  echo "agent-cli: $source_file absent" >&2
+  exit 1
+}
+# The checkout belongs to the deploy account, not to the service user that runs this
+# launcher: git would otherwise refuse to read it.
+git() { command git -c safe.directory="$repo" "$@"; }
+
+# Code the service user can write is code a turn can rewrite: the engine and its venv
+# must belong to another account.
+[ ! -w src ] && [ ! -w src/redline ] || {
+  echo "agent-cli: code du moteur modifiable par l'utilisateur du service" >&2
+  exit 1
+}
+
+git ls-files --error-unmatch -- "$source_file" >/dev/null 2>&1 || {
+  echo "agent-cli: commande non suivie par Git" >&2
+  exit 1
+}
+
+runtime_changes=$(git status --porcelain --untracked-files=all -- \
+  src deploy migrations alembic.ini pyproject.toml)
+[ -z "$runtime_changes" ] || {
+  echo "agent-cli: runtime différent du commit déployé, exécution refusée" >&2
+  exit 1
+}
+
+python_bin=$(command -v python) || {
+  echo "agent-cli: python absent" >&2
+  exit 1
+}
+case "$python_bin" in
+  */.venvs/*) ;;
+  *)
+    echo "agent-cli: python hors du venv du service" >&2
+    exit 1
+    ;;
+esac
+# A `sitecustomize.py` or a `.pth` dropped in the venv would run with every command.
+venv=$(CDPATH='' cd -- "$(dirname -- "$python_bin")/.." && pwd -P)
+for writable in "$venv" "$venv"/bin "$venv"/lib/python3*/site-packages; do
+  [ ! -w "$writable" ] || {
+    echo "agent-cli: venv modifiable par l'utilisateur du service ($writable)" >&2
+    exit 1
+  }
+done
+
+# The script comes from the engine verified above and runs INSIDE the vault
+# (`VAULT_PATH`, as for the service), where the coach left its turn files. The vault
+# is always its own folder. `-P` keeps that working directory off `sys.path`: a turn
+# writes the vault, and a `redline/` folder there would otherwise replace the engine.
+vault=${VAULT_PATH:-}
+[ -n "$vault" ] || {
+  echo "agent-cli: VAULT_PATH absent" >&2
+  exit 1
+}
+[ -d "$vault" ] || {
+  echo "agent-cli: vault introuvable ($vault)" >&2
+  exit 1
+}
+cd "$vault"
+exec "$python_bin" -P -m "$module" "$@"

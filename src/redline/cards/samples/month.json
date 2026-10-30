@@ -1,0 +1,23 @@
+{
+  "month": "Juillet 2030",
+  "km": 186.4,
+  "dplus": 4820,
+  "sessions": 19,
+  "weeks": [
+    {"label": "W27", "km": 38.2},
+    {"label": "W28", "km": 44.6},
+    {"label": "W29", "km": 51.8},
+    {"label": "W30", "km": 51.8}
+  ],
+  "capabilities": {
+    "Endurance": 3,
+    "Vitesse": 2,
+    "Côtes": 1,
+    "Ravitaillement": 2,
+    "Mental": 2,
+    "Allure marathon": 3
+  },
+  "cap_scale": 5,
+  "race_name": "TargetRace",
+  "race_date": "2030-12-08"
+}

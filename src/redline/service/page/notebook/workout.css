@@ -1,0 +1,16 @@
+/* The guided session, a full screen over the notebook (notebook/workout.js): the bar
+ * keeps close and sound, the tabs, Back and Settings disappear. */
+.n-sv { display: none; }
+:root.n-workout .n-sv { display: grid; }
+:root.n-workout #page, :root.n-workout .n-nav, :root.n-workout #ptr, :root.n-workout #back, :root.n-workout #settings { display: none; }
+:root.n-workout .n-app { padding-bottom: calc(48px + env(safe-area-inset-bottom)); }
+#workout { font-size: 17px; line-height: 1.45; }
+/* It rises from the bottom over the screen being left, frozen beneath; it descends on exit. */
+#workout.n-rising { position: relative; z-index: 4; min-height: 100vh; background: var(--bg); box-shadow: 0 -8px 30px rgb(0 0 0 / .12); }
+.n-move.n-falling { z-index: 5; box-shadow: 0 -8px 30px rgb(0 0 0 / .12); }
+/* The speaker, struck through when sound is off. */
+#workout-sound .off, #workout-sound.muted .on { display: none; }
+#workout-sound.muted .off { display: inline; }
+/* Leaving a started session: what happens, then the two choices, like an iOS action sheet. */
+.n-leave { margin: 0 8px 18px; font: 400 15px/1.4 var(--sys); color: var(--muted); text-align: center; }
+#leave-stay { font-weight: 600; }

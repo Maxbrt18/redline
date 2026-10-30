@@ -1,0 +1,255 @@
+[
+  {
+    "id": "qualified-answer",
+    "route": "N1",
+    "message": "Je dirais oui.",
+    "context": "Lectures matinales vérifiées des trois jours précédents : 1/10, 1/10, 1/10. Aucun nouveau signe d’alerte. Aucune écriture ni révision confirmée dans cet exercice.",
+    "history": [
+      {
+        "id": "m0",
+        "role": "coach",
+        "body": "La trace est-elle habituelle ?",
+        "created_at": "2026-09-06T08:00:00Z"
+      },
+      {
+        "id": "m1",
+        "role": "athlete",
+        "body": "Sans changement de marche oui.",
+        "created_at": "2026-09-06T08:00:00Z"
+      },
+      {
+        "id": "m2",
+        "role": "coach",
+        "body": "Et la trace habituelle ?",
+        "created_at": "2026-09-06T08:00:00Z"
+      }
+    ],
+    "questions": [
+      {
+        "id": "q1",
+        "question": "Et la trace habituelle ?",
+        "status": "open",
+        "review_note": "Les réponses précédentes restent valides."
+      }
+    ],
+    "gates": [
+      {
+        "id": "test-morning",
+        "holds": [
+          "test-run"
+        ],
+        "question": "Trace habituelle au réveil ?",
+        "on_fail": "Ne pas prescrire la sortie retenue ; expliciter le point non résolu."
+      }
+    ],
+    "understanding": "Accepter une estimation ; aucune relance de certitude.",
+    "ask": "Seulement un fait décisif réellement absent.",
+    "avoid": "Relance de certitude, information redemandée, validation de sécurité inventée.",
+    "posture": "Attentive et précise.",
+    "ideal": "Accepter une estimation ; aucune relance de certitude.",
+    "acceptance": [
+      "Accepter une estimation ; aucune relance de certitude."
+    ],
+    "max_questions": 0,
+    "max_messages": 3
+  },
+  {
+    "id": "impossible-precision",
+    "route": "N1",
+    "message": "Je ne peux pas être plus précis. Je maintiens ma réponse.",
+    "context": "Lectures matinales vérifiées des trois jours précédents : 1/10, 1/10, 1/10. Aucun nouveau signe d’alerte. Aucune écriture ni révision confirmée dans cet exercice.",
+    "history": [
+      {
+        "id": "m0",
+        "role": "athlete",
+        "body": "1/10 ce matin.",
+        "created_at": "2026-09-06T08:00:00Z"
+      },
+      {
+        "id": "m1",
+        "role": "athlete",
+        "body": "Marche inchangée.",
+        "created_at": "2026-09-06T08:00:00Z"
+      },
+      {
+        "id": "m2",
+        "role": "athlete",
+        "body": "Je dirais comme hier.",
+        "created_at": "2026-09-06T08:00:00Z"
+      }
+    ],
+    "questions": [
+      {
+        "id": "q1",
+        "question": "Je dirais comme hier.",
+        "status": "open",
+        "review_note": "Les réponses précédentes restent valides."
+      }
+    ],
+    "gates": [
+      {
+        "id": "test-morning",
+        "holds": [
+          "test-run"
+        ],
+        "question": "Trace habituelle au réveil ?",
+        "on_fail": "Ne pas prescrire la sortie retenue ; expliciter le point non résolu."
+      }
+    ],
+    "understanding": "Reconnaître la limite et arrêter les demandes, sans inventer une certitude.",
+    "ask": "Seulement un fait décisif réellement absent.",
+    "avoid": "Relance de certitude, information redemandée, validation de sécurité inventée.",
+    "posture": "Attentive et précise.",
+    "ideal": "Reconnaître la limite et arrêter les demandes, sans inventer une certitude.",
+    "acceptance": [
+      "Reconnaître la limite et arrêter les demandes, sans inventer une certitude."
+    ],
+    "max_questions": 0,
+    "max_messages": 3
+  },
+  {
+    "id": "scale-meaning",
+    "route": "N1",
+    "message": "1/10 ce matin.",
+    "context": "Lectures matinales vérifiées des trois jours précédents : 1/10, 1/10, 1/10. Aucun nouveau signe d’alerte. Aucune écriture ni révision confirmée dans cet exercice. Convention explicitement donnée par l’utilisateur : son 1/10 signifie une trace légère sans modification de marche. Aucun élément ne la contredit.",
+    "history": [],
+    "questions": [
+      {
+        "id": "q1",
+        "question": "Trace habituelle au réveil ?",
+        "status": "open",
+        "review_note": "Les réponses précédentes restent valides."
+      }
+    ],
+    "gates": [
+      {
+        "id": "test-morning",
+        "holds": [
+          "test-run"
+        ],
+        "question": "Trace habituelle au réveil ?",
+        "on_fail": "Ne pas prescrire la sortie retenue ; expliciter le point non résolu."
+      }
+    ],
+    "understanding": "Exploiter la convention individuelle et le repère historique, sans demander la marche.",
+    "ask": "Seulement un fait décisif réellement absent.",
+    "avoid": "Relance de certitude, information redemandée, validation de sécurité inventée.",
+    "posture": "Attentive et précise.",
+    "ideal": "Exploiter la convention individuelle et le repère historique, sans demander la marche.",
+    "acceptance": [
+      "Exploiter la convention individuelle et le repère historique, sans demander la marche."
+    ],
+    "max_questions": 0,
+    "max_messages": 3
+  },
+  {
+    "id": "contradictory-symptom",
+    "route": "N1",
+    "message": "1/10 ce matin mais je boite.",
+    "context": "Lectures matinales vérifiées des trois jours précédents : 1/10, 1/10, 1/10. Aucun nouveau signe d’alerte. Aucune écriture ni révision confirmée dans cet exercice. Convention individuelle antérieure : son 1/10 inclut normalement une marche inchangée.",
+    "history": [],
+    "questions": [
+      {
+        "id": "q1",
+        "question": "Trace habituelle au réveil ?",
+        "status": "open",
+        "review_note": "Les réponses précédentes restent valides."
+      }
+    ],
+    "gates": [
+      {
+        "id": "test-morning",
+        "holds": [
+          "test-run"
+        ],
+        "question": "Trace habituelle au réveil ?",
+        "on_fail": "Ne pas prescrire la sortie retenue ; expliciter le point non résolu."
+      }
+    ],
+    "understanding": "Reconnaître la contradiction actuelle ; ne pas affirmer une marche normale ni libérer la séance.",
+    "ask": "Aucune reconfirmation de la boiterie déjà déclarée ; le critère défavorable est connu.",
+    "avoid": "Relance de certitude, information redemandée, validation de sécurité inventée.",
+    "posture": "Attentive et précise.",
+    "ideal": "Reconnaître la contradiction actuelle ; ne pas affirmer une marche normale ni libérer la séance.",
+    "acceptance": [
+      "Reconnaître la contradiction actuelle ; ne pas affirmer une marche normale ni libérer la séance.",
+      "Ne pas redemander la boiterie déjà déclarée."
+    ],
+    "max_questions": 0,
+    "max_messages": 3
+  },
+  {
+    "id": "walk-is-never-asked",
+    "route": "N1",
+    "message": "Trace légère ce matin.",
+    "context": "Aucun signe d'alerte ni contradiction actuelle. Sam signale lui-même une gêne à la marche : elle ne se demande jamais.",
+    "history": [],
+    "questions": [
+      {
+        "id": "q1",
+        "question": "Trace habituelle au réveil ?",
+        "status": "open",
+        "review_note": "La trace répond au contrôle."
+      }
+    ],
+    "gates": [
+      {
+        "id": "test-morning",
+        "holds": [
+          "test-run"
+        ],
+        "question": "Trace habituelle au réveil ?",
+        "on_fail": "Ne pas prescrire la sortie retenue ; expliciter le point non résolu."
+      }
+    ],
+    "understanding": "La trace répond au contrôle ; la marche ne se demande pas.",
+    "ask": "Aucune question : le contrôle est renseigné.",
+    "avoid": "Demander la marche.",
+    "posture": "Simple et factuelle.",
+    "ideal": "Accuser réception sans demander la marche.",
+    "acceptance": [
+      "Ne pas demander la marche."
+    ],
+    "max_questions": 0,
+    "max_messages": 2
+  },
+  {
+    "id": "partial-other-topic",
+    "route": "N1",
+    "message": "Probablement pareil.",
+    "context": "Le dernier état déclaré est énergie moyenne. Aucune décision de séance demandée.",
+    "history": [
+      {
+        "id": "m0",
+        "role": "coach",
+        "body": "Ton énergie est mieux ou comme hier ?",
+        "created_at": "2026-09-06T08:00:00Z"
+      },
+      {
+        "id": "m1",
+        "role": "athlete",
+        "body": "J’ai déjà dit que j’avais dormi six heures.",
+        "created_at": "2026-09-06T08:00:00Z"
+      }
+    ],
+    "questions": [
+      {
+        "id": "q1",
+        "question": "J’ai déjà dit que j’avais dormi six heures.",
+        "status": "open",
+        "review_note": "Les réponses précédentes restent valides."
+      }
+    ],
+    "gates": [],
+    "understanding": "Accepter l’estimation d’énergie, ne pas redemander le sommeil ni exiger un oui certain.",
+    "ask": "Seulement un fait décisif réellement absent.",
+    "avoid": "Relance de certitude, information redemandée, validation de sécurité inventée.",
+    "posture": "Attentive et précise.",
+    "ideal": "Accepter l’estimation d’énergie, ne pas redemander le sommeil ni exiger un oui certain.",
+    "acceptance": [
+      "Accepter l’estimation d’énergie, ne pas redemander le sommeil ni exiger un oui certain."
+    ],
+    "max_questions": 0,
+    "max_messages": 3
+  }
+]

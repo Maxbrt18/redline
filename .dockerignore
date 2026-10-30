@@ -1,0 +1,16 @@
+# Never in the image: secrets, the local venv, caches and anything a run writes. The Git
+# metadata stays: the agent CLI compares the code it runs with the commit.
+.env
+.env.*
+.venv/
+var/
+**/__pycache__/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+# compose.yml: what the host mounts or reads, never baked into the image.
+/redline.env
+/secrets/
+/vault/
+/ssh/

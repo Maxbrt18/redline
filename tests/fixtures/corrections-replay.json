@@ -1,0 +1,23 @@
+[
+  {
+    "correction": "2026-01-10 — Une distance disponible dans l'activité dite invérifiable",
+    "replay": "pending",
+    "note": "donnée enregistrée ignorée ; consigne du modèle",
+    "scenarios": []
+  },
+  {
+    "correction": "2026-01-05 — Une alarme sur un plaisir élevé",
+    "replay": "code",
+    "carriers": [
+      "src/redline/analysis/signals.py"
+    ],
+    "note": "alarme retirée de redline signals",
+    "scenarios": []
+  },
+  {
+    "correction": "2026-01-02 — Un mécanisme expliqué deux fois de travers",
+    "replay": "off-bench",
+    "note": "mécanisme retiré",
+    "scenarios": []
+  }
+]

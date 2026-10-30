@@ -1,0 +1,62 @@
+# L'instance fictive de la suite de tests. « Sam » n'est personne : c'est le seul
+# endroit où ce prénom est déclaré, et les tests le lisent d'ici.
+
+[athlete]
+name = "Sam"
+hr_rest = 55
+hr_max = 190
+timezone = "Europe/Paris"
+
+[notebook]
+place = "Paris"
+
+[[injuries]]
+slug = "knee"
+label = "Genou"
+
+[[capabilities]]
+slug = "cap1-endurance"
+label = "Endurance"
+icon = "run"
+
+[[capabilities]]
+slug = "cap2-speed"
+label = "Vitesse"
+icon = "run"
+
+[[capabilities]]
+slug = "cap3-fueling"
+label = "Ravitaillement"
+icon = "food"
+
+[[capabilities]]
+slug = "cap4-hills"
+label = "Côtes"
+icon = "descent"
+
+[[capabilities]]
+slug = "cap5-knee"
+label = "Genou"
+icon = "pain"
+
+[[capabilities]]
+slug = "cap6-mental"
+label = "Mental"
+icon = "mind"
+
+[vault]
+note_types = ["capability", "exercise", "workout"]
+
+[[vault.budget]]
+tier = "per-turn"
+total = 3600
+files = [{ path = "CLAUDE.md", words = 2200 }, { path = "ai/hot-cache.md", words = 1400 }]
+
+[[vault.budget]]
+tier = "N2"
+total = 2800
+files = [{ path = "athlete/athlete.md", words = 2800 }]
+
+# Les séances d’avant ce jour suivaient un contrat moins exigeant : jamais réclamées.
+[ledger]
+complete_from = "2026-07-30"

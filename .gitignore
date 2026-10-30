@@ -1,0 +1,42 @@
+.DS_Store
+
+# Editor swap files: a swapped .env holds its secrets in clear text.
+*.sw[a-p]
+.*.sw[a-p]
+*~
+.*.swp
+*.swo
+
+.env
+.env.*
+!.env.example
+
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Per-turn JSON handed to a CLI (`--input`), deleted at the end of the turn.
+.agent-tmp/
+
+# Coaching data belongs to a private vault, never to the engine repository.
+/athlete/
+/inbox/
+/episodes/
+/concepts/
+/sources/
+
+# Metadata written by `pip install -e .`
+*.egg-info/
+
+# Runtime state of a running service (`REDLINE_STATE_DIR`, by default here): outbox,
+# attachments, the Strava token cache. Never committed.
+/var/
+
+# compose.yml: the host-side configuration, secrets and data, never in Git.
+/redline.env
+/secrets/
+/vault/
+/ssh/

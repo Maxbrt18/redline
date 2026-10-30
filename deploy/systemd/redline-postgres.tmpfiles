@@ -1,0 +1,2 @@
+# Socket PostgreSQL local partagé par le service et ses outils métier.
+d /run/redline-postgres 1777 root root -

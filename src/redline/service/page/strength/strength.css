@@ -1,0 +1,295 @@
+/* The interactive strength session -- phone first, one thumb, at arm's length.
+ *
+ * A screen of the notebook: the notebook's bar, title and sheets
+ * frame it (notebook/workout.css), this file styles what runs inside #workout. Every
+ * element rule is scoped there with :where(), so it never reaches the notebook and
+ * keeps the specificity of a bare element. Class names are prefixed `p-`.
+ *
+ * WHAT CARRIES MEANING HERE: type size, ink weight, and space. Nothing else.
+ * No accent rule down the side of the current step, no badge, no boxed alert, no
+ * filled "selected" state -- the current exercise is the one that is big and
+ * open, a finished one is the one that has gone faint, and that is the whole
+ * visual language. Steps are separated by a hairline, like the card rows; the
+ * only surfaces left are the buttons, because a surface says "press me".
+ *
+ * The theme is the notebook's: the phone's, or the one pinned in its settings.
+ */
+
+:where(#workout) *, :where(#workout) *::before, :where(#workout) *::after { box-sizing: border-box; }
+
+:where(#workout) :is(p, h1, h2, ol, ul, figure) { margin: 0; padding: 0; list-style: none; }
+
+:where(#workout) :is(button, input, textarea) {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+}
+:where(#workout) button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.p-num { font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------------- header */
+.p-note { margin-top: 16px; color: var(--muted); line-height: 1.42; }
+/* The safeguard sentence. Full ink, because it explains why the displayed session is
+ * not the announced one -- no frame or pill for that: ink weight is what sets it apart,
+ * as everywhere here. */
+.p-note--gate { color: var(--ink); font-weight: 600; }
+
+/* -------------------------------------------------------------------- steps */
+.p-steps {
+  display: flex;
+  flex-direction: column;
+  margin-top: 18px;
+}
+
+.p-step { padding: 16px 0; border-bottom: 1px solid var(--grid); }
+.p-step--live { padding: 22px 0 24px; }
+.p-step:last-child { border-bottom: 0; }   /* the rule under the list closes it */
+
+.p-step__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  width: 100%;
+  padding: 0;
+  text-align: left;
+}
+.p-step__index {
+  flex: 0 0 26px;
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--faint);
+}
+.p-step__main { flex: 1 1 auto; min-width: 0; }
+.p-step__name { font-weight: 600; line-height: 1.28; overflow-wrap: anywhere; }
+.p-step__sub { margin-top: 5px; font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+
+/* UNDER the name, on its own full line. It used to be a right-hand cell, like the
+ * card rows -- but the card is frozen at 1080 px and this has to hold at 375, where
+ * two columns simply cannot both have enough room: "3 min" wrapped to two lines and
+ * "40 contacts, en blocs de 10" to three, against a name already using three.
+ * Given the whole line, the dose has nothing left to arbitrate. */
+.p-step__dose {
+  margin-top: 5px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--muted);
+  overflow-wrap: break-word;
+}
+
+/* Finished: the whole row recedes. No tick, no strike-through -- it has simply
+ * stopped being the thing you are doing. */
+.p-step--done .p-step__name,
+.p-step--done .p-step__dose,
+.p-step--done .p-step__index { color: var(--faint); font-weight: 500; }
+
+.p-step--live .p-step__name { font-size: 21px; line-height: 1.22; }
+.p-step--live .p-step__index { color: var(--muted); }
+
+/* ------------------------------------------------------------------ control */
+.p-ctrl { margin: 18px 0 2px 40px; }
+@media (max-width: 400px) { .p-ctrl { margin-left: 0; } }
+
+/* Where you are in the exercise. This is the main orientation cue between two
+ * sets, so it wears --muted, not --faint: it is read, not glanced at. */
+.p-ctrl__label {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* The countdown and the contact counter: figures big enough to read from the
+ * floor, which is where you are during a plank. */
+.p-figure {
+  margin-top: 6px;
+  font-family: var(--display);
+  font-size: 58px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.p-figure--muted { color: var(--muted); }
+.p-figure__unit { font-family: var(--sans); font-size: 17px; font-weight: 500; color: var(--muted); }
+
+/* The dose restated where the hands are, for exercises with nothing to count.
+ * 18 px, not 20: on an AMRAP this line IS the figure, and at 20 px « 2-3 ×
+ * jusqu'à échec technique / jambe » ran to two heavy lines above an empty box. */
+.p-ctrl__value { margin-top: 6px; font-size: 18px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+
+.p-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+
+.p-btn {
+  flex: 1 1 auto;
+  min-height: 52px;
+  padding: 13px 20px;
+  background: var(--panel);
+  font-weight: 600;
+}
+.p-btn:active { background: var(--grid); }
+.p-btn--wide { flex-basis: 100%; }
+/* The way out, not a peer of the forward action: no surface, no border, and it
+ * sits on its own line under it. */
+.p-btn--quiet {
+  flex: 1 1 100%;
+  min-height: 44px;
+  background: none;
+  border-color: transparent;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.p-count { display: inline-flex; align-items: center; gap: 14px; margin-top: 8px; }
+.p-count .p-btn { flex: 0 0 auto; min-width: 62px; text-align: center; }
+
+.p-input {
+  width: 100%;
+  max-width: 160px;
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: var(--bg);
+  border: 1px solid var(--grid);
+  font-variant-numeric: tabular-nums;
+}
+textarea.p-input { max-width: none; min-height: 96px; resize: vertical; line-height: 1.4; }
+
+/* Sets already banked, as plain text: "14 · 12 · 11". Data, not chips. */
+.p-tally { margin-top: 10px; font-size: 15px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* The movement cue. A disclosure, not an action: the button has no surface or border,
+ * so it cannot be mistaken for the action that moves the session forward. Cues as a
+ * list, one per line -- that is how they are re-read at a glance between two sets, not
+ * as a paragraph. */
+.p-how { margin-top: 16px; }
+.p-how__toggle {
+  flex: 0 0 auto;
+  min-height: 0;
+  padding: 0;
+  /* No surface or border: inherited from .p-btn, they made it look like a session
+   * action, next to the one that really is one. */
+  background: none;
+  border-color: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: var(--muted);
+}
+.p-how__toggle:active { background: none; color: var(--ink); }
+.p-how__list { margin-top: 8px; }
+.p-how__cue {
+  position: relative;
+  margin-top: 6px;
+  padding-left: 16px;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+/* An em-dash bullet, not a disc: the same punctuation as the rest of the page, and
+ * nothing that looks like a pill. */
+.p-how__cue::before { content: "—"; position: absolute; left: 0; color: var(--faint); }
+
+/* What last week's session banked on this exercise. Sits ABOVE the buttons, not
+ * below with the tally: it is read before deciding how hard to go, not after.
+ * Faint on purpose -- it informs the set, it does not prescribe it. */
+.p-last { margin-top: 16px; }
+.p-last__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--faint);
+}
+.p-last__value { margin-top: 3px; font-size: 16px; color: var(--muted); }
+
+/* ---------------------------------------------------------------- opening */
+/* The pain reading from before. Same treatment as the end review: it is the same
+ * question, asked at the other end of the session. */
+.p-open { margin-top: 30px; }
+.p-open__title {
+  font-family: var(--display);
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.12;
+}
+.p-open__hint { margin: 10px 0 18px; color: var(--muted); font-size: 15px; line-height: 1.4; }
+
+/* ------------------------------------------------------------------- review */
+.p-rule {
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid var(--grid);
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.p-review { margin-top: 34px; }
+.p-review__title {
+  font-family: var(--display);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.p-review__hint { margin-top: 10px; color: var(--muted); font-size: 15px; line-height: 1.4; }
+
+.p-score { margin-top: 24px; }
+.p-score__name { font-weight: 600; overflow-wrap: anywhere; }
+/* Which end of the scale is which. Without it, "note de 0 à 10" says nothing --
+ * the scale was genuinely unreadable until this line existed. */
+.p-score__legend { margin-top: 4px; font-size: 13px; color: var(--faint); }
+
+/* The 0-10 scale. The chosen value is simply BIGGER and full ink; the others
+ * stay faint. No pill, no fill, no ring -- the size is the selection. */
+.p-scale { display: flex; gap: 2px; margin-top: 6px; }
+.p-scale__step {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 12px 0 8px;
+  font-family: var(--display);
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--faint);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.p-scale__step[aria-checked="true"] { font-size: 30px; color: var(--ink); }
+
+.p-status { margin-top: 20px; color: var(--muted); font-size: 15px; line-height: 1.4; }
+
+.p-current {
+  margin-top: 8px;
+  font-family: var(--display);
+  font-size: clamp(26px, 7vw, 34px);
+  font-weight: 700;
+  line-height: 1.1;
+}
+.p-setup { margin-top: 8px; color: var(--muted); font-size: 15px; }
+.p-auto { display: flex; align-items: center; gap: 10px; margin-top: 14px; min-height: 44px; font-size: 15px; color: var(--muted); }
+.p-auto input { width: 20px; height: 20px; accent-color: var(--brand); }
+.p-cue { margin-top: 12px; font-weight: 600; font-size: 16px; }
+.p-prep { margin-top: 20px; padding: 14px 0; border-top: 1px solid var(--grid); }
+.p-prep summary { cursor: pointer; font-weight: 600; min-height: 32px; }
+.p-feedback { margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--grid); }
+.p-feedback-disclosure { margin-top: 18px; color: var(--muted); }
+.p-feedback-disclosure summary { cursor: pointer; padding: 12px 0; min-height: 44px; }
+/* Disclosures: a label followed by a rotating chevron, as in the notebook, not the
+ * browser's triangle. */
+.p-prep summary, .p-feedback-disclosure summary { display: flex; align-items: center; gap: 8px; list-style: none; }
+.p-prep summary::-webkit-details-marker, .p-feedback-disclosure summary::-webkit-details-marker { display: none; }
+.p-prep summary::after, .p-feedback-disclosure summary::after { content: ""; width: 7px; height: 12px; background: var(--faint); -webkit-mask: var(--chevron); mask: var(--chevron); transition: transform .15s; }
+.p-prep[open] > summary::after, .p-feedback-disclosure[open] > summary::after { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .p-prep summary::after, .p-feedback-disclosure summary::after { transition: none; } }
+.p-exercise-note { min-height: 58px !important; font-size: 15px; }
+:where(#workout) button:disabled { cursor: default; opacity: .65; }
+:where(#workout) :is(button, summary):focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
+
+/* --------------------------------------------------------------------- boot */
+.p-boot { padding: 40px 4px; }
+.p-boot__title {
+  font-family: var(--display);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.p-boot__msg { margin-top: 12px; color: var(--muted); line-height: 1.45; }

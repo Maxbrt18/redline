@@ -1,0 +1,122 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+# The ranges below are what the engine works with; requirements.txt and
+# requirements-dev.txt pin the exact versions tested, and serve as constraints:
+#
+#   pip install -c requirements.txt -c requirements-dev.txt -e '.[cards,dev]'
+#
+# Extras: `codex` for the Codex provider, `cards` for the PNG cards and the notebook
+# tests (then `playwright install chromium`), `dev` for the checks.
+[project]
+name = "redline"
+version = "0.1.0"
+description = "A running coach on a language model, with its memory in a Markdown vault and PostgreSQL."
+readme = "README.md"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.18,<2",
+    "babel>=2.17,<3",
+    "flask>=3.1,<4",
+    "psycopg[binary,pool]>=3.3,<4",
+    "pyyaml>=6.0,<7",
+    "requests>=2.32,<3",
+    "SQLAlchemy>=2.0,<2.1",
+    "waitress>=3.0,<4",
+]
+
+[project.optional-dependencies]
+codex = ["openai-codex>=0.156.1,<1.0.0"]
+cards = ["playwright>=1.60,<2"]
+dev = ["mypy", "pytest", "ruff", "types-PyYAML", "types-requests", "vulture"]
+
+[project.urls]
+Repository = "https://github.com/Maxbrt18/redline"
+Issues = "https://github.com/Maxbrt18/redline/issues"
+
+[project.scripts]
+redline = "redline.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"*" = ["*.md", "*.css", "*.js", "*.html", "*.json", "*.toml", "*.txt", "*.png", "*.woff2"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = []
+
+[tool.ruff.lint]
+# UP, PIE and FURB: one syntax, not two (`X | None` rather than `Optional[X]`), and
+# the idioms the standard library already does better.
+select = ["E", "W", "F", "I", "B", "SIM", "C4", "RUF", "UP", "PIE", "FURB"]
+ignore = [
+    # Long URLs and regexes in the middle of a rule are not worth a backslash.
+    "E501",
+    # RUF001-003 flag French typography (— « » ’ °) as "ambiguous unicode". Every
+    # string the athlete reads is French, so this fires ~44 times on correct code.
+    "RUF001", "RUF002", "RUF003",
+    # `class X(str, Enum)` -> StrEnum would change str(x), hence the incident text.
+    "UP042",
+    # PEP 695 syntax (`type X = ...`, generics): no gain here, and mypy reads it even
+    # less well than TypeAlias/TypeVar.
+    "UP040", "UP047",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["redline"]
+
+[tool.ruff.lint.per-file-ignores]
+# Test names are sentences on purpose (test_a_view_is_replaced_between_its_markers).
+"tests/*" = ["E741"]
+
+[tool.vulture]
+# Production code only: tests are left out of the analysis, so a function only its own
+# test calls is reported as dead. A false positive is declared here, by name.
+paths = ["src"]
+# The stored vocabularies are reached by iterating their enums (CLI choices, CHECK
+# constraints, the notebook's answers), never member by member.
+exclude = ["*/tests/*", "*/model/vocabulary.py"]
+min_confidence = 60
+# Flask routes: called by the framework, never by the code.
+ignore_decorators = ["@app.get", "@app.post", "@app.before_request", "@app.after_request", "@app.errorhandler"]
+ignore_names = [
+    # Lazy loading of the `redline.storage` package (PEP 562).
+    "__getattr__",
+    # Declaration of the triggers the database must carry, checked against it.
+    "TRIGGERS",
+    # Named carrier of each rule of the compiled rulebook (CLAUDE.md, "a general rule
+    # names its carrier"): data, not a call.
+    "enforced_by",
+    # Rulebook thresholds only a rule's text cites (`{pain_cap}`), read by
+    # `Parameters.spoken`: the code applies none, the coach does.
+    "gate_trend_weeks", "pain_cap",
+    # Flask setting read by Werkzeug.
+    "max_content_length",
+    # `Activity` fields only `summary()` reads, through `dataclasses.fields`.
+    "relative_effort", "calories",
+]
+
+[tool.mypy]
+# Added after a real outage: `_buffer_proactive_retry` was CALLED in worker.py without
+# existing for eleven days, and the Sunday review crashed instead of being deferred.
+# Neither ruff nor the tests see a missing method on `self`; mypy names it.
+python_version = "3.12"
+files = ["src"]
+warn_unused_ignores = true
+warn_redundant_casts = true
+
+[[tool.mypy.overrides]]
+# No stubs published, and the import is already guarded at the call site.
+module = ["waitress", "playwright.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# `tests` for conftest helpers; `src` so the suite runs without an install.
+pythonpath = ["tests", "src"]

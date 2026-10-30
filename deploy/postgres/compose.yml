@@ -1,0 +1,41 @@
+# PostgreSQL alone, for a service that runs on the host under systemd: the socket is
+# shared with the host in /run/redline-postgres (deploy/systemd/redline-postgres.tmpfiles)
+# and the port listens on 127.0.0.1. The compose.yml at the root keeps it on its own
+# network instead. Variables: config/postgres.env.example.
+#
+#   docker compose --env-file /etc/redline/postgres.env -f deploy/postgres/compose.yml up -d
+services:
+  postgres:
+    build:
+      context: .
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: redline
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+      - postgres_app_password
+      - postgres_migrator_password
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - /run/redline-postgres:/var/run/postgresql
+      - ./init-roles.sh:/docker-entrypoint-initdb.d/010-roles.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d redline"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  postgres_data:
+
+secrets:
+  postgres_password:
+    file: ${REDLINE_SECRETS_DIR}/postgres_password
+  postgres_app_password:
+    file: ${REDLINE_SECRETS_DIR}/postgres_app_password
+  postgres_migrator_password:
+    file: ${REDLINE_SECRETS_DIR}/postgres_migrator_password
