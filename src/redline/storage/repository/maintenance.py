@@ -9,6 +9,7 @@ import sqlalchemy as sa
 
 from ..schema import (
     agent_sessions,
+    agent_turns,
     athlete_activity_states,
     athletes,
     capability_evaluations,
@@ -73,7 +74,8 @@ class Maintenance(StoreBase):
             "conversation_questions": conversation_questions,
             "gear_items": gear_items, "coach_predictions": coach_predictions,
             "correction_deliveries": correction_deliveries,
-            "agent_sessions": agent_sessions, "handoffs": handoffs,
+            "agent_sessions": agent_sessions, "agent_turns": agent_turns,
+            "handoffs": handoffs,
             "inbound_activity_states": inbound_activity_states,
             "inbound_messages": inbound_messages,
             "messenger_message_refs": messenger_message_refs,

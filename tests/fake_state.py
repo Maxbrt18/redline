@@ -141,6 +141,7 @@ class FakeProactiveState:
 class FakeStateStore:
     def __init__(self) -> None:
         self.proactive = FakeProactiveState()
+        self.turns: list = []
         self._sessions: dict[str, dict] = {}
         self._handoffs: dict[str, str] = {}
         self._inbound: dict[str, float] = {}
@@ -155,6 +156,9 @@ class FakeStateStore:
 
     def register_turn(self, turn_id: str, psid: str) -> None:
         pass
+
+    def record_turn(self, identity) -> None:
+        self.turns.append(identity)
 
     def materialize_intelligence(self, now: datetime) -> int:
         return 0

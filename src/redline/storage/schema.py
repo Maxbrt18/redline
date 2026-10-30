@@ -680,9 +680,16 @@ conversation_messages = sa.Table(
     sa.Column("body", sa.Text, nullable=False),
     sa.Column("source_key", sa.Text, nullable=False),
     sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=UTC_NOW),
+    # The model turn that wrote the message. Absent for the athlete, for a text the
+    # service composes itself, and for messages older than the turn register.
+    sa.Column("turn_id", UUID_PK,
+              sa.ForeignKey("redline.agent_turns.turn_id",
+                            name="fk_conversation_messages_turn_id_agent_turns")),
     sa.CheckConstraint("role IN ('athlete','coach','proactive')",
                        name="ck_conversation_messages_role"),
     sa.CheckConstraint("body <> ''", name="ck_conversation_messages_body"),
+    sa.CheckConstraint("role <> 'athlete' OR turn_id IS NULL",
+                       name="ck_conversation_messages_turn_id"),
     sa.UniqueConstraint("psid", "source_key", name="uq_conversation_messages_source"),
 )
 
@@ -886,6 +893,35 @@ agent_sessions = sa.Table(
     sa.Column("prompt_digest", sa.Text),
     sa.CheckConstraint("provider IN ('codex','claude')", name="ck_agent_sessions_provider"),
     sa.CheckConstraint("psid <> '' AND session_id <> ''", name="ck_agent_sessions_identity"),
+)
+
+#: What produced a model turn, written once whatever its outcome. Behaviour drifts from
+#: one model or prompt version to the next: without this register, two replies can only
+#: be compared by guessing what wrote them. Never purged; append-only for the service.
+agent_turns = sa.Table(
+    "agent_turns", metadata,
+    sa.Column("turn_id", UUID_PK, primary_key=True),
+    sa.Column("psid", sa.Text, nullable=False),
+    sa.Column("provider", sa.Text, nullable=False),
+    sa.Column("route", sa.Text, nullable=False),
+    # The model the provider says answered, else the one requested; absent when the
+    # provider chose its own default and did not name it.
+    sa.Column("model", sa.Text),
+    sa.Column("model_reported", sa.Boolean, nullable=False),
+    sa.Column("effort", sa.Text),
+    # `redline.service.prompts.instruction_digest`: baked style plus normative vault files.
+    sa.Column("instruction_digest", sa.Text, nullable=False),
+    # The rulebook file in force, instance or engine default.
+    sa.Column("rulebook_digest", sa.Text, nullable=False),
+    # `VaultRepo.runtime_tree`: the engine code, its tool allowlist and its migrations.
+    # Absent when the engine checkout cannot be read.
+    sa.Column("engine_tree", sa.Text),
+    sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=UTC_NOW),
+    sa.CheckConstraint("provider IN ('codex','claude')", name="ck_agent_turns_provider"),
+    sa.CheckConstraint("psid <> '' AND route <> '' AND instruction_digest <> '' "
+                       "AND rulebook_digest <> ''", name="ck_agent_turns_identity"),
+    sa.CheckConstraint("NOT model_reported OR model IS NOT NULL",
+                       name="ck_agent_turns_model_reported"),
 )
 
 handoffs = sa.Table(

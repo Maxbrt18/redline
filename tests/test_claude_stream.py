@@ -68,3 +68,17 @@ def test_result_is_fallback_without_assistant_text():
 
 def test_unreadable_lines_are_ignored():
     assert consume(["pas du json", "", assistant(text("Ça va ?"))]).full == "Ça va ?"
+
+
+def test_the_model_that_answered_is_captured():
+    state = consume([
+        json.dumps({"type": "system", "subtype": "init", "model": "claude-sonnet-5-5"}),
+        json.dumps({"type": "assistant", "message": {"model": "claude-opus-5-5",
+                                                     "content": [text("Ok.")]}}),
+        result("Ok."),
+    ])
+    assert state.model == "claude-opus-5-5"
+
+
+def test_without_a_named_model_none_is_claimed():
+    assert consume([assistant(text("Ok.")), result("Ok.")]).model is None

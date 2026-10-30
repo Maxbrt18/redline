@@ -145,6 +145,8 @@ class RunResult:
     failure: FailureKind | None = None
     work_started: bool = False
     silent: bool = False
+    # The model the provider says answered; None when it does not say.
+    model: str | None = None
 
     @property
     def allows_fallback(self) -> bool:
@@ -176,6 +178,22 @@ class RunSpec:
     # Typed `{send, text}` reply: an initiative says whether it speaks without any
     # code having to look for a sentinel word in its prose.
     structured_reply: bool = False
+
+
+@dataclass(frozen=True)
+class TurnIdentity:
+    """What produced a model turn: the provider, the model and the versions it ran under."""
+
+    turn_id: str
+    psid: str
+    provider: str
+    route: str
+    model: str | None
+    model_reported: bool
+    effort: str | None
+    instruction_digest: str
+    rulebook_digest: str
+    engine_tree: str | None
 
 
 #: Output contract of an initiative, shared by both providers.

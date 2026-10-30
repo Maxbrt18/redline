@@ -3,6 +3,7 @@
 from dataclasses import replace
 
 import pytest
+from conftest import TEST_VAULT
 
 from redline.service.agent import FailureKind, RunResult, SessionMode
 from redline.service.routing import Route, RoutingConfig, RoutingError
@@ -110,7 +111,8 @@ def test_turn_executor_tries_the_fallback_before_persisting(make_config):
     state = MagicMock()
     plan = RoutingConfig.default("codex").plan(Route.N1)
 
-    outcome = TurnExecutor(agent, repo, state).execute("4242", "salut", plan=plan)
+    outcome = TurnExecutor(agent, repo, state, vault_path=TEST_VAULT).execute(
+        "4242", "salut", plan=plan)
 
     assert outcome.result.full_text == "réponse de secours"
     assert agent.run.call_count == 2
@@ -130,7 +132,7 @@ def test_turn_executor_never_relaunches_work_that_already_started():
     repo.is_clean.return_value = True
     state = MagicMock()
 
-    outcome = TurnExecutor(agent, repo, state).execute(
+    outcome = TurnExecutor(agent, repo, state, vault_path=TEST_VAULT).execute(
         "4242", "travail", plan=RoutingConfig.default("codex").plan(Route.N2))
 
     assert outcome.result.failure is FailureKind.WATCHDOG
@@ -149,7 +151,7 @@ def test_a_read_only_turn_discards_database_and_git_changes():
     state = MagicMock()
     plan = RoutingConfig.default("codex").plan(Route.N1).with_read_only()
 
-    result = TurnExecutor(agent, repo, state).read_only(
+    result = TurnExecutor(agent, repo, state, vault_path=TEST_VAULT).read_only(
         "4242", "analyse", plan=plan, turn_id="turn-read-only")
 
     assert result.full_text == "observation"
@@ -168,7 +170,8 @@ def test_a_failed_fork_does_not_destroy_the_interactive_session():
     state = MagicMock()
     plan = RoutingConfig.default("codex").plan(Route.DEEP)
 
-    TurnExecutor(agent, repo, state).execute("4242", "creuse", plan=plan)
+    TurnExecutor(agent, repo, state, vault_path=TEST_VAULT).execute(
+        "4242", "creuse", plan=plan)
 
     state.clear_session.assert_not_called()
 
@@ -200,7 +203,7 @@ def _executor(results, persisted=None):
     repo.head.return_value = "base"
     repo.is_clean.return_value = True
     repo.persist_turn.return_value = persisted or PersistenceResult(True)
-    return TurnExecutor(agent, repo, MagicMock()), agent, repo
+    return TurnExecutor(agent, repo, MagicMock(), vault_path=TEST_VAULT), agent, repo
 
 
 @pytest.mark.parametrize("applied", [0, 3])
@@ -260,3 +263,55 @@ def test_refused_writes_discard_the_turn_and_its_session():
     assert not outcome.persistence.writes_applied
     repo.discard_turn.assert_called_once_with(outcome.turn_id)
     state.clear_session.assert_called_once_with("4242", "codex")
+
+
+def test_each_turn_registers_the_model_that_answered_and_shows_a_model_change():
+    """Switching models must be visible in the register, turn by turn."""
+    from unittest.mock import MagicMock
+
+    from fake_state import FakeStateStore
+
+    agent = MagicMock(provider="claude")
+    agent.run.side_effect = [RunResult(full_text="Un.", model="claude-sonnet-5-5"),
+                             RunResult(full_text="Deux.", model="claude-opus-5-5")]
+    repo = MagicMock()
+    repo.head.return_value = "base"
+    repo.is_clean.return_value = True
+    repo.runtime_tree.return_value = "a7ac902a8d52"
+    repo.persist_turn.return_value = PersistenceResult(True)
+    state = FakeStateStore()
+    executor = TurnExecutor(agent, repo, state, vault_path=TEST_VAULT)
+    plan = RoutingConfig.default("claude").plan(Route.N1)
+
+    first = executor.execute("4242", "salut", plan=plan)
+    second = executor.execute("4242", "encore", plan=plan)
+
+    assert [turn.turn_id for turn in state.turns] == [first.turn_id, second.turn_id]
+    assert [turn.model for turn in state.turns] == ["claude-sonnet-5-5", "claude-opus-5-5"]
+    assert all(turn.model_reported and turn.provider == "claude" and turn.route == "N1"
+               and turn.engine_tree == "a7ac902a8d52" for turn in state.turns)
+    assert state.turns[0].instruction_digest and state.turns[0].rulebook_digest
+
+
+def test_a_failed_turn_registers_the_model_requested_as_unconfirmed():
+    executor, _, _ = _executor([RunResult(error="watchdog", failure=FailureKind.WATCHDOG,
+                                              work_started=True)])
+    plan = RoutingConfig.default("codex").plan(Route.N2)
+
+    executor.execute("4242", "travail", plan=plan)
+
+    identity = executor._state.record_turn.call_args.args[0]
+    assert identity.model == plan.primary.model
+    assert identity.model_reported is False
+    assert identity.effort == plan.primary.effort
+
+
+def test_a_register_failure_never_costs_the_reply():
+    executor, _, _ = _executor([RunResult(full_text="Bien reçu.")])
+    executor._state.record_turn.side_effect = RuntimeError("base indisponible")
+
+    outcome = executor.execute("4242", "salut",
+                               plan=RoutingConfig.default("codex").plan(Route.N1))
+
+    assert outcome.result.full_text == "Bien reçu."
+    assert outcome.persistence is not None and outcome.persistence.writes_applied

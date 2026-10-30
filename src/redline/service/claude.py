@@ -100,6 +100,7 @@ class _Stream:
     # failure, and the turn is not replayed.
     started: bool = False
     structured: object = None
+    model: str | None = None
 
 
 class ClaudeCodeRunner:
@@ -217,14 +218,14 @@ class ClaudeCodeRunner:
 
             if returncode == 0 and not parsed.is_error:
                 if not spec.structured_reply:
-                    return RunResult(parsed.session, parsed.full)
+                    return RunResult(parsed.session, parsed.full, model=parsed.model)
                 try:
                     send, text = structured_reply(parsed.structured)
                 except (TypeError, ValueError) as exc:
                     return RunResult(parsed.session,
                                      error=f"sortie Claude hors contrat : {exc}",
                                      failure=FailureKind.IN_FLIGHT, work_started=True)
-                return RunResult(parsed.session, text, silent=not send)
+                return RunResult(parsed.session, text, silent=not send, model=parsed.model)
 
             last_detail = (parsed.result_text or stderr or "").strip()[:500]
             log.warning("claude failed (attempt %d/%d, code %d, session %s): %s",
@@ -355,8 +356,13 @@ class ClaudeCodeRunner:
             if obj.get("session_id"):
                 state.session = obj["session_id"]
             kind = obj.get("type")
+            if kind == "system" and obj.get("model"):
+                state.model = str(obj["model"])
             if kind == "assistant":
                 state.started = True
+                # The model that actually answered, which may differ from the one requested.
+                if obj.get("message", {}).get("model"):
+                    state.model = str(obj["message"]["model"])
                 separate = True  # first text block of this message: separate it from the accumulated
                 for block in obj.get("message", {}).get("content", []):
                     btype = block.get("type")

@@ -2585,3 +2585,58 @@ def test_corrections_are_matched_on_their_rare_words(store):
     context = state.correction_context("et la descente de demain ?")
     assert summaries["c1"] in context
     assert summaries["c2"] not in context and summaries["c3"] not in context
+
+
+def _turn_identity(turn_id: str, model: str = "claude-sonnet-5-5"):
+    from redline.service.agent import TurnIdentity
+    return TurnIdentity(
+        turn_id=turn_id, psid="4242", provider="claude", route="N1", model=model,
+        model_reported=True, effort="medium", instruction_digest="0123456789abcdef",
+        rulebook_digest="fedcba9876543210", engine_tree="a7ac902a8d52")
+
+
+def test_a_coach_message_names_the_turn_and_model_that_wrote_it(store):
+    state = PostgresStateStore(store.database)
+    first, second = str(uuid.uuid4()), str(uuid.uuid4())
+    state.record_turn(_turn_identity(first))
+    state.record_turn(_turn_identity(second, model="claude-opus-5-5"))
+    state.record_outbound("4242", "Premier.", source_key="test:first", turn_id=first)
+    state.record_outbound("4242", "Second.", source_key="test:second", turn_id=second)
+    # A text the service composes itself, and a turn whose identity was never recorded.
+    state.record_outbound("4242", "Limite.", source_key="test:limit")
+    state.record_outbound("4242", "Orphelin.", source_key="test:orphan",
+                          turn_id=str(uuid.uuid4()))
+
+    with store.database.engine.connect() as connection:
+        rows = dict(connection.execute(sa.text(
+            "SELECT m.body, t.model FROM redline.conversation_messages m "
+            "LEFT JOIN redline.agent_turns t USING (turn_id) "
+            "WHERE m.source_key LIKE 'test:%'")).all())
+    assert rows == {"Premier.": "claude-sonnet-5-5", "Second.": "claude-opus-5-5",
+                    "Limite.": None, "Orphelin.": None}
+
+
+def test_a_turn_identity_is_written_once_and_never_rewritten(service_role_store):
+    store = service_role_store
+    state = PostgresStateStore(store.database)
+    turn_id = str(uuid.uuid4())
+    state.record_turn(_turn_identity(turn_id))
+    state.record_turn(_turn_identity(turn_id, model="claude-opus-5-5"))
+
+    with store.database.engine.connect() as connection:
+        assert connection.execute(sa.text(
+            "SELECT model FROM redline.agent_turns WHERE turn_id = :id"),
+            {"id": turn_id}).scalar_one() == "claude-sonnet-5-5"
+    with pytest.raises(StorageError), store.database.transaction() as connection:
+        connection.execute(sa.text("UPDATE redline.agent_turns SET model = 'autre'"))
+
+
+def test_an_athlete_message_cannot_claim_a_model_turn(store):
+    state = PostgresStateStore(store.database)
+    turn_id = str(uuid.uuid4())
+    state.record_turn(_turn_identity(turn_id))
+    with pytest.raises(StorageError), store.database.transaction() as connection:
+        connection.execute(sa.text(
+            "INSERT INTO redline.conversation_messages (id, psid, role, body, source_key, "
+            "turn_id) VALUES (:id, '4242', 'athlete', 'Salut', 'test:athlete', :turn)"),
+            {"id": str(uuid.uuid4()), "turn": turn_id})

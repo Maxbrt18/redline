@@ -20,6 +20,7 @@ what the coach reads is what the code applies.
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import string
 import tomllib
 from dataclasses import dataclass
@@ -213,6 +214,11 @@ def location(vault: Path) -> Path:
     """The instance rulebook if it exists, else the engine's."""
     own = vault / FILENAME
     return own if own.is_file() else DEFAULT
+
+
+def digest(vault: Path) -> str:
+    """Fingerprint of the rulebook file in force, instance or engine default."""
+    return hashlib.sha256(location(vault).read_bytes()).hexdigest()[:16]
 
 
 @lru_cache(maxsize=4)

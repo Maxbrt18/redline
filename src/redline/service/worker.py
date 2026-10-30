@@ -204,7 +204,7 @@ class TurnWorker:
             Path(config.attachment_dir), max_bytes=config.attachment_max_bytes,
             total_bytes=config.attachment_total_bytes)
         self._delivery = DeliveryService(client, outbox, state, config.coach_base_url, notebook)
-        self._turns = TurnExecutor(agent, repo, state)
+        self._turns = TurnExecutor(agent, repo, state, vault_path=config.vault_path)
         self._queue = WorkQueue(config.debounce_seconds, config.debounce_max_seconds)
         self._thread: threading.Thread | None = None
         # State of the single worker, read by the scheduler: a conversation is active during a
@@ -453,10 +453,11 @@ class TurnWorker:
 
     # ---- replies
 
-    def _deliver_attachment_text(self, request: AttachmentRequest, text: str) -> bool:
+    def _deliver_attachment_text(self, request: AttachmentRequest, text: str,
+                                 turn_id: str = "") -> bool:
         source_key = f"attachment:{request.message_id}"
         envelope = (EnvelopeBuilder(request.psid, source_key)
-                    .meta(kind="attachment", memory=text).text(text).build())
+                    .meta(kind="attachment", memory=text, turn_id=turn_id).text(text).build())
         return self._finish_reactive(request.psid, source_key, dict(envelope.meta),
                                      self._delivery.deliver(envelope))
 
@@ -501,8 +502,9 @@ class TurnWorker:
             # An analysis that already failed midway is not blindly relaunched: the athlete knows
             # what to resend.
             return self._deliver_attachment_text(request, ATTACHMENT_UNREADABLE)
-        answer = result.full_text.strip() or replies.ATTACHMENT_NOTHING_RELIABLE
-        return self._deliver_attachment_text(request, answer)
+        if not result.full_text.strip():
+            return self._deliver_attachment_text(request, replies.ATTACHMENT_NOTHING_RELIABLE)
+        return self._deliver_attachment_text(request, result.full_text.strip(), turn_id)
 
     def _with_freshness(self, psid: str, prompt: str, vault_changed: bool) -> str:
         """If a sync brought new commits while a model session is still alive, prepend
