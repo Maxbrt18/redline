@@ -20,7 +20,6 @@ export const hm = text => Number(text.slice(0, 2)) + '\u00a0h' + (text.slice(3, 
 export const startedAt = fact => fact && fact.started_at ? hm(fact.started_at.slice(11, 16)) : '';
 export const paceOf = seconds => Math.floor(seconds / 60) + ':' + String(Math.round(seconds % 60)).padStart(2, '0');
 export const rpeRange = target => target.rpe_min != null && target.rpe_min !== target.rpe_max ? target.rpe_min + '-' + target.rpe_max : '≤' + target.rpe_max;
-export const minutesText = minutes => minutes < 60 ? minutes + ' min' : Math.floor(minutes / 60) + ' h ' + String(minutes % 60).padStart(2, '0');
 export const dayNumber = value => weekday(value) + ' ' + day(value).getDate();
 export function plannedValue(item) {
   const target = item.targets || {};
