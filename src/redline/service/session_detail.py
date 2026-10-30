@@ -20,6 +20,7 @@ from typing import Any
 
 from redline.integrations import strava, weather
 from redline.model import debrief, hr_zones
+from redline.model import notebook_views as views
 from redline.model.activity import Activity, Lap
 
 log = logging.getLogger("redline")
@@ -160,7 +161,7 @@ def stops(s: dict) -> list[list[int]]:
     return [[s["t"][k - 1], s["t"][k]] for k, dt, _ in _steps(s) if dt > GAP_S]
 
 
-def stop_summary(s: dict) -> dict | None:
+def stop_summary(s: dict) -> views.StopSummary | None:
     """Stops in one figure: how many, how long, and the longest one to the nearest km."""
     found = [(k, dt) for k, dt, _ in _steps(s) if dt > GAP_S]
     if not found:
@@ -176,7 +177,7 @@ def _mean(values: list) -> float | None:
     return sum(known) / len(known) if known else None
 
 
-def km_splits(s: dict) -> list[dict] | None:
+def km_splits(s: dict) -> list[views.KmSplit] | None:
     """Each kilometre: distance, moving time, mean HR and cadence, elevation gain."""
     distance = s.get("d")
     if not distance:
@@ -186,7 +187,7 @@ def km_splits(s: dict) -> list[dict] | None:
     if edges and total - edges[-1] < SPLIT_MIN_M:
         edges.pop()
     edges.append(float(total))
-    out: list[dict] = []
+    out: list[views.KmSplit] = []
     start, k0 = 0.0, 0
     for edge in edges:
         moving_s, hrs, cads, gain, k = 0, [], [], 0.0, k0
@@ -214,7 +215,7 @@ def km_splits(s: dict) -> list[dict] | None:
     return out
 
 
-def drift(s: dict) -> dict | None:
+def drift(s: dict) -> views.Drift | None:
     """Mean HR of the two halves of the moving time."""
     hr = s.get("hr")
     if not hr:
@@ -227,7 +228,7 @@ def drift(s: dict) -> dict | None:
             "second": round(_mean([hr[k] for k in moving[half:]]) or 0)}
 
 
-def series(s: dict, points: int = CHART_POINTS) -> dict:
+def series(s: dict, points: int = CHART_POINTS) -> views.Curves:
     """The chart curves: means per time slice, `None` during a stop."""
     time, hr, alt = s["t"], s.get("hr"), s.get("alt")
     duration = time[-1] or 1
@@ -272,7 +273,7 @@ def _lap_bounds(laps: Sequence[Lap], s: dict | None) -> list[list[float]]:
     return out
 
 
-def quality(laps: Sequence[Lap], s: dict | None) -> dict | None:
+def quality(laps: Sequence[Lap], s: dict | None) -> views.Quality | None:
     """The phases of a quality session and the detail of each repetition.
 
     Blocks come from the same lap reading as the repetitions card
@@ -287,7 +288,7 @@ def quality(laps: Sequence[Lap], s: dict | None) -> dict | None:
     def span(block: list[dict]) -> tuple[float, float]:
         return bounds[block[0]["index"]][0], bounds[block[-1]["index"]][1]
 
-    def merged(block: list[dict]) -> dict:
+    def merged(block: list[dict]) -> views.Effort:
         items = [laps[phase["index"]] for phase in block]
         seconds = sum(phase["time_s"] for phase in block)
         metres = sum(phase["dist_m"] for phase in block)
@@ -306,8 +307,8 @@ def quality(laps: Sequence[Lap], s: dict | None) -> dict | None:
                 "cadence": None if step is None else round(step),
                 "dplus": round(sum(item.elevation_gain_m or 0 for item in items))}
 
-    phases: list[dict] = []
-    reps: list[dict] = []
+    phases: list[views.Phase] = []
+    reps: list[views.Rep] = []
     first, last = efforts[0], efforts[-1]
     if first > 0:
         start, end = bounds[blocks[0][1][0]["index"]][0], span(blocks[first - 1][1])[1]
@@ -315,7 +316,8 @@ def quality(laps: Sequence[Lap], s: dict | None) -> dict | None:
                        **merged([phase for _, block in blocks[:first] for phase in block])})
     for fast, block in blocks[first:last + 1]:
         start, end = span(block)
-        phase = {"kind": "rep" if fast else "recovery", "start": start, "end": end, **merged(block)}
+        phase: views.Phase = {"kind": "rep" if fast else "recovery", "start": start, "end": end,
+                              **merged(block)}
         phases.append(phase)
         if fast:
             after = _at(s, end + HR_DROP_S) if s else None
@@ -327,7 +329,7 @@ def quality(laps: Sequence[Lap], s: dict | None) -> dict | None:
         phases.append({"kind": "cooldown", "start": span(blocks[last + 1][1])[0],
                        "end": span(blocks[-1][1])[1], **merged(tail)})
     paces = [rep["pace_s"] for rep in reps if rep["pace_s"]]
-    reading = None
+    reading: views.RepReading | None = None
     if len(paces) >= 2:
         before = paces[:-1]
         # Faster than all the previous ones: the last repetition accelerated.

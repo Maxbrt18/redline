@@ -7,10 +7,12 @@ import hashlib
 import re
 import secrets
 import uuid
-from typing import Any
+from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+from redline.model.notebook_views import Entry
 
 from .database import Database
 from .schema import notebook_credentials as credentials
@@ -117,7 +119,7 @@ class NotebookStore:
 
     def list_entries(self, psid: str, *, offset: int = 0, limit: int = 40,
                      kind: str = "", month: str = "",
-                     between: tuple[dt.date, dt.date] | None = None) -> list[dict]:
+                     between: tuple[dt.date, dt.date] | None = None) -> list[Entry]:
         filters = [entries.c.psid == psid, self._visible()]
         if kind:
             filters.append(entries.c.kind == kind)
@@ -136,7 +138,7 @@ class NotebookStore:
             ).where(*filters).order_by(
                 entries.c.occurred_on.desc(), entries.c.created_at.desc(), entries.c.id
             ).offset(offset).limit(limit)).mappings()
-            return [self._public(dict(row)) for row in rows]
+            return cast("list[Entry]", [self._public(dict(row)) for row in rows])
 
     @staticmethod
     def _public(row: dict) -> dict:

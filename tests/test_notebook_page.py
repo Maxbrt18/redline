@@ -3,7 +3,9 @@
 import json
 import time
 
+import contract
 import pytest
+from notebook_payloads import DETAIL, ENTRY, INJURY, RACE, STRENGTH, TODAY, WEEK, WEEKS, ef
 
 pytest.importorskip('playwright')
 from playwright.sync_api import sync_playwright
@@ -11,79 +13,11 @@ from playwright.sync_api import sync_playwright
 from redline.cards import render
 from redline.coach.fr import session_labels
 from redline.model.dose import Dose
+from redline.model.notebook_views import TodayView
 from redline.service.page import document as session_document
 from redline.service.page import notebook_document
 
 BASE = 'https://redline.test'
-ENTRY = {'id':'one', 'kind':'monthly', 'title':'Monthly · 2026-09', 'period':'2026-09',
-         'occurred_on':'2026-09-01', 'origin':'delivery', 'has_image':True}
-
-
-def ef(identifier, date, status='planned', fact=None):
-    return {'id': identifier, 'date': date, 'title': 'EF, permis accompagné', 'kind': 'run',
-            'workout': 'easy', 'status': status, 'start_time': None, 'location': None,
-            'note': 'Tu choisis la durée.', 'planned': ['≤55 min', 'RPE 2-3', 'Z1-Z2, 130-157 bpm'],
-            'fact': fact, 'entry_id': None, 'transition': None,
-            'targets': {'duration_cap_min': 55, 'rpe_min': 2, 'rpe_max': 3, 'hr_cap_bpm': 157}}
-
-
-STRENGTH = {'id': 'w41-ven-renfo', 'date': '2026-10-09', 'title': 'Renfo, séance unique',
-         'kind': 'strength', 'workout': 'strength', 'routine': 'a', 'status': 'planned', 'start_time': None,
-         'location': None, 'note': None, 'planned': [], 'fact': None, 'entry_id': None,
-         'transition': None, 'targets': {}}
-DONE = ef('w41-mar-ef', '2026-10-06', 'done', {
-    'km': 8.35, 'duration_min': 48, 'hr_avg': 162, 'rpe': 3,
-    'pains': [{'zone': 'knee', 'label': 'Genou', 'value': 0.5}],
-    'enjoyment': 8, 'started_at': '2026-10-06T07:10:00+02:00', 'over': ['hr_avg']})
-TOTALS = {'km_done': 14.06, 'km_target': 41, 'runs_done': 2, 'runs_planned': 5, 'dplus': 27,
-          'strength_done': 1, 'strength_planned': 2, 'load': 25}
-STRIP = [{'date': f'2026-10-{day:02d}', 'letter': letter, 'abbr': 'easy', 'today': day == 9,
-          'done_km': 8.35 if day == 6 else None, 'planned_km': 16 if day == 11 else None,
-          'planned_label': '≤55′' if day == 9 else None, 'long': day == 11, 'rest': day == 5}
-         for day, letter in zip(range(5, 12), 'LMMJVSD', strict=True)]
-TODAY = {
-    'date': '2026-10-09', 'week': '2026-W41', 'plan': {'status': 'valid', 'message': ''},
-    'sessions': [ef('w41-ven-ef', '2026-10-09'), STRENGTH], 'extra': [],
-    'tomorrow': {'date': '2026-10-10', 'plan': 'valid', 'sessions': [], 'next': []},
-    'ahead': [],
-    'strip': STRIP, 'totals': TOTALS,
-    'asks': [{'id': 'cell:6b0f3c1e-1d1a-4a39-9e0d-5c1b0b5d2f10', 'type': 'cells',
-              'date': '2026-10-07', 'kind': 'easy', 'km': 5.71, 'fields': ['pain:knee', 'rpe'],
-              'labels': {'pain:knee': 'Genou'}}],
-    'pain': {'cap': 2.0, 'zones': [{'zone': 'knee', 'label': 'Genou', 'weeks': [
-        {'week': '2026-W40', 'peak': 1.5}, {'week': '2026-W41', 'peak': 1.0}]}]},
-    'race': {'name': 'TargetRace', 'date': '2026-11-26', 'days': 50, 'start_time': '09:00',
-             'distance_km': 45},
-    'strength': {'status': 'ready', 'signature': 'old', 'date': '2026-10-09', 'session': {
-        'title': 'Renfo A', 'exercises': [{'name': 'Mollets', 'dose': {'text': '3 × 12'}}]}},
-}
-WEEK = {'week': '2026-W41', 'monday': '2026-10-05', 'current': '2026-W41',
-        'plan': {'status': 'valid', 'message': '', 'revision': 3},
-        'sessions': [DONE, ef('w41-ven-ef', '2026-10-09'), STRENGTH], 'extra': [],
-        'totals': TOTALS, 'strip': STRIP, 'review': None, 'cards': [ENTRY]}
-INJURY = {'zone': 'knee', 'label': 'Genou', 'zones': [{'zone': 'knee', 'label': 'Genou'}],
-          'cap': 2.0, 'start': '2026-09-28', 'today': '2026-10-09', 'week': '2026-W41',
-          'points': [{'date': '2026-10-03', 'pain': 1.5, 'kind': 'long', 'long': True},
-                     {'date': '2026-10-06', 'pain': 0.5, 'kind': 'easy', 'long': False},
-                     {'date': '2026-10-07', 'pain': 2.5, 'kind': 'easy', 'long': False}],
-          'wakes': [{'date': '2026-10-08', 'pain': 0.0}],
-          'weeks': [{'week': '2026-W40', 'peak': 1.5, 'n': 1, 'wake': None},
-                    {'week': '2026-W41', 'peak': 2.5, 'n': 2, 'wake': 0.0}],
-          'missing': ['2026-10-07'], 'scale': [{'value': 1, 'text': 'Pas gênante.'}]}
-WEEKS = {'weeks': [{'week': f'2026-W{n}', 'monday': monday, 'km_done': km, 'km_target': target,
-                    'review': None} for n, monday, km, target in (
-    (40, '2026-09-28', 38.2, 40.0), (39, '2026-09-21', 35.0, 36.0), (38, '2026-09-14', 31.5, 34.0),
-    (37, '2026-09-07', 29.0, 30.0), (36, '2026-08-31', 27.4, None))]}
-RACE = {'race': TODAY['race'] | {'target': '<4 h 30'},
-        'longest': {'km': 15.84, 'planned_km': 16, 'planned_on': '2026-10-11', 'weeks': [
-            {'week': '2026-W40', 'km': 15.84, 'volume': 39.66, 'target': 40.0, 'open': False},
-            {'week': '2026-W41', 'km': 8.35, 'volume': 14.06, 'target': 41.0, 'open': True}]},
-        'milestones': [{'date': '2026-10-04', 'label': 'Accès vélo', 'kind': 'deadline', 'overdue': True},
-                       {'date': '2026-10-14', 'label': 'Frontale ≥400 lm', 'kind': 'deadline', 'overdue': False},
-                       {'date': '2026-11-26', 'label': 'Départ', 'kind': 'race', 'start_time': '09:00'}],
-        'capabilities': [{'label': 'Genou', 'score': 3, 'scale': 5, 'number': 5,
-                          'evaluated_on': '2026-10-04'}],
-        'archives': [ENTRY]}
 
 
 @pytest.fixture(scope='module')
@@ -109,6 +43,8 @@ def serve(tab, answers=None):
             data = WEEKS
         elif path.startswith('injury'):
             data = INJURY
+        elif path.startswith('session/'):
+            data = DETAIL
         elif path == 'entries':
             data = {'entries': [ENTRY], 'next_offset': None, 'latest': [ENTRY]}
         elif path == 'entries/one':
@@ -148,12 +84,11 @@ def test_today_week_and_course_fit_a_phone_and_keep_text_inert(browser, width):
     tab.get_by_role('button', name='Semaine', exact=True).click()
     tab.get_by_text('FC +5', exact=True).wait_for()
     assert not tab.locator('.n-rail .out').is_visible()
+    # A completed outing opens on its detail, where the overrun reads on the gauge.
     tab.locator('.n-krow', has_text='FC +5').click()
-    # Open, the overrun reads on the gauge: the label fades, the facts line repeats neither
-    # the duration nor the HR.
-    assert tab.locator('.n-rail .out').is_visible()
-    assert not tab.get_by_text('FC +5', exact=True).is_visible()
-    assert tab.locator('.n-kday.open .n-kmore p').first.inner_text() == '8,35 km · 5:45/km · douleur 0,5 · plaisir 8'
+    tab.locator('.n-rail .out').wait_for()
+    tab.get_by_role('button', name='Retour').click()
+    tab.get_by_role('heading', name='Semaine 41').wait_for()
     assert '›' not in tab.locator('#content').inner_text()
     assert tab.get_by_text('EF + renfo', exact=True).count() == 1
     assert not tab.evaluate("document.body.classList.contains('n-sky')")
@@ -352,15 +287,14 @@ def test_the_morning_comes_first_and_a_high_heart_rate_asks_why(browser):
     """Before noon, the morning check-in comes before the session; a high HR asks its question."""
     morning = {**TODAY, 'asks': [
         {'id': 'wake:2026-10-09:injury', 'type': 'wake', 'zone': 'knee', 'label': 'Genou',
-         'date': '2026-10-09'},
+         'date': '2026-10-09', 'after_effort': False},
         {'id': 'daily:2026-10-09', 'type': 'daily', 'date': '2026-10-09', 'fields': ['sleep', 'life_load']},
         {'id': 'hr:2026-10-07', 'type': 'hr', 'date': '2026-10-07', 'hr': 157, 'reference': 151,
          'n': 5, 'pace_s': 406}]}
     tab = browser.new_page(viewport={'width': 390, 'height': 844})
     answers = []
     serve(tab, answers)
-    tab.route(BASE + '/notebook-api/today', lambda route: route.fulfill(
-        content_type='application/json', body=json.dumps(morning)))
+    tab.route(BASE + '/notebook-api/today', replying(morning))
     tab.goto(BASE + '/carnet')
     tab.get_by_role('heading', name='Comment tu te réveilles ?').wait_for()
     first = tab.locator('#content h1, #content h2').first.inner_text()
@@ -415,8 +349,7 @@ def test_the_weather_answers_what_to_wear_and_whether_night_falls_during_the_run
     sky = {**SKY, 'sunrise': '07:55', 'hours': [
         {'hour': 17, 'temp': 16, 'feels': 15, 'rain': 0, 'wind': 12, 'code': 2, 'day': True},
         {'hour': 18, 'temp': 15, 'feels': 13, 'rain': 10, 'wind': 14, 'code': 3, 'day': True}]}
-    tab.route(BASE + '/notebook-api/today', lambda route: route.fulfill(
-        content_type='application/json', body=json.dumps(start)))
+    tab.route(BASE + '/notebook-api/today', replying(start))
     tab.route(BASE + '/notebook-api/weather*', lambda route: route.fulfill(
         content_type='application/json', body=json.dumps(sky)))
     tab.goto(BASE + '/carnet')
@@ -595,7 +528,7 @@ def guided(tab, today=None):
     """The notebook with a strength session ready: `Séance guidée` gets a link."""
     serve(tab)
     data = today or {**TODAY, 'strength': {**TODAY['strength'], 'session': SESSION}}
-    tab.route(BASE + '/notebook-api/today', lambda route: route.fulfill(content_type='application/json', body=json.dumps(data)))
+    tab.route(BASE + '/notebook-api/today', replying(data))
     tab.route(BASE + '/notebook-api/launch', lambda route: route.fulfill(
         content_type='application/json', body=json.dumps({'url': '/s#t=' + 'A' * 32})))
     tab.route('**/strength-session', lambda route: route.fulfill(
@@ -723,7 +656,9 @@ def test_the_top_bar_folds_the_title_when_it_scrolls_under(browser):
 
 
 def replying(data):
-    """A route that returns this data (Playwright passes the request to a two-argument handler)."""
+    """A route that returns this Today screen, once it reads as what the service serves
+    (Playwright passes the request to a two-argument handler)."""
+    assert contract.problems(TodayView, data) == []
     return lambda route: route.fulfill(content_type='application/json', body=json.dumps(data))
 
 
@@ -849,8 +784,7 @@ def test_a_rest_day_shows_tomorrow_whole_with_its_weather(browser):
     rest = {**TODAY, 'sessions': [], 'asks': [], 'tomorrow': {
         'date': '2026-10-10', 'plan': 'valid', 'next': [],
         'sessions': [{**TODAY['sessions'][0], 'id': 'w41-sam-ef', 'date': '2026-10-10', 'start_time': '09:30'}]}}
-    tab.route(BASE + '/notebook-api/today', lambda route: route.fulfill(
-        content_type='application/json', body=json.dumps(rest)))
+    tab.route(BASE + '/notebook-api/today', replying(rest))
     tab.route(BASE + '/notebook-api/weather*', lambda route: route.fulfill(
         content_type='application/json', body=json.dumps({**SKY, 'hours': [
             {'hour': 9, 'temp': 11, 'feels': 9, 'rain': 0, 'wind': 8, 'code': 0, 'day': True}]})))
@@ -866,16 +800,16 @@ def test_the_red_point_moves_from_the_run_to_the_strength_once_done(browser):
     """The day thread: the completed session ticks off and keeps its figures, its feelings come
     one question at a time, strength takes the only red dot; the markers lead to their tab."""
     done = ef('w41-ven-ef', '2026-10-09', 'done', {
+        'observation_id': 'obs', 'kind': 'easy', 'date': '2026-10-09',
         'km': 8.35, 'duration_min': 48, 'hr_avg': 162, 'rpe': None, 'pains': [], 'enjoyment': None,
-        'started_at': '2026-10-09T07:10:00+02:00', 'over': ['hr_avg'], 'observation_id': 'obs'})
+        'dplus': None, 'started_at': '2026-10-09T07:10:00+02:00', 'over': ['hr_avg']})
     after = {**TODAY, 'sessions': [done, STRENGTH], 'asks': [
         {'id': 'cell:obs', 'type': 'cells', 'date': '2026-10-09', 'kind': 'easy', 'km': 8.35,
          'fields': ['pain:knee', 'rpe', 'enjoyment'], 'labels': {'pain:knee': 'Genou'}}]}
     tab = browser.new_page(viewport={'width': 393, 'height': 852})
     answers = []
     serve(tab, answers)
-    tab.route(BASE + '/notebook-api/today', lambda route: route.fulfill(
-        content_type='application/json', body=json.dumps(after)))
+    tab.route(BASE + '/notebook-api/today', replying(after))
     tab.goto(BASE + '/carnet')
     tab.locator('.n-step.done').wait_for()
     assert tab.locator('.n-step.done .n-skick').inner_text() == 'FAIT · 7\u00a0H\u00a010'

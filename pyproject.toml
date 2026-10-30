@@ -80,8 +80,9 @@ known-first-party = ["redline"]
 # test calls is reported as dead. A false positive is declared here, by name.
 paths = ["src"]
 # The stored vocabularies are reached by iterating their enums (CLI choices, CHECK
-# constraints, the notebook's answers), never member by member.
-exclude = ["*/tests/*", "*/model/vocabulary.py"]
+# constraints, the notebook's answers), never member by member. The notebook's views are
+# JSON shapes: their keys are read as strings, and by the page.
+exclude = ["*/tests/*", "*/model/vocabulary.py", "*/model/notebook_views.py"]
 min_confidence = 60
 # Flask routes: called by the framework, never by the code.
 ignore_decorators = ["@app.get", "@app.post", "@app.before_request", "@app.after_request", "@app.errorhandler"]

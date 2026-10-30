@@ -21,7 +21,7 @@ import json
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from redline.analysis import ledger, signals
 from redline.coach import dates
@@ -39,6 +39,7 @@ from redline.model import (
     transitions,
 )
 from redline.model import ledger as ledger_model
+from redline.model import notebook_views as views
 from redline.model.activity import Activity
 from redline.model.errors import InputError
 from redline.model.instance import Instance, derived_label
@@ -82,20 +83,20 @@ def _activity(intake: dict | None) -> Activity | None:
     return Activity.from_json(stored) if stored else None
 
 
-def known_pains(observation: dict, labels: dict[str, str]) -> list[dict]:
+def known_pains(observation: dict, labels: dict[str, str]) -> list[views.PainReading]:
     """The known pain of each zone, in declared zone order."""
     pains = observation.get("pains") or {}
-    ordered = [zone for zone in labels if zone in pains] + sorted(set(pains) - set(labels))
+    ordered: list[str] = [zone for zone in labels if zone in pains] + sorted(set(pains) - set(labels))
     return [{"zone": zone, "label": labels.get(zone, zone),
              "value": float(pains[zone]["value"])} for zone in ordered
             if pains[zone].get("state") == "known" and pains[zone].get("value") is not None]
 
 
 def observation_fact(observation: dict, session: dict | None = None,
-                     labels: dict[str, str] | None = None) -> dict:
+                     labels: dict[str, str] | None = None) -> views.Fact:
     """The known measures of an observation, and the typed caps they exceed."""
     duration = _known(observation, "duration_s")
-    fact: dict[str, Any] = {
+    fact: views.Fact = {
         "observation_id": str(observation["id"]), "kind": observation["kind"],
         "date": observation["occurred_on"].isoformat(),
         "km": _known(observation, "distance_km"),
@@ -112,11 +113,11 @@ def observation_fact(observation: dict, session: dict | None = None,
         "over": [],
     }
     if session:
-        for key, cap in (("hr_avg", "hr_cap_bpm"), ("rpe", "rpe_max"),
-                         ("duration_min", "duration_cap_min"), ("km", "distance_cap_km")):
-            if fact[key] is not None and session.get(cap) is not None \
-                    and fact[key] > float(session[cap]):
-                fact["over"].append(key)
+        fact["over"] = [key for key, value, cap in (
+            ("hr_avg", fact["hr_avg"], "hr_cap_bpm"), ("rpe", fact["rpe"], "rpe_max"),
+            ("duration_min", fact["duration_min"], "duration_cap_min"),
+            ("km", fact["km"], "distance_cap_km"))
+            if value is not None and session.get(cap) is not None and value > float(session[cap])]
     return fact
 
 
@@ -136,6 +137,18 @@ def _scale(metric: str, value: Any) -> float:
 
 def _fr(value: float) -> str:
     return f"{value:g}".replace(".", ",")
+
+
+def _targets(session: dict) -> views.Targets:
+    """The limits the plan sets for this session."""
+    return cast("views.Targets", {key: session[key] for key in views.Targets.__optional_keys__
+                                  if session.get(key) is not None})
+
+
+def _distance(session: views.SessionItem) -> float | None:
+    """The distance a session aims at: its target, else its cap."""
+    targets = session["targets"]
+    return targets.get("distance_target_km") or targets.get("distance_cap_km")
 
 
 def _planned(session: dict) -> list[str]:
@@ -246,11 +259,12 @@ class Board:
                       if week_label(row["performed_on"]) == label])
 
     # ------------------------------------------------------------ sessions
-    def session_item(self, week: Week, session: dict, entries: dict[str, str]) -> dict:
+    def session_item(self, week: Week, session: dict,
+                     entries: dict[str, str]) -> views.SessionItem:
         status = session["status"]
         if status == "planned" and session["id"] in week.held:
             status = "held"
-        item: dict[str, Any] = {
+        item: views.SessionItem = {
             "id": session["id"], "date": session["date"], "title": session["title"],
             "kind": session["kind"], "workout": session["workout"], "status": status,
             "start_time": session.get("start_time"), "location": session.get("location_label"),
@@ -258,15 +272,12 @@ class Board:
             "planned": _planned(session), "fact": None, "entry_id": None,
             "transition": transitions.label(session["transition"])
             if session.get("transition") else None,
-            "targets": {key: session.get(key) for key in (
-                "distance_target_km", "distance_cap_km", "duration_cap_min",
-                "rpe_min", "rpe_max", "hr_cap_bpm") if session.get(key) is not None},
+            "targets": _targets(session), "change": None,
         }
         # A change's context is written for the coach; the athlete reads what moved
         # and when, the session instruction already says the rest.
         change = next((c for c in (week.revision or {}).get("changes") or []
                        if c.get("session_id") == session["id"]), None)
-        item["change"] = None
         if change:
             stamp = dt.datetime.fromisoformat((week.revision or {})["computed_at"]).astimezone(
                 local_time.zone())
@@ -292,7 +303,8 @@ class Board:
             item["entry_id"] = entries.get(session["date"])
         return item
 
-    def sessions(self, week: Week, entries: dict[str, str] | None = None) -> list[dict]:
+    def sessions(self, week: Week,
+                 entries: dict[str, str] | None = None) -> list[views.SessionItem]:
         if not week.revision:
             return []
         order = {"run": 0, "bike": 1, "hike": 1, "test": 2, "strength": 3, "rest": 4}
@@ -300,7 +312,7 @@ class Board:
                           key=lambda s: (s["date"], order.get(s["kind"], 5)))
         return [self.session_item(week, session, entries or {}) for session in sessions]
 
-    def unplanned(self, week: Week) -> list[dict]:
+    def unplanned(self, week: Week) -> list[views.UnplannedFact]:
         """What was run or walked with no program session to carry it."""
         linked = {link["observation_id"] for link in week.links.values()
                   if link.get("observation_id")}
@@ -309,18 +321,19 @@ class Board:
                 if row["kind"] in MOVING_TYPES and row["id"] not in linked]
 
     # ------------------------------------------------------------ aggregates
-    def strip(self, week: Week, sessions: list[dict]) -> list[dict]:
-        days = []
+    def strip(self, week: Week, sessions: list[views.SessionItem]) -> list[views.StripDay]:
+        days: list[views.StripDay] = []
         for day in week.days:
             iso = day.isoformat()
             same = [s for s in sessions if s["date"] == iso and s["status"] != "cancelled"]
             done = sum(row.km or 0 for row in week.rows
                        if row.date == day and row.type in ledger.RUN_TYPES)
             pending = [s for s in same if s["kind"] == "run" and s["status"] != "done"]
-            planned_km = planned_label = None
+            planned_km: float | None = None
+            planned_label: str | None = None
             if pending and not done:
                 targets = pending[0]["targets"]
-                planned_km = targets.get("distance_target_km") or targets.get("distance_cap_km")
+                planned_km = _distance(pending[0])
                 if planned_km is None and targets.get("duration_cap_min"):
                     planned_label = f"≤{targets['duration_cap_min']}′"
             abbr = "+".join(dict.fromkeys(
@@ -334,7 +347,7 @@ class Board:
             })
         return days
 
-    def totals(self, week: Week, sessions: list[dict]) -> dict:
+    def totals(self, week: Week, sessions: list[views.SessionItem]) -> views.Totals:
         volume = ledger.week_volume(week.rows)
         live = [s for s in sessions if s["status"] != "cancelled"]
         runs = [s for s in live if s["kind"] == "run"]
@@ -358,14 +371,14 @@ class Board:
                 for zone in self.zones],
         }
 
-    def pain(self) -> dict:
+    def pain(self) -> views.PainTrend:
         return {"cap": ledger.ESCULIER_CAP, "zones": [
             {"zone": zone.slug, "label": zone.label,
              "weeks": [{"week": item.week, "peak": item.effort.peak}
                        for item in ledger.pain_trend(self.rows, 4, zone.slug)]}
             for zone in self.zones]}
 
-    def injury_view(self, zone: str | None = None, weeks: int = 5) -> dict | None:
+    def injury_view(self, zone: str | None = None, weeks: int = 5) -> views.InjuryView | None:
         """The notebook Pain screen: each rated session and each wake-up over the recent
         calendar weeks, the peak per week, and the wake-ups described without a rating.
         Facts, never a verdict (under-reporting bias).
@@ -381,7 +394,7 @@ class Board:
                 if start <= row.date <= self.today and row.pain_at(slug) is not None]
         efforts = [row for row in rows if row.type in ledger_model.EFFORT_TYPES]
         wakes = [row for row in rows if row.type == session_kinds.WAKE_TRACE]
-        table = []
+        table: list[views.InjuryWeek] = []
         for index in range(weeks):
             label = week_label(start + dt.timedelta(weeks=index))
             effort = [row.pains[slug] for row in efforts if row.week == label]
@@ -406,7 +419,7 @@ class Board:
             "scale": PAIN_SCALE,
         }
 
-    def race(self) -> dict | None:
+    def race(self) -> views.Race | None:
         race_on = ledger.next_race_date(self.ops, self.today)
         if race_on is None:
             return None
@@ -414,16 +427,16 @@ class Board:
                    if row.get("kind") == "race" and row["due_on"] == race_on
                    and row["status"] != "done")
         context = row.get("context") or {}
-        return {"name": row.get("athlete_label") or "Course objectif",
-                "date": race_on.isoformat(), "days": (race_on - self.today).days,
-                **{key: context[key] for key in (
-                    "start_time", "distance_km", "elevation_gain_m", "elevation_loss_m",
-                    "elevation_approximate", "target") if context.get(key) is not None}}
+        return cast("views.Race", {
+            "name": row.get("athlete_label") or "Course objectif",
+            "date": race_on.isoformat(), "days": (race_on - self.today).days,
+            **{key: context[key] for key in views.Race.__optional_keys__
+               if context.get(key) is not None}})
 
     # ------------------------------------------------------------ demandes
-    def asks(self) -> list[dict]:
+    def asks(self) -> list[views.Ask]:
         """The feelings the ledger requests and the athlete can give in one tap."""
-        asks: list[dict] = []
+        asks: list[views.Ask] = []
         yesterday = self.today - dt.timedelta(days=1)
         # The trace is asked every morning, rest days included: without it, nothing
         # says whether the pain subsides between two sessions.
@@ -474,10 +487,10 @@ class Board:
     def _hr_marker(day: dt.date) -> str:
         return notebook_text.HR_MARKER.format(day=day)
 
-    def hr_asks(self) -> list[dict]:
+    def hr_asks(self) -> list[views.HrAsk]:
         """The latest recent easy run whose heart rate exceeds the same-pace reference:
         one question at a time, on the freshest run in memory."""
-        asks: list[dict] = []
+        asks: list[views.HrAsk] = []
         for drift in signals.hr_at_pace(self.rows):
             if drift.delta < signals.HR_DRIFT_BPM or not \
                     0 <= (self.today - drift.date).days < HR_ASK_DAYS:
@@ -606,14 +619,14 @@ class Board:
         self.ops.complete_measurement(observation["id"], "reps_in_reserve", value, actor=ACTOR)
         return {"alert": None}
 
-    def _previous(self, observation: dict) -> dict | None:
+    def _previous(self, observation: dict) -> views.Previous | None:
         """The last session of the same type before this one, for comparison."""
         earlier = next((row for row in self.observations
                         if row["kind"] == observation["kind"]
                         and row["occurred_on"] < observation["occurred_on"]), None)
         if earlier is None:
             return None
-        out: dict[str, Any] = {
+        out: views.Previous = {
             "date": earlier["occurred_on"].isoformat(), "km": _known(earlier, "distance_km"),
             "hr_avg": None if earlier.get("hr_doubt") == HrDoubt.NO_SENSOR
             else _known(earlier, "hr_avg_bpm"),
@@ -621,7 +634,8 @@ class Board:
             "enjoyment": _known(earlier, "enjoyment"), "rep_dplus": None, "rep_hr": None}
         activity = _activity(self.ops.strava_detail(earlier["id"]))
         laps = activity.laps if activity else ()
-        reps = (session_detail.quality(laps, None) or {}).get("reps") or []
+        reading = session_detail.quality(laps, None)
+        reps = reading["reps"] if reading else []
         if reps:
             out["rep_dplus"] = round(sum(rep["dplus"] for rep in reps) / len(reps))
             beats = [rep["hr"] for rep in reps if rep["hr"] is not None]
@@ -629,14 +643,14 @@ class Board:
                 out["rep_hr"] = round(sum(beats) / len(beats))
         return out
 
-    def _gear(self, gear_id: str) -> dict | None:
+    def _gear(self, gear_id: str) -> views.Gear | None:
         row = next((row for row in self.ops.gear_rows() if row["gear_id"] == gear_id), None)
         if row is None:
             return None
         return {"name": row["name"], "km": round(float(row["distance_km"])),
                 "retire_at_km": row.get("retire_at_km"), "status": row.get("status")}
 
-    def _wake(self, day: dt.date) -> dict:
+    def _wake(self, day: dt.date) -> views.WakeTrace:
         """The wake trace of the day (before the session) and the next day (after), per zone."""
         def pains_on(when: dt.date) -> dict[str, float]:
             row = next((row for row in self.observations
@@ -651,13 +665,15 @@ class Board:
                            "after": after_pains.get(zone.slug)} for zone in self.zones],
                 "after_due": after > self.today}
 
-    def _week_context(self, day: dt.date) -> dict:
+    def _week_context(self, day: dt.date) -> views.WeekContext:
         week = self.week(week_label(day))
         sessions = self.sessions(week)
         totals = self.totals(week, sessions)
-        out = {"week": week.label, "current": week.label == week_label(self.today),
-               **{key: totals[key] for key in ("km_done", "km_target", "runs_done", "runs_planned")},
-               "next": None}
+        out: views.WeekContext = {
+            "week": week.label, "current": week.label == week_label(self.today),
+            "km_done": totals["km_done"], "km_target": totals["km_target"],
+            "runs_done": totals["runs_done"], "runs_planned": totals["runs_planned"],
+            "next": None}
         if out["current"]:
             ahead = self.ahead(week, sessions, days=7)
             if ahead:
@@ -667,7 +683,7 @@ class Board:
                                "planned": same[0]["planned"]}
         return out
 
-    def session_view(self, observation_id: str, intake: dict | None) -> dict | None:
+    def session_view(self, observation_id: str, intake: dict | None) -> views.SessionView | None:
         """The detail of a completed session: the fact, the plan, the streams read, the context."""
         observation = self._observation(observation_id)
         if observation is None or observation["kind"] not in MOVING_TYPES:
@@ -679,30 +695,30 @@ class Board:
         hr_valid = observation.get("hr_doubt") != HrDoubt.NO_SENSOR
         s = None if not streams else {**streams, "hr": streams.get("hr") if hr_valid else None}
         quality = debrief.is_quality(session)
-        reps = (session_detail.quality(activity.laps if activity else (), s)
-                if quality else None)
+        reading = session_detail.quality(activity.laps if activity else (), s) if quality else None
         fact = observation_fact(observation, session, self.zone_labels)
         dplus = fact["dplus"]
-        series = None
+        series: views.Series | None = None
         if s:
-            series = session_detail.series(s)
-            if dplus is None or dplus < session_detail.PROFILE_MIN_DPLUS_M:
-                series["alt"] = None
-            series["bands"] = [[rep["start"], rep["end"]] for rep in (reps or {}).get("reps", [])]
-            series["stops"] = [stop for stop in session_detail.stops(s)
-                               if stop[1] - stop[0] >= session_detail.STOP_MARK_S]
+            curves = session_detail.series(s)
+            flat = dplus is None or dplus < session_detail.PROFILE_MIN_DPLUS_M
+            series = {**curves, "alt": None if flat else curves["alt"],
+                      "bands": [[rep["start"], rep["end"]]
+                                for rep in (reading["reps"] if reading else [])],
+                      "stops": [stop for stop in session_detail.stops(s)
+                                if stop[1] - stop[0] >= session_detail.STOP_MARK_S]}
         limits = self.instance.hr_bounds if self.instance is not None else None
         seconds = session_detail.zone_seconds(s, limits) if s and limits else None
         conditions = (intake or {}).get("weather") or {}
-        weather = {**{key: conditions.get(key) for key in (
-            "temp", "feels_like", "humidity", "wind", "wbgt")},
-            "conditions": weather_labels.sky(conditions)} if conditions else None
+        weather = cast("views.Conditions", {
+            **{key: conditions.get(key) for key in ("temp", "feels_like", "humidity", "wind", "wbgt")},
+            "conditions": weather_labels.sky(conditions)}) if conditions else None
         wbgt = (intake or {}).get("wbgt_value")
         if weather is None and wbgt is not None:
             weather = {"wbgt": float(wbgt)}
         gear_id = observation.get("gear_id") or (activity.gear_id if activity else None)
-        ask = next((item for item in self.asks() if item["id"] == f"cell:{observation['id']}"),
-                   None)
+        ask = next((item for item in self.asks() if item["type"] == "cells"
+                    and item["id"] == f"cell:{observation['id']}"), None)
         return {
             "id": str(observation["id"]), "date": day.isoformat(), "kind": observation["kind"],
             "title": session["title"] if session else None,
@@ -713,16 +729,14 @@ class Board:
                      "cadence": _known(observation, "cadence_spm"),
                      "reserve": _known(observation, "reps_in_reserve")},
             "plan": None if not session else {
-                "targets": {key: session.get(key) for key in (
-                    "distance_target_km", "distance_cap_km", "duration_cap_min",
-                    "rpe_min", "rpe_max", "hr_cap_bpm") if session.get(key) is not None},
-                "note": session.get("note")},
+                "targets": _targets(session), "note": session.get("note")},
             "ask": None if ask is None else {"id": ask["id"], "fields": ask["fields"],
                                              "labels": ask["labels"]},
             "reserve_ask": self.reserve_ask(observation, session),
             "wake": self._wake(day),
-            "phases": (reps or {}).get("phases"), "reps": (reps or {}).get("reps"),
-            "reading": (reps or {}).get("reading"),
+            "phases": reading["phases"] if reading else None,
+            "reps": reading["reps"] if reading else None,
+            "reading": reading["reading"] if reading else None,
             "km": None if quality or not s else session_detail.km_splits(s),
             "stops": session_detail.stop_summary(s) if s else None,
             "drift": None if quality or not s else session_detail.drift(s),
@@ -740,7 +754,8 @@ class Board:
         }
 
     # ------------------------------------------------------------ screens
-    def ahead(self, week: Week, sessions: list[dict], days: int = 3) -> list[dict]:
+    def ahead(self, week: Week, sessions: list[views.SessionItem],
+              days: int = 3) -> list[views.SessionItem]:
         """The sessions of the coming days, across the week boundary if needed."""
         horizon = self.today + dt.timedelta(days=days)
         pool = list(sessions)
@@ -749,7 +764,7 @@ class Board:
         return [s for s in pool if self.today.isoformat() < s["date"] <= horizon.isoformat()
                 and s["kind"] != "rest" and s["status"] not in {"cancelled", "done"}]
 
-    def today_view(self) -> dict:
+    def today_view(self) -> views.BoardToday:
         week = self.week(week_label(self.today))
         sessions = self.sessions(week)
         tomorrow = self.today + dt.timedelta(days=1)
@@ -784,7 +799,7 @@ class Board:
             "race": self.race(),
         }
 
-    def week_view(self, label: str, entries: list[dict]) -> dict:
+    def week_view(self, label: str, entries: list[views.Entry]) -> views.WeekView:
         week = self.week(label)
         strength_entries = {entry["period"]: entry["id"] for entry in entries
                             if entry["kind"] == "strength"}
@@ -806,7 +821,7 @@ class Board:
             "next": self.next_week() if label == week_label(self.today) else None,
         }
 
-    def next_week(self) -> dict | None:
+    def next_week(self) -> views.NextWeek | None:
         """The following week as soon as its program exists: on Sunday, it is the one
         being organized. Without a valid program, nothing is announced."""
         week = self.week(week_label(self.today + dt.timedelta(days=7)))
@@ -816,11 +831,11 @@ class Board:
         return {"week": week.label, "monday": week.days[0].isoformat(),
                 "km_target": totals["km_target"], "runs_planned": totals["runs_planned"]}
 
-    def weeks_view(self, reviews: dict[str, str], limit: int = 52) -> list[dict]:
+    def weeks_view(self, reviews: dict[str, str], limit: int = 52) -> list[views.PastWeek]:
         """The closed weeks, most recent first: the ledger fact and the target of the
         active revision. The current week is not in it; it is the root of the Week tab."""
         current = week_label(self.today)
-        out = []
+        out: list[views.PastWeek] = []
         for trace in reversed(ledger.trajectory(self.rows, self.today, weeks=limit)):
             if trace.label >= current:
                 continue
@@ -831,7 +846,7 @@ class Board:
                         "review": reviews.get(trace.label)})
         return out
 
-    def race_view(self, archives: list[dict]) -> dict:
+    def race_view(self, archives: list[views.Entry]) -> views.RaceView:
         current = week_label(self.today)
         traces = ledger.trajectory(self.rows, self.today, weeks=6)
         week = self.week(current)
@@ -840,16 +855,13 @@ class Board:
                    and s["date"] >= self.today.isoformat()]
         # The current week's long run is the program's one until it has been run: the
         # longest of the past days is not one, it usually comes on the weekend.
-        long_run = next((s for s in planned if s["workout"] == session_kinds.LONG
-                         and (s["targets"].get("distance_target_km")
-                              or s["targets"].get("distance_cap_km"))), None)
-        milestones = []
-        key = max(planned, key=lambda s: s["targets"].get("distance_target_km")
-                  or s["targets"].get("distance_cap_km") or 0, default=None)
-        if key and (key["targets"].get("distance_target_km") or key["targets"].get("distance_cap_km")):
+        long_run = next((s for s in planned
+                         if s["workout"] == session_kinds.LONG and _distance(s)), None)
+        milestones: list[views.Milestone] = []
+        key = max(planned, key=lambda s: _distance(s) or 0, default=None)
+        if key and (key_km := _distance(key)):
             milestones.append({"date": key["date"], "label": key["title"], "kind": "session",
-                               "km": key["targets"].get("distance_target_km")
-                               or key["targets"].get("distance_cap_km")})
+                               "km": key_km})
         for row in self.ops.deadline_rows():
             if not row.get("athlete_label") or row["status"] == "done" or row["kind"] == "race":
                 continue
@@ -860,7 +872,7 @@ class Board:
             milestones.append({"date": race["date"], "label": notebook_text.RACE_START, "kind": "race",
                                "start_time": race.get("start_time")})
         milestones.sort(key=lambda item: item["date"])
-        capabilities = sorted(
+        capabilities: list[views.Capability] = sorted(
             ({"label": self._capability_label(row["slug"]), "icon": self._capability_icon(row["slug"]),
               "score": row["score"], "scale": row["scale"], "number": row["capability_number"],
               "evaluated_on": row["evaluated_on"].isoformat()}
@@ -869,7 +881,7 @@ class Board:
         longest = ledger.longest_recent(self.rows, self.today + dt.timedelta(days=1))
         # One period, one archive: the delivered image takes precedence over its recovered copy.
         seen: set[tuple[str, str]] = set()
-        kept = []
+        kept: list[views.Entry] = []
         for entry in sorted(archives, key=lambda item: item.get("origin") != "delivery"):
             identity = (entry["kind"], entry.get("period") or entry["id"])
             if identity not in seen:
@@ -892,8 +904,7 @@ class Board:
                         "weeks": [{"week": trace.label, "km": round(trace.longest, 2),
                                    "volume": round(trace.km, 2), "target": target(trace.label),
                                    "open": trace.open} for trace in traces],
-                        "planned_km": long_run and (long_run["targets"].get("distance_target_km")
-                                                    or long_run["targets"].get("distance_cap_km")),
+                        "planned_km": long_run and _distance(long_run),
                         "planned_on": long_run and long_run["date"]},
             "milestones": milestones, "capabilities": capabilities,
             "archives": [*monthly, *weekly],

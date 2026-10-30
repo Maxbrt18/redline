@@ -74,6 +74,11 @@ Parse once at the boundary (Strava, LLM output, config, frontmatter) into frozen
 dataclasses and pass typed objects inward. Derived values (pace, zones, weekly load) are
 computed, never stored.
 
+What the notebook page reads is declared in `src/redline/model/notebook_views.py`.
+`tests/test_notebook_contract.py` holds the real routes, the browser payloads of
+`tests/notebook_payloads.py` and the page's modules to it: change a key there, in its
+builder and in the page together.
+
 ## Failures
 
 Raise the categories of `redline.model.errors` (`InputError`, `ConfigError`,
