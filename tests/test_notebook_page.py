@@ -955,3 +955,16 @@ def test_two_watched_zones_get_two_tiles_and_two_morning_traces(browser):
     tab.locator('#content').get_by_role('button', name='Talon', exact=True).click()
     tab.wait_for_function("document.getElementById('lt-title').textContent === 'Talon'")
     tab.close()
+
+
+def test_a_reply_that_is_not_json_says_the_notebook_is_unavailable(browser):
+    """A 502 from the proxy during a restart used to surface as Safari's parsing error."""
+    tab = browser.new_page(has_touch=True)
+    serve(tab)
+    tab.goto(BASE + '/carnet')
+    tab.get_by_role('heading', name='EF, permis accompagné', exact=True).wait_for()
+    tab.route(BASE + '/notebook-api/today', lambda route: route.fulfill(
+        status=502, content_type='text/html', body='<html><body>Bad Gateway</body></html>'))
+    pull(tab)
+    tab.locator('#toast', has_text='Le carnet est indisponible pour le moment.').wait_for()
+    tab.close()
