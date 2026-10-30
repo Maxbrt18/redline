@@ -4,8 +4,11 @@
 
 **How it was checked**
 
-<!-- The tests added, and anything rehearsed by hand. -->
+<!-- The tests added, and anything rehearsed by hand. CI runs the lint, type, dead-code,
+test and schema checks. -->
 
-- [ ] `ruff check . && mypy && vulture && pytest -q -rs` passes
+**What is not covered**
+
+<!-- What this leaves out or could not verify. "Nothing" is a valid answer. -->
+
 - [ ] No personal data, in the code or in the images
-- [ ] A schema change comes with a new Alembic revision
