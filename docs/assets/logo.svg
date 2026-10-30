@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Redline">
+  <defs>
+    <radialGradient id="glow" cx="1" cy="0" r="1">
+      <stop offset="0" stop-color="#700000"/>
+      <stop offset="0.65" stop-color="#3f0000"/>
+    </radialGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#glow)"/>
+  <path fill="#d40000" d="M0 173H320A267 267 0 0 1 480 652L606 849H401L309 706H0V545H317A106 106 0 0 0 317 333H0Z"/>
+</svg>
