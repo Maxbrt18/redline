@@ -18,6 +18,7 @@ from . import program as strength_program
 from .notes import NoteError
 from .program import GATE_SCHEMA as STRENGTH_GATE_SCHEMA
 from .schema import Schema, SchemaError, field
+from .vocabulary import Decider
 
 WEEK_RE = r"20\d{2}-W(?:0[1-9]|[1-4]\d|5[0-3])"
 DATE_RE = r"20\d{2}-\d{2}-\d{2}"
@@ -177,6 +178,39 @@ CHANGE_SCHEMA = Schema("session change evidence", [
           note="required when the session is removed, cancelled or reduced"),
 ])
 
+ALTERNATIVE_SCHEMA = Schema("rejected option", [
+    field("option", str, minimum=3, note="the option considered and not chosen"),
+    field("rejected_because", str, minimum=3, note="why it was set aside"),
+])
+
+
+def _decision_coherent(decision: dict) -> list[str]:
+    by, rule = decision["by"], decision.get("rule")
+    if by == Decider.RULE and not rule:
+        return ["field `rule`: required when `by` is rule -- the rulebook id that decided"]
+    if by != Decider.RULE and rule:
+        return [f"field `rule`: only for `by` rule, not {by}"]
+    if by == Decider.JUDGMENT and not decision["alternatives"]:
+        return ["field `alternatives`: a judgment names at least one option it set aside"]
+    return []
+
+
+DECISION_SCHEMA = Schema("decision", [
+    field("by", str, choices=tuple(Decider),
+          note="rule (a rulebook rule left no choice), judgment, or request"),
+    field("rule", str, required=False, minimum=1),
+    field("alternatives", list, item=field("alternative", dict, schema=ALTERNATIVE_SCHEMA),
+          note="the options considered and set aside, with the reason"),
+], check=_decision_coherent)
+
+#: Computed by the engine when the revision is written (`analysis.decision_state`).
+STATE_SNAPSHOT_SCHEMA = Schema("decision state", [
+    field("as_of", str, pattern=r"\d{4}-\d{2}-\d{2}"),
+    field("week_km_done", float, minimum=0),
+    field("pain_max_7d", dict),
+    field("daily", dict, required=False),
+])
+
 REVISION_SCHEMA = Schema("weekly revision", [
     field("revision", int, minimum=1),
     field("computed_at", str, pattern=STAMP_RE, note="ISO 8601 date-time"),
@@ -197,6 +231,10 @@ REVISION_SCHEMA = Schema("weekly revision", [
           note="running volume targeted over the whole week, in km"),
     field("sessions", list, minimum=1,
           item=field("session", dict, schema=SESSION_SCHEMA)),
+    # Optional on read: older revisions carry neither. Required on write
+    # (`decision_errors`); the snapshot is the engine's, never the model's.
+    field("decision", dict, required=False, schema=DECISION_SCHEMA),
+    field("state_snapshot", dict, required=False, schema=STATE_SNAPSHOT_SCHEMA),
 ])
 
 WEEKLY_PLAN_SCHEMA = Schema("weekly plan", [
@@ -853,6 +891,24 @@ def _restriction_errors(session_id: str, entry: dict, cuts: list[str],
 _AUTHORITATIVE_TRIGGER = re.compile(
     r"^(?:observation|exposure|messenger|medical|availability|gate|request|incident|strength|strava):"
 )
+
+
+def decision_errors(revision: dict, where: str = "revision") -> list[str]:
+    """A new revision says what settled it and, for a judgment, what it set aside.
+
+    Afterwards nobody can rebuild the options that were dropped, so the register is
+    written at the moment of deciding or not at all.
+    """
+    decision = revision.get("decision")
+    if not isinstance(decision, dict):
+        return [f"{where}.decision: missing -- `by` (rule, judgment or request), `rule` "
+                "when by is rule, and `alternatives`: the options set aside, each with "
+                "`option` and `rejected_because`"]
+    rule = decision.get("rule")
+    known = [entry for entry in restriction_rules() if entry != REQUEST_RULE]
+    if decision.get("by") == Decider.RULE and rule and rule not in known:
+        return [f"{where}.decision.rule: {rule!r} unknown (expected: {', '.join(known)})"]
+    return []
 
 
 def change_evidence_errors(previous: dict | None, current: dict) -> list[str]:

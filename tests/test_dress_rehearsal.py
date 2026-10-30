@@ -62,6 +62,8 @@ def revision_json(number: int) -> str:
         "evidence": ["registre W33"],
         "constraints": [],
         "volume_target_km": 30.0,
+        "decision": {"by": "judgment", "alternatives": [
+            {"option": "monter à 32 km", "rejected_because": "semaine de répétition"}]},
         "sessions": [{
             "id": "w33-ven-ef", "title": "EF", "date": "2026-08-14", "kind": "run",
             "workout": "easy", "status": "planned", "distance_target_km": 7.0,

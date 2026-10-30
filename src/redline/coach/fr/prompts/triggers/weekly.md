@@ -25,7 +25,9 @@ Fais le bilan du dimanche et prépare la semaine suivante.
    daté, une fois par semaine au plus, jamais en reproche.
 4. Le service crée le journal de la semaine suivante ; écris-y l'intention et une
    révision complète (`volume_target_km` compris) via `redline week-plan
-   revise/check`. Une condition du jour va dans la `note` de sa séance (trace nette :
+   revise/check`. Sa `decision` dit ce qui a tranché (`by` : rule et son `rule`,
+   judgment ou request) et ses `alternatives`, options écartées et raison ; un
+   jugement en nomme une au moins. Une condition du jour va dans la `note` de sa séance (trace nette :
    repos), jamais en `gate` ; au-delà,
    `redline fact-write deadline` (`--athlete-label` si ⟨athlète⟩ agit). Renfo
    selon `coaching/strength.md`. Une séance dont la nature sort des 30 derniers jours

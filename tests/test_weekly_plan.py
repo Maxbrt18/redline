@@ -57,6 +57,7 @@ WRITTEN_ON = "2026-08-04T09:00:00+02:00"
 
 def written_today(**overrides):
     overrides.setdefault("volume_target_km", 30.0)
+    overrides.setdefault("decision", {"by": "request", "alternatives": []})
     return revision(computed_at=WRITTEN_ON, **overrides)
 
 
@@ -643,3 +644,38 @@ def test_a_routine_the_vault_does_not_declare_is_refused():
 def test_the_kind_is_the_family_of_the_workout():
     with pytest.raises(SchemaError, match="kind must be run for easy"):
         weekly_plan.validate(plan([session(kind="bike")]))
+
+
+def test_a_new_revision_must_say_what_settled_it():
+    missing = written_today()
+    del missing["decision"]
+    assert "decision: missing" in weekly_plan.decision_errors(missing)[0]
+    assert weekly_plan.decision_errors(written_today()) == []
+
+
+def test_a_judgment_names_the_options_it_set_aside():
+    bare = written_today(decision={"by": "judgment", "alternatives": []})
+    with pytest.raises(SchemaError, match="at least one option"):
+        weekly_plan.validate({"week": "2026-W32", "revisions": [bare]})
+    weighed = written_today(decision={"by": "judgment", "alternatives": [
+        {"option": "garder la sortie longue samedi",
+         "rejected_because": "douleur au réveil à 3/10 deux jours de suite"}]})
+    weekly_plan.validate({"week": "2026-W32", "revisions": [weighed]})
+
+
+def test_a_rule_decision_names_a_rule_of_the_rulebook():
+    unnamed = written_today(decision={"by": "rule", "alternatives": []})
+    with pytest.raises(SchemaError, match="required when `by` is rule"):
+        weekly_plan.validate({"week": "2026-W32", "revisions": [unnamed]})
+    unknown = written_today(decision={"by": "rule", "rule": "invented", "alternatives": []})
+    assert "unknown" in weekly_plan.decision_errors(unknown)[0]
+    known = weekly_plan.restriction_rules()[0]
+    named = written_today(decision={"by": "rule", "rule": known, "alternatives": []})
+    assert weekly_plan.decision_errors(named) == []
+    misplaced = written_today(decision={"by": "request", "rule": known, "alternatives": []})
+    with pytest.raises(SchemaError, match="only for `by` rule"):
+        weekly_plan.validate({"week": "2026-W32", "revisions": [misplaced]})
+
+
+def test_history_without_a_decision_stays_readable():
+    weekly_plan.validate({"week": "2026-W32", "revisions": [revision()]})

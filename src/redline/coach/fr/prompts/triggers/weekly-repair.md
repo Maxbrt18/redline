@@ -8,5 +8,6 @@ aucune séance ne peut être prescrite tant qu'il ne l'est pas.
    bilan disponible, reste au plus près de la dernière semaine valide : aucune hausse,
    aucune séance de transition, les contrôles datés en vigueur conservés. Une séance
    retirée ou réduite porte sa `restriction` (`rule` et `fact`), sinon elle reste.
+   La révision porte sa `decision` : ce qui a tranché et les options écartées.
 3. Écris un message court : la suite de la semaine est prête, en une ou deux phrases.
    Ne raconte ni panne ni outil ; le service joint lui-même les séances.

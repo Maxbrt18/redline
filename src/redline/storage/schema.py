@@ -423,12 +423,20 @@ plan_revisions = sa.Table(
     sa.Column("calibration_target", sa.SmallInteger),
     # Targeted running volume of the week: the intention, never the fact (the ledger).
     sa.Column("volume_target_km", sa.Numeric(5, 1)),
+    # What settled the revision and the options it set aside (`weekly_plan.DECISION_SCHEMA`),
+    # and what the engine measured at that instant (`analysis.decision_state`). Absent on
+    # revisions written before the register.
+    sa.Column("decision", JSONB),
+    sa.Column("state_snapshot", JSONB),
     sa.UniqueConstraint("plan_id", "revision", name="uq_plan_revisions_number"),
     sa.CheckConstraint("revision >= 1", name="ck_plan_revisions_number"),
     sa.CheckConstraint("calibration_target IS NULL OR calibration_target IN (0, 2, 3)",
                        name="ck_plan_revisions_calibration_target"),
     sa.CheckConstraint("volume_target_km IS NULL OR volume_target_km BETWEEN 1 AND 200",
                        name="ck_plan_revisions_volume_target"),
+    sa.CheckConstraint(
+        f"decision IS NULL OR decision->>'by' IN ({voc.sql_values(voc.Decider)})",
+        name="ck_plan_revisions_decision"),
 )
 
 planned_sessions = sa.Table(

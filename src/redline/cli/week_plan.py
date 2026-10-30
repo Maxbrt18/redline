@@ -21,10 +21,12 @@ prompt.
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import json
 import os
 import sys
 
+from redline.analysis import decision_state
 from redline.coach.fr import plan as wording
 from redline.model import (
     agent_input,
@@ -39,6 +41,7 @@ from redline.model.weekly_plan import (
     as_json,
     change_evidence_errors,
     current_week,
+    decision_errors,
     gate_reasons,
     intention_errors,
     now_stamp,
@@ -52,8 +55,6 @@ from redline.storage import StorageError
 
 def _distance_notes(store, revision: dict) -> str:
     """The gap to the rule n8 window for each upcoming session (informative)."""
-    import datetime as dt
-
     from redline.analysis import ledger
     from redline.model import rulebook
     days = rulebook.current().parameters.transition_lookback_days
@@ -102,6 +103,15 @@ def _database_command(store, command: str, week: str, optional: bool,
         # time would disarm a guardrail. The only reliable clock in the chain is the one
         # that writes.
         current["computed_at"] = now_stamp()
+        # What the coach could see is measured by the engine, at the same instant. A
+        # measurement that fails costs the register one snapshot, never the prescription.
+        current.pop("state_snapshot", None)
+        try:
+            current["state_snapshot"] = decision_state.snapshot(
+                store, dt.date.fromisoformat(current["computed_at"][:10]))
+        except Exception as exc:
+            print(wording.SNAPSHOT_UNREADABLE.format(name=exc.__class__.__name__),
+                  file=sys.stderr)
         # The incoming text is judged before the plan containing it: the revision is fed
         # back to the coach on every prescriptive turn, and title/note go to the athlete's
         # phone. Judged here and not in `validate` because history is append-only: the
@@ -113,6 +123,7 @@ def _database_command(store, command: str, week: str, optional: bool,
             *written_text_errors(current, f"{week} revision {current["revision"]}"),
             *change_evidence_errors(previous, current),
             *typed_target_errors(current, f"{week} revision {current["revision"]}"),
+            *decision_errors(current, f"{week} revision {current["revision"]}"),
         ]
         if mistakes:
             raise SchemaError(mistakes)

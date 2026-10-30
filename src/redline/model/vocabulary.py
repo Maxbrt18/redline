@@ -119,6 +119,18 @@ class HrReason(StrEnum):
     NONE = "none"
 
 
+class Decider(StrEnum):
+    """What settled a plan revision (`plan_revisions.decision`).
+
+    A rule leaves no choice and identifies nothing; a judgment weighed options and must
+    name the ones it set aside.
+    """
+
+    RULE = "rule"
+    JUDGMENT = "judgment"
+    REQUEST = "request"
+
+
 class ProactiveKind(StrEnum):
     """What a proactive job does (`proactive_jobs.kind`)."""
 

@@ -108,6 +108,8 @@ class Plans(StoreBase):
             constraints=revision.get("constraints", []),
             changes=revision.get("changes", []),
             volume_target_km=revision.get("volume_target_km"),
+            decision=revision.get("decision"),
+            state_snapshot=revision.get("state_snapshot"),
         ))
         cycle_inputs = []
         for session in revision.get("sessions", []):
@@ -297,6 +299,9 @@ class Plans(StoreBase):
             }
             if row["volume_target_km"] is not None:
                 revision["volume_target_km"] = float(row["volume_target_km"])
+            for name in ("decision", "state_snapshot"):
+                if row[name] is not None:
+                    revision[name] = row[name]
             session_rows = connection.execute(sa.select(planned_sessions).where(
                 planned_sessions.c.revision_id == row["id"]
             ).order_by(planned_sessions.c.scheduled_on,
