@@ -5,9 +5,12 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass, replace
+from pathlib import Path
 
-from .agent import AgentRunner, RunResult, RunSpec, SessionMode
-from .prompts import EMPTY_REPLY_NOTE
+from redline.model import rulebook
+
+from .agent import AgentRunner, RunResult, RunSpec, SessionMode, TurnIdentity
+from .prompts import EMPTY_REPLY_NOTE, instruction_digest
 from .routing import RoutePlan
 from .state import StateStore
 from .vault import PersistenceFailure, PersistenceResult, VaultRepo
@@ -35,10 +38,12 @@ class TurnExecutor:
     validated one by one during the turn (`stage_command`).
     """
 
-    def __init__(self, agent: AgentRunner, repo: VaultRepo, state: StateStore) -> None:
+    def __init__(self, agent: AgentRunner, repo: VaultRepo, state: StateStore, *,
+                 vault_path: str | Path) -> None:
         self._agent = agent
         self._repo = repo
         self._state = state
+        self._vault_path = Path(vault_path)
 
     def execute(self, psid: str, prompt: str, *, plan: RoutePlan,
                 required_weeks=()) -> TurnOutcome:
@@ -94,6 +99,8 @@ class TurnExecutor:
                 )
             return TurnOutcome(result, persisted, base_head, turn_id, used_spec, calls)
         finally:
+            if used_spec is not None:
+                self._record_identity(turn_id, psid, plan, used_spec, result)
             # The JSON files handed to the CLIs (`--input`, src/redline/model/agent_input.py)
             # do not outlive the turn: a later turn never re-reads them.
             self._repo.clear_turn_inputs(turn_id)
@@ -114,10 +121,12 @@ class TurnExecutor:
         base_head = self._repo.head()
         actual_turn_id = turn_id or str(uuid.uuid4())
         last: RunResult | None = None
+        used_spec: RunSpec | None = None
         try:
             for attempt, spec in enumerate(plan.attempts):
+                used_spec = replace(spec, read_only=True)
                 last = self._agent.run(
-                    psid, prompt, turn_id=actual_turn_id, spec=replace(spec, read_only=True))
+                    psid, prompt, turn_id=actual_turn_id, spec=used_spec)
                 if not last.error or attempt + 1 >= len(plan.attempts):
                     return last
                 if not last.allows_fallback:
@@ -127,6 +136,8 @@ class TurnExecutor:
                 self._reset_for_retry(actual_turn_id, base_head)
             return last or RunResult(error="No read profile available")
         finally:
+            if used_spec is not None:
+                self._record_identity(actual_turn_id, psid, plan, used_spec, last)
             self._repo.discard_turn(actual_turn_id)
             self._repo.clear_turn_inputs(actual_turn_id)
             try:
@@ -135,6 +146,21 @@ class TurnExecutor:
                 dirty = True
             if dirty:
                 self._repo.abandon_turn(base_head)
+
+    def _record_identity(self, turn_id: str, psid: str, plan: RoutePlan, spec: RunSpec,
+                         result: RunResult | None) -> None:
+        """Register what produced the turn; a failure here never costs the reply."""
+        reported = result.model if result is not None else None
+        try:
+            self._state.record_turn(TurnIdentity(
+                turn_id=turn_id, psid=psid, provider=self._agent.provider,
+                route=plan.route.value, model=reported or spec.model,
+                model_reported=reported is not None, effort=spec.effort,
+                instruction_digest=instruction_digest(self._vault_path),
+                rulebook_digest=rulebook.digest(self._vault_path),
+                engine_tree=self._repo.runtime_tree() or None))
+        except Exception:
+            log.exception("Identity of turn %s could not be recorded", turn_id)
 
     def _reset_for_retry(self, turn_id: str, base_head: str) -> None:
         """Clean up a failed attempt without needlessly resetting Git."""

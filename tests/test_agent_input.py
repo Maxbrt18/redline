@@ -12,7 +12,7 @@ import subprocess
 from unittest.mock import MagicMock
 
 import pytest
-from conftest import ENGINE_ROOT, cli_command
+from conftest import ENGINE_ROOT, TEST_VAULT, cli_command
 
 from redline.model import agent_input
 from redline.service import persona
@@ -121,7 +121,7 @@ def test_every_turn_clears_its_files_whatever_the_outcome():
     repo = MagicMock()
     repo.head.return_value = "base"
 
-    outcome = TurnExecutor(agent, repo, MagicMock()).execute(
+    outcome = TurnExecutor(agent, repo, MagicMock(), vault_path=TEST_VAULT).execute(
         "4242", "bilan", plan=RoutingConfig.default("claude").plan(Route.HEAVY))
 
     assert agent.run.call_args.args[1] == "bilan"

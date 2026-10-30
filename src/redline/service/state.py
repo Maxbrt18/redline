@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from .config import Config
+
+if TYPE_CHECKING:
+    from .agent import TurnIdentity
 
 
 class ProactiveState(Protocol):
@@ -35,6 +38,7 @@ class StateStore(Protocol):
     proactive: ProactiveState
 
     def register_turn(self, turn_id: str, psid: str) -> None: ...
+    def record_turn(self, identity: TurnIdentity) -> None: ...
     def materialize_intelligence(self, now: datetime) -> int: ...
     def missed_session_is_current(self, job_id: str) -> bool: ...
     def ingest_strava_activity(self, activity_id: int, *,

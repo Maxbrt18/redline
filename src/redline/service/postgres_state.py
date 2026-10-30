@@ -24,6 +24,7 @@ from redline.storage.database import Database
 from redline.storage.repository import ATHLETE, CORRECTION_ANNOUNCE_WINDOW, OperationalStore
 from redline.storage.schema import (
     agent_sessions,
+    agent_turns,
     athlete_activity_states,
     coach_predictions,
     conversation_messages,
@@ -55,6 +56,7 @@ from redline.storage.schema import (
 )
 
 from . import strength
+from .agent import TurnIdentity
 from .attachments import safe_conversation_label
 from .config import Config
 from .race_countdown import compile_deadline
@@ -87,6 +89,17 @@ class PostgresStateStore(StateStore):
             connection.execute(turn_scopes.delete().where(
                 turn_scopes.c.created_at < dt.datetime.now(dt.UTC) - dt.timedelta(days=1)))
             connection.execute(turn_scopes.insert().values(turn_id=uuid.UUID(turn_id), psid=psid))
+
+    def record_turn(self, identity: TurnIdentity) -> None:
+        with self.database.transaction() as connection:
+            connection.execute(pg_insert(agent_turns).values(
+                turn_id=uuid.UUID(identity.turn_id), psid=identity.psid,
+                provider=identity.provider, route=identity.route, model=identity.model,
+                model_reported=identity.model_reported, effort=identity.effort,
+                instruction_digest=identity.instruction_digest,
+                rulebook_digest=identity.rulebook_digest,
+                engine_tree=identity.engine_tree,
+            ).on_conflict_do_nothing())
 
     def session_id(self, psid: str, provider: str) -> str | None:
         with self.database.engine.connect() as connection:
@@ -185,10 +198,15 @@ class PostgresStateStore(StateStore):
         if not body:
             return
         with self.database.transaction() as connection:
+            # A turn whose identity could not be recorded still leaves its message.
+            written_by = None
+            if turn_id:
+                written_by = connection.execute(sa.select(agent_turns.c.turn_id).where(
+                    agent_turns.c.turn_id == uuid.UUID(turn_id))).scalar_one_or_none()
             message_id = connection.execute(pg_insert(conversation_messages).values(
                 id=uuid.uuid4(), psid=psid,
                 role="proactive" if proactive else "coach", body=body,
-                source_key=source_key).on_conflict_do_nothing().returning(
+                source_key=source_key, turn_id=written_by).on_conflict_do_nothing().returning(
                     conversation_messages.c.id)).scalar_one_or_none()
             created = message_id is not None
             if message_id is None:
