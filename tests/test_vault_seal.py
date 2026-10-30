@@ -18,6 +18,7 @@ import subprocess
 import sys
 from unittest.mock import MagicMock
 
+import pytest
 from conftest import ENGINE_ROOT, git
 
 from redline.service.vault import VaultRepo
@@ -38,6 +39,52 @@ class TestTheLedgerIsSealedBeforeStaging:
         (git_repo / "source.md").write_text("notes")
         assert VaultRepo(str(git_repo), "origin", "main").persist_turn().writes_applied
         assert "source.md" in _committed(git_repo)
+
+
+class TestForbiddenPathsAreSeenWhateverTheirName:
+    """Git quotes accents by default and folds a rename into its new name."""
+
+    def test_an_accented_script_is_removed(self, git_repo):
+        (git_repo / "é.py").write_text("print('turn')", encoding="utf-8")
+        (git_repo / "note.md").write_text("notes", encoding="utf-8")
+        result = VaultRepo(str(git_repo), "origin", "main").persist_turn()
+        assert result.restored == ("é.py",)
+        assert not (git_repo / "é.py").exists()
+        assert "note.md" in _committed(git_repo)
+
+    def test_an_accented_tracked_file_is_restored(self, git_repo):
+        workflows = git_repo / ".github"
+        workflows.mkdir()
+        (workflows / "é.yml").write_text("before", encoding="utf-8")
+        git(git_repo, "add", ".")
+        git(git_repo, "commit", "-m", "base")
+        (workflows / "é.yml").write_text("after", encoding="utf-8")
+        result = VaultRepo(str(git_repo), "origin", "main").persist_turn()
+        assert result.restored == (".github/é.yml",)
+        assert (workflows / "é.yml").read_text(encoding="utf-8") == "before"
+
+    def test_a_forbidden_file_renamed_by_a_commit_of_the_agent_comes_back(self, git_repo):
+        workflows = git_repo / ".github"
+        workflows.mkdir()
+        (workflows / "ci.yml").write_text("name: ci\non: push\n", encoding="utf-8")
+        git(git_repo, "add", ".")
+        git(git_repo, "commit", "-m", "base")
+        base = _head(git_repo)
+        git(git_repo, "mv", ".github/ci.yml", "renamed-note.md")
+        git(git_repo, "commit", "-m", "commit du tour")
+        result = VaultRepo(str(git_repo), "origin", "main").persist_turn(base_head=base)
+        assert ".github/ci.yml" in result.restored
+        assert (workflows / "ci.yml").exists()
+
+    def test_a_name_that_is_not_utf8_is_removed_and_reported(self, git_repo):
+        name = os.fsencode(git_repo) + b"/caf\xe9.py"
+        try:
+            open(name, "w").close()
+        except OSError:
+            pytest.skip("this file system refuses names that are not UTF-8")
+        result = VaultRepo(str(git_repo), "origin", "main").persist_turn()
+        assert result.restored == ("caf\ufffd.py",)
+        assert not os.path.exists(name)
 
 
 class TestNothingFailsSilently:

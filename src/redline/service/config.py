@@ -192,12 +192,12 @@ class Config:
 
     @classmethod
     def from_env(cls) -> Config:
-        required = ("MESSENGER_PAGE_TOKEN", "MESSENGER_VERIFY_TOKEN",
-                    "MESSENGER_APP_SECRET", "MESSENGER_ALLOWED_PSID", "VAULT_PATH")
+        required = ("MESSENGER_PAGE_TOKEN", "MESSENGER_VERIFY_TOKEN", "MESSENGER_APP_SECRET",
+                    "MESSENGER_ALLOWED_PSID", "VAULT_PATH", "AGENT_PROVIDER")
         missing = [key for key in required if not os.environ.get(key)]
         if missing:
             raise ConfigError(f"Incomplete configuration, missing variables: {', '.join(missing)}")
-        provider = (os.environ.get("AGENT_PROVIDER") or "codex").strip().lower()
+        provider = os.environ["AGENT_PROVIDER"].strip().lower()
         if provider not in {"claude", "codex"}:
             raise ConfigError(
                 f"AGENT_PROVIDER invalid: {provider!r} (expected claude or codex)")

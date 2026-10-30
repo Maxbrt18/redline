@@ -24,6 +24,7 @@ MINIMAL = {
     "MESSENGER_VERIFY_TOKEN": "v" * 43,
     "MESSENGER_APP_SECRET": "secret",
     "MESSENGER_ALLOWED_PSID": "4242",
+    "AGENT_PROVIDER": "codex",
 }
 
 
@@ -105,6 +106,12 @@ def test_environment_variables_no_longer_override_a_route(env):
     config = Config.from_env()
     assert config.routing.plan(Route.N1).primary.model == "gpt-6-luna"
     assert config.routing.plan(Route.N1).primary.effort == "high"
+
+
+def test_the_agent_provider_is_never_implicit(env):
+    env.delenv("AGENT_PROVIDER")
+    with pytest.raises(ConfigError, match="AGENT_PROVIDER"):
+        Config.from_env()
 
 
 def test_an_unknown_agent_provider_stops_startup(env):

@@ -116,6 +116,11 @@ def forbidden_in_turn(path: str) -> bool:
             or Path(path).suffix in EXECUTABLE_SUFFIXES)
 
 
+def _printable(path: str) -> str:
+    """A path as text: a name that is not UTF-8 stays on disk, and shows replaced."""
+    return path.encode("utf-8", "surrogateescape").decode("utf-8", "replace")
+
+
 def _view_environment() -> dict[str, str]:
     """The service environment without its secrets.
 
@@ -262,9 +267,10 @@ class VaultRepo:
         self._git("clean", "-fd")
 
     def _changed_paths(self) -> list[str]:
-        tracked = self._git("diff", "--name-only", "HEAD", log_errors=False).stdout.splitlines()
-        untracked = self._git(
-            "ls-files", "--others", "--exclude-standard", log_errors=False).stdout.splitlines()
+        # `--no-renames`: a forbidden file renamed by a commit of the agent must show its
+        # old path too, or its deletion would go unnoticed.
+        tracked = self._git_paths("diff", "--name-only", "-z", "--no-renames", "HEAD")
+        untracked = self._git_paths("ls-files", "-z", "--others", "--exclude-standard")
         return list(dict.fromkeys([*tracked, *untracked]))
 
     def persist_turn(self, required_weeks=(), base_head: str = "",
@@ -344,8 +350,8 @@ class VaultRepo:
                            if forbidden_in_turn(path) or path in scripts)
         if not forbidden:
             return ()
-        known = set(self._git("ls-tree", "-r", "--name-only", "HEAD", "--", *forbidden,
-                              log_errors=False).stdout.splitlines())
+        known = set(self._git_paths("ls-tree", "-r", "-z", "--name-only", "HEAD", "--",
+                                    *forbidden))
         tracked = [path for path in forbidden if path in known]
         created = [path for path in forbidden if path not in known]
         if tracked:
@@ -356,9 +362,10 @@ class VaultRepo:
             for path in created:
                 with contextlib.suppress(FileNotFoundError):
                     os.remove(os.path.join(self._path, path))
+        shown = tuple(_printable(path) for path in forbidden)
         self._alert(ALERT_WRITE, "forbidden files restored during a coach turn: "
-                    + ", ".join(forbidden))
-        return tuple(forbidden)
+                    + ", ".join(shown))
+        return shown
 
     def _scripts(self, paths: list[str]) -> set[str]:
         """The paths among ``paths`` that are executable at HEAD or in the worktree."""
@@ -649,8 +656,8 @@ class VaultRepo:
         command = ["git", *args]
         try:
             process = subprocess.run(
-                command, cwd=cwd or self._path, capture_output=True, text=True,
-                timeout=GIT_TIMEOUT)
+                command, cwd=cwd or self._path, capture_output=True, encoding="utf-8",
+                errors="surrogateescape", timeout=GIT_TIMEOUT)
         except subprocess.TimeoutExpired:
             process = subprocess.CompletedProcess(
                 command, 124, "", f"timeout after {GIT_TIMEOUT} s")
@@ -658,3 +665,7 @@ class VaultRepo:
             detail = (process.stderr or process.stdout).strip()[:300]
             log.error("git %s failed (%d): %s", args[0], process.returncode, detail)
         return process
+
+    def _git_paths(self, *args: str) -> list[str]:
+        """Paths out of a `-z` listing: raw, where the default output quotes accents."""
+        return [path for path in self._git(*args, log_errors=False).stdout.split("\0") if path]
