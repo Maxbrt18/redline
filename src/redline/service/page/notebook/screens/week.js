@@ -1,7 +1,7 @@
 import {add, button, el} from '../../shared/dom.js';
 import {app} from '../state.js';
 import {chevron, content, kindIcon, pastille, section} from '../ui.js';
-import {day, dm, fmt, isoDate, kindName, minutesText, paceOf, plannedValue, shortTitle, weekNumber, weekSpan} from '../format.js';
+import {day, dm, fmt, isoDate, kindName, plannedValue, shortTitle, weekNumber, weekSpan} from '../format.js';
 import {push} from '../nav.js';
 
 // ------------------------------------------------------------ Week
@@ -25,31 +25,27 @@ function gauge(label, low, high, cap, value, shown, limit, out, floor) {
   const right = add(el('span', null, 'n-gv'), el('b', shown, out ? 'n-over' : null), el('span', limit));
   return add(el('div', null, 'n-g'), el('span', label), rail, right);
 }
-// The gauges of a completed session, and the measures they already show (the facts line
-// does not repeat them).
+// The gauges of a completed session.
 export function gauges(item) {
-  const fact = item.fact, target = item.targets || {}, over = new Set(fact.over || []), rows = [], shown = new Set();
+  const fact = item.fact, target = item.targets || {}, over = new Set(fact.over || []), rows = [];
   const distanceCap = target.distance_cap_km || target.distance_target_km;
   if (distanceCap && fact.km != null) {
-    shown.add('km');
     rows.push(gauge('Distance', 0, Math.max(distanceCap * 1.25, fact.km * 1.1), distanceCap, fact.km, fmt(fact.km), '≤' + fmt(distanceCap), over.has('km')));
   }
   if (target.duration_cap_min && fact.duration_min != null && (!distanceCap || over.has('duration_min'))) {
-    shown.add('duration_min');
     rows.push(gauge('Durée', 0, Math.max(target.duration_cap_min * 1.3, fact.duration_min * 1.1), target.duration_cap_min, fact.duration_min, fact.duration_min + '′', '≤' + target.duration_cap_min, over.has('duration_min')));
   }
   if (target.hr_cap_bpm && fact.hr_avg != null) {
-    shown.add('hr_avg');
     rows.push(gauge('FC moy', 120, Math.max(180, fact.hr_avg + 5), target.hr_cap_bpm, fact.hr_avg, fmt(fact.hr_avg, 0), '≤' + target.hr_cap_bpm, over.has('hr_avg')));
   }
   if (target.rpe_max != null && fact.rpe != null) {
     const low = target.rpe_min != null && target.rpe_min !== target.rpe_max ? target.rpe_min : null;
     rows.push(gauge('RPE', 0, 10, target.rpe_max, fact.rpe, fmt(fact.rpe), low != null ? low + '-' + target.rpe_max : String(target.rpe_max), over.has('rpe'), low));
   }
-  return [rows.length ? add(el('div', null, 'n-gauges'), ...rows) : null, shown];
+  return rows.length ? add(el('div', null, 'n-gauges'), ...rows) : null;
 }
 // What overshot, as labels after the title: the gap to the limit, not a sentence. The
-// open day shows it on its gauges.
+// detail screen shows it on its gauges.
 function crossing(item) {
   const fact = item.fact, target = item.targets || {}, over = new Set(fact.over || []), tags = [];
   if (over.has('hr_avg')) tags.push('FC +' + fmt(fact.hr_avg - target.hr_cap_bpm, 0));
@@ -57,22 +53,6 @@ function crossing(item) {
   if (over.has('km')) tags.push('+' + fmt(fact.km - target.distance_cap_km) + ' km');
   if (over.has('duration_min')) tags.push('+' + (fact.duration_min - target.duration_cap_min) + ' min');
   return tags.map(text => el('span', text, 'n-cross'));
-}
-// A session's facts. Under gauges, a single line, without what the gauges show.
-function factLines(fact, shown) {
-  const lines = [], parts = [], skip = shown || new Set();
-  if (fact.km != null && !skip.has('km')) parts.push(fmt(fact.km, 2) + ' km');
-  if (fact.duration_min != null && !skip.has('duration_min')) parts.push(minutesText(fact.duration_min));
-  if (fact.km && fact.duration_min) parts.push(paceOf(fact.duration_min * 60 / fact.km) + '/km');
-  if (fact.hr_avg != null && !skip.has('hr_avg')) parts.push('FC ' + fmt(fact.hr_avg, 0));
-  if (fact.dplus >= 100) parts.push(fact.dplus + ' m D+');
-  const several = (fact.pains || []).length > 1;
-  const pains = (fact.pains || []).map(item => 'douleur ' + (several ? item.label.toLowerCase() + ' ' : '') + fmt(item.value));
-  const feel = [...pains, fact.enjoyment != null ? 'plaisir ' + fmt(fact.enjoyment, 0) : null].filter(Boolean);
-  if (shown) return parts.length || feel.length ? [el('p', [...parts, ...feel].join(' · '))] : [];
-  if (parts.length) lines.push(el('p', parts.join(' · ')));
-  if (feel.length) lines.push(el('p', feel.join(' · ')));
-  return lines;
 }
 // A day: its programmed sessions and what was run outside the program.
 function dayRow(date, items, extras, todayIso) {
@@ -92,8 +72,7 @@ function dayRow(date, items, extras, todayIso) {
     title = (kindName[extra.kind] || extra.kind) + ' · hors programme';
     icons = [kindIcon(extra.kind)];
     value = extra.km != null ? fmt(extra.km) + ' km' : extra.duration_min != null ? extra.duration_min + ' min' : '';
-    observed = extra.observation_id ? {id: extra.observation_id, title: kindName[extra.kind] || extra.kind} : null;
-    if (!observed) detail.push(...factLines(extra));
+    observed = {id: extra.observation_id, title: kindName[extra.kind] || extra.kind};
   } else {
     const names = [shortTitle(main.title)];
     if (main.kind !== 'strength' && strength.length) names.push('renfo');
@@ -103,12 +82,7 @@ function dayRow(date, items, extras, todayIso) {
       value = main.fact && main.fact.km != null ? fmt(main.fact.km) + ' km' : main.fact && main.fact.duration_min != null ? main.fact.duration_min + ' min' : 'fait';
       if (main.fact && main.kind !== 'strength') {
         tags = crossing(main);
-        if (main.fact.observation_id) observed = {id: main.fact.observation_id, title: main.title};
-        else {
-          const [rules, shown] = gauges(main);
-          detail.push(...factLines(main.fact, rules ? shown : null));
-          if (rules) detail.push(rules);
-        }
+        observed = {id: main.fact.observation_id, title: main.title};
       }
     } else if (main.status === 'cancelled') { value = 'sauté'; cls = 'skip'; if (main.note) detail.push(el('p', main.note)); }
     else if (past) { value = 'pas de trace'; cls = 'plan'; }

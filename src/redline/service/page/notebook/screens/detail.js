@@ -186,7 +186,7 @@ function sdFeelings(data) {
 // ---- planned and done
 function sdPlan(data) {
   if (!data.plan) return null;
-  const [rules] = gauges({fact: data.fact, targets: data.plan.targets});
+  const rules = gauges({fact: data.fact, targets: data.plan.targets});
   const steps = el('div', null, 'n-dsteps');
   const phases = data.phases || [];
   const step = (kind, name, sub, value, valueSub) => add(el('div', null, 'n-dstep' + (kind ? ' ' + kind : '')), el('i'),
