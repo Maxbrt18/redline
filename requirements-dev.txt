@@ -2,5 +2,6 @@ pytest==8.4.2
 ruff==0.16.0
 mypy==1.19.1
 vulture==2.14
+scipy-stubs==1.18.1.1
 types-requests==2.33.0.20261006
 types-PyYAML==6.0.12.20260906

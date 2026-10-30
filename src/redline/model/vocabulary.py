@@ -119,6 +119,13 @@ class HrReason(StrEnum):
     NONE = "none"
 
 
+class ElevationSource(StrEnum):
+    """Where the elevation of a race route profile comes from (`analysis.route_profile`)."""
+
+    IGN = "ign"
+    GPX = "gpx"
+
+
 class CarbMix(StrEnum):
     """The sugars a fuelling target is taken as (`planned_sessions.carbs_mix`)."""
 

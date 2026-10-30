@@ -51,6 +51,15 @@ icon = "run"
 # [ledger]
 # complete_from = "2030-01-01"
 
+# La courbe de pente mesurée sur l'athlète : [pente %, vitesse / vitesse à plat]. Facultatif :
+# sans ce bloc, le plan de course suit le GAP de Strava (2017) en montée comme en descente.
+# `descent` : les descentes telles que l'athlète les court en course.
+# `training_climb` : les montées telles qu'il les court à l'entraînement ; elles donnent la
+# borne rapide de la fourchette d'un plan de course.
+# [pace]
+# descent = [[-20, 0.93], [-12, 1.0], [-6, 1.0], [0, 1.0]]
+# training_climb = [[0, 1.0], [6, 0.88], [12, 0.78]]
+
 # Ce que `redline vault-check` vérifie dans le vault. Facultatif : sans ce bloc, ni le type
 # des notes ni le budget de lecture ne sont contrôlés.
 # [vault]

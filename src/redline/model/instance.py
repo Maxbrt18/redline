@@ -79,6 +79,13 @@ INSTANCE_SCHEMA = Schema("redline.toml", [
               note=("the first day whose sessions must be complete; earlier ones are never asked "
                     "for")),
     ])),
+    # The athlete's measured grade curve, as [grade %, speed relative to flat] points.
+    field("pace", dict, required=False, schema=Schema("[pace]", [
+        field("descent", list, required=False, item=field("point", list),
+              note="descents as this athlete runs them in races, grades from -30 to 0"),
+        field("training_climb", list, required=False, item=field("point", list),
+              note="climbs as run in training, grades from 0 to 30: the fast bound of a plan"),
+    ])),
     # What `redline vault-check` holds the vault to; without it, nothing is checked for it.
     field("vault", dict, required=False, schema=Schema("[vault]", [
         field("note_types", list, required=False, item=field(
@@ -131,6 +138,10 @@ class Instance:
     locale: str = DEFAULT_LOCALE
     #: Observations before this day were written under a less demanding contract.
     complete_from: dt.date = dt.date.min
+    #: Measured speed factors (grade %, speed / flat speed), sorted by grade; empty when
+    #: not declared.
+    descent_speed: tuple[tuple[float, float], ...] = ()
+    training_climb_speed: tuple[tuple[float, float], ...] = ()
 
     @property
     def hr_bounds(self) -> tuple[int, ...]:
@@ -186,6 +197,24 @@ def _locale(name: str) -> str:
     return name
 
 
+def _curve(points: list, name: str, low: float, high: float) -> tuple[tuple[float, float], ...]:
+    """Grade points of a declared curve: numbers, inside their range, grades increasing."""
+    curve = []
+    for point in points:
+        if (not isinstance(point, list) or len(point) != 2
+                or not all(isinstance(v, int | float) and not isinstance(v, bool) for v in point)):
+            raise InstanceError(f"{FILENAME}: [pace] {name}: each point is [grade %, factor]")
+        grade, factor = float(point[0]), float(point[1])
+        if not low <= grade <= high or not 0.2 <= factor <= 2.0:
+            raise InstanceError(f"{FILENAME}: [pace] {name}: [{grade:g}, {factor:g}] outside "
+                                f"grades {low:g} to {high:g} or factors 0.2 to 2")
+        curve.append((grade, factor))
+    grades = [grade for grade, _ in curve]
+    if grades != sorted(set(grades)):
+        raise InstanceError(f"{FILENAME}: [pace] {name}: grades strictly increasing")
+    return tuple(curve)
+
+
 def parse(text: str) -> Instance:
     try:
         payload = tomllib.loads(text)
@@ -210,6 +239,7 @@ def parse(text: str) -> Instance:
         raise InstanceError(f"{FILENAME}: duplicate monitored zone ({", ".join(zones)})")
     vault = payload.get("vault", {})
     ledger = payload.get("ledger", {})
+    pace = payload.get("pace", {})
     budget = tuple(Tier(tier["tier"], tier["total"],
                         tuple((entry["path"], entry["words"]) for entry in tier["files"]))
                    for tier in vault.get("budget", []))
@@ -231,6 +261,8 @@ def parse(text: str) -> Instance:
         locale=_locale(athlete.get("locale", DEFAULT_LOCALE)),
         complete_from=(dt.date.fromisoformat(ledger["complete_from"])
                        if "complete_from" in ledger else dt.date.min),
+        descent_speed=_curve(pace.get("descent", []), "descent", -30, 0),
+        training_climb_speed=_curve(pace.get("training_climb", []), "training_climb", 0, 30),
     )
 
 
