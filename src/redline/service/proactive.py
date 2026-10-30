@@ -326,12 +326,12 @@ class ProactiveScheduler:
                          record["detail"], capture["status"])
                 snapshot = capture.get("snapshot")
                 if not isinstance(snapshot, dict) or not snapshot.get("activity"):
-                    raise ValueError("instantané Strava vide après capture")
+                    raise ValueError("empty Strava snapshot after capture")
             except strava.StravaNotFound as exc:
                 # Deleted or private: retrying every 5 min only burns API calls and
                 # never changes the outcome.
                 log.warning("Strava activity %s gone: %s", record["detail"], exc)
-                pro.fail_job(record["id"], "activité introuvable sur Strava")
+                pro.fail_job(record["id"], "activity not found on Strava")
                 return None
             except Exception as exc:
                 log.error("Strava activity %s not captured (%s): %s",
@@ -350,9 +350,9 @@ class ProactiveScheduler:
             if late > self.DEBRIEF_MAX_LATE_HOURS * 3600:
                 due_at = clock.fromtimestamp(record["due"]).time()
                 if self._config.in_active_window(due_at):
-                    pro.fail_job(record["id"], "débrief trop tardif pour partir à chaud")
-                    log.error("Incident interne « debrief-abandonne:%s » : débrief non "
-                              "envoyé, %.1f h de retard pendant la plage d'envoi",
+                    pro.fail_job(record["id"], "debrief too late to go out while fresh")
+                    log.error("Internal incident debrief-dropped:%s: debrief not sent, "
+                              "%.1f h late during the sending window",
                               record["detail"], late / 3600)
                     return None
                 pro.complete_job(record["id"])

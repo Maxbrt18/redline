@@ -98,3 +98,27 @@ AWAITING_ATHLETE = "{week} : en attente de la réponse de l'athlète :"
 ARBITRATION_REQUIRED = (
     "{week} : arbitrage obligatoire, activité non rattachée apparue depuis la révision — "
     "le programme reste lisible, mais rien ne se prescrit avant une révision")
+
+# The plan as Messenger shows it to the athlete.
+MESSENGER_NOTHING = "rien de prévu"
+MESSENGER_DONE = " (fait)"
+MESSENGER_AT = " à {time}"
+MESSENGER_PLACE = "lieu "
+MESSENGER_DAY = "{weekday} {day:%d/%m}"
+MESSENGER_NOTHING_UNTIL_SUNDAY = "Rien de prévu d'ici dimanche."
+MESSENGER_NOTHING_TODAY = "Rien de prévu aujourd'hui."
+MESSENGER_NEXT = "Prochaine séance, {day} : "
+MESSENGER_CANCELLED = "{day} : {title} annulé"
+MESSENGER_MOVED = "{title} déplacé de {before} à {after} : "
+MESSENGER_REMOVED = "{day} : {title} retiré"
+MESSENGER_ONE_CHANGE = "Changement au programme : {change}."
+MESSENGER_CHANGES = "Changements au programme :"
+MESSENGER_TODAY = "Aujourd'hui : "
+MESSENGER_TODAY_HELD = "Aujourd'hui : {titles}, en attente de ta réponse."
+MESSENGER_REST_OF_WEEK = "La suite de la semaine :"
+MESSENGER_WEEK = "Programme du {first:%d/%m} au {last:%d/%m} :"
+
+# What the coach reads in place of a plan that cannot be served.
+CANONICAL_MISSING = "ABSENT OU INVALIDE"
+ACTIVE_MISSING = ("ABSENTE OU INVALIDE : ne prescris aucune séance. Une réparation dédiée est "
+                  "programmée par le service ; ne la fais pas ici")

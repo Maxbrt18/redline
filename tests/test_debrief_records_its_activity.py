@@ -63,7 +63,7 @@ def test_a_debrief_that_speaks_without_recording_is_logged_not_announced(
 
     assert client.send_burst.called, "la prose du coach part quand même"
     client.send_text.assert_not_called()
-    assert "debrief-non-consigne" in caplog.text
+    assert "debrief-unrecorded" in caplog.text
 
 
 def test_the_check_asks_about_the_activity_of_this_very_job(make_bot, client):
@@ -92,7 +92,7 @@ def test_the_deferred_debrief_carries_the_same_contract(make_bot, client, caplog
                                         prompt="débriefe", detail=ACTIVITY))
 
     client.send_text.assert_not_called()
-    assert "debrief-non-consigne" in caplog.text
+    assert "debrief-unrecorded" in caplog.text
 
 
 def test_a_trigger_without_an_activity_is_never_accused(make_bot, client):

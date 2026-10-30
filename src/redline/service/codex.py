@@ -173,7 +173,7 @@ class CodexRunner:
         try:
             return bool(checker(exc))
         except Exception:  # a broken classifier must not weaken fail-closed writes
-            log.exception("Classification de panne Codex indisponible")
+            log.exception("Codex outage classification unavailable")
             return False
 
     def activity(self, psid: str) -> AgentActivity | None:
@@ -240,7 +240,7 @@ class CodexRunner:
             try:
                 handle.interrupt()
             except Exception as exc:  # the turn result remains the final authority
-                log.warning("Interruption Codex non confirmée : %s", exc)
+                log.warning("Codex interruption not confirmed: %s", exc)
 
         timer = threading.Timer(timeout, interrupt)
         timer.start()
@@ -249,10 +249,10 @@ class CodexRunner:
                 result = handle.run()
             except Exception as exc:
                 if cancelled.is_set():
-                    raise _CancelledError("tour Codex annulé par l'athlète") from exc
+                    raise _CancelledError("Codex turn cancelled by the athlete") from exc
                 if timed_out.is_set():
                     raise _WatchdogError(
-                        "tour Codex interrompu après le délai maximal") from exc
+                        "Codex turn interrupted after the maximum delay") from exc
                 # ``ServerBusyError`` means that the provider could not allocate
                 # the selected model.  It is a preflight failure even though the
                 # native handle already exists, so preserve the SDK exception for
@@ -264,9 +264,9 @@ class CodexRunner:
             timer.cancel()
             self._runs.finish(psid, active)
         if cancelled.is_set():
-            raise _CancelledError("tour Codex annulé par l'athlète")
+            raise _CancelledError("Codex turn cancelled by the athlete")
         if timed_out.is_set():
-            raise _WatchdogError("tour Codex interrompu après le délai maximal")
+            raise _WatchdogError("Codex turn interrupted after the maximum delay")
         return result
 
     def run(self, psid: str, message: str, *, spec: RunSpec | None = None,
@@ -299,24 +299,24 @@ class CodexRunner:
                 if session_mode is SessionMode.CONTINUE:
                     self._state.clear_session(psid, self.provider)
                 return RunResult(
-                    error="tour Codex annulé par /cancel", failure=FailureKind.CANCELLED,
+                    error="Codex turn cancelled by /cancel", failure=FailureKind.CANCELLED,
                     work_started=True)
             except _WatchdogError:
                 if session_mode is SessionMode.CONTINUE:
                     self._state.clear_session(psid, self.provider)
                 return RunResult(
-                    error=f"watchdog Codex après {spec.timeout} s",
+                    error=f"Codex watchdog after {spec.timeout} s",
                     failure=FailureKind.WATCHDOG, work_started=True)
             except _InFlightError as exc:
                 if session_mode is SessionMode.CONTINUE:
                     self._state.clear_session(psid, self.provider)
                 log.warning("Codex failed after work started: %s", exc)
                 return RunResult(
-                    error=f"panne Codex en cours de tour : {exc}"[:500],
+                    error=f"Codex outage during the turn: {exc}"[:500],
                     failure=FailureKind.IN_FLIGHT, work_started=True)
             except ImportError as exc:
-                log.error("SDK Codex absent : %s", exc)
-                return RunResult(error="SDK openai-codex absent",
+                log.error("Codex SDK missing: %s", exc)
+                return RunResult(error="openai-codex SDK missing",
                                  failure=FailureKind.PREFLIGHT)
             except Exception as exc:
                 retryable = self._is_retryable_error(exc)
@@ -330,7 +330,7 @@ class CodexRunner:
         if session_mode is SessionMode.CONTINUE:
             self._state.clear_session(psid, self.provider)
         return RunResult(
-            error=f"Codex indisponible avant tout travail : {last_error}"[:500],
+            error=f"Codex unavailable before any work: {last_error}"[:500],
             failure=FailureKind.PREFLIGHT)
 
     def one_shot(self, message: str, *, spec: RunSpec, output_schema: dict | None = None,
@@ -365,9 +365,9 @@ class CodexRunner:
                                 output_schema=TRIAGE_SCHEMA, label="__triage__")
             return parse_triage(json.loads(raw or "{}"))
         except (_WatchdogError, _CancelledError):
-            log.warning("Triage Codex expiré après %d s ; repli sur N1", candidate.timeout)
+            log.warning("Codex triage timed out after %d s; falling back to N1", candidate.timeout)
         except Exception as exc:
-            log.warning("Triage Codex indisponible (%s) ; repli sur N1",
+            log.warning("Codex triage unavailable (%s); falling back to N1",
                         type(exc).__name__)
         return Triage()
 

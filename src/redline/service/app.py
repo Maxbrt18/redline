@@ -36,8 +36,8 @@ def require_supported_python(version_info: tuple[int, ...] | None = None) -> Non
     version = tuple(sys.version_info) if version_info is None else version_info
     if version[:2] < MIN_PYTHON:
         raise SystemExit(
-            "Redline requiert Python 3.12 ou plus récent "
-            f"(version active : {version[0]}.{version[1]})."
+            "Redline needs Python 3.12 or later "
+            f"(running {version[0]}.{version[1]})."
         )
 
 
@@ -55,15 +55,15 @@ def main() -> None:
     config = Config.from_env()
 
     if not config.database_url:
-        raise ConfigError("DATABASE_URL obligatoire : aucun stockage de secours n'existe")
+        raise ConfigError("DATABASE_URL is required: there is no fallback storage")
     from redline.storage import Database, OperationalStore
     from redline.storage.database import expected_schema_revision
     database = Database(config.database_url, application_name="redline-server")
     expected_revision = expected_schema_revision(paths.ENGINE_ROOT / "alembic.ini")
     if not database.ready(expected_revision):
         raise StorageError(
-            "PostgreSQL indisponible ou schéma en retard : démarrage refusé sans "
-            f"stockage canonique à la révision {expected_revision}")
+            "PostgreSQL unavailable or schema behind: refusing to start without "
+            f"canonical storage at revision {expected_revision}")
     operational_store = OperationalStore(database)
     # The `[[injuries]]` zones become the reference for pain readings: an added zone
     # opens, a removed zone turns inactive and keeps its history.
@@ -74,12 +74,12 @@ def main() -> None:
     # markers are purged. Never a fact nor an idempotency key.
     purged = operational_store.purge_expired()
     if purged:
-        log.info("Traces périmées effacées : %s",
+        log.info("Expired traces purged: %s",
                  ", ".join(f"{name} {count}" for name, count in sorted(purged.items())))
     state = PostgresStateStore(database)
     recovered = state.proactive.recover_running_jobs()
     if recovered:
-        log.warning("Jobs proactifs repris après redémarrage : %d", recovered)
+        log.warning("Proactive jobs recovered after restart: %d", recovered)
     client = MessengerClient(config)
     repo = VaultRepo(config.vault_path, config.git_remote, config.git_branch,
                      operational_store=operational_store, regen_command=REGEN_COMMAND)

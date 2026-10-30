@@ -43,3 +43,7 @@ PERMIT = (
 CAPABILITIES = "Capacités (dernière évaluation) : "
 
 FOOTER = "[/DOSSIER]"
+
+UNAVAILABLE = (
+    "[DOSSIER DU BILAN indisponible : calcul en échec, voir les journaux. "
+    "Relance toi-même redline ledger, redline signals et redline fact-read predictions --due.]")

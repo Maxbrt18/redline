@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import re
 
+from redline.coach.fr import relationship as wording
 from redline.model import voice
 
 _SPACE = re.compile(r"\s+")
@@ -26,61 +27,45 @@ def render_memory(messages: list[dict], open_questions: list[dict],
                   resolved_questions: list[dict] | None = None) -> str:
     if not messages and not open_questions and not threads and not resolved_questions:
         return ""
-    lines = ["[SOUVENIR RELATIONNEL DURABLE — invisible pour ⟨athlète⟩]"]
+    lines = [wording.HEADER]
     for row in messages[-8:]:
-        speaker = "⟨athlète⟩" if row["role"] == "athlete" else "Coach"
+        coach = row["role"] != "athlete"
+        speaker = wording.COACH if coach else wording.ATHLETE
         body = _SPACE.sub(" ", row["body"]).strip()
-        if speaker == "Coach":
+        if coach:
             body = voice.muted(body)
         if len(body) > 1200:
-            body = body[:800] + " [extrait abrégé] " + body[-350:]
-        lines.append(f"- {speaker} [{row.get('created_at', 'date inconnue')}; "
-                     f"message_id={row.get('id', '?')}]: {body}")
+            body = body[:800] + wording.ABRIDGED + body[-350:]
+        lines.append(wording.MESSAGE.format(
+            speaker=speaker, created_at=row.get("created_at", wording.UNKNOWN_DATE),
+            id=row.get("id", "?"), body=body))
     if open_questions:
-        lines.append(
-            "Pour examiner une réponse, utilise /usr/local/bin/redline-agent-cli fact-write "
-            "question --question-id <UUID> --answer-id <UUID> --status <état> --note "
-            "'Ce qui est compris et ce qui manque'. Les UUID sont ceux de ce souvenir. "
-            "answered exige une réponse suffisante à toute la question ; open conserve "
-            "une réponse partielle ; deferred respecte une reprise ultérieure "
-            "(--follow-up-on YYYY-MM-DD seulement si convenu) ; expired ferme un sujet "
-            "refusé ou impossible à préciser, sans valider le fait manquant. Un oui, un chiffre, "
-            "un mot commun ou une reply Messenger ne prouvent "
-            "pas automatiquement que toute la question est réglée : interprète-les dans "
-            "l'ensemble de l'échange, avec les faits déjà fournis. Une estimation "
-            "prudente (je dirais oui, probablement pareil) est une réponse, pas une "
-            "absence : conserve sa réserve dans la note, sans exiger de certitude. "
-            "answered signifie information suffisante, pas certitude absolue. "
-            "Une information impossible à préciser ne se redemande pas : ferme la "
-            "collecte avec sa limite explicite, sans lever un contrôle de sécurité "
-            "qui en dépend encore.")
-        lines.append("Questions restées ouvertes :")
+        lines.append(wording.REVIEW_HOW)
+        lines.append(wording.OPEN_QUESTIONS)
         for row in open_questions[-20:]:
-            lines.append(f"- question_id={row.get('id', '?')} "
-                         f"[{row.get('status', 'open')}; posée {row.get('asked_at', '?')}; "
-                         f"reprise {row.get('follow_up_on') or 'non fixée'}] : {row['question']}")
+            lines.append(wording.OPEN_QUESTION.format(
+                id=row.get("id", "?"), status=row.get("status", "open"),
+                asked_at=row.get("asked_at", "?"),
+                follow_up_on=row.get("follow_up_on") or wording.NOT_SET,
+                question=row["question"]))
             if row.get("review_note"):
-                lines.append("  Déjà compris / encore manquant : " + row["review_note"])
-        lines.append("Une question ouverte est un contexte, jamais un agenda imposé. "
-                     "Ne répète pas ce qui est déjà répondu. Un changement de sujet la laisse "
-                     "ouverte ; cumule les réponses partielles au lieu de repartir de la dernière phrase. "
-                     "Pour deferred sans date, attends que ⟨athlète⟩ reprenne le sujet ; avec une "
-                     "date, aucune relance avant celle-ci. Une date échue n'impose pas de relance.")
+                lines.append(wording.REVIEW_NOTE + row["review_note"])
+        lines.append(wording.OPEN_QUESTIONS_RULE)
         if len(open_questions) > 20:
-            lines.append("D'autres questions sont conservées : les lire avec "
-                         "/usr/local/bin/redline-agent-cli fact-read questions --limit 1000.")
+            lines.append(wording.MORE_QUESTIONS)
     if threads:
-        lines.append("Sujets conservés (leur présence ne demande aucune relance) :")
+        lines.append(wording.THREADS)
         for row in threads[:15]:
-            lines.append(f"- {row['thread_key']} [{row['status']}; "
-                         f"reprise {row.get('follow_up_on') or 'non fixée'}] : {row['body']}")
+            lines.append(wording.THREAD.format(
+                thread_key=row["thread_key"], status=row["status"],
+                follow_up_on=row.get("follow_up_on") or wording.NOT_SET, body=row["body"]))
     if resolved_questions:
-        lines.append("Questions déjà traitées (historique daté, pas état du jour) :")
+        lines.append(wording.RESOLVED)
         for row in resolved_questions[:12]:
-            lines.append(f"- [{row['status']}; clôturée {row.get('resolved_at', '?')}] "
-                         f"{row['question']}"
-                         + (f" Réponse ou limite : {row['review_note']}"
-                            if row.get('review_note') else ""))
-        lines.append("Ne repose pas ces questions sans élément nouveau précis. "
-                     "Une réponse ancienne n'établit pas l'état actuel.")
+            lines.append(wording.RESOLVED_QUESTION.format(
+                status=row["status"], resolved_at=row.get("resolved_at", "?"),
+                question=row["question"])
+                + (wording.RESOLVED_NOTE.format(review_note=row["review_note"])
+                   if row.get("review_note") else ""))
+        lines.append(wording.RESOLVED_RULE)
     return "\n".join(lines)

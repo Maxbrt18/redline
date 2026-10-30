@@ -31,7 +31,7 @@ FIELDS = frozenset({
 def emit(event: str, **fields: Any) -> None:
     unknown = set(fields) - FIELDS
     if unknown:
-        raise ValueError(f"champ d'événement non autorisé : {', '.join(sorted(unknown))}")
+        raise ValueError(f"event field not allowed: {', '.join(sorted(unknown))}")
     payload = {"event": event, **{key: value for key, value in fields.items()
                                   if value is not None}}
     log.info(json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str))

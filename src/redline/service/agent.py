@@ -81,7 +81,7 @@ class Triage:
         if self.plan_asked and self.plan_scope == "none":
             self.plan_scope = "remaining"
         if self.plan_scope not in PLAN_SCOPES:
-            raise ValueError(f"portée de programme inconnue : {self.plan_scope!r}")
+            raise ValueError(f"unknown plan scope: {self.plan_scope!r}")
         if self.plan_scope != "none":
             self.plan_asked = True
 
@@ -110,17 +110,17 @@ def parse_triage(data: dict) -> Triage:
     depth = data["depth"]
     holding = data["holding"]
     if depth not in {"N0", "N1", "N2", "N3"}:
-        raise ValueError(f"niveau de triage invalide : {depth!r}")
+        raise ValueError(f"invalid triage depth: {depth!r}")
     if holding is not None and not isinstance(holding, str):
-        raise TypeError("holding doit être une chaîne ou null")
+        raise TypeError("holding must be a string or null")
     if not all(isinstance(data[flag], bool)
                for flag in ("emotional", "plan_change", "plan_asked")):
-        raise TypeError("les indicateurs de triage doivent être booléens")
+        raise TypeError("the triage flags must be booleans")
     plan_scope = data["plan_scope"]
     if plan_scope not in PLAN_SCOPES:
-        raise ValueError(f"portée de programme invalide : {plan_scope!r}")
+        raise ValueError(f"invalid plan scope: {plan_scope!r}")
     if data["plan_asked"] != (plan_scope != "none"):
-        raise ValueError("plan_asked et plan_scope se contredisent")
+        raise ValueError("plan_asked and plan_scope contradict each other")
     # The small model answering the question instead of announcing the wait.
     if holding and len(holding) > HOLDING_MAX_CHARS:
         holding = None
@@ -243,7 +243,7 @@ class ActiveRuns:
         try:
             run.stop()
         except Exception as exc:  # the turn result remains the final authority
-            log.warning("Annulation %s non confirmée : %s", self._label, exc)
+            log.warning("Cancellation of %s not confirmed: %s", self._label, exc)
         return True
 
     def psids(self) -> tuple[str, ...]:
@@ -258,10 +258,10 @@ def live_session(state: StateStore, config: Config, provider: str,
     if not session_id:
         return None
     if state.session_age(psid, provider) > config.session_ttl:
-        log.info("Session %s %s expirée (>%.0f h) : nouveau contexte depuis le vault",
+        log.info("Session %s %s expired (>%.0f h): fresh context from the vault",
                  provider, psid, config.session_ttl_hours)
     elif state.session_prompt(psid, provider) != instruction_digest(config.vault_path):
-        log.info("Instructions du coach modifiées : session %s %s abandonnée", provider, psid)
+        log.info("Coach instructions changed: session %s %s dropped", provider, psid)
     else:
         return session_id
     state.clear_session(psid, provider)

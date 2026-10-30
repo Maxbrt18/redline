@@ -1,4 +1,4 @@
-"""État durable du service : sessions, files, claims et quotas atomiques."""
+"""The service's durable state: sessions, queues, claims and atomic quotas."""
 
 from __future__ import annotations
 
@@ -16,6 +16,8 @@ from sqlalchemy import RowMapping
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from redline.analysis import signals as signal_model
+from redline.coach.fr import relationship as wording
+from redline.coach.fr import signals as signal_wording
 from redline.model import commands, local_time
 from redline.model.vocabulary import Desire, ThreadStatus
 from redline.storage.database import Database
@@ -100,7 +102,7 @@ class PostgresStateStore(StateStore):
         return time.time() - _epoch(value) if value else float("inf")
 
     def session_prompt(self, psid: str, provider: str) -> str:
-        """L'empreinte des instructions sous lesquelles cette session a été ouverte."""
+        """The fingerprint of the instructions this session was opened under."""
         with self.database.engine.connect() as connection:
             return connection.execute(sa.select(agent_sessions.c.prompt_digest).where(
                 agent_sessions.c.psid == psid, agent_sessions.c.provider == provider,
@@ -153,7 +155,7 @@ class PostgresStateStore(StateStore):
 
     def claim_inbound(self, message_id: str, psid: str, kind: str, body: str, *,
                       reply_to_message_id: str = "") -> bool:
-        """Réserve durablement un événement Meta avant de le mettre en file."""
+        """Durably reserve a Meta event before queueing it."""
         with self.database.transaction() as connection:
             claimed = connection.execute(pg_insert(inbound_messages).values(
                 message_id=message_id, psid=psid, kind=kind, body=body,
@@ -266,7 +268,7 @@ class PostgresStateStore(StateStore):
                 conversation_questions.c.status == "open",
                 conversation_questions.c.asked_at < limit,
             ).values(status="expired", resolved_at=dt.datetime.now(dt.UTC),
-                     review_note=f"Fermée sans examen après {older_than_days} jours."
+                     review_note=wording.EXPIRED_UNREVIEWED.format(days=older_than_days)
                      )).rowcount
 
     def begin_outbound_delivery(self, source_key: str, psid: str,
@@ -351,7 +353,7 @@ class PostgresStateStore(StateStore):
                      last_error="" if delivered else error[:500],
                      updated_at=dt.datetime.now(dt.UTC))).rowcount
             if changed != 1:
-                raise KeyError(f"enveloppe sortante non finalisable : {source_key}")
+                raise KeyError(f"outbound envelope cannot be finalized: {source_key}")
 
     def reply_context(self, message_ids: tuple[str, ...]) -> str:
         """Render the Meta reply relation, without confusing the quote and the present.
@@ -387,23 +389,16 @@ class PostgresStateStore(StateStore):
         references = []
         for row in rows:
             if row["reply_body"]:
-                owner = ("du coach" if row["reply_role"] in {"coach", "proactive"}
-                         else "de ⟨athlète⟩")
-                references.append(
-                    f"Le message courant répond directement à ce message antérieur {owner} :\n"
-                    f"« {row['reply_body']} »")
+                owner = (wording.REPLY_TO_COACH if row["reply_role"] in {"coach", "proactive"}
+                         else wording.REPLY_TO_ATHLETE)
+                references.append(wording.REPLY_QUOTED.format(owner=owner,
+                                                              body=row["reply_body"]))
             else:
-                references.append(
-                    "Le message courant est une réponse directe à un ancien message "
-                    "Messenger, mais son contenu n'est plus disponible localement. "
-                    "N'invente pas la citation.")
-        return ("[RÉPONSE MESSENGER CIBLÉE — invisible]\n"
-                + "\n\n".join(references)
-                + "\nInterprète ce lien comme une réponse ciblée, pas comme un nouveau sujet. "
-                  "Ne récite pas cette note.")
+                references.append(wording.REPLY_LOST)
+        return wording.REPLY_HEADER + "\n\n".join(references) + wording.REPLY_RULE
 
     def issue_strength_link(self, psid: str, session: dict) -> str:
-        """Persiste la prescription immuable et rend sa capacité brute éphémère."""
+        """Persist the immutable prescription and return its short-lived raw capability."""
         now = dt.datetime.now(dt.UTC)
         snapshot = strength.expiring_snapshot(session, now=int(now.timestamp()))
         expires_at = dt.datetime.fromtimestamp(snapshot["expires_at"], tz=dt.UTC)
@@ -418,7 +413,7 @@ class PostgresStateStore(StateStore):
                     strength_session_links.c.token_hash)).scalar_one_or_none()
             if inserted is not None:
                 return token
-        raise RuntimeError("collision répétée de jeton de séance")
+        raise RuntimeError("repeated session token collision")
 
     def resolve_strength_link(self, psid: str, token: str) -> dict:
         digest = strength.token_digest(token)
@@ -502,8 +497,7 @@ class PostgresStateStore(StateStore):
         if not scored:
             return ""
         selected = [summary for _, summary in sorted(scored, reverse=True)[:3]]
-        return ("[CORRECTIONS PERTINENTES — invisible, à ne pas réciter]\n- "
-                + "\n- ".join(selected))
+        return wording.CORRECTIONS + "\n- ".join(selected)
 
     def pending_inbound(self) -> list[dict]:
         with self.database.engine.connect() as connection:
@@ -630,7 +624,7 @@ class PostgresStateStore(StateStore):
     @staticmethod
     def _materialize_cycles(connection, store: OperationalStore, local: dt.datetime,
                             utc: dt.datetime) -> int:
-        """Séance manquée, retour digestif."""
+        """Missed session, digestive follow-up."""
         created = 0
         cycles = connection.execute(sa.select(
             session_cycles, weekly_plans.c.iso_week, planned_sessions.c.title,
@@ -720,7 +714,7 @@ class PostgresStateStore(StateStore):
                     sa.or_(proactive_jobs.c.job_key == f"correction:{correction['correction_key']}",
                            proactive_jobs.c.job_key.like(f"correction-id:{correction['id']}:%")),
                     proactive_jobs.c.status == "pending").values(
-                        status="failed", completed_at=utc, last_error="expiré avant livraison"))
+                        status="failed", completed_at=utc, last_error="expired before delivery"))
                 continue
             created += int(PostgresProactiveState._enqueue(
                 connection, f"correction:{correction['correction_key']}", "correction",
@@ -731,7 +725,7 @@ class PostgresStateStore(StateStore):
     @staticmethod
     def _materialize_challenges(connection, predictions: Sequence[RowMapping],
                                 utc: dt.datetime) -> int:
-        """Une hausse de charge ouverte attend sa contradiction."""
+        """An open load increase awaits its challenge."""
         created = 0
         for prediction in predictions:
             if prediction["direction"] == "increase" and not prediction["challenge"]:
@@ -759,10 +753,10 @@ class PostgresStateStore(StateStore):
             daily_checkins.c.checked_on >= local.date() - dt.timedelta(days=21),
         ).order_by(daily_checkins.c.checked_on.desc()).limit(3)).mappings())
         if len(recent_daily) == 3 and all(row["desire"] == Desire.LOW for row in recent_daily):
-            signals.append("envie basse sur les trois dernières lectures")
+            signals.append(signal_wording.DESIRE_LOW)
         due_predictions = [row for row in predictions if row["due_on"] <= local.date()]
         if due_predictions:
-            signals.append(f"{len(due_predictions)} prédiction(s) échue(s) à résoudre")
+            signals.append(signal_wording.PREDICTIONS_DUE.format(count=len(due_predictions)))
         missed_count = connection.execute(sa.select(sa.func.count()).select_from(
             session_cycles).join(planned_sessions,
                 planned_sessions.c.id == session_cycles.c.source_session_id).where(
@@ -775,7 +769,7 @@ class PostgresStateStore(StateStore):
                     planned_sessions.c.routine == strength_sessions.c.workout,
                 ))).scalar_one()
         if missed_count >= 2:
-            signals.append(f"{missed_count} séances manquées sur 21 jours")
+            signals.append(signal_wording.SESSIONS_MISSED.format(count=missed_count))
         if signals:
             created += int(PostgresProactiveState._enqueue(
                 connection, f"daily-signal:{local.date().isoformat()}", "daily_signal",
@@ -784,7 +778,7 @@ class PostgresStateStore(StateStore):
 
     @staticmethod
     def _materialize_gear(connection, utc: dt.datetime) -> int:
-        """Une paire active à 90 % de son seuil d’inspection."""
+        """An active pair at 90 % of its inspection threshold."""
         created = 0
         distance = sa.case((observation_metrics.c.distance_km_state == "known",
                             observation_metrics.c.distance_km), else_=0)
@@ -816,7 +810,7 @@ class PostgresStateStore(StateStore):
         return created
 
     def ingest_strava_activity(self, activity_id: int, *, fresh_words: bool = False) -> dict:
-        """Capture et enrichit les faits objectifs avant de réveiller l'agent."""
+        """Capture and enrich the objective facts before waking the agent."""
         from redline.storage.repository import OperationalStore
 
         from .activity_pipeline import ActivityPipeline
@@ -918,7 +912,7 @@ class PostgresProactiveState(ProactiveState):
             connection.execute(proactive_jobs.update().where(
                 proactive_jobs.c.job_key == row["job_key"]
             ).values(status="failed", completed_at=current,
-                     last_error="expiré avant livraison"))
+                     last_error="expired before delivery"))
         return len(rows)
 
     def expire_jobs(self, now: float) -> int:
@@ -957,7 +951,7 @@ class PostgresProactiveState(ProactiveState):
                 proactive_jobs.c.status.in_(("pending", "running")),
             ).values(status="pending", due_at=_at(due), expires_at=_at(expire_at)))
             if result.rowcount != 1:
-                raise KeyError(f"job proactif inconnu ou déjà soldé : {job_id}")
+                raise KeyError(f"proactive job unknown or already settled: {job_id}")
 
     def reopen_job(self, job_id: str, due: float, expire_at: float) -> None:
         """Explicitly reopen a finished job after an operator repair.
@@ -972,7 +966,7 @@ class PostgresProactiveState(ProactiveState):
             ).values(status="pending", due_at=_at(due), expires_at=_at(expire_at),
                      completed_at=None, attempts=0, last_error=""))
             if result.rowcount != 1:
-                raise KeyError(f"job proactif terminé inconnu : {job_id}")
+                raise KeyError(f"unknown finished proactive job: {job_id}")
 
     def release_job(self, job_id: str, delay: float = 60.0, *,
                     expire_at: float = 0.0) -> bool:
@@ -994,7 +988,7 @@ class PostgresProactiveState(ProactiveState):
                 connection.execute(proactive_jobs.update().where(
                     proactive_jobs.c.job_key == job_id).values(
                         status="failed", completed_at=dt.datetime.now(dt.UTC),
-                        last_error="expiré avant livraison"))
+                        last_error="expired before delivery"))
                 return False
             # A deferral is not an attempt: only a failure consumes the cap.
             connection.execute(proactive_jobs.update().where(
@@ -1004,7 +998,7 @@ class PostgresProactiveState(ProactiveState):
             return True
 
     def fail_job(self, job_id: str, cause: str) -> None:
-        """Solde un job non livré en gardant sa cause, distincte d'un succès."""
+        """Settle an undelivered job, keeping its cause, distinct from a success."""
         with self.database.transaction() as connection:
             connection.execute(proactive_jobs.update().where(
                 proactive_jobs.c.job_key == job_id,
@@ -1079,7 +1073,7 @@ class PostgresProactiveState(ProactiveState):
                     proactive_jobs.c.status == "running",
                 ).values(status="done", completed_at=now))
                 if result.rowcount != 1:
-                    raise KeyError(f"job proactif non acquittable : {job_id}")
+                    raise KeyError(f"proactive job cannot be acknowledged: {job_id}")
                 if job_id.startswith("correction-id:"):
                     correction_id = uuid.UUID(job_id.split(":", 2)[1])
                     connection.execute(correction_deliveries.update().where(

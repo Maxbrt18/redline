@@ -44,7 +44,7 @@ def test_a_debrief_that_goes_silent_is_retried_once_then_failed(make_bot, store)
 
     client.send_text.assert_not_called()
     job = store.proactive.jobs()[0]
-    assert job["status"] == "failed" and "muet" in job["last_error"]
+    assert job["status"] == "failed" and "silent" in job["last_error"]
     assert len(bot._agent.calls) == 2
 
 

@@ -48,7 +48,7 @@ class TestNothingFailsSilently:
         repo.persist_turn()
         repo.publish()
         assert "source.md" in _committed(git_repo)         # the session is saved
-        assert any("régénération" in alert.text for alert in repo.drain_alerts())
+        assert any("regeneration" in alert.text for alert in repo.drain_alerts())
 
     def test_a_commit_created_during_the_turn_is_taken_over_by_the_service(self, git_repo):
         base = _head(git_repo)

@@ -16,6 +16,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
+from redline.coach.fr import replies
+
 from . import strength
 from .messenger import DeliveredMessage, DeliveryResult, MessengerClient
 from .notebook import NotebookService
@@ -107,7 +109,7 @@ def envelope_from_payload(stored: StoredDelivery) -> OutboundEnvelope:
         elif item.get("kind") == "notebook_button":
             parts.append(NotebookButtonPart(str(item["text"])))
     if not parts:
-        raise ValueError(f"enveloppe stockée sans contenu : {stored.source_key}")
+        raise ValueError(f"stored envelope without content: {stored.source_key}")
     return OutboundEnvelope(stored.psid, stored.source_key, tuple(parts),
                             str(payload.get("messaging_type") or "RESPONSE"),
                             payload.get("tag"), dict(payload.get("meta") or {}))
@@ -165,7 +167,7 @@ class EnvelopeBuilder:
 
     def build(self) -> OutboundEnvelope:
         if not self.parts:
-            raise ValueError("une enveloppe de sortie ne peut pas être vide")
+            raise ValueError("an outbound envelope cannot be empty")
         return OutboundEnvelope(
             self.psid, self.source_key, tuple(self.parts), self.messaging_type, self.tag,
             dict(self.metadata))
@@ -281,13 +283,13 @@ class DeliveryService:
         if entries and text_ok and self.notebook:
             try:
                 button = self.client.send_button(
-                    envelope.psid, "Tes cartes et bilans restent dans ton carnet.",
-                    self.notebook.link(envelope.psid, entries[0]), "Ouvrir mon carnet",
+                    envelope.psid, replies.NOTEBOOK_ARCHIVE,
+                    self.notebook.link(envelope.psid, entries[0]), replies.NOTEBOOK_BUTTON,
                     messaging_type=envelope.messaging_type, tag=envelope.tag)
                 if not button.ok:
-                    log.warning("Bouton du carnet non livré ; archive conservée")
+                    log.warning("Notebook button not delivered; archive kept")
             except Exception:
-                log.exception("Lien du carnet indisponible ; archive conservée")
+                log.exception("Notebook link unavailable; archive kept")
         return receipt
 
     def _deliver_part(self, envelope: OutboundEnvelope,
@@ -310,13 +312,13 @@ class DeliveryService:
             try:
                 url = self.notebook.link(envelope.psid)
             except Exception:
-                log.exception("Lien du carnet indisponible ; texte seul")
+                log.exception("Notebook link unavailable; text only")
         if url is None:
             return self.client.send_text(
                 envelope.psid, part.text, messaging_type=envelope.messaging_type,
                 tag=envelope.tag)
         return self.client.send_button(
-            envelope.psid, part.text, url, "Ouvrir mon carnet",
+            envelope.psid, part.text, url, replies.NOTEBOOK_BUTTON,
             messaging_type=envelope.messaging_type, tag=envelope.tag)
 
     def _deliver_image(self, envelope: OutboundEnvelope,
@@ -325,10 +327,10 @@ class DeliveryService:
             envelope.psid, str(part.path), messaging_type=envelope.messaging_type,
             tag=envelope.tag)
         if not result.ok:
-            log.error("Image non livrée, mise en quarantaine : %s", part.path.name)
+            log.error("Image not delivered, quarantined: %s", part.path.name)
             self.outbox.fail(part.path)
             return result
-        log.info("Image envoyée : %s", part.path.name)
+        log.info("Image sent: %s", part.path.name)
         if not part.link:
             self.outbox.archive(part.path)
             return result
@@ -339,27 +341,27 @@ class DeliveryService:
             token = self.state.issue_strength_link(envelope.psid, session)
             url = strength.token_url(self.coach_base_url, token)
         except Exception as exc:
-            log.exception("Lien de séance non créé : %s", part.path.name)
+            log.exception("Session link not created: %s", part.path.name)
             self.outbox.archive(part.path)
             return DeliveryResult.failure(
-                f"lien de séance non créé : {exc}", delivered=result.delivered,
+                f"session link not created: {exc}", delivered=result.delivered,
                 messages=result.messages)
         button = self.client.send_button(
             envelope.psid, text, url, strength.BUTTON_TITLE,
             messaging_type=envelope.messaging_type, tag=envelope.tag)
         self.outbox.archive(part.path)
         if not button.ok:
-            log.error("Bouton de séance non livré : %s", part.path.name)
+            log.error("Session button not delivered: %s", part.path.name)
             self.state.revoke_strength_link(envelope.psid, token)
             return DeliveryResult.failure(
                 button.detail, delivered=result.delivered + button.delivered,
                 messages=result.messages + button.messages)
-        log.info("Lien de séance envoyé : %s", part.path.name)
+        log.info("Session link sent: %s", part.path.name)
         return DeliveryResult.success(
             result.delivered + button.delivered, result.messages + button.messages)
 
     def _discard_image(self, path: Path) -> None:
-        log.info("Image écartée (sortie textuelle absente) : %s", path.name)
+        log.info("Image discarded (no text output): %s", path.name)
         self.outbox.archive(path)
 
     @staticmethod

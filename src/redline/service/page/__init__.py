@@ -35,6 +35,8 @@ import struct
 import zlib
 from pathlib import Path
 
+from redline.coach.fr import notebook as notebook_text
+
 log = logging.getLogger("redline")
 
 PAGE_DIR = Path(__file__).resolve().parent
@@ -269,7 +271,7 @@ def notebook_document(cards_dir: Path, cues=None, kinds=None) -> str:
         f"{_launch_links()}"
         '<link rel="apple-touch-icon" href="/carnet-icon.png">'
         '<link rel="icon" href="/carnet-icon.png">'
-        '<title>Mon carnet — Redline</title>'
+        f'<title>{notebook_text.PAGE_TITLE}</title>'
         f"<style>{_font_css(cards_dir / 'fonts', 'block')}{css}</style></head><body>"
         f"{_read(PAGE_DIR / 'notebook' / 'notebook.html', 'notebook.html')}"
         f"{_cue_script(cues)}"

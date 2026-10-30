@@ -169,7 +169,7 @@ class ClaudeCodeRunner:
                 )
             except OSError as exc:
                 log.error("claude binary not found: %s", exc)
-                return RunResult(error=f"binaire Claude introuvable : {exc}",
+                return RunResult(error=f"Claude binary not found: {exc}",
                                  failure=FailureKind.PREFLIGHT)
 
             active = self._runs.start(
@@ -193,7 +193,7 @@ class ClaudeCodeRunner:
                 lambda flag=killed, process=proc: (flag.set(), process.kill()))
             timer.start()
             if proc.stdout is None:   # we asked for PIPE; this cannot happen
-                raise RuntimeError("claude : stdout non capturé malgré subprocess.PIPE")
+                raise RuntimeError("claude: stdout not captured despite subprocess.PIPE")
             try:
                 parsed = self._consume(proc.stdout)
                 returncode = proc.wait()
@@ -208,11 +208,11 @@ class ClaudeCodeRunner:
                                         instruction_digest(self._config.vault_path))
 
             if cancelled.is_set():
-                return RunResult(parsed.session, error="tour Claude annulé par /cancel",
+                return RunResult(parsed.session, error="Claude turn cancelled by /cancel",
                                  failure=FailureKind.CANCELLED, work_started=True)
             if killed.is_set():
                 return RunResult(parsed.session,
-                                 error=f"watchdog Claude après {spec.timeout} s",
+                                 error=f"Claude watchdog after {spec.timeout} s",
                                  failure=FailureKind.WATCHDOG, work_started=True)
 
             if returncode == 0 and not parsed.is_error:
@@ -232,12 +232,12 @@ class ClaudeCodeRunner:
                         last_detail or "(no detail)")
             failure, retry_at = self._classify_failure(last_detail)
             if failure is not None:
-                return RunResult(error=f"Claude indisponible : {last_detail}"[:500],
+                return RunResult(error=f"Claude unavailable: {last_detail}"[:500],
                                  retry_at=retry_at, failure=failure, work_started=False)
             if parsed.started:
                 if session_id and not isolated and not fork_session:
                     self._state.clear_session(psid, self.provider)
-                return RunResult(error=f"panne Claude en cours de tour : {last_detail}"[:500],
+                return RunResult(error=f"Claude outage during the turn: {last_detail}"[:500],
                                  failure=FailureKind.IN_FLIGHT, work_started=True)
             if session_id:
                 # Nothing started with this session: it is probably dead
@@ -246,7 +246,7 @@ class ClaudeCodeRunner:
             if attempt < self.MAX_ATTEMPTS:
                 time.sleep(self.RETRY_DELAY * attempt)
 
-        return RunResult(error=f"Claude indisponible avant tout travail : {last_detail}"[:500],
+        return RunResult(error=f"Claude unavailable before any work: {last_detail}"[:500],
                          failure=FailureKind.PREFLIGHT)
 
     def classify(self, message: str, *, spec: RunSpec | None = None) -> Triage:
@@ -278,23 +278,23 @@ class ClaudeCodeRunner:
                                       env=self._agent_env(), capture_output=True,
                                       text=True, timeout=candidate.timeout)
             except subprocess.TimeoutExpired as exc:
-                log.warning("Triage Claude expiré (%d/%d, %s)",
+                log.warning("Claude triage timed out (%d/%d, %s)",
                             attempt, len(candidates), exc)
                 continue
             except OSError as exc:
-                log.warning("Triage Claude échoué (%d/%d, %s)",
+                log.warning("Claude triage failed (%d/%d, %s)",
                             attempt, len(candidates), exc)
                 continue
             if proc.returncode != 0:
-                log.warning("Triage Claude échoué (%d/%d, code %d)",
+                log.warning("Claude triage failed (%d/%d, code %d)",
                             attempt, len(candidates), proc.returncode)
                 continue
             try:
                 return parse_triage(json.loads(proc.stdout or "{}")["structured_output"])
             except (ValueError, TypeError, KeyError) as exc:
-                log.warning("Triage Claude illisible (%d/%d, %s)",
+                log.warning("Claude triage unreadable (%d/%d, %s)",
                             attempt, len(candidates), exc)
-        log.warning("Triage Claude indisponible après %d profils ; repli sur N1",
+        log.warning("Claude triage unavailable after %d profiles; falling back to N1",
                     len(candidates))
         return Triage()
 
@@ -323,14 +323,14 @@ class ClaudeCodeRunner:
             proc = subprocess.run(command, cwd=cwd, env=self._agent_env(),
                                   capture_output=True, text=True, timeout=spec.timeout)
         if proc.returncode != 0:
-            raise RuntimeError(f"{label} : claude a rendu le code {proc.returncode}")
+            raise RuntimeError(f"{label}: claude returned code {proc.returncode}")
         payload = json.loads(proc.stdout or "{}")
         if payload.get("is_error"):
             raise RuntimeError(f"{label} : {str(payload.get('result', ''))[:200]}")
         if output_schema is not None:
             structured = payload.get("structured_output")
             if structured is None:
-                raise RuntimeError(f"{label} : aucune sortie structurée")
+                raise RuntimeError(f"{label}: no structured output")
             return json.dumps(structured, ensure_ascii=False)
         return str(payload.get("result") or "")
 
@@ -398,8 +398,8 @@ class ClaudeCodeRunner:
             return FailureKind.RATE_LIMIT, (float(reset_ts) if reset_ts else None)
         if any(word in lowered for word in ("oauth", "authentication", "api key",
                                              "please run /login")):
-            log.error("Accès Claude expiré : sur le VPS, `claude setup-token` puis mettre "
-                      "à jour CLAUDE_CODE_OAUTH_TOKEN dans l'environnement du service")
+            log.error("Claude access expired: on the server, run `claude setup-token`, then update "
+                      "CLAUDE_CODE_OAUTH_TOKEN in the service environment")
             return FailureKind.PREFLIGHT, None
         return None, None
 

@@ -14,6 +14,8 @@ from typing import ClassVar
 
 import requests
 
+from redline.coach.fr import replies
+
 from . import persona
 from .config import Config
 from .prompts import DEEP_PATIENCE_LINES, PATIENCE_LINES
@@ -122,7 +124,7 @@ class MessengerClient:
         mime = self.IMAGE_TYPES.get(file.suffix.lower())
         if mime is None or not file.is_file():
             log.error("Image skipped (missing or unknown format): %s", path)
-            return DeliveryResult.failure(f"image invalide : {path}")
+            return DeliveryResult.failure(f"invalid image: {path}")
         data = {
             "recipient": json.dumps({"id": psid}),
             "messaging_type": messaging_type,
@@ -158,7 +160,7 @@ class MessengerClient:
             "messaging_type": messaging_type,
             "message": {"attachment": {"type": "template", "payload": {
                 "template_type": "button",
-                "text": (text or "Ta séance")[:self.BUTTON_TEXT_MAX],
+                "text": (text or replies.SESSION_BUTTON_TEXT)[:self.BUTTON_TEXT_MAX],
                 "buttons": [{"type": "web_url", "url": url,
                              "title": title[:self.BUTTON_TITLE_MAX]}],
             }}},
@@ -187,10 +189,10 @@ class MessengerClient:
             except requests.ReadTimeout as exc:
                 # The request may have been accepted: resending risks a duplicate.
                 # The Send API has no idempotency; doubt counts as delivery.
-                log.error("%s sans réponse après envoi : livraison incertaine (%s)",
+                log.error("%s got no answer after sending: delivery uncertain (%s)",
                           label, exc)
                 return DeliveryResult.failure(
-                    f"{label} : livraison incertaine, délai de lecture dépassé",
+                    f"{label}: delivery uncertain, read timeout exceeded",
                     delivered=1)
             except catch as exc:
                 log.warning("%s unreachable (attempt %d/%d): %s",
@@ -227,7 +229,7 @@ class MessengerClient:
                     except (AttributeError, TypeError, ValueError):
                         retry_after = 0.0
                 time.sleep(max(2 * attempt, min(retry_after, 30.0)))
-        return DeliveryResult.failure(f"{label} indisponible après {attempts} tentatives")
+        return DeliveryResult.failure(f"{label} unavailable after {attempts} attempts")
 
     def _personal(self, payload: dict) -> dict:
         """The last pass before the phone: no token reaches it as is."""
@@ -369,7 +371,7 @@ class TypingIndicator:
                     try:
                         self._deliver(self._patience_line())
                     except Exception:
-                        log.exception("Phrase d'attente non livrée")
+                        log.exception("Holding sentence not delivered")
             if self._deep and elapsed > self.BACKGROUND_AFTER:
                 # The request continues; only the animation stops. No second text, even
                 # if the guard refused the first. /status and /cancel remain available.

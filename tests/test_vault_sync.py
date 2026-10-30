@@ -62,7 +62,7 @@ def test_unrelated_remote_head_is_refused(tmp_path, monkeypatch):
 
     monkeypatch.setattr(repo, "_git", no_base)
     assert repo.sync() is False
-    assert "historique" in repo.drain_alerts()[0].text
+    assert "remote history" in repo.drain_alerts()[0].text
 
 
 def test_a_commit_that_names_engine_paths_is_integrated_like_any_other(tmp_path, monkeypatch):

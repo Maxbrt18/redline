@@ -13,4 +13,4 @@ def build_agent(config: Config, state: StateStore) -> AgentRunner:
     if config.agent_provider == "codex":
         return CodexRunner(config, state)
     # Config already validates this field; this guard protects direct constructions.
-    raise ValueError(f"fournisseur d'agent inconnu : {config.agent_provider!r}")
+    raise ValueError(f"unknown agent provider: {config.agent_provider!r}")

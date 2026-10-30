@@ -19,12 +19,13 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from redline.coach.fr import strength_report as wording
 from redline.model import strength_log
 from redline.model.errors import InputError
 
 PAGE_PATH = "/s"
 SIDECAR_SUFFIX = ".link"
-BUTTON_TITLE = "Ouvrir la séance"   # Messenger caps a button title at 20 characters
+BUTTON_TITLE = wording.BUTTON_TITLE
 
 NOTE_MAX = 300          # a free-text note the coach will read, not an essay
 REPS_MAX_SETS = 24
@@ -49,7 +50,7 @@ def new_token() -> str:
     """Capability put in the fragment; only its SHA-256 digest is persisted."""
     token = secrets.token_urlsafe(TOKEN_BYTES)
     if not TOKEN_RE.fullmatch(token):  # guards a future stdlib behaviour change
-        raise RuntimeError("jeton de séance produit dans un format inattendu")
+        raise RuntimeError("session token produced in an unexpected format")
     return token
 
 
@@ -62,7 +63,7 @@ def token_digest(token: str) -> str:
 
 def token_url(base_url: str, token: str) -> str:
     if not base_url or not token_digest(token):
-        raise ValueError("URL de séance ou jeton invalide")
+        raise ValueError("invalid session URL or token")
     return f"{base_url.rstrip('/')}{PAGE_PATH}#t={token}"
 
 
@@ -71,7 +72,7 @@ def expiring_snapshot(session: dict, *, now: int | None = None) -> dict:
     try:
         snapshot = json.loads(json.dumps(session, ensure_ascii=False))
     except (TypeError, ValueError) as exc:
-        raise ReportError(f"session non sérialisable : {exc}") from exc
+        raise ReportError(f"session not serializable: {exc}") from exc
     snapshot["expires_at"] = (int(time.time()) if now is None else now) + LINK_TTL_SECONDS
     validate_session(snapshot, now=now)
     return snapshot
@@ -117,7 +118,7 @@ def read_sidecar(image: Path) -> tuple | None:
         return None
     if not isinstance(session.get("exercises"), list) or not session["exercises"]:
         return None
-    return str(data.get("text") or "Ta séance de renfo"), session
+    return str(data.get("text") or wording.DEFAULT_TEXT), session
 
 
 # --------------------------------------------------------------------- report
@@ -129,28 +130,28 @@ def validate_session(session: dict, *, now: int | None = None) -> None:
     exercises = session.get("exercises")
     expires_at = session.get("expires_at")
     if not isinstance(sid, str) or not sid.strip() or len(sid) > 64:
-        raise ReportError("session.sid invalide")
+        raise ReportError("invalid session.sid")
     if not isinstance(workout, str) or not ROUTINE.fullmatch(workout):
-        raise ReportError("session.session invalide")
+        raise ReportError("invalid session.session")
     if not isinstance(exercises, list) or not exercises or len(exercises) > 20:
-        raise ReportError("session.exercises invalide")
+        raise ReportError("invalid session.exercises")
     if type(expires_at) is not int:
-        raise ReportError("session.expires_at invalide")
+        raise ReportError("invalid session.expires_at")
     if expires_at < (int(time.time()) if now is None else now):
-        raise ExpiredLink("ce lien de séance a expiré")
+        raise ExpiredLink("this session link has expired")
     for index, exercise in enumerate(exercises):
         if not isinstance(exercise, dict):
-            raise ReportError(f"session.exercises[{index}] invalide")
+            raise ReportError(f"invalid session.exercises[{index}]")
         slug = exercise.get("slug")
         if slug is not None and (not isinstance(slug, str) or len(slug) > 60):
-            raise ReportError(f"session.exercises[{index}].slug invalide")
+            raise ReportError(f"invalid session.exercises[{index}].slug")
 
 
 def _optional_int(value, low: int, high: int, field: str) -> int | None:
     if value is None:
         return None
     if type(value) is not int or not low <= value <= high:
-        raise ReportError(f"{field} : entier attendu entre {low} et {high}")
+        raise ReportError(f"{field}: integer expected between {low} and {high}")
     return value
 
 
@@ -183,7 +184,7 @@ def parse_report(report: dict, exercises: list, zones: dict[str, str] | None = N
     """
     exercise_count = len(exercises)
     if not isinstance(report, dict):
-        raise ReportError("report : objet JSON attendu")
+        raise ReportError("report: JSON object expected")
     allowed = {"performed_on", "pains", "minutes", "note", "exercises"}
     unknown = sorted(set(report) - allowed)
     if unknown:
@@ -191,21 +192,21 @@ def parse_report(report: dict, exercises: list, zones: dict[str, str] | None = N
     performed_on = report.get("performed_on")
     if performed_on is not None:
         if not isinstance(performed_on, str):
-            raise ReportError("performed_on : date ISO attendue")
+            raise ReportError("performed_on: ISO date expected")
         try:
             date.fromisoformat(performed_on)
         except ValueError as exc:
-            raise ReportError("performed_on : date ISO attendue") from exc
+            raise ReportError("performed_on: ISO date expected") from exc
     note = report.get("note", "")
     if not isinstance(note, str):
-        raise ReportError("note : texte attendu")
+        raise ReportError("note: text expected")
     raw_exercises = report.get("exercises", [])
     if not isinstance(raw_exercises, list) or len(raw_exercises) > exercise_count:
-        raise ReportError("exercises : liste trop longue ou invalide")
+        raise ReportError("exercises: list too long or invalid")
     items = {}
     for entry_position, entry in enumerate(raw_exercises):
         if not isinstance(entry, dict):
-            raise ReportError(f"exercises[{entry_position}] : objet attendu")
+            raise ReportError(f"exercises[{entry_position}]: object expected")
         entry_unknown = sorted(set(entry) - {"i", "score", "skipped", "gated", "reps", "status", "note"})
         if entry_unknown:
             raise ReportError(f"exercises[{entry_position}] : champs inconnus : "
@@ -214,21 +215,21 @@ def parse_report(report: dict, exercises: list, zones: dict[str, str] | None = N
         # it would silently file "exercise 99" under a real exercise.
         raw_index = entry.get("i")
         if type(raw_index) is not int:
-            raise ReportError(f"exercises[{entry_position}].i : entier attendu")
+            raise ReportError(f"exercises[{entry_position}].i: integer expected")
         index = raw_index
         if not 0 <= index < exercise_count or index in items:
-            raise ReportError(f"exercises[{entry_position}].i : index invalide ou dupliqué")
+            raise ReportError(f"exercises[{entry_position}].i: invalid or duplicate index")
         raw_reps = entry.get("reps", [])
         if not isinstance(raw_reps, list) or len(raw_reps) > REPS_MAX_SETS:
-            raise ReportError(f"exercises[{entry_position}].reps : liste invalide")
+            raise ReportError(f"exercises[{entry_position}].reps: invalid list")
         reps = [_optional_int(rep, 0, 999, f"exercises[{entry_position}].reps")
                 for rep in raw_reps]
         slots = (exercises[index].get("dose") or {}).get("slots") or []
         if slots and len(reps) > len(slots):
-            raise ReportError(f"exercises[{entry_position}].reps : trop de séries")
+            raise ReportError(f"exercises[{entry_position}].reps: too many sets")
         for flag in ("skipped", "gated"):
             if flag in entry and type(entry[flag]) is not bool:
-                raise ReportError(f"exercises[{entry_position}].{flag} : booléen attendu")
+                raise ReportError(f"exercises[{entry_position}].{flag}: boolean expected")
         status = entry.get("status")
         if status is None:
             status = ("gated" if entry.get("gated") else
@@ -237,14 +238,14 @@ def parse_report(report: dict, exercises: list, zones: dict[str, str] | None = N
                       "completed" if slots and len(reps) == len(slots) else
                       "partial" if reps else "unknown")
         if status not in {"completed", "partial", "skipped", "gated", "unknown"}:
-            raise ReportError(f"exercises[{entry_position}].status : état invalide")
+            raise ReportError(f"exercises[{entry_position}].status: invalid status")
         if ((status in {"skipped", "gated"} and reps)
                 or (status == "partial" and not reps)
                 or (status == "completed" and slots and len(reps) != len(slots))):
-            raise ReportError(f"exercises[{entry_position}].status : séries incompatibles")
+            raise ReportError(f"exercises[{entry_position}].status: inconsistent sets")
         exercise_note = entry.get("note", "")
         if not isinstance(exercise_note, str) or len(exercise_note) > NOTE_MAX:
-            raise ReportError(f"exercises[{entry_position}].note : texte de 300 caractères maximum")
+            raise ReportError(f"exercises[{entry_position}].note: text of at most 300 characters")
         # An unspoken left/right gap is a flag of the calf capacity test (>10 %,
         # coaching/strength.md), and it disappears the moment the two sides are
         # poured into one list. Hence the split, done here where the doses are.
@@ -325,17 +326,17 @@ def _parse_pains(raw: Any, zones: dict[str, str]) -> dict[str, dict]:
     if raw is None:
         return {}
     if not isinstance(raw, dict):
-        raise ReportError("pains : objet {zone: {before, after}} attendu")
+        raise ReportError("pains: object {zone: {before, after}} expected")
     unknown = sorted(set(raw) - set(zones))
     if unknown:
-        raise ReportError("pains : zone non surveillée " + ", ".join(unknown))
+        raise ReportError("pains: zone not monitored: " + ", ".join(unknown))
     pains = {}
     for zone, label in zones.items():
         moments = raw.get(zone)
         if moments is None:
             continue
         if not isinstance(moments, dict) or set(moments) - {"before", "after"}:
-            raise ReportError(f"pains.{zone} : objet {{before, after}} attendu")
+            raise ReportError(f"pains.{zone}: object {{before, after}} expected")
         before = _optional_int(moments.get("before"), 0, 10, f"pains.{zone}.before")
         after = _optional_int(moments.get("after"), 0, 10, f"pains.{zone}.after")
         if before is not None or after is not None:
@@ -352,10 +353,12 @@ def format_message(session: dict, clean: dict) -> str:
     """
     exercises = session.get("exercises") or []
 
-    head = session.get("title") or f"Renfo {session.get('type', '')}".strip()
+    head = session.get("title") or wording.HEAD.format(type=session.get("type", "")).strip()
     when = session.get("date") or ""
-    duration = f", {clean['minutes']} min" if clean["minutes"] is not None else ""
-    lines = [f"Séance de renfo terminée ({', '.join(x for x in [head, when] if x)}){duration}."]
+    duration = (wording.DURATION.format(minutes=clean["minutes"])
+                if clean["minutes"] is not None else "")
+    lines = [wording.DONE.format(what=", ".join(x for x in [head, when] if x),
+                                 duration=duration)]
 
     detail = []
     for index, exercise in enumerate(exercises):
@@ -366,36 +369,37 @@ def format_message(session: dict, clean: dict) -> str:
         if item["gated"]:
             # "Removed by the guard rail" is not "not done": the coach would read a
             # non-compliance where its own rule applied.
-            remark = f" — remarque : « {item['note']} »" if item["note"] else ""
-            detail.append(f"- {name} : retiré par le garde-fou de douleur{remark}")
+            remark = wording.REMARK_SUFFIX.format(note=item["note"]) if item["note"] else ""
+            detail.append(wording.GATED.format(name=name, remark=remark))
             continue
         if item["skipped"]:
-            remark = f" — remarque : « {item['note']} »" if item["note"] else ""
-            detail.append(f"- {name} : pas fait{remark}")
+            remark = wording.REMARK_SUFFIX.format(note=item["note"]) if item["note"] else ""
+            detail.append(wording.SKIPPED.format(name=name, remark=remark))
             continue
         bits = []
         if item["status"] == "partial":
-            bits.append(f"partiel, {item['completed_slots']} série(s)/côté(s) validé(s)")
+            bits.append(wording.PARTIAL.format(slots=item["completed_slots"]))
         if item["score"] is not None:
-            bits.append(f"{item['score']}/10")
+            bits.append(wording.SCORE.format(score=item["score"]))
         sides = item["sides"]
         if sides.get("d") or sides.get("g"):
             # The two sides are read separately or not at all: their gap is a flag
             # (>10 %) and it disappears as soon as they are mixed.
             told = [f"{label} {', '.join(str(rep) for rep in sides[key])}"
-                    for label, key in (("droite", "d"), ("gauche", "g")) if sides.get(key)]
+                    for label, key in ((wording.RIGHT, "d"), (wording.LEFT, "g"))
+                    if sides.get(key)]
             bits.append(" · ".join(told))
         elif item["reps"]:
-            bits.append("séries " + ", ".join(str(rep) for rep in item["reps"]))
+            bits.append(wording.SETS + ", ".join(str(rep) for rep in item["reps"]))
         if item["note"]:
-            bits.append(f"remarque : « {item['note']} »")
-        detail.append(f"- {name} : {' — '.join(bits) if bits else 'fait'}")
+            bits.append(wording.REMARK.format(note=item["note"]))
+        detail.append(wording.EXERCISE.format(
+            name=name, bits=" — ".join(bits) if bits else wording.EXERCISE_DONE))
     if detail:
         lines.append("")
         # Naming what the number IS matters as much here as on the page: read out
         # of context, "7/10" on an exercise reads like a performance mark.
-        lines.append("Difficulté ressentie par exercice, 0 = facile, 10 = trop dur "
-                     "(0-5 on progresse, 6-7 on tient, 8-10 on régresse) :")
+        lines.append(wording.DIFFICULTY)
         lines.extend(detail)
 
     tail = []
@@ -405,16 +409,18 @@ def format_message(session: dict, clean: dict) -> str:
     for reading in clean["pains"].values():
         before, after, label = reading["before"], reading["after"], reading["label"]
         if before is not None and after is not None:
-            move = "stable" if before == after else ("monté" if after > before else "descendu")
-            tail.append(f"{label} : {before}/10 avant, {after}/10 après ({move}).")
+            move = (wording.STABLE if before == after
+                    else wording.UP if after > before else wording.DOWN)
+            tail.append(wording.PAIN_BOTH.format(label=label, before=before, after=after,
+                                                 move=move))
         elif after is not None:
-            tail.append(f"{label} : {after}/10 après la séance (rien avant).")
+            tail.append(wording.PAIN_AFTER.format(label=label, after=after))
         elif before is not None:
-            tail.append(f"{label} : {before}/10 avant de commencer.")
+            tail.append(wording.PAIN_BEFORE.format(label=label, before=before))
     if clean["note"]:
         # Quoted, and named as such: the free-text field is the only thing here
         # that is not a bounded number.
-        tail.append(f"Ce que ⟨athlète⟩ ajoute : « {clean['note']} »")
+        tail.append(wording.ATHLETE_NOTE.format(note=clean["note"]))
     if tail:
         lines.append("")
         lines.extend(tail)

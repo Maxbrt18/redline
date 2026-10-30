@@ -8,6 +8,7 @@ from collections.abc import Iterable
 from datetime import date, datetime, timedelta
 
 from redline.coach import dates
+from redline.coach.fr import plan as wording
 from redline.model import weekly_plan as weekly_plan_model
 
 #: A day that empties is named. The prescriptive render filters on `remaining()`,
@@ -15,14 +16,16 @@ from redline.model import weekly_plan as weekly_plan_model
 #: from the list instead of showing as empty, leaving a gap neither reader can see.
 #: The render claims "here is what remains", so it must speak of EVERY day in the
 #: period it announces, including to say there is nothing.
-NOTHING = "rien de prévu"
+NOTHING = wording.MESSENGER_NOTHING
 
 
 class PlanStatus(enum.Enum):
-    VALID = "valide"
-    AWAITING = "en attente d'une réponse de ⟨athlète⟩"
-    STALE = "à réexaminer : une activité non rattachée est apparue depuis son calcul"
-    INVALID = "invalide"
+    VALID = "valid"
+    #: A dated check awaits the athlete's answer.
+    AWAITING = "awaiting"
+    #: An unlinked activity appeared since the plan was computed: to reexamine.
+    STALE = "stale"
+    INVALID = "invalid"
 
 
 def _monday(week: str) -> date:
@@ -75,12 +78,13 @@ def strength_due(context: str, today: str) -> dict | None:
 
 
 def _done(session: dict) -> str:
-    return " (fait)" if session.get("status") == "done" else ""
+    return wording.MESSENGER_DONE if session.get("status") == "done" else ""
 
 
 def _short(session: dict) -> str:
     distance = weekly_plan_model.distance_of(session)
-    timing = f" à {session['start_time']}" if session.get("start_time") else ""
+    timing = (wording.MESSENGER_AT.format(time=session["start_time"])
+              if session.get("start_time") else "")
     head = session["title"] + timing
     head = f"{head}, {distance}" if distance else head
     return head + _done(session)
@@ -89,15 +93,15 @@ def _short(session: dict) -> str:
 def _full(session: dict) -> str:
     head = session["title"] + _done(session)
     if session.get("start_time"):
-        head += f" à {session['start_time']}"
+        head += wording.MESSENGER_AT.format(time=session["start_time"])
     details = weekly_plan_model.details_of(session)
     if session.get("location_label"):
-        details.append("lieu " + session["location_label"])
+        details.append(wording.MESSENGER_PLACE + session["location_label"])
     return ", ".join([head, *details])
 
 
 def _label(day: date) -> str:
-    return f"{dates.weekday(day, 'abbreviated')} {day:%d/%m}"
+    return wording.MESSENGER_DAY.format(weekday=dates.weekday(day, "abbreviated"), day=day)
 
 
 def _day_lines(sessions: list) -> list[str]:
@@ -196,11 +200,11 @@ def render_plan_for_scope(raw: str, week: str, scope: str, *, today: str,
         candidates = [session for session in candidates
                       if session.get("id") not in exclude_ids]
         if not candidates:
-            return "Rien de prévu d'ici dimanche."
+            return wording.MESSENGER_NOTHING_UNTIL_SUNDAY
         first = min(session["date"] for session in candidates)
         same_day = [session for session in candidates if session["date"] == first]
         day = date.fromisoformat(first)
-        return (f"Prochaine séance, {_label(day)} : "
+        return (wording.MESSENGER_NEXT.format(day=_label(day))
                 + " ; ".join(_full(session) for session in same_day) + ".")
     # `remaining` is also the safe fallback for old clients that carried only a D.
     return render_plan_message(
@@ -225,24 +229,26 @@ def render_plan_delta(before_raw: str, after_raw: str, week: str, *, today: str,
             continue
         day = date.fromisoformat(session["date"])
         if session.get("status") == "cancelled":
-            changed.append(f"{_label(day)} : {session['title']} annulé")
+            changed.append(wording.MESSENGER_CANCELLED.format(day=_label(day), title=session["title"]))
         elif previous is not None and previous.get("date") != session.get("date"):
             old_day = date.fromisoformat(previous["date"])
             changed.append(
-                f"{session['title']} déplacé de {_label(old_day)} à {_label(day)} : "
+                wording.MESSENGER_MOVED.format(title=session["title"], before=_label(old_day),
+                                               after=_label(day))
                 + ", ".join(weekly_plan_model.details_of(session)))
         else:
             changed.append(f"{_label(day)} : {_full(session)}")
     for session_id, session in old.items():
         if session_id in new or session.get("date", "") < today or session_id in exclude_ids:
             continue
-        changed.append(f"{_label(date.fromisoformat(session['date']))} : {session['title']} retiré")
+        changed.append(wording.MESSENGER_REMOVED.format(
+            day=_label(date.fromisoformat(session["date"])), title=session["title"]))
     if not changed:
         return ""
     # No revision number nor ISO week: the athlete reads a program, not a ledger.
     if len(changed) == 1:
-        return f"Changement au programme : {changed[0]}."
-    return "\n".join(["Changements au programme :", *(f"{line}." for line in changed)])
+        return wording.MESSENGER_ONE_CHANGE.format(change=changed[0])
+    return "\n".join([wording.MESSENGER_CHANGES, *(f"{line}." for line in changed)])
 
 
 def render_plan_message(raw: str, week: str, *, today: str = "", since: str = "",
@@ -265,15 +271,16 @@ def render_plan_message(raw: str, week: str, *, today: str = "", since: str = ""
     if not sessions:
         if today and held_today:
             titles = " + ".join(dict.fromkeys(session["title"] for session in held_today))
-            return f"Aujourd'hui : {titles}, en attente de ta réponse."
-        return "Rien de prévu d'ici dimanche." if since else "Rien de prévu aujourd'hui."
+            return wording.MESSENGER_TODAY_HELD.format(titles=titles)
+        return (wording.MESSENGER_NOTHING_UNTIL_SUNDAY if since
+                else wording.MESSENGER_NOTHING_TODAY)
     if today:
-        text = "Aujourd'hui : " + " ; ".join(_full(session) for session in sessions)
+        text = wording.MESSENGER_TODAY + " ; ".join(_full(session) for session in sessions)
         return text if text.endswith((".", "!", "?")) else text + "."
     every = revision.get("sessions", [])
     first = date.fromisoformat(since) if since else _monday(week)
-    header = ("La suite de la semaine :" if since
-              else f"Programme du {first:%d/%m} au {_sunday(first):%d/%m} :")
+    header = (wording.MESSENGER_REST_OF_WEEK if since
+              else wording.MESSENGER_WEEK.format(first=first, last=_sunday(first)))
     return "\n".join([header,
                        *_covered_lines(sessions, every,
                                        _span(first, _sunday(first)), exclude_ids)])

@@ -49,3 +49,76 @@ UNRECORDED_LABELS = {
 def unrecorded(labels: list[str]) -> str:
     return (f"Attention : je n'ai pas pu enregistrer {listing(labels)}. Ne le considère pas "
             "comme noté ; redis-le-moi dans un moment.")
+
+
+ATTACHMENT_NOTHING_RELIABLE = (
+    "Je n'arrive pas à extraire quelque chose de fiable de cette pièce jointe.")
+
+#: What `/renfo` answers when the card cannot go out, by state.
+STRENGTH_CARD_LIMITS = {
+    "unavailable": (
+        "Je n'ai pas de programme fiable pour aujourd'hui en ce moment, donc je ne "
+        "peux pas te confirmer s'il y a du renfo. Je m'en occupe."),
+    "stale": (
+        "Ta semaine a bougé depuis le dernier programme : je le remets à jour avant "
+        "de t'envoyer la carte de renfo."),
+    "blocked": (
+        "Le renfo du jour est prévu, mais j'attends d'abord ta réponse à ma question "
+        "du jour avant de t'envoyer sa carte."),
+    "none": "Aucune séance de renforcement n'est prescrite aujourd'hui.",
+}
+
+STRENGTH_CARD_FAILED = (
+    "La séance de renfo est bien prévue, mais je n'arrive pas à générer sa carte pour "
+    "l'instant.")
+
+STRENGTH_TITLE = "renforcement"
+
+STRENGTH_CARD = "Ta carte de renfo du jour — {title}."
+
+NOTEBOOK_UNAVAILABLE = "Le carnet est momentanément indisponible."
+
+NOTEBOOK_REVOKED = ("Les accès au carnet sont révoqués. Tape /carnet pour reconnecter ton "
+                    "appareil.")
+
+NOTEBOOK_INVITE = "Ton carnet : ta séance du jour, ta semaine et ta course."
+
+NOTEBOOK_BUTTON = "Ouvrir mon carnet"
+
+CLEARED = "Nouvelle conversation. Je repars du contexte frais du vault au prochain message."
+
+CANCEL_REQUESTED = ("Annulation demandée. Le travail en cours va s'arrêter sans être "
+                    "relancé automatiquement.")
+
+NOTHING_TO_CANCEL = "Aucun travail en cours à arrêter."
+
+DEEP_WITHOUT_QUESTION = "Ajoute la question dans le même message : /deep <ta question>"
+
+# `/status`.
+STATUS = "Moteur : {provider}\n{running}\n{session}\nRoutage :\n{routing}"
+
+STATUS_RUNNING = "Travail en cours : {model}/{effort}, depuis {elapsed}, watchdog dans {watchdog}"
+
+STATUS_DEFAULT_MODEL = "modèle par défaut"
+
+STATUS_DEFAULT_EFFORT = "effort par défaut"
+
+STATUS_CANCELLING = ", annulation en cours"
+
+STATUS_IDLE = "Aucun travail en cours"
+
+STATUS_SESSION = "Session active, dernier échange il y a {age}, contexte frais dans {fresh_in}"
+
+STATUS_NO_SESSION = "Aucune session active, le prochain message relira le vault"
+
+STATUS_HEAVY_ROUTE = "proactif lourd"
+
+STATUS_ROUTE = "{label} : {route}"
+
+STATUS_HOURS = "{hours} h {minutes:02d}"
+
+STATUS_MINUTES = "{minutes} min"
+
+NOTEBOOK_ARCHIVE = "Tes cartes et bilans restent dans ton carnet."
+
+SESSION_BUTTON_TEXT = "Ta séance"

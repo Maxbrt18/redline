@@ -66,6 +66,7 @@ def test_a_single_effort_or_no_laps_gives_no_card():
 # ------------------------------------------------------------------ the bot
 
 import time  # noqa: E402
+from datetime import time as dtime  # noqa: E402
 from unittest.mock import MagicMock  # noqa: E402
 
 from conftest import FakeAgent  # noqa: E402
@@ -97,7 +98,9 @@ def _bot(make_bot, tmp_path):
 
     repo.render_workout_card.side_effect = render
     agent = FakeAgent(result=RunResult(full_text="Quatre montées régulières, bravo."))
-    return make_bot(agent=agent, repo=repo, outbox=outbox), agent, repo
+    # A window open all day: the test does not depend on the hour it runs at.
+    return (make_bot(agent=agent, repo=repo, outbox=outbox,
+                     proactive_active_start=dtime(0, 0)), agent, repo)
 
 
 def test_the_job_carries_the_card_and_the_quality_flag_from_the_snapshot():

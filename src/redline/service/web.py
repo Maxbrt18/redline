@@ -135,7 +135,7 @@ def _exercise_cues(vault: Path) -> dict:
         from redline.model.program import load
         notes = load(vault).exercises
     except Exception as exc:
-        log.warning("Consignes d'exécution non chargées (%s) : %s", type(exc).__name__, exc)
+        log.warning("Execution cues not loaded (%s): %s", type(exc).__name__, exc)
         return {}
     return {slug: note["how"] for slug, note in notes.items() if note.get("how")}
 
@@ -190,10 +190,10 @@ def _accept_strength_report(payload: dict, operational_store: OperationalStore,
         accepted = operational_store.accept_strength_report(
             payload, max_per_day)
     except Exception as exc:
-        log.error("Journal renfo non écrit (%s) : %s", type(exc).__name__, exc)
+        log.error("Strength log not written (%s): %s", type(exc).__name__, exc)
         return None
     if accepted not in {"accepted", "duplicate", "quota"}:
-        log.error("Journal renfo : statut repository inconnu %r", accepted)
+        log.error("Strength log: unknown repository status %r", accepted)
         return None
     return accepted
 
@@ -223,11 +223,11 @@ def create_app(config: Config, bot: TurnWorker, state: Any,
         register_notebook(app, notebook, config.allowed_psid, alert=lambda text, key: (
             bot.submit_event(config.allowed_psid, "postback", text, message_id=key)),
             place=config.instance.place, cues=cues,
-            settled=lambda activity_id: hasten_debrief(activity_id, "ressentis du carnet"))
+            settled=lambda activity_id: hasten_debrief(activity_id, "notebook feelings"))
     try:
         schema_expected = expected_schema_revision(paths.ENGINE_ROOT / "alembic.ini")
     except Exception as exc:
-        log.error("Tête Alembic illisible au démarrage : %s", exc)
+        log.error("Alembic head unreadable at startup: %s", exc)
         schema_expected = "unknown"
 
     @app.get("/webhook")
@@ -320,7 +320,7 @@ def create_app(config: Config, bot: TurnWorker, state: Any,
             # Strava saves title and description together: a renamed title means the
             # athlete has written what they wanted to say about the run. With no
             # pending debrief (an old run edited), nothing happens.
-            hasten_debrief(activity_id, "titre renommé")
+            hasten_debrief(activity_id, "title renamed")
         return "ok", 200
 
     # ---- interactive strength session
@@ -419,11 +419,11 @@ def create_app(config: Config, bot: TurnWorker, state: Any,
                       if zone["active"]} if operational_store is not None else {})
             clean = strength.parse_report(report, session["exercises"], zones)
             if not clean["performed_on"]:
-                raise strength.ReportError("performed_on absent")
+                raise strength.ReportError("performed_on missing")
             performed_on = date.fromisoformat(clean["performed_on"])
             today = clock.today()
             if not today - timedelta(days=7) <= performed_on <= today:
-                raise strength.ReportError("performed_on hors de la fenêtre autorisée")
+                raise strength.ReportError("performed_on outside the allowed window")
         except strength.ReportError as exc:
             log.warning("Strength report refused: %s", exc)
             return jsonify({"status": "invalid", "error": str(exc)}), 400

@@ -72,7 +72,7 @@ class PersistenceFailure(enum.Enum):
     """
 
     #: The facts could not be applied (schema, immutability, conflict, outage).
-    WRITE_REFUSED = "écriture refusée"
+    WRITE_REFUSED = "write refused"
 
 
 @dataclass(frozen=True)
@@ -173,7 +173,7 @@ class VaultRepo:
         ).stdout.strip()
         if not base:
             self._alert(ALERT_HISTORY,
-                        "Synchronisation Git refusée : historique distant incompatible")
+                        "Git sync refused: incompatible remote history")
             return False
         if self._git("rebase", "--autostash", incoming).returncode != 0:
             self._git("rebase", "--abort", log_errors=False)
@@ -211,8 +211,8 @@ class VaultRepo:
         paths = self._changed_paths()
         if not paths:
             return []
-        log.error("Worktree sale au début d'un tour — résidu d'un tour mort avant sa "
-                  "persistance, abandonné : %s", ", ".join(paths[:10]))
+        log.error("Dirty worktree at the start of a turn, left by a turn that died before "
+                  "persisting, discarded: %s", ", ".join(paths[:10]))
         self._reset_worktree()
         return paths
 
@@ -221,7 +221,7 @@ class VaultRepo:
         if base_head and self._head() not in ("", base_head):
             # The agent sometimes commits itself; a refused turn does not keep that
             # commit (never pushed: pushing only happens after a successful persistence).
-            log.critical("Tour abandonné après un commit de l'agent : retour à %s",
+            log.critical("Turn abandoned after an agent commit: back to %s",
                          base_head[:8])
             self._git("reset", "--hard", base_head)
         self._reset_worktree()
@@ -235,13 +235,13 @@ class VaultRepo:
         try:
             agent_input.clear(turn_id, root=Path(self._path))
         except OSError as exc:
-            log.warning("Fichiers du tour %s non supprimés : %s", turn_id, exc)
+            log.warning("Files of turn %s not deleted: %s", turn_id, exc)
 
     def record_proactive_delivery(self, job, sent_at: datetime, message: str,
                                   turn_id: str = "") -> None:
         """Record a message only once Messenger has delivered it."""
         if self._store is None:
-            raise StorageError("stockage PostgreSQL absent pour la trace proactive")
+            raise StorageError("no PostgreSQL storage for the proactive trace")
         kind = {
             "morning": "morning", "weekly": "weekly", "monthly": "monthly",
             "strava_debrief": "debrief", "strava_debrief_late": "debrief",
@@ -307,8 +307,8 @@ class VaultRepo:
             # The PostgreSQL transaction is already committed. A failed reread cannot
             # turn it into a refused write; it only withholds the sessions, since they
             # cannot be proven.
-            log.exception("Relecture du programme impossible après le tour %s", turn_id)
-            detail = f"faits enregistrés ; relecture interrompue : {type(exc).__name__}"
+            log.exception("Plan reread failed after turn %s", turn_id)
+            detail = f"facts recorded; reread interrupted: {type(exc).__name__}"
             self._alert(ALERT_PROJECTION, detail)
             return PersistenceResult(True, applied_commands=applied, receipts=receipts,
                                      detail=detail, invalid=required_weeks,
@@ -320,11 +320,11 @@ class VaultRepo:
         stale = tuple(week for week, status in statuses.items()
                       if status is PlanStatus.STALE)
         if awaiting:
-            log.info("Semaine(s) %s enregistrée(s) mais non prescriptible(s) : "
-                     "un contrôle daté attend la réponse de ⟨athlète⟩", ", ".join(awaiting))
+            log.info("Week(s) %s recorded but not prescribable: a dated check awaits the "
+                     "athlete's answer", ", ".join(awaiting))
         if stale:
-            log.info("Semaine(s) %s enregistrée(s) mais périmée(s) : une séance a bougé "
-                     "depuis leur calcul, la prescription attend une révision",
+            log.info("Week(s) %s recorded but stale: a session moved since they were "
+                     "computed, the prescription awaits a revision",
                      ", ".join(stale))
         return PersistenceResult(True, applied_commands=applied, receipts=receipts,
                                  awaiting=awaiting, stale=stale, invalid=invalid,
@@ -336,7 +336,7 @@ class VaultRepo:
         if base_head and current and current != base_head:
             # The agent committed itself: its changes become work in progress again,
             # judged like the rest, then committed by the service.
-            log.warning("Commit de l'agent pendant le tour : repris dans le commit du service")
+            log.warning("Agent commit during the turn: folded into the service commit")
             self._git("reset", "--soft", base_head)
         changed = self._changed_paths()
         scripts = self._scripts(changed)
@@ -356,7 +356,7 @@ class VaultRepo:
             for path in created:
                 with contextlib.suppress(FileNotFoundError):
                     os.remove(os.path.join(self._path, path))
-        self._alert(ALERT_WRITE, "fichiers interdits restaurés pendant un tour coach : "
+        self._alert(ALERT_WRITE, "forbidden files restored during a coach turn: "
                     + ", ".join(forbidden))
         return tuple(forbidden)
 
@@ -378,7 +378,7 @@ class VaultRepo:
         if not turn_id:
             return 0, ()
         if self._store is None:
-            raise StorageError("stockage PostgreSQL absent à la frontière du tour")
+            raise StorageError("no PostgreSQL storage at the turn boundary")
         for pause in (0.0, *APPLY_RETRY_PAUSES):
             if pause:
                 time.sleep(pause)
@@ -387,9 +387,9 @@ class VaultRepo:
             except StorageError as exc:
                 if not _transient(exc) or pause == APPLY_RETRY_PAUSES[-1]:
                     raise
-                log.warning("Application du tour %s reportée (%s) ; nouvelle tentative",
+                log.warning("Applying turn %s postponed (%s); retrying",
                             turn_id, exc)
-        raise AssertionError("boucle d'application épuisée")  # pragma: no cover
+        raise AssertionError("apply loop exhausted")  # pragma: no cover
 
     def _refused_kinds(self, turn_id: str) -> tuple[str, ...]:
         if not turn_id or self._store is None:
@@ -397,7 +397,7 @@ class VaultRepo:
         try:
             return self._store.pending_turn_kinds(turn_id)
         except Exception:
-            log.exception("Commandes refusées du tour %s illisibles", turn_id)
+            log.exception("Refused commands of turn %s unreadable", turn_id)
             return ()
 
     def _commit_local(self) -> bool:
@@ -408,14 +408,14 @@ class VaultRepo:
         staged = self._git("add", "-A", "--", *paths)
         if staged.returncode != 0:
             detail = (staged.stderr or staged.stdout).strip()[:200]
-            self._alert(ALERT_COMMIT, f"Préparation du commit refusée par git : {detail}")
+            self._alert(ALERT_COMMIT, f"git refused to stage the commit: {detail}")
             return False
         stamp = clock.now().strftime("%Y-%m-%d %H:%M")
         # This boundary seals and regenerates itself; the hook is for human commits.
         committed = self._git("commit", "--no-verify", "-m", f"coach (messenger) - {stamp}")
         if committed.returncode != 0:
             detail = (committed.stderr or committed.stdout).strip()[:200]
-            self._alert(ALERT_COMMIT, f"Commit du vault refusé par git : {detail}")
+            self._alert(ALERT_COMMIT, f"git refused the vault commit: {detail}")
             return False
         self._push_due = True
         return True
@@ -430,7 +430,7 @@ class VaultRepo:
             projection_due = (self._store.projection_pending()
                               if self._store is not None else False)
         except Exception as exc:
-            self._alert(ALERT_PROJECTION, f"état des projections illisible : {exc}")
+            self._alert(ALERT_PROJECTION, f"projection state unreadable: {exc}")
             projection_due = False
         if projection_due or self._views_due or self._changed_paths():
             self._views_due = False
@@ -438,8 +438,7 @@ class VaultRepo:
                 self.regenerate_views()
             except Exception as exc:
                 self._alert(ALERT_PROJECTION,
-                            "faits enregistrés dans PostgreSQL, projection à reprendre : "
-                            f"{exc}")
+                            f"facts recorded in PostgreSQL, projection to resume: {exc}")
         self._commit_local()
         if not self._push_due and not self._ahead_of_remote():
             return True
@@ -471,14 +470,14 @@ class VaultRepo:
         try:
             weekly_plan_model.validate(plan)
         except Exception as exc:
-            log.error("plan PostgreSQL %s invalide : %s", week, exc)
+            log.error("PostgreSQL plan %s invalid: %s", week, exc)
             return PlanStatus.INVALID
         if weekly_plan_model.blocking_gates(plan):
             return PlanStatus.AWAITING
         active = weekly_plan_model.active(plan)
         if self._store.plan_needs_arbitration(week, active["revision"]):
-            log.info("plan PostgreSQL %s à réexaminer : une activité non rattachée est "
-                     "apparue depuis son calcul", week)
+            log.info("PostgreSQL plan %s to reexamine: an unlinked activity appeared "
+                     "since it was computed", week)
             return PlanStatus.STALE
         return PlanStatus.VALID
 
@@ -489,11 +488,10 @@ class VaultRepo:
         try:
             return self._store.activity_recorded(int(str(activity_id).strip()))
         except (ValueError, TypeError):
-            log.error("Contrôle de consignation impossible : « %s » n'est pas un "
-                      "identifiant d'activité", activity_id)
+            log.error("Recording check failed: %r is not an activity id", activity_id)
             return None
         except StorageError as exc:
-            log.error("Contrôle de consignation impossible pour %s : %s", activity_id, exc)
+            log.error("Recording check failed for %s: %s", activity_id, exc)
             return None
 
     def pending_ledger_cells(self, today) -> list:
@@ -552,12 +550,12 @@ class VaultRepo:
         from pathlib import Path
 
         from redline.analysis import weekly_dossier
+        from redline.coach.fr import weekly_dossier as wording
         try:
             return weekly_dossier.render(self._store, Path(self._path), week, clock.today())
         except Exception:  # the dossier is an aid, never a gate
-            log.exception("Dossier du bilan %s non calculé", week)
-            return ("[DOSSIER DU BILAN indisponible : calcul en échec, voir les journaux. "
-                    "Relance toi-même redline ledger, redline signals et redline fact-read predictions --due.]")
+            log.exception("Review dossier %s not computed", week)
+            return wording.UNAVAILABLE
 
     def weekly_plan_message(self, week: str, today: str = "", since: str = "",
                             exclude_ids=frozenset()) -> str:
@@ -585,11 +583,11 @@ class VaultRepo:
                 command, cwd=self._path, env=_view_environment(), capture_output=True,
                 text=True, timeout=PROCESS_TIMEOUT)
         except subprocess.TimeoutExpired:
-            log.error("carte du plan %s non générée : timeout", week)
+            log.error("Plan card %s not rendered: timeout", week)
             return False
         if process.returncode != 0:
             detail = (process.stderr or process.stdout).strip()[:500]
-            log.error("carte du plan %s non générée : %s", week, detail)
+            log.error("Plan card %s not rendered: %s", week, detail)
             return False
         return True
 
@@ -605,11 +603,11 @@ class VaultRepo:
                 input=json.dumps(card, ensure_ascii=False), capture_output=True,
                 text=True, timeout=PROCESS_TIMEOUT)
         except subprocess.TimeoutExpired:
-            log.error("carte de séance %s non générée : timeout", activity_id)
+            log.error("Workout card %s not rendered: timeout", activity_id)
             return False
         if process.returncode != 0:
             detail = (process.stderr or process.stdout).strip()[:500]
-            log.error("carte de séance %s non générée : %s", activity_id, detail)
+            log.error("Workout card %s not rendered: %s", activity_id, detail)
             return False
         return True
 
@@ -631,10 +629,10 @@ class VaultRepo:
             capture_output=True, text=True, timeout=PROCESS_TIMEOUT)
         if process.returncode != 0:
             detail = (process.stderr or process.stdout).strip()[:300]
-            log.error("régénération des vues échouée (%d) : %s",
+            log.error("View regeneration failed (%d): %s",
                       process.returncode, detail)
             raise StorageError(
-                "régénération des vues du vault échouée : " + detail)
+                "vault view regeneration failed: " + detail)
 
     def _push(self) -> bool:
         # If the remote moved in the meantime (a push from the Mac), rebase and retry.
@@ -643,7 +641,7 @@ class VaultRepo:
         self.sync()
         if self._git("push", self._remote, self._branch).returncode == 0:
             return True
-        self._alert(ALERT_PUSH, "Commit enregistré localement mais push Git échoué")
+        self._alert(ALERT_PUSH, "Commit recorded locally but the Git push failed")
         return False
 
     def _git(self, *args: str, log_errors: bool = True,
@@ -655,7 +653,7 @@ class VaultRepo:
                 timeout=GIT_TIMEOUT)
         except subprocess.TimeoutExpired:
             process = subprocess.CompletedProcess(
-                command, 124, "", f"timeout après {GIT_TIMEOUT} s")
+                command, 124, "", f"timeout after {GIT_TIMEOUT} s")
         if log_errors and process.returncode != 0:
             detail = (process.stderr or process.stdout).strip()[:300]
             log.error("git %s failed (%d): %s", args[0], process.returncode, detail)
