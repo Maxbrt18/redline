@@ -2,6 +2,8 @@
 import {app} from './state.js';
 import {lock} from './session.js';
 
+const UNAVAILABLE = 'Le carnet est indisponible pour le moment.';
+
 export async function api(path, body) {
   // While the link is being exchanged for the device cookie, nothing else is sent: a first
   // call without a cookie would return 401 and lock a notebook that has just opened. A
@@ -14,10 +16,15 @@ export async function api(path, body) {
     headers: body === undefined ? {} : {'Content-Type': 'application/json'},
     body: body === undefined ? undefined : JSON.stringify(body)
   });
-  const value = await response.json();
+  // A reply that is not JSON -- the proxy's 502 while the service restarts, a page left by
+  // an earlier version calling a route that no longer exists -- reads as an unavailable
+  // notebook, never as the browser's parsing error.
+  let value;
+  try { value = await response.json(); }
+  catch { throw new Error(UNAVAILABLE); }
   if (!response.ok) {
     if (response.status === 401) lock(value.error);
-    throw new Error(value.error || 'Le carnet est indisponible pour le moment.');
+    throw new Error(value.error || UNAVAILABLE);
   }
   return value;
 }
