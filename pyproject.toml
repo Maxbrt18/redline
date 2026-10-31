@@ -31,7 +31,9 @@ dependencies = [
 [project.optional-dependencies]
 codex = ["openai-codex>=0.156.1,<1.0.0"]
 cards = ["playwright>=1.60,<2"]
-dev = ["mypy", "pytest", "ruff", "types-PyYAML", "types-requests", "vulture"]
+# The race route profile: resampling and smoothing of elevation along a track.
+route = ["numpy>=2.2,<3", "scipy>=1.15,<2"]
+dev = ["mypy", "pytest", "ruff", "scipy-stubs", "types-PyYAML", "types-requests", "vulture"]
 
 [project.urls]
 Repository = "https://github.com/Maxbrt18/redline"

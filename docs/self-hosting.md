@@ -86,7 +86,7 @@ sudo install -D -o root -g root -m 0644 deploy/agent-cli/agent-cli-tools.txt \
 sudo install -o root -g root -m 0644 deploy/systemd/coach-messenger.service /etc/systemd/system/
 sudo systemctl daemon-reload
 VENV=/home/ubuntu/.venvs/redline-current
-$VENV/bin/python -m pip install -c requirements.txt -e '.[cards]'    # add codex if used
+$VENV/bin/python -m pip install -c requirements.txt -e '.[cards,route]'    # add codex if used
 DATABASE_URL="$MIGRATOR_DATABASE_URL" $VENV/bin/alembic upgrade head
 sudo systemctl restart coach-messenger
 curl -fsS http://127.0.0.1:8000/ready && curl -s http://127.0.0.1:8000/health

@@ -26,7 +26,7 @@ RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
 COPY . /opt/redline
 WORKDIR /opt/redline
 RUN python -m venv /opt/.venvs/redline \
-    && /opt/.venvs/redline/bin/pip install -c requirements.txt -e '.[cards]' \
+    && /opt/.venvs/redline/bin/pip install -c requirements.txt -e '.[cards,route]' \
     && /opt/.venvs/redline/bin/python -m playwright install --with-deps chromium \
     && rm -rf /var/lib/apt/lists/* \
     && install -m 0755 deploy/agent-cli/redline-agent-cli /usr/local/bin/redline-agent-cli \

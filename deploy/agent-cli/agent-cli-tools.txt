@@ -12,6 +12,7 @@ knowledge-search
 ledger
 ledger-add
 ledger-complete
+race-plan
 session-cycle
 signals
 strava
