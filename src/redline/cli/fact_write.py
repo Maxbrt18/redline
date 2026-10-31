@@ -14,6 +14,11 @@ exactly their contract. Two explicit refusals, never an interpretation: `--patch
 missing key refuses (no partial row is created), and without `--patch` a missing
 required field refuses by naming it.
 
+**`--context` under `--patch` merges key by key.** The context is the one field made of
+fields: replacing it whole would erase every key the caller did not retype (a race's
+start time, its taper, its aid stations). So the named keys are written over the stored
+ones, and a key given as `null` is removed.
+
 Two accepted limits. (1) `--patch` never sets a field back to NULL: going from a value to
 "nothing" takes the full form, because an absent option already means "unchanged" and
 gets no second meaning. (2) Under `REDLINE_TURN_ID`, the reread happens at queue time
@@ -144,6 +149,11 @@ def _daily(args, _) -> dict:
 def _deadline(args, existing) -> dict:
     payload = merge(DEADLINE_FIELDS, args, existing)
     payload["kind"] = payload.get("kind") or "general"
+    if getattr(args, "context", UNSET) is not UNSET and not isinstance(args.context, dict):
+        raise InputError("--context: a JSON object")
+    if existing is not None and getattr(args, "context", UNSET) is not UNSET:
+        merged = {**(existing.get("context") or {}), **args.context}
+        payload["context"] = {key: value for key, value in merged.items() if value is not None}
     payload["context"] = payload.get("context") or {}
     if payload["kind"] == race_model.KIND:
         race_model.CONTEXT_SCHEMA.validate(payload["context"], "context")
@@ -316,7 +326,8 @@ def _direct(store, command: str, payload: dict) -> object:
 
 
 PATCH_HELP = ("--patch: writes only the cited fields and rereads the others from the existing"
-               " row (missing key = refusal; resets no field to NULL)")
+               " row (missing key = refusal; resets no field to NULL); --context then merges"
+               " key by key, a key set to null is removed")
 
 
 def parser() -> argparse.ArgumentParser:
