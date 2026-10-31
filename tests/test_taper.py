@@ -136,13 +136,26 @@ def test_the_report_says_a_loose_taper_only_once_the_race_is_run():
     assert before[0].startswith("Affûtage : référence 50.0 km/sem (W44-W45)")
     assert len(before) == 1
     after = taper.report_lines(Store(), rows, "2030-W48", RACE_ON)
-    assert after[-1].startswith("🔴 Affûtage relâché")
+    assert after[-1].startswith("⚠ Affûtage relâché")
 
 
-def test_the_report_flags_a_cut_beyond_the_ceiling_at_once():
+def test_the_report_flags_a_cut_beyond_the_ceiling_once_the_week_closes():
     rows = _history(("2030-W46", 3.0, 5))
-    lines = taper.report_lines(Store(), rows, "2030-W46", dt.date(2030, 11, 17))
-    assert lines[-1].startswith("🔴 Affûtage coupé au-delà de 60 %")
+    sunday = dt.date(2030, 11, 17)
+    assert taper.report_lines(Store(), rows, "2030-W46", dt.date(2030, 11, 18))[-1] \
+        .startswith("⚠ Affûtage coupé au-delà de 60 %")
+    assert taper.report_lines(Store(), rows, "2030-W46", sunday, closing=True)[-1] \
+        .startswith("⚠ Affûtage coupé au-delà de 60 %")
+    assert taper.report_lines(Store(), rows, "2030-W46", sunday) == [
+        "Affûtage : référence 50.0 km/sem (W44-W45) · W46 15.0 km (en cours) · la baisse "
+        "se mesure à la clôture de la semaine"]
+
+
+def test_a_week_in_progress_is_shown_but_never_judged():
+    rows = _history(("2030-W46", 3.0, 5), ("2030-W47", 2.0, 2))
+    lines = taper.report_lines(Store(), rows, "2030-W47", dt.date(2030, 11, 20))
+    assert "W46 15.0 km · W47 4.0 km (en cours)" in lines[0]
+    assert "baisse moyenne des semaines closes 70 %" in lines[0]
     assert taper.report_lines(Store(), rows, "2030-W40", dt.date(2030, 10, 6)) == []
     assert taper.report_lines(Store(), [], "2030-W46", dt.date(2030, 11, 17)) == [
         "Affûtage : aucune course à pied en W44-W45, baisse non mesurable."]
