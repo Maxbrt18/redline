@@ -192,3 +192,32 @@ def test_a_prediction_reason_must_fit_its_outcome():
     with pytest.raises(InputError, match="does not go with --outcome true"):
         fact_write._prediction(
             parse("prediction", "--key", "k", "--outcome", "true", "--reason", "scope"), None)
+
+
+def test_a_patched_context_merges_key_by_key_and_null_removes_a_key():
+    existing = deadline_row(kind="race", context={"start_time": "23:00", "target": "<4 h 30",
+                                                   "taper_weeks": 3})
+    args = parse("deadline", "--key", "d-1", "--patch", "--context",
+                 '{"stop_minutes": 2.5, "target": null, "taper_weeks": 2}')
+    _, _, payload = fact_write._payload(args, existing)
+    assert payload["context"] == {"start_time": "23:00", "taper_weeks": 2, "stop_minutes": 2.5}
+
+
+def test_a_patch_without_context_keeps_it_whole():
+    existing = deadline_row(kind="race", context={"start_time": "23:00"})
+    args = parse("deadline", "--key", "d-1", "--patch", "--due-on", "2026-08-23")
+    _, _, payload = fact_write._payload(args, existing)
+    assert payload["context"] == {"start_time": "23:00"}
+
+
+def test_a_merged_race_context_is_still_checked():
+    existing = deadline_row(kind="race", context={"taper_cut_max_pct": 50})
+    args = parse("deadline", "--key", "d-1", "--patch", "--context", '{"taper_cut_min_pct": 70}')
+    with pytest.raises(InputError, match="is above taper_cut_max_pct"):
+        fact_write._payload(args, existing)
+
+
+def test_a_context_that_is_not_an_object_is_refused():
+    args = parse("deadline", "--key", "d-1", "--patch", "--context", "[1, 2]")
+    with pytest.raises(InputError, match="a JSON object"):
+        fact_write._payload(args, deadline_row())
