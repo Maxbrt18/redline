@@ -41,6 +41,7 @@ from redline.model import (
     session_kinds,
 )
 from redline.model import ledger as table
+from redline.model import race as race_model
 from redline.model.errors import InputError
 from redline.model.vocabulary import HrDoubt, WeekLifeLoad, WeekSleep
 
@@ -948,16 +949,8 @@ def race_projection(rows: list[Row], today: dt.date, race_on: dt.date,
 
 def next_race_date(store: LedgerStore, today: dt.date) -> dt.date | None:
     """The next TYPED race (`redline fact-write deadline --kind race`), never prose."""
-    dates = []
-    for row in store.deadline_rows():
-        if row.get("kind") != "race" or row.get("status") == "done":
-            continue
-        due = row.get("due_on")
-        if isinstance(due, str):
-            due = dt.date.fromisoformat(due)
-        if isinstance(due, dt.date) and due > today:
-            dates.append(due)
-    return min(dates) if dates else None
+    race = race_model.upcoming(store, today)
+    return race.on if race else None
 
 
 def transition_notes(rows: list[Row], sessions: list[dict], today: dt.date) -> list[str]:
@@ -1070,11 +1063,11 @@ def week_report(store: LedgerStore, rows: list[Row], instruments: dict, targets:
         longest = longest_recent(rows, reference)
         if longest is not None:
             lines.append(text.REPORT_LONGEST.format(longest=longest))
-        race_on = next_race_date(store, today)
-        projection = race_projection(rows, today, race_on) if race_on else None
+        race = race_model.upcoming(store, today)
+        projection = race_projection(rows, today, race.on, race.taper_weeks) if race else None
         if projection:
             lines.extend(projection_lines(projection, target_km))
-        elif race_on is None:
+        elif race is None:
             lines.append(text.REPORT_NO_RACE)
     # Imported here: the taper reads the ledger's volumes.
     from redline.analysis import taper

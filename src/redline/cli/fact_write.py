@@ -41,6 +41,7 @@ from redline.model import (
     vault_layout,
 )
 from redline.model import predictions as prediction_model
+from redline.model import race as race_model
 from redline.model import vocabulary as voc
 from redline.model.errors import ConfigError, InputError
 
@@ -144,6 +145,8 @@ def _deadline(args, existing) -> dict:
     payload = merge(DEADLINE_FIELDS, args, existing)
     payload["kind"] = payload.get("kind") or "general"
     payload["context"] = payload.get("context") or {}
+    if payload["kind"] == race_model.KIND:
+        race_model.CONTEXT_SCHEMA.validate(payload["context"], "context")
     payload["athlete_label"] = (payload.get("athlete_label") or "").strip() or None
     return payload
 
@@ -378,7 +381,8 @@ def parser() -> argparse.ArgumentParser:
     deadline.add_argument("--starts-on", type=day, default=UNSET)
     deadline.add_argument("--ends-on", type=day, default=UNSET)
     deadline.add_argument("--context", type=json.loads, default=UNSET,
-                          help="JSON object reserved for the scenario's details")
+                          help="JSON object of the deadline's details; a race may set taper_weeks, "
+                               "taper_cut_min_pct and taper_cut_max_pct")
     deadline.add_argument(
         "--athlete-label", default=UNSET,
         help="short label (3-80 chars): the deadline is an action of the athlete, shown in "

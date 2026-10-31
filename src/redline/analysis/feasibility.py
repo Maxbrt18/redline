@@ -24,6 +24,9 @@ from typing import Any
 from redline.analysis import ledger
 from redline.coach.fr import transitions as text
 from redline.model import (
+    race as race_model,
+)
+from redline.model import (
     rulebook,
     session_kinds,
     transitions,
@@ -49,13 +52,14 @@ def novelties(sessions: list[dict], rows: list, as_of: dt.date) -> tuple[str, ..
 
 def build_problem(store: Any, rows: list, today: dt.date,
                   free: frozenset[str] = frozenset()) -> transitions.Problem | None:
-    race_on = ledger.next_race_date(store, today)
-    if race_on is None:
+    race = race_model.upcoming(store, today)
+    if race is None:
         return None
+    race_on = race.on
     book = rulebook.current()
     race_week = transitions.week_of(race_on)
     taper = tuple(transitions.shift(race_week, -offset)
-                  for offset in reversed(range(book.parameters.taper_weeks)))
+                  for offset in reversed(range(race.taper_weeks)))
     weeks: list[str] = []
     week = transitions.week_of(today)
     while week < taper[0]:
