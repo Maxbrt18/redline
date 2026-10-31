@@ -1,7 +1,7 @@
 # Contributing
 
-Redline is published as is, without support or a roadmap, so an issue or a pull request
-may stay unanswered. A small, focused fix is the most likely to land. For anything larger,
+Redline is published as is, without support, and it moves with the needs of the runner who
+uses it, so an issue or a pull request may stay unanswered. A small, focused fix is the most likely to land. For anything larger,
 open an issue first, before you spend time on it.
 
 ## Set up

@@ -94,7 +94,9 @@ docker compose up -d --build
 ## Good to know
 
 - **Published as is.** This is the engine of a coach used daily, without anything personal:
-  no athlete data, no keys, no private knowledge vault. There is no support and no roadmap.
+  no athlete data, no keys, no private knowledge vault. There is no support: it moves with
+  the needs of the runner who uses it, and each release is listed in the
+  [changelog](CHANGELOG.md).
 - **The coach speaks French.** The code and its documentation are in English.
 - **It is an AI, not a medical professional.** It gives no diagnosis and no medication
   advice, and says so.
