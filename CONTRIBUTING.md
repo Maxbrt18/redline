@@ -51,7 +51,8 @@ has proven itself on the real server: migrations applied, features used, no know
 regression. The version follows SemVer for 0.x: `0.x.0` when it brings features or a
 migration, `0.x.y` when it only fixes. Each release has its entry in
 [`CHANGELOG.md`](CHANGELOG.md), merged before the tag. `stable` then moves forward to that
-commit, which gets an annotated `v0.x.y` tag; it never receives a merge.
+commit, which gets an annotated `v0.x.y` tag; it never receives a merge. Every tag has its
+GitHub release, whose notes are its changelog entry.
 
 ## License
 
