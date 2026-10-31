@@ -44,6 +44,15 @@ Keep one change per pull request, with tests. Pull requests are squashed into `m
 the title should say what is now true. `main` runs on a real server before it becomes a
 release.
 
+## Releases
+
+A release groups what `main` has gathered, never a single merge. It is cut once that work
+has proven itself on the real server: migrations applied, features used, no known
+regression. The version follows SemVer for 0.x: `0.x.0` when it brings features or a
+migration, `0.x.y` when it only fixes. Each release has its entry in
+[`CHANGELOG.md`](CHANGELOG.md), merged before the tag. `stable` then moves forward to that
+commit, which gets an annotated `v0.x.y` tag; it never receives a merge.
+
 ## License
 
 By contributing, you agree that your work is licensed under the
