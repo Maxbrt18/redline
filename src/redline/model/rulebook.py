@@ -63,6 +63,10 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
               note="highest fuelling target a session may carry, in g/h"),
         field("carbs_mix_above_g_h", int, required=False, minimum=30, maximum=150,
               note="above this target, the session names a glucose-fructose mix"),
+        field("taper_cut_min_pct", int, required=False, minimum=0, maximum=100,
+              note="least drop of the taper's mean weekly volume, in %"),
+        field("taper_cut_max_pct", int, required=False, minimum=0, maximum=100,
+              note="largest drop of the taper's mean weekly volume, in %"),
     ])),
     field("transitions", list, minimum=1, maximum=12, item=field(
         "transition", dict, schema=Schema("[[transitions]]", [
@@ -102,6 +106,8 @@ class Parameters:
     assimilation_weeks: tuple[str, ...]
     carbs_cap_g_h: int | None = None
     carbs_mix_above_g_h: int | None = None
+    taper_cut_min_pct: int | None = None
+    taper_cut_max_pct: int | None = None
 
     def spoken(self) -> dict[str, str]:
         """Thresholds as a rule's text states them: decimal comma."""
