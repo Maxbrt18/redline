@@ -1,0 +1,190 @@
+"""The taper, measured: how much the weeks before a race really drop.
+
+`taper_weeks` places the taper; nothing checked that it happened. The reference is the
+mean running volume of the REFERENCE_WEEKS weeks before it, assimilation weeks skipped:
+an assimilation week already drops, and counting it would hide part of the cut. The
+race week counts the days before the race only, and never the race itself.
+
+The band is the rulebook's (`taper_cut_min_pct`, `taper_cut_max_pct`): a drop of 41 to
+60 % of the volume is where meta-analyses find the benefit (Bosquet et al. 2007, Wang et
+al. 2023). It bounds the taper as a whole, never a single week: a progressive taper
+drops little at first and a lot at the end. So a cut beyond the ceiling is judged as soon
+as it shows, and a loose taper only once the race week is written or over.
+"""
+
+from __future__ import annotations
+
+import datetime as dt
+from dataclasses import dataclass
+
+from redline.coach.fr import ledger as text
+from redline.model import rulebook, session_kinds, transitions
+from redline.model.vocabulary import Decider
+
+from . import ledger
+
+REFERENCE_WEEKS = 2
+#: Weeks searched back for the reference before giving up: a long block of assimilation
+#: weeks means no comparable load.
+REFERENCE_SEARCH_WEEKS = 6
+#: Runs the taper may drop below the reference frequency, race week aside: the taper
+#: keeps its frequency and cuts each session.
+FREQUENCY_SLACK = 1
+
+
+@dataclass(frozen=True)
+class Window:
+    race_on: dt.date
+    weeks: tuple[str, ...]          # the taper, race week last
+    reference: tuple[str, ...]      # the weeks it is compared with, oldest first
+
+    @property
+    def race_week(self) -> str:
+        return self.weeks[-1]
+
+
+def window(race_on: dt.date) -> Window:
+    parameters = rulebook.current().parameters
+    race_week = transitions.week_of(race_on)
+    weeks = tuple(transitions.shift(race_week, -offset)
+                  for offset in reversed(range(parameters.taper_weeks)))
+    skipped = set(parameters.assimilation_weeks)
+    reference: list[str] = []
+    for back in range(1, REFERENCE_SEARCH_WEEKS + 1):
+        week = transitions.shift(weeks[0], -back)
+        if week not in skipped:
+            reference.insert(0, week)
+        if len(reference) == REFERENCE_WEEKS:
+            break
+    return Window(race_on=race_on, weeks=weeks, reference=tuple(reference))
+
+
+def race_window(store: ledger.LedgerStore, week: str) -> Window | None:
+    """The typed race whose taper holds `week`, run or still ahead."""
+    for row in store.deadline_rows():
+        due = row.get("due_on")
+        if row.get("kind") != "race" or due is None:
+            continue
+        found = window(due if isinstance(due, dt.date) else dt.date.fromisoformat(due))
+        if week in found.weeks:
+            return found
+    return None
+
+
+def _before_race(rows: list[ledger.Row], week: str, race_on: dt.date) -> list[ledger.Row]:
+    return [row for row in rows if row.week == week and row.date < race_on]
+
+
+@dataclass(frozen=True)
+class Cut:
+    reference_km: float
+    reference_runs: float
+    weeks: tuple[tuple[str, float], ...]    # taper weeks counted so far, with their km
+
+    @property
+    def percent(self) -> float:
+        """The drop of the taper's mean weekly volume so far; negative when it rose."""
+        mean = sum(km for _, km in self.weeks) / len(self.weeks)
+        return (1 - mean / self.reference_km) * 100
+
+
+def _reference(rows: list[ledger.Row], frame: Window) -> tuple[float, float] | None:
+    volumes = [ledger.week_volume([row for row in rows if row.week == week])
+               for week in frame.reference]
+    km = sum(volume.km_run for volume in volumes) / len(volumes) if volumes else 0
+    if not km:
+        return None
+    return km, sum(volume.runs for volume in volumes) / len(volumes)
+
+
+def measured(rows: list[ledger.Row], frame: Window, through: str) -> Cut | None:
+    """The drop the ledger shows, taper weeks up to `through` included."""
+    reference = _reference(rows, frame)
+    if reference is None or through not in frame.weeks:
+        return None
+    counted = frame.weeks[:frame.weeks.index(through) + 1]
+    weeks = tuple((week, ledger.week_volume(_before_race(rows, week, frame.race_on)).km_run)
+                  for week in counted)
+    return Cut(reference_km=reference[0], reference_runs=reference[1], weeks=weeks)
+
+
+def _planned_runs(sessions: list[dict], race_on: dt.date) -> list[dict]:
+    return [session for session in sessions
+            if session.get("kind") == "run" and session.get("status") != "cancelled"
+            and session.get("workout") != session_kinds.RACE
+            and transitions.day_of(session["date"]) < race_on]
+
+
+def planned(rows: list[ledger.Row], frame: Window, week: str,
+            sessions: list[dict]) -> Cut | None:
+    """The drop a revision of `week` plans: the weeks before it as run, then its own
+    sessions as planned."""
+    before = measured(rows, frame, transitions.shift(week, -1)) \
+        if week != frame.weeks[0] else None
+    reference = _reference(rows, frame)
+    if reference is None or week not in frame.weeks:
+        return None
+    runs = _planned_runs(sessions, frame.race_on)
+    km = sum(float(session.get("distance_target_km") or session.get("distance_cap_km") or 0)
+             for session in runs)
+    return Cut(reference_km=reference[0], reference_runs=reference[1],
+               weeks=(*(before.weeks if before else ()), (week, km)))
+
+
+def plan_errors(rows: list[ledger.Row], frame: Window, week: str,
+                revision: dict, where: str = "revision") -> list[str]:
+    """The band binds the coach's judgment. A rule (a pain cap) or the athlete's
+    request may cut deeper or keep more; the readback still shows the drop."""
+    parameters = rulebook.current().parameters
+    low, high = parameters.taper_cut_min_pct, parameters.taper_cut_max_pct
+    if (revision.get("decision") or {}).get("by") != Decider.JUDGMENT:
+        return []
+    cut = planned(rows, frame, week, revision.get("sessions") or [])
+    if cut is None:
+        return []
+    problems = []
+    span = f"{frame.reference[0]}..{frame.reference[-1]}"
+    if high is not None and cut.percent > high:
+        problems.append(
+            f"{where}: the taper's mean volume drops {cut.percent:.0f} % from "
+            f"{cut.reference_km:.1f} km ({span}), beyond the {high} % ceiling -- keep "
+            "more, or decide by rule or request")
+    if low is not None and week == frame.race_week and cut.percent < low:
+        problems.append(
+            f"{where}: the taper's mean volume drops only {cut.percent:.0f} % from "
+            f"{cut.reference_km:.1f} km ({span}), under the {low} % floor -- cut more, "
+            "or decide by rule or request")
+    runs = len(_planned_runs(revision.get("sessions") or [], frame.race_on))
+    floor = int(cut.reference_runs) - FREQUENCY_SLACK
+    if week != frame.race_week and runs < floor:
+        problems.append(
+            f"{where}: {runs} planned run(s) against {cut.reference_runs:g} a week in "
+            f"{span} -- the taper keeps its frequency (at least {floor}) and shortens "
+            "each run")
+    return problems
+
+
+def report_lines(store: ledger.LedgerStore, rows: list[ledger.Row], label: str,
+                 today: dt.date) -> list[str]:
+    """The drop so far, for a week of the taper. A loose taper is only said once the
+    race is run: before, the weeks left can still cut."""
+    frame = race_window(store, label)
+    if frame is None:
+        return []
+    span = f"{transitions.short(frame.reference[0])}-{transitions.short(frame.reference[-1])}"
+    cut = measured(rows, frame, label)
+    if cut is None:
+        return [text.TAPER_NO_REFERENCE.format(span=span)]
+    parameters = rulebook.current().parameters
+    low, high = parameters.taper_cut_min_pct, parameters.taper_cut_max_pct
+    band = text.TAPER_BAND.format(low=low, high=high) if low is not None and high is not None else ""
+    weeks = " · ".join(text.TAPER_WEEK.format(week=transitions.short(week), km=km)
+                       for week, km in cut.weeks)
+    lines = [text.TAPER.format(reference_km=cut.reference_km, span=span, weeks=weeks,
+                               percent=cut.percent, band=band)]
+    if high is not None and cut.percent > high:
+        lines.append(text.TAPER_TOO_CUT.format(high=high))
+    if low is not None and label == frame.race_week and today >= frame.race_on \
+            and cut.percent < low:
+        lines.append(text.TAPER_LOOSE.format(low=low))
+    return lines

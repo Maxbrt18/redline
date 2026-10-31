@@ -73,6 +73,22 @@ def _distance_notes(store, revision: dict) -> str:
                       *(f"  - {note}" for note in notes)])
 
 
+def _taper_errors(store, week: str, revision: dict) -> list[str]:
+    """The taper band, when `week` is in one. A measurement that fails costs the check,
+    never the prescription."""
+    from redline.analysis import ledger, taper
+    try:
+        frame = taper.race_window(store, week)
+        rows = ledger.parse_ledger(store) if frame else []
+    except Exception as exc:
+        print(wording.TAPER_UNREADABLE.format(name=exc.__class__.__name__), file=sys.stderr)
+        return []
+    if frame is None:
+        return []
+    return taper.plan_errors(rows, frame, week, revision,
+                             f"{week} revision {revision['revision']}")
+
+
 EXIT_OK = 0
 EXIT_INVALID = 1
 EXIT_AWAITING_GATE = 2
@@ -126,6 +142,7 @@ def _database_command(store, command: str, week: str, optional: bool,
             *typed_target_errors(current, f"{week} revision {current["revision"]}"),
             *decision_errors(current, f"{week} revision {current["revision"]}"),
             *fuelling_errors(current, f"{week} revision {current["revision"]}"),
+            *_taper_errors(store, week, current),
         ]
         if mistakes:
             raise SchemaError(mistakes)

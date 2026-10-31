@@ -126,3 +126,6 @@ MESSENGER_WEEK = "Programme du {first:%d/%m} au {last:%d/%m} :"
 CANONICAL_MISSING = "ABSENT OU INVALIDE"
 ACTIVE_MISSING = ("ABSENTE OU INVALIDE : ne prescris aucune séance. Une réparation dédiée est "
                   "programmée par le service ; ne la fais pas ici")
+
+TAPER_UNREADABLE = ("Affûtage : lecture du registre impossible ({name}), la baisse du "
+                    "volume n'est pas contrôlée pour cette révision.")

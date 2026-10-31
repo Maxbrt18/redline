@@ -60,6 +60,7 @@ BY_SLUG = {kind.slug: kind for kind in KINDS}
 
 EASY = "easy"
 LONG = "long"
+RACE = "race"
 STRENGTH = "strength"
 WAKE_TRACE = "wake-trace"
 
