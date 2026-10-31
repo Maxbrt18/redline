@@ -18,7 +18,7 @@ from redline.coach.fr import session_labels
 from redline.storage.database import StorageError
 from redline.storage.notebook import DEVICE_SECONDS
 
-from . import clock, page
+from . import clock, page, race_plan
 from . import notebook_weather as weather
 from .notebook import NotebookService
 from .notebook_board import AnswerError
@@ -214,6 +214,16 @@ def register(app: Flask, notebook: NotebookService, psid: str,
     @app.get("/notebook-api/race")
     def notebook_race():
         return jsonify(notebook.race(psid))
+
+    @app.get("/notebook-api/race-plan")
+    def notebook_race_plan():
+        try:
+            view = notebook.race_plan()
+        except race_plan.Pending:
+            return jsonify(error=notebook_text.ERRORS["race_plan_pending"]), 503
+        if view is None:
+            return jsonify(error=notebook_text.ERRORS["no_race_plan"]), 404
+        return jsonify(view)
 
     @app.get("/notebook-api/weather")
     def notebook_weather():

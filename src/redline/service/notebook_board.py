@@ -40,12 +40,13 @@ from redline.model import (
 )
 from redline.model import ledger as ledger_model
 from redline.model import notebook_views as views
+from redline.model import race as race_model
 from redline.model.activity import Activity
 from redline.model.errors import InputError
 from redline.model.instance import Instance, derived_label
 from redline.model.vocabulary import HrDoubt, HrReason, LifeLoad, MorningTrace, Sleep
 
-from . import session_detail
+from . import race_plan, session_detail
 from .plans import PlanStatus, blocked_session_ids
 
 ACTOR = "notebook"
@@ -901,6 +902,8 @@ class Board:
 
         return {
             "race": race,
+            "plan": race_plan.plan(race_model.upcoming(self.ops, self.today), self.root,
+                                   self.instance) if race else None,
             # Each week's volume against its target, and its long run.
             "longest": {"km": longest,
                         "weeks": [{"week": trace.label, "km": round(trace.longest, 2),

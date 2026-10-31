@@ -41,3 +41,38 @@
 /* Each capability carries its pill; the injury ones keep their purple. */
 .n-cp { grid-template-columns: 128px 1fr 30px; }
 .n-cp > span { display: flex; align-items: center; gap: 8px; }
+/* Race plan: the profile against an altitude scale, aid stations named on it; the
+ * passages as clock times with their band. The data is ink on --ghost, like the volume. */
+.n-rp-chart { display: block; width: 100%; height: auto; margin-top: 12px; overflow: visible; }
+.n-rp-chart .area { fill: var(--ghost); }
+.n-rp-chart .line { fill: none; stroke: var(--ink); stroke-width: 1.6; stroke-linejoin: round; }
+.n-rp-chart .grid { stroke: var(--grid); stroke-width: 1; }
+.n-rp-chart .aid { stroke: var(--faint); stroke-width: 1; stroke-dasharray: 3 3; }
+.n-rp-chart .al { font: 600 11px var(--sans); fill: var(--ink); }
+.n-rp-chart .ak { font: 500 10.5px var(--sans); fill: var(--faint); }
+.n-rp-chart .yl { font: 500 10px var(--sans); fill: var(--faint); paint-order: stroke; stroke: var(--bg); stroke-width: 3px; }
+.n-rp-chart .hi { font: 700 11px var(--sans); fill: var(--ink); }
+.n-rp-chart .dp { font: 600 10.5px var(--sans); fill: var(--muted); }
+.n-rp-chart .pt { fill: var(--ink); }
+.n-rp-arr { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin-top: 14px; }
+.n-rp-arr .lab { font: 600 11px/1 var(--sans); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.n-rp-arr .big { font: 700 34px/1 var(--display); }
+.n-rp-arr .n-rp-small { margin-top: 4px; }
+.n-rp-small { font-size: 12.5px; color: var(--muted); margin: 8px 0 0; }
+.n-rp-pace { display: grid; grid-template-columns: 40px 1fr 40px; align-items: center; gap: 10px; margin-top: 4px; padding: 12px 14px;
+  background: var(--panel); border-radius: 16px; }
+.n-rp-pace .v { text-align: center; }
+.n-rp-pace .v b { display: block; font: 700 30px/1 var(--display); }
+.n-rp-pace .v span { font-size: 12px; color: var(--muted); }
+.n-rp-pace .n-round svg { stroke-width: 2; }
+.n-rp-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 12px 0; border-bottom: 1px solid var(--grid); }
+.n-rp-row:last-of-type { border-bottom: 0; }
+.n-rp-row .nm { font-size: 15px; font-weight: 600; }
+.n-rp-row .nm small { font-weight: 400; color: var(--muted); font-size: 13px; }
+.n-rp-row .ck { font: 700 22px/1 var(--display); text-align: right; }
+.n-rp-row.goal .ck { font-size: 26px; }
+.n-rp-row .sub, .n-rp-row .rg { font-size: 12.5px; color: var(--muted); }
+.n-rp-row .rg { text-align: right; white-space: nowrap; }
+.n-rp-wx { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 13px; }
+.n-rp-wx .n-sky { width: 18px; height: 18px; flex: none; }
+.n-rp-src { font-size: 12.5px; color: var(--muted); line-height: 1.45; margin: 10px 0 0; }

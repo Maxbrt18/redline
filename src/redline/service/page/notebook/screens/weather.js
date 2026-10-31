@@ -10,7 +10,7 @@ import {hm} from '../format.js';
 const rainWord = chance => chance >= 50 ? 'pluie probable' : chance >= 20 ? 'pluie possible' : 'sec';
 const toHours = text => Number(text.slice(0, 2)) + Number(text.slice(3, 5)) / 60;
 // The sky as a WMO code (Open-Meteo): an icon and a word, by day and by night.
-function skyOf(hour) {
+export function skyOf(hour) {
   const code = hour.code, light = hour.day !== false;
   // Without a code (old forecast), the word only tells about rain.
   const night = light ? null : 'night';
@@ -40,7 +40,7 @@ const SKY_ICONS = {
   // Not a sky: the watch of the "before leaving" line, in ink.
   watch: '<rect x="6.5" y="6.5" width="11" height="11" rx="3"/><path d="M9 6.5l.6-3h4.8l.6 3M9 17.5l.6 3h4.8l.6-3M12 9.5v2.7l1.6 1"/>'
 };
-function skyIcon(name) {
+export function skyIcon(name) {
   const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   icon.setAttribute('viewBox', '0 0 24 24'); icon.setAttribute('class', 'n-sky'); icon.setAttribute('aria-hidden', 'true');
   icon.innerHTML = SKY_ICONS[name] || SKY_ICONS.cloud;

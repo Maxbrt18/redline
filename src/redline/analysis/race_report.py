@@ -97,15 +97,22 @@ def _forecast(raw: dict) -> Forecast | None:
     return Forecast(*numbers) if len(numbers) == len(values) else None
 
 
-def build(track: route_profile.Track, *, pace_s_per_km: float,
-          aids: Sequence[race_pace.AidStation] = (), stop_minutes: float = 0.0,
-          curve: race_pace.GradeCurve = STRAVA_ONLY,
-          sampler: route_profile.ElevationSampler | None = None,
-          carbs_g_h: int | None = None, carbs_cap_g_h: int | None = None,
-          carbs_mix_above_g_h: int | None = None,
-          start_local: dt.datetime | None = None, zone: ZoneInfo | None = None,
-          resolve_zone: ZoneResolver | None = None,
-          forecaster: Forecaster | None = None) -> RaceReport:
+def build(track: route_profile.Track, *, sampler: route_profile.ElevationSampler | None = None,
+          **plan) -> RaceReport:
+    """The report of a route read from its GPX; `plan` as for `assemble`."""
+    return assemble(route_profile.profile(track, sampler), **plan)
+
+
+def assemble(profile: route_profile.Profile, *, pace_s_per_km: float,
+             aids: Sequence[race_pace.AidStation] = (), stop_minutes: float = 0.0,
+             curve: race_pace.GradeCurve = STRAVA_ONLY,
+             carbs_g_h: int | None = None, carbs_cap_g_h: int | None = None,
+             carbs_mix_above_g_h: int | None = None,
+             start_local: dt.datetime | None = None, zone: ZoneInfo | None = None,
+             resolve_zone: ZoneResolver | None = None,
+             forecaster: Forecaster | None = None) -> RaceReport:
+    """The report of a profile already computed: a reader that keeps profiles in a cache
+    plans without measuring the route again."""
     if not 0 <= stop_minutes <= 30:
         raise InputError("stops: minutes per aid station, 0 to 30")
     if carbs_g_h is not None and not 0 < carbs_g_h <= (carbs_cap_g_h or CARBS_LIMIT_G_H):
@@ -113,7 +120,6 @@ def build(track: route_profile.Track, *, pace_s_per_km: float,
                          f"{carbs_cap_g_h or CARBS_LIMIT_G_H} g/h (rule f1)")
     if start_local is not None and start_local.tzinfo is not None:
         raise InputError("the start is a local wall-clock time, without an offset")
-    profile = route_profile.profile(track, sampler)
     plan = race_pace.plan(profile.distance_m, profile.elevation_m, curve, pace_s_per_km,
                           aids, stop_minutes)
     start = None

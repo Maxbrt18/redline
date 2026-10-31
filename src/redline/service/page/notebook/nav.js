@@ -2,10 +2,11 @@ import {$, add, button, el} from '../shared/dom.js';
 import {retry} from '../strength/send.js';
 import {app, calm} from './state.js';
 import {content, message} from './ui.js';
-import {entryTitle, humanDate, kindName, kindWord, longDay, raceFacts, startedAt, weekNumber, weekSpan, weekState} from './format.js';
+import {entryTitle, fmt, humanDate, kindName, kindWord, longDay, raceFacts, startedAt, weekNumber, weekSpan, weekState} from './format.js';
 import {renderToday} from './screens/today.js';
 import {renderWeek, renderWeeks} from './screens/week.js';
 import {renderCourse} from './screens/course.js';
+import {renderRacePlan} from './screens/raceplan.js';
 import {renderInjury} from './screens/injury.js';
 import {renderOutcome} from './screens/detail.js';
 import {renderArchive, renderEntry} from './screens/archives.js';
@@ -28,6 +29,7 @@ export function screen() {
   if (route.k === 'archive') return {key: 'archive', path: 'entries'};
   // One watched area per screen: the key and the request name it.
   if (route.k === 'injury') return {key: 'injury:' + (route.zone || ''), path: 'injury' + (route.zone ? '?zone=' + encodeURIComponent(route.zone) : '')};
+  if (route.k === 'race-plan') return {key: 'race-plan', path: 'race-plan'};
   if (route.k === 'session') return {key: 'session:' + route.id, path: 'session/' + encodeURIComponent(route.id), title: route.title};
   return {key: 'entry:' + route.id, path: 'entries/' + encodeURIComponent(route.id), title: route.title};
 }
@@ -38,6 +40,10 @@ function heading(view, data) {
   if (view.key.startsWith('week:')) {
     const label = view.key.slice(5);
     return label ? ['Semaine ' + weekNumber(label), weekSpan(label) + (weekState(label) ? ' · ' + weekState(label) : '')] : ['Semaine', ''];
+  }
+  if (view.key === 'race-plan') {
+    const race = app.views.course && app.views.course.race;
+    return ['Plan de course', [race ? race.name : null, data ? fmt(data.plan.length_km) + ' km · D+ ' + fmt(data.plan.dplus_m, 0) + ' m' : null].filter(Boolean).join(' · ')];
   }
   if (view.key === 'weeks') return ['Toutes les semaines', data && data.weeks ? data.weeks.length + ' semaines au registre' : ''];
   if (view.key === 'archive') return ['Archives', 'bilans, monthly et cartes'];
@@ -81,6 +87,7 @@ export function render(y) {
   else if (view.key === 'archive') renderArchive(data);
   else if (view.key.startsWith('injury:')) renderInjury(data);
   else if (view.key.startsWith('session:')) renderOutcome(data);
+  else if (view.key === 'race-plan') renderRacePlan(data);
   else renderEntry(data);
   content.querySelectorAll('details > summary').forEach(node => { if (opened.has(node.textContent)) node.parentElement.open = true; });
   if (y != null) scrollTo(0, y);

@@ -236,8 +236,26 @@ WEEKS = {"weeks": [
     past_week(36, "2026-08-31", 27.4, None),
 ]}
 
+#: A fictional route: 42 km, two aid stations, timed at the chosen pace of 5:30/km.
+RACE_PLAN = {
+    "source": "ign", "length_km": 42.2, "dplus_m": 905, "dminus_m": 910,
+    "dplus_band_m": [890, 921],
+    "profile": [[0, 320], [5, 410], [10, 620], [15, 540], [20, 700], [25, 480], [30, 520],
+                [35, 390], [40, 350], [42.2, 330]],
+    "highest": [700, 20.0],
+    "stretches": [{"to_km": 14.0, "dplus_m": 340, "dminus_m": 120},
+                  {"to_km": 28.0, "dplus_m": 380, "dminus_m": 400},
+                  {"to_km": 42.2, "dplus_m": 185, "dminus_m": 390}],
+    "passages": [{"km": 14.0, "name": "Le Col", "hours": 1.42, "running_hours": 1.42},
+                 {"km": 28.0, "name": "Le Lac", "hours": 2.85, "running_hours": 1.39},
+                 {"km": 42.2, "name": "", "hours": 4.21, "running_hours": 1.32}],
+    "reference_pace_s": 330.0, "pace_s_per_km": 330.0, "stop_minutes": 2.5, "carbs_g_h": 60,
+    "model_error": [0.04, 0.085], "start": "2026-11-26T09:00",
+}
+
 RACE = {
     "race": TODAY["race"] | {"target": "<4 h 30"},
+    "plan": RACE_PLAN,
     "longest": {
         "km": 15.84,
         "planned_km": 16,
@@ -261,4 +279,13 @@ RACE = {
         "evaluated_on": "2026-10-04",
     }],
     "archives": [ENTRY],
+}
+
+
+#: The plan screen, with the forecast at each passage.
+RACE_PLAN_VIEW = {
+    "plan": RACE_PLAN,
+    "weather": [[{"time": f"2026-11-26T{hour:02d}:00", "temp": 3 + hour - 9, "feels": hour - 9,
+                  "rain": 10, "wind": 14, "code": 2, "day": True} for hour in range(9, 16)]
+                for _ in range(3)],
 }

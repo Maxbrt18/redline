@@ -21,6 +21,7 @@ import urllib.request
 from typing import Any
 
 from redline.model import local_time
+from redline.model import notebook_views as views
 
 GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search"
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
@@ -118,3 +119,27 @@ def forecast(name: str, day: dt.date, start: str | None, now: dt.datetime) -> di
     return {"place": label, "date": day.isoformat(), "hours": out,
             "sunrise": sunrise[11:16] if sunrise else None,
             "sunset": sunset[11:16] if sunset else None} if out else None
+
+
+def hourly(lat: float, lon: float, days: list[dt.date],
+           hours: list[dt.datetime]) -> list[views.PassageHour]:
+    """The forecast at a point for these local hours, the race plan's: an hour the
+    forecast does not reach yet is left out. Raises OSError without a network."""
+    rows: dict[str, views.PassageHour] = {}
+    for day in days:
+        hourly_data = _forecast(lat, lon, day).get("hourly") or {}
+        times = hourly_data.get("time") or []
+        def column(key: str, data: dict = hourly_data, length: int = len(times)) -> list:
+            return [*(data.get(key) or []), *[None] * length][:length]
+        temp, feels, rain, wind, code, light = (column(key) for key in (
+            "temperature_2m", "apparent_temperature", "precipitation_probability",
+            "wind_speed_10m", "weather_code", "is_day"))
+        for index, stamp in enumerate(times):
+            if None in (temp[index], feels[index], wind[index]):
+                continue
+            rows[stamp] = {"time": stamp, "temp": round(temp[index]),
+                           "feels": round(feels[index]), "rain": rain[index],
+                           "wind": round(wind[index]), "code": code[index],
+                           "day": bool(1 if light[index] is None else light[index])}
+    wanted = [hour.strftime("%Y-%m-%dT%H:00") for hour in hours]
+    return [rows[stamp] for stamp in wanted if stamp in rows]

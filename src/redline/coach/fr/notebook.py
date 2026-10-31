@@ -82,6 +82,8 @@ ERRORS = {
     "no_zone": "Aucune zone surveillée.",
     "bad_session": "Séance invalide.",
     "no_session": "Séance introuvable.",
+    "no_race_plan": "Aucun parcours déclaré pour la course.",
+    "race_plan_pending": "Le profil du parcours se calcule : réessaie dans une minute.",
     "bad_request": "Demande invalide.",
     "bad_date": "Date invalide.",
     "bad_answer": "Réponse invalide.",
