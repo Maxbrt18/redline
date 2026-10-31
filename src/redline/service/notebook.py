@@ -13,12 +13,13 @@ from typing import TYPE_CHECKING
 from redline.cards import archive, strength_card
 from redline.coach.fr import notebook as notebook_text
 from redline.model import notebook_views as views
+from redline.model import race as race_model
 from redline.model.instance import Instance
 from redline.model.program import load
 from redline.storage.database import StorageError
 from redline.storage.notebook import NotebookStore
 
-from . import clock, session_detail, strength
+from . import clock, race_plan, session_detail, strength
 from .notebook_board import Board, week_monday
 from .plans import PlanStatus, blocked_session_ids, strength_due
 from .strength_artifact import selection_for
@@ -101,6 +102,12 @@ class NotebookService:
         archives = [*self.store.list_entries(psid, kind="monthly", limit=12),
                     *self.store.list_entries(psid, kind="weekly", limit=8)]
         return self.board().race_view(archives)
+
+    def race_plan(self) -> views.RacePlanView | None:
+        """The plan screen of the typed race; None when it declares no readable route."""
+        board = self.board()
+        return race_plan.view(race_model.upcoming(board.ops, board.today), board.root,
+                              board.instance, board.today)
 
     def connected(self, psid: str) -> bool:
         """Does the notebook collect the feelings? Unreadable database: no, Messenger

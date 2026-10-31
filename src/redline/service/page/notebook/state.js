@@ -14,6 +14,7 @@ export const app = {
   stash: null,    // figures kept on the device, read back at opening
   connecting: null,  // the sign-in link exchange in progress, which other calls wait for
   move: null,     // the current transition: {top, bottom, back, was, after, timer}
+  racePace: null,  // the pace explored on the race plan, never recorded; null: the chosen one
 };
 export const skies = new Map();
 export const flights = new Map();

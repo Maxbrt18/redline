@@ -367,8 +367,70 @@ class Capability(TypedDict):
     evaluated_on: str
 
 
+class RouteStretch(TypedDict):
+    """The climb up to an aid station or the finish, from the previous one."""
+
+    to_km: float
+    dplus_m: float
+    dminus_m: float
+
+
+class RacePassage(TypedDict):
+    """An aid station or the finish (empty name), timed at the plan's reference pace."""
+
+    km: float
+    name: str
+    hours: float
+    running_hours: float
+
+
+class RacePlan(TypedDict):
+    """The race plan of the typed race. Running time is proportional to the pace and the
+    stops are not, so the page retimes every passage at any pace from these figures."""
+
+    source: Literal["ign", "gpx"]
+    length_km: float
+    dplus_m: float
+    dminus_m: float
+    dplus_band_m: list[float] | None
+    #: [km, m] every ~200 m, and the high point as [m, km].
+    profile: list[list[float]]
+    highest: list[float]
+    stretches: list[RouteStretch]
+    passages: list[RacePassage]
+    reference_pace_s: float
+    #: The pace chosen with the coach; None: no passage is shown.
+    pace_s_per_km: float | None
+    stop_minutes: float
+    carbs_g_h: int | None
+    #: The relative bands: the median error, then nine times out of ten.
+    model_error: list[float]
+    #: Local start, YYYY-MM-DDTHH:MM; None without a start time.
+    start: str | None
+
+
+class PassageHour(TypedDict):
+    """One hour of forecast at a passage's place; `time` is local, YYYY-MM-DDTHH:00."""
+
+    time: str
+    temp: int
+    feels: int
+    rain: int | None
+    wind: int
+    code: int | None
+    day: bool
+
+
+class RacePlanView(TypedDict):
+    plan: RacePlan
+    #: For each passage, the hours of the race night at its place; None until the
+    #: forecast reaches the race date.
+    weather: list[list[PassageHour]] | None
+
+
 class RaceView(TypedDict):
     race: Race | None
+    plan: RacePlan | None
     longest: Longest
     milestones: list[Milestone]
     capabilities: list[Capability]

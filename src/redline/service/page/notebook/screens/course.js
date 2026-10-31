@@ -2,6 +2,7 @@ import {add, button, el} from '../../shared/dom.js';
 import {SVG, chevron, content, pastille, section, shape} from '../ui.js';
 import {day, dm, fmt, shortDay} from '../format.js';
 import {push} from '../nav.js';
+import {raceSummary} from './raceplan.js';
 
 // ------------------------------------------------------------ Course
 const archiveLabel = entry => entry.kind === 'monthly' && entry.period
@@ -43,6 +44,7 @@ export function renderCourse(data) {
     const head = add(el('div', null, 'n-head'), el('h1', 'J-' + race.days));
     if (race.target) head.append(add(el('div', null, 'goal'), el('div', 'cible', 'n-meta'), el('b', race.target)));
     content.append(head);
+    if (data.plan) content.append(raceSummary(data.plan));
   } else content.append(el('p', 'Aucune course datée.', 'n-meta'));
   const longest = data.longest;
   if (longest.weeks.length) {

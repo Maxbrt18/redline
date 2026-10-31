@@ -16,7 +16,7 @@ from unittest.mock import MagicMock
 import contract
 import pytest
 from conftest import TEST_VAULT, reset_database
-from notebook_payloads import DETAIL, INJURY, RACE, TODAY, WEEK, WEEKS
+from notebook_payloads import DETAIL, INJURY, RACE, RACE_PLAN_VIEW, TODAY, WEEK, WEEKS
 from test_notebook_board import PARIS, Repo, ef, seed_week
 from test_notebook_board import WEEK as SEEDED_WEEK
 from test_page_modules import modules
@@ -26,7 +26,7 @@ from test_weekly_plan import revision
 from redline.model import instance
 from redline.model import notebook_views as views
 from redline.model.activity import Activity
-from redline.service import clock, page, session_detail
+from redline.service import clock, page, race_plan, session_detail
 from redline.service.notebook import NotebookService
 from redline.service.web import create_app
 from redline.storage import Database, OperationalStore
@@ -69,7 +69,8 @@ def test_a_tagged_union_reports_its_closest_shape():
 @pytest.mark.parametrize(("shape", "payload"), [
     (views.TodayView, TODAY), (views.WeekView, WEEK), (list[views.PastWeek], WEEKS["weeks"]),
     (views.InjuryView, INJURY), (views.RaceView, RACE), (views.SessionView, DETAIL),
-], ids=["today", "week", "weeks", "injury", "race", "detail"])
+    (views.RacePlanView, RACE_PLAN_VIEW),
+], ids=["today", "week", "weeks", "injury", "race", "detail", "race-plan"])
 def test_a_browser_payload_is_what_the_service_serves(shape, payload):
     assert contract.problems(shape, payload) == []
 
@@ -182,6 +183,23 @@ def test_the_screens_serve_their_declared_shapes(store, connect):
     assert contract.problems(list[views.PastWeek], served(client, "weeks")["weeks"]) == []
     assert contract.problems(views.InjuryView, served(client, "injury")) == []
     assert contract.problems(views.RaceView, served(client, "race")) == []
+
+
+@needs_database
+def test_a_race_without_a_route_has_no_plan_and_a_route_being_measured_says_so(
+        store, connect, monkeypatch):
+    seed_week(store)
+    seed_race_tab(store)
+    client, _, _ = connect(dt.datetime(2026, 10, 7, 8, 0, tzinfo=PARIS))
+    assert served(client, "race")["plan"] is None
+    response = client.get("/notebook-api/race-plan")
+    assert response.status_code == 404 and "parcours" in response.json["error"]
+
+    def measuring(self):
+        raise race_plan.Pending
+    monkeypatch.setattr(NotebookService, "race_plan", measuring)
+    response = client.get("/notebook-api/race-plan")
+    assert response.status_code == 503 and "réessaie" in response.json["error"]
 
 
 @needs_database

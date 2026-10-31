@@ -40,3 +40,32 @@ def test_the_upcoming_race_skips_the_ones_run_or_done():
     assert race.upcoming(Store(), dt.date(2030, 7, 1)).on == dt.date(2030, 11, 30)
     assert race.upcoming(Store(), dt.date(2030, 12, 1)) is None
     assert [typed.on.month for typed in race.typed(Store())] == [6, 9, 11]
+
+
+def test_a_race_carries_what_its_plan_needs():
+    typed = race.from_row({"kind": "race", "status": "scheduled", "due_on": "2030-11-30",
+                           "athlete_label": "Course fictive",
+                           "context": {"start_time": "23:00", "route_gpx": "coaching/route.gpx",
+                                       "aid_stations": [{"km": 26, "name": "B"},
+                                                        {"km": 12, "name": "A"}],
+                                       "stop_minutes": 2.5, "carbs_g_h": 60,
+                                       "pace_s_per_km": 330}})
+    assert typed.name == "Course fictive" and typed.start_time == dt.time(23, 0)
+    assert [aid.name for aid in typed.aid_stations] == ["A", "B"]
+    assert (typed.route_gpx, typed.stop_minutes, typed.carbs_g_h, typed.pace_s_per_km) == (
+        "coaching/route.gpx", 2.5, 60, 330.0)
+
+
+def test_the_plan_keys_are_checked_on_write():
+    with pytest.raises(SchemaError, match="route_gpx"):
+        race.CONTEXT_SCHEMA.validate({"route_gpx": "route.kml"})
+    with pytest.raises(SchemaError, match="name"):
+        race.CONTEXT_SCHEMA.validate({"aid_stations": [{"km": 12}]})
+    with pytest.raises(SchemaError, match="pace_s_per_km"):
+        race.CONTEXT_SCHEMA.validate({"pace_s_per_km": 60})
+
+
+def test_an_unreadable_key_costs_its_value_never_the_race():
+    typed = race.from_row({"kind": "race", "status": "scheduled", "due_on": "2030-11-30",
+                           "context": {"taper_weeks": 1, "pace_s_per_km": "fast"}})
+    assert typed.taper_weeks == 1 and typed.pace_s_per_km is None

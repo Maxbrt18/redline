@@ -5,7 +5,18 @@ import time
 
 import contract
 import pytest
-from notebook_payloads import DETAIL, ENTRY, INJURY, RACE, STRENGTH, TODAY, WEEK, WEEKS, ef
+from notebook_payloads import (
+    DETAIL,
+    ENTRY,
+    INJURY,
+    RACE,
+    RACE_PLAN_VIEW,
+    STRENGTH,
+    TODAY,
+    WEEK,
+    WEEKS,
+    ef,
+)
 
 pytest.importorskip('playwright')
 from playwright.sync_api import sync_playwright
@@ -28,7 +39,7 @@ def browser():
         instance.close()
 
 
-def serve(tab, answers=None):
+def serve(tab, answers=None, race=RACE, race_plan=RACE_PLAN_VIEW):
     tab.route(BASE + '/carnet', lambda route: route.fulfill(
         content_type='text/html', body=notebook_document(render.CARDS_DIR, kinds=session_labels.for_page())))
     def respond(route):
@@ -38,7 +49,9 @@ def serve(tab, answers=None):
         elif path.startswith('week/'):
             data = WEEK
         elif path == 'race':
-            data = RACE
+            data = race
+        elif path == 'race-plan':
+            data = race_plan
         elif path == 'weeks':
             data = WEEKS
         elif path.startswith('injury'):
@@ -902,3 +915,65 @@ def test_a_reply_that_is_not_json_says_the_notebook_is_unavailable(browser):
     pull(tab)
     tab.locator('#toast', has_text='Le carnet est indisponible pour le moment.').wait_for()
     tab.close()
+
+
+def test_the_race_plan_retimes_its_passages_at_the_pace_explored(browser):
+    tab = browser.new_page(viewport={'width': 390, 'height': 844})
+    errors = []
+    tab.on('pageerror', lambda error: errors.append(str(error)))
+    serve(tab)
+    tab.goto(BASE + '/carnet#t=' + 'x' * 43)
+    tab.get_by_role('button', name='Course', exact=True).click()
+    tab.get_by_role('heading', name='J-50').wait_for()
+    # The Race tab: the profile, the finish at the chosen pace, the way to the plan.
+    summary = tab.locator('.n-sec', has_text='Plan de course')
+    assert summary.locator('.n-rp-arr .big').inner_text() == '4\xa0h\xa013'
+    assert 'arrivée vers 13\xa0h\xa013' in summary.locator('.n-rp-arr .n-rp-small').inner_text()
+    assert summary.locator('.n-rp-chart .al').all_text_contents() == ['Le Col', 'Le Lac']
+    summary.get_by_role('button', name='Passages, ravitos et glucides').click()
+    tab.locator('.n-rp-row').first.wait_for()
+    assert tab.locator('#lt-title').inner_text() == 'Plan de course'
+    assert tab.locator('.n-rp-row .ck').all_text_contents() == ['1\xa0h\xa025', '2\xa0h\xa051', '4\xa0h\xa013']
+    assert tab.locator('.n-rp-row .rg').first.inner_text() == '1\xa0h\xa022 – 1\xa0h\xa029'
+    assert 'vers 10\xa0h\xa025 · ≈ 85 g de glucides au tronçon' in tab.locator('.n-rp-row .sub').first.inner_text()
+    assert tab.locator('.n-rp-chart .dp').all_text_contents() == ['+340 −120', '+380 −400', '+185 −390']
+    # The forecast of the hour of each passage, sky drawn.
+    assert tab.locator('.n-rp-row').first.locator('.n-rp-wx').inner_text() == '4°, ressenti 1° · éclaircies · vent 14 km/h'
+    # Faster: every passage earlier, the stops unchanged; nothing is sent.
+    requests = []
+    tab.on('request', lambda request: requests.append(request.url))
+    tab.get_by_role('button', name='Plus vite').click()
+    assert tab.locator('.n-rp-pace b').inner_text() == '5:25'
+    assert tab.locator('.n-rp-row .ck').all_text_contents() == ['1\xa0h\xa024', '2\xa0h\xa048', '4\xa0h\xa009']
+    assert 'Allure retenue avec le coach : 5:30/km' in tab.locator('#content').inner_text()
+    assert requests == []
+    # The Race tab keeps the chosen pace, never the one explored.
+    tab.get_by_role('button', name='Retour').click()
+    tab.get_by_role('heading', name='J-50').wait_for()
+    assert tab.locator('.n-rp-arr .big').inner_text() == '4\xa0h\xa013'
+    assert tab.evaluate('document.documentElement.scrollWidth <= innerWidth')
+    assert errors == []
+
+
+def test_without_a_chosen_pace_the_plan_shows_the_route_and_no_passage(browser):
+    unchosen = {**RACE_PLAN_VIEW['plan'], 'pace_s_per_km': None, 'reference_pace_s': 360.0}
+    tab = browser.new_page(viewport={'width': 390, 'height': 844})
+    serve(tab, race={**RACE, 'plan': unchosen}, race_plan={'plan': unchosen, 'weather': None})
+    tab.goto(BASE + '/carnet#t=' + 'x' * 43)
+    tab.get_by_role('button', name='Course', exact=True).click()
+    tab.get_by_text('Allure à choisir avec le coach', exact=False).wait_for()
+    assert tab.locator('.n-rp-arr').count() == 0
+    tab.get_by_role('button', name='Profil et ravitos').click()
+    tab.locator('.n-rp-chart .hi').wait_for()
+    assert tab.locator('.n-rp-row').count() == 0 and tab.locator('.n-rp-pace').count() == 0
+    assert '42,2 km · D+ 905 m (890 – 921)' in tab.locator('.n-rp-src').inner_text()
+
+
+def test_a_plan_before_the_forecast_says_when_it_comes(browser):
+    tab = browser.new_page(viewport={'width': 390, 'height': 844})
+    serve(tab, race_plan={**RACE_PLAN_VIEW, 'weather': None})
+    tab.goto(BASE + '/carnet#t=' + 'x' * 43)
+    tab.get_by_role('button', name='Course', exact=True).click()
+    tab.get_by_role('button', name='Passages, ravitos et glucides').click()
+    tab.get_by_text('Prévision disponible vers le 11/11', exact=False).wait_for()
+    assert tab.locator('.n-rp-wx').count() == 0
