@@ -210,14 +210,19 @@ START_WRITTEN = "Départ facultatif {state}."
 
 MATCH_WRITTEN = "Appariement {state}."
 
-TAPER = "Affûtage : référence {reference_km:.1f} km/sem ({span}) · {weeks} · baisse moyenne {percent:.0f} %{band}"
+TAPER = "Affûtage : référence {reference_km:.1f} km/sem ({span}) · {weeks} · baisse moyenne des semaines closes {percent:.0f} %{band}"
 
 TAPER_BAND = " (visée {low}-{high} %)"
 
 TAPER_WEEK = "{week} {km:.1f} km"
 
+TAPER_WEEK_OPEN = "{week} {km:.1f} km (en cours)"
+
+TAPER_OPENING = ("Affûtage : référence {reference_km:.1f} km/sem ({span}) · {weeks} · "
+                 "la baisse se mesure à la clôture de la semaine")
+
 TAPER_NO_REFERENCE = "Affûtage : aucune course à pied en {span}, baisse non mesurable."
 
-TAPER_TOO_CUT = "🔴 Affûtage coupé au-delà de {high} % : on arrive désentraîné plutôt que reposé."
+TAPER_TOO_CUT = "⚠ Affûtage coupé au-delà de {high} % : on arrive désentraîné plutôt que reposé."
 
-TAPER_LOOSE = "🔴 Affûtage relâché : baisse sous {low} %, la fatigue n'a pas eu le temps de partir."
+TAPER_LOOSE = "⚠ Affûtage relâché : baisse sous {low} %, la fatigue n'a pas eu le temps de partir."

@@ -1071,7 +1071,7 @@ def week_report(store: LedgerStore, rows: list[Row], instruments: dict, targets:
             lines.append(text.REPORT_NO_RACE)
     # Imported here: the taper reads the ledger's volumes.
     from redline.analysis import taper
-    lines.extend(taper.report_lines(store, rows, label, today))
+    lines.extend(taper.report_lines(store, rows, label, today, closing))
     return lines
 
 

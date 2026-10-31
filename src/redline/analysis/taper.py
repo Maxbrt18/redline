@@ -164,10 +164,18 @@ def plan_errors(rows: list[ledger.Row], frame: Window, week: str,
     return problems
 
 
+def _closed(frame: Window, week: str, today: dt.date, closing: str | None) -> bool:
+    if week == frame.race_week:
+        return today >= frame.race_on
+    return week == closing or transitions.monday_of(week) + dt.timedelta(days=7) <= today
+
+
 def report_lines(store: ledger.LedgerStore, rows: list[ledger.Row], label: str,
-                 today: dt.date) -> list[str]:
-    """The drop so far, for a week of the taper. A loose taper is only said once the
-    race is run: before, the weeks left can still cut."""
+                 today: dt.date, closing: bool = False) -> list[str]:
+    """The drop so far, for a week of the taper. Only closed weeks are judged: a week
+    in progress is shown, never compared, since its first days would read as a deep
+    cut. A loose taper is only said once the race is run: before, the weeks left can
+    still cut."""
     frame = race_window(store, label)
     if frame is None:
         return []
@@ -175,15 +183,24 @@ def report_lines(store: ledger.LedgerStore, rows: list[ledger.Row], label: str,
     cut = measured(rows, frame, label)
     if cut is None:
         return [text.TAPER_NO_REFERENCE.format(span=span)]
+    done = tuple((week, km) for week, km in cut.weeks
+                 if _closed(frame, week, today, label if closing else None))
+    weeks = " · ".join(
+        (text.TAPER_WEEK if (week, km) in done else text.TAPER_WEEK_OPEN).format(
+            week=transitions.short(week), km=km)
+        for week, km in cut.weeks)
+    if not done:
+        return [text.TAPER_OPENING.format(reference_km=cut.reference_km, span=span,
+                                          weeks=weeks)]
+    closed = Cut(reference_km=cut.reference_km, reference_runs=cut.reference_runs,
+                 weeks=done)
     low, high = frame.race.taper_cut_min_pct, frame.race.taper_cut_max_pct
     band = text.TAPER_BAND.format(low=low, high=high) if low is not None and high is not None else ""
-    weeks = " · ".join(text.TAPER_WEEK.format(week=transitions.short(week), km=km)
-                       for week, km in cut.weeks)
     lines = [text.TAPER.format(reference_km=cut.reference_km, span=span, weeks=weeks,
-                               percent=cut.percent, band=band)]
-    if high is not None and cut.percent > high:
+                               percent=closed.percent, band=band)]
+    if high is not None and closed.percent > high:
         lines.append(text.TAPER_TOO_CUT.format(high=high))
     if low is not None and label == frame.race_week and today >= frame.race_on \
-            and cut.percent < low:
+            and closed.percent < low:
         lines.append(text.TAPER_LOOSE.format(low=low))
     return lines
