@@ -178,3 +178,21 @@ def test_the_command_reads_the_declared_curve_and_caps_fuelling(tmp_path):
     assert "descentes mesurées" in done.stdout
     refused = _run(tmp_path, "--pace", "6:00", "--carbs", "120", vault=vault)
     assert refused.returncode == 1 and "rule f1" in refused.stderr
+
+
+def test_the_report_times_the_foot_of_each_climb_like_a_passage(tmp_path):
+    """The fictional route climbs 1 km at +10 % from km 2: one main climb, its foot timed
+    by the same curve as the passages, the stops made before it included."""
+    from redline.analysis import race_report, route_profile
+    track = route_profile.parse_gpx(_gpx(tmp_path).read_bytes())
+    report = race_report.build(track, pace_s_per_km=360.0,
+                               aids=[race_pace.parse_aid("1:Pont")], stop_minutes=2.0)
+    [climb] = report.climbs
+    assert climb.main
+    assert climb.start_km == pytest.approx(2.0, abs=0.15)
+    assert climb.end_km == pytest.approx(3.0, abs=0.15)
+    assert climb.gain_m == pytest.approx(100, abs=8)
+    assert climb.steepest_pct >= climb.grade_pct
+    assert climb.hours - climb.running_hours == pytest.approx(2 / 60)
+    assert climb.running_hours == pytest.approx(climb.start_km * 360 / 3600, rel=0.02)
+    assert "Côtes principales (1 ; 0 bosses" in race_plan.render(report)

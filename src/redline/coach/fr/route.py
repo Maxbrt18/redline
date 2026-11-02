@@ -16,6 +16,13 @@ TOTALS = "D+ {dplus:.0f} m · D− {dminus:.0f} m"
 
 HIGH_POINT = "Point haut {high:.0f} m au km {high_km:.1f}"
 
+CLIMBS_HEADER = "Côtes principales ({main} ; {bumps} bosses plus courtes, +{bump_gain:.0f} m en tout)"
+
+CLIMB = ("  km {start:5.1f} → {end:5.1f} : +{gain:4.0f} m sur {length:.1f} km à {grade:.0f} % "
+         "· jusqu'à {steepest:.0f} % sur {steepest_m:.0f} m")
+
+CLIMB_FOOT = " · pied à {time}"
+
 STRETCH = "  km {start:5.1f} → {end:5.1f} : D+ {dplus:4.0f} m · D− {dminus:4.0f} m"
 
 PLAN_HEADER = ("{name} — {length:.1f} km, soit {flat:.1f} km à plat équivalent · allure tenue "

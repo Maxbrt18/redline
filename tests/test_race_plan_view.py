@@ -77,6 +77,8 @@ def test_the_plan_is_what_the_page_reads(tmp_path):
     assert [item["to_km"] for item in plan["stretches"]] == [2.0, 3.5, plan["length_km"]]
     assert plan["profile"][0][0] == 0 and plan["profile"][-1][0] == plan["length_km"]
     assert plan["start"] == "2030-11-30T23:00" and plan["reference_pace_s"] == 330
+    [climb] = plan["climbs"]
+    assert climb["main"] and climb["start_km"] == pytest.approx(2.0, abs=0.15)
 
 
 def test_the_page_retimes_at_any_pace_from_the_reference(tmp_path):

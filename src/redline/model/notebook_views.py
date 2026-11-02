@@ -380,6 +380,23 @@ class RouteStretch(TypedDict):
     dminus_m: float
 
 
+class RouteClimb(TypedDict):
+    """A climb of the route, timed at its foot at the plan's reference pace: `hours`
+    includes the stops already made, `running_hours` does not."""
+
+    start_km: float
+    end_km: float
+    gain_m: float
+    grade_pct: float
+    #: Its steepest section of homogeneous grade: grade and length.
+    steepest_pct: float
+    steepest_m: float
+    #: A climb a runner would name; the others are bumps.
+    main: bool
+    hours: float
+    running_hours: float
+
+
 class RacePassage(TypedDict):
     """An aid station or the finish (empty name), timed at the plan's reference pace."""
 
@@ -403,6 +420,7 @@ class RacePlan(TypedDict):
     highest: list[float]
     stretches: list[RouteStretch]
     passages: list[RacePassage]
+    climbs: list[RouteClimb]
     reference_pace_s: float
     #: The pace chosen with the coach; None: no passage is shown.
     pace_s_per_km: float | None
