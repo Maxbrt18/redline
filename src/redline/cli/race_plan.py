@@ -23,6 +23,8 @@ from redline.model import entrypoint, instance, paths, rulebook
 from redline.model.errors import ConfigError, InputError
 from redline.model.vocabulary import ElevationSource
 
+from .route_profile import climb_lines
+
 
 def _clock(hours: float) -> str:
     minutes = round(hours * 60)
@@ -73,6 +75,9 @@ def render(report) -> str:
                                           duration=_clock(passage.running_hours)))
     if report.has_fast_bound:
         lines.append(text.FAST_BOUND.format(time=_clock(report.finish.fast_hours)))
+    lines.extend(climb_lines([(climb.start_km, climb.end_km, climb.gain_m, climb.grade_pct,
+                               climb.steepest_pct, climb.steepest_m, climb.main, climb.hours)
+                              for climb in report.climbs], _clock))
     lines.append("")
     if report.forecast_available is False:
         lines.append(text.WEATHER_LATER)

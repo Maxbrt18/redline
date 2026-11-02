@@ -180,6 +180,12 @@ def _plan(race: race_model.Race, root: Path, instance: Instance | None
         "passages": [{"km": round(passage.km, 2), "name": passage.name,
                       "hours": passage.hours, "running_hours": passage.running_hours}
                      for passage in report.passages],
+        "climbs": [{"start_km": round(climb.start_km, 2), "end_km": round(climb.end_km, 2),
+                    "gain_m": round(climb.gain_m), "grade_pct": round(climb.grade_pct, 1),
+                    "steepest_pct": round(climb.steepest_pct, 1),
+                    "steepest_m": round(climb.steepest_m), "main": climb.main,
+                    "hours": climb.hours, "running_hours": climb.running_hours}
+                   for climb in report.climbs],
         "reference_pace_s": report.pace_s_per_km, "pace_s_per_km": race.pace_s_per_km,
         "stop_minutes": race.stop_minutes, "carbs_g_h": race.carbs_g_h,
         "model_error": list(report.model_error),

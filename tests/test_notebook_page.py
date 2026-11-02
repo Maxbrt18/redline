@@ -967,7 +967,7 @@ def test_the_race_plan_retimes_its_passages_at_the_pace_explored(browser):
     summary.get_by_role('button', name='Passages, ravitos et glucides').click()
     tab.locator('.n-rp-row').first.wait_for()
     assert tab.locator('#lt-title').inner_text() == 'Plan de course'
-    assert tab.locator('.n-rp-row .ck').all_text_contents() == ['1\xa0h\xa025', '2\xa0h\xa051', '4\xa0h\xa013']
+    assert tab.locator('.n-rp-row:not(.n-rp-climb) .ck').all_text_contents() == ['1\xa0h\xa025', '2\xa0h\xa051', '4\xa0h\xa013']
     assert tab.locator('.n-rp-row .rg').first.inner_text() == '1\xa0h\xa022 – 1\xa0h\xa029'
     assert 'vers 10\xa0h\xa025 · ≈ 85 g de glucides au tronçon' in tab.locator('.n-rp-row .sub').first.inner_text()
     assert tab.locator('.n-rp-chart .dp').all_text_contents() == ['+340 −120', '+380 −400', '+185 −390']
@@ -978,7 +978,7 @@ def test_the_race_plan_retimes_its_passages_at_the_pace_explored(browser):
     tab.on('request', lambda request: requests.append(request.url))
     tab.get_by_role('button', name='Plus vite').click()
     assert tab.locator('.n-rp-pace b').inner_text() == '5:25'
-    assert tab.locator('.n-rp-row .ck').all_text_contents() == ['1\xa0h\xa024', '2\xa0h\xa048', '4\xa0h\xa009']
+    assert tab.locator('.n-rp-row:not(.n-rp-climb) .ck').all_text_contents() == ['1\xa0h\xa024', '2\xa0h\xa048', '4\xa0h\xa009']
     assert 'Allure retenue avec le coach : 5:30/km' in tab.locator('#content').inner_text()
     assert requests == []
     # The Race tab keeps the chosen pace, never the one explored.
@@ -999,8 +999,35 @@ def test_without_a_chosen_pace_the_plan_shows_the_route_and_no_passage(browser):
     assert tab.locator('.n-rp-arr').count() == 0
     tab.get_by_role('button', name='Profil et ravitos').click()
     tab.locator('.n-rp-chart .hi').wait_for()
-    assert tab.locator('.n-rp-row').count() == 0 and tab.locator('.n-rp-pace').count() == 0
+    assert tab.locator('.n-rp-row:not(.n-rp-climb)').count() == 0
+    assert tab.locator('.n-rp-pace').count() == 0
+    # The climbs need no pace: only their feet go untimed.
+    assert tab.locator('.n-rp-climb').count() == 2
+    assert tab.locator('.n-rp-climb .rg').first.inner_text() == ''
     assert '42,2 km · D+ 905 m (890 – 921)' in tab.locator('.n-rp-src').inner_text()
+
+
+def test_the_main_climbs_are_numbered_on_the_profile_and_timed_at_their_foot(browser):
+    """The foot is retimed like a passage: running time scales with the pace, the stops
+    already made do not. The bumps are only counted."""
+    tab = browser.new_page(viewport={'width': 390, 'height': 844})
+    serve(tab)
+    tab.goto(BASE + '/carnet#t=' + 'x' * 43)
+    tab.get_by_role('button', name='Course', exact=True).click()
+    tab.get_by_role('button', name='Passages, ravitos et glucides').click()
+    tab.locator('.n-rp-climb').first.wait_for()
+    assert tab.locator('.n-rp-chart .climb').count() == 2
+    assert tab.locator('.n-rp-chart .cn').all_text_contents() == ['1', '2']
+    second = tab.locator('.n-rp-climb').nth(1)
+    assert second.locator('.ck').inner_text() == '+160 m'
+    assert second.locator('.sub').inner_text() == '3,5 km à 5 %'
+    assert second.locator('.rg').inner_text().replace('\xa0', ' ') == 'pied à 1 h 45, vers 10 h 45'
+    first = tab.locator('.n-rp-climb').first
+    assert first.locator('.sub').inner_text() == '4 km à 5 % · jusqu’à 11 % sur 400 m'
+    assert tab.get_by_text('Et 1 bosse plus courte : +18 m en tout.').is_visible()
+    tab.locator('.n-rp-pace .n-round').last.click()
+    assert second.locator('.rg').inner_text().replace('\xa0', ' ') == 'pied à 1 h 43, vers 10 h 43'
+    tab.close()
 
 
 def test_a_plan_before_the_forecast_says_when_it_comes(browser):

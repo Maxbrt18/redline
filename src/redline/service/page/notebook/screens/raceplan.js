@@ -24,6 +24,16 @@ function retime(plan, seconds) {
       carbs: plan.carbs_g_h ? leg * plan.carbs_g_h : null};
   });
 }
+// A climb's foot, retimed like a passage: its running time scales, its stops do not.
+const climbHours = (plan, climb, seconds) => climb.running_hours * seconds / plan.reference_pace_s + climb.hours - climb.running_hours;
+// The altitude at any kilometre, between the profile's points.
+function heightAt(plan, km) {
+  const after = plan.profile.findIndex(point => point[0] >= km);
+  if (after <= 0) return plan.profile[Math.max(after, 0)][1];
+  const [k0, m0] = plan.profile[after - 1], [k1, m1] = plan.profile[after];
+  return m0 + (m1 - m0) * (km - k0) / (k1 - k0);
+}
+const mainClimbs = plan => (plan.climbs || []).filter(climb => climb.main);
 const raceDuration = hours => { const minutes = Math.round(hours * 60); return Math.floor(minutes / 60) + ' h ' + String(minutes % 60).padStart(2, '0'); };
 // The local time of a passage, to the nearest minute like the durations: the start is a
 // wall-clock time at the race's place.
@@ -56,6 +66,22 @@ function profileChart(plan, full) {
   scale.forEach(metres => shape('line', {x1: 0, x2: width, y1: y(metres), y2: y(metres), class: 'grid'}, svg));
   const line = plan.profile.map(([km, metres], index) => (index ? 'L' : 'M') + x(km).toFixed(1) + ' ' + y(metres).toFixed(1)).join(' ');
   shape('path', {d: line + ' L' + width + ' ' + base + ' L0 ' + base + ' Z', class: 'area'}, svg);
+  // Full size, the main climbs are tinted under the line and numbered at their summit,
+  // the numbers of the list below.
+  // Two close summits stack their numbers instead of overlapping.
+  let previous = {x: -1e9, y: 0};
+  if (full) mainClimbs(plan).forEach((climb, index) => {
+    const inside = [[climb.start_km, heightAt(plan, climb.start_km)],
+      ...plan.profile.filter(([km]) => km > climb.start_km && km < climb.end_km),
+      [climb.end_km, heightAt(plan, climb.end_km)]];
+    const top = inside.reduce((high, point) => point[1] > high[1] ? point : high);
+    shape('path', {d: inside.map(([km, metres], at) => (at ? 'L' : 'M') + x(km).toFixed(1) + ' ' + y(metres).toFixed(1)).join(' ')
+      + ' L' + x(inside[inside.length - 1][0]).toFixed(1) + ' ' + base + ' L' + x(inside[0][0]).toFixed(1) + ' ' + base + ' Z', class: 'climb'}, svg);
+    const at = {x: x(top[0]), y: y(top[1]) - 6};
+    if (at.x - previous.x < 16) at.y = Math.min(at.y, previous.y - 12);
+    shape('text', {x: at.x, y: at.y, 'text-anchor': 'middle', class: 'cn'}, svg, String(index + 1));
+    previous = at;
+  });
   shape('path', {d: line, class: 'line'}, svg);
   scale.forEach(metres => shape('text', {x: width, y: y(metres) - 4, 'text-anchor': 'end', class: 'yl'}, svg, metres + ' m'));
   let last = -1e9, row = 0;
@@ -149,11 +175,31 @@ export function renderRacePlan(data) {
     }
   }
 
+  if ((plan.climbs || []).length) content.append(climbList(plan, seconds));
   const band = plan.dplus_band_m ? ' (' + fmt(plan.dplus_band_m[0], 0) + ' – ' + fmt(plan.dplus_band_m[1], 0) + ')' : '';
   const facts = [fmt(plan.length_km) + ' km · D+ ' + fmt(plan.dplus_m, 0) + ' m' + band + ' · D− ' + fmt(plan.dminus_m, 0) + ' m.'];
   if (plan.carbs_g_h) facts.push('Glucides : ' + plan.carbs_g_h + ' g/h de course.');
   if (plan.stop_minutes) facts.push('Arrêts : ' + fmt(plan.stop_minutes) + ' min par ravito.');
   content.append(add(section('Parcours'), el('p', facts.join(' '), 'n-rp-src')));
+}
+// The main climbs, numbered as on the profile: where, how much, how steep at worst, and
+// when the foot comes at the explored pace. The bumps are only counted.
+function climbList(plan, seconds) {
+  const main = mainClimbs(plan), bumps = (plan.climbs || []).filter(climb => !climb.main);
+  const node = section('Côtes', el('span', main.length + ' principale' + (main.length > 1 ? 's' : ''), 'n-meta'));
+  main.forEach((climb, index) => {
+    const length = (climb.end_km - climb.start_km) * 1000;
+    const when = seconds ? passageAt(plan, climbHours(plan, climb, seconds)) : null;
+    node.append(add(el('div', null, 'n-rp-row n-rp-climb'),
+      add(el('div', null, 'nm'), el('i', String(index + 1), 'n-rp-cn'), 'km ' + fmt(climb.start_km, 1) + ' ', el('small', '→ ' + fmt(climb.end_km, 1))),
+      el('div', '+' + fmt(climb.gain_m, 0) + ' m', 'ck'),
+      el('div', fmt(length / 1000, 1) + ' km à ' + fmt(climb.grade_pct, 0) + ' %'
+        + (climb.steepest_pct >= climb.grade_pct + 2 ? ' · jusqu’à ' + fmt(climb.steepest_pct, 0) + ' % sur ' + fmt(Math.round(climb.steepest_m / 50) * 50, 0) + ' m' : ''), 'sub'),
+      el('div', seconds ? 'pied à ' + raceDuration(climbHours(plan, climb, seconds)) + (when ? ', vers ' + wallClock(when) : '') : '', 'rg')));
+  });
+  if (bumps.length) node.append(el('p', 'Et ' + bumps.length + ' bosse' + (bumps.length > 1 ? 's' : '') + ' plus courte' + (bumps.length > 1 ? 's' : '')
+    + ' : +' + fmt(bumps.reduce((sum, climb) => sum + climb.gain_m, 0), 0) + ' m en tout.', 'n-rp-small'));
+  return node;
 }
 // The plan screen redraws itself when the pace moves; the figures stay on the device.
 function redraw() {

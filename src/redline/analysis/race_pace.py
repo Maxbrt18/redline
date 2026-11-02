@@ -128,6 +128,16 @@ def stretches(distance_m: np.ndarray, elevation_m: np.ndarray) -> tuple[np.ndarr
     return lengths[keep], (np.diff(heights)[keep] / lengths[keep]) * 100
 
 
+def running_hours_at(distance_m: np.ndarray, elevation_m: np.ndarray, curve: GradeCurve,
+                     pace_s_per_km: float, kms: Sequence[float]) -> list[float]:
+    """Hours of running, stops excluded, from the start to each of these kilometres."""
+    lengths, grades = stretches(distance_m, elevation_m)
+    marks = np.concatenate([[0.0], np.cumsum(lengths) / 1000])
+    central = np.concatenate([[0.0], np.cumsum(
+        lengths / (1000 / pace_s_per_km * np.array([curve.speed(g) for g in grades])))])
+    return [float(np.interp(km, marks, central)) / 3600 for km in kms]
+
+
 def plan(distance_m: np.ndarray, elevation_m: np.ndarray, curve: GradeCurve,
          pace_s_per_km: float, aids: Sequence[AidStation] = (),
          stop_minutes: float = 0.0) -> RacePlan:

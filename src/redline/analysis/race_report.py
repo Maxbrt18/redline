@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 from redline.model.errors import InputError
 from redline.model.vocabulary import ElevationSource
 
-from . import race_pace, route_profile
+from . import climbs, race_pace, route_profile
 
 #: (lat, lon, aware datetime) -> the hour's weather, or raises RuntimeError/OSError when the
 #: date has no forecast yet.
@@ -56,6 +56,21 @@ class PassageReport:
 
 
 @dataclass(frozen=True)
+class ClimbReport:
+    start_km: float
+    end_km: float
+    gain_m: float
+    grade_pct: float
+    #: The steepest of its sections of homogeneous grade, and its length.
+    steepest_pct: float
+    steepest_m: float
+    main: bool
+    #: Hours from the start to its foot, stops included, and of running only.
+    hours: float
+    running_hours: float
+
+
+@dataclass(frozen=True)
 class RaceReport:
     name: str
     source: ElevationSource
@@ -76,6 +91,7 @@ class RaceReport:
     #: The finish band nine times out of ten, in hours.
     finish_p90_hours: tuple[float, float]
     passages: tuple[PassageReport, ...]
+    climbs: tuple[ClimbReport, ...]
 
     @property
     def finish(self) -> PassageReport:
@@ -141,6 +157,18 @@ def assemble(profile: route_profile.Profile, *, pace_s_per_km: float,
         except (RuntimeError, OSError):
             available = False
     median, p90 = race_pace.MODEL_ERROR
+    found = climbs.detect(profile.distance_m, profile.elevation_m)
+    feet = race_pace.running_hours_at(profile.distance_m, profile.elevation_m, curve,
+                                      pace_s_per_km, [climb.start_m / 1000 for climb in found])
+    climb_reports = []
+    for climb, running in zip(found, feet, strict=True):
+        steepest = max(climb.sections, key=lambda section: section.grade_pct)
+        stops = sum(aid.km * 1000 < climb.start_m for aid in aids) * stop_minutes / 60
+        climb_reports.append(ClimbReport(
+            start_km=climb.start_m / 1000, end_km=climb.end_m / 1000, gain_m=climb.gain_m,
+            grade_pct=climb.grade_pct, steepest_pct=steepest.grade_pct,
+            steepest_m=steepest.end_m - steepest.start_m, main=climb.main,
+            hours=running + stops, running_hours=running))
     passages = tuple(PassageReport(
         km=p.km, name=p.name, hours=p.hours, low_hours=p.hours * (1 - median),
         high_hours=p.hours * (1 + median), fast_hours=p.fast_hours,
@@ -159,4 +187,4 @@ def assemble(profile: route_profile.Profile, *, pace_s_per_km: float,
                          and carbs_g_h > carbs_mix_above_g_h),
         forecast_available=available, model_error=race_pace.MODEL_ERROR,
         finish_p90_hours=(plan.finish.hours * (1 - p90), plan.finish.hours * (1 + p90)),
-        passages=passages)
+        passages=passages, climbs=tuple(climb_reports))
