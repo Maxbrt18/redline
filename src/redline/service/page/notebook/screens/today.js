@@ -87,8 +87,21 @@ const hrChoices = [['sleep', 'Nuit courte'], ['cold', 'Début de rhume'], ['heat
 export const fieldSpec = {
   pain: {label: 'Douleur, au pic', name: 'la douleur', values: [0, 0.5, 1, 1.5, 2, 2.5, 3]},
   rpe: {label: 'RPE, séance entière', name: 'le RPE', values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]},
-  enjoyment: {label: 'Plaisir', name: 'le plaisir', values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}
+  enjoyment: {label: 'Plaisir', name: 'le plaisir', values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]},
+  carbs_g_h: {label: 'Glucides pris, par heure', name: 'les glucides', values: [0, 20, 30, 40, 50, 60, 70, 80, 90], unit: ' g'},
+  fuel_formats: {label: 'Sous quelle forme ?', name: 'la forme', many: true,
+    options: [['drink', 'Boisson'], ['gel', 'Gel'], ['chew', 'Pâte ou gomme'], ['solid', 'Solide']]},
+  fuel_mix: {label: 'Les sucres', name: 'les sucres',
+    options: [['glucose', 'Glucose seul'], ['glucose_fructose', 'Glucose + fructose'], ['unknown', 'Je ne sais pas']]},
+  gut_symptoms: {label: 'Troubles digestifs, au pic', name: 'les troubles', values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]},
+  gut_symptom_kinds: {label: 'Lesquels ?', name: 'lesquels', many: true,
+    options: [['nausea', 'Nausée'], ['reflux', 'Reflux'], ['cramps', 'Crampes'], ['bloating', 'Ballonnement'], ['urgency', 'Besoin pressant']]},
+  gut_onset_min: {label: 'Apparus vers', name: 'le moment'}
 };
+// Quarter hours up to the session's duration, written as elapsed time.
+const elapsed = minutes => minutes < 60 ? minutes + ' min' : (minutes / 60 | 0) + ' h' + (minutes % 60 ? ' ' + minutes % 60 : '');
+const onsetValues = minutes => Array.from({length: Math.max(1, Math.ceil((minutes || 60) / 15))},
+  (_, index) => [(index + 1) * 15, elapsed((index + 1) * 15)]);
 // `pain:<zone>`: a zone's pain, named by its label.
 export function specOf(field, labels) {
   if (!field.startsWith('pain:')) return fieldSpec[field];
@@ -110,14 +123,32 @@ async function answer(ask, value, card, picked) {
 }
 // All the values of a scale at a glance, with no hidden scrolling: pain fits on one
 // line, RPE and enjoyment on two.
-function chips(values, ask, card, label = value => fmt(value)) {
+function chips(values, ask, card, label = value => fmt(value), write = answer) {
   const row = el('div', null, 'n-chips');
   row.style.setProperty('--cols', String(values.length <= 7 ? values.length : Math.ceil(values.length / 2)));
   values.forEach(value => {
     const [sent, text] = Array.isArray(value) ? value : [value, label(value)];
-    row.append(button(text, node => answer(ask, sent, card, node), ''));
+    row.append(button(text, node => write(ask, sent, card, node), ''));
   });
   return row;
+}
+// Several answers to one question: each tap toggles a choice, one button sends them all.
+function manyChoices(options, ask, card, write) {
+  const picked = new Set();
+  const confirm = button('Valider', node => write(ask, [...picked], card, node), 'n-action n-confirm');
+  confirm.disabled = true;
+  const row = el('div', null, 'n-choices two');
+  options.forEach(([value, text]) => {
+    const node = button(text, () => {
+      if (picked.has(value)) picked.delete(value); else picked.add(value);
+      node.classList.toggle('n-on', picked.has(value));
+      node.setAttribute('aria-pressed', String(picked.has(value)));
+      confirm.disabled = picked.size === 0;
+    }, '');
+    node.setAttribute('aria-pressed', 'false');
+    row.append(node);
+  });
+  return add(el('div'), row, confirm);
 }
 function choices(label, hint, options, ask, card) {
   const head = el('span', label);
@@ -143,19 +174,26 @@ function hrCard(ask) {
   return add(card, head, choices('Une explication ?', '', hrChoices, ask.id, card));
 }
 // The debrief, one question at a time: the first missing one, its rank among the total,
-// and what follows. Each answer recomputes the screen, which moves on to the next.
-// The total: one pain per monitored zone, then RPE and enjoyment.
-export const cellCount = ask => Object.keys(ask.labels || {}).length + 2;
-function cellsCard(ask, target) {
+// and what follows. Each answer recomputes the screen, which moves on to the next. The
+// service counts the total: pains, RPE and enjoyment, then the fuel registry of a fuelled
+// session. `write` sends one answer; the session detail passes its own.
+export function cellsCard(ask, target, write = answer) {
   const card = el('div', null, 'n-check');
   const metric = ask.fields[0], spec = specOf(metric, ask.labels), label = el('span', spec.label);
   if (metric === 'rpe' && target && target.rpe_max != null) label.append(el('small', 'visé ' + rpeRange(target)));
-  const total = cellCount(ask);
+  if (metric === 'carbs_g_h' && target && target.carbs_target_g_h != null) label.append(el('small', 'visé ' + target.carbs_target_g_h + ' g/h'));
+  const total = ask.total;
   const head = add(el('p', null, 'n-check-head'), label, el('span', (total - ask.fields.length + 1) + ' sur ' + total, 'n-of'));
-  add(card, head, chips(spec.values, ask.id + ':' + metric, card));
+  const key = ask.id + ':' + metric;
+  if (spec.many) add(card, head, manyChoices(spec.options, key, card, write));
+  else if (spec.options) add(card, head, add(el('div', null, 'n-choices' + (spec.options.length === 3 ? ' one' : ' two')),
+    ...spec.options.map(([value, text]) => button(text, node => write(key, value, card, node), ''))));
+  else add(card, head, chips(metric === 'gut_onset_min' ? onsetValues(ask.duration_min) : spec.values, key, card,
+    spec.unit ? value => fmt(value) + spec.unit : undefined, write));
   const next = ask.fields.slice(1).map(field => specOf(field, ask.labels).name);
   const notes = [];
-  if (next.length) notes.push('Puis ' + next.join(' et ') + (next.length > 1 ? ', un geste chacun.' : '.'));
+  const listed = next.length > 1 ? next.slice(0, -1).join(', ') + ' et ' + next[next.length - 1] : next[0];
+  if (next.length) notes.push('Puis ' + listed + (next.length > 1 ? ', un geste chacun.' : '.'));
   if (metric.startsWith('pain:')) notes.push('Plus de 3 ? Dis-le au coach dans Messenger.');
   if (notes.length) card.append(el('p', notes.join(' '), 'n-note'));
   return card;

@@ -147,6 +147,14 @@ MEASUREMENT_DEFINITIONS: dict[str, tuple[Any, str]] = {
     "enjoyment": (sa.Numeric(3, 1), "value BETWEEN 0 AND 10"),
     "carbs_g_h": (sa.Numeric(5, 1), "value BETWEEN 0 AND 200"),
     "gut_symptoms": (sa.Numeric(3, 1), "value BETWEEN 0 AND 10"),
+    # The fuel registry of a session that tested a carbohydrate target: what it came in,
+    # the sugars it was taken as, and, when the gut complained, how and from which minute.
+    "fuel_formats": (sa.ARRAY(sa.Text), "cardinality(value) > 0 AND "
+                     f"value <@ ARRAY[{voc.sql_values(voc.FuelFormat)}]::text[]"),
+    "fuel_mix": (sa.Text, f"value IN ({voc.sql_values(voc.CarbMix)})"),
+    "gut_symptom_kinds": (sa.ARRAY(sa.Text), "cardinality(value) > 0 AND "
+                          f"value <@ ARRAY[{voc.sql_values(voc.GutSymptom)}]::text[]"),
+    "gut_onset_min": (sa.SmallInteger, "value BETWEEN 0 AND 1440"),
     # Reserve of a quality session: whole repetitions still possible at the same effort,
     # declared in the logbook.
     "reps_in_reserve": (sa.SmallInteger, "value BETWEEN 0 AND 5"),

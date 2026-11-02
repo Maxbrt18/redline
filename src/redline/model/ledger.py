@@ -6,12 +6,14 @@ import datetime as dt
 import re
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from enum import StrEnum
 
 from redline.coach.fr import ledger as text
 
 from . import session_kinds
 from .errors import ConfigError, InputError
 from .schema import Schema, field
+from .vocabulary import CarbMix, FuelFormat, GutSymptom
 
 UNKNOWN = "?"
 
@@ -217,12 +219,49 @@ COMPLETION_WINDOW = dt.timedelta(days=2)
 METRIC_COLUMNS = {
     "rpe": "rpe", "enjoyment": "enjoyment",
     "elevation_gain_m": "dplus", "elevation_loss_m": "dminus",
-    "carbs_g_h": "carbs_g_h", "gut_symptoms": "gut_symptoms",
+    "carbs_g_h": "carbs_g_h", "fuel_formats": "fuel_formats", "fuel_mix": "fuel_mix",
+    "gut_symptoms": "gut_symptoms", "gut_symptom_kinds": "gut_symptom_kinds",
+    "gut_onset_min": "gut_onset_min",
 }
 
 #: Awaited only after a session that tested a fuelling target: linking it marks them
-#: pending (`session_cycles`), and only that marking makes them due.
-FUELLING_METRICS = ("carbs_g_h", "gut_symptoms")
+#: pending (`session_cycles`), and only that marking makes them due. In the order they are
+#: asked.
+FUELLING_ASKED = ("carbs_g_h", "fuel_formats", "fuel_mix", "gut_symptoms")
+#: Awaited once the gut complained: a known `gut_symptoms` above 0 marks them pending.
+GUT_DETAIL = ("gut_symptom_kinds", "gut_onset_min")
+FUELLING_METRICS = FUELLING_ASKED + GUT_DETAIL
+
+#: Measurements holding slugs instead of a number: several of them, or exactly one.
+SEVERAL_CHOICES: dict[str, type[StrEnum]] = {
+    "fuel_formats": FuelFormat, "gut_symptom_kinds": GutSymptom}
+ONE_CHOICE: dict[str, type[StrEnum]] = {"fuel_mix": CarbMix}
+
+
+def measurement_value(metric: str, value: object) -> float | str | list[str]:
+    """The stored form of a measurement value: a number, a slug, or sorted distinct slugs.
+
+    Several slugs come as a list or as one comma-separated string (the command line).
+    """
+    if metric in SEVERAL_CHOICES:
+        items = value.split(",") if isinstance(value, str) else value
+        if not isinstance(items, (list, tuple)):
+            raise LedgerError(text.CHOICES_EXPECTED.format(metric=metric))
+        slugs = sorted({str(item).strip() for item in items} - {""})
+        allowed = [member.value for member in SEVERAL_CHOICES[metric]]
+        if not slugs or not set(slugs) <= set(allowed):
+            raise LedgerError(text.CHOICES_UNKNOWN.format(
+                metric=metric, allowed=", ".join(allowed)))
+        return slugs
+    if metric in ONE_CHOICE:
+        allowed = [member.value for member in ONE_CHOICE[metric]]
+        if value not in allowed:
+            raise LedgerError(text.CHOICES_UNKNOWN.format(
+                metric=metric, allowed=", ".join(allowed)))
+        return str(value)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise LedgerError(text.NUMBER_EXPECTED.format(metric=metric))
+    return value
 
 
 def missing_observation_fields(observation: dict) -> list[str]:

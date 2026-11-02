@@ -159,6 +159,77 @@ def test_the_coach_waits_only_for_what_the_ledger_claims(store):
     assert rows["strava:90000000019"]["pains"]["knee"] == {"state": "known", "value": 2.5}
 
 
+def test_a_fuelled_session_asks_its_fuel_registry_one_answer_at_a_time(store):
+    seed_week(store)
+    pending = {"state": "pending"}
+    store.add_observation({
+        "occurred_on": dt.date(2026, 10, 7), "kind": "long",
+        "started_at": dt.datetime(2026, 10, 7, 7, 0, tzinfo=PARIS),
+        "idempotency_key": "test:fuelled", "note": "",
+        "measurements": {
+            "distance_km": {"state": "known", "value": 22.8},
+            "duration_s": {"state": "known", "value": 8400},
+            "rpe": {"state": "known", "value": 5},
+            "enjoyment": {"state": "known", "value": 7},
+            "carbs_g_h": pending, "fuel_formats": pending, "fuel_mix": pending,
+            "gut_symptoms": pending},
+        "pains": {"knee": {"state": "known", "value": 1.0}},
+    })
+    fuelled = next(row["id"] for row in store.observation_rows()
+                   if row["idempotency_key"] == "test:fuelled")
+
+    def ask():
+        return next(item for item in board(store).asks()
+                    if item.get("id") == f"cell:{fuelled}")
+
+    first = ask()
+    assert first["fields"] == ["carbs_g_h", "fuel_formats", "fuel_mix", "gut_symptoms"]
+    assert (first["total"], first["duration_min"]) == (7, 140)
+    board(store).answer(first["id"] + ":carbs_g_h", 40)
+    with pytest.raises(AnswerError):
+        board(store).answer(first["id"] + ":fuel_formats", ["bonbon"])
+    board(store).answer(first["id"] + ":fuel_formats", ["gel", "drink"])
+    board(store).answer(first["id"] + ":fuel_mix", "unknown")
+    result = board(store).answer(first["id"] + ":gut_symptoms", 6)
+    assert result["activity"] is None
+
+    detail = ask()
+    assert detail["fields"] == ["gut_symptom_kinds", "gut_onset_min"]
+    assert detail["total"] == 9
+    board(store).answer(detail["id"] + ":gut_symptom_kinds", ["reflux", "nausea"])
+    board(store).answer(detail["id"] + ":gut_onset_min", 75)
+
+    assert not [item for item in board(store).asks() if item.get("id") == f"cell:{fuelled}"]
+    measures = next(row for row in store.observation_rows()
+                    if row["id"] == fuelled)["measurements"]
+    assert measures["carbs_g_h"] == {"state": "known", "value": 40.0}
+    assert measures["fuel_formats"] == {"state": "known", "value": ["drink", "gel"]}
+    assert measures["fuel_mix"] == {"state": "unavailable", "value": None}
+    assert measures["gut_symptom_kinds"] == {"state": "known", "value": ["nausea", "reflux"]}
+    assert measures["gut_onset_min"] == {"state": "known", "value": 75}
+
+
+def test_a_quiet_gut_asks_neither_which_trouble_nor_when(store):
+    seed_week(store)
+    store.add_observation({
+        "occurred_on": dt.date(2026, 10, 7), "kind": "long",
+        "started_at": dt.datetime(2026, 10, 7, 7, 0, tzinfo=PARIS),
+        "idempotency_key": "test:quiet", "note": "",
+        "measurements": {"rpe": {"state": "known", "value": 5},
+                         "enjoyment": {"state": "known", "value": 7},
+                         "gut_symptoms": {"state": "pending"}},
+        "pains": {"knee": {"state": "known", "value": 1.0}},
+    })
+    quiet = next(row["id"] for row in store.observation_rows()
+                 if row["idempotency_key"] == "test:quiet")
+    board(store).answer(f"cell:{quiet}:gut_symptoms", 0)
+    assert not [item for item in board(store).asks() if item.get("id") == f"cell:{quiet}"]
+    measures = next(row for row in store.observation_rows()
+                    if row["id"] == quiet)["measurements"]
+    assert measures["gut_symptom_kinds"]["state"] == "not_applicable"
+    assert measures["gut_onset_min"]["state"] == "not_applicable"
+
+
 def test_a_net_wake_trace_alerts_the_coach_with_the_session_condition(store):
     """The condition lives in the session, the alert triggers it."""
     seed_week(store)

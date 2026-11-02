@@ -2747,6 +2747,69 @@ def test_the_fuelling_answer_is_awaited_recorded_and_drives_the_progression(stor
             1, sessions=[following], computed_at="2026-08-17T19:10:00+02:00"))
 
 
+def test_the_fuel_registry_is_recorded_by_the_command_and_read_by_the_coach(store):
+    """Linking a fuelled session awaits its formats and sugars too; slugs pass through the
+    command line, and the coach reads the registry in one fact."""
+    from test_weekly_plan import revision as build_revision
+    from test_weekly_plan import session
+
+    from redline.model import ledger as ledger_model
+
+    long_run = session("w33-dim-sl", "2026-08-16", "long", carbs_target_g_h=60)
+    store.append_plan_revision("2026-W33", build_revision(
+        1, sessions=[long_run], computed_at="2026-08-09T19:10:00+02:00"))
+    store.add_observation({
+        "occurred_on": dt.date(2026, 8, 16), "kind": "long",
+        "started_at": dt.datetime(2026, 8, 16, 8, 0, tzinfo=dt.UTC),
+        "idempotency_key": "strava:4244", "strava_activity_id": 4244,
+        "note": "", "measurements": {},
+        "session_key": "2026-W33:w33-dim-sl"})
+
+    def missing():
+        row = next(row for row in store.observation_rows()
+                   if row["idempotency_key"] == "strava:4244")
+        return [field for field in ledger_model.missing_observation_fields(row)
+                if field in ledger_model.FUELLING_METRICS]
+
+    assert missing() == list(ledger_model.FUELLING_ASKED)
+    env = {**os.environ, "DATABASE_URL": URL}
+    env.pop("REDLINE_TURN_ID", None)
+
+    def complete(metric, value):
+        return subprocess.run([*cli_command("ledger-complete"), "--key", "strava:4244",
+                               "--metric", metric, "--value", value],
+                              cwd=ENGINE_ROOT, env=env, capture_output=True, text=True,
+                              check=False)
+
+    assert complete("fuel_formats", "gel,bonbon").returncode != 0
+    for metric, value in (("carbs_g_h", "55"), ("fuel_formats", "gel,drink"),
+                          ("fuel_mix", "glucose_fructose"), ("gut_symptoms", "4")):
+        done = complete(metric, value)
+        assert done.returncode == 0, done.stderr
+    assert missing() == list(ledger_model.GUT_DETAIL)
+    for metric, value in (("gut_symptom_kinds", "reflux"), ("gut_onset_min", "75")):
+        done = complete(metric, value)
+        assert done.returncode == 0, done.stderr
+    assert missing() == []
+
+    shown = subprocess.run([*cli_command("fact-read"), "observations", "--limit", "5"],
+                           cwd=ENGINE_ROOT, env=env, capture_output=True, text=True,
+                           check=False)
+    assert shown.returncode == 0, shown.stderr
+    assert ("carburant 55 g/h · boisson, gel · glucose-fructose · troubles 4/10 (reflux) "
+            "dès 75 min") in shown.stdout
+
+
+def test_a_fuel_registry_value_outside_its_vocabulary_is_refused(store):
+    store.add_observation({**observation(strava=90000000104),
+                           "measurements": {"fuel_mix": {"state": "pending"}}})
+    observation_id = store.observation_id("test:90000000104")
+    with pytest.raises(StorageError, match="fuel_mix"):
+        store.complete_measurement(observation_id, "fuel_mix", "maltodextrin")
+    with pytest.raises(StorageError, match="pain"):
+        store.complete_measurement(observation_id, "pain", ["gel"])
+
+
 def test_a_session_without_a_fuelling_target_awaits_no_fuelling_figure(store):
     from redline.model import ledger as ledger_model
 

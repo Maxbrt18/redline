@@ -226,3 +226,9 @@ TAPER_NO_REFERENCE = "Affûtage : aucune course à pied en {span}, baisse non me
 TAPER_TOO_CUT = "⚠ Affûtage coupé au-delà de {high} % : on arrive désentraîné plutôt que reposé."
 
 TAPER_LOOSE = "⚠ Affûtage relâché : baisse sous {low} %, la fatigue n'a pas eu le temps de partir."
+
+NUMBER_EXPECTED = "{metric} : un nombre est attendu"
+
+CHOICES_EXPECTED = "{metric} : une liste de choix est attendue"
+
+CHOICES_UNKNOWN = "{metric} : choix inconnu (possibles : {allowed})"
