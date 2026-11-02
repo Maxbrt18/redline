@@ -53,6 +53,10 @@
 .n-choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .n-choices.two { grid-template-columns: repeat(2, 1fr); }
 .n-choices button { background: var(--bg); border: 0; border-radius: 10px; min-height: 44px; padding: 4px 6px; font-size: 14.5px; font-weight: 500; }
+.n-choices.one { grid-template-columns: 1fr; }
+.n-choices button.n-on { background: var(--ink); color: var(--bg); }
+.n-confirm { display: block; width: 100%; margin-top: 8px; border-radius: 12px; }
+.n-confirm:disabled { opacity: .35; }
 .n-choices button:active, .n-chips button:active { background: var(--ink); color: var(--bg); }
 .n-chips { display: grid; grid-template-columns: repeat(var(--cols, 5), minmax(0, 1fr)); gap: 6px; }
 .n-chips button { background: var(--bg); border: 0; border-radius: 12px; min-height: 44px; padding: 4px 0; font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; }

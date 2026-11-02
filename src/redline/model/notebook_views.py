@@ -23,6 +23,7 @@ class Targets(TypedDict, total=False):
     rpe_min: int
     rpe_max: int
     hr_cap_bpm: int
+    carbs_target_g_h: int
 
 
 class PainReading(TypedDict):
@@ -155,6 +156,10 @@ class CellsAsk(TypedDict):
     km: float | None
     fields: list[str]
     labels: dict[str, str]
+    #: Every cell of the debrief, answered or not: the rank shown is `total - fields + 1`.
+    total: int
+    #: Bounds the onset of digestive trouble, asked in quarter hours.
+    duration_min: int | None
 
 
 class DailyAsk(TypedDict):
@@ -453,6 +458,8 @@ class DetailAsk(TypedDict):
     id: str
     fields: list[str]
     labels: dict[str, str]
+    total: int
+    duration_min: int | None
 
 
 class WakeZone(TypedDict):

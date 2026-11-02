@@ -67,6 +67,7 @@ from .proactive_messages import (
     CLOSED_KINDS,
     ClosedProactive,
     compose_closed_proactive,
+    gut_review_in_notebook,
     missing_cells_in_notebook,
 )
 from .prompts import (
@@ -1213,7 +1214,9 @@ class TurnWorker:
             self._complete_job(job)
             return
         if job.kind in CLOSED_KINDS:
-            closed = compose_closed_proactive(job.kind, job.detail)
+            closed = (gut_review_in_notebook(job.detail)
+                      if job.kind == "gut_review" and self._notebook_connected(job.psid)
+                      else compose_closed_proactive(job.kind, job.detail))
             if closed is None:
                 self._fail_job(job, "unreadable detail for a closed message")
                 return

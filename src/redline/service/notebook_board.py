@@ -122,6 +122,10 @@ def observation_fact(observation: dict, session: dict | None = None,
     return fact
 
 
+#: The notebook's answer when the athlete does not know the sugars they took.
+FUEL_MIX_UNKNOWN = "unknown"
+
+
 def _scale(metric: str, value: Any) -> float:
     """The athlete's scales: integer RPE and enjoyment, pain in half points."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -466,11 +470,19 @@ class Board:
             fields = [f"pain:{zone}" for zone in labels
                       if ledger_model.pain_column(zone) in missing]
             fields += [column for column in ("rpe", "enjoyment") if column in missing]
+            fields += [metric for metric in ledger_model.FUELLING_METRICS if metric in missing]
             if fields:
+                measurements = row.get("measurements") or {}
+                fuelled = [metric for metric in ledger_model.FUELLING_METRICS
+                           if (measurements.get(metric) or {}).get("state")
+                           not in (None, "not_applicable")]
+                seconds = _known(row, "duration_s")
                 asks.append({"id": f"cell:{row['id']}", "type": "cells",
                              "date": day.isoformat(), "kind": row["kind"],
                              "km": _known(row, "distance_km"), "fields": fields,
-                             "labels": {f"pain:{zone}": label for zone, label in labels.items()}})
+                             "labels": {f"pain:{zone}": label for zone, label in labels.items()},
+                             "total": len(labels) + 2 + len(fuelled),
+                             "duration_min": round(seconds / 60) if seconds else None})
         daily = self.daily(self.today)
         missing = [field for field in DAILY_FIELDS if not daily.get(field)]
         if missing and self._morning:
@@ -575,10 +587,15 @@ class Board:
         if field not in ask["fields"]:
             raise AnswerError(notebook_text.ALREADY_FILLED)
         metric, _, zone = field.partition(":")
-        number = _scale(metric, value)
         observation_id = uuid.UUID(ask["id"].split(":", 1)[1])
-        self.ops.complete_measurement(observation_id, metric, number, zone=zone or None,
-                                      actor=ACTOR)
+        if metric in ledger_model.FUELLING_METRICS:
+            opened = self._answer_fuel(observation_id, metric, value)
+            number = 0.0
+        else:
+            opened = False
+            number = _scale(metric, value)
+            self.ops.complete_measurement(observation_id, metric, number, zone=zone or None,
+                                          actor=ACTOR)
         alert = None
         if metric == "pain" and number > ledger.ESCULIER_CAP:
             day = dt.date.fromisoformat(ask["date"])
@@ -588,8 +605,30 @@ class Board:
                                                     day=day, cap=ledger.ESCULIER_CAP)
         # The run's feelings are complete: its debrief no longer has to wait.
         settled = (self.ops.strava_activity_for_observation(observation_id)
-                   if set(ask["fields"]) == {field} else None)
+                   if set(ask["fields"]) == {field} and not opened else None)
         return {"alert": alert, "activity": settled}
+
+    def _answer_fuel(self, observation_id: uuid.UUID, metric: str, value: Any) -> bool:
+        """The fuel registry: grams per hour, slugs, the gut on its /10 scale, the onset in
+        minutes. Not knowing the sugars is an answer: the measurement is unavailable.
+
+        True when the answer opens further questions (a gut above 0 asks which trouble
+        and from when)."""
+        if metric == "fuel_mix" and value == FUEL_MIX_UNKNOWN:
+            self.ops.complete_measurement(observation_id, metric, None, unavailable=True,
+                                          actor=ACTOR)
+            return False
+        if metric == "gut_symptoms":
+            value = _scale(metric, value)
+        elif metric in ("carbs_g_h", "gut_onset_min") and (
+                isinstance(value, bool) or not isinstance(value, int) or value < 0):
+            raise AnswerError(notebook_text.INTEGER_EXPECTED)
+        try:
+            value = ledger_model.measurement_value(metric, value)
+        except ledger_model.LedgerError as exc:
+            raise AnswerError(notebook_text.UNEXPECTED_ANSWER) from exc
+        self.ops.complete_measurement(observation_id, metric, value, actor=ACTOR)
+        return metric == "gut_symptoms" and bool(value)
 
     # ------------------------------------------------------------ session detail
     def _observation(self, observation_id: str) -> dict | None:
@@ -733,8 +772,9 @@ class Board:
                      "reserve": _known(observation, "reps_in_reserve")},
             "plan": None if not session else {
                 "targets": _targets(session), "note": session.get("note")},
-            "ask": None if ask is None else {"id": ask["id"], "fields": ask["fields"],
-                                             "labels": ask["labels"]},
+            "ask": None if ask is None else {
+                "id": ask["id"], "fields": ask["fields"], "labels": ask["labels"],
+                "total": ask["total"], "duration_min": ask["duration_min"]},
             "reserve_ask": self.reserve_ask(observation, session),
             "wake": self._wake(day),
             "phases": reading["phases"] if reading else None,

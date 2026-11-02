@@ -191,7 +191,8 @@ class Observations(StoreBase):
                 ).where(pain_readings.c.observation_id == observation_id)).mappings()}
 
     def complete_measurement(self, observation_id: uuid.UUID, metric: str,
-                             value: float | None, *, zone: str | None = None,
+                             value: float | str | list[str] | None, *,
+                             zone: str | None = None,
                              unavailable: bool = False,
                              actor: str = "application") -> None:
         with self.database.transaction() as connection:
@@ -226,10 +227,13 @@ class Observations(StoreBase):
         _request_projection(connection)
 
     def complete_measurement_in(self, connection: Connection, observation_id: uuid.UUID,
-                                metric: str, value: float | None, *, zone: str | None = None,
+                                metric: str, value: float | str | list[str] | None, *,
+                                zone: str | None = None,
                                 unavailable: bool = False,
                                 actor: str = "application") -> None:
         if metric == "pain":
+            if isinstance(value, (str, list)):
+                raise StorageError("pain: a number is expected")
             self._complete_pain_in(connection, observation_id, zone, value,
                                    unavailable=unavailable, actor=actor)
             return
@@ -237,6 +241,11 @@ class Observations(StoreBase):
             raise StorageError(f"only pain is measured per zone, not {metric}")
         if metric not in MEASUREMENT_DEFINITIONS:
             raise StorageError(f"unknown measurement: {metric}")
+        if not unavailable:
+            try:
+                value = ledger.measurement_value(metric, value)
+            except ledger.LedgerError as exc:
+                raise StorageError(str(exc)) from exc
         state = "unavailable" if unavailable else "known"
         state_column = observation_metrics.c[f"{metric}_state"]
         result = connection.execute(observation_metrics.update().where(
@@ -250,6 +259,14 @@ class Observations(StoreBase):
                   observation_metrics.c[metric]: None if unavailable else value}))
         if result.rowcount != 1:
             raise StorageError("measurement missing, already known or ambiguous")
+        if metric == "gut_symptoms" and not unavailable and value:
+            # Only a gut that complained has a kind of trouble and an onset to tell.
+            connection.execute(observation_metrics.update().where(
+                observation_metrics.c.observation_id == observation_id,
+            ).values({observation_metrics.c[f"{detail}_state"]: sa.case(
+                (observation_metrics.c[f"{detail}_state"] == "not_applicable", "pending"),
+                else_=observation_metrics.c[f"{detail}_state"])
+                for detail in ledger.GUT_DETAIL}))
         _audit(connection, actor, "measurement.completed", "observation", observation_id,
                {"metric": metric, "state": state, "value": value})
         _request_projection(connection)

@@ -7,6 +7,10 @@ illness) it leaves the pace-matched HR comparisons, hence the gate.
 
 Pain is completed per zone: `--metric pain --zone genou --value 2`. `--zone` may be
 omitted when the observation carries a single zone.
+
+The fuel registry takes slugs: `--metric fuel_formats --value gel,drink`,
+`--metric fuel_mix --value glucose_fructose`, `--metric gut_symptom_kinds --value nausea`.
+A gut above 0/10 opens `gut_symptom_kinds` and `gut_onset_min` (minutes into the session).
 """
 
 from __future__ import annotations
@@ -21,13 +25,14 @@ from redline.coach.fr import ledger as wording
 from redline.model import (
     commands,
     entrypoint,
+    ledger,
 )
 from redline.model.errors import InputError
 from redline.model.vocabulary import HrDoubt
 
 METRICS = ("rpe", "pain", "enjoyment", "distance_km", "duration_s", "pace_s_per_km",
            "hr_avg_bpm", "hr_max_bpm", "cadence_spm", "elevation_gain_m",
-           "elevation_loss_m", "wbgt_c", "carbs_g_h", "gut_symptoms")
+           "elevation_loss_m", "wbgt_c", *ledger.FUELLING_METRICS)
 
 
 def resolve_key(store, key: str, date: str, kind: str) -> str:
@@ -69,7 +74,9 @@ def main() -> int:
     parser.add_argument("--cause", default="",
                         help="the cause the athlete declared, in their words")
     values = parser.add_mutually_exclusive_group()
-    values.add_argument("--value", type=float)
+    values.add_argument("--value",
+                        help="a number; comma-separated slugs for fuel_formats and "
+                             "gut_symptom_kinds, one slug for fuel_mix")
     values.add_argument("--unavailable", action="store_true")
     parser.add_argument("--database-url", default=os.environ.get("DATABASE_URL", ""))
     args = parser.parse_args()
@@ -89,6 +96,15 @@ def main() -> int:
         parser.error("--metric and (--value or --unavailable) are required")
     if args.zone is not None and args.metric != "pain":
         parser.error("--zone only applies to --metric pain")
+    value: float | str | list[str] | None = args.value
+    if args.value is not None:
+        if args.metric in ledger.SEVERAL_CHOICES or args.metric in ledger.ONE_CHOICE:
+            value = ledger.measurement_value(args.metric, args.value)
+        else:
+            try:
+                value = float(args.value)
+            except ValueError:
+                parser.error(f"--value: a number is expected for {args.metric}")
 
     store = OperationalStore(Database(args.database_url, application_name="ledger-complete"))
     # Resolved BEFORE staging: a turn command prepared on a nonexistent key only fails
@@ -121,7 +137,7 @@ def main() -> int:
         return 0
     if turn_id:
         payload = {"idempotency_key": key, "metric": args.metric,
-                   "value": args.value, "unavailable": args.unavailable}
+                   "value": value, "unavailable": args.unavailable}
         if args.zone is not None:
             payload["zone"] = args.zone
         digest = hashlib.sha256(json.dumps(
@@ -131,7 +147,7 @@ def main() -> int:
         print(wording.MEASUREMENT_STAGED.format(key=key, metric=args.metric))
         return 0
     try:
-        store.complete_measurement(observation_id, args.metric, args.value, zone=args.zone,
+        store.complete_measurement(observation_id, args.metric, value, zone=args.zone,
                                    unavailable=args.unavailable, actor="ledger-complete")
     except StorageError as exc:
         print(str(exc), file=sys.stderr)

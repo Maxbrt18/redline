@@ -1,9 +1,9 @@
 import {add, button, el} from '../../shared/dom.js';
 import {chevron, content, kindIcon, message, pastille, shape, SVG} from '../ui.js';
 import {api} from '../api.js';
-import {dm, fmt, kindName, paceOf, rpeRange, weekNumber} from '../format.js';
+import {dm, fmt, kindName, paceOf, weekNumber} from '../format.js';
 import {gauges} from './week.js';
-import {cellCount, specOf} from './today.js';
+import {cellsCard} from './today.js';
 import {ensure, loadToday} from '../data.js';
 
 // ------------------------------------------------------------ Completed session detail
@@ -135,21 +135,7 @@ async function sdAnswer(ask, value, card, picked) {
     card.querySelectorAll('button').forEach(node => { node.disabled = false; node.classList.remove('n-picked'); });
   }
 }
-function sdAsk(data) {
-  const ask = data.ask, metric = ask.fields[0], spec = specOf(metric, ask.labels), card = el('div', null, 'n-check');
-  const label = el('span', spec.label), target = (data.plan || {}).targets;
-  if (metric === 'rpe' && target && target.rpe_max != null) label.append(el('small', 'visé ' + rpeRange(target)));
-  const total = cellCount(ask);
-  card.append(add(el('p', null, 'n-check-head'), label, el('span', (total - ask.fields.length + 1) + ' sur ' + total, 'n-of')));
-  const row = el('div', null, 'n-chips');
-  row.style.setProperty('--cols', String(spec.values.length <= 7 ? spec.values.length : Math.ceil(spec.values.length / 2)));
-  spec.values.forEach(value => row.append(button(fmt(value), node => sdAnswer(ask.id + ':' + metric, value, card, node), '')));
-  card.append(row);
-  const next = ask.fields.slice(1).map(field => specOf(field, ask.labels).name);
-  if (next.length) card.append(el('p', 'Puis ' + next.join(' et ') + (next.length > 1 ? ', un geste chacun.' : '.'), 'n-note'));
-  if (metric.startsWith('pain:')) card.append(el('p', 'Plus de 3 ? Dis-le au coach dans Messenger.', 'n-note'));
-  return card;
-}
+const sdAsk = data => cellsCard(data.ask, (data.plan || {}).targets, sdAnswer);
 function sdFeelings(data) {
   const ask = data.ask, missing = ask ? ask.fields : [];
   const box = add(el('section', null, 'n-dsec'), sdHead('Ressenti', ask ? 'un geste par valeur' : 'déclaré après la séance'));

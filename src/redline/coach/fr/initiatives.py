@@ -48,8 +48,15 @@ def missed_session(title: str) -> str:
 
 
 def gut_review(title: str) -> str:
-    return (f"Sur ta séance {title}, tu as pris combien de glucides par heure, et tes "
-            "symptômes digestifs étaient à combien sur 10 ?")
+    return (f"Sur ta séance {title}, tu as pris combien de glucides par heure, sous quelle "
+            "forme (boisson, gel, pâte, solide) et avec quels sucres ? Et tes troubles "
+            "digestifs, à combien sur 10 ? S'il y en a eu : lesquels, et vers quelle minute "
+            "ils sont apparus ?")
+
+
+def gut_review_in_notebook(title: str) -> str:
+    return (f"Ton retour carburant sur {title} t’attend dans le carnet : glucides, forme, "
+            "sucres et troubles digestifs, un tap chacun.")
 
 
 def gear_alert(name: str, km: float | None, limit: float | None) -> str:

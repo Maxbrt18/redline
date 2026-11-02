@@ -126,6 +126,13 @@ def _gut_review(detail: str) -> ClosedProactive:
     return ClosedProactive(text, question=text)
 
 
+def gut_review_in_notebook(detail: str) -> ClosedProactive:
+    """With the notebook connected, the fuel registry is filled there, one tap a question:
+    the message points to it and awaits no reply."""
+    return ClosedProactive(initiatives.gut_review_in_notebook(_session_title(_object(detail))),
+                           notebook=True)
+
+
 def _number(value) -> float | None:
     return value if isinstance(value, (int, float)) else None
 

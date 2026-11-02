@@ -19,7 +19,12 @@ CELL_QUESTIONS = {
     "dplus": "le D+",
     "dminus": "le D-",
     "carbs_g_h": "les glucides pris par heure (g/h)",
+    "fuel_formats": "la forme des glucides (boisson, gel, pâte ou gomme, solide)",
+    "fuel_mix": "les sucres (glucose seul ou glucose + fructose)",
     "gut_symptoms": "les troubles digestifs (/10)",
+    "gut_symptom_kinds": "les troubles ressentis (nausée, reflux, crampes, ballonnement, "
+                         "besoin pressant)",
+    "gut_onset_min": "la minute d'apparition des troubles",
 }
 
 NO_CAPTION = "(aucune légende)"

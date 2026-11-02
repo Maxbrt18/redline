@@ -28,6 +28,20 @@ ENJOYMENT = "/10 plaisir"
 
 TO_COMPLETE = "à compléter : "
 
+FUEL = "carburant {grams:g} g/h"
+
+FUEL_GUT = "troubles {value:g}/10"
+
+FUEL_ONSET = "dès {minutes} min"
+
+#: The fuel registry's slugs, as the coach reads them.
+FUEL_FORMATS = {"drink": "boisson", "gel": "gel", "chew": "pâte ou gomme", "solid": "solide"}
+
+GUT_SYMPTOMS = {"nausea": "nausée", "reflux": "reflux", "cramps": "crampes",
+                "bloating": "ballonnement", "urgency": "besoin pressant"}
+
+SUGARS_UNKNOWN = "sucres inconnus"
+
 KEY = "clé={idempotency_key}"
 
 EXPOSURES = "Expositions {scope} ({rows})"

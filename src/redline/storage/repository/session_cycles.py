@@ -8,7 +8,7 @@ from typing import Any
 import sqlalchemy as sa
 from sqlalchemy.engine import Connection
 
-from redline.model import local_time, session_kinds
+from redline.model import ledger, local_time, session_kinds
 from redline.model.activity import Activity
 
 from ..database import StorageError
@@ -174,14 +174,9 @@ class SessionCycles(StoreBase):
         if planned["carbs_target_g_h"] is not None:
             connection.execute(observation_metrics.update().where(
                 observation_metrics.c.observation_id == observation["id"],
-            ).values(
-                carbs_g_h_state=sa.case(
-                    (observation_metrics.c.carbs_g_h_state == "known", "known"),
-                    else_="pending"),
-                gut_symptoms_state=sa.case(
-                    (observation_metrics.c.gut_symptoms_state == "known", "known"),
-                    else_="pending"),
-            ))
+            ).values({observation_metrics.c[f"{metric}_state"]: sa.case(
+                (observation_metrics.c[f"{metric}_state"] == "known", "known"),
+                else_="pending") for metric in ledger.FUELLING_ASKED}))
         state = "completed"
         connection.execute(session_cycles.update().where(
             session_cycles.c.id == cycle["id"]).values(

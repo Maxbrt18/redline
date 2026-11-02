@@ -127,10 +127,31 @@ class ElevationSource(StrEnum):
 
 
 class CarbMix(StrEnum):
-    """The sugars a fuelling target is taken as (`planned_sessions.carbs_mix`)."""
+    """The sugars a fuelling target is taken as (`planned_sessions.carbs_mix`), and the
+    sugars a session's fuel was actually taken as (`observation_metrics.fuel_mix`)."""
 
     GLUCOSE = "glucose"
     GLUCOSE_FRUCTOSE = "glucose_fructose"
+
+
+class FuelFormat(StrEnum):
+    """What a session's carbohydrate came in (`observation_metrics.fuel_formats`)."""
+
+    DRINK = "drink"
+    GEL = "gel"
+    CHEW = "chew"
+    SOLID = "solid"
+
+
+class GutSymptom(StrEnum):
+    """The kinds of digestive trouble felt during a session
+    (`observation_metrics.gut_symptom_kinds`)."""
+
+    NAUSEA = "nausea"
+    REFLUX = "reflux"
+    CRAMPS = "cramps"
+    BLOATING = "bloating"
+    URGENCY = "urgency"
 
 
 class Decider(StrEnum):

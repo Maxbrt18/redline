@@ -169,6 +169,8 @@ TODAY = {
         "km": 5.71,
         "fields": ["pain:knee", "rpe"],
         "labels": {"pain:knee": "Genou"},
+        "total": 3,
+        "duration_min": None,
     }],
     "pain": {"cap": 2.0, "zones": [{**KNEE, "weeks": [
         {"week": PREVIOUS_WEEK, "peak": 1.5},

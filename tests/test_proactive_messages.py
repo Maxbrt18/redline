@@ -329,3 +329,22 @@ def test_the_wake_reminder_follows_the_notebook_wake_ask():
     assert service.wake_reminder_due() is True
     board.asks.return_value = [{"id": "cell:x:rpe", "type": "cells"}]
     assert service.wake_reminder_due() is False
+
+
+def test_with_a_connected_notebook_the_gut_review_points_to_the_fuel_registry(
+        make_bot, store):
+    """Five fuel questions in Messenger would cost a coach turn each answer; the notebook
+    takes them one tap each, so the review only points there and awaits no reply."""
+    bot = make_bot(proactive_active_start=dtime(0, 0))
+    _connected_notebook(bot)
+    detail = '{"title":"SL","target_g_h":60}'
+    store.proactive.enqueue_job("gut:1", "gut_review", detail, 0)
+
+    bot._respond_proactive(ProactiveJob(psid="4242", kind="gut_review", prompt="",
+                                        detail=detail, job_id="gut:1"))
+
+    bot._client.send_burst.assert_not_called()
+    _, text, url, _ = bot._client.send_button.call_args.args
+    assert text.startswith("Ton retour carburant sur SL t’attend dans le carnet")
+    assert url.endswith("#t=jeton")
+    assert not store.question_known("4242", text)

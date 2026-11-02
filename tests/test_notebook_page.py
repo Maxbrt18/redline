@@ -141,6 +141,39 @@ def test_an_answer_is_one_tap_and_says_when_the_coach_takes_over(browser):
     tab.close()
 
 
+def test_the_fuel_registry_takes_several_formats_then_one_sugar(browser):
+    """Several formats are toggled and sent together; the sugars are one tap, unknown
+    included; the onset is offered in quarter hours up to the session's duration."""
+    tab = browser.new_page(viewport={'width': 393, 'height': 852})
+    answers = []
+    serve(tab, answers)
+    ask = {**TODAY['asks'][0], 'fields': ['fuel_formats', 'fuel_mix', 'gut_symptoms'],
+           'total': 7, 'duration_min': 50}
+    tab.route(BASE + '/notebook-api/today', replying({**TODAY, 'asks': [ask]}))
+    tab.goto(BASE + '/carnet')
+    card = tab.locator('.n-check').first
+    card.get_by_text('5 sur 7', exact=True).wait_for()
+    send = card.get_by_role('button', name='Valider')
+    assert send.is_disabled()
+    card.get_by_role('button', name='Gel').click()
+    card.get_by_role('button', name='Boisson').click()
+    assert card.get_by_role('button', name='Gel').get_attribute('aria-pressed') == 'true'
+    send.click()
+    tab.get_by_text('Noté').wait_for()
+    assert answers == [{'ask': ask['id'] + ':fuel_formats', 'value': ['gel', 'drink']}]
+    tab.close()
+
+    tab = browser.new_page(viewport={'width': 393, 'height': 852})
+    serve(tab)
+    onset = {**ask, 'fields': ['gut_onset_min'], 'total': 9}
+    tab.route(BASE + '/notebook-api/today', replying({**TODAY, 'asks': [onset]}))
+    tab.goto(BASE + '/carnet')
+    chips = tab.locator('.n-check').first.locator('.n-chips button')
+    chips.first.wait_for()
+    assert chips.all_inner_texts() == ['15 min', '30 min', '45 min', '1\u00a0h']
+    tab.close()
+
+
 def test_expired_access_clears_private_content(browser):
     tab = browser.new_page(has_touch=True)
     serve(tab)
@@ -818,7 +851,8 @@ def test_the_red_point_moves_from_the_run_to_the_strength_once_done(browser):
         'dplus': None, 'started_at': '2026-10-09T07:10:00+02:00', 'over': ['hr_avg']})
     after = {**TODAY, 'sessions': [done, STRENGTH], 'asks': [
         {'id': 'cell:obs', 'type': 'cells', 'date': '2026-10-09', 'kind': 'easy', 'km': 8.35,
-         'fields': ['pain:knee', 'rpe', 'enjoyment'], 'labels': {'pain:knee': 'Genou'}}]}
+         'fields': ['pain:knee', 'rpe', 'enjoyment'], 'labels': {'pain:knee': 'Genou'},
+         'total': 3, 'duration_min': 48}]}
     tab = browser.new_page(viewport={'width': 393, 'height': 852})
     answers = []
     serve(tab, answers)

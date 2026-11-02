@@ -11,6 +11,7 @@ import os
 from typing import Any
 
 from redline.coach.fr import fact_read as wording
+from redline.coach.fr import plan as plan_wording
 from redline.coach.fr import session_labels
 from redline.model import entrypoint, voice
 from redline.model import ledger as table
@@ -25,6 +26,39 @@ def _known(row: dict, metric: str, suffix: str = "") -> str | None:
     if not measurement or measurement["state"] != "known":
         return None
     return f"{measurement['value']}{suffix}"
+
+
+def _fuel(row: dict) -> str | None:
+    """The fuel registry in one fact: grams, formats, sugars, then the gut and its onset."""
+    measures = row["measurements"]
+
+    def known(metric: str) -> Any:
+        measure = measures.get(metric) or {}
+        return measure.get("value") if measure.get("state") == "known" else None
+
+    grams = known("carbs_g_h")
+    if grams is None:
+        return None
+    parts = [wording.FUEL.format(grams=grams)]
+    formats = known("fuel_formats")
+    if formats:
+        parts.append(", ".join(wording.FUEL_FORMATS[slug] for slug in formats))
+    mix = known("fuel_mix")
+    if mix:
+        parts.append(plan_wording.CARBS_MIX[mix])
+    elif (measures.get("fuel_mix") or {}).get("state") == "unavailable":
+        parts.append(wording.SUGARS_UNKNOWN)
+    gut = known("gut_symptoms")
+    if gut is not None:
+        gut_text = wording.FUEL_GUT.format(value=gut)
+        kinds = known("gut_symptom_kinds")
+        if kinds:
+            gut_text += " (" + ", ".join(wording.GUT_SYMPTOMS[slug] for slug in kinds) + ")"
+        onset = known("gut_onset_min")
+        if onset is not None:
+            gut_text += " " + wording.FUEL_ONSET.format(minutes=onset)
+        parts.append(gut_text)
+    return " · ".join(parts)
 
 
 def observations(store: Any, limit: int) -> list[str]:
@@ -44,6 +78,9 @@ def observations(store: Any, limit: int) -> list[str]:
             if value:
                 facts.append(value)
         facts.extend(table.pain_facts(row.get("pains") or {}))
+        fuel = _fuel(row)
+        if fuel:
+            facts.append(fuel)
         pending = sorted(metric for metric, measure in row["measurements"].items()
                          if measure["state"] == "pending")
         pending += table.pending_pains(row.get("pains") or {})
