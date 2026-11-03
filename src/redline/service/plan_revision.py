@@ -18,6 +18,7 @@ from redline.model.weekly_plan import (
     decision_errors,
     fuelling_errors,
     intention_errors,
+    pain_rule_errors,
     typed_target_errors,
     validate,
     written_text_errors,
@@ -38,6 +39,24 @@ def taper_errors(store, week: str, revision: dict, warn: Callable[[str], None]) 
         return []
     return taper.plan_errors(rows, frame, week, revision,
                              f"{week} revision {revision['revision']}")
+
+
+def pain_errors(store, week: str, revision: dict, existing: dict | None,
+                warn: Callable[[str], None]) -> list[str]:
+    """Rules n3 and n4, from the ledger at the instant of writing. A measurement that
+    fails costs the check, never the prescription."""
+    from redline.analysis import ledger, pain_rules
+    today = dt.date.fromisoformat(revision["computed_at"][:10])
+    try:
+        rows = [row for row in ledger.parse_ledger(store) if row.date <= today]
+        zones = [zone.slug for zone in ledger.pain_zones(store)]
+        holds = pain_rules.holds(rows, store.daily_rows(), zones, today)
+        ceilings = pain_rules.volume_ceilings(
+            rows, zones, week, (existing or {}).get("revisions", []), today)
+    except Exception as exc:
+        warn(wording.PAIN_RULES_UNREADABLE.format(name=exc.__class__.__name__))
+        return []
+    return pain_rule_errors(revision, holds, ceilings, f"{week} revision {revision['revision']}")
 
 
 def checked(store, week: str, revision: dict, existing: dict | None, *, stamp: str,
@@ -74,6 +93,7 @@ def checked(store, week: str, revision: dict, existing: dict | None, *, stamp: s
         *decision_errors(current, where),
         *fuelling_errors(current, where),
         *taper_errors(store, week, current, warn),
+        *pain_errors(store, week, current, existing, warn),
     ]
     if mistakes:
         raise SchemaError(mistakes)

@@ -8,6 +8,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import re
+from dataclasses import dataclass
 from itertools import pairwise
 
 from redline.coach import dates
@@ -938,6 +939,67 @@ def fuelling_errors(revision: dict, where: str = "revision") -> list[str]:
                 and session.get("carbs_mix") != CarbMix.GLUCOSE_FRUCTOSE):
             problems.append(f"{label}.carbs_mix: {target} g/h is above {mix_above} g/h -- "
                             f"name the mix `{CarbMix.GLUCOSE_FRUCTOSE}` (rule f1)")
+    return problems
+
+
+@dataclass(frozen=True)
+class QualityHold:
+    """A window in which a rulebook rule removes every quality session.
+
+    Computed by the engine from the ledger (`analysis.pain_rules`), never written by the
+    model. `fact` is the evidence entry a revision cites to cancel a session under it.
+    """
+
+    rule: str
+    start: dt.date
+    end: dt.date
+    fact: str
+
+
+@dataclass(frozen=True)
+class VolumeCeiling:
+    """The most a week may target once a rule has cut it."""
+
+    rule: str
+    week: str
+    ceiling_km: float
+    reference_km: float
+    fact: str
+
+
+def _is_quality(session: dict) -> bool:
+    return (session.get("workout") in session_kinds.QUALITY
+            or session.get("transition") in rulebook.current().quality_kinds)
+
+
+def pain_rule_errors(revision: dict, holds: list[QualityHold],
+                     ceilings: list[VolumeCeiling], where: str = "revision") -> list[str]:
+    """Rules n3 and n4 on write: no quality inside a hold, no volume above a ceiling.
+
+    Judged on the new revision only, from its own date on: a session already behind it
+    belongs to the week's story, and an older revision stays readable.
+    """
+    written_on = str(revision.get("computed_at") or now_stamp())[:10]
+    problems = []
+    for session in revision.get("sessions") or []:
+        if (session.get("status") == "cancelled" or not _is_quality(session)
+                or session.get("date", "") < written_on):
+            continue
+        for hold in holds:
+            if hold.start.isoformat() <= session["date"] <= hold.end.isoformat():
+                problems.append(
+                    f"{where}.{session.get('id', '?')}: quality on {session['date']} inside "
+                    f"the hold of rule {hold.rule} ({hold.start} to {hold.end}). Cancel or "
+                    f"replace it with restriction rule={hold.rule} and, copied into evidence, "
+                    f"fact={hold.fact!r}")
+                break
+    target = revision.get("volume_target_km")
+    for ceiling in ceilings:
+        if target is not None and target > ceiling.ceiling_km:
+            problems.append(
+                f"{where}.volume_target_km: {target:g} km is above {ceiling.ceiling_km:g} km, "
+                f"the cut of rule {ceiling.rule} on the {ceiling.reference_km:g} km planned "
+                f"before {ceiling.fact!r}")
     return problems
 
 
