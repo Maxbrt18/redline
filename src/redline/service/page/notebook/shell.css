@@ -252,7 +252,7 @@ button, .n-nav, .n-krow, summary { touch-action: manipulation; }
 :root.n-piste .n-hkick { color: color-mix(in oklab, var(--on-track) 78%, var(--tartan)); }
 .n-htitle { display: flex; align-items: center; gap: 10px; margin: 0; font: 600 22px/1.15 var(--sys); }
 .n-hfig { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; margin: 8px 0 0; }
-.n-hfig b { font: 700 96px/.86 var(--display); letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.n-hfig b { font: 700 96px/.86 var(--display); letter-spacing: -.01em; font-variant-numeric: proportional-nums; }
 .n-hfig > span { font-size: 15px; line-height: 1.3; color: var(--muted); }
 :root.n-piste .n-hfig > span { color: color-mix(in oklab, var(--on-track) 78%, var(--tartan)); }
 .n-hsub { margin: 8px 0 0; font-size: 14.5px; color: var(--muted); }
