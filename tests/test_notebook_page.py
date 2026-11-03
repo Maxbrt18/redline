@@ -1143,3 +1143,57 @@ def test_a_day_becomes_a_habit_and_a_week_to_come_is_stated_for_the_review(brows
     tab.wait_for_function('() => !document.querySelector(".n-confirm[disabled]")')
     assert stated == [{'week': '2026-W42', 'days': [{'date': '2026-10-11', 'kind': 'easy'}]}]
     tab.close()
+
+
+def test_the_athlete_asks_the_coach_then_takes_or_dismisses_a_proposal(browser):
+    from notebook_payloads import PROPOSAL, REORGANIZE
+
+    asks, taken, dismissed = [], [], []
+    tab = browser.new_page(viewport={'width': 390, 'height': 844})
+    serve(tab)
+    more = {**REORGANIZE, 'variants': [{**REORGANIZE['variants'][0], 'moves': [], 'notes': []}]}
+    state = {'view': more}
+
+    def answer(route):
+        url, body = route.request.url, json.loads(route.request.post_data or '{}')
+        if url.endswith('/ask'):
+            asks.append(body)
+            state['view'] = {**more, 'proposals': [PROPOSAL]}
+            data = {'status': 'ok'}
+        elif url.endswith('/take'):
+            taken.append(body)
+            data = {'status': 'ok', 'revision': 4}
+        elif url.endswith('/dismiss'):
+            dismissed.append(body)
+            data = {'status': 'ok'}
+        else:
+            data = state['view']
+        route.fulfill(content_type='application/json', body=json.dumps(data))
+    for pattern in ('reorganize**', 'proposals/**'):
+        tab.route(BASE + '/notebook-api/' + pattern, answer)
+    tab.goto(BASE + '/carnet#t=' + 'x' * 43)
+    tab.locator('button[data-tab="week"]').click()
+    tab.get_by_role('button', name='Réorganiser la semaine').click()
+    tab.locator('button.n-rg-day', has_text='10').click()
+    tab.locator('#day-sheet').get_by_role('button', name='Je peux en faire plus').click()
+    tab.locator('#day-sheet [data-close]').last.click()
+    tab.get_by_role('button', name='Plus de volume').click()
+    tab.locator('.n-rg-ask textarea').fill('Vacances, je suis frais.')
+    tab.get_by_role('button', name='Envoyer au coach').click()
+    tab.get_by_text('Le seuil samedi, à frais').wait_for()
+    assert asks == [{'week': REORGANIZE['week'], 'days': [{'date': '2026-10-10', 'kind': 'more'}],
+                     'wish': 'volume', 'context': 'Vacances, je suis frais.'}]
+    assert 'Seuil : vendredi devient samedi' in tab.locator('#content').inner_text()
+    tab.get_by_role('button', name='Aucune, je garde ma semaine').click()
+    for _ in range(50):
+        if dismissed:
+            break
+        tab.wait_for_timeout(100)
+    assert dismissed == [{'week': REORGANIZE['week']}]
+    tab.get_by_role('button', name='Prendre', exact=True).click()
+    for _ in range(50):
+        if taken:
+            break
+        tab.wait_for_timeout(100)
+    assert taken == [{'id': PROPOSAL['id']}]
+    tab.close()

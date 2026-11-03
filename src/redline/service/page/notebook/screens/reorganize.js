@@ -246,23 +246,88 @@ export function renderReorganize(view) {
   if (data.blocked) { content.append(el('p', REORG_BLOCKED[data.blocked], 'n-banner')); return; }
   const list = el('div', null, 'n-rg-days');
   data.days.forEach(item => list.append(reorgDayRow(view.week, item, reorgKnown(plan, item))));
-  content.append(list, reorgHabitsLink());
-  if (!reorgStated(plan).length) return;
+  content.append(list);
+  if (data.proposals.length) reorgProposals(data);
+  const known = data.days.map(item => reorgKnown(plan, item)).filter(item => item && item.kind !== 'as_planned');
   const best = data.variants[0];
-  if (best && !best.moves.length && !best.dropped.length) {
+  if (!known.length) {
+    // Nothing stated: nothing to compute.
+  } else if (best && !best.moves.length && !best.dropped.length) {
     // The days stated leave the plan as it is: any other placement would only shuffle it.
     content.append(el('p', 'Ta semaine tient déjà avec ces jours : rien à déplacer.', 'n-banner'));
-    return;
-  }
-  if (!data.variants.length) {
-    content.append(el('p', 'Aucune variante ne respecte les règles avec ces jours. Dis-le au coach dans Messenger : lui seul peut changer une séance.', 'n-banner'));
+  } else if (!data.variants.length) {
+    content.append(el('p', 'Aucune variante ne respecte les règles avec ces jours : seul le coach peut changer une séance.', 'n-banner'));
   } else {
     const node = section(data.variants.length === 1 ? '1 variante' : data.variants.length + ' variantes');
     data.variants.forEach((variant, index) => node.append(reorgCard(data, variant, index)));
     content.append(node);
+    if (data.others) content.append(el('p', data.others + (data.others === 1 ? ' autre placement respecte' : ' autres placements respectent') + ' les règles ; ils changent plus de dates ou plient plus de préférences.', 'n-rg-more'));
   }
   if (data.held_back.length) content.append(el('p', data.held_back.join(', ') + ' ne peut pas être avancé : un signal de douleur est actif. Le reculer reste possible ; l’avancer demande l’avis du coach.', 'n-banner'));
-  if (data.others) content.append(el('p', data.others + (data.others === 1 ? ' autre placement respecte' : ' autres placements respectent') + ' les règles ; ils changent plus de dates ou plient plus de préférences.', 'n-rg-more'));
+  // Changing a session is the coach's: the request is open at once when the days ask for
+  // more, or when no variant holds; otherwise it waits behind a line.
+  const wanted = known.some(item => item.kind === 'more') || (known.length && !data.variants.length);
+  if (wanted || plan.asking) content.append(reorgAsk(view, data, plan, known));
+  else content.append(add(button('', () => { plan.asking = true; render(scrollY); }, 'n-list n-rg-entry'),
+    add(el('span', 'Demander au coach'), el('small', 'changer une séance, en ajouter une')), chevron()));
+  content.append(reorgHabitsLink());
+}
+
+// ------------------------------------------------------------ the coach
+const REORG_WISHES = [['intensity', 'Plus d’intensité'], ['volume', 'Plus de volume'], ['other', 'Autre']];
+function reorgAsk(view, data, plan, known) {
+  const node = section('Demander au coach');
+  const card = el('div', null, 'n-check n-rg-ask');
+  const said = known.map(item => reorgDay(item.date) + ' : ' + REORG_LABEL[item.kind].toLowerCase()).join(' · ') || 'aucun jour déclaré';
+  card.append(add(el('p', null, 'n-rg-sum'), 'Envoyé avec ta demande : ', el('b', said), ', la semaine telle qu’elle est, et ce que le carnet a pu calculer.'));
+  plan.wish = plan.wish || 'intensity';
+  const wishRow = el('div', null, 'n-choices');
+  REORG_WISHES.forEach(([wish, label]) => {
+    const choice = button(label, () => { plan.wish = wish; wishRow.querySelectorAll('button').forEach(other => other.classList.toggle('n-on', other === choice)); });
+    if (wish === plan.wish) choice.classList.add('n-on');
+    wishRow.append(choice);
+  });
+  card.append(add(el('div', null, 'n-field'), el('span', 'Ce que tu aimerais'), wishRow));
+  const area = el('textarea'); area.maxLength = 500; area.value = plan.context || '';
+  area.placeholder = 'Par exemple : fin des partiels jeudi, je serai plus reposé.';
+  area.addEventListener('input', () => { plan.context = area.value; });
+  card.append(add(el('div', null, 'n-field'), add(el('span', 'Contexte'), el('small', 'facultatif')), area));
+  const sendAsk = button('Envoyer au coach', async () => {
+    sendAsk.disabled = true;
+    try {
+      await api('reorganize/ask', {week: view.week, days: reorgStated(plan), wish: plan.wish, context: plan.context || ''});
+      plan.asking = false; plan.context = '';
+      message('Envoyé : le coach répond dans Messenger, et ses propositions arrivent ici.');
+      reorgLoad(view.week);
+    } catch (error) { sendAsk.disabled = false; message(error.message); }
+  }, 'n-action n-confirm');
+  card.append(sendAsk);
+  node.append(card);
+  return node;
+}
+function reorgProposals(data) {
+  const node = section('Le coach propose');
+  data.proposals.forEach(proposal => {
+    const card = add(el('div', null, 'n-rg-var'), add(el('p', null, 'n-rg-head'), el('span', proposal.title)),
+      el('p', proposal.body, 'n-rg-body'));
+    if (proposal.lines.length) card.append(add(el('div', null, 'n-rg-lines n-rg-said'), ...proposal.lines.map(line => el('p', line))));
+    const take = button('Prendre', async () => {
+      take.disabled = true;
+      try {
+        await api('proposals/take', {id: proposal.id});
+        app.reorg = null; delete app.views['reorganize:' + data.week];
+        message('Proposition prise : ta semaine est à jour.');
+        leave(); refresh(true);
+      } catch (error) { take.disabled = false; message(error.message); reorgLoad(data.week); }
+    }, 'n-action');
+    card.append(take);
+    node.append(card);
+  });
+  node.append(add(button('', async () => {
+    try { await api('proposals/dismiss', {week: data.week}); reorgLoad(data.week); }
+    catch (error) { message(error.message); }
+  }, 'n-list'), el('span', 'Aucune, je garde ma semaine'), chevron()));
+  content.append(node);
 }
 
 const reorgHabitsLink = () => add(button('', () => push({k: 'habits'}), 'n-list n-rg-entry'),

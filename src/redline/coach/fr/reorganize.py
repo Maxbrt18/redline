@@ -33,6 +33,27 @@ DAYS_NONE = "Aucun jour déclaré pour {week} : ni habitude, ni jour dit d'avanc
 DAYS_LINE = "  - {day} : {state}{habit}"
 HABIT = " (habitude)"
 
+# ------------------------------------------------------------------ the request to the coach
+
+#: The message the coach receives when the athlete asks from the notebook. It names the
+#: command that answers it: a request with no field to land in ends up in prose.
+ASK = (
+    "[Demande du carnet] Réorganiser {week} au-delà des dates. Jours : {days}. "
+    "Souhait : {wish}.{context} {found} Réponds par une à trois propositions avec "
+    "`redline week-plan propose --week {week} --input <fichier>` "
+    "(`{{\"proposals\": [{{\"title\", \"body\", \"revision\"}}]}}`, chaque revision complète "
+    "comme pour revise) ; l'athlète en prend une d'un tap dans le carnet. Si rien ne doit "
+    "changer, dis-le simplement, sans proposition.")
+WISHES = {"intensity": "plus d'intensité", "volume": "plus de volume",
+          "other": "autre chose, voir le contexte"}
+CONTEXT = " Contexte, en ses mots : « {context} »."
+FOUND = "Le calcul sans IA propose {count} variante(s) de dates ; la meilleure : {best}."
+FOUND_NONE = "Le calcul sans IA ne trouve aucune variante de dates qui respecte les filtres."
+FOUND_UNWRITTEN = "La semaine n'est pas encore écrite."
+PROPOSED = "Propositions enregistrées pour {week}, sur la révision {based_on} :"
+PROPOSED_STAGED = "Propositions préparées pour {week}, sur la révision {based_on} (enregistrées à la fin du tour) :"
+PROPOSAL = "  {number}. {title}"
+
 # ------------------------------------------------------------------ the revision it writes
 
 REASON = "Semaine réorganisée dans le carnet, variante {number} sur {count} : {summary}."
@@ -48,6 +69,8 @@ DAY = "{day} {state}"
 PINNED = "{title} épinglée {day}"
 MOVED = "{title} passe du {before} au {after}"
 DROPPED = "{title} saute"
+ADDED = "{title} s'ajoute le {day}"
+CHANGED = "{title} change, le {day}"
 #: How a day the athlete stated reads in the evidence.
 DAY_STATES = {
     "as_planned": "comme prévu",

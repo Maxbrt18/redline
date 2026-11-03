@@ -527,3 +527,105 @@ def test_a_habit_steers_the_variants_and_a_week_to_come_is_prepared(seeded):
     coming = service.view(seeded, "2030-W11", {"days": []}, today)
     assert coming["written"] is False and coming["blocked"] is None
     assert coming["days"][3]["stated"]["habit"] is True
+
+
+# ------------------------------------------------------------------ the coach's proposals
+
+def _proposal(store, title="Le footing passe samedi"):
+    plan = store.load_plan(WEEK)
+    revision = json.loads(json.dumps(plan["revisions"][-1]))
+    for session in revision["sessions"]:
+        if session["id"] == "w10-sat-foot":
+            session["date"] = "2030-03-08"
+    revision.update(revision=revision["revision"] + 1, reason="proposition sur demande",
+                    evidence=["request: carnet, plus de volume"],
+                    changes=[{"session_id": "w10-sat-foot", "fields": ["date"],
+                              "trigger": "request: carnet, plus de volume",
+                              "context": "demande du carnet", "rule": "jugement du coach"}],
+                    decision={"by": "judgment", "alternatives": [
+                        {"option": "rien ne bouge", "rejected_because": "demande explicite"}]})
+    revision.pop("state_snapshot", None)
+    return {"title": title, "body": "Un jour de plus entre le footing et la SL.",
+            "revision": revision}
+
+
+def test_a_request_to_the_coach_names_the_days_the_wish_and_the_command(seeded):
+    from redline.service import reorganize as service
+
+    text = service.ask(seeded, WEEK, {"days": [{"date": "2030-03-08", "kind": "more"}]},
+                       "volume", "fin des partiels", dt.date(2030, 3, 5))
+    assert "peut en faire plus" in text and "plus de volume" in text
+    assert "fin des partiels" in text and "week-plan propose --week 2030-W10" in text
+    assert [row["kind"] for row in seeded.stated_days(DATES[0], DATES[-1])] == ["more"]
+    with pytest.raises(service.ReorganizeError):
+        service.ask(seeded, WEEK, {"days": []}, "nap", "", dt.date(2030, 3, 5))
+
+
+def test_a_proposal_is_checked_kept_shown_then_taken(seeded):
+    from redline.service import reorganize as service
+
+    stamp = "2030-03-05T12:00:00+01:00"
+    based_on, checked = service.checked_proposals(
+        seeded, WEEK, {"proposals": [_proposal(seeded), _proposal(seeded, "Variante bis")]}, stamp)
+    assert based_on == 1 and checked[0]["revision"]["state_snapshot"]["as_of"] == "2030-03-05"
+    seeded.add_proposals(WEEK, based_on, checked)
+    shown = service.view(seeded, WEEK, {"days": []}, dt.date(2030, 3, 5))["proposals"]
+    assert [item["title"] for item in shown] == ["Le footing passe samedi", "Variante bis"]
+    assert shown[0]["lines"][0].startswith("Footing passe du ")
+    assert not any("w10-" in line for line in shown[0]["lines"])
+    assert service.take_proposal(seeded, shown[0]["id"], stamp) == 2
+    assert seeded.open_proposals(WEEK) == []
+    with pytest.raises(service.ReorganizeError):
+        service.take_proposal(seeded, shown[1]["id"], stamp)
+
+
+def test_a_proposal_that_breaks_a_rule_is_refused_before_it_is_kept(seeded):
+    from redline.service import reorganize as service
+
+    broken = _proposal(seeded)
+    broken["revision"]["changes"] = []
+    with pytest.raises(SchemaError):
+        service.checked_proposals(seeded, WEEK, {"proposals": [broken]},
+                                  "2030-03-05T12:00:00+01:00")
+    with pytest.raises(SchemaError):
+        service.checked_proposals(seeded, WEEK, {"proposals": []}, "2030-03-05T12:00:00+01:00")
+
+
+def test_a_new_set_of_proposals_replaces_the_open_one_and_can_be_dismissed(seeded):
+    from redline.service import reorganize as service
+
+    stamp = "2030-03-05T12:00:00+01:00"
+    for title in ("Premier envoi", "Second envoi"):
+        based_on, checked = service.checked_proposals(
+            seeded, WEEK, {"proposals": [_proposal(seeded, title)]}, stamp)
+        seeded.add_proposals(WEEK, based_on, checked)
+    assert [row["title"] for row in seeded.open_proposals(WEEK)] == ["Second envoi"]
+    seeded.dismiss_proposals(WEEK)
+    assert seeded.open_proposals(WEEK) == []
+
+
+def test_the_command_keeps_proposals_outside_a_turn(seeded, monkeypatch, tmp_path, capsys):
+    from conftest import load_script
+
+    week_plan = load_script("week-plan")
+    monkeypatch.delenv("REDLINE_TURN_ID", raising=False)
+    monkeypatch.setattr(week_plan, "now_stamp", lambda: "2030-03-05T12:00:00+01:00")
+    request = tmp_path / "proposals.json"
+    request.write_text(json.dumps({"proposals": [_proposal(seeded)]}), encoding="utf-8")
+    assert week_plan._propose(seeded, WEEK, str(request)) == 0
+    assert "1. Le footing passe samedi" in capsys.readouterr().out
+    assert len(seeded.open_proposals(WEEK)) == 1
+
+
+def test_proposals_staged_in_a_turn_appear_only_when_the_turn_applies(seeded):
+    from redline.model import commands
+    from redline.service import reorganize as service
+
+    based_on, checked = service.checked_proposals(
+        seeded, WEEK, {"proposals": [_proposal(seeded)]}, "2030-03-05T12:00:00+01:00")
+    turn_id = "0b7e7c2a-3c35-4d3e-9a0e-6f2d9d1c4b11"
+    seeded.stage_command(turn_id, f"propose:{WEEK}:r{based_on}", commands.PLAN_PROPOSE,
+                         {"week": WEEK, "based_on": based_on, "proposals": checked})
+    assert seeded.open_proposals(WEEK) == []
+    assert seeded.apply_turn_with_receipts(turn_id)[0] == 1
+    assert [row["title"] for row in seeded.open_proposals(WEEK)] == ["Le footing passe samedi"]

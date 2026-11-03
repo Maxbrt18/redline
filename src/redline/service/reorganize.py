@@ -17,7 +17,7 @@ from redline.coach import dates
 from redline.coach.fr import reorganize as text
 from redline.coach.fr import session_labels
 from redline.model import notebook_views as views
-from redline.model import paths, rulebook, week_days
+from redline.model import paths, rulebook, week_days, weekly_plan
 from redline.model import program as strength_program
 from redline.model.errors import InputError
 from redline.model.notes import NoteError
@@ -191,13 +191,15 @@ def view(store, week: str, payload: object, today: dt.date) -> views.ReorganizeV
     blocked = _blocked(plan, week, today)
     revision = active(plan) if plan is not None else None
     if revision is None or blocked:
-        return {"week": week, "revision": revision["revision"] if revision else 0,
+        return {"proposals": [], "week": week,
+                "revision": revision["revision"] if revision else 0,
                 "written": revision is not None, "blocked": blocked,
                 "days": _days(revision, week, today, request, habits), "variants": [],
                 "others": 0, "held_back": []}
     computation = compute(store, plan, week, request, today, pain_signal(store, today))
     titles = {session["id"]: session["title"] for session in revision["sessions"]}
     return {
+        "proposals": _proposals(store, plan, week),
         "week": week, "revision": revision["revision"], "written": True, "blocked": None,
         "days": _days(revision, week, today, request, habits),
         "variants": [_variant(variant, computation) for variant in computation.outcome.variants],
@@ -362,3 +364,92 @@ def days_readback(store, week: str) -> str:
         text.DAYS_LINE.format(day=_day(date), state=_words(day),
                               habit=text.HABIT if day.habit else "")
         for date, day in sorted(request.days.items()))])
+
+
+# ------------------------------------------------------------------ the coach's proposals
+
+WISHES = ("intensity", "volume", "other")
+CONTEXT_MAX = 500
+
+
+def ask(store, week: str, payload: object, wish: str, context: str, today: dt.date) -> str:
+    """Keep the days stated, and the message that hands the request to the coach."""
+    if wish not in WISHES or len(context) > CONTEXT_MAX:
+        raise ReorganizeError("unreadable request")
+    state_days(store, week, payload, today)
+    request = request_of(store, week, {"days": []})
+    plan = store.load_plan(week)
+    if plan is None:
+        found = text.FOUND_UNWRITTEN
+    else:
+        validate(plan)
+        computation = compute(store, plan, week, request, today, pain_signal(store, today))
+        titles = {session["id"]: session["title"] for session in computation.revision["sessions"]}
+        variants = computation.outcome.variants
+        found = (text.FOUND.format(count=len(variants), best=_summary(variants[0], titles))
+                 if variants else text.FOUND_NONE)
+    titles = {session["id"]: session["title"]
+              for session in (active(plan)["sessions"] if plan else [])}
+    return text.ASK.format(week=week, days=_stated(request, titles), wish=text.WISHES[wish],
+                           context=text.CONTEXT.format(context=context.strip())
+                           if context.strip() else "", found=found)
+
+
+def checked_proposals(store, week: str, payload: object, stamp: str,
+                      warn=lambda line: None) -> tuple[int, list[dict]]:
+    """Each proposal checked as the revision it would become; the revision it builds on."""
+    clean = weekly_plan.PROPOSALS_SCHEMA.validate(payload, "proposals")
+    plan = store.load_plan(week)
+    if plan is None:
+        raise ReorganizeError(f"{week}: no plan to build a proposal on")
+    validate(plan)
+    based_on = active(plan)["revision"]
+    out = []
+    for proposal in clean["proposals"]:
+        _, current = plan_revision.checked(store, week, proposal["revision"], plan,
+                                           stamp=stamp, warn=warn)
+        out.append({"title": proposal["title"], "body": proposal["body"], "revision": current})
+    return based_on, out
+
+
+def _changes(current: dict, proposed: dict) -> list[str]:
+    """What a proposal changes, in the athlete's words: titles and days, never ids."""
+    before = {session["id"]: session for session in current["sessions"]}
+    lines = []
+    for session in proposed["sessions"]:
+        old = before.get(session["id"])
+        day = _day(dt.date.fromisoformat(session["date"]))
+        if old is None:
+            lines.append(text.ADDED.format(title=session["title"], day=day))
+        elif session["status"] == "cancelled" and old["status"] != "cancelled":
+            lines.append(text.DROPPED.format(title=old["title"]))
+        elif old["date"] != session["date"]:
+            lines.append(text.MOVED.format(title=session["title"], after=day,
+                                           before=_day(dt.date.fromisoformat(old["date"]))))
+        elif weekly_plan.revision_diff({"sessions": [old]}, {"sessions": [session]}):
+            lines.append(text.CHANGED.format(title=session["title"], day=day))
+    kept = {session["id"] for session in proposed["sessions"]}
+    lines += [text.DROPPED.format(title=session["title"])
+              for session_id, session in before.items() if session_id not in kept]
+    return lines
+
+
+def _proposals(store, plan: dict, week: str) -> list[views.Proposal]:
+    current = active(plan)
+    return [{"id": str(row["id"]), "title": row["title"], "body": row["body"],
+             "lines": _changes(current, row["revision"])}
+            for row in store.open_proposals(week) if row["based_on"] == current["revision"]]
+
+
+def take_proposal(store, proposal_id: str, stamp: str, warn=lambda line: None) -> int:
+    """Write the proposal the athlete took, checked again now; its revision number."""
+    found = store.open_proposal(uuid.UUID(proposal_id))
+    if found is None:
+        raise ReorganizeError(f"proposal {proposal_id}: unknown or settled")
+    plan = store.load_plan(found["week"])
+    if plan is None or active(plan)["revision"] != found["based_on"]:
+        raise ReorganizeError(f"proposal {proposal_id}: the week moved on")
+    _, current = plan_revision.checked(store, found["week"], found["revision"], plan,
+                                       stamp=stamp, warn=warn)
+    store.take_proposal(found["id"], current)
+    return current["revision"]

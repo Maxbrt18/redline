@@ -722,6 +722,16 @@ class Variant(TypedDict):
     around_min: int | None
 
 
+class Proposal(TypedDict):
+    """A revision the coach proposed for the week, taken with one tap."""
+
+    id: str
+    title: str
+    body: str
+    #: What it changes, one line per session, in the coach's words.
+    lines: list[str]
+
+
 class ReorganizeView(TypedDict):
     """The athlete's week to reorganise, and the variants the days they stated allow.
 
@@ -738,6 +748,8 @@ class ReorganizeView(TypedDict):
     others: int
     #: Titles of the demanding sessions a pain signal keeps from moving earlier.
     held_back: list[str]
+    #: What the coach proposed for this revision of the week, if the athlete asked.
+    proposals: list[Proposal]
 
 
 class Habit(DayState):

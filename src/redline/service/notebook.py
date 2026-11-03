@@ -121,6 +121,18 @@ class NotebookService:
     def end_habit(self, habit_id: str) -> None:
         reorganize.end_habit(self.board().ops, habit_id, clock.today())
 
+    def ask_coach(self, week: str, days: object, wish: str, context: str) -> str:
+        """The message that hands the athlete's request to the coach; the days are kept."""
+        return reorganize.ask(self.board().ops, week, {"days": days}, wish, context,
+                              clock.today())
+
+    def take_proposal(self, proposal_id: str) -> int:
+        stamp = clock.now().replace(microsecond=0).isoformat()
+        return reorganize.take_proposal(self.board().ops, proposal_id, stamp)
+
+    def dismiss_proposals(self, week: str) -> None:
+        self.board().ops.dismiss_proposals(week)
+
     def race(self, psid: str) -> views.RaceView:
         archives = [*self.store.list_entries(psid, kind="monthly", limit=12),
                     *self.store.list_entries(psid, kind="weekly", limit=8)]

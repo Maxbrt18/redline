@@ -127,6 +127,7 @@ class TurnCommands(StoreBase):
             commands.HR_DOUBT: self._apply_hr_doubt,
             commands.EXPOSURE_UPSERT: self._apply_exposure,
             commands.PLAN_REVISE: self._apply_plan,
+            commands.PLAN_PROPOSE: self._apply_proposals,
             commands.DAILY_UPSERT: self._apply_daily,
             commands.CAPABILITY_EVALUATE: self._apply_capability,
             commands.THREAD_UPSERT: self._apply_thread,
@@ -221,6 +222,11 @@ class TurnCommands(StoreBase):
         week = payload["week"]
         self.append_plan_revision_in(connection, week, revision, actor=actor)
         return week
+
+    def _apply_proposals(self, connection: Connection, payload: dict, actor: str) -> str:
+        self.add_proposals_in(connection, payload["week"], payload["based_on"],
+                              payload["proposals"], actor=actor)
+        return payload["week"]
 
     def _apply_daily(self, connection: Connection, payload: dict, actor: str) -> None:
         payload["day"] = dt.date.fromisoformat(payload["day"])
