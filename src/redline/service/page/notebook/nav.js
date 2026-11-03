@@ -1,7 +1,8 @@
 import {$, add, button, el} from '../shared/dom.js';
 import {retry} from '../strength/send.js';
 import {app, calm} from './state.js';
-import {content, message} from './ui.js';
+import {content, hero, message} from './ui.js';
+import {pisteBar} from '../shared/theme.js';
 import {entryTitle, fmt, humanDate, kindName, kindWord, longDay, raceFacts, startedAt, weekNumber, weekSpan, weekState} from './format.js';
 import {renderToday} from './screens/today.js';
 import {renderWeek, renderWeeks} from './screens/week.js';
@@ -75,7 +76,10 @@ function failure(text, retry) {
 export function render(y) {
   const view = screen(), data = app.views[view.key];
   const opened = new Set([...content.querySelectorAll('details[open] > summary')].map(node => node.textContent));
-  content.replaceChildren();
+  content.replaceChildren(); hero.replaceChildren();
+  // The three tabs open on the track; a pushed screen, on paper.
+  const piste = Boolean(view.root) && !app.workout;
+  document.documentElement.classList.toggle('n-piste', piste); pisteBar(piste);
   document.querySelectorAll('[data-tab]').forEach(node => {
     if (node.dataset.tab === app.active) node.setAttribute('aria-current', 'page');
     else node.removeAttribute('aria-current');
@@ -221,6 +225,8 @@ export function barState(instant = false) {
   topBar.classList.toggle('instant', instant);
   topBar.classList.toggle('scrolled', scrollY > 2);
   topBar.classList.toggle('titled', title.getBoundingClientRect().bottom < topBar.getBoundingClientRect().bottom);
+  // The bar stays on the track while the track shows under it, then turns to paper.
+  topBar.classList.toggle('ontrack', $('track').getBoundingClientRect().bottom > topBar.getBoundingClientRect().bottom);
   if (instant) { void topBar.offsetWidth; topBar.classList.remove('instant'); }
 }
 let ticking = false;

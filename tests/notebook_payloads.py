@@ -267,15 +267,6 @@ RACE_PLAN = {
 RACE = {
     "race": TODAY["race"] | {"target": "<4 h 30"},
     "plan": RACE_PLAN,
-    "longest": {
-        "km": 15.84,
-        "planned_km": 16,
-        "planned_on": "2026-10-11",
-        "weeks": [
-            {"week": PREVIOUS_WEEK, "km": 15.84, "volume": 39.66, "target": 40.0, "open": False},
-            {"week": CURRENT_WEEK, "km": 8.35, "volume": 14.06, "target": 41.0, "open": True},
-        ],
-    },
     "milestones": [
         {"date": "2026-10-04", "label": "Accès vélo", "kind": "deadline", "overdue": True},
         {"date": "2026-10-14", "label": "Frontale ≥400 lm", "kind": "deadline", "overdue": False},

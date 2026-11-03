@@ -2,20 +2,16 @@
  * rules used elsewhere in the notebook: many lines were hard to read. Group titles sit
  * above the cards, as in Settings. Colour has a meaning: the family tint in the pill, the
  * HR zone ramp (--z1 to --z5) wherever an HR is shown, red for repetitions. */
-.n-dh { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 26px 4px 8px; }
-.n-dh h2 { font: 600 12px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.n-dh { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 30px 0 8px; }
+.n-dh h2 { font: 700 20px/1.2 var(--sys); color: var(--ink); margin: 0; }
 .n-dh span { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
-.n-dcard, .n-dtile, .n-dlink { background: var(--card); box-shadow: 0 1px 2px rgb(40 30 25 / .06), 0 4px 14px rgb(40 30 25 / .04); }
-:root[data-theme="dark"] :is(.n-dcard, .n-dtile, .n-dlink) { box-shadow: inset 0 .5px 0 rgb(255 255 255 / .06); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) :is(.n-dcard, .n-dtile, .n-dlink) { box-shadow: inset 0 .5px 0 rgb(255 255 255 / .06); } }
-.n-dcard { border-radius: 18px; padding: 16px; }
+.n-dcard { padding: 0; }
 
 /* The head: on sand, a big figure, then the session as a bar. */
-.n-dhero { --h: var(--h-run); background: var(--sand); border-radius: 22px; padding: 16px 18px 18px; margin-top: 10px; }
+.n-dhero { --h: var(--h-run); margin-top: 4px; }
 .n-dkind { display: flex; align-items: center; gap: 9px; margin: 0; font: 600 13.5px var(--sans); }
-.n-dhero .n-pas { background: color-mix(in oklab, var(--h) var(--tile-pas-mix), var(--sand)); }
 .n-dbig { display: flex; align-items: baseline; gap: 8px; margin: 14px 0 0; }
-.n-dbig b { font: 700 68px/.86 var(--display); letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.n-dbig b { font: 700 96px/.86 var(--display); letter-spacing: -.01em; font-variant-numeric: proportional-nums; }
 .n-dbig span { font: 600 22px var(--display); color: var(--muted); }
 .n-dpair { display: flex; gap: 26px; margin-top: 12px; }
 .n-dpair b { display: block; font: 700 30px/1 var(--display); font-variant-numeric: tabular-nums; }
@@ -23,8 +19,8 @@
 .n-dpair span { font-size: 12.5px; color: var(--muted); }
 .n-dstrip { display: flex; height: 14px; border-radius: 7px; overflow: hidden; gap: 2px; margin-top: 18px; }
 .n-dstrip i { display: block; height: 100%; }
-.n-dstrip .e { background: color-mix(in oklab, var(--h) 45%, var(--sand)); }
-.n-dstrip .r { background: color-mix(in oklab, var(--h) 22%, var(--sand)); }
+.n-dstrip .e { background: var(--dots-ink); }
+.n-dstrip .r { background: var(--dots-faint); }
 .n-dstrip .q { background: var(--red); }
 .n-dkstrip { display: grid; grid-template-columns: repeat(var(--n, 10), minmax(0, 1fr)); gap: 3px; margin-top: 18px; }
 .n-dkstrip i { height: 14px; border-radius: 3px; background: var(--zc); }
@@ -40,7 +36,7 @@
 .n-dtiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
 .n-dh + .n-dtiles { margin-top: 0; }
 .n-dtiles.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.n-dtile { border-radius: 16px; padding: 12px 12px 11px; min-width: 0; }
+.n-dtile { padding: 10px 0 4px; min-width: 0; border-top: .5px solid var(--grid); }
 .n-dtl { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
 .n-dico { display: inline-grid; flex: none; }
 .n-dico svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
@@ -49,7 +45,7 @@
 .n-dtile > small { display: block; font-size: 12px; color: var(--muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .n-dtiles.two .n-dtile > small { white-space: normal; line-height: 1.35; }
 .n-dtile.pain { --h: var(--h-pain); }
-.n-dtile.todo { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ghost); }
+.n-dtile.todo { border-top-style: dashed; }
 .n-dtile.todo > b { color: var(--faint); }
 .n-zc { display: inline-block; padding: 1px 6px 2px; border-radius: 6px; font: 700 11px/1.3 var(--sans); color: var(--zc);
   background: color-mix(in oklab, var(--zc) 16%, transparent); }
@@ -59,14 +55,14 @@
 .n-dseg i.half { opacity: .5; }
 .n-dfoot { font-size: 13px; color: var(--muted); margin: 10px 4px 0; }
 .n-dpend { color: var(--faint); border-bottom: 1.5px dashed var(--faint); }
-.n-dsec .n-check { background: var(--card); margin-top: 8px; }
+.n-dsec .n-check { margin-top: 8px; }
 
 /* Planned and done. */
 .n-dcard .n-gauges { margin-top: 0; }
 .n-dsteps { display: grid; gap: 8px; margin-top: 16px; }
 .n-dstep { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px;
   background: color-mix(in oklab, var(--ink) 4%, transparent); }
-.n-dstep > i { width: 10px; height: 10px; border-radius: 3px; background: color-mix(in oklab, var(--h-run) 45%, var(--card)); }
+.n-dstep > i { width: 10px; height: 10px; border-radius: 3px; background: color-mix(in oklab, var(--h-run) 45%, var(--bg)); }
 .n-dstep.q > i { background: var(--red); }
 .n-dstep > span:nth-child(2) { font-size: 14.5px; font-weight: 600; min-width: 0; }
 .n-dstep > span:nth-child(2) small { display: block; font-size: 12.5px; font-weight: 400; color: var(--muted); margin-top: 1px; }
@@ -108,7 +104,7 @@
 .n-drr { padding: 7px 0; font: 600 18px/1 var(--display); font-variant-numeric: tabular-nums; }
 .n-drr + .n-drr { border-top: 1px solid color-mix(in oklab, var(--ink) 7%, transparent); }
 .n-drn { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%;
-  background: color-mix(in oklab, var(--red) 14%, var(--card)); color: var(--red); font: 700 14px var(--display); }
+  background: color-mix(in oklab, var(--red) 14%, var(--bg)); color: var(--red); font: 700 14px var(--display); }
 .n-drr small { font: 400 11px var(--sans); color: var(--muted); margin-left: 1px; }
 :is(.n-drr, .n-dkr) .fc { color: var(--zc); }
 :is(.n-drr, .n-dkr) .fc::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 5px; vertical-align: 2px; }
@@ -124,7 +120,7 @@
 .n-dread-row.pend { color: var(--faint); }
 .n-dread-row.ask { display: block; }
 .n-dask { display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: start; margin-bottom: 10px; }
-.n-dchoice button { background: var(--card); font-size: 14.5px; }
+.n-dchoice button { font-size: 14.5px; }
 
 /* Per kilometre: pace as a bar, HR in its zone's colour. */
 .n-dkm { margin-top: 16px; }
@@ -159,10 +155,10 @@
 .n-dcrow.head span:nth-child(2) { color: var(--ink); }
 .n-dweek > b { font: 700 30px/1 var(--display); }
 .n-dweek > b small { font: 600 16px var(--display); color: var(--muted); margin-left: 4px; }
-.n-dmeter { height: 8px; border-radius: 4px; background: color-mix(in oklab, var(--h-run) 16%, transparent); margin-top: 10px; overflow: hidden; }
-.n-dmeter i { display: block; height: 100%; border-radius: 4px; background: var(--h-run); }
+.n-dmeter { height: 8px; border-radius: 4px; background: var(--ghost); margin-top: 10px; overflow: hidden; }
+.n-dmeter i { display: block; height: 100%; border-radius: 4px; background: var(--data); }
 .n-dweek .n-dnote { margin-top: 8px; }
-.n-dlink { display: flex; align-items: center; gap: 10px; margin-top: 8px; padding: 12px 14px; border-radius: 16px; color: var(--ink);
+.n-dlink { display: flex; align-items: center; gap: 10px; margin-top: 0; padding: 13px 0; border-top: .5px solid var(--grid); color: var(--ink);
   text-decoration: none; font-size: 15px; min-height: 48px; }
 .n-dlink > span:nth-child(2) { flex: 1; min-width: 0; }
 .n-dlink small { color: var(--muted); font-size: 13px; white-space: nowrap; }

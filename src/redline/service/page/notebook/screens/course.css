@@ -1,32 +1,18 @@
-/* Course */
-.n-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
-.n-head h1 { margin: 0; font-size: 44px; }
-.n-head .goal { text-align: right; }
-.n-head .goal b { font: 700 26px/1 var(--display); }
-/* Volume and long run: the fact against its target, the long run in figures below. */
-.n-vchart { display: block; width: 100%; height: auto; margin-top: 14px; overflow: visible; }
-.n-vchart .track { fill: var(--ghost); }
-.n-vchart .done { fill: var(--data); }
-.n-vchart .axis { stroke: var(--faint); stroke-width: 1; }
-.n-vchart .sep { stroke: var(--grid); stroke-width: 1; }
-.n-vchart .vl { font: 700 12px var(--sans); fill: var(--ink); }
-.n-vchart .vl .t { font-weight: 500; font-size: 10.5px; fill: var(--faint); }
-.n-vchart .wl { font: 500 10.5px var(--sans); fill: var(--faint); }
-.n-vchart .wl.now { font-weight: 700; fill: var(--ink); }
-.n-vchart .cap { font: 600 10.5px var(--sans); letter-spacing: .07em; text-transform: uppercase; fill: var(--muted); }
-.n-vchart .slv { font: 700 17px var(--display); fill: var(--ink); }
-.n-vchart .slv.plan { fill: var(--faint); }
-.n-vchart .sls { font: 500 10px var(--sans); fill: var(--faint); }
-.n-vleg { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 10px 0 0; font-size: 12px; color: var(--muted); }
-.n-vleg i { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 2px; vertical-align: -1px; }
-.n-vleg i.done { background: var(--data); }
-.n-vleg i.track { background: var(--ghost); }
+/* Course: the head on the track carries the days left and the course itself. */
+:root.n-piste .n-track .n-rp-chart .area { fill: url(#n-dots-light); }
+:root.n-piste .n-track .n-rp-chart .line { stroke: var(--on-track); }
+:root.n-piste .n-track .n-rp-chart :is(.al, .hi, .pt) { fill: var(--on-track); }
+:root.n-piste .n-track .n-rp-chart :is(.ak, .dp, .yl) { fill: color-mix(in oklab, var(--on-track) 80%, var(--tartan)); stroke: none; }
+:root.n-piste .n-track .n-rp-chart .aid { stroke: color-mix(in oklab, var(--on-track) 70%, transparent); }
+:root.n-piste .n-track .n-rp-chart .grid { stroke: color-mix(in oklab, var(--on-track) 25%, transparent); }
+:root.n-piste .n-track .n-rp-chart .climb { fill: color-mix(in oklab, var(--on-track) 22%, transparent); }
+:root.n-piste .n-track .n-rp-chart .cn { fill: var(--on-track); stroke: var(--tartan); }
 .n-timeline { position: relative; margin: 14px 0 4px; padding-left: 18px; }
 .n-timeline::before { content: ""; position: absolute; left: 5px; top: 6px; bottom: 6px; width: 2px; background: var(--grid); }
 .n-tl { position: relative; padding: 0 0 12px; }
 .n-tl::before { content: ""; position: absolute; left: -17px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--bg); border: 2px solid var(--faint); }
-.n-tl.now::before { background: var(--red); border-color: var(--red); }
-.n-tl.goal::before { background: var(--ink); border-color: var(--ink); }
+.n-tl.now::before { background: var(--ink); border-color: var(--ink); }
+.n-tl.goal::before { background: var(--tartan); border-color: var(--tartan); }
 .n-tl p { margin: 0; }
 .n-tl .w { font-size: 12px; color: var(--muted); }
 .n-tl .w.n-over { color: var(--over); }
@@ -44,7 +30,7 @@
 /* Race plan: the profile against an altitude scale, aid stations named on it; the
  * passages as clock times with their band. The data is ink on --ghost, like the volume. */
 .n-rp-chart { display: block; width: 100%; height: auto; margin-top: 12px; overflow: visible; }
-.n-rp-chart .area { fill: var(--ghost); }
+.n-rp-chart .area { fill: url(#n-dots-red); }
 .n-rp-chart .line { fill: none; stroke: var(--ink); stroke-width: 1.6; stroke-linejoin: round; }
 .n-rp-chart .grid { stroke: var(--grid); stroke-width: 1; }
 .n-rp-chart .aid { stroke: var(--faint); stroke-width: 1; stroke-dasharray: 3 3; }
@@ -54,19 +40,15 @@
 .n-rp-chart .hi { font: 700 11px var(--sans); fill: var(--ink); }
 .n-rp-chart .dp { font: 600 10.5px var(--sans); fill: var(--muted); }
 .n-rp-chart .pt { fill: var(--ink); }
-.n-rp-chart .climb { fill: color-mix(in oklab, var(--h-race) 32%, var(--bg)); }
+.n-rp-chart .climb { fill: color-mix(in oklab, var(--data) 26%, transparent); }
 .n-rp-chart .cn { font: 700 11px var(--sans); fill: var(--h-race); paint-order: stroke; stroke: var(--bg); stroke-width: 3px; }
 .n-rp-cn { display: inline-grid; place-items: center; width: 20px; height: 20px; margin-right: 8px; border-radius: 50%; vertical-align: 1px;
   background: color-mix(in oklab, var(--h-race) var(--pas-mix), var(--bg)); color: var(--h-race); font: 700 11.5px/1 var(--sans); font-style: normal; }
-.n-rp-arr { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin-top: 14px; }
-.n-rp-arr .lab { font: 600 11px/1 var(--sans); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
-.n-rp-arr .big { font: 700 34px/1 var(--display); }
-.n-rp-arr .n-rp-small { margin-top: 4px; }
 .n-rp-small { font-size: 12.5px; color: var(--muted); margin: 8px 0 0; }
 .n-rp-pace { display: grid; grid-template-columns: 40px 1fr 40px; align-items: center; gap: 10px; margin-top: 4px; padding: 12px 14px;
-  background: var(--panel); border-radius: 16px; }
+  background: var(--panel); border-radius: 18px; }
 .n-rp-pace .v { text-align: center; }
-.n-rp-pace .v b { display: block; font: 700 30px/1 var(--display); }
+.n-rp-pace .v b { display: block; font: 700 40px/1 var(--display); }
 .n-rp-pace .v span { font-size: 12px; color: var(--muted); }
 .n-rp-pace .n-round svg { stroke-width: 2; }
 .n-rp-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 12px 0; border-bottom: 1px solid var(--grid); }

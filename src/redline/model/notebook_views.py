@@ -324,21 +324,6 @@ class InjuryView(TypedDict):
     scale: list[ScaleStep]
 
 
-class LongestWeek(TypedDict):
-    week: str
-    km: float
-    volume: float
-    target: float | None
-    open: bool
-
-
-class Longest(TypedDict):
-    km: float | None
-    weeks: list[LongestWeek]
-    planned_km: float | None
-    planned_on: str | None
-
-
 class SessionMilestone(TypedDict):
     date: str
     label: str
@@ -454,7 +439,6 @@ class RacePlanView(TypedDict):
 class RaceView(TypedDict):
     race: Race | None
     plan: RacePlan | None
-    longest: Longest
     milestones: list[Milestone]
     capabilities: list[Capability]
     archives: list[Entry]

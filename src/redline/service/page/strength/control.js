@@ -257,7 +257,7 @@ export function control(index) {
     counter.appendChild(btn('+10', bump(10)));
     if (progress.otherCount) box.appendChild(counter);
     if (!progress.otherCount) {
-      actions.appendChild(btn(`${target} contacts faits → repos`, () => validateSlot(target), 'p-btn--wide'));
+      actions.appendChild(btn(`${target} contacts faits, puis repos`, () => validateSlot(target), 'p-btn--wide'));
       actions.appendChild(btn('Autre nombre', () => { progress.otherCount = true; save(); renderSession(); }, 'p-btn--quiet'));
     } else actions.appendChild(forward(() => progress.count || null));
   } else if (mode === 'amrap') {

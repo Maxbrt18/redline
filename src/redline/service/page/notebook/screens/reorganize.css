@@ -19,10 +19,8 @@
 .n-rg-day.set .n-rg-what > span:last-child { color: var(--ink); }
 .n-rg-tag { font-size: 13px; font-weight: 600; white-space: nowrap; color: var(--bg); background: var(--ink); border-radius: 8px; padding: 4px 8px; }
 /* Variant cards. */
-.n-rg-var { background: var(--card); border-radius: 18px; padding: 16px; margin-top: 12px;
-  box-shadow: 0 1px 2px rgb(40 30 25 / .06), 0 4px 14px rgb(40 30 25 / .04); }
-:root[data-theme="dark"] .n-rg-var { box-shadow: inset 0 .5px 0 rgb(255 255 255 / .06); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .n-rg-var { box-shadow: inset 0 .5px 0 rgb(255 255 255 / .06); } }
+/* A variant on paper: what moves solid, what stays in dots. */
+.n-rg-var { margin-top: 18px; padding-top: 14px; border-top: .5px solid var(--grid); }
 .n-rg-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin: 0; font-size: 15.5px; font-weight: 600; }
 .n-rg-head small { color: var(--muted); font-size: 13px; font-weight: 400; }
 .n-rg-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-top: 14px; align-items: end; }
@@ -30,7 +28,7 @@
 .n-rg-cell.past { opacity: .45; }
 .n-rg-cell .n-bar { width: 100%; }
 .n-rg-cell .n-bar.flat { height: 3px; }
-.n-rg-cell .n-bar.plan { border-width: 1.5px; }
+.n-rg-cell .n-bar { width: 72%; }
 .n-rg-cell em { font-style: normal; font-weight: 600; font-size: 11px; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .n-rg-cell.moved em { color: var(--ink); }
 .n-rg-cell i.grp { font-style: normal; font-size: 10px; color: var(--muted); margin-top: -3px; }
@@ -41,8 +39,7 @@
 .n-rg-lines p span { color: var(--muted); text-align: right; white-space: nowrap; }
 .n-rg-lines p.left b { color: var(--muted); font-weight: 600; }
 .n-rg-why { margin: 10px 0 0; font-size: 13px; color: var(--muted); text-wrap: pretty; }
-.n-rg-var .n-action { display: block; width: 100%; margin-top: 14px; border-radius: 12px; }
-.n-rg-var .n-action:disabled { opacity: .4; }
+.n-rg-var .n-go:disabled { opacity: .4; }
 .n-rg-more { color: var(--muted); font-size: 13px; margin: 14px 4px 0; text-wrap: pretty; }
 /* The day sheet, on the settings sheet's pattern. It outgrows a phone once a state shows
  * its details: it scrolls inside, the page beneath does not. */

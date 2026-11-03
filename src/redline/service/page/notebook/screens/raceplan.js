@@ -1,5 +1,5 @@
 import {add, button, el} from '../../shared/dom.js';
-import {SVG, chevron, content, section, shape} from '../ui.js';
+import {SVG, chevron, content, cursor, section, shape} from '../ui.js';
 import {dm, fmt, hm, paceOf} from '../format.js';
 import {push} from '../nav.js';
 import {app} from '../state.js';
@@ -106,16 +106,18 @@ function profileChart(plan, full) {
 }
 // The Race tab: the profile, the finish at the pace chosen with the coach (never the one
 // being explored), and the way to the plan.
+// The course in the head of the Course tab, on the track.
+export const raceProfile = plan => profileChart(plan, false);
 export function raceSummary(plan) {
   const seconds = plan.pace_s_per_km;
   const node = section('Plan de course', seconds ? el('span', 'à ' + paceOf(seconds) + '/km à plat éq.', 'n-meta') : null);
-  node.append(profileChart(plan, false));
   if (seconds) {
+    // The time aimed at is a target, not a limit: an ink tick on its range in dots.
     const finish = retime(plan, seconds).pop(), when = passageAt(plan, finish.hours);
-    node.append(add(el('div', null, 'n-rp-arr'),
-      add(el('div'), el('div', 'Temps de course', 'lab'), el('div', raceDuration(finish.hours), 'big'),
-        el('div', raceDuration(finish.low) + ' – ' + raceDuration(finish.high)
-          + (when ? ' · arrivée vers ' + wallClock(when) : ''), 'n-rp-small'))));
+    const width = finish.high - finish.low, lo = finish.low - width * 0.4, hi = finish.high + width * 0.4;
+    node.append(cursor({label: 'Temps de course, arrêts compris', value: raceDuration(finish.hours), unit: null, lo, hi,
+      band: [finish.low, finish.high], target: finish.hours, scale: [raceDuration(lo), raceDuration(finish.low) + ' – ' + raceDuration(finish.high), raceDuration(hi)]}));
+    if (when) node.append(el('p', 'Arrivée vers ' + wallClock(when) + '.', 'n-rp-small'));
   } else node.append(el('p', 'Allure à choisir avec le coach : les passages s’afficheront ensuite.', 'n-rp-small'));
   node.append(add(button('', () => push({k: 'race-plan'}), 'n-list'),
     el('span', seconds ? 'Passages, ravitos et glucides' : 'Profil et ravitos'), chevron()));

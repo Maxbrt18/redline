@@ -26,8 +26,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 button:disabled { cursor: wait; opacity: .55; }
 a { color: inherit; }
 [hidden] { display: none !important; }
+/* The page's side padding; the track cancels it to run edge to edge. */
+:root { --gutter: 20px; }
 .n-app { max-width: 620px; margin: auto;
-  padding: calc(var(--bar) + env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) calc(var(--tabbar) + 100px) max(20px, env(safe-area-inset-left)); }
+  padding: calc(var(--bar) + env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right)) calc(var(--tabbar) + 100px) max(var(--gutter), env(safe-area-inset-left)); }
 
 /* Glass: a translucent blurred background, a thread of light, a soft shadow. */
 .n-glass { border: .5px solid var(--edge); background: var(--glass); -webkit-backdrop-filter: blur(20px) saturate(1.6);
@@ -90,7 +92,7 @@ a { color: inherit; }
 h1 { font: 700 32px/1.05 var(--display); margin: 2px 0 8px; text-wrap: balance; }
 h2 { font: 600 22px/1.15 var(--display); margin: 0; }
 p { margin: 8px 0; }
-.n-kicker { font: 600 12px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 16px 0 6px; }
+.n-kicker { font-size: 13px; font-weight: 600; color: var(--muted); margin: 16px 0 6px; }
 .n-meta { color: var(--muted); font-size: 13.5px; margin: 8px 0; }
 .n-notice { color: var(--muted); margin: 18px 0; overflow-wrap: anywhere; }
 .n-banner { background: var(--panel); border-radius: 12px; padding: 12px 14px; margin: 14px 0 0; font-size: 14px; }
@@ -102,8 +104,8 @@ p { margin: 8px 0; }
 /* A single section title: small caps on a rule, like the zones of Today; whatever
  * sits at its right keeps the same size. */
 .n-sec { margin-top: 30px; }
-.n-sec > .n-row { padding-bottom: 9px; border-bottom: 1px solid var(--grid); }
-.n-sec > .n-row h2 { font: 600 12px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.n-sec > .n-row { padding-bottom: 6px; }
+.n-sec > .n-row h2 { font: 700 20px/1.2 var(--sys); color: var(--ink); }
 .n-sec > .n-row .n-meta { margin: 0; font-size: 12.5px; }
 /* The chevron: the same stroke in tiles, lists and disclosures (the mask is needed for
  * pseudo-elements, which cannot carry inline SVG). */
@@ -126,7 +128,7 @@ details[open] > summary::after { transform: rotate(90deg); }
 
 /* Upcoming and Landmarks: a small-caps title on a rule, never a box. */
 .n-zone { margin-top: 30px; }
-.n-zh { font: 600 12px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; padding-bottom: 9px; border-bottom: 1px solid var(--grid); }
+.n-zh { font: 700 20px/1.2 var(--sys); color: var(--ink); margin: 0; padding-bottom: 6px; }
 .n-list { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; background: none; border: 0; border-bottom: 1px solid var(--grid); padding: 13px 0; text-align: left; font-size: 15px; }
 .n-list:last-child { border-bottom: 0; }
 .n-list small { color: var(--muted); white-space: nowrap; }
@@ -180,7 +182,7 @@ button, .n-nav, .n-krow, summary { touch-action: manipulation; }
   @keyframes n-rise { from { opacity: 0; transform: translate(-50%, 8px); } }
 }
 
-@media (max-width: 360px) { .n-app { padding-left: 16px; padding-right: 16px; } h1 { font-size: 28px; } .n-lt h1 { font-size: 30px; } }
+@media (max-width: 360px) { :root { --gutter: 16px; } h1 { font-size: 28px; } .n-lt h1 { font-size: 30px; } }
 /* Without blur (old browser), the glass stays legible: an almost solid background. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { :root { --glass: color-mix(in oklab, var(--bg) 96%, transparent); } }
 @media (prefers-reduced-motion: no-preference) { button { transition: opacity .15s, background .15s; } }
@@ -216,3 +218,107 @@ button, .n-nav, .n-krow, summary { touch-action: manipulation; }
 /* Two sessions on the same day: the badges overlap, outlined by the paper. */
 .n-pasg { display: inline-flex; flex: none; }
 .n-pasg .n-pas + .n-pas { margin-left: -7px; box-shadow: 0 0 0 2px var(--bg); }
+
+/* The track. The three tabs open on a surface of pure red with a rubber grain and three
+ * lanes: the only red surface of the notebook. A pushed screen keeps the same head on
+ * paper. Red elsewhere is a limit (the cursor's stroke), or the main action under the
+ * thumb. */
+:root { --tartan: #c8102e; --tartan-deep: #a50d24; --on-track: #fff6f0; --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.3' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+:root[data-theme="dark"] { --tartan: #b30f28; --tartan-deep: #8c0b1f; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --tartan: #b30f28; --tartan-deep: #8c0b1f; } }
+.n-hero:empty { display: none; }
+.n-lanes { display: none; }
+:root.n-piste .n-track { position: relative; isolation: isolate; color: var(--on-track);
+  margin: calc(-1 * (var(--bar) + env(safe-area-inset-top))) calc(-1 * max(var(--gutter), env(safe-area-inset-right))) 0 calc(-1 * max(var(--gutter), env(safe-area-inset-left)));
+  padding: calc(var(--bar) + env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right)) 64px max(var(--gutter), env(safe-area-inset-left));
+  background: var(--tartan); }
+:root.n-piste .n-track::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: var(--grain); background-size: 140px;
+  mix-blend-mode: soft-light; opacity: .9; }
+:root.n-piste .n-track .n-lt p, :root.n-piste .n-hero .n-hsub { color: color-mix(in oklab, var(--on-track) 78%, var(--tartan)); }
+:root.n-piste .n-lanes { display: block; position: absolute; left: 0; right: 0; bottom: 0; height: 46px; }
+.n-lanes i { position: absolute; left: 0; right: 0; height: 2px; background: color-mix(in oklab, var(--on-track) 85%, transparent); }
+.n-lanes i:nth-child(1) { top: 0; } .n-lanes i:nth-child(2) { top: 15px; } .n-lanes i:nth-child(3) { top: 30px; }
+.n-lanes span { position: absolute; right: 24px; font: 700 11px/1 var(--display); color: var(--on-track); }
+.n-lanes span:nth-of-type(1) { top: 3px; } .n-lanes span:nth-of-type(2) { top: 18px; } .n-lanes span:nth-of-type(3) { top: 33px; }
+/* On the track, the bar takes its red until the track has scrolled under it. */
+:root.n-piste .n-topbar.ontrack { background-color: var(--tartan); }
+:root.n-piste .n-topbar.ontrack::before { opacity: 0; }
+:root.n-piste .n-topbar.ontrack .n-round { background: rgb(255 255 255 / .18); color: var(--on-track); box-shadow: none; }
+:root.n-piste .n-topbar.ontrack .c { opacity: 0; }
+:root.n-piste.n-veiled .n-topbar.ontrack { background-color: color-mix(in srgb, #000 20%, var(--tartan)); }
+:root.n-piste .n-track .n-pas { background: rgb(255 255 255 / .2); color: var(--on-track); }
+
+/* The head of a screen: a kicker, a title with its pill, one figure as large as it gets. */
+.n-hero { margin-top: 10px; }
+.n-hkick { margin: 14px 0 6px; font-size: 13px; font-weight: 600; color: var(--muted); }
+:root.n-piste .n-hkick { color: color-mix(in oklab, var(--on-track) 78%, var(--tartan)); }
+.n-htitle { display: flex; align-items: center; gap: 10px; margin: 0; font: 600 22px/1.15 var(--sys); }
+.n-hfig { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; margin: 8px 0 0; }
+.n-hfig b { font: 700 96px/.86 var(--display); letter-spacing: -.01em; font-variant-numeric: proportional-nums; }
+.n-hfig > span { font-size: 15px; line-height: 1.3; color: var(--muted); }
+:root.n-piste .n-hfig > span { color: color-mix(in oklab, var(--on-track) 78%, var(--tartan)); }
+.n-hsub { margin: 8px 0 0; font-size: 14.5px; color: var(--muted); }
+/* Planned in outline, done solid: the rule of the dotted bar, carried by the figures. */
+.n-plan-num { color: transparent; -webkit-text-stroke: 1.4px var(--ink); }
+.n-hfig b.n-plan-num { -webkit-text-stroke-width: 2.2px; }
+:root.n-piste .n-track .n-plan-num { -webkit-text-stroke-color: var(--on-track); }
+
+/* Dots: what is planned or allowed, what passes a limit, the race itself. */
+:root { --dots-faint: radial-gradient(circle, var(--faint) 1.2px, transparent 1.5px) 0 0 / 4.5px 4.5px;
+  --dots-ink: radial-gradient(circle, var(--ink) 1.3px, transparent 1.6px) 0 0 / 4.5px 4.5px;
+  --dots-red: radial-gradient(circle, var(--red) 1.25px, transparent 1.55px) 0 1px / 3.5px 3.5px;
+  --dots-light: radial-gradient(circle, color-mix(in oklab, var(--on-track) 85%, transparent) 1.2px, transparent 1.5px) 0 0 / 4.5px 4.5px; }
+.n-defs { position: absolute; width: 0; height: 0; }
+.n-defs .faint { fill: var(--faint); } .n-defs .ink { fill: var(--ink); } .n-defs .red { fill: var(--red); } .n-defs .light { fill: var(--on-track); }
+
+/* The cursor (ui.js). */
+.n-cur { margin-top: 18px; }
+.n-cur-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 13.5px; color: var(--muted); }
+.n-cur-head b { font: 700 22px/1 var(--display); color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.n-cur-head b.n-over { color: var(--over); }
+.n-cur-head b small { margin-left: 3px; font: 600 13px var(--sys); color: var(--muted); }
+.n-cur-rail { position: relative; height: 8px; margin-top: 24px; border-radius: 4px; background: var(--ghost); }
+.n-cur-rail > span { position: absolute; top: 0; bottom: 0; }
+.n-cur-rail .band { background: radial-gradient(circle, color-mix(in oklab, var(--data) 75%, transparent) 1.05px, transparent 1.35px) 0 0 / 4px 4px; }
+.n-cur-rail .fill { border-radius: 4px 0 0 4px; background: var(--data); }
+.n-cur-rail .ex { border-radius: 0 4px 4px 0; background: var(--dots-red); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--red) 55%, transparent); }
+.n-cur-rail .lim, .n-cur-rail .tgt { top: -6px; bottom: -6px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--red); }
+.n-cur-rail .tgt { top: -5px; bottom: -5px; background: var(--ink); }
+.n-cur-rail em { position: absolute; bottom: calc(100% + 3px); left: 50%; transform: translateX(-50%); font: 600 12px/1 var(--sys); font-style: normal; white-space: nowrap; color: var(--red); }
+.n-cur-rail .tgt em { color: var(--ink); }
+.n-cur-rail .tgt.below em { bottom: auto; top: calc(100% + 4px); }
+.n-cur-scale { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: no-preference) {
+  .n-cur-rail .fill, .n-cur-rail .ex { animation: n-grow .9s cubic-bezier(.2, .8, .2, 1) both; }
+  .n-cur-rail .ex { animation-delay: .7s; }
+  .n-cur-rail .lim { animation: n-drop .5s .35s cubic-bezier(.2, .8, .2, 1) both; transform-origin: bottom; }
+  @keyframes n-grow { from { width: 0; } }
+  @keyframes n-drop { from { transform: scaleY(0); } }
+}
+/* The main action: on the track's red, with its grain, under the thumb. */
+.n-go { position: relative; isolation: isolate; overflow: hidden; display: block; width: 100%; min-height: 50px; margin-top: 16px; border: 0; border-radius: 14px;
+  background: var(--tartan); color: var(--on-track); font-size: 16px; font-weight: 600; }
+.n-go::after { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--grain); background-size: 140px; mix-blend-mode: soft-light; }
+.n-go:active { opacity: .6; }
+
+/* Planned and done on one red stroke (ui.js `limits`). */
+.n-pf { margin-top: 12px; }
+.n-pfh, .n-pfr { display: grid; grid-template-columns: 70px 1fr 78px; gap: 12px; }
+.n-pfh { margin: 0 0 2px; }
+.n-pfh em { padding-left: calc(75% - 16px); font: 600 11.5px/1 var(--sys); font-style: normal; color: var(--red); }
+.n-pfr { align-items: center; min-height: 46px; }
+.n-pf-l { font-size: 14px; color: var(--muted); }
+.n-pf-rail { position: relative; height: 8px; border-radius: 4px; background: var(--ghost); }
+.n-pf-rail > span { position: absolute; top: 0; bottom: 0; }
+.n-pf-rail .fill { border-radius: 4px 0 0 4px; background: var(--data); }
+.n-pf-rail .band { background: radial-gradient(circle, color-mix(in oklab, var(--data) 75%, transparent) 1.05px, transparent 1.35px) 0 0 / 4px 4px; }
+.n-pf-rail .ex { border-radius: 0 4px 4px 0; background: var(--dots-red); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--red) 55%, transparent); }
+.n-pf-rail .lim { top: -19px; bottom: -19px; width: 2px; margin-left: -1px; background: var(--red); }
+.n-pfr:first-of-type .n-pf-rail .lim { top: -8px; }
+.n-pfr:has(+ .n-pfr.tg) .n-pf-rail .lim, .n-pfr:last-child .n-pf-rail .lim { bottom: -8px; }
+.n-pf-rail .tick { top: -6px; bottom: -6px; width: 2px; margin-left: -1px; background: var(--ink); }
+.n-pf-v { text-align: right; line-height: 1; }
+.n-pf-v b { display: block; font: 700 22px/1 var(--display); font-variant-numeric: tabular-nums; }
+.n-pf-v small { display: block; margin-top: 3px; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.n-pfr.over .n-pf-v b { color: var(--over); }
+.n-pfr.tg { margin-top: 4px; border-top: .5px solid var(--grid); }

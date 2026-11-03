@@ -2,7 +2,7 @@ import {add, button, el} from '../../shared/dom.js';
 import {remembered} from '../../shared/storage.js';
 import {savedProgress} from '../../strength/session.js';
 import {app} from '../state.js';
-import {SVG, chevron, content, installed, kindIcon, message, pastille, section, shape, zone} from '../ui.js';
+import {chevron, content, cursor, hero, installed, kindIcon, message, pastille, section, sessionLimits, zone} from '../ui.js';
 import {api} from '../api.js';
 import {capital, day, dayNumber, fmt, hm, isoDate, kindName, paceOf, plannedValue, rpeRange, shortTitle, startedAt, weekNumber} from '../format.js';
 import {prep, weatherSlot} from './weather.js';
@@ -20,14 +20,24 @@ function tiles(cells) {
   cells.slice(0, 4).forEach(([value, label, over]) => grid.append(add(el('div'), el('b', value, over ? 'n-over' : null), el('small', label))));
   return grid;
 }
-function targetCells(item) {
-  const target = item.targets || {}, cells = [];
-  if (target.distance_target_km != null) cells.push([fmt(target.distance_target_km), 'km' + (target.distance_cap_km && target.distance_cap_km !== target.distance_target_km ? ' · ≤' + fmt(target.distance_cap_km) : '')]);
-  else if (target.distance_cap_km != null) cells.push(['≤' + fmt(target.distance_cap_km), 'km']);
-  if (target.duration_cap_min != null && cells.length === 0) cells.push(['≤' + target.duration_cap_min, 'min']);
-  if (target.hr_cap_bpm != null) cells.push(['≤' + target.hr_cap_bpm, 'FC moy']);
-  if (target.rpe_max != null) cells.push([rpeRange(target), 'RPE']);
-  return cells;
+// A planned run: its limits as cursors, nothing done yet. Distance and duration first, the
+// heart rate on its allowed band, the effort on its band.
+function targetCursors(item) {
+  const target = item.targets || {}, box = el('div', null, 'n-curs');
+  if (target.distance_cap_km != null || target.distance_target_km != null) {
+    const cap = target.distance_cap_km, aim = target.distance_target_km, top = Math.ceil((cap || aim) * 1.25);
+    box.append(cursor({label: 'Distance', value: fmt(aim != null ? aim : cap), unit: aim != null ? 'km visés' : 'km au plus', lo: 0, hi: top,
+      cap, capLabel: cap != null ? fmt(cap) : null, target: aim, targetLabel: aim != null && cap != null ? fmt(aim) : null, below: true, scale: ['0', String(top)]}));
+  } else if (target.duration_cap_min != null) {
+    const top = Math.ceil(target.duration_cap_min * 1.2 / 10) * 10;
+    box.append(cursor({label: 'Durée', value: target.duration_cap_min + '′', unit: 'au plus', lo: 0, hi: top, cap: target.duration_cap_min,
+      capLabel: target.duration_cap_min + '′', scale: ['0', top + '′']}));
+  }
+  if (target.hr_cap_bpm != null) {
+    const lo = target.hr_cap_bpm - 47, hi = target.hr_cap_bpm + 13;
+    box.append(cursor({label: 'FC moyenne', value: String(target.hr_cap_bpm), unit: 'bpm au plus', lo, hi, cap: target.hr_cap_bpm, scale: [String(lo), String(hi)]}));
+  }
+  return box.childElementCount ? box : null;
 }
 function factCells(item) {
   const fact = item.fact, target = item.targets || {}, over = new Set(fact.over || []), cells = [];
@@ -60,12 +70,12 @@ function launcher(strength) {
   list.hidden = !showExercises;
   // A session started on this phone resumes where it stopped.
   const progress = savedProgress(strength.session);
-  const go = button(progress ? 'Reprendre la séance →' : 'Séance guidée →', async node => {
+  const go = button(progress ? 'Reprendre la séance' : 'Séance guidée', async node => {
     node.disabled = true;
     try { openWorkout(await launchWorkout(strength)); }
     catch (error) { message(error.message); }
     node.disabled = false;
-  }, 'n-action');
+  }, 'n-go');
   const row = add(el('div', null, 'n-acts'), go);
   const done = progress ? el('p', progress.done + ' exercice' + (progress.done > 1 ? 's' : '') + ' sur ' + progress.total, 'n-meta') : null;
   if (exercises.length) {
@@ -249,7 +259,8 @@ function dayFeed(data, items, extras, options) {
     }
     const kicker = ['Fait', startedAt(fact), item.extra ? 'hors programme' : null].filter(Boolean).join(' · ');
     const [node, body] = feedStep('done', kicker, item.extra ? kindName[fact.kind] || fact.kind : item.title, false, item.extra ? kindIcon(fact.kind) : kindIcon(item.kind, item.workout));
-    add(body, tiles(factCells(item)), item.extra ? null : overLine(item));
+    const limited = item.extra ? null : sessionLimits(item.targets || {}, fact);
+    add(body, limited || tiles(factCells(item)), item.extra ? null : overLine(item));
     if (fact.observation_id) {
       const title = item.extra ? kindName[fact.kind] || fact.kind : item.title;
       body.append(add(button('', () => push({k: 'session', id: fact.observation_id, title}), 'n-dopen'), el('span', 'Détail de la séance'), chevron()));
@@ -266,14 +277,13 @@ function dayFeed(data, items, extras, options) {
     const started = strength && options.today && data.strength && data.strength.status === 'ready' ? savedProgress(data.strength.session) : null;
     const role = started ? 'En cours' : phase === 'now' ? 'À faire' : index > 0 ? 'Puis' : options.today ? 'Ensuite' : null;
     const kicker = [role, started ? 'commencée à ' + hm(clockText(started.startedAt)) : item.start_time ? hm(item.start_time) : null, item.location].filter(Boolean).join(' · ');
-    const [node, body] = feedStep(phase, kicker, item.title, strength || compact, kindIcon(item.kind, item.workout));
+    const [node, body] = feedStep(phase, kicker, item === options.hero ? null : item.title, strength || compact, kindIcon(item.kind, item.workout));
     if (item.status === 'held') body.append(el('p', 'Une question t’attend dans Messenger avant cette séance.', 'n-meta'));
     else if (strength) {
       if (item.note && !compact) body.append(el('p', item.note, 'n-meta'));
       if (options.today) body.append(launcher(data.strength));
     } else {
-      const cells = targetCells(item);
-      if (cells.length) body.append(tiles(cells));
+      body.append(targetCursors(item));
       if (item.note && !compact) body.append(el('p', item.note, 'n-meta'));
       body.append(prep(item, {today: options.today, compact}));
     }
@@ -317,19 +327,14 @@ function ahead(data, seen) {
   });
   return node;
 }
-// The landmarks (one wide tile, two half tiles): the week full width with its numbered
-// bars, then pain against its ceiling and running side by side. Each tile leads to its
-// tab; D-N stays in ink, red belongs to the current step.
-function tile(label, onPress, cls, icon) {
-  const name = add(el('span', null, 'l'), pastille(icon, true), el('span', label));
-  return add(button('', onPress, 'n-tile ' + cls), add(el('span', null, 'n-tlab'), name, chevron()));
-}
-function tvalue(value, suffix) {
-  return add(el('b', value, 'n-tvalue'), suffix ? el('span', suffix) : null);
+// The landmarks, on paper: the week with its bars, each watched zone against its ceiling,
+// the race. Each one leads to its screen.
+function landmark(label, onPress, icon) {
+  return add(button('', onPress, 'n-lm'), pastille(icon, true), el('span', label), chevron());
 }
 function weekBars(days) {
-  const height = 40, peak = Math.max(1, ...days.map(item => Math.max(item.done_km || 0, item.planned_km || 0)));
-  const bars = el('span', null, 'n-mini');
+  const height = 52, peak = Math.max(1, ...days.map(item => Math.max(item.done_km || 0, item.planned_km || 0)));
+  const bars = el('div', null, 'n-mini');
   days.forEach(item => {
     const col = el('span'), bar = el('i');
     let value = '';
@@ -339,57 +344,34 @@ function weekBars(days) {
       bar.style.height = (item.planned_km ? Math.max(4, height * item.planned_km / peak) : height / 2) + 'px';
       value = item.planned_km ? fmt(item.planned_km) : item.planned_label;
     } else bar.className = 'flat';
-    bars.append(add(col, el('em', value, item.done_km ? null : 'plan'), bar, el(item.today ? 'b' : 'small', item.letter)));
+    bars.append(add(col, el('em', value, item.done_km ? null : 'plan'), bar, el('small', item.letter, item.today ? 'now' : null)));
   });
   return bars;
 }
-function painPlot(pain) {
-  const width = 144, height = 62, lo = height - 18, hi = 6;
-  const top = Math.max(2.5, pain.cap + 0.5, ...pain.weeks.map(item => (item.peak || 0) + 0.5));
-  const y = value => (lo - (lo - hi) * value / top).toFixed(1);
-  const svg = document.createElementNS(SVG, 'svg');
-  svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height); svg.setAttribute('class', 'n-plot'); svg.setAttribute('aria-hidden', 'true');
-  shape('line', {x1: 0, x2: width, y1: lo + 4, y2: lo + 4, class: 'base'}, svg);
-  shape('line', {x1: 0, x2: width, y1: y(pain.cap), y2: y(pain.cap), class: 'cap'}, svg);
-  shape('text', {x: width, y: y(pain.cap) - 4, 'text-anchor': 'end', class: 'capl'}, svg, 'plafond ' + fmt(pain.cap));
-  // Week labels are centred on their point: a 12 px margin keeps them inside the tile,
-  // whatever the number of weeks.
-  const step = (width - 30) / Math.max(1, pain.weeks.length - 1);
-  pain.weeks.forEach((item, index) => {
-    const x = 12 + step * index, now = index === pain.weeks.length - 1 ? ' now' : '';
-    shape('text', {x, y: height - 1, 'text-anchor': 'middle', class: 'w' + now}, svg, 'W' + item.week.slice(-2));
-    if (item.peak == null) return;
-    const out = item.peak > pain.cap ? ' out' : '';
-    shape('circle', {cx: x, cy: y(item.peak), r: 3.6, class: now + out}, svg);
-    shape('text', {x: x + 7, y: Number(y(item.peak)) + 4, class: 'v' + now + out}, svg, fmt(item.peak));
-  });
-  return svg;
-}
 function landmarks(data) {
-  const totals = data.totals, grid = el('div', null, 'n-tiles');
+  const totals = data.totals, node = section('Repères');
   const runs = totals.runs_done + ' sortie' + (totals.runs_done > 1 ? 's' : '') + (totals.runs_planned ? ' sur ' + totals.runs_planned : '');
-  const week = tile('Semaine ' + weekNumber(data.week), () => select('week'), 'wide week', 'week');
+  const week = add(el('div', null, 'n-mark'), landmark('Semaine ' + weekNumber(data.week), () => select('week'), 'week'),
+    add(el('p', null, 'n-big'), el('b', fmt(totals.km_done)), totals.km_target ? el('span', 'sur', 'of') : null,
+      totals.km_target ? el('b', fmt(totals.km_target), 'n-plan-num') : null, el('span', 'km · ' + runs)), weekBars(data.strip));
   week.setAttribute('aria-label', 'Semaine ' + weekNumber(data.week) + ' : ' + fmt(totals.km_done) + ' kilomètres courus' + (totals.km_target ? ' sur environ ' + fmt(totals.km_target) : ''));
-  grid.append(add(week, add(el('span'), tvalue(fmt(totals.km_done), totals.km_target ? '/' + fmt(totals.km_target) + ' km' : 'km'),
-    el('small', runs)), weekBars(data.strip)));
-  // One tile per monitored zone; none when the instance monitors none.
+  node.append(week);
+  // One block per watched zone; none when the instance watches none.
   data.pain.zones.forEach(item => {
-    const peak = (item.weeks[item.weeks.length - 1] || {}).peak;
-    const pain = tvalue(peak == null ? '—' : fmt(peak), '/10');
-    if (peak > data.pain.cap) pain.classList.add('n-over');
-    grid.append(add(tile(item.label, () => push({k: 'injury', zone: item.zone}), 'pain', 'pain'), pain, el('small', 'pic de la semaine'),
-      add(el('span', null, 'n-tfoot'), painPlot({cap: data.pain.cap, weeks: item.weeks}))));
+    const peak = (item.weeks[item.weeks.length - 1] || {}).peak, top = Math.max(3, Math.ceil((peak || 0) + 0.5));
+    node.append(add(el('div', null, 'n-mark pain'), landmark(item.label, () => push({k: 'injury', zone: item.zone}), 'pain'),
+      cursor({label: 'Pic d’effort, cette semaine', value: peak == null ? '—' : fmt(peak), unit: 'sur 10', lo: 0, hi: top,
+        fill: peak, cap: data.pain.cap, capLabel: 'plafond ' + fmt(data.pain.cap), scale: Array.from({length: top + 1}, (_, index) => String(index))})));
   });
   const race = data.race;
   if (race) {
     const date = day(race.date).toLocaleDateString('fr-FR', {weekday: 'short', day: 'numeric', month: 'long'});
-    const start = [race.start_time ? 'départ ' : null, race.start_time ? el('b', hm(race.start_time)) : null,
-      race.distance_km ? (race.start_time ? ' · ' : '') + fmt(race.distance_km) + ' km' : null].filter(Boolean);
-    grid.append(add(tile(race.name, () => select('course'), 'race', 'race'), tvalue('J-' + race.days), el('small', date),
-      add(el('span', null, 'n-tfoot'), start.length ? add(el('small'), ...start) : null,
-        race.target ? add(el('small', 'cible '), el('b', race.target)) : null)));
+    const facts = [date, race.start_time ? 'départ ' + hm(race.start_time) : null, race.distance_km ? fmt(race.distance_km) + ' km' : null,
+      race.target ? 'cible ' + race.target : null].filter(Boolean).join(' · ');
+    node.append(add(el('div', null, 'n-mark race'), landmark(race.name, () => select('course'), 'race'),
+      add(el('p', null, 'n-big'), el('b', String(race.days)), el('span', race.days > 1 ? 'jours' : 'jour')), el('p', facts, 'n-meta')));
   }
-  return add(zone('Repères'), grid);
+  return node;
 }
 function installSection() {
   if (installed() || remembered('carnet-install-later')) return null;
@@ -407,12 +389,25 @@ function installSection() {
   }, 'n-action'));
   return node;
 }
+function todayHero(item) {
+  const target = item.targets || {};
+  let figure = null, side = [];
+  if (target.distance_target_km != null) { figure = fmt(target.distance_target_km); side = ['km visés'].concat(target.distance_cap_km != null ? [fmt(target.distance_cap_km) + ' au plus'] : []); }
+  else if (target.distance_cap_km != null) { figure = fmt(target.distance_cap_km); side = ['km au plus']; }
+  else if (target.duration_cap_min != null) { figure = target.duration_cap_min + '′'; side = ['au plus']; }
+  if (target.rpe_max != null) side.push('RPE ' + rpeRange(target));
+  add(hero, el('p', item.start_time ? 'Au programme · ' + hm(item.start_time) : 'Au programme', 'n-hkick'),
+    add(el('h2', null, 'n-htitle'), pastille(kindIcon(item.kind, item.workout)), item.title),
+    figure ? add(el('p', null, 'n-hfig'), el('b', figure, 'n-plan-num'), add(el('span'), ...side.flatMap((text, index) => index ? [el('br'), text] : [text]))) : null);
+}
 export function renderToday(data) {
   if (data.plan.status === 'awaiting') content.append(el('p', data.plan.message, 'n-banner'));
   if (data.plan.status === 'stale') content.append(el('p', data.plan.message, 'n-banner'));
   const items = data.sessions.filter(item => item.kind !== 'rest');
   const seen = new Set([data.date]);
-  if (items.length || data.extra.length) content.append(dayFeed(data, items, data.extra, {today: true}));
+  const main = items.find(item => item.kind !== 'strength' && item.status !== 'done' && item.status !== 'held');
+  if (main) todayHero(main);
+  if (items.length || data.extra.length) content.append(dayFeed(data, items, data.extra, {today: true, hero: main}));
   else {
     const [box, heroDate] = restFeed(data);
     content.append(box);

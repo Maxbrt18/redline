@@ -9,22 +9,14 @@
  * landmarks. The red dot is the current step: a solid disc, no halo or pulse. A done step
  * is ticked in ink; rest is a dimmed dot. */
 .n-feed { margin-top: 20px; }
-.n-day { font: 600 12px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--red); margin: 26px 0 14px; }
+.n-day { font: 700 20px/1.2 var(--sys); color: var(--ink); margin: 30px 0 10px; }
 .n-day + .n-feed { margin-top: 0; }
-.n-step { display: grid; grid-template-columns: 24px minmax(0, 1fr); position: relative; padding-bottom: 26px; }
-.n-step:last-child { padding-bottom: 4px; }
-.n-step::before { content: ""; position: absolute; left: 5px; top: 18px; bottom: 2px; width: 2px; border-radius: 1px; background: var(--grid); }
-.n-step:last-child::before { display: none; }
-.n-node { display: block; position: relative; z-index: 1; width: 12px; height: 12px; margin-top: 1px; border-radius: 50%; background: var(--bg); box-shadow: inset 0 0 0 2px var(--faint); }
-.n-step.now .n-node { background: var(--red); box-shadow: none; }
-.n-step.done .n-node { display: grid; place-items: center; background: var(--data); box-shadow: none; }
-.n-step.rest .n-node { background: var(--ghost); box-shadow: none; }
-.n-node svg { width: 8px; height: 8px; fill: none; stroke: var(--bg); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
-.n-step.bare .n-node { margin-top: 6px; }
-.n-skick { font: 600 12px/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; }
-.n-step.now .n-skick { color: var(--red); }
-.n-step h2 { font: 700 26px/1.08 var(--display); margin: 7px 0 0; overflow-wrap: anywhere; }
-.n-step.small h2 { font-size: 22px; }
+.n-step { position: relative; padding: 18px 0 20px; border-top: .5px solid var(--grid); }
+.n-feed > .n-step:first-child { border-top: 0; padding-top: 6px; }
+.n-skick { font-size: 13px; font-weight: 600; color: var(--muted); margin: 0; }
+.n-step.now .n-skick { color: var(--ink); }
+.n-step h2 { font: 600 20px/1.2 var(--sys); margin: 7px 0 0; overflow-wrap: anywhere; }
+.n-step.small h2 { font-size: 18px; }
 .n-step.bare h2 { margin-top: 0; }
 .n-step .n-meta { font-size: 14px; line-height: 1.45; text-wrap: pretty; }
 .n-restline { margin: 0; font-size: 15px; color: var(--muted); }
@@ -104,56 +96,31 @@
 .n-at small { display: block; margin-top: 3px; font-size: 13px; font-weight: 400; color: var(--muted); }
 .n-at small .n-sky { width: 16px; height: 16px; margin-right: 4px; vertical-align: -3px; }
 .n-av { font-size: 15px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--muted); }
-/* The landmarks (one wide tile, two half tiles): the week full width, pain and running
- * below; the bottom of each half tile aligns. */
-.n-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
-.n-tile { display: flex; flex-direction: column; align-items: stretch; min-width: 0; padding: 12px 14px 13px; overflow: hidden;
-  border: 0; border-radius: 16px; background: var(--panel); color: var(--ink); text-align: left; font: inherit; }
-.n-tile.wide { grid-column: 1 / -1; display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 18px; align-items: end; }
-.n-tlab { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 6px; min-width: 0;
-  font-size: 13px; font-weight: 600; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.n-tvalue { display: block; margin-top: 10px; font: 700 32px/1 var(--display); white-space: nowrap; }
-.n-tile.wide .n-tvalue { margin-top: 4px; font-size: 38px; }
-.n-tvalue span { margin-left: 3px; font: 600 15px var(--display); color: var(--muted); }
-.n-tile small { display: block; margin-top: 4px; font-size: 12.5px; line-height: 1.3; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.n-tile small b { font-weight: 600; color: var(--ink); }
-.n-tfoot { display: block; margin-top: auto; padding-top: 12px; }
-/* Solid = run, dashed = planned (bolder for the long run), hairline = rest. */
-.n-mini { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; align-items: end; margin-top: 6px; }
-.n-mini > span { display: flex; flex-direction: column; justify-content: flex-end; height: 70px; min-width: 0; }
-.n-mini i { display: block; align-self: center; box-sizing: border-box; width: 64%; max-width: 18px; border-radius: 3px; background: var(--data); }
-.n-mini i.plan { background: transparent; border: 1.4px dashed var(--faint); }
-.n-mini i.plan.long { border-color: var(--muted); }
-.n-mini i.flat { height: 2px; border-radius: 1px; background: var(--grid); }
-.n-mini em { display: block; margin-bottom: 3px; font: 600 10.5px/1 var(--sans); font-style: normal; text-align: center; white-space: nowrap;
-  font-variant-numeric: tabular-nums; color: var(--muted); }
-.n-mini em.plan { font-weight: 500; color: var(--faint); }
-.n-mini small, .n-mini b { display: block; margin-top: 5px; font: 500 10.5px/1 var(--sans); text-align: center; color: var(--faint); }
-.n-mini b { font-weight: 700; color: var(--red); }
-/* The peak per week against the ceiling, dashed like the Injury screen. */
-.n-plot { display: block; width: 100%; height: auto; overflow: visible; }
-.n-plot .base { stroke: var(--grid); stroke-width: 1; }
-.n-plot .cap { stroke: var(--over); stroke-width: 1.2; stroke-dasharray: 3 3; }
-.n-plot .capl { font: 600 10px var(--sans); fill: var(--over); }
-.n-plot circle { fill: var(--muted); }
-.n-plot circle.now { fill: var(--ink); }
-.n-plot circle.out { fill: var(--over); }
-.n-plot .v { font: 500 10.5px var(--sans); fill: var(--muted); }
-.n-plot .w { font: 500 10px var(--sans); fill: var(--faint); }
-.n-plot .now { font-weight: 700; fill: var(--ink); }
-.n-plot .v.out { fill: var(--over); }
 .n-choices button.n-picked, .n-chips button.n-picked { background: var(--ink); color: var(--bg); opacity: 1; }
-@media (max-width: 360px) { .n-facts b { font-size: 22px; } .n-tvalue { font-size: 27px; } .n-tile.wide .n-tvalue { font-size: 32px; } }
+@media (max-width: 360px) { .n-facts b { font-size: 22px; } .n-hfig b { font-size: 80px; } }
 /* A session in the thread carries its family pill in front of its title. */
 .n-step h2 { display: flex; align-items: center; gap: 10px; }
 .n-step h2 > .n-pas { margin-top: -2px; }
-/* The landmarks on sand (the "Sable" palette): one neutral warm background for all three,
- * the label in ink; only the pill tells the family. With no tinted card, red keeps its
- * meaning everywhere: the day's letter, the ceiling crossed. */
-.n-tile.week { --h: var(--h-run); }
-.n-tile.pain { --h: var(--h-pain); }
-.n-tile.race { --h: var(--h-race); }
-.n-tile.week, .n-tile.pain, .n-tile.race { background: var(--sand); }
-.n-tlab .l { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.n-tile .n-tlab .l { color: var(--ink); }
-.n-tile .n-pas { background: color-mix(in oklab, var(--h) var(--tile-pas-mix), var(--sand)); }
+
+/* The landmarks, on paper: a name that leads to its screen, one figure, its chart. */
+.n-mark { margin-top: 22px; }
+.n-mark + .n-mark { padding-top: 18px; border-top: .5px solid var(--grid); }
+.n-lm { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 32px; padding: 0; border: 0; background: none; color: var(--ink); font-size: 15px; font-weight: 600; text-align: left; }
+.n-lm .n-chevron { margin-left: auto; }
+.n-big { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; margin: 8px 0 0; }
+.n-big b { font: 700 48px/.9 var(--display); font-variant-numeric: proportional-nums; }
+.n-big span { font-size: 14px; color: var(--muted); }
+.n-big .of { font-size: 15px; }
+/* Done solid, planned in dots (the long run in ink dots), rest a hairline. */
+.n-mini { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; align-items: end; margin-top: 14px; }
+.n-mini > span { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 84px; min-width: 0; }
+.n-mini i { display: block; width: 70%; max-width: 22px; border-radius: 3px; background: var(--data); }
+.n-mini i.plan { background: var(--dots-faint); }
+.n-mini i.plan.long { background: var(--dots-ink); }
+.n-mini i.flat { height: 3px; border-radius: 2px; background: var(--grid); }
+.n-mini em { display: block; margin-bottom: 4px; font: 600 12px/1 var(--sys); font-style: normal; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--ink); }
+.n-mini em.plan { color: var(--muted); }
+.n-mini small { display: grid; place-items: center; width: 24px; height: 24px; margin-top: 4px; font-size: 12.5px; color: var(--muted); }
+.n-mini small.now { border-radius: 50%; background: var(--ink); color: var(--bg); font-weight: 700; }
+.n-step h2 > .n-pas { margin-top: -2px; }
+.n-step h2 { display: flex; align-items: center; gap: 10px; }

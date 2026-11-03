@@ -1,6 +1,6 @@
 import {add, button, el} from '../../shared/dom.js';
 import {app} from '../state.js';
-import {chevron, content, kindIcon, pastille, section} from '../ui.js';
+import {SVG, chevron, content, hero, kindIcon, pastille, section, shape} from '../ui.js';
 import {day, dm, fmt, followingWeek, isoDate, kindName, plannedValue, shortTitle, weekNumber, weekSpan} from '../format.js';
 import {push} from '../nav.js';
 
@@ -8,42 +8,6 @@ import {push} from '../nav.js';
 // One figure, one bar, seven lines. Each day fits on one line: the session and a single
 // figure, the fact in ink, the plan in grey, an overshoot in one red phrase. The detail
 // unfolds on touch, one day at a time.
-// A gauge: it fills up to the fact, a tick marks the limit, and what exceeds it turns red.
-// No knob: a knob on a rail reads as a slider that could be dragged.
-function gauge(label, low, high, cap, value, shown, limit, out, floor) {
-  const at = number => Math.max(0, Math.min(100, 100 * (number - low) / (high - low)));
-  const rail = el('span', null, 'n-rail'), fill = el('i');
-  fill.style.width = at(Math.min(value, cap)) + '%';
-  rail.append(fill);
-  if (value > cap) {
-    const beyond = el('i', null, 'out');
-    beyond.style.left = at(cap) + '%'; beyond.style.width = (at(value) - at(cap)) + '%';
-    rail.append(beyond);
-  }
-  const mark = el('u'); mark.style.left = at(cap) + '%'; rail.append(mark);
-  if (floor != null) { const low = el('u', null, 'floor'); low.style.left = at(floor) + '%'; rail.append(low); }
-  const right = add(el('span', null, 'n-gv'), el('b', shown, out ? 'n-over' : null), el('span', limit));
-  return add(el('div', null, 'n-g'), el('span', label), rail, right);
-}
-// The gauges of a completed session.
-export function gauges(item) {
-  const fact = item.fact, target = item.targets || {}, over = new Set(fact.over || []), rows = [];
-  const distanceCap = target.distance_cap_km || target.distance_target_km;
-  if (distanceCap && fact.km != null) {
-    rows.push(gauge('Distance', 0, Math.max(distanceCap * 1.25, fact.km * 1.1), distanceCap, fact.km, fmt(fact.km), '≤' + fmt(distanceCap), over.has('km')));
-  }
-  if (target.duration_cap_min && fact.duration_min != null && (!distanceCap || over.has('duration_min'))) {
-    rows.push(gauge('Durée', 0, Math.max(target.duration_cap_min * 1.3, fact.duration_min * 1.1), target.duration_cap_min, fact.duration_min, fact.duration_min + '′', '≤' + target.duration_cap_min, over.has('duration_min')));
-  }
-  if (target.hr_cap_bpm && fact.hr_avg != null) {
-    rows.push(gauge('FC moy', 120, Math.max(180, fact.hr_avg + 5), target.hr_cap_bpm, fact.hr_avg, fmt(fact.hr_avg, 0), '≤' + target.hr_cap_bpm, over.has('hr_avg')));
-  }
-  if (target.rpe_max != null && fact.rpe != null) {
-    const low = target.rpe_min != null && target.rpe_min !== target.rpe_max ? target.rpe_min : null;
-    rows.push(gauge('RPE', 0, 10, target.rpe_max, fact.rpe, fmt(fact.rpe), low != null ? low + '-' + target.rpe_max : String(target.rpe_max), over.has('rpe'), low));
-  }
-  return rows.length ? add(el('div', null, 'n-gauges'), ...rows) : null;
-}
 // What overshot, as labels after the title: the gap to the limit, not a sentence. The
 // detail screen shows it on its gauges.
 function crossing(item) {
@@ -167,14 +131,11 @@ export function renderWeek(data, root) {
   const todayIso = app.today ? app.today.date : '';
   const totals = data.totals, open = data.week >= data.current, upcoming = data.week > data.current;
   // An upcoming week has nothing done: its figure is the target, not a zero.
-  if (upcoming) content.append(add(el('div', null, 'n-ksum'), el('b', totals.km_target ? '~' + fmt(totals.km_target) : '—'), el('span', 'km prévus')));
-  else content.append(add(el('div', null, 'n-ksum'), el('b', fmt(totals.km_done)), el('span', totals.km_target ? 'sur ~' + fmt(totals.km_target) + ' km' : 'km')));
-  if (totals.km_target && !upcoming) {
-    const meter = el('div', null, 'n-kmeter'), fill = el('i');
-    fill.style.width = Math.min(100, 100 * totals.km_done / totals.km_target) + '%';
-    content.append(add(meter, fill));
-  }
-  const sub = el('p', null, 'n-ksub');
+  // The head: done solid, planned in outline, then the seven days.
+  if (upcoming) hero.append(add(el('p', null, 'n-hfig n-ksum'), el('b', totals.km_target ? fmt(totals.km_target) : '—', 'n-plan-num'), el('span', 'km prévus')));
+  else hero.append(add(el('p', null, 'n-hfig n-ksum'), el('b', fmt(totals.km_done)),
+    totals.km_target ? el('span', 'sur', 'of') : null, totals.km_target ? el('b', fmt(totals.km_target), 'n-plan-num') : null, el('span', 'km')));
+  const sub = el('p', null, 'n-hsub');
   if (upcoming) sub.append(el('b', totals.runs_planned + ' sortie' + (totals.runs_planned > 1 ? 's' : '')), totals.strength_planned ? ' · ' + totals.strength_planned + ' renfo' + (totals.strength_planned > 1 ? 's' : '') : '');
   else sub.append(el('b', totals.runs_done + ' sortie' + (totals.runs_done > 1 ? 's' : '') + (totals.runs_planned ? ' sur ' + totals.runs_planned : '')));
   const rest = [];
@@ -185,8 +146,8 @@ export function renderWeek(data, root) {
     if (item.peak != null) rest.push('douleur au pic ' + (peaks.length > 1 ? item.label.toLowerCase() + ' ' : '') + fmt(item.peak));
   });
   if (rest.length) sub.append(' · ' + rest.join(' · '));
-  content.append(sub);
-  if (data.strip) content.append(weekChart(data.strip));
+  hero.append(sub);
+  if (data.strip) hero.append(weekChart(data.strip));
   if (data.plan.message) content.append(el('p', data.plan.message, 'n-banner'));
   if (!data.sessions.length && data.plan.status === 'invalid') content.append(el('p', 'Aucun programme enregistré pour cette semaine. Le registre reste ci-dessous.', 'n-meta'));
   const days = el('div', null, 'n-kdays');
@@ -229,10 +190,30 @@ export function renderWeek(data, root) {
   const past = (root && app.views.weeks && app.views.weeks.weeks) || [];
   if (past.length) {
     const node = section('Semaines passées');
+    node.append(pastChart(past.slice(0, 5).reverse()));
     past.slice(0, 4).forEach(item => node.append(weekRow(item)));
     if (past.length > 4) node.append(add(button('', () => push({k: 'weeks'}), 'n-list'), el('span', 'Toutes les semaines'), add(el('small', String(past.length)), chevron())));
     content.append(node);
   }
+}
+// Past weeks: the target in dots, the kilometres done solid in front of it, both written.
+function pastChart(weeks) {
+  const width = 353, base = 118, top = 22, band = width / weeks.length;
+  const peak = Math.max(1, ...weeks.map(item => Math.max(item.km_done || 0, item.km_target || 0)));
+  const y = km => base - (base - top) * km / peak;
+  const svg = document.createElementNS(SVG, 'svg');
+  svg.setAttribute('viewBox', '0 0 ' + width + ' ' + (base + 34)); svg.setAttribute('class', 'n-pastc');
+  svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', 'Kilomètres faits devant les kilomètres visés, semaine par semaine');
+  shape('line', {x1: 0, x2: width, y1: base, y2: base, class: 'base'}, svg);
+  weeks.forEach((item, index) => {
+    const cx = band * (index + .5);
+    if (item.km_target) shape('rect', {x: cx - 16, y: y(item.km_target), width: 32, height: base - y(item.km_target), rx: 3, class: 'aim'}, svg);
+    if (item.km_done) shape('rect', {x: cx - 7, y: y(item.km_done), width: 14, height: base - y(item.km_done), rx: 2, class: 'done'}, svg);
+    shape('text', {x: cx, y: y(Math.max(item.km_done || 0, item.km_target || 0)) - 6, 'text-anchor': 'middle', class: 'v'}, svg, fmt(item.km_done || 0));
+    shape('text', {x: cx, y: base + 14, 'text-anchor': 'middle', class: 't'}, svg, item.km_target ? '~' + fmt(item.km_target) : '');
+    shape('text', {x: cx, y: base + 30, 'text-anchor': 'middle', class: 'w'}, svg, 'W' + item.week.slice(-2));
+  });
+  return svg;
 }
 export function renderWeeks(data) {
   const list = el('div', null, 'n-wlist');
