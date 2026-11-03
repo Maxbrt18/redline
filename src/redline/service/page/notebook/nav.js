@@ -5,6 +5,7 @@ import {content, message} from './ui.js';
 import {entryTitle, fmt, humanDate, kindName, kindWord, longDay, raceFacts, startedAt, weekNumber, weekSpan, weekState} from './format.js';
 import {renderToday} from './screens/today.js';
 import {renderWeek, renderWeeks} from './screens/week.js';
+import {renderReorganize} from './screens/reorganize.js';
 import {renderCourse} from './screens/course.js';
 import {renderRacePlan} from './screens/raceplan.js';
 import {renderInjury} from './screens/injury.js';
@@ -26,6 +27,8 @@ export function screen() {
   }
   if (route.k === 'week') return {key: 'week:' + route.label, path: 'week/' + route.label, label: route.label};
   if (route.k === 'weeks') return {key: 'weeks', path: 'weeks'};
+  // Its figures depend on the days stated on it: the screen asks for them itself.
+  if (route.k === 'reorganize') return {key: 'reorganize:' + route.week, path: null, week: route.week};
   if (route.k === 'archive') return {key: 'archive', path: 'entries'};
   // One watched area per screen: the key and the request name it.
   if (route.k === 'injury') return {key: 'injury:' + (route.zone || ''), path: 'injury' + (route.zone ? '?zone=' + encodeURIComponent(route.zone) : '')};
@@ -45,6 +48,7 @@ function heading(view, data) {
     const race = app.views.course && app.views.course.race;
     return ['Plan de course', [race ? race.name : null, data ? fmt(data.plan.length_km) + ' km · D+ ' + fmt(data.plan.dplus_m, 0) + ' m' : null].filter(Boolean).join(' · ')];
   }
+  if (view.key.startsWith('reorganize:')) return ['Réorganiser', 'Semaine ' + weekNumber(view.week) + ' · ' + weekSpan(view.week)];
   if (view.key === 'weeks') return ['Toutes les semaines', data && data.weeks ? data.weeks.length + ' semaines au registre' : ''];
   if (view.key === 'archive') return ['Archives', 'bilans, monthly et cartes'];
   if (view.key.startsWith('injury:')) return [data ? data.label : 'Douleur', data ? 'Douleur au pic, sur 10 · ' + data.weeks.length + ' semaines' : ''];
@@ -79,7 +83,8 @@ export function render(y) {
   $('back').hidden = Boolean(view.root); $('settings').hidden = !view.root;
   const route = topRoute();
   history.replaceState(history.state, '', route && route.k === 'entry' ? '/carnet#entry=' + encodeURIComponent(route.id) : '/carnet');
-  if (!data) content.append(app.failures[view.key] ? failure(app.failures[view.key], () => refresh(true)) : skeleton());
+  if (view.key.startsWith('reorganize:')) renderReorganize(view);
+  else if (!data) content.append(app.failures[view.key] ? failure(app.failures[view.key], () => refresh(true)) : skeleton());
   else if (view.key === 'today') renderToday(data);
   else if (view.key === 'course') renderCourse(data);
   else if (view.key.startsWith('week:')) renderWeek(data, view.root);

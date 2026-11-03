@@ -50,8 +50,8 @@ logoutRow.addEventListener('click', () => {
 // ------------------------------------------------------------ sheets
 // A sheet rising from the bottom, as on iOS: it closes by dragging it down, by tapping
 // outside, with the cross or Escape. The page does not scroll beneath.
-// Three sheets share this gesture: the settings, the session sound and the exit of a
-// started session. Only one is open at a time.
+// Four sheets share this gesture: the settings, a day of the week being reorganised, the
+// session sound and the exit of a started session. Only one is open at a time.
 const sheet = $('sheet');
 let openWrap = null, opener = null, sheetTimer = null, settleSheet = null;
 export const sheetShown = () => Boolean(document.querySelector('.n-sheetwrap:not([hidden])'));

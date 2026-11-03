@@ -29,7 +29,6 @@ import json
 import os
 import sys
 
-from redline.analysis import decision_state
 from redline.coach import dates
 from redline.coach.fr import plan as wording
 from redline.coach.fr import reorganize as reorganize_text
@@ -42,21 +41,15 @@ from redline.model.errors import ConfigError
 from redline.model.notes import NoteError
 from redline.model.schema import SchemaError
 from redline.model.weekly_plan import (
-    SETTLED_STATUSES,
     active,
     as_json,
-    change_evidence_errors,
     current_week,
-    decision_errors,
-    fuelling_errors,
     gate_reasons,
-    intention_errors,
     now_stamp,
     revision_readback,
-    typed_target_errors,
     validate,
-    written_text_errors,
 )
+from redline.service import plan_revision
 from redline.storage import StorageError
 
 
@@ -77,34 +70,6 @@ def _distance_notes(store, revision: dict) -> str:
         return ""
     return "\n".join([wording.GAP_TITLE.format(days=days),
                       *(f"  - {note}" for note in notes)])
-
-
-def _taper_errors(store, week: str, revision: dict) -> list[str]:
-    """The taper band, when `week` is in one. A measurement that fails costs the check,
-    never the prescription."""
-    from redline.analysis import ledger, taper
-    try:
-        frame = taper.race_window(store, week)
-        rows = ledger.parse_ledger(store) if frame else []
-    except Exception as exc:
-        print(wording.TAPER_UNREADABLE.format(name=exc.__class__.__name__), file=sys.stderr)
-        return []
-    if frame is None:
-        return []
-    return taper.plan_errors(rows, frame, week, revision,
-                             f"{week} revision {revision['revision']}")
-
-
-def _pain_signal(store, today: dt.date) -> bool:
-    """An effort pain above the rulebook's cap (rule n3) in the last 7 days."""
-    from redline.analysis import decision_state, ledger
-    from redline.model import ledger as ledger_model
-    from redline.model import rulebook
-    cap = rulebook.current().parameters.pain_cap
-    since = today - dt.timedelta(days=decision_state.PAIN_WINDOW_DAYS)
-    return any(value > cap for row in ledger.parse_ledger(store)
-               if since < row.date <= today and row.type in ledger_model.EFFORT_TYPES
-               for value in row.pains.values())
 
 
 def _day(date: dt.date) -> str:
@@ -148,41 +113,22 @@ def _readback(week: str, revision: dict, outcome) -> str:
 
 def _variants(store, week: str, input_path: str | None, as_json: bool,
               today: dt.date | None = None) -> int:
-    from redline.analysis import reorganize
-    from redline.model import paths, rulebook, week_days
-    from redline.model import program as strength_program
+    from redline.analysis import reorganize as search
+    from redline.model import week_days
+    from redline.service import reorganize
     plan = store.load_plan(week)
     if plan is None:
         raise NoteError(f"{week}: weekly plan missing in PostgreSQL")
     validate(plan)
-    revision = active(plan)
     request = week_days.parse(agent_input.read_json(input_path), week)
-    vault = paths.vault_root()
-    try:
-        program = strength_program.load(vault)
-        targets = strength_program.rpe_targets(vault)
-    except NoteError:
-        program, targets = None, {}
-    parameters = rulebook.current().parameters
     today = today or dt.date.today()
-    sessions = revision["sessions"]
-    outcome = reorganize.reorganise(
-        reorganize.items(sessions, revision.get("gates") or [], program, targets),
-        week_days.week_dates(week), today, request,
-        reorganize.Rules(runs_per_day=parameters.runs_per_day,
-                         sessions_per_day=parameters.sessions_per_day,
-                         load_margin_pct=parameters.reorganize_load_margin_pct,
-                         long_run_weekdays=parameters.long_run_weekdays,
-                         pain_signal=_pain_signal(store, today)),
-        rest_days=frozenset(dt.date.fromisoformat(session["date"]) for session in sessions
-                            if session["workout"] == "rest"),
-        settled=frozenset(session["id"] for session in sessions
-                          if session["status"] in SETTLED_STATUSES))
+    computation = reorganize.compute(store, plan, week, request, today,
+                                     reorganize.pain_signal(store, today))
     if as_json:
-        print(json.dumps({"week": week, "revision": revision["revision"],
-                          **reorganize.as_dict(outcome)}, ensure_ascii=False))
+        print(json.dumps({"week": week, "revision": computation.revision["revision"],
+                          **search.as_dict(computation.outcome)}, ensure_ascii=False))
     else:
-        print(_readback(week, revision, outcome))
+        print(_readback(week, computation.revision, computation.outcome))
     return EXIT_OK
 
 
@@ -207,44 +153,9 @@ def _database_command(store, command: str, week: str, optional: bool,
         # `src/redline/model/agent_input.py`. stdin remains the operator-launch path.
         revision = agent_input.read_json(input_path)
         existing = store.load_plan(week)
-        expected = 1 if existing is None else len(existing["revisions"]) + 1
-        if revision.get("revision") != expected:
-            raise SchemaError([f"revision: expected {expected}, got {revision.get("revision")!r}"])
-        current = dict(revision)
-        # The timestamp belongs to the service, not the model. A model that invents the
-        # time of day also invents the day the athlete is talking about, and
-        # `semantic_errors` compares a dated check's due date to this field, so a wrong
-        # time would disarm a guardrail. The only reliable clock in the chain is the one
-        # that writes.
-        current["computed_at"] = now_stamp()
-        # What the coach could see is measured by the engine, at the same instant. A
-        # measurement that fails costs the register one snapshot, never the prescription.
-        current.pop("state_snapshot", None)
-        try:
-            current["state_snapshot"] = decision_state.snapshot(
-                store, dt.date.fromisoformat(current["computed_at"][:10]))
-        except Exception as exc:
-            print(wording.SNAPSHOT_UNREADABLE.format(name=exc.__class__.__name__),
-                  file=sys.stderr)
-        # The incoming text is judged before the plan containing it: the revision is fed
-        # back to the coach on every prescriptive turn, and title/note go to the athlete's
-        # phone. Judged here and not in `validate` because history is append-only: the
-        # same rule applied to the whole plan would refuse today's revision because of
-        # yesterday's text.
-        previous = existing["revisions"][-1] if existing else None
-        mistakes = [
-            *intention_errors(current, f"{week} revision {current["revision"]}"),
-            *written_text_errors(current, f"{week} revision {current["revision"]}"),
-            *change_evidence_errors(previous, current),
-            *typed_target_errors(current, f"{week} revision {current["revision"]}"),
-            *decision_errors(current, f"{week} revision {current["revision"]}"),
-            *fuelling_errors(current, f"{week} revision {current["revision"]}"),
-            *_taper_errors(store, week, current),
-        ]
-        if mistakes:
-            raise SchemaError(mistakes)
-        candidate = {"week": week, "revisions": [*(existing or {}).get("revisions", []), current]}
-        validate(candidate)
+        previous, current = plan_revision.checked(
+            store, week, revision, existing, stamp=now_stamp(),
+            warn=lambda line: print(line, file=sys.stderr))
         # The readback goes to stdout in BOTH paths. The Messenger turn goes through
         # `stage_command`, which is precisely the coach's path and so the one that must
         # reread; rendering it only on the CLI path would leave production without the

@@ -16,7 +16,7 @@ from unittest.mock import MagicMock
 import contract
 import pytest
 from conftest import TEST_VAULT, reset_database
-from notebook_payloads import DETAIL, INJURY, RACE, RACE_PLAN_VIEW, TODAY, WEEK, WEEKS
+from notebook_payloads import DETAIL, INJURY, RACE, RACE_PLAN_VIEW, REORGANIZE, TODAY, WEEK, WEEKS
 from test_notebook_board import PARIS, Repo, ef, seed_week
 from test_notebook_board import WEEK as SEEDED_WEEK
 from test_page_modules import modules
@@ -38,7 +38,7 @@ SAM = instance.load(TEST_VAULT)
 RACE_DAY = {"name": "TargetRace", "date": "2026-11-26", "days": 50}
 
 #: Declared keys the page has no use for: the service sends them, nothing reads them.
-UNREAD = {"created_at", "has_image", "humidity", "revision", "strength_done"}
+UNREAD = {"created_at", "has_image", "humidity", "strength_done"}
 
 
 # ------------------------------------------------------------ the checker
@@ -69,8 +69,8 @@ def test_a_tagged_union_reports_its_closest_shape():
 @pytest.mark.parametrize(("shape", "payload"), [
     (views.TodayView, TODAY), (views.WeekView, WEEK), (list[views.PastWeek], WEEKS["weeks"]),
     (views.InjuryView, INJURY), (views.RaceView, RACE), (views.SessionView, DETAIL),
-    (views.RacePlanView, RACE_PLAN_VIEW),
-], ids=["today", "week", "weeks", "injury", "race", "detail", "race-plan"])
+    (views.RacePlanView, RACE_PLAN_VIEW), (views.ReorganizeView, REORGANIZE),
+], ids=["today", "week", "weeks", "injury", "race", "detail", "race-plan", "reorganize"])
 def test_a_browser_payload_is_what_the_service_serves(shape, payload):
     assert contract.problems(shape, payload) == []
 
@@ -251,3 +251,35 @@ def test_an_easy_session_detail_serves_its_declared_shape(store, connect, monkey
     assert view["km"] and view["drift"] and view["stops"] and view["series"]
     assert view["previous"] and view["gear"] and view["weather"]
     assert contract.problems(views.SessionView, view) == []
+
+
+@needs_database
+def test_the_reorganise_routes_compute_then_write_the_next_revision(store, connect):
+    seed_week(store)
+    client, _, _ = connect(dt.datetime(2026, 10, 7, 8, 0, tzinfo=PARIS))
+    days = [{"date": "2026-10-09", "kind": "off"}]
+    shown = client.post("/notebook-api/reorganize", json={"week": SEEDED_WEEK, "days": days})
+    assert shown.status_code == 200, shown.text
+    assert contract.problems(views.ReorganizeView, shown.json) == []
+    assert shown.json["variants"] and shown.json["blocked"] is None
+    stale = client.post("/notebook-api/reorganize/take", json={
+        "week": SEEDED_WEEK, "days": days, "revision": 9, "choice": 0})
+    assert stale.status_code == 409
+    taken = client.post("/notebook-api/reorganize/take", json={
+        "week": SEEDED_WEEK, "days": days, "revision": shown.json["revision"], "choice": 0})
+    assert taken.status_code == 200, taken.text
+    assert taken.json == {"status": "ok", "revision": shown.json["revision"] + 1}
+    latest = store.load_plan(SEEDED_WEEK)["revisions"][-1]
+    assert all(session["date"] != "2026-10-09" for session in latest["sessions"]
+               if session["status"] != "cancelled" and session["workout"] != "rest")
+
+
+@needs_database
+@pytest.mark.parametrize("body", [
+    {"week": "2026-W41"}, {"week": "nope", "days": []},
+    {"week": "2026-W41", "days": [{"date": "2026-10-09", "kind": "never"}]},
+])
+def test_the_reorganise_route_refuses_what_it_cannot_read(store, connect, body):
+    seed_week(store)
+    client, _, _ = connect(dt.datetime(2026, 10, 7, 8, 0, tzinfo=PARIS))
+    assert client.post("/notebook-api/reorganize", json=body).status_code == 400

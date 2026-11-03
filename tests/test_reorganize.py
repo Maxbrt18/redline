@@ -350,7 +350,7 @@ def _run_variants(monkeypatch, tmp_path, days, as_json):
     from conftest import load_script
 
     week_plan = load_script("week-plan")
-    monkeypatch.setattr(week_plan, "_pain_signal", lambda store, today: False)
+    monkeypatch.setattr("redline.service.reorganize.pain_signal", lambda store, today: False)
     monkeypatch.delenv("REDLINE_TURN_ID", raising=False)
     request = tmp_path / "days.json"
     request.write_text(json.dumps({"days": days}), encoding="utf-8")
@@ -374,3 +374,81 @@ def test_the_command_prints_json_for_the_notebook(monkeypatch, tmp_path, capsys)
     data = json.loads(capsys.readouterr().out)
     assert data["week"] == WEEK and data["revision"] == 1
     assert data["variants"][0]["carried"] == "w10-tue-ef"
+
+
+# ------------------------------------------------------------------ taking a variant
+
+def _database():
+    import os
+
+    from conftest import reset_database
+
+    from redline.storage import Database, OperationalStore
+
+    url = os.environ.get("TEST_DATABASE_URL", "")
+    if not url:
+        pytest.skip("TEST_DATABASE_URL absent")
+    reset_database()
+    database = Database(url, application_name="pytest")
+    return database, OperationalStore(database)
+
+
+@pytest.fixture
+def seeded(monkeypatch):
+    database, store = _database()
+    plan = _plan()
+    first = dict(plan["revisions"][0], volume_target_km=40.0,
+                 decision={"by": "request", "alternatives": []})
+    store.append_plan_revision(WEEK, first, actor="test")
+    monkeypatch.setattr("redline.service.reorganize.pain_signal", lambda store, today: False)
+    yield store
+    database.dispose()
+
+
+THURSDAY_AND_FRIDAY_OFF = {"days": [{"date": "2030-03-06", "kind": "off"},
+                                    {"date": "2030-03-07", "kind": "off"},
+                                    {"date": "2030-03-08", "kind": "off"}]}
+
+
+def test_taking_a_variant_writes_the_next_revision_with_its_evidence(seeded):
+    from redline.service import reorganize as service
+
+    number = service.take(seeded, WEEK, THURSDAY_AND_FRIDAY_OFF, expected=1, choice=0,
+                          today=dt.date(2030, 3, 5), stamp="2030-03-05T12:00:00+01:00")
+    assert number == 2
+    revision = seeded.load_plan(WEEK)["revisions"][-1]
+    sessions = {session["id"]: session for session in revision["sessions"]}
+    assert sessions["w10-sat-foot"]["status"] == "cancelled"
+    assert sessions["w10-thu-seuil"]["date"] != "2030-03-07"
+    assert revision["evidence"][0].startswith("availability: carnet")
+    assert revision["decision"]["by"] == "request"
+    assert revision["volume_target_km"] == 40.0
+    assert revision["state_snapshot"]["as_of"] == "2030-03-05"
+
+
+def test_a_variant_is_refused_once_the_week_has_moved_on(seeded):
+    from redline.service import reorganize as service
+
+    with pytest.raises(service.ReorganizeError):
+        service.take(seeded, WEEK, THURSDAY_AND_FRIDAY_OFF, expected=7, choice=0,
+                     today=dt.date(2030, 3, 5), stamp="2030-03-05T12:00:00+01:00")
+    with pytest.raises(service.ReorganizeError):
+        service.take(seeded, WEEK, THURSDAY_AND_FRIDAY_OFF, expected=1, choice=9,
+                     today=dt.date(2030, 3, 5), stamp="2030-03-05T12:00:00+01:00")
+    with pytest.raises(service.ReorganizeError):
+        service.take(seeded, WEEK, {"days": []}, expected=1, choice=0,
+                     today=dt.date(2030, 3, 5), stamp="2030-03-05T12:00:00+01:00")
+
+
+def test_the_screen_serves_its_declared_shape(seeded):
+    import contract
+
+    from redline.model import notebook_views as views
+    from redline.service import reorganize as service
+
+    shown = service.view(seeded, WEEK, THURSDAY_AND_FRIDAY_OFF, dt.date(2030, 3, 5))
+    assert contract.problems(views.ReorganizeView, shown) == []
+    assert shown["blocked"] is None
+    assert shown["variants"][0]["dropped"][0]["title"] == "Footing"
+    closed = service.view(seeded, WEEK, {"days": []}, dt.date(2030, 3, 12))
+    assert closed["blocked"] == "closed" and closed["variants"] == []

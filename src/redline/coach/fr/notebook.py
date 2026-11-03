@@ -89,6 +89,8 @@ ERRORS = {
     "bad_answer": "Réponse invalide.",
     "session_changed": "La séance a changé ou n’est plus disponible. Actualise le carnet.",
     "no_card": "Carte introuvable.",
+    "bad_days": "Jours invalides.",
+    "week_moved": "La semaine a changé entre-temps. Les variantes sont recalculées.",
 }
 
 # Why the strength session cannot start.

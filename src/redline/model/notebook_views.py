@@ -640,3 +640,81 @@ class SessionView(TypedDict):
     weather: Conditions | None
     gear: Gear | None
     week: WeekContext
+
+
+class ReorganizeSession(TypedDict):
+    """A session the plan holds on a day, as the reorganisation screen lists it."""
+
+    id: str
+    title: str
+    kind: str
+    workout: str
+    #: The binding figure, short: "≤50 min", "25 km".
+    figure: str
+
+
+class ReorganizeDay(TypedDict):
+    date: str
+    sessions: list[ReorganizeSession]
+    #: The plan keeps the day for rest.
+    rest: bool
+    #: Before today: shown, never moved.
+    past: bool
+
+
+class VariantMove(TypedDict):
+    session: str
+    title: str
+    before: str
+    after: str
+
+
+class VariantDrop(TypedDict):
+    session: str
+    title: str
+    #: The distance the week loses, when the session states one.
+    km: float | None
+
+
+class VariantNote(TypedDict):
+    """A preference the variant bends; the page words it from `remark`."""
+
+    remark: Literal["impact_near_hard", "load_above_plan", "long_off_days",
+                    "group_uncarried", "rest_day_used"]
+    title: str | None
+    date: str | None
+    value: int | None
+
+
+class VariantDay(TypedDict):
+    date: str
+    #: The short labels of what the day holds, in order.
+    labels: list[str]
+    #: The day's planned load, on the scale of the week.
+    load: float
+    moved: bool
+    carried: bool
+
+
+class Variant(TypedDict):
+    moves: list[VariantMove]
+    dropped: list[VariantDrop]
+    notes: list[VariantNote]
+    days: list[VariantDay]
+    around_min: int | None
+
+
+class ReorganizeView(TypedDict):
+    """The athlete's week to reorganise, and the variants the days they stated allow.
+
+    `blocked` names why nothing can move: a dated check awaits an answer, the plan is
+    missing, or the week is over."""
+
+    week: str
+    revision: int
+    blocked: Literal["awaiting", "missing", "closed"] | None
+    days: list[ReorganizeDay]
+    variants: list[Variant]
+    others: int
+    #: Titles of the demanding sessions a pain signal keeps from moving earlier.
+    held_back: list[str]

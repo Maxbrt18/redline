@@ -300,3 +300,43 @@ RACE_PLAN_VIEW = {
                   "rain": 10, "wind": 14, "code": 2, "day": True} for hour in range(9, 16)]
                 for _ in range(3)],
 }
+
+
+def _variant_day(day, labels, load, moved=False, carried=False):
+    return {"date": f"2026-10-{day:02d}", "labels": labels, "load": load, "moved": moved,
+            "carried": carried}
+
+
+REORGANIZE = {
+    "week": CURRENT_WEEK,
+    "revision": 3,
+    "blocked": None,
+    "days": [
+        {"date": "2026-10-05", "sessions": [], "rest": True, "past": True},
+        {"date": "2026-10-06", "past": True, "rest": False, "sessions": [
+            {"id": "w41-mar-ef", "title": "EF, permis accompagné", "kind": "run",
+             "workout": "easy", "figure": "≤55 min"}]},
+        {"date": "2026-10-07", "sessions": [], "rest": False, "past": True},
+        {"date": "2026-10-08", "sessions": [], "rest": False, "past": True},
+        {"date": "2026-10-09", "past": False, "rest": False, "sessions": [
+            {"id": "w41-ven-ef", "title": "EF, permis accompagné", "kind": "run",
+             "workout": "easy", "figure": "≤55 min"}]},
+        {"date": "2026-10-10", "sessions": [], "rest": False, "past": False},
+        {"date": "2026-10-11", "past": False, "rest": False, "sessions": [
+            {"id": "w41-dim-sl", "title": "Sortie longue", "kind": "run", "workout": "long",
+             "figure": "16 km"}]},
+    ],
+    "variants": [{
+        "moves": [{"session": "w41-ven-ef", "title": "EF, permis accompagné",
+                   "before": "2026-10-09", "after": "2026-10-10"}],
+        "dropped": [],
+        "notes": [{"remark": "load_above_plan", "title": None, "date": None, "value": 30}],
+        "days": [_variant_day(5, [], 0), _variant_day(6, ["EF"], 137), _variant_day(7, [], 0),
+                 _variant_day(8, [], 0), _variant_day(9, [], 0),
+                 _variant_day(10, ["EF"], 137, moved=True, carried=True),
+                 _variant_day(11, ["SL"], 540)],
+        "around_min": None,
+    }],
+    "others": 4,
+    "held_back": [],
+}

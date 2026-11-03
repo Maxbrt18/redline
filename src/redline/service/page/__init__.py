@@ -63,6 +63,7 @@ NOTEBOOK_SCRIPT = (
     "strength/send.js", "strength/main.js",
     "notebook/state.js", "notebook/ui.js", "notebook/session.js", "notebook/api.js", "notebook/format.js",
     "notebook/screens/weather.js", "notebook/screens/today.js", "notebook/screens/week.js",
+    "notebook/screens/reorganize.js",
     "notebook/screens/raceplan.js", "notebook/screens/course.js", "notebook/screens/injury.js",
     "notebook/screens/archives.js",
     "notebook/screens/detail.js",
@@ -73,6 +74,7 @@ NOTEBOOK_SCRIPT = (
 NOTEBOOK_STYLE = (
     "shared/base.css", "notebook/shell.css", "notebook/screens/today.css", "notebook/screens/week.css",
     "notebook/screens/course.css", "notebook/screens/injury.css", "notebook/screens/archives.css",
+    "notebook/screens/reorganize.css",
     "notebook/screens/detail.css", "notebook/sheet.css", "notebook/viewer.css", "strength/strength.css", "notebook/workout.css",
 )
 

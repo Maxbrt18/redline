@@ -689,11 +689,13 @@ def test_the_write_guard_is_wired_into_the_revise_path_not_merely_available():
     """A guard function nobody calls is an intention, not a guard. It must be visible
     on the write path itself."""
     from conftest import ENGINE_ROOT
-    source = (ENGINE_ROOT / "src" / "redline" / "cli" / "week_plan.py").read_text()
+    command = (ENGINE_ROOT / "src" / "redline" / "cli" / "week_plan.py").read_text()
+    assert "plan_revision.checked(" in command, "revise no longer goes through the checks"
+    source = (ENGINE_ROOT / "src" / "redline" / "service" / "plan_revision.py").read_text()
     assert "written_text_errors(current" in source, (
         "the typography guard is not called on the new revision")
     before = source.index("written_text_errors(current")
-    after = source.index("validate(candidate)")
+    after = source.index("validate({")
     assert before < after, (
         "the text must be judged before the plan that holds it: otherwise a dirty "
         "revision is accepted as soon as the plan itself is valid")
