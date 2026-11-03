@@ -40,7 +40,7 @@ WEEK = r"\d{4}-W(0[1-9]|[1-4]\d|5[0-3])"
 
 #: Rules the engine enforces itself: the coach must read them, otherwise the code would
 #: reject from the program what the injected rulebook does not state.
-ENFORCED = ("n2", "n7", "n8", "po", "s9")
+ENFORCED = ("n2", "n3", "n4", "n7", "n8", "po", "s9")
 
 RULEBOOK_SCHEMA = Schema("rulebook.toml", [
     field("parameters", dict, schema=Schema("[parameters]", [
@@ -79,6 +79,20 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
         field("long_run_weekdays", list, required=False,
               item=field("weekday", int, minimum=1, maximum=7),
               note="ISO weekdays the long run stays on unless the athlete pins it elsewhere"),
+        # Optional: absent, rules n3 and n4 stay with the coach alone. Present, the
+        # engine refuses the revisions that break their verifiable part.
+        field("persistent_wake_min", float, required=False, minimum=0.5, maximum=10,
+              note="wake trace at or above which a morning counts towards persistence"),
+        field("persistent_wake_mornings", int, required=False, minimum=2, maximum=7,
+              note="consecutive mornings at that level: pain persisting beyond 48 h"),
+        field("pain_no_quality_days", int, required=False, minimum=1, maximum=42,
+              note="days without quality from the morning persistence is established"),
+        field("pain_cut_pct", int, required=False, minimum=0, maximum=100,
+              note="cut of a week planned before persistence was established, in %"),
+        field("poor_nights_streak", int, required=False, minimum=2, maximum=7,
+              note="consecutive poor nights that remove quality"),
+        field("alarm_no_quality_days", int, required=False, minimum=1, maximum=14,
+              note="days without quality after poor nights or a high easy-run HR"),
     ])),
     field("transitions", list, minimum=1, maximum=12, item=field(
         "transition", dict, schema=Schema("[[transitions]]", [
@@ -94,7 +108,7 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
             field("text", str, minimum=1, maximum=400),
             field("grade", str, minimum=1, maximum=120),
             field("owner", str, minimum=1, maximum=200),
-            field("enforced_by", str, minimum=1, maximum=200),
+            field("enforced_by", str, minimum=1, maximum=300),
         ]))),
 ])
 
@@ -124,6 +138,12 @@ class Parameters:
     sessions_per_day: int = 2
     reorganize_load_margin_pct: int | None = None
     long_run_weekdays: tuple[int, ...] = ()
+    persistent_wake_min: float | None = None
+    persistent_wake_mornings: int | None = None
+    pain_no_quality_days: int | None = None
+    pain_cut_pct: int | None = None
+    poor_nights_streak: int | None = None
+    alarm_no_quality_days: int | None = None
 
     def spoken(self) -> dict[str, str]:
         """Thresholds as a rule's text states them: decimal comma."""
@@ -213,7 +233,8 @@ def parse(text: str, source: Path) -> Rulebook:
         "long_run_weekdays": tuple(raw.get("long_run_weekdays") or ()),
         "wake_trace_until": dt.time.fromisoformat(raw["wake_trace_until"]),
         **{name: float(raw[name])
-           for name in ("gate_effort_peak", "hard_min_hours", "stall_tolerance_km")}})
+           for name in ("gate_effort_peak", "hard_min_hours", "stall_tolerance_km",
+                        "persistent_wake_min") if name in raw}})
     problems = []
     for what, values in (("transition", [entry["slug"] for entry in payload["transitions"]]),
                          ("rule", [entry["id"] for entry in payload["rules"]])):
@@ -226,11 +247,13 @@ def parse(text: str, source: Path) -> Rulebook:
     spoken = parameters.spoken()
     rules = []
     for entry in payload["rules"]:
-        cited = {name for _, name, _, _ in string.Formatter().parse(entry["text"]) if name}
+        cited = {name for label in ("text", "enforced_by")
+                 for _, name, _, _ in string.Formatter().parse(entry[label]) if name}
         if unknown := sorted(cited - spoken.keys()):
             problems.append(f"rule {entry["id"]}: unknown threshold {", ".join(unknown)} (known: {", ".join(sorted(spoken))})")
             continue
-        rules.append(Rule(**{**entry, "text": entry["text"].format_map(spoken)}))
+        rules.append(Rule(**{**entry, "text": entry["text"].format_map(spoken),
+                             "enforced_by": entry["enforced_by"].format_map(spoken)}))
     if problems:
         raise RulebookError("\n  - ".join([f"{source} :", *problems]))
     return Rulebook(

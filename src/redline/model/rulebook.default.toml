@@ -56,6 +56,18 @@ reorganize_load_margin_pct = 25
 # The long run stays on these ISO weekdays (6 = Saturday, 7 = Sunday) unless the athlete
 # pins it elsewhere.
 long_run_weekdays = [6, 7]
+# Rule n3: a wake trace at or above this level (1 = light) ...
+persistent_wake_min = 1
+# ... on this many consecutive mornings is pain persisting beyond 48 h.
+persistent_wake_mornings = 3
+# Rule n3: from that morning, no quality session for this many days ...
+pain_no_quality_days = 14
+# ... and a week planned before it targets at least this much less volume (%).
+pain_cut_pct = 30
+# Rule n4: this many consecutive poor nights remove quality ...
+poor_nights_streak = 3
+# ... as an abnormally high easy-run HR does, for this many days.
+alarm_no_quality_days = 7
 
 # ------------------------------------------------------------------ transitions
 
@@ -92,7 +104,9 @@ race_first = true
 # coach are thus the same. `owner` names the vault file holding the reasoning;
 # `enforced_by`, what applies the rule.
 #
-# Rules n2, n7, n8, po and s9 are enforced by the engine: they are mandatory.
+# Rules n2, n3, n4, n7, n8, po and s9 are enforced by the engine: they are mandatory.
+# When the engine holds only part of a rule, `enforced_by` names that part and leaves
+# the rest, by name, to the coach.
 
 [[rules]]
 id = "n1"
@@ -116,7 +130,7 @@ title = "Douleur"
 text = "plafond {pain_cap}/10 à l'effort, zone par zone ; au-dessus ou foulée modifiée : arrêt. Persistante > 48 h : -30 %, puis paliers 50/70/85 % et 2 semaines sans qualité."
 grade = "règle de coaching"
 owner = "coaching/current-plan.md"
-enforced_by = "le coach"
+enforced_by = "code : trace au réveil persistante → qualité refusée {pain_no_quality_days} j, semaine déjà prévue -{pain_cut_pct} % (redline week-plan revise). Coach : arrêt en séance, foulée modifiée, paliers 50/70/85 %"
 
 [[rules]]
 id = "n4"
@@ -124,7 +138,7 @@ title = "Sommeil et FC"
 text = "2-3 mauvaises nuits consécutives ou FC anormalement haute en footing : qualité supprimée, semaine traitée en assimilation."
 grade = "règle de coaching"
 owner = "coaching/current-plan.md"
-enforced_by = "le coach ; FC à allure calculée par redline signals"
+enforced_by = "code : {poor_nights_streak} mauvaises nuits de suite ou FC à allure haute → qualité refusée {alarm_no_quality_days} j (redline week-plan revise). Coach : 2 nuits, volume d'assimilation"
 
 [[rules]]
 id = "n5"

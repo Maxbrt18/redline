@@ -657,7 +657,52 @@ def _pain_gate_cases(rows: list[Row], label: str, previous: str,
         cases.append(("?", detail))
     else:
         cases.append(("✓", detail))
+    cases.extend(_wake_trend_cases(rows, _week_start(label) + dt.timedelta(days=6), zone))
     return cases
+
+
+def _wake_trend_cases(rows: list[Row], as_of: dt.date, zone: str) -> list[tuple[str, str]]:
+    """The morning trend of the 14 days to `as_of`, and a persistence established in them."""
+    from redline.analysis import pain_rules  # pain_rules imports this module
+
+    trend = pain_rules.wake_trend(rows, zone, as_of)
+    cases = []
+    if trend.direction is None:
+        cases.append(("?", text.GATE_WAKE_TREND_UNKNOWN.format(days=trend.days)))
+    else:
+        cases.append(("✗" if trend.direction == "rising" else "✓", text.GATE_WAKE_TREND.format(
+            days=trend.days, earlier=trend.earlier, recent=trend.recent,
+            direction=text.WAKE_DIRECTIONS[trend.direction])))
+    parameters = rulebook.current().parameters
+    if parameters.persistent_wake_min is not None and parameters.persistent_wake_mornings:
+        start = as_of - dt.timedelta(days=trend.days - 1)
+        cases.extend(("✗", text.GATE_WAKE_PERSISTENT.format(day=persistence.established))
+                     for persistence in pain_rules.persistences(
+                         rows, zone, parameters.persistent_wake_min,
+                         parameters.persistent_wake_mornings)
+                     if start <= persistence.established <= as_of)
+    return cases
+
+
+def wake_lines(rows: list[Row], zone: str, today: dt.date) -> list[str]:
+    """The morning trend and what followed each effort above the n3 cap, for the coach."""
+    from redline.analysis import pain_rules  # pain_rules imports this module
+
+    trend = pain_rules.wake_trend(rows, zone, today)
+    lines = [text.WAKE_TREND.format(
+        days=trend.days, n=len(trend.readings),
+        earlier="—" if trend.earlier is None else f"{trend.earlier:g}",
+        recent="—" if trend.recent is None else f"{trend.recent:g}",
+        direction=text.WAKE_DIRECTIONS.get(trend.direction or "", text.WAKE_TREND_NONE))]
+    parameters = rulebook.current().parameters
+    if parameters.persistent_wake_min is None:
+        return lines
+    after = pain_rules.settling(rows, zone, parameters.pain_cap, parameters.persistent_wake_min)
+    lines.append(text.SETTLING.format(settled=len(after.settled),
+                                      persisted=len(after.persisted), unread=len(after.unread)))
+    if after.too_sensitive:
+        lines.append(text.SETTLING_TOO_SENSITIVE)
+    return lines
 
 
 def gate(rows: list[Row], label: str, instr: Instruments,
@@ -1039,6 +1084,7 @@ def week_report(store: LedgerStore, rows: list[Row], instruments: dict, targets:
             lines.append(text.REPORT_PAIN.format(label=zone.label, trend=pain[0]))
         lines.extend(text.REPORT_ESCULIER.format(zone_prefix=zone_prefix(zone, zones), flag=flag)
                      for flag in esculier_check(week_rows, zone.slug, history=rows))
+        lines.extend(wake_lines(rows, zone.slug, min(today, _week_start(label) + dt.timedelta(days=6))))
     lines.extend(gate(rows, label, instr, zones))
     lines.extend(text.REPORT_OVER_TARGET.format(overshoot=overshoot)
                  for overshoot in over_target(week_rows, targets))
@@ -1139,6 +1185,8 @@ def main() -> int:
                 print(f"    {flag}")
             if not flags:
                 print(text.TREND_NOTHING)
+            for line in wake_lines(rows, zone.slug, dt.date.today()):
+                print(line)
             print()
         return 0
 

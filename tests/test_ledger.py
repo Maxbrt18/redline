@@ -609,6 +609,7 @@ ZONES = [ledger.PainZone(ZONE, "Genou")]
 
 def _gate_rows(*, peak_before=1.0, peak_now=1.0, wake_now=(1.0,)):
     rows = [Row(dt.date(2026, 9, 1), "wake-trace", pains=zoned(1.0)),
+            Row(dt.date(2026, 9, 30), "wake-trace", pains=zoned(1.0)),
             Row(dt.date(2026, 9, 29), "easy", km=8, hours=0.8, pains=zoned(peak_before)),
             Row(dt.date(2026, 10, 6), "easy", km=8, hours=0.8, pains=zoned(peak_now))]
     rows += [Row(dt.date(2026, 10, 7 + i), "wake-trace", pains=zoned(value))
@@ -657,6 +658,7 @@ def test_two_zones_never_share_a_series():
 def test_the_gate_judges_each_zone_and_names_it():
     zones = [ledger.PainZone("talon", "Talon"), ledger.PainZone("cheville", "Cheville")]
     rows = [Row(dt.date(2026, 9, 1), "wake-trace", pains={"talon": 1.0, "cheville": 1.0}),
+            Row(dt.date(2026, 9, 30), "wake-trace", pains={"talon": 1.0, "cheville": 1.0}),
             Row(dt.date(2026, 9, 29), "easy", km=8, hours=0.8, pains={"talon": 1.0, "cheville": 1.0}),
             Row(dt.date(2026, 10, 6), "easy", km=8, hours=0.8, pains={"talon": 1.0, "cheville": 1.5}),
             Row(dt.date(2026, 10, 7), "wake-trace", pains={"talon": 1.0, "cheville": 1.0})]

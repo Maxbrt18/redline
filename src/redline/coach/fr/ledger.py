@@ -232,3 +232,20 @@ NUMBER_EXPECTED = "{metric} : un nombre est attendu"
 CHOICES_EXPECTED = "{metric} : une liste de choix est attendue"
 
 CHOICES_UNKNOWN = "{metric} : choix inconnu (possibles : {allowed})"
+
+WAKE_DIRECTIONS = {"rising": "en hausse", "falling": "en baisse", "stable": "stable"}
+
+GATE_WAKE_TREND = "réveils {days} j : {earlier:g} → {recent:g} ({direction})"
+
+GATE_WAKE_TREND_UNKNOWN = "réveils {days} j : une moitié de la fenêtre sans lecture"
+
+GATE_WAKE_PERSISTENT = "réveil persistant établi le {day:%d/%m} (règle n3)"
+
+WAKE_TREND = "  réveils {days} j : {n} lecture(s), {earlier} → {recent} ({direction})"
+
+WAKE_TREND_NONE = "pas de comparaison"
+
+SETTLING = ("  au-dessus du plafond n3 : {settled} retombée(s) en 48 h, {persisted} "
+            "persistante(s), {unread} sans lecture")
+
+SETTLING_TOO_SENSITIVE = "  → retombe presque toujours en 48 h : plafond n3 trop sensible ?"
