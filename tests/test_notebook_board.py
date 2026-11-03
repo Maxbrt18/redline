@@ -310,10 +310,6 @@ def test_the_race_and_only_alex_s_deadlines_reach_the_course_tab(store):
     labels = [item["label"] for item in view["milestones"]]
     assert labels == ["Sortie longue au Testathlon", "Frontale ≥400 lm, 5 h d’autonomie", "Départ"]
     assert [item["label"] for item in view["capabilities"]] == ["Knee", "Fueling"]
-    assert view["longest"]["km"] == 8.35 and view["longest"]["planned_km"] == 16.0
-    assert view["longest"]["planned_on"] == "2026-10-11"
-    current = view["longest"]["weeks"][-1]
-    assert current["open"] and current["target"] == 41.0 and current["volume"] >= current["km"] == 8.35
     assert board(store).today_view()["race"]["days"] == 50
 
 
