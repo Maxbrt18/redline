@@ -855,6 +855,8 @@ def test_the_red_point_moves_from_the_run_to_the_strength_once_done(browser):
     tab.goto(BASE + '/carnet')
     tab.locator('.n-step.done').wait_for()
     assert tab.locator('.n-step.done .n-skick').inner_text() == 'Fait · 7\u00a0h\u00a010'
+    # No drawing in the thread outgrows its pill: an unstyled icon fills the width.
+    assert tab.locator('.n-step svg').evaluate_all('nodes => nodes.every(n => n.getBoundingClientRect().width <= 40)')
     assert tab.get_by_text('FC moyenne 5 bpm au-dessus de ton plafond.').is_visible()
     assert tab.locator('.n-step.now').count() == 1
     assert tab.locator('.n-step.now h2').inner_text() == 'Renfo, séance unique'

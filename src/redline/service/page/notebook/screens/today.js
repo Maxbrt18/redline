@@ -208,16 +208,13 @@ export function cellsCard(ask, target, write = answer) {
   if (notes.length) card.append(el('p', notes.join(' '), 'n-note'));
   return card;
 }
-// A step of the thread: its dot, its role in small caps, its title, preceded by its family
-// pill when it is a session.
-const CHECK = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 5.2l2 2 4-4.4"/></svg>';
+// A step of the thread: its role, its title, preceded by its family pill when it is a
+// session. The thread draws no dot: the phase reads in the kicker and the class.
 export function feedStep(phase, kicker, title, small, icon) {
-  const node = el('i', null, 'n-node');
-  if (phase === 'done') node.innerHTML = CHECK;
   const body = el('div', null, 'n-sbody');
   if (kicker) body.append(el('p', kicker, 'n-skick'));
   if (title) body.append(add(el('h2'), icon ? pastille(icon) : null, title));
-  return [add(el('div', null, 'n-step ' + phase + (small ? ' small' : '') + (kicker ? '' : ' bare')), node, body), body];
+  return [add(el('div', null, 'n-step ' + phase + (small ? ' small' : '') + (kicker ? '' : ' bare')), body), body];
 }
 // A day's thread: the morning point, overdue questions, what is done, then what remains.
 // The first expected gesture takes the red dot.
