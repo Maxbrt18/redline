@@ -86,10 +86,13 @@ document.querySelectorAll('.n-sheetwrap').forEach(wrap => {
   const panel = wrap.querySelector('.n-sheet');
   wrap.querySelectorAll('[data-close]').forEach(node => node.addEventListener('click', () => dismiss()));
   wrap.addEventListener('touchmove', event => { if (!panel.contains(event.target) && event.cancelable) event.preventDefault(); }, {passive: false});
+  // A sheet taller than the screen scrolls; it follows the finger down only from its top,
+  // so a scroll back up never turns into a dismissal.
   let drag = null;
   panel.addEventListener('touchstart', event => { drag = {y: event.touches[0].clientY, dy: 0}; panel.classList.add('dragging'); }, {passive: true});
   panel.addEventListener('touchmove', event => {
     if (!drag) return;
+    if (panel.scrollTop > 0) { drag.y = event.touches[0].clientY; return; }
     drag.dy = Math.max(0, event.touches[0].clientY - drag.y);
     panel.style.transform = drag.dy ? 'translateY(' + drag.dy + 'px)' : '';
     if (drag.dy && event.cancelable) event.preventDefault();

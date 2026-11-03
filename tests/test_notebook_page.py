@@ -1144,6 +1144,47 @@ def test_a_day_becomes_a_habit_and_a_week_to_come_is_stated_for_the_review(brows
     tab.close()
 
 
+def test_another_sport_keeps_its_name_as_typed_and_its_sheet_scrolls(browser):
+    from notebook_payloads import REORGANIZE
+
+    habits = []
+    tab = browser.new_page(viewport={'width': 390, 'height': 600}, has_touch=True)
+    serve(tab)
+
+    def answer(route):
+        if route.request.url.endswith('/habits'):
+            habits.append(json.loads(route.request.post_data))
+            data = {'status': 'ok'}
+        else:
+            data = REORGANIZE
+        route.fulfill(content_type='application/json', body=json.dumps(data))
+    for pattern in ('reorganize**', 'habits**'):
+        tab.route(BASE + '/notebook-api/' + pattern, answer)
+    tab.goto(BASE + '/carnet#t=' + 'x' * 43)
+    tab.locator('button[data-tab="week"]').click()
+    tab.get_by_role('button', name='Réorganiser la semaine').click()
+    tab.locator('button.n-rg-day', has_text='10').click()
+    sheet = tab.locator('#day-sheet')
+    sheet.get_by_role('button', name='Autre sport').click()
+    name = sheet.get_by_role('textbox', name='Nom du sport')
+    assert name.input_value() == ''
+    # Typed, never blurred: what iOS leaves when the cross closes the sheet.
+    name.press_sequentially('Volleyball')
+    assert tab.evaluate('document.activeElement.classList.contains("n-rg-name")')
+    assert 'Volleyball' in tab.locator('button.n-rg-day', has_text='10').inner_text()
+    box = tab.locator('.n-rg-sheet')
+    assert box.evaluate('node => getComputedStyle(node).touchAction') == 'pan-y'
+    assert box.evaluate('node => node.scrollHeight > node.clientHeight')
+    sheet.get_by_role('checkbox', name='Tous les samedis').check()
+    for _ in range(50):
+        if habits:
+            break
+        tab.wait_for_timeout(100)
+    assert habits == [{'weekday': 6, 'kind': 'other_sport', 'sport': 'Volleyball',
+                       'demanding': False, 'run_too': False}]
+    tab.close()
+
+
 def test_the_athlete_asks_the_coach_then_takes_or_dismisses_a_proposal(browser):
     from notebook_payloads import PROPOSAL, REORGANIZE
 

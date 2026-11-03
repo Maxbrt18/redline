@@ -44,8 +44,9 @@
 .n-rg-var .n-action { display: block; width: 100%; margin-top: 14px; border-radius: 12px; }
 .n-rg-var .n-action:disabled { opacity: .4; }
 .n-rg-more { color: var(--muted); font-size: 13px; margin: 14px 4px 0; text-wrap: pretty; }
-/* The day sheet, on the settings sheet's pattern. */
-.n-rg-sheet { max-height: calc(100% - 12px); overflow-y: auto; }
+/* The day sheet, on the settings sheet's pattern. It outgrows a phone once a state shows
+ * its details: it scrolls inside, the page beneath does not. */
+.n-sheet.n-rg-sheet { max-height: calc(100% - 12px); overflow-y: auto; touch-action: pan-y; overscroll-behavior: contain; }
 .n-rg-gh { margin: 4px 18px 7px; font: 400 13px var(--sys); text-transform: uppercase; letter-spacing: .02em; color: var(--muted); }
 .n-rg-sheet .n-group { margin-bottom: 18px; }
 .n-rg-sheet .n-group + .n-rg-foot { margin-top: -12px; }
@@ -56,7 +57,8 @@
 .n-rg-state { min-height: 46px; }
 .n-rg-check { width: 22px; height: 22px; flex: none; fill: none; stroke: var(--ink); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .n-rg-sheet .n-cell .n-seg button { padding: 3px 10px; }
-.n-rg-name { width: 150px; border: 0; background: none; text-align: right; font: 400 17px var(--sys); color: var(--muted); }
+.n-rg-name { width: 150px; border: 0; background: none; text-align: right; font: 400 17px var(--sys); color: var(--ink); }
+.n-rg-name::placeholder { color: var(--muted); }
 /* Habits. */
 .n-rg-habit { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 13px 0; border-bottom: 1px solid var(--grid); }
 .n-rg-habit > span { font-size: 15px; } .n-rg-habit > span small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }

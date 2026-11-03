@@ -114,11 +114,16 @@ const REORG_DEFAULTS = {
   with_others: {minutes: 60, pace: 'easy', required: false},
   other_sport: {sport: 'Autre sport', demanding: false, run_too: false},
 };
+// The sheet is rebuilt on every answer of the engine: it keeps its scroll, and the sport's
+// name keeps the focus and the caret while it is being typed.
 function reorgSheet(week, date) {
   const plan = reorgPlan(week), item = plan.sheet, panel = $('day-panel');
   if (!item || item.date !== date) return;
-  const stated = reorgKnown(plan, item) || {date, kind: 'as_planned'};
-  const set = change => reorgSet(week, date, {...stated, ...change});
+  const known = () => reorgKnown(plan, item) || {date, kind: 'as_planned'};
+  const stated = known();
+  const set = change => reorgSet(week, date, {...known(), ...change});
+  const box = panel.parentElement, top = box.scrollTop;
+  const typing = document.activeElement && document.activeElement.matches('#day-panel .n-rg-name') ? document.activeElement : null;
   $('day-title').textContent = day(date).toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric'}).replace(/^./, c => c.toUpperCase());
   panel.replaceChildren();
   if (item.sessions.length) {
@@ -149,9 +154,17 @@ function reorgSheet(week, date) {
   }
   if (stated.kind === 'other_sport') {
     panel.append(reorgHead('Le sport'));
-    const name = el('input', null, 'n-rg-name');
-    name.type = 'text'; name.maxLength = 40; name.value = stated.sport; name.setAttribute('aria-label', 'Nom du sport');
-    name.addEventListener('change', () => { if (name.value.trim()) set({sport: name.value.trim()}); });
+    // The name is kept at each keystroke: iOS fires no change when the cross closes the
+    // sheet. The engine never reads it, so nothing is recomputed.
+    const name = el('input', null, 'n-rg-name'), unnamed = REORG_DEFAULTS.other_sport.sport;
+    name.type = 'text'; name.maxLength = 40; name.placeholder = 'Volley, vélo…'; name.enterKeyHint = 'done';
+    name.value = stated.sport && stated.sport !== unnamed ? stated.sport : '';
+    name.setAttribute('aria-label', 'Nom du sport');
+    name.addEventListener('input', () => {
+      plan.days[date] = reorgFields({...known(), sport: name.value.trim() || unnamed});
+      render(scrollY);
+    });
+    name.addEventListener('keydown', event => { if (event.key === 'Enter') name.blur(); });
     const runToo = el('input', null, 'n-switch');
     runToo.type = 'checkbox'; runToo.checked = stated.run_too; runToo.setAttribute('aria-label', 'Courir aussi ce jour-là');
     runToo.addEventListener('change', () => set({run_too: runToo.checked}));
@@ -165,9 +178,12 @@ function reorgSheet(week, date) {
   every.type = 'checkbox'; every.checked = Boolean(item.habit_id);
   every.disabled = !item.habit_id && stated.kind === 'as_planned';
   every.setAttribute('aria-label', 'Tous les ' + dayName + 's');
-  every.addEventListener('change', () => reorgHabit(week, date, item, stated, every));
+  every.addEventListener('change', () => reorgHabit(week, date, item, known(), every));
   panel.append(add(el('div', null, 'n-group'), reorgCell('Tous les ' + dayName + 's', every)));
   panel.append(el('p', item.habit_id ? 'Une habitude : elle revient chaque semaine. Tu la retrouves dans Mes habitudes.' : 'En faire une habitude : elle reviendra chaque semaine, et le coach en tiendra compte en écrivant ta semaine.', 'n-small n-rg-foot'));
+  box.scrollTop = top;
+  const name = typing && panel.querySelector('.n-rg-name');
+  if (name) { name.focus({preventScroll: true}); name.setSelectionRange(typing.selectionStart, typing.selectionEnd); }
 }
 async function reorgHabit(week, date, item, stated, toggle) {
   toggle.disabled = true;
