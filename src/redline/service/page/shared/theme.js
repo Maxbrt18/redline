@@ -9,13 +9,15 @@ const themeColors = {light: '#f7f5f2', dark: '#110e0d'};
 // `theme-color` stays up to date for the launch screen and older iOS versions.
 const veiled = {light: '#c6c4c2', dark: '#0e0b0a'};  // --bg under the 20% black veil
 let barTint = null;
-// The track under the bar on the three tabs: the strip under the clock takes its red.
-const trackColors = {light: '#c8102e', dark: '#b30f28'};
+// The track under the bar on the three tabs: the strip under the clock takes its mean red
+// (--track-flat in notebook/shell.css), plain or under the sheet's veil.
+const trackColors = {light: '#cd183b', dark: '#ba1635'};
+const veiledTrack = {light: '#a4132f', dark: '#95122a'};
 let onTrack = false;
 const systemDark = matchMedia('(prefers-color-scheme: dark)');
 function paintBar() {
   const scheme = document.documentElement.dataset.theme || (systemDark.matches ? 'dark' : 'light');
-  const color = barTint === 'viewer' ? '#000000' : barTint === 'sheet' ? veiled[scheme] : onTrack ? trackColors[scheme] : themeColors[scheme];
+  const color = barTint === 'viewer' ? '#000000' : barTint === 'sheet' ? (onTrack ? veiledTrack : veiled)[scheme] : onTrack ? trackColors[scheme] : themeColors[scheme];
   document.querySelector('meta[name="theme-color"]').content = color;
 }
 systemDark.addEventListener('change', paintBar);

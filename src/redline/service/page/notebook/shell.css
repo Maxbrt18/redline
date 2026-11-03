@@ -68,7 +68,7 @@ a { color: inherit; }
 .n-topbar .r { justify-self: end; }
 .n-topbar .c { max-width: 230px; font: 600 17px/1.2 var(--sys); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; transition: opacity .15s; }
 .n-topbar.titled .c { opacity: 1; }
-.n-topbar.instant .c, .n-topbar.instant::before { transition: none; }
+.n-topbar.instant, .n-topbar.instant .c, .n-topbar.instant::before { transition: none; }
 /* The bar of the screen being left, frozen over the new one during the transition. */
 .n-barcopy { position: absolute; left: 0; right: 0; bottom: 0; pointer-events: none; }
 .n-barcopy * { pointer-events: none !important; }
@@ -222,10 +222,12 @@ button, .n-nav, .n-krow, summary { touch-action: manipulation; }
 /* The track. The three tabs open on a surface of pure red with a rubber grain and three
  * lanes: the only red surface of the notebook. A pushed screen keeps the same head on
  * paper. Red elsewhere is a limit (the cursor's stroke), or the main action under the
- * thumb. */
-:root { --tartan: #c8102e; --tartan-deep: #a50d24; --on-track: #fff6f0; --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.3' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
-:root[data-theme="dark"] { --tartan: #b30f28; --tartan-deep: #8c0b1f; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --tartan: #b30f28; --tartan-deep: #8c0b1f; } }
+ * thumb. --track-flat is the mean color of the track once grained, measured in the
+ * browser: the top bar and the iOS status bar take it, since neither can carry a texture.
+ * Change it with --tartan or the grain. */
+:root { --tartan: #c8102e; --tartan-deep: #a50d24; --track-flat: #cd183b; --on-track: #fff6f0; --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.3' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+:root[data-theme="dark"] { --tartan: #b30f28; --tartan-deep: #8c0b1f; --track-flat: #ba1635; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --tartan: #b30f28; --tartan-deep: #8c0b1f; --track-flat: #ba1635; } }
 .n-hero:empty { display: none; }
 .n-lanes { display: none; }
 :root.n-piste .n-track { position: relative; isolation: isolate; color: var(--on-track);
@@ -241,11 +243,11 @@ button, .n-nav, .n-krow, summary { touch-action: manipulation; }
 .n-lanes span { position: absolute; right: 24px; font: 700 11px/1 var(--display); color: var(--on-track); }
 .n-lanes span:nth-of-type(1) { top: 3px; } .n-lanes span:nth-of-type(2) { top: 18px; } .n-lanes span:nth-of-type(3) { top: 33px; }
 /* On the track, the bar takes its red until the track has scrolled under it. */
-:root.n-piste .n-topbar.ontrack { background-color: var(--tartan); }
+:root.n-piste .n-topbar.ontrack { background-color: var(--track-flat); }
 :root.n-piste .n-topbar.ontrack::before { opacity: 0; }
 :root.n-piste .n-topbar.ontrack .n-round { background: rgb(255 255 255 / .18); color: var(--on-track); box-shadow: none; }
 :root.n-piste .n-topbar.ontrack .c { opacity: 0; }
-:root.n-piste.n-veiled .n-topbar.ontrack { background-color: color-mix(in srgb, #000 20%, var(--tartan)); }
+:root.n-piste.n-veiled .n-topbar.ontrack { background-color: color-mix(in srgb, #000 20%, var(--track-flat)); }
 :root.n-piste .n-track .n-pas { background: rgb(255 255 255 / .2); color: var(--on-track); }
 
 /* The head of a screen: a kicker, a title with its pill, one figure as large as it gets. */

@@ -366,10 +366,10 @@ def test_the_theme_follows_the_phone_unless_pinned_on_this_device(browser):
     tab.get_by_role('button', name='Sombre').click()
     assert tab.evaluate("document.documentElement.dataset.theme") == 'dark'
     assert tab.evaluate(background) != light
-    # Under the sheet, the status bar takes the scrim; closed, the red of the track under it.
-    assert tab.evaluate("[...document.querySelectorAll('meta[name=theme-color]')].every(m => m.content === '#0e0b0a')")
+    # Under the sheet, the status bar takes the veiled track; closed, the track's mean red.
+    assert tab.evaluate("[...document.querySelectorAll('meta[name=theme-color]')].every(m => m.content === '#95122a')")
     tab.keyboard.press('Escape')
-    assert tab.evaluate("[...document.querySelectorAll('meta[name=theme-color]')].every(m => m.content === '#b30f28')")
+    assert tab.evaluate("[...document.querySelectorAll('meta[name=theme-color]')].every(m => m.content === '#ba1635')")
     tab.reload()
     tab.get_by_role('heading', name='EF, permis accompagné', exact=True).wait_for()
     assert tab.evaluate("document.documentElement.dataset.theme") == 'dark'
@@ -398,7 +398,7 @@ def test_the_weather_answers_what_to_wear_and_whether_night_falls_during_the_run
     assert tab.get_by_text('Ressenti 15° · éclaircies, sec').is_visible()
     assert tab.get_by_text('Vent 12 km/h · 15° à 18 h').is_visible()
     assert tab.locator('.n-step.now .n-skick').inner_text() == 'À faire · 17\u00a0h'
-    assert tab.evaluate("[...document.querySelectorAll('meta[name=theme-color]')].map(m => m.content)") == ['#c8102e']
+    assert tab.evaluate("[...document.querySelectorAll('meta[name=theme-color]')].map(m => m.content)") == ['#cd183b']
     tab.close()
 
 
@@ -690,8 +690,14 @@ def test_the_top_bar_folds_the_title_when_it_scrolls_under(browser):
     tab.goto(BASE + '/carnet')
     tab.get_by_role('heading', name='EF, permis accompagné', exact=True).wait_for()
     assert tab.evaluate("document.getElementById('bar').className") == 'n-topbar ontrack'
+    bar_color = "getComputedStyle(document.getElementById('bar')).backgroundColor"
+    assert tab.evaluate(bar_color) == 'rgb(205, 24, 59)'
     tab.evaluate('scrollTo(0, 400)')
     tab.wait_for_function("document.getElementById('bar').classList.contains('titled')")
+    # Off the track the bar turns to paper at once, and the status bar with it: iOS keeps
+    # the color it samples, a fade would leave it halfway.
+    assert tab.evaluate(bar_color) == 'rgb(247, 245, 242)'
+    assert tab.evaluate("document.querySelector('meta[name=theme-color]').content") == '#f7f5f2'
     assert tab.locator('#bar-title').inner_text() == 'Aujourd’hui'
     tab.close()
 
