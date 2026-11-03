@@ -79,7 +79,7 @@ export function render(y) {
   content.replaceChildren(); hero.replaceChildren();
   // The three tabs open on the track; a pushed screen, on paper.
   const piste = Boolean(view.root) && !app.workout;
-  document.documentElement.classList.toggle('n-piste', piste); pisteBar(piste);
+  document.documentElement.classList.toggle('n-piste', piste);
   document.querySelectorAll('[data-tab]').forEach(node => {
     if (node.dataset.tab === app.active) node.setAttribute('aria-current', 'page');
     else node.removeAttribute('aria-current');
@@ -222,11 +222,16 @@ export function select(tab) {
 // During the guided session, its large title is the one that collapses.
 export function barState(instant = false) {
   const title = app.workout ? $('title') : $('lt-title');
+  // Leaving or reaching the track switches the color at once: iOS samples the bar for its
+  // status bar and would keep a color caught halfway through the fade.
+  const underTrack = $('track').getBoundingClientRect().bottom > topBar.getBoundingClientRect().bottom;
+  instant = instant || underTrack !== topBar.classList.contains('ontrack');
   topBar.classList.toggle('instant', instant);
   topBar.classList.toggle('scrolled', scrollY > 2);
   topBar.classList.toggle('titled', title.getBoundingClientRect().bottom < topBar.getBoundingClientRect().bottom);
   // The bar stays on the track while the track shows under it, then turns to paper.
-  topBar.classList.toggle('ontrack', $('track').getBoundingClientRect().bottom > topBar.getBoundingClientRect().bottom);
+  topBar.classList.toggle('ontrack', underTrack);
+  pisteBar(underTrack && document.documentElement.classList.contains('n-piste'));
   if (instant) { void topBar.offsetWidth; topBar.classList.remove('instant'); }
 }
 let ticking = false;
