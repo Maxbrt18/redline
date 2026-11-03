@@ -27,7 +27,7 @@ from .notebook_board import AnswerError
 WEEK = re.compile(r"20\d{2}-W(?:0[1-9]|[1-4]\d|5[0-3])")
 UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 ZONE = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")
-HABIT_ID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+UUID_TEXT = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 ASK = re.compile(r"(?:cell:[0-9a-f-]{36}:(?:pain:[a-z0-9][a-z0-9-]{0,39}|rpe|enjoyment)"
                  r"|wake-cell:[0-9a-f-]{36}:[a-z0-9][a-z0-9-]{0,39}"
                  r"|reserve:[0-9a-f-]{36}"
@@ -298,12 +298,55 @@ def register(app: Flask, notebook: NotebookService, psid: str,
     def notebook_end_habit():
         body = request.get_json(silent=True)
         if (not isinstance(body, dict) or set(body) != {"id"} or not isinstance(body["id"], str)
-                or not HABIT_ID.fullmatch(body["id"])):
+                or not UUID_TEXT.fullmatch(body["id"])):
             return jsonify(error=notebook_text.ERRORS["bad_request"]), 400
         try:
             notebook.end_habit(body["id"])
         except reorganize.ReorganizeError:
             return jsonify(error=notebook_text.ERRORS["no_habit"]), 404
+        return jsonify(status="ok")
+
+    @app.post("/notebook-api/reorganize/ask")
+    def notebook_ask_coach():
+        body = request.get_json(silent=True)
+        if (not isinstance(body, dict) or set(body) != {"week", "days", "wish", "context"}
+                or not isinstance(body["week"], str) or not WEEK.fullmatch(body["week"])
+                or not isinstance(body["wish"], str) or not isinstance(body["context"], str)):
+            return jsonify(error=notebook_text.ERRORS["bad_request"]), 400
+        try:
+            text = notebook.ask_coach(body["week"], body["days"], body["wish"], body["context"])
+        except SchemaError:
+            return jsonify(error=notebook_text.ERRORS["bad_days"]), 400
+        except reorganize.ReorganizeError:
+            return jsonify(error=notebook_text.ERRORS["bad_request"]), 400
+        if alert is None:
+            return jsonify(error=notebook_text.ERRORS["coach_unreachable"]), 503
+        try:
+            alert(text, f"notebook:reorganize:{body['week']}:{int(clock.now().timestamp())}")
+        except Exception:
+            app.logger.exception("Reorganisation request not passed to the coach")
+            return jsonify(error=notebook_text.ERRORS["coach_unreachable"]), 503
+        return jsonify(status="ok")
+
+    @app.post("/notebook-api/proposals/take")
+    def notebook_take_proposal():
+        body = request.get_json(silent=True)
+        if (not isinstance(body, dict) or set(body) != {"id"} or not isinstance(body["id"], str)
+                or not UUID_TEXT.fullmatch(body["id"])):
+            return jsonify(error=notebook_text.ERRORS["bad_request"]), 400
+        try:
+            number = notebook.take_proposal(body["id"])
+        except (reorganize.ReorganizeError, SchemaError, StorageError):
+            return jsonify(error=notebook_text.ERRORS["proposal_gone"]), 409
+        return jsonify(status="ok", revision=number)
+
+    @app.post("/notebook-api/proposals/dismiss")
+    def notebook_dismiss_proposals():
+        body = request.get_json(silent=True)
+        if (not isinstance(body, dict) or set(body) != {"week"}
+                or not isinstance(body["week"], str) or not WEEK.fullmatch(body["week"])):
+            return jsonify(error=notebook_text.ERRORS["bad_request"]), 400
+        notebook.dismiss_proposals(body["week"])
         return jsonify(status="ok")
 
     @app.post("/notebook-api/answer")

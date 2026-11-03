@@ -23,6 +23,8 @@ PREDICTION_UPSERT = "prediction.upsert"
 CORRECTION_REGISTER = "correction.register"
 #: Easy-run permit: the coach's choice, sealed before the athlete decides.
 PERMIT_SEAL = "permit.seal"
+#: Revisions the coach proposes for a week; none is active until the athlete takes one.
+PLAN_PROPOSE = "plan.propose"
 
 ACTIVE = (
     OBSERVATION_ADD, ACTIVITY_LINK, MEASUREMENT_COMPLETE, HR_DOUBT, EXPOSURE_UPSERT, PLAN_REVISE,
@@ -30,5 +32,5 @@ ACTIVE = (
     THREAD_UPSERT, QUESTION_REVIEW, QUESTION_ASK, DEADLINE_UPSERT,
     SESSION_START, SESSION_MATCH,
     PROACTIVE_ANGLE,
-    GEAR_UPSERT, PREDICTION_UPSERT, CORRECTION_REGISTER, PERMIT_SEAL,
+    GEAR_UPSERT, PREDICTION_UPSERT, CORRECTION_REGISTER, PERMIT_SEAL, PLAN_PROPOSE,
 )

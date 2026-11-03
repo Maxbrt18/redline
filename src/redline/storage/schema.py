@@ -839,6 +839,29 @@ stated_days = sa.Table(
     sa.Column("stated_at", sa.DateTime(timezone=True), nullable=False, server_default=UTC_NOW),
 )
 
+#: A revision the coach proposes for a week, built on its active revision. None of them
+#: prescribes anything until the athlete takes one; a new set replaces the open ones.
+plan_proposals = sa.Table(
+    "plan_proposals", metadata,
+    _id(),
+    sa.Column("athlete_id", sa.Text, sa.ForeignKey("redline.athletes.id"), nullable=False),
+    sa.Column("week", sa.Text, nullable=False),
+    sa.Column("based_on", sa.SmallInteger, nullable=False),
+    sa.Column("position", sa.SmallInteger, nullable=False),
+    sa.Column("title", sa.Text, nullable=False),
+    sa.Column("body", sa.Text, nullable=False),
+    sa.Column("revision", JSONB, nullable=False),
+    sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=UTC_NOW),
+    sa.Column("settled_at", sa.DateTime(timezone=True)),
+    sa.Column("outcome", sa.Text),
+    sa.CheckConstraint("char_length(title) BETWEEN 3 AND 80", name="ck_plan_proposals_title"),
+    sa.CheckConstraint("position BETWEEN 1 AND 3", name="ck_plan_proposals_position"),
+    sa.CheckConstraint("outcome IS NULL OR outcome IN ('taken','dismissed','superseded')",
+                       name="ck_plan_proposals_outcome"),
+    sa.CheckConstraint("(outcome IS NULL) = (settled_at IS NULL)",
+                       name="ck_plan_proposals_settled"),
+)
+
 gear_items = sa.Table(
     "gear_items", metadata,
     sa.Column("gear_id", sa.Text, primary_key=True),

@@ -319,3 +319,22 @@ def test_the_habit_and_day_routes_keep_what_the_athlete_states(store, connect):
     unknown = client.post("/notebook-api/habits/end",
                           json={"id": "00000000-0000-4000-8000-000000000000"})
     assert unknown.status_code == 404
+
+
+@needs_database
+def test_the_request_to_the_coach_goes_out_and_a_bad_one_does_not(store, connect):
+    seed_week(store)
+    client, _, _ = connect(dt.datetime(2026, 10, 7, 8, 0, tzinfo=PARIS))
+    asked = client.post("/notebook-api/reorganize/ask", json={
+        "week": SEEDED_WEEK, "days": [{"date": "2026-10-10", "kind": "more"}],
+        "wish": "intensity", "context": "vacances"})
+    assert asked.status_code == 200, asked.text
+    assert client.post("/notebook-api/reorganize/ask", json={
+        "week": SEEDED_WEEK, "days": [], "wish": "nap", "context": ""}).status_code == 400
+    shown = client.post("/notebook-api/reorganize", json={"week": SEEDED_WEEK, "days": []})
+    assert shown.json["proposals"] == []
+    gone = client.post("/notebook-api/proposals/take",
+                       json={"id": "00000000-0000-4000-8000-000000000000"})
+    assert gone.status_code == 409
+    assert client.post("/notebook-api/proposals/dismiss",
+                       json={"week": SEEDED_WEEK}).status_code == 200

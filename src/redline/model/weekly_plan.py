@@ -244,6 +244,18 @@ REVISION_SCHEMA = Schema("weekly revision", [
     field("state_snapshot", dict, required=False, schema=STATE_SNAPSHOT_SCHEMA),
 ])
 
+#: What the coach proposes when the athlete asks for more than a reorganisation: one to
+#: three full revisions of the week, none active until the athlete takes one.
+PROPOSALS_SCHEMA = Schema("proposals", [
+    field("proposals", list, minimum=1, maximum=3, item=field("proposal", dict, schema=Schema(
+        "proposal", [
+            field("title", str, minimum=3, maximum=80, note="what the proposal does, in a line"),
+            field("body", str, minimum=10, maximum=400,
+                  note="why, for the athlete, in two or three sentences"),
+            field("revision", dict, note="the full next revision, as `revise` takes it"),
+        ]))),
+])
+
 WEEKLY_PLAN_SCHEMA = Schema("weekly plan", [
     field("week", str, pattern=WEEK_RE, note="YYYY-WNN"),
     field("revisions", list, minimum=1,

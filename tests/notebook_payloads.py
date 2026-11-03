@@ -348,7 +348,12 @@ REORGANIZE = {
     }],
     "others": 4,
     "held_back": [],
+    "proposals": [],
 }
+
+PROPOSAL = {"id": "8b0f3c1e-1d1a-4a39-9e0d-5c1b0b5d2f42", "title": "Le seuil samedi, à frais",
+            "body": "Tu sors des partiels jeudi : le seuil passe au premier jour reposé.",
+            "lines": ["Seuil : vendredi devient samedi"]}
 
 
 HABITS = {"habits": [{

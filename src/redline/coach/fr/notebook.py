@@ -94,6 +94,8 @@ ERRORS = {
     "week_over": "Cette semaine est terminée.",
     "bad_habit": "Habitude invalide.",
     "no_habit": "Habitude introuvable.",
+    "proposal_gone": "Cette proposition n’est plus valable : la semaine a changé.",
+    "coach_unreachable": "Le coach n’a pas pu être prévenu. Écris-lui dans Messenger.",
 }
 
 # Why the strength session cannot start.

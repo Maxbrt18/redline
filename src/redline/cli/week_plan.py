@@ -12,6 +12,9 @@ Exit codes of `check` and `show`; the distinction carries everything else:
   that unplanned load, not to copy the completed sessions;
 - ``1`` invalid: missing or unreadable. Only there is nothing readable and nothing printed.
 
+`propose` checks one to three full revisions the athlete asked for from the notebook and
+keeps them as proposals: none prescribes anything until the athlete takes one.
+
 `variants` reads the athlete's days (`--input`, see `redline.model.week_days`) and prints the
 placements of the remaining sessions those days allow, best first. `days` prints the days
 already known for the week: habits and days stated ahead. Neither writes anything.
@@ -132,6 +135,28 @@ def _variants(store, week: str, input_path: str | None, as_json: bool,
     return EXIT_OK
 
 
+def _propose(store, week: str, input_path: str | None) -> int:
+    from redline.model import weekly_plan
+    from redline.service import reorganize
+    based_on, proposals = reorganize.checked_proposals(
+        store, week, agent_input.read_json(input_path), now_stamp(),
+        warn=lambda line: print(line, file=sys.stderr))
+    turn_id = (os.environ.get("REDLINE_TURN_ID") or "").strip()
+    if turn_id:
+        store.stage_command(turn_id, f"propose:{week}:r{based_on}", commands.PLAN_PROPOSE,
+                            {"week": week, "based_on": based_on, "proposals": proposals})
+        print(reorganize_text.PROPOSED_STAGED.format(week=week, based_on=based_on))
+    else:
+        store.add_proposals(week, based_on, proposals, actor="week-plan-cli")
+        print(reorganize_text.PROPOSED.format(week=week, based_on=based_on))
+    current = active(store.load_plan(week))
+    for number, proposal in enumerate(proposals, 1):
+        print(reorganize_text.PROPOSAL.format(number=number, title=proposal["title"]))
+        for line in weekly_plan.revision_diff(current, proposal["revision"]):
+            print("     " + line)
+    return EXIT_OK
+
+
 EXIT_OK = 0
 EXIT_INVALID = 1
 EXIT_AWAITING_GATE = 2
@@ -219,7 +244,8 @@ def _database_command(store, command: str, week: str, optional: bool,
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command",
-                        choices=("check", "show", "revise", "preview", "variants", "days"))
+                        choices=("check", "show", "revise", "preview", "variants", "days",
+                                 "propose"))
     parser.add_argument("--week", default=current_week())
     parser.add_argument("--optional", action="store_true")
     parser.add_argument("--input", help="revise/preview JSON, or the days of variants "
@@ -227,6 +253,8 @@ def main() -> int:
     parser.add_argument("--json", action="store_true", help="variants: print JSON")
     args = parser.parse_args()
     try:
+        if args.command == "propose":
+            return _propose(_database_store(), args.week, args.input)
         if args.command == "days":
             from redline.service import reorganize
             print(reorganize.days_readback(_database_store(), args.week))

@@ -62,3 +62,10 @@
 .n-rg-habit > span { font-size: 15px; } .n-rg-habit > span small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
 .n-rg-stop { background: var(--panel); border: 0; border-radius: 10px; min-height: 36px; padding: 6px 12px; font-size: 14px; font-weight: 500; color: var(--ink); }
 .n-rg-stop:disabled { opacity: .4; }
+/* The request to the coach, and what it proposes. */
+.n-rg-ask textarea { width: 100%; min-height: 76px; box-sizing: border-box; border: 0; border-radius: 12px; background: var(--bg);
+  padding: 10px 12px; font: 15px/1.4 var(--sans); color: var(--ink); resize: none; }
+.n-rg-sum { margin: 0 0 12px; font-size: 13.5px; color: var(--muted); }
+.n-rg-sum b { color: var(--ink); font-weight: 600; }
+.n-rg-body { margin: 8px 0 0; font-size: 14.5px; text-wrap: pretty; }
+.n-rg-said p { display: block; color: var(--muted); }

@@ -15,6 +15,7 @@ from .maintenance import Maintenance
 from .observations import Observations
 from .plans import Plans
 from .proactive import ProactiveMessages
+from .proposals import Proposals
 from .session_cycles import SessionCycles
 from .strava_intake import StravaIntake
 from .strength import Strength
@@ -24,7 +25,7 @@ __all__ = ["ATHLETE", "CORRECTION_ANNOUNCE_WINDOW", "OperationalStore"]
 
 
 class OperationalStore(TurnCommands, Conversation, Observations, StravaIntake,
-                       SessionCycles, Strength, Plans, Facts, ProactiveMessages,
+                       SessionCycles, Strength, Proposals, Plans, Facts, ProactiveMessages,
                        Days, Maintenance):
     """Single fact API. Public calls open exactly one transaction."""
 
