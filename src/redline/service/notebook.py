@@ -19,7 +19,7 @@ from redline.model.program import load
 from redline.storage.database import StorageError
 from redline.storage.notebook import NotebookStore
 
-from . import clock, race_plan, session_detail, strength
+from . import clock, race_plan, reorganize, session_detail, strength
 from .notebook_board import Board, week_monday
 from .plans import PlanStatus, blocked_session_ids, strength_due
 from .strength_artifact import selection_for
@@ -97,6 +97,16 @@ class NotebookService:
                                    or intake.get("weather") is None):
             intake = session_detail.ensure(board.ops, intake)
         return board.session_view(observation_id, intake)
+
+    def reorganize(self, week: str, days: object) -> views.ReorganizeView:
+        """The week to reorganise and the variants the stated days allow."""
+        return reorganize.view(self.board().ops, week, {"days": days}, clock.today())
+
+    def take_variant(self, week: str, days: object, expected: int, choice: int) -> int:
+        """Write the chosen variant as the next revision of the week; its number."""
+        stamp = clock.now().replace(microsecond=0).isoformat()
+        return reorganize.take(self.board().ops, week, {"days": days}, expected, choice,
+                               clock.today(), stamp)
 
     def race(self, psid: str) -> views.RaceView:
         archives = [*self.store.list_entries(psid, kind="monthly", limit=12),

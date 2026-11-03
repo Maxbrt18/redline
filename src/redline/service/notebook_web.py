@@ -15,10 +15,11 @@ from sqlalchemy.exc import SQLAlchemyError
 from redline.cards import render
 from redline.coach.fr import notebook as notebook_text
 from redline.coach.fr import session_labels
+from redline.model.schema import SchemaError
 from redline.storage.database import StorageError
 from redline.storage.notebook import DEVICE_SECONDS
 
-from . import clock, page, race_plan
+from . import clock, page, race_plan, reorganize
 from . import notebook_weather as weather
 from .notebook import NotebookService
 from .notebook_board import AnswerError
@@ -237,6 +238,33 @@ def register(app: Flask, notebook: NotebookService, psid: str,
         except ValueError:
             return jsonify(error=notebook_text.ERRORS["bad_date"]), 400
         return jsonify(weather.forecast(where, when, start, clock.now()) or {})
+
+    @app.post("/notebook-api/reorganize")
+    def notebook_reorganize():
+        body = request.get_json(silent=True)
+        if (not isinstance(body, dict) or set(body) != {"week", "days"}
+                or not isinstance(body["week"], str) or not WEEK.fullmatch(body["week"])):
+            return jsonify(error=notebook_text.ERRORS["bad_request"]), 400
+        try:
+            return jsonify(notebook.reorganize(body["week"], body["days"]))
+        except SchemaError:
+            return jsonify(error=notebook_text.ERRORS["bad_days"]), 400
+
+    @app.post("/notebook-api/reorganize/take")
+    def notebook_take_variant():
+        body = request.get_json(silent=True)
+        if (not isinstance(body, dict) or set(body) != {"week", "days", "revision", "choice"}
+                or not isinstance(body["week"], str) or not WEEK.fullmatch(body["week"])
+                or type(body["revision"]) is not int or type(body["choice"]) is not int):
+            return jsonify(error=notebook_text.ERRORS["bad_request"]), 400
+        try:
+            number = notebook.take_variant(body["week"], body["days"], body["revision"],
+                                           body["choice"])
+        except reorganize.ReorganizeError:
+            return jsonify(error=notebook_text.ERRORS["week_moved"]), 409
+        except SchemaError:
+            return jsonify(error=notebook_text.ERRORS["bad_days"]), 400
+        return jsonify(status="ok", revision=number)
 
     @app.post("/notebook-api/answer")
     def notebook_answer():

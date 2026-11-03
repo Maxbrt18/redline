@@ -15,6 +15,7 @@ export const app = {
   connecting: null,  // the sign-in link exchange in progress, which other calls wait for
   move: null,     // the current transition: {top, bottom, back, was, after, timer}
   racePace: null,  // the pace explored on the race plan, never recorded; null: the chosen one
+  reorg: null,     // the days stated on the week being reorganised: {week, days, sheet}
 };
 export const skies = new Map();
 export const flights = new Map();

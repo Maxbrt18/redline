@@ -196,6 +196,10 @@ export function renderWeek(data, root) {
     days.append(dayRow(iso, data.sessions.filter(item => item.date === iso), data.extra.filter(item => item.date === iso), todayIso));
   }
   content.append(days);
+  if (open && data.plan.status === 'valid' && data.sessions.some(item => item.status !== 'done' && item.status !== 'cancelled' && item.kind !== 'rest' && item.date >= todayIso)) {
+    content.append(add(button('', () => push({k: 'reorganize', week: data.week}), 'n-list n-rg-entry'),
+      add(el('span', 'Réorganiser la semaine'), el('small', 'déplacer des séances selon tes jours')), chevron()));
+  }
   // The next week as soon as its program exists: on Sunday, that is the one being
   // organised.
   if (root && data.next) {

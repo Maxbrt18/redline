@@ -1038,3 +1038,55 @@ def test_a_plan_before_the_forecast_says_when_it_comes(browser):
     tab.get_by_role('button', name='Passages, ravitos et glucides').click()
     tab.get_by_text('Prévision disponible vers le 11/11', exact=False).wait_for()
     assert tab.locator('.n-rp-wx').count() == 0
+
+
+def test_a_week_is_reorganised_from_its_days_and_a_tapped_variant(browser):
+    from notebook_payloads import REORGANIZE
+
+    asked, taken = [], []
+    tab = browser.new_page(viewport={'width': 390, 'height': 844})
+    serve(tab)
+
+    def reorganize(route):
+        body = json.loads(route.request.post_data)
+        if route.request.url.endswith('/take'):
+            taken.append(body)
+            data = {'status': 'ok', 'revision': 4}
+        else:
+            asked.append(body)
+            data = REORGANIZE if body['days'] else {**REORGANIZE, 'variants': [], 'others': 0}
+        route.fulfill(content_type='application/json', body=json.dumps(data))
+    tab.route(BASE + '/notebook-api/reorganize**', reorganize)
+    tab.goto(BASE + '/carnet#t=' + 'x' * 43)
+    tab.locator('button[data-tab="week"]').click()
+    tab.get_by_role('button', name='Réorganiser la semaine').click()
+    tab.locator('.n-rg-day').first.wait_for()
+    assert asked[-1] == {'week': REORGANIZE['week'], 'days': []}
+    # A past day cannot be touched; Saturday opens its sheet.
+    assert tab.locator('div.n-rg-day.past').count() == 4
+    tab.locator('button.n-rg-day', has_text='10').click()
+    unchanged = {**REORGANIZE['variants'][0], 'moves': [], 'notes': []}
+    tab.route(BASE + '/notebook-api/reorganize', lambda route: route.fulfill(
+        content_type='application/json',
+        body=json.dumps({**REORGANIZE, 'variants': [unchanged]})))
+    tab.locator('#day-sheet').get_by_role('button', name='Pas de course').click()
+    tab.wait_for_function('() => document.querySelector(".n-banner")')
+    assert 'rien à déplacer' in tab.locator('#content').inner_text()
+    tab.unroute(BASE + '/notebook-api/reorganize')
+    sheet = tab.locator('#day-sheet')
+    sheet.get_by_role('button', name='Avec d’autres').click()
+    tab.wait_for_function('() => document.querySelector(".n-rg-var")')
+    assert asked[-1]['days'] == [{'date': '2026-10-10', 'kind': 'with_others', 'minutes': 60,
+                                  'pace': 'easy', 'required': False}]
+    sheet.get_by_role('button', name='Obligatoire').click()
+    tab.wait_for_function('() => document.querySelectorAll(".n-rg-var").length === 1')
+    assert asked[-1]['days'][0]['required'] is True
+    sheet.locator('[data-close]').last.click()
+    card = tab.locator('.n-rg-var')
+    assert 'Trois jours plus chargés que prévu' in card.inner_text()
+    assert '4 autres placements' in tab.locator('#content').inner_text()
+    card.get_by_role('button', name='Prendre cette variante').click()
+    tab.wait_for_function('() => !document.querySelector(".n-rg-var")')
+    assert taken == [{'week': REORGANIZE['week'], 'revision': 3, 'choice': 0,
+                      'days': asked[-1]['days']}]
+    tab.close()

@@ -27,3 +27,33 @@ REMARKS = {
     "group_uncarried": "    · Aucune séance ne va avec le groupe du {day}.",
     "rest_day_used": "    · {title} tombe sur un jour de repos prévu ({day}).",
 }
+
+# ------------------------------------------------------------------ the revision it writes
+
+REASON = "Semaine réorganisée dans le carnet, variante {number} sur {count} : {summary}."
+#: The fact behind every change: what the athlete said of their days.
+EVIDENCE = "availability: carnet {stamp}, {days}"
+NO_DAY = "aucun jour déclaré"
+CHANGE_CONTEXT = "Variante {number} sur {count} calculées sans IA, choisie dans le carnet."
+CHANGE_RULE = "réorganisation : seules les dates changent, filtres du moteur respectés"
+DROP_CONTEXT = "Les jours manquent : la séance de plus faible priorité saute."
+REJECTED = "non choisie dans le carnet"
+ALTERNATIVE = "Variante {number} : {summary}"
+DAY = "{day} {state}"
+PINNED = "{title} épinglée {day}"
+MOVED = "{title} passe du {before} au {after}"
+DROPPED = "{title} saute"
+#: How a day the athlete stated reads in the evidence.
+DAY_STATES = {
+    "as_planned": "comme prévu",
+    "off": "pas de course",
+    "short": "court seulement ({minutes} min)",
+    "easy": "facile seulement",
+    "more": "peut en faire plus",
+    "with_others": "avec d'autres (~{minutes} min, {pace}, {firmness})",
+    "other_sport": "{sport} ({effort}, {run})",
+}
+PACES = {"easy": "tranquille", "mixed": "variable", "workout": "séance"}
+FIRMNESS = {True: "obligatoire", False: "si ça rentre"}
+EFFORT = {True: "exigeant", False: "léger"}
+RUN_TOO = {True: "course possible", False: "sans course"}
