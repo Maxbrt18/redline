@@ -114,7 +114,7 @@ export function raceSummary(plan) {
   if (seconds) {
     // The time aimed at is a target, not a limit: an ink tick on its range in dots.
     const finish = retime(plan, seconds).pop(), when = passageAt(plan, finish.hours);
-    const spread = finish.high - finish.low, lo = finish.low - spread * 0.4, hi = finish.high + spread * 0.4;
+    const width = finish.high - finish.low, lo = finish.low - width * 0.4, hi = finish.high + width * 0.4;
     node.append(cursor({label: 'Temps de course, arrêts compris', value: raceDuration(finish.hours), unit: null, lo, hi,
       band: [finish.low, finish.high], target: finish.hours, scale: [raceDuration(lo), raceDuration(finish.low) + ' – ' + raceDuration(finish.high), raceDuration(hi)]}));
     if (when) node.append(el('p', 'Arrivée vers ' + wallClock(when) + '.', 'n-rp-small'));

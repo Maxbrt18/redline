@@ -890,16 +890,10 @@ class Board:
         return out
 
     def race_view(self, archives: list[views.Entry]) -> views.RaceView:
-        current = week_label(self.today)
-        traces = ledger.trajectory(self.rows, self.today, weeks=6)
-        week = self.week(current)
+        week = self.week(week_label(self.today))
         planned = [s for s in self.sessions(week) if s["kind"] == "run"
                    and s["status"] not in {"done", "cancelled"}
                    and s["date"] >= self.today.isoformat()]
-        # The current week's long run is the program's one until it has been run: the
-        # longest of the past days is not one, it usually comes on the weekend.
-        long_run = next((s for s in planned
-                         if s["workout"] == session_kinds.LONG and _distance(s)), None)
         milestones: list[views.Milestone] = []
         key = max(planned, key=lambda s: _distance(s) or 0, default=None)
         if key and (key_km := _distance(key)):
@@ -921,7 +915,6 @@ class Board:
               "evaluated_on": row["evaluated_on"].isoformat()}
              for row in self.ops.latest_capabilities()),
             key=lambda item: (-item["score"], item["number"]))
-        longest = ledger.longest_recent(self.rows, self.today + dt.timedelta(days=1))
         # One period, one archive: the delivered image takes precedence over its recovered copy.
         seen: set[tuple[str, str]] = set()
         kept: list[views.Entry] = []
@@ -934,23 +927,10 @@ class Board:
                          key=lambda e: e.get("period") or "", reverse=True)
         weekly = sorted((e for e in kept if e["kind"] == "weekly"),
                         key=lambda e: e.get("period") or "", reverse=True)[:3]
-        def target(label: str) -> float | None:
-            if label == current:
-                return (week.revision or {}).get("volume_target_km")
-            context = self.repo.weekly_plan_context(label)
-            return json.loads(context).get("volume_target_km") if context else None
-
         return {
             "race": race,
             "plan": race_plan.plan(race_model.upcoming(self.ops, self.today), self.root,
                                    self.instance) if race else None,
-            # Each week's volume against its target, and its long run.
-            "longest": {"km": longest,
-                        "weeks": [{"week": trace.label, "km": round(trace.longest, 2),
-                                   "volume": round(trace.km, 2), "target": target(trace.label),
-                                   "open": trace.open} for trace in traces],
-                        "planned_km": long_run and _distance(long_run),
-                        "planned_on": long_run and long_run["date"]},
             "milestones": milestones, "capabilities": capabilities,
             "archives": [*monthly, *weekly],
         }

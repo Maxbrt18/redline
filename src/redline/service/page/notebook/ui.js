@@ -79,11 +79,11 @@ export const kindIcon = (kind, workout) => kind === 'long' || workout === 'long'
 // The cursor: a rail, what was done in ink, the allowed band in dots, the limit as a red
 // stroke that names its value, what passes it in red dots. A target that is not a limit
 // is an ink tick. `scale` labels the rail's ends (and its middle when given three).
-export function cursor({label, value, unit, lo, hi, fill = null, cap = null, capLabel = null,
+export function cursor({label, value, unit: suffix = null, lo, hi, fill = null, cap = null, capLabel = null,
   target = null, targetLabel = null, band = null, scale = null, below = false}) {
   const at = number => Math.max(0, Math.min(100, 100 * (number - lo) / (hi - lo)));
   const over = fill != null && cap != null && fill > cap;
-  const head = add(el('div', null, 'n-cur-head'), el('span', label), add(el('b', value, over ? 'n-over' : null), unit ? el('small', unit) : null));
+  const head = add(el('div', null, 'n-cur-head'), el('span', label), add(el('b', value, over ? 'n-over' : null), suffix ? el('small', suffix) : null));
   const rail = el('div', null, 'n-cur-rail');
   const part = (cls, left, width) => { const node = el('span', null, cls); node.style.left = left + '%'; if (width != null) node.style.width = width + '%'; rail.append(node); return node; };
   if (band) part('band', at(band[0]), at(band[1]) - at(band[0]));

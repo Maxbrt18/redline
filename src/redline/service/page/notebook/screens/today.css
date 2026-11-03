@@ -13,7 +13,7 @@
 .n-day + .n-feed { margin-top: 0; }
 .n-step { position: relative; padding: 18px 0 20px; border-top: .5px solid var(--grid); }
 .n-feed > .n-step:first-child { border-top: 0; padding-top: 6px; }
-.n-step.now .n-step.done .n-step.rest .n-step.bare .n-skick { font-size: 13px; font-weight: 600; color: var(--muted); margin: 0; }
+.n-skick { font-size: 13px; font-weight: 600; color: var(--muted); margin: 0; }
 .n-step.now .n-skick { color: var(--ink); }
 .n-step h2 { font: 600 20px/1.2 var(--sys); margin: 7px 0 0; overflow-wrap: anywhere; }
 .n-step.small h2 { font-size: 18px; }
@@ -108,7 +108,7 @@
 .n-lm { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 32px; padding: 0; border: 0; background: none; color: var(--ink); font-size: 15px; font-weight: 600; text-align: left; }
 .n-lm .n-chevron { margin-left: auto; }
 .n-big { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; margin: 8px 0 0; }
-.n-big b { font: 700 48px/.9 var(--display); font-variant-numeric: tabular-nums; }
+.n-big b { font: 700 48px/.9 var(--display); font-variant-numeric: proportional-nums; }
 .n-big span { font-size: 14px; color: var(--muted); }
 .n-big .of { font-size: 15px; }
 /* Done solid, planned in dots (the long run in ink dots), rest a hairline. */

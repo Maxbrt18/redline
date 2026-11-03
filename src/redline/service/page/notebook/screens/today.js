@@ -329,7 +329,7 @@ function ahead(data, seen) {
 }
 // The landmarks, on paper: the week with its bars, each watched zone against its ceiling,
 // the race. Each one leads to its screen.
-function mark(label, onPress, icon) {
+function landmark(label, onPress, icon) {
   return add(button('', onPress, 'n-lm'), pastille(icon, true), el('span', label), chevron());
 }
 function weekBars(days) {
@@ -351,7 +351,7 @@ function weekBars(days) {
 function landmarks(data) {
   const totals = data.totals, node = section('Repères');
   const runs = totals.runs_done + ' sortie' + (totals.runs_done > 1 ? 's' : '') + (totals.runs_planned ? ' sur ' + totals.runs_planned : '');
-  const week = add(el('div', null, 'n-mark'), mark('Semaine ' + weekNumber(data.week), () => select('week'), 'week'),
+  const week = add(el('div', null, 'n-mark'), landmark('Semaine ' + weekNumber(data.week), () => select('week'), 'week'),
     add(el('p', null, 'n-big'), el('b', fmt(totals.km_done)), totals.km_target ? el('span', 'sur', 'of') : null,
       totals.km_target ? el('b', fmt(totals.km_target), 'n-plan-num') : null, el('span', 'km · ' + runs)), weekBars(data.strip));
   week.setAttribute('aria-label', 'Semaine ' + weekNumber(data.week) + ' : ' + fmt(totals.km_done) + ' kilomètres courus' + (totals.km_target ? ' sur environ ' + fmt(totals.km_target) : ''));
@@ -359,7 +359,7 @@ function landmarks(data) {
   // One block per watched zone; none when the instance watches none.
   data.pain.zones.forEach(item => {
     const peak = (item.weeks[item.weeks.length - 1] || {}).peak, top = Math.max(3, Math.ceil((peak || 0) + 0.5));
-    node.append(add(el('div', null, 'n-mark pain'), mark(item.label, () => push({k: 'injury', zone: item.zone}), 'pain'),
+    node.append(add(el('div', null, 'n-mark pain'), landmark(item.label, () => push({k: 'injury', zone: item.zone}), 'pain'),
       cursor({label: 'Pic d’effort, cette semaine', value: peak == null ? '—' : fmt(peak), unit: 'sur 10', lo: 0, hi: top,
         fill: peak, cap: data.pain.cap, capLabel: 'plafond ' + fmt(data.pain.cap), scale: Array.from({length: top + 1}, (_, index) => String(index))})));
   });
@@ -368,7 +368,7 @@ function landmarks(data) {
     const date = day(race.date).toLocaleDateString('fr-FR', {weekday: 'short', day: 'numeric', month: 'long'});
     const facts = [date, race.start_time ? 'départ ' + hm(race.start_time) : null, race.distance_km ? fmt(race.distance_km) + ' km' : null,
       race.target ? 'cible ' + race.target : null].filter(Boolean).join(' · ');
-    node.append(add(el('div', null, 'n-mark race'), mark(race.name, () => select('course'), 'race'),
+    node.append(add(el('div', null, 'n-mark race'), landmark(race.name, () => select('course'), 'race'),
       add(el('p', null, 'n-big'), el('b', String(race.days)), el('span', race.days > 1 ? 'jours' : 'jour')), el('p', facts, 'n-meta')));
   }
   return node;

@@ -26,8 +26,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 button:disabled { cursor: wait; opacity: .55; }
 a { color: inherit; }
 [hidden] { display: none !important; }
+/* The page's side padding; the track cancels it to run edge to edge. */
+:root { --gutter: 20px; }
 .n-app { max-width: 620px; margin: auto;
-  padding: calc(var(--bar) + env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) calc(var(--tabbar) + 100px) max(20px, env(safe-area-inset-left)); }
+  padding: calc(var(--bar) + env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right)) calc(var(--tabbar) + 100px) max(var(--gutter), env(safe-area-inset-left)); }
 
 /* Glass: a translucent blurred background, a thread of light, a soft shadow. */
 .n-glass { border: .5px solid var(--edge); background: var(--glass); -webkit-backdrop-filter: blur(20px) saturate(1.6);
@@ -180,7 +182,7 @@ button, .n-nav, .n-krow, summary { touch-action: manipulation; }
   @keyframes n-rise { from { opacity: 0; transform: translate(-50%, 8px); } }
 }
 
-@media (max-width: 360px) { .n-app { padding-left: 16px; padding-right: 16px; } h1 { font-size: 28px; } .n-lt h1 { font-size: 30px; } }
+@media (max-width: 360px) { :root { --gutter: 16px; } h1 { font-size: 28px; } .n-lt h1 { font-size: 30px; } }
 /* Without blur (old browser), the glass stays legible: an almost solid background. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { :root { --glass: color-mix(in oklab, var(--bg) 96%, transparent); } }
 @media (prefers-reduced-motion: no-preference) { button { transition: opacity .15s, background .15s; } }
@@ -227,8 +229,8 @@ button, .n-nav, .n-krow, summary { touch-action: manipulation; }
 .n-hero:empty { display: none; }
 .n-lanes { display: none; }
 :root.n-piste .n-track { position: relative; isolation: isolate; color: var(--on-track);
-  margin: calc(-1 * (var(--bar) + env(safe-area-inset-top))) calc(-1 * max(20px, env(safe-area-inset-right))) 0 calc(-1 * max(20px, env(safe-area-inset-left)));
-  padding: calc(var(--bar) + env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) 64px max(20px, env(safe-area-inset-left));
+  margin: calc(-1 * (var(--bar) + env(safe-area-inset-top))) calc(-1 * max(var(--gutter), env(safe-area-inset-right))) 0 calc(-1 * max(var(--gutter), env(safe-area-inset-left)));
+  padding: calc(var(--bar) + env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right)) 64px max(var(--gutter), env(safe-area-inset-left));
   background: var(--tartan); }
 :root.n-piste .n-track::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: var(--grain); background-size: 140px;
   mix-blend-mode: soft-light; opacity: .9; }

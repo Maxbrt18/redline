@@ -166,7 +166,7 @@ def forward(tab) -> None:
     # The counter aims at the BLOCK, not at the whole prescription: see
     # test_plyometrics_is_walked_one_block_at_a_time below.
     ({"measure": "contacts", "contacts": 40, "block": 10},
-     "0 / 10 contacts", False, "10 contacts faits → repos"),
+     "0 / 10 contacts", False, "10 contacts faits, puis repos"),
     ({"measure": "amrap", "sets": 2, "side": "each"}, None, True, None),
     ({"measure": "reps", "sets": 3, "reps": [8, 10], "side": "each"}, None, False, None),
 ])

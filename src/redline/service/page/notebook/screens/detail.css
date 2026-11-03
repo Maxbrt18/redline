@@ -11,7 +11,7 @@
 .n-dhero { --h: var(--h-run); margin-top: 4px; }
 .n-dkind { display: flex; align-items: center; gap: 9px; margin: 0; font: 600 13.5px var(--sans); }
 .n-dbig { display: flex; align-items: baseline; gap: 8px; margin: 14px 0 0; }
-.n-dbig b { font: 700 96px/.86 var(--display); letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.n-dbig b { font: 700 96px/.86 var(--display); letter-spacing: -.01em; font-variant-numeric: proportional-nums; }
 .n-dbig span { font: 600 22px var(--display); color: var(--muted); }
 .n-dpair { display: flex; gap: 26px; margin-top: 12px; }
 .n-dpair b { display: block; font: 700 30px/1 var(--display); font-variant-numeric: tabular-nums; }

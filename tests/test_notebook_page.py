@@ -91,15 +91,15 @@ def test_today_week_and_course_fit_a_phone_and_keep_text_inert(browser, width):
     assert tab.locator('.n-nav').bounding_box()['y'] > 700
     tab.get_by_role('button', name='1 exercice', exact=True).click()
     assert tab.get_by_text('3 × 12', exact=True).is_visible()
-    tab.get_by_role('button', name='Séance guidée →').click()
+    tab.get_by_role('button', name='Séance guidée').click()
     tab.get_by_text('La séance a changé.', exact=True).wait_for()
     assert tab.evaluate('document.documentElement.scrollWidth <= innerWidth')
     tab.get_by_role('button', name='Semaine', exact=True).click()
     tab.get_by_text('FC +5', exact=True).wait_for()
-    assert not tab.locator('.n-rail .out').is_visible()
-    # A completed outing opens on its detail, where the overrun reads on the gauge.
+    assert not tab.locator('.n-pfr.over').is_visible()
+    # A completed outing opens on its detail, where the overrun reads past the limit.
     tab.locator('.n-krow', has_text='FC +5').click()
-    tab.locator('.n-rail .out').wait_for()
+    tab.locator('.n-pfr.over').wait_for()
     tab.get_by_role('button', name='Retour').click()
     tab.get_by_role('heading', name='Semaine 41').wait_for()
     assert '›' not in tab.locator('#content').inner_text()
@@ -113,12 +113,7 @@ def test_today_week_and_course_fit_a_phone_and_keep_text_inert(browser, width):
     tab.get_by_role('button', name='Retour').click()
     tab.get_by_role('heading', name='Semaine 41').wait_for()
     tab.get_by_role('button', name='Course', exact=True).click()
-    tab.get_by_role('heading', name='J-50').wait_for()
-    # The volume against its target, the long run below; the current week uses the
-    # program long run until it has been run.
-    assert tab.locator('.n-vchart .vl').all_text_contents() == ['39,7/40', '14,1/41']
-    assert tab.locator('.n-vchart .slv').all_text_contents() == ['15,8', '16']
-    assert tab.locator('.n-vchart .sls').all_text_contents() == ['prévue dim.']
+    tab.locator('.n-hfig b:visible', has_text='J-50').wait_for()
     late = tab.get_by_text('en retard · 04/10')
     assert 'n-over' in late.get_attribute('class')
     assert late.evaluate('e => getComputedStyle(e).color') == tab.evaluate(
@@ -325,7 +320,7 @@ def test_tabs_are_prepared_while_today_is_read_and_shown_without_waiting(browser
     tab.get_by_role('button', name='Semaine', exact=True).click()
     tab.get_by_role('heading', name='Semaine 41').wait_for(timeout=1000)
     tab.get_by_role('button', name='Course', exact=True).click()
-    tab.get_by_role('heading', name='J-50').wait_for(timeout=1000)
+    tab.locator('.n-hfig b:visible', has_text='J-50').wait_for(timeout=1000)
     context.close()
 
 
@@ -371,10 +366,10 @@ def test_the_theme_follows_the_phone_unless_pinned_on_this_device(browser):
     tab.get_by_role('button', name='Sombre').click()
     assert tab.evaluate("document.documentElement.dataset.theme") == 'dark'
     assert tab.evaluate(background) != light
-    # Under the sheet, the status bar takes the scrim; closed, the theme background.
+    # Under the sheet, the status bar takes the scrim; closed, the red of the track under it.
     assert tab.evaluate("[...document.querySelectorAll('meta[name=theme-color]')].every(m => m.content === '#0e0b0a')")
     tab.keyboard.press('Escape')
-    assert tab.evaluate("[...document.querySelectorAll('meta[name=theme-color]')].every(m => m.content === '#110e0d')")
+    assert tab.evaluate("[...document.querySelectorAll('meta[name=theme-color]')].every(m => m.content === '#b30f28')")
     tab.reload()
     tab.get_by_role('heading', name='EF, permis accompagné', exact=True).wait_for()
     assert tab.evaluate("document.documentElement.dataset.theme") == 'dark'
@@ -402,8 +397,8 @@ def test_the_weather_answers_what_to_wear_and_whether_night_falls_during_the_run
     tab.get_by_text('Nuit à 19 h 05 : tu rentres plus d’une heure avant.').wait_for()
     assert tab.get_by_text('Ressenti 15° · éclaircies, sec').is_visible()
     assert tab.get_by_text('Vent 12 km/h · 15° à 18 h').is_visible()
-    assert tab.locator('.n-step.now .n-skick').inner_text() == 'À FAIRE · 17\u00a0H'
-    assert tab.evaluate("[...document.querySelectorAll('meta[name=theme-color]')].map(m => m.content)") == ['#f7f5f2']
+    assert tab.locator('.n-step.now .n-skick').inner_text() == 'À faire · 17\u00a0h'
+    assert tab.evaluate("[...document.querySelectorAll('meta[name=theme-color]')].map(m => m.content)") == ['#c8102e']
     tab.close()
 
 
@@ -531,7 +526,7 @@ def test_navigation_never_loses_the_athlete(browser):
     assert tab.locator('.n-nav').count() == 1
     # Race: archives, then a card; back goes up one level, not to the root.
     tab.get_by_role('button', name='Course', exact=True).click()
-    tab.get_by_role('heading', name='J-50').wait_for()
+    tab.locator('.n-hfig b:visible', has_text='J-50').wait_for()
     tab.get_by_role('button', name='Toutes les archives').click()
     tab.wait_for_function("document.getElementById('lt-title').textContent === 'Archives'")
     tab.get_by_role('button', name='Monthly · 2026-09').click()
@@ -547,7 +542,7 @@ def test_navigation_never_loses_the_athlete(browser):
     tab.get_by_role('button', name='Course', exact=True).click()
     tab.wait_for_function("document.getElementById('lt-title').textContent === 'Septembre 2026'")
     tab.get_by_role('button', name='Course', exact=True).click()
-    tab.get_by_role('heading', name='J-50').wait_for()
+    tab.locator('.n-hfig b:visible', has_text='J-50').wait_for()
     assert title(tab) == 'TargetRace' and not tab.locator('#back').is_visible()
     tab.close()
 
@@ -594,7 +589,7 @@ def test_the_guided_session_opens_over_the_notebook_and_closes_back_to_it(browse
     tab = browser.new_page(viewport={'width': 393, 'height': 852})
     guided(tab)
     entries = tab.evaluate('history.length')
-    tab.get_by_role('button', name='Séance guidée →').click()
+    tab.get_by_role('button', name='Séance guidée').click()
     tab.wait_for_selector('.p-step--live')
     assert in_session(tab) and tab.url == BASE + '/carnet' and tab.evaluate('history.length') == entries
     assert tab.locator('#title').inner_text() == 'Renfo A'
@@ -613,7 +608,7 @@ def test_leaving_a_started_session_asks_and_loses_nothing(browser):
     Today then says where it stands, and resuming brings it back."""
     tab = browser.new_page(viewport={'width': 393, 'height': 852})
     guided(tab)
-    tab.get_by_role('button', name='Séance guidée →').click()
+    tab.get_by_role('button', name='Séance guidée').click()
     tab.wait_for_selector('.p-step--live')
     tab.locator('.p-ctrl .p-btn--wide').first.click()    # Step-up done: calf in progress
     tab.wait_for_function("document.querySelector('.p-step--live .p-step__name').textContent === 'Mollet'")
@@ -629,7 +624,7 @@ def test_leaving_a_started_session_asks_and_loses_nothing(browser):
     tab.wait_for_function("!document.documentElement.classList.contains('n-workout')")
     step = tab.locator('.n-step', has_text='Renfo')
     assert 'EN COURS · COMMENCÉE À' in step.inner_text().upper() and '1 exercice sur 3' in step.inner_text()
-    step.get_by_role('button', name='Reprendre la séance →').click()
+    step.get_by_role('button', name='Reprendre la séance').click()
     tab.wait_for_function("document.querySelector('.p-step--live .p-step__name').textContent === 'Mollet'")
     tab.close()
 
@@ -638,7 +633,7 @@ def test_no_gesture_leaves_the_session_by_accident(browser):
     """Between two sets, a swipe to the right does not leave the session."""
     tab = browser.new_page(viewport={'width': 393, 'height': 852})
     guided(tab)
-    tab.get_by_role('button', name='Séance guidée →').click()
+    tab.get_by_role('button', name='Séance guidée').click()
     tab.wait_for_selector('.p-step--live')
     swipe_back(tab)
     tab.wait_for_timeout(500)
@@ -650,7 +645,7 @@ def test_a_reloaded_page_comes_back_to_the_session(browser):
     """iOS sometimes reloads a PWA left in the background: the open session comes back."""
     tab = browser.new_page(viewport={'width': 393, 'height': 852})
     guided(tab)
-    tab.get_by_role('button', name='Séance guidée →').click()
+    tab.get_by_role('button', name='Séance guidée').click()
     tab.wait_for_selector('.p-step--live')
     tab.reload()
     tab.wait_for_selector('.p-step--live')
@@ -694,7 +689,7 @@ def test_the_top_bar_folds_the_title_when_it_scrolls_under(browser):
     serve(tab)
     tab.goto(BASE + '/carnet')
     tab.get_by_role('heading', name='EF, permis accompagné', exact=True).wait_for()
-    assert tab.evaluate("document.getElementById('bar').className") == 'n-topbar'
+    assert tab.evaluate("document.getElementById('bar').className") == 'n-topbar ontrack'
     tab.evaluate('scrollTo(0, 400)')
     tab.wait_for_function("document.getElementById('bar').classList.contains('titled')")
     assert tab.locator('#bar-title').inner_text() == 'Aujourd’hui'
@@ -859,7 +854,7 @@ def test_the_red_point_moves_from_the_run_to_the_strength_once_done(browser):
     tab.route(BASE + '/notebook-api/today', replying(after))
     tab.goto(BASE + '/carnet')
     tab.locator('.n-step.done').wait_for()
-    assert tab.locator('.n-step.done .n-skick').inner_text() == 'FAIT · 7\u00a0H\u00a010'
+    assert tab.locator('.n-step.done .n-skick').inner_text() == 'Fait · 7\u00a0h\u00a010'
     assert tab.get_by_text('FC moyenne 5 bpm au-dessus de ton plafond.').is_visible()
     assert tab.locator('.n-step.now').count() == 1
     assert tab.locator('.n-step.now h2').inner_text() == 'Renfo, séance unique'
@@ -868,8 +863,8 @@ def test_the_red_point_moves_from_the_run_to_the_strength_once_done(browser):
     tab.locator('.n-step.done .n-chips').get_by_role('button', name='0,5', exact=True).click()
     tab.get_by_text('Noté').wait_for()
     assert answers == [{'ask': 'cell:obs:pain:knee', 'value': 0.5}]
-    tab.locator('.n-tile', has_text='TargetRace').click()
-    tab.get_by_role('heading', name='J-50').wait_for()
+    tab.locator('.n-mark', has_text='TargetRace').locator('.n-lm').click()
+    tab.locator('.n-hfig b:visible', has_text='J-50').wait_for()
     tab.close()
 
 
@@ -878,12 +873,10 @@ def test_the_landmarks_open_more_detail(browser):
     tab = browser.new_page(viewport={'width': 393, 'height': 852})
     serve(tab)
     tab.goto(BASE + '/carnet')
-    tile = tab.locator('.n-tile', has_text='Genou')
-    tile.locator('.n-plot').wait_for()
-    left = tile.bounding_box()['x'] + 8
-    assert all(box['x'] >= left for box in tile.locator('.n-plot text').evaluate_all(
-        'nodes => nodes.map(n => n.getBoundingClientRect().toJSON())'))
-    tile.click()
+    mark = tab.locator('.n-mark.pain', has_text='Genou')
+    mark.locator('.n-cur').wait_for()
+    assert tab.evaluate('document.documentElement.scrollWidth <= innerWidth')
+    mark.locator('.n-lm').click()
     tab.wait_for_function("document.getElementById('lt-title').textContent === 'Genou'")
     tab.locator('.n-pchart').wait_for()
     assert tab.locator('.n-pchart circle').count() == 3
@@ -900,7 +893,7 @@ def test_the_landmarks_open_more_detail(browser):
     assert tab.evaluate('document.documentElement.scrollWidth <= innerWidth')
     tab.get_by_role('button', name='Retour').click()
     tab.wait_for_function("document.getElementById('lt-title').textContent === 'Aujourd’hui'")
-    tab.locator('.n-tile.wide').click()
+    tab.locator('.n-mark', has_text='Semaine 41').locator('.n-lm').click()
     tab.get_by_role('heading', name='Semaine 41').wait_for()
     assert tab.locator('.n-strip .n-bar').count() == 7
     tab.close()
@@ -929,9 +922,9 @@ def test_two_watched_zones_get_two_tiles_and_two_morning_traces(browser):
     tab.goto(BASE + '/carnet')
     tab.get_by_text('Trace · Talon').wait_for()
     assert tab.get_by_text('Trace · Cheville').is_visible()
-    assert tab.locator('.n-tile', has_text='Talon').count() == 1
-    assert tab.locator('.n-tile', has_text='Cheville').count() == 1
-    tab.locator('.n-tile', has_text='Cheville').click()
+    assert tab.locator('.n-mark.pain', has_text='Talon').count() == 1
+    assert tab.locator('.n-mark.pain', has_text='Cheville').count() == 1
+    tab.locator('.n-mark.pain', has_text='Cheville').locator('.n-lm').click()
     tab.wait_for_function("document.getElementById('lt-title').textContent === 'Cheville'")
     tab.locator('#content').get_by_role('button', name='Talon', exact=True).click()
     tab.wait_for_function("document.getElementById('lt-title').textContent === 'Talon'")
@@ -958,12 +951,12 @@ def test_the_race_plan_retimes_its_passages_at_the_pace_explored(browser):
     serve(tab)
     tab.goto(BASE + '/carnet#t=' + 'x' * 43)
     tab.get_by_role('button', name='Course', exact=True).click()
-    tab.get_by_role('heading', name='J-50').wait_for()
-    # The Race tab: the profile, the finish at the chosen pace, the way to the plan.
+    tab.locator('.n-hfig b:visible', has_text='J-50').wait_for()
+    # The Race tab: the profile on the track, the finish at the chosen pace, the way to the plan.
     summary = tab.locator('.n-sec', has_text='Plan de course')
-    assert summary.locator('.n-rp-arr .big').inner_text() == '4\xa0h\xa013'
-    assert 'arrivée vers 13\xa0h\xa013' in summary.locator('.n-rp-arr .n-rp-small').inner_text()
-    assert summary.locator('.n-rp-chart .al').all_text_contents() == ['Le Col', 'Le Lac']
+    assert summary.locator('.n-cur-head b').inner_text() == '4\xa0h\xa013'
+    assert summary.get_by_text('Arrivée vers 13\xa0h\xa013.', exact=True).is_visible()
+    assert tab.locator('#track .n-rp-chart .al').all_text_contents() == ['Le Col', 'Le Lac']
     summary.get_by_role('button', name='Passages, ravitos et glucides').click()
     tab.locator('.n-rp-row').first.wait_for()
     assert tab.locator('#lt-title').inner_text() == 'Plan de course'
@@ -983,8 +976,8 @@ def test_the_race_plan_retimes_its_passages_at_the_pace_explored(browser):
     assert requests == []
     # The Race tab keeps the chosen pace, never the one explored.
     tab.get_by_role('button', name='Retour').click()
-    tab.get_by_role('heading', name='J-50').wait_for()
-    assert tab.locator('.n-rp-arr .big').inner_text() == '4\xa0h\xa013'
+    tab.locator('.n-hfig b:visible', has_text='J-50').wait_for()
+    assert summary.locator('.n-cur-head b').inner_text() == '4\xa0h\xa013'
     assert tab.evaluate('document.documentElement.scrollWidth <= innerWidth')
     assert errors == []
 
@@ -996,7 +989,7 @@ def test_without_a_chosen_pace_the_plan_shows_the_route_and_no_passage(browser):
     tab.goto(BASE + '/carnet#t=' + 'x' * 43)
     tab.get_by_role('button', name='Course', exact=True).click()
     tab.get_by_text('Allure à choisir avec le coach', exact=False).wait_for()
-    assert tab.locator('.n-rp-arr').count() == 0
+    assert tab.locator('.n-sec', has_text='Plan de course').locator('.n-cur').count() == 0
     tab.get_by_role('button', name='Profil et ravitos').click()
     tab.locator('.n-rp-chart .hi').wait_for()
     assert tab.locator('.n-rp-row:not(.n-rp-climb)').count() == 0
