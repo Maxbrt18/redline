@@ -1070,8 +1070,7 @@ def test_a_week_is_reorganised_from_its_days_and_a_tapped_variant(browser):
         content_type='application/json',
         body=json.dumps({**REORGANIZE, 'variants': [unchanged]})))
     tab.locator('#day-sheet').get_by_role('button', name='Pas de course').click()
-    tab.wait_for_function('() => document.querySelector(".n-banner")')
-    assert 'rien à déplacer' in tab.locator('#content').inner_text()
+    tab.get_by_text('Ta semaine tient déjà avec ces jours').wait_for()
     tab.unroute(BASE + '/notebook-api/reorganize')
     sheet = tab.locator('#day-sheet')
     sheet.get_by_role('button', name='Avec d’autres').click()
