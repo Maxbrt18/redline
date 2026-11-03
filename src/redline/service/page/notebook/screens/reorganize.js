@@ -3,7 +3,7 @@ import {app} from '../state.js';
 import {chevron, content, kindIcon, message, pastille, section} from '../ui.js';
 import {api} from '../api.js';
 import {day, fmt} from '../format.js';
-import {leave, render, screen} from '../nav.js';
+import {leave, push, render, screen} from '../nav.js';
 import {refresh} from '../data.js';
 import {present} from '../sheet.js';
 
@@ -33,7 +33,14 @@ function reorgPlan(week) {
   if (!app.reorg || app.reorg.week !== week) app.reorg = {week, days: {}, sheet: null};
   return app.reorg;
 }
-const reorgStated = plan => Object.values(plan.days).filter(item => item.kind !== 'as_planned');
+// Only the fields of its kind travel: a day read back from the server carries the others
+// as null, and where it came from.
+const REORG_FIELDS = {short: ['minutes'], with_others: ['minutes', 'pace', 'required'], other_sport: ['sport', 'demanding', 'run_too']};
+const reorgFields = item => Object.fromEntries([['date', item.date], ['kind', item.kind], ...(REORG_FIELDS[item.kind] || []).map(name => [name, item[name]])]);
+// What the athlete touched on this screen, sent over what is already known: a day set back
+// to as planned travels too, to clear a habit for this week.
+const reorgStated = plan => Object.values(plan.days).map(reorgFields);
+const reorgKnown = (plan, item) => plan.days[item.date] || (item.stated ? {...item.stated, date: item.date} : null);
 async function reorgLoad(week) {
   const plan = reorgPlan(week), key = 'reorganize:' + week, asked = JSON.stringify(reorgStated(plan));
   plan.asked = asked;
@@ -41,6 +48,10 @@ async function reorgLoad(week) {
     const data = await api('reorganize', {week, days: reorgStated(plan)});
     if (plan.asked !== asked) return;
     app.views[key] = data; delete app.failures[key];
+    if (plan.sheet) {
+      plan.sheet = data.days.find(item => item.date === plan.sheet.date) || plan.sheet;
+      reorgSheet(week, plan.sheet.date);
+    }
   } catch (error) {
     if (plan.asked !== asked) return;
     if (app.views[key]) message(error.message); else app.failures[key] = error.message;
@@ -49,7 +60,7 @@ async function reorgLoad(week) {
 }
 function reorgSet(week, date, stated) {
   const plan = reorgPlan(week);
-  plan.days[date] = {date, ...stated};
+  plan.days[date] = reorgFields({...stated, date});
   reorgSheet(week, date);
   reorgLoad(week);
 }
@@ -57,6 +68,7 @@ function reorgSet(week, date, stated) {
 // A day as the athlete stated it: the tag on the right, the details under the title.
 function reorgStateLine(stated) {
   if (!stated || stated.kind === 'as_planned') return '';
+  if (stated.habit) return [reorgStateLine({...stated, habit: false}), 'habitude'].filter(Boolean).join(' · ');
   if (stated.kind === 'short') return '≤ ' + reorgHours(stated.minutes);
   if (stated.kind === 'with_others') return '~' + reorgHours(stated.minutes) + ', ' + REORG_PACE[stated.pace].toLowerCase() + (stated.required ? ' · obligatoire' : ' · si ça rentre');
   if (stated.kind === 'other_sport') return [stated.sport, stated.demanding ? 'exigeant' : 'léger', stated.run_too ? 'course possible' : null].filter(Boolean).join(' · ');
@@ -105,7 +117,7 @@ const REORG_DEFAULTS = {
 function reorgSheet(week, date) {
   const plan = reorgPlan(week), item = plan.sheet, panel = $('day-panel');
   if (!item || item.date !== date) return;
-  const stated = plan.days[date] || {date, kind: 'as_planned'};
+  const stated = reorgKnown(plan, item) || {date, kind: 'as_planned'};
   const set = change => reorgSet(week, date, {...stated, ...change});
   $('day-title').textContent = day(date).toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric'}).replace(/^./, c => c.toUpperCase());
   panel.replaceChildren();
@@ -148,6 +160,27 @@ function reorgSheet(week, date) {
       reorgCell('Courir aussi ce jour-là', runToo)));
     panel.append(el('p', 'Exigeant : il compte comme un jour dur, donc pas de séance exigeante la veille ni le lendemain. Léger : le jour est seulement pris.', 'n-small n-rg-foot'));
   }
+  const dayName = day(date).toLocaleDateString('fr-FR', {weekday: 'long'});
+  const every = el('input', null, 'n-switch');
+  every.type = 'checkbox'; every.checked = Boolean(item.habit_id);
+  every.disabled = !item.habit_id && stated.kind === 'as_planned';
+  every.setAttribute('aria-label', 'Tous les ' + dayName + 's');
+  every.addEventListener('change', () => reorgHabit(week, date, item, stated, every));
+  panel.append(add(el('div', null, 'n-group'), reorgCell('Tous les ' + dayName + 's', every)));
+  panel.append(el('p', item.habit_id ? 'Une habitude : elle revient chaque semaine. Tu la retrouves dans Mes habitudes.' : 'En faire une habitude : elle reviendra chaque semaine, et le coach en tiendra compte en écrivant ta semaine.', 'n-small n-rg-foot'));
+}
+async function reorgHabit(week, date, item, stated, toggle) {
+  toggle.disabled = true;
+  try {
+    if (toggle.checked) {
+      const fields = reorgFields(stated);
+      delete fields.date;
+      await api('habits', {weekday: (day(date).getDay() + 6) % 7 + 1, ...fields});
+    } else await api('habits/end', {id: item.habit_id});
+    delete reorgPlan(week).days[date];
+    delete app.views.habits;
+  } catch (error) { message(error.message); }
+  reorgLoad(week);
 }
 
 // ------------------------------------------------------------ the variants
@@ -208,11 +241,12 @@ export function renderReorganize(view) {
     content.append(wait);
     return;
   }
+  if (!data.written && !data.blocked) { reorgPrepare(view, data, plan); return; }
   content.append(el('p', 'Touche un jour pour dire comment il se présente. Seules les dates changent ; pour changer une séance, c’est le coach.', 'n-rg-intro'));
   if (data.blocked) { content.append(el('p', REORG_BLOCKED[data.blocked], 'n-banner')); return; }
   const list = el('div', null, 'n-rg-days');
-  data.days.forEach(item => list.append(reorgDayRow(view.week, item, plan.days[item.date])));
-  content.append(list);
+  data.days.forEach(item => list.append(reorgDayRow(view.week, item, reorgKnown(plan, item))));
+  content.append(list, reorgHabitsLink());
   if (!reorgStated(plan).length) return;
   const best = data.variants[0];
   if (best && !best.moves.length && !best.dropped.length) {
@@ -229,4 +263,49 @@ export function renderReorganize(view) {
   }
   if (data.held_back.length) content.append(el('p', data.held_back.join(', ') + ' ne peut pas être avancé : un signal de douleur est actif. Le reculer reste possible ; l’avancer demande l’avis du coach.', 'n-banner'));
   if (data.others) content.append(el('p', data.others + (data.others === 1 ? ' autre placement respecte' : ' autres placements respectent') + ' les règles ; ils changent plus de dates ou plient plus de préférences.', 'n-rg-more'));
+}
+
+const reorgHabitsLink = () => add(button('', () => push({k: 'habits'}), 'n-list n-rg-entry'),
+  add(el('span', 'Mes habitudes'), el('small', 'ce qui revient chaque semaine')), chevron());
+// The coach has not written the week yet: what the athlete says of their days is kept for
+// the review, where the week is written around it.
+function reorgPrepare(view, data, plan) {
+  content.append(el('p', 'Le coach n’a pas encore écrit cette semaine. Dis-lui comment se présentent tes jours : il placera les séances au bon endroit, et tu n’auras rien à réorganiser.', 'n-rg-intro'));
+  const list = el('div', null, 'n-rg-days');
+  data.days.forEach(item => list.append(reorgDayRow(view.week, item, reorgKnown(plan, item))));
+  content.append(list);
+  const keepDays = button('Enregistrer pour le bilan', async () => {
+    keepDays.disabled = true;
+    const days = data.days.filter(item => !item.past).map(item => plan.days[item.date] || (item.stated && !item.stated.habit ? reorgFields({...item.stated, date: item.date}) : null)).filter(Boolean);
+    try {
+      await api('days', {week: view.week, days});
+      message('Enregistré : le coach en tiendra compte en écrivant ta semaine.');
+      plan.days = {}; reorgLoad(view.week);
+    } catch (error) { message(error.message); }
+    keepDays.disabled = false;
+  }, 'n-action n-confirm');
+  content.append(keepDays, reorgHabitsLink());
+}
+
+// ------------------------------------------------------------ Habits
+const REORG_WEEKDAYS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
+export function renderHabits(data) {
+  content.append(el('p', 'Elles sont cochées d’avance sur tes jours, et le coach les lit quand il écrit ta semaine. Pour en créer une, touche un jour dans Réorganiser puis « Tous les … ».', 'n-rg-intro'));
+  if (!data.habits.length) { content.append(el('p', 'Aucune habitude pour le moment.', 'n-meta')); return; }
+  const node = section('Chaque semaine');
+  data.habits.forEach(habit => {
+    const name = REORG_WEEKDAYS[habit.weekday - 1];
+    const since = habit.starts_on > (app.today ? app.today.date : '') ? 'à partir du ' + day(habit.starts_on).toLocaleDateString('fr-FR', {day: 'numeric', month: 'long'})
+      : 'depuis le ' + day(habit.starts_on).toLocaleDateString('fr-FR', {day: 'numeric', month: 'long'});
+    const stop = button('Arrêter', async () => {
+      stop.disabled = true;
+      try { await api('habits/end', {id: habit.id}); app.views.habits = await api('habits'); app.reorg = null; render(scrollY); }
+      catch (error) { stop.disabled = false; message(error.message); }
+    }, 'n-rg-stop');
+    node.append(add(el('div', null, 'n-rg-habit'),
+      add(el('span', name.charAt(0).toUpperCase() + name.slice(1) + ' · ' + REORG_LABEL[habit.kind].toLowerCase()),
+        el('small', [reorgStateLine({...habit, habit: false}), since, habit.ends_on ? 'jusqu’au ' + day(habit.ends_on).toLocaleDateString('fr-FR', {day: 'numeric', month: 'long'}) : null].filter(Boolean).join(' · '))),
+      stop));
+  });
+  content.append(node);
 }

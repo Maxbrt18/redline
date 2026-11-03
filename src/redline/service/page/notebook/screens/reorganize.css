@@ -57,3 +57,8 @@
 .n-rg-check { width: 22px; height: 22px; flex: none; fill: none; stroke: var(--ink); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .n-rg-sheet .n-cell .n-seg button { padding: 3px 10px; }
 .n-rg-name { width: 150px; border: 0; background: none; text-align: right; font: 400 17px var(--sys); color: var(--muted); }
+/* Habits. */
+.n-rg-habit { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 13px 0; border-bottom: 1px solid var(--grid); }
+.n-rg-habit > span { font-size: 15px; } .n-rg-habit > span small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+.n-rg-stop { background: var(--panel); border: 0; border-radius: 10px; min-height: 36px; padding: 6px 12px; font-size: 14px; font-weight: 500; color: var(--ink); }
+.n-rg-stop:disabled { opacity: .4; }

@@ -16,7 +16,17 @@ from unittest.mock import MagicMock
 import contract
 import pytest
 from conftest import TEST_VAULT, reset_database
-from notebook_payloads import DETAIL, INJURY, RACE, RACE_PLAN_VIEW, REORGANIZE, TODAY, WEEK, WEEKS
+from notebook_payloads import (
+    DETAIL,
+    HABITS,
+    INJURY,
+    RACE,
+    RACE_PLAN_VIEW,
+    REORGANIZE,
+    TODAY,
+    WEEK,
+    WEEKS,
+)
 from test_notebook_board import PARIS, Repo, ef, seed_week
 from test_notebook_board import WEEK as SEEDED_WEEK
 from test_page_modules import modules
@@ -70,7 +80,9 @@ def test_a_tagged_union_reports_its_closest_shape():
     (views.TodayView, TODAY), (views.WeekView, WEEK), (list[views.PastWeek], WEEKS["weeks"]),
     (views.InjuryView, INJURY), (views.RaceView, RACE), (views.SessionView, DETAIL),
     (views.RacePlanView, RACE_PLAN_VIEW), (views.ReorganizeView, REORGANIZE),
-], ids=["today", "week", "weeks", "injury", "race", "detail", "race-plan", "reorganize"])
+    (views.HabitsView, HABITS),
+], ids=["today", "week", "weeks", "injury", "race", "detail", "race-plan", "reorganize",
+        "habits"])
 def test_a_browser_payload_is_what_the_service_serves(shape, payload):
     assert contract.problems(shape, payload) == []
 
@@ -283,3 +295,27 @@ def test_the_reorganise_route_refuses_what_it_cannot_read(store, connect, body):
     seed_week(store)
     client, _, _ = connect(dt.datetime(2026, 10, 7, 8, 0, tzinfo=PARIS))
     assert client.post("/notebook-api/reorganize", json=body).status_code == 400
+
+
+@needs_database
+def test_the_habit_and_day_routes_keep_what_the_athlete_states(store, connect):
+    seed_week(store)
+    client, _, _ = connect(dt.datetime(2026, 10, 7, 8, 0, tzinfo=PARIS))
+    habit = {"weekday": 6, "kind": "with_others", "minutes": 60, "pace": "easy",
+             "required": False}
+    assert client.post("/notebook-api/habits", json=habit).status_code == 200
+    assert client.post("/notebook-api/habits", json={"weekday": 6, "kind": "as_planned"}).status_code == 400
+    habits = served(client, "habits")
+    assert contract.problems(views.HabitsView, habits) == []
+    assert [item["kind"] for item in habits["habits"]] == ["with_others"]
+    days = client.post("/notebook-api/days", json={
+        "week": "2026-W42", "days": [{"date": "2026-10-14", "kind": "off"}]})
+    assert days.status_code == 200, days.text
+    over = client.post("/notebook-api/days", json={"week": "2026-W40", "days": []})
+    assert over.status_code == 409
+    ended = client.post("/notebook-api/habits/end", json={"id": habits["habits"][0]["id"]})
+    assert ended.status_code == 200
+    assert served(client, "habits")["habits"] == []
+    unknown = client.post("/notebook-api/habits/end",
+                          json={"id": "00000000-0000-4000-8000-000000000000"})
+    assert unknown.status_code == 404

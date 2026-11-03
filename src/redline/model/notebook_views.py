@@ -653,9 +653,27 @@ class ReorganizeSession(TypedDict):
     figure: str
 
 
+class DayState(TypedDict):
+    """How a day presents itself, as stated or as its weekly habit gives it."""
+
+    kind: Literal["as_planned", "off", "short", "easy", "more", "with_others", "other_sport"]
+    minutes: int | None
+    pace: Literal["easy", "mixed", "workout"] | None
+    required: bool | None
+    sport: str | None
+    demanding: bool | None
+    run_too: bool | None
+    #: It comes from the habit of that weekday.
+    habit: bool
+
+
 class ReorganizeDay(TypedDict):
     date: str
     sessions: list[ReorganizeSession]
+    #: What is already known of the day: stated for it, else its habit.
+    stated: DayState | None
+    #: The habit in force for that weekday on that date.
+    habit_id: str | None
     #: The plan keeps the day for rest.
     rest: bool
     #: Before today: shown, never moved.
@@ -712,9 +730,22 @@ class ReorganizeView(TypedDict):
 
     week: str
     revision: int
+    #: False while the coach has not written the week: the days are stated for it.
+    written: bool
     blocked: Literal["awaiting", "missing", "closed"] | None
     days: list[ReorganizeDay]
     variants: list[Variant]
     others: int
     #: Titles of the demanding sessions a pain signal keeps from moving earlier.
     held_back: list[str]
+
+
+class Habit(DayState):
+    id: str
+    weekday: int
+    starts_on: str
+    ends_on: str | None
+
+
+class HabitsView(TypedDict):
+    habits: list[Habit]

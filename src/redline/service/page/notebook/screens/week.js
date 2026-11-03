@@ -1,7 +1,7 @@
 import {add, button, el} from '../../shared/dom.js';
 import {app} from '../state.js';
 import {chevron, content, kindIcon, pastille, section} from '../ui.js';
-import {day, dm, fmt, isoDate, kindName, plannedValue, shortTitle, weekNumber, weekSpan} from '../format.js';
+import {day, dm, fmt, followingWeek, isoDate, kindName, plannedValue, shortTitle, weekNumber, weekSpan} from '../format.js';
 import {push} from '../nav.js';
 
 // ------------------------------------------------------------ Week
@@ -202,6 +202,11 @@ export function renderWeek(data, root) {
   }
   // The next week as soon as its program exists: on Sunday, that is the one being
   // organised.
+  if (root && !data.next && data.week === data.current) {
+    const coming = followingWeek(data.week);
+    content.append(add(button('', () => push({k: 'reorganize', week: coming}), 'n-list n-rg-entry'),
+      add(el('span', 'Préparer la semaine ' + weekNumber(coming)), el('small', 'dire au coach comment se présentent tes jours')), chevron()));
+  }
   if (root && data.next) {
     const node = section('Semaine prochaine'), next = data.next;
     const figure = add(el('span', null, 'n-wfig'), next.km_target ? el('small', '~' + fmt(next.km_target) + ' km') : null);

@@ -345,6 +345,12 @@ class _Store:
     def load_plan(self, week):
         return _plan()
 
+    def habits(self, on=None, until=None):
+        return []
+
+    def stated_days(self, first, last):
+        return []
+
 
 def _run_variants(monkeypatch, tmp_path, days, as_json):
     from conftest import load_script
@@ -452,3 +458,72 @@ def test_the_screen_serves_its_declared_shape(seeded):
     assert shown["variants"][0]["dropped"][0]["title"] == "Footing"
     closed = service.view(seeded, WEEK, {"days": []}, dt.date(2030, 3, 12))
     assert closed["blocked"] == "closed" and closed["variants"] == []
+
+
+# ------------------------------------------------------------------ habits and days stated ahead
+
+def _habit(weekday, kind, starts_on="2030-01-01", ends_on=None, **details):
+    return {"id": f"h{weekday}{kind}", "weekday": weekday,
+            "starts_on": dt.date.fromisoformat(starts_on),
+            "ends_on": dt.date.fromisoformat(ends_on) if ends_on else None, "kind": kind,
+            **{name: details.get(name) for name in
+               ("minutes", "pace", "required", "sport", "demanding", "run_too")}}
+
+
+def test_a_day_is_what_was_touched_else_stated_else_its_habit():
+    habits = [_habit(3, "other_sport", sport="volley", demanding=False, run_too=False),
+              _habit(6, "with_others", minutes=60, pace="easy", required=False),
+              _habit(7, "with_others", minutes=90, pace="easy", required=True),
+              _habit(1, "off", ends_on="2030-02-01")]
+    stated = [{"day": day(5), "kind": "as_planned"}, {"day": day(3), "kind": "short",
+                                                       "minutes": 30}]
+    touched = week_days.parse({"days": [{"date": str(day(2)), "kind": "easy"}]}, WEEK)
+    found = week_days.effective(WEEK, habits, stated, touched).days
+    assert found[day(2)].kind.value == "easy" and not found[day(2)].habit
+    assert found[day(3)].kind.value == "short"
+    assert day(5) not in found and day(0) not in found
+    assert found[day(6)].habit and found[day(6)].minutes == 90
+
+
+def test_the_latest_habit_of_a_weekday_holds():
+    older, newer = _habit(6, "off", "2030-01-01"), _habit(6, "easy", "2030-02-01")
+    assert week_days.habit_on([older, newer], day(5))["kind"] == "easy"
+    assert week_days.habit_on([older, newer], dt.date(2030, 1, 12))["kind"] == "off"
+
+
+def test_a_habit_must_change_something():
+    with pytest.raises(SchemaError):
+        week_days.HABIT_SCHEMA.validate({"weekday": 3, "kind": "as_planned"})
+    with pytest.raises(SchemaError):
+        week_days.HABIT_SCHEMA.validate({"weekday": 8, "kind": "off"})
+
+
+def test_habits_and_stated_days_are_kept_and_read_back(seeded):
+    from redline.service import reorganize as service
+
+    today = dt.date(2030, 3, 5)
+    service.add_habit(seeded, {"weekday": 3, "kind": "other_sport", "sport": "volley",
+                               "demanding": False, "run_too": False}, today)
+    service.add_habit(seeded, {"weekday": 3, "kind": "off"}, today)
+    habits = service.habits_view(seeded, today)["habits"]
+    assert [habit["kind"] for habit in habits] == ["off"]
+    service.state_days(seeded, WEEK, {"days": [{"date": "2030-03-04", "kind": "off"},
+                                               {"date": "2030-03-08", "kind": "easy"}]}, today)
+    assert [row["day"] for row in seeded.stated_days(DATES[0], DATES[-1])] == [dt.date(2030, 3, 8)]
+    readback = service.days_readback(seeded, WEEK)
+    assert "pas de course (habitude)" in readback and "facile seulement" in readback
+    service.end_habit(seeded, habits[0]["id"], today)
+    assert service.habits_view(seeded, today)["habits"] == []
+
+
+def test_a_habit_steers_the_variants_and_a_week_to_come_is_prepared(seeded):
+    from redline.service import reorganize as service
+
+    today = dt.date(2030, 3, 5)
+    service.add_habit(seeded, {"weekday": 4, "kind": "off"}, today)
+    shown = service.view(seeded, WEEK, {"days": []}, today)
+    assert shown["days"][3]["stated"]["kind"] == "off" and shown["days"][3]["habit_id"]
+    assert all(variant["days"][3]["labels"] == [] for variant in shown["variants"])
+    coming = service.view(seeded, "2030-W11", {"days": []}, today)
+    assert coming["written"] is False and coming["blocked"] is None
+    assert coming["days"][3]["stated"]["habit"] is True

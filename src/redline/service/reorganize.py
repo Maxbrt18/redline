@@ -8,6 +8,7 @@ for these days and this revision, never by a placement it could have altered.
 from __future__ import annotations
 
 import datetime as dt
+import uuid
 from dataclasses import dataclass
 from typing import Literal
 
@@ -29,6 +30,14 @@ ACTOR = "notebook"
 
 class ReorganizeError(InputError):
     """The variant cannot be taken: the week changed, or the choice is gone."""
+
+
+def request_of(store, week: str, payload: object) -> week_days.Request:
+    """The days as they stand: what the page sends, over what was stated, over habits."""
+    sent = week_days.parse(payload, week)
+    dates = week_days.week_dates(week)
+    return week_days.effective(week, store.habits(dates[0], dates[-1]),
+                               store.stated_days(dates[0], dates[-1]), sent)
 
 
 @dataclass(frozen=True)
@@ -85,10 +94,10 @@ Blocked = Literal["awaiting", "missing", "closed"]
 
 
 def _blocked(plan: dict | None, week: str, today: dt.date) -> Blocked | None:
-    if plan is None:
-        return "missing"
     if week_days.week_dates(week)[-1] < today:
         return "closed"
+    if plan is None:
+        return None
     revision = active(plan)
     if blocking_gates(plan, today) or any(
             dt.date.fromisoformat(gate["due"]) < today for gate in revision.get("gates") or []):
@@ -108,14 +117,27 @@ def _figure(session: dict) -> str:
     return ""
 
 
-def _days(revision: dict, week: str, today: dt.date) -> list[views.ReorganizeDay]:
+def _state(day: week_days.Day | None) -> views.DayState | None:
+    if day is None:
+        return None
+    row = week_days.state_row(day)
+    return {"kind": row["kind"], "minutes": row["minutes"], "pace": row["pace"],
+            "required": row["required"], "sport": row["sport"], "demanding": row["demanding"],
+            "run_too": row["run_too"], "habit": day.habit}
+
+
+def _days(revision: dict | None, week: str, today: dt.date, request: week_days.Request,
+          habits: list[dict]) -> list[views.ReorganizeDay]:
     out: list[views.ReorganizeDay] = []
     for date in week_days.week_dates(week):
         iso = date.isoformat()
-        here = [session for session in revision["sessions"]
+        here = [session for session in (revision or {}).get("sessions", [])
                 if session["date"] == iso and session["status"] != "cancelled"]
+        habit = week_days.habit_on(habits, date)
         out.append({
             "date": iso, "past": date < today,
+            "stated": _state(request.days.get(date)),
+            "habit_id": str(habit["id"]) if habit else None,
             "rest": any(session["workout"] == "rest" for session in here),
             "sessions": [{"id": session["id"], "title": session["title"],
                           "kind": session["kind"], "workout": session["workout"],
@@ -160,24 +182,24 @@ def _variant(variant: reorganize.Variant, computation: Computation) -> views.Var
 
 
 def view(store, week: str, payload: object, today: dt.date) -> views.ReorganizeView:
-    request = week_days.parse(payload, week)
+    request = request_of(store, week, payload)
+    dates = week_days.week_dates(week)
+    habits = store.habits(dates[0], dates[-1])
     plan = store.load_plan(week)
     if plan is not None:
         validate(plan)
     blocked = _blocked(plan, week, today)
-    if plan is None:
-        return {"week": week, "revision": 0, "blocked": blocked, "days": [], "variants": [],
+    revision = active(plan) if plan is not None else None
+    if revision is None or blocked:
+        return {"week": week, "revision": revision["revision"] if revision else 0,
+                "written": revision is not None, "blocked": blocked,
+                "days": _days(revision, week, today, request, habits), "variants": [],
                 "others": 0, "held_back": []}
-    revision = active(plan)
-    if blocked:
-        return {"week": week, "revision": revision["revision"], "blocked": blocked,
-                "days": _days(revision, week, today), "variants": [], "others": 0,
-                "held_back": []}
     computation = compute(store, plan, week, request, today, pain_signal(store, today))
     titles = {session["id"]: session["title"] for session in revision["sessions"]}
     return {
-        "week": week, "revision": revision["revision"], "blocked": None,
-        "days": _days(revision, week, today),
+        "week": week, "revision": revision["revision"], "written": True, "blocked": None,
+        "days": _days(revision, week, today, request, habits),
         "variants": [_variant(variant, computation) for variant in computation.outcome.variants],
         "others": computation.outcome.others,
         "held_back": [titles[item] for item in computation.outcome.held_back],
@@ -197,14 +219,16 @@ def _summary(variant: reorganize.Variant, titles: dict[str, str]) -> str:
     return " ; ".join(parts) or text.UNCHANGED
 
 
+def _words(day: week_days.Day) -> str:
+    return text.DAY_STATES[day.kind.value].format(
+        minutes=day.minutes, pace=text.PACES.get(day.pace.value if day.pace else "", ""),
+        firmness=text.FIRMNESS[day.required], sport=day.sport,
+        effort=text.EFFORT[day.demanding], run=text.RUN_TOO[day.run_too])
+
+
 def _stated(request: week_days.Request, titles: dict[str, str]) -> str:
-    said = []
-    for date, day in sorted(request.days.items()):
-        state = text.DAY_STATES[day.kind.value].format(
-            minutes=day.minutes, pace=text.PACES.get(day.pace.value if day.pace else "", ""),
-            firmness=text.FIRMNESS[day.required], sport=day.sport,
-            effort=text.EFFORT[day.demanding], run=text.RUN_TOO[day.run_too])
-        said.append(text.DAY.format(day=_day(date), state=state))
+    said = [text.DAY.format(day=_day(date), state=_words(day))
+            for date, day in sorted(request.days.items())]
     said += [text.PINNED.format(title=titles.get(session, session), day=_day(date))
              for session, date in sorted(request.pins.items())]
     return " ; ".join(said) or text.NO_DAY
@@ -266,7 +290,7 @@ def revision_of(computation: Computation, choice: int, stamp: str) -> dict:
 def take(store, week: str, payload: object, expected: int, choice: int, today: dt.date,
          stamp: str, warn=lambda line: None) -> int:
     """Write the chosen variant as the next revision; its number."""
-    request = week_days.parse(payload, week)
+    request = request_of(store, week, payload)
     plan = store.load_plan(week)
     if plan is not None:
         validate(plan)
@@ -284,3 +308,57 @@ def take(store, week: str, payload: object, expected: int, choice: int, today: d
     _, current = plan_revision.checked(store, week, revision, plan, stamp=stamp, warn=warn)
     store.append_plan_revision(week, current, actor=ACTOR)
     return current["revision"]
+
+
+# ------------------------------------------------------------------ days stated ahead, habits
+
+def state_days(store, week: str, payload: object, today: dt.date) -> None:
+    """Keep the days stated for `week` from today on: the coach writes the week with them."""
+    dates = week_days.week_dates(week)
+    if dates[-1] < today:
+        raise ReorganizeError(f"{week}: the week is over")
+    sent = week_days.parse(payload, week)
+    store.state_days(max(dates[0], today), dates[-1],
+                     [{"day": date, **week_days.state_row(day)}
+                      for date, day in sorted(sent.days.items()) if date >= today])
+
+
+def _habit(row: dict) -> views.Habit:
+    state = week_days.state_row(week_days.from_row(row["starts_on"], row, habit=True))
+    return {"kind": state["kind"], "minutes": state["minutes"], "pace": state["pace"],
+            "required": state["required"], "sport": state["sport"],
+            "demanding": state["demanding"], "run_too": state["run_too"], "habit": True,
+            "id": str(row["id"]), "weekday": row["weekday"],
+            "starts_on": row["starts_on"].isoformat(),
+            "ends_on": row["ends_on"].isoformat() if row["ends_on"] else None}
+
+
+def habits_view(store, today: dt.date) -> views.HabitsView:
+    """The habits in force or to come."""
+    return {"habits": [_habit(row) for row in store.habits(today)]}
+
+
+def add_habit(store, payload: object, today: dt.date) -> None:
+    """A habit from today on; the one it replaces on that weekday ends yesterday."""
+    clean = week_days.HABIT_SCHEMA.validate(payload, "habit")
+    day = week_days.from_row(today, clean)
+    for row in store.habits(today):
+        if row["weekday"] == clean["weekday"]:
+            store.end_habit(row["id"], today - dt.timedelta(days=1))
+    store.add_habit({"weekday": clean["weekday"], "starts_on": today, **week_days.state_row(day)})
+
+
+def end_habit(store, habit_id: str, today: dt.date) -> None:
+    if not store.end_habit(uuid.UUID(habit_id), today - dt.timedelta(days=1)):
+        raise ReorganizeError(f"habit {habit_id}: unknown")
+
+
+def days_readback(store, week: str) -> str:
+    """The days known for `week`, in the coach's words."""
+    request = request_of(store, week, {"days": []})
+    if not request.days:
+        return text.DAYS_NONE.format(week=week)
+    return "\n".join([text.DAYS_HEADER.format(week=week), *(
+        text.DAYS_LINE.format(day=_day(date), state=_words(day),
+                              habit=text.HABIT if day.habit else "")
+        for date, day in sorted(request.days.items()))])

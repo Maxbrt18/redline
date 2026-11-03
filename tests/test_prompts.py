@@ -342,7 +342,9 @@ def test_runtime_prompts_stay_within_explicit_context_budgets():
     measures a cost, not a virtue.
 
     The proactive-trigger ceiling pays for a COMMAND, `fact-write angle`, which gives
-    the angle a place to go: a reasoning given no field ends up in the prose.
+    the angle a place to go: a reasoning given no field ends up in the prose. It also pays
+    for `week-plan days`, so the weekly review writes the week around the days the athlete
+    stated instead of making them reorganise it afterwards.
     """
     # The explicit launcher adds a word to the former bare CLI mentions. That cost buys
     # exact alignment with `dontAsk`.
@@ -353,7 +355,7 @@ def test_runtime_prompts_stay_within_explicit_context_budgets():
     assert len(TRIAGE_RULES.split()) <= 300
     assert len(TRIAGE_PROMPT.split()) <= 350
     assert max(len(text.split()) for text in DEPTH_NOTES.values()) <= 180
-    assert max(len(text.split()) for text in PROACTIVE_TRIGGERS.values()) <= 520
+    assert max(len(text.split()) for text in PROACTIVE_TRIGGERS.values()) <= 530
 
 
 def test_weekly_cannot_use_the_generic_silence_escape_hatch():

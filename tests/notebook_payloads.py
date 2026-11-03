@@ -310,19 +310,28 @@ def _variant_day(day, labels, load, moved=False, carried=False):
 REORGANIZE = {
     "week": CURRENT_WEEK,
     "revision": 3,
+    "written": True,
     "blocked": None,
     "days": [
-        {"date": "2026-10-05", "sessions": [], "rest": True, "past": True},
-        {"date": "2026-10-06", "past": True, "rest": False, "sessions": [
+        {"date": "2026-10-05", "sessions": [], "rest": True, "past": True, "stated": None, "habit_id": None},
+        {"date": "2026-10-06", "past": True, "rest": False, "stated": None, "habit_id": None,
+         "sessions": [
             {"id": "w41-mar-ef", "title": "EF, permis accompagné", "kind": "run",
              "workout": "easy", "figure": "≤55 min"}]},
-        {"date": "2026-10-07", "sessions": [], "rest": False, "past": True},
-        {"date": "2026-10-08", "sessions": [], "rest": False, "past": True},
-        {"date": "2026-10-09", "past": False, "rest": False, "sessions": [
+        {"date": "2026-10-07", "sessions": [], "rest": False, "past": True,
+         "stated": {"kind": "other_sport", "minutes": None, "pace": None, "required": None,
+                    "sport": "Volley", "demanding": False, "run_too": False, "habit": True},
+         "habit_id": "5d1c0c5e-8a4b-4f1e-9a43-2f0b8f3c1a77"},
+        {"date": "2026-10-08", "sessions": [], "rest": False, "past": True, "stated": None,
+         "habit_id": None},
+        {"date": "2026-10-09", "past": False, "rest": False, "stated": None, "habit_id": None,
+         "sessions": [
             {"id": "w41-ven-ef", "title": "EF, permis accompagné", "kind": "run",
              "workout": "easy", "figure": "≤55 min"}]},
-        {"date": "2026-10-10", "sessions": [], "rest": False, "past": False},
-        {"date": "2026-10-11", "past": False, "rest": False, "sessions": [
+        {"date": "2026-10-10", "sessions": [], "rest": False, "past": False, "stated": None,
+         "habit_id": None},
+        {"date": "2026-10-11", "past": False, "rest": False, "stated": None, "habit_id": None,
+         "sessions": [
             {"id": "w41-dim-sl", "title": "Sortie longue", "kind": "run", "workout": "long",
              "figure": "16 km"}]},
     ],
@@ -340,3 +349,9 @@ REORGANIZE = {
     "others": 4,
     "held_back": [],
 }
+
+
+HABITS = {"habits": [{
+    "id": "5d1c0c5e-8a4b-4f1e-9a43-2f0b8f3c1a77", "weekday": 3, "starts_on": "2026-09-01",
+    "ends_on": None, "kind": "other_sport", "minutes": None, "pace": None, "required": None,
+    "sport": "Volley", "demanding": False, "run_too": False, "habit": True}]}

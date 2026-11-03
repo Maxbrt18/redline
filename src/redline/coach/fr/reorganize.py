@@ -28,6 +28,11 @@ REMARKS = {
     "rest_day_used": "    · {title} tombe sur un jour de repos prévu ({day}).",
 }
 
+DAYS_HEADER = "Jours déclarés pour {week} (habitudes et jours dits d'avance), à placer autour :"
+DAYS_NONE = "Aucun jour déclaré pour {week} : ni habitude, ni jour dit d'avance."
+DAYS_LINE = "  - {day} : {state}{habit}"
+HABIT = " (habitude)"
+
 # ------------------------------------------------------------------ the revision it writes
 
 REASON = "Semaine réorganisée dans le carnet, variante {number} sur {count} : {summary}."
