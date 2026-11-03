@@ -254,3 +254,12 @@ def test_the_rulebook_says_what_the_code_holds_and_what_the_coach_keeps():
     assert "3 mauvaises nuits" in rules["n4"].enforced_by
     assert "Coach : 2 nuits" in rules["n4"].enforced_by
     assert {"n3", "n4"} <= set(rulebook.ENFORCED)
+
+
+def test_in_a_week_in_progress_the_gate_and_the_report_read_the_same_window():
+    rows = [*wakes(*[0.5] * 7, start=day(-7)), *wakes(0, 0, 0, 0)]
+    zones = [ledger.PainZone(ZONE, "Genou")]
+    lines = ledger.gate(rows, "2026-W41", Instruments(sleep="ok"), zones, today=day(3))
+    report = ledger.wake_lines(rows, ZONE, ledger._week_as_of("2026-W41", day(3)))
+    assert "  ✓ réveils 14 j : 0.5 → 0.21 (en baisse)" in lines
+    assert report[0] == "  réveils 14 j : 11 lecture(s), 0.5 → 0.21 (en baisse)"

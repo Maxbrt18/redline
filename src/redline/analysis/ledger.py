@@ -623,7 +623,7 @@ def esculier_check(rows: list[Row], zone: str,
 
 
 def _pain_gate_cases(rows: list[Row], label: str, previous: str,
-                     zone: str) -> list[tuple[str, str]]:
+                     zone: str, as_of: dt.date) -> list[tuple[str, str]]:
     def peak(week: str) -> float | None:
         values = [value for row in rows if row.week == week and row.type in RUN_TYPES
                   and (value := row.pain_at(zone)) is not None]
@@ -657,7 +657,7 @@ def _pain_gate_cases(rows: list[Row], label: str, previous: str,
         cases.append(("?", detail))
     else:
         cases.append(("✓", detail))
-    cases.extend(_wake_trend_cases(rows, _week_start(label) + dt.timedelta(days=6), zone))
+    cases.extend(_wake_trend_cases(rows, as_of, zone))
     return cases
 
 
@@ -705,8 +705,17 @@ def wake_lines(rows: list[Row], zone: str, today: dt.date) -> list[str]:
     return lines
 
 
+def _week_as_of(label: str, today: dt.date) -> dt.date:
+    """The last day of `label` the ledger can already hold: today in a week in progress.
+
+    The morning trend of the report and of the gate both end here, so a week in progress
+    shows one window, not two.
+    """
+    return min(today, _week_start(label) + dt.timedelta(days=6))
+
+
 def gate(rows: list[Row], label: str, instr: Instruments,
-         zones: list[PainZone]) -> list[str]:
+         zones: list[PainZone], today: dt.date | None = None) -> list[str]:
     """The gate (rule `po` of the rulebook), computed box by box from the ledger.
 
     Judging it by eye in the review lets prose claim readings the numeric series does not
@@ -718,10 +727,12 @@ def gate(rows: list[Row], label: str, instr: Instruments,
     from redline.analysis import signals  # signals imports this module: deferred import
 
     previous = _week_label(_week_start(label) - dt.timedelta(days=7))
+    as_of = _week_as_of(label, today or dt.date.today())
     cases: list[tuple[str, str]] = []
     for zone in zones:
         cases.extend((mark, zone_prefix(zone, zones) + text)
-                     for mark, text in _pain_gate_cases(rows, label, previous, zone.slug))
+                     for mark, text in _pain_gate_cases(rows, label, previous, zone.slug,
+                                                        as_of))
     drifts = [drift for drift in signals.hr_at_pace(rows)
               if _week_label(drift.date) in (previous, label)
               and drift.delta >= signals.HR_DRIFT_BPM]
@@ -1084,8 +1095,8 @@ def week_report(store: LedgerStore, rows: list[Row], instruments: dict, targets:
             lines.append(text.REPORT_PAIN.format(label=zone.label, trend=pain[0]))
         lines.extend(text.REPORT_ESCULIER.format(zone_prefix=zone_prefix(zone, zones), flag=flag)
                      for flag in esculier_check(week_rows, zone.slug, history=rows))
-        lines.extend(wake_lines(rows, zone.slug, min(today, _week_start(label) + dt.timedelta(days=6))))
-    lines.extend(gate(rows, label, instr, zones))
+        lines.extend(wake_lines(rows, zone.slug, _week_as_of(label, today)))
+    lines.extend(gate(rows, label, instr, zones, today))
     lines.extend(text.REPORT_OVER_TARGET.format(overshoot=overshoot)
                  for overshoot in over_target(week_rows, targets))
     lines.extend(text.REPORT_INCOMPLETE.format(problem=problem)
