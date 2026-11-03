@@ -1090,3 +1090,56 @@ def test_a_week_is_reorganised_from_its_days_and_a_tapped_variant(browser):
     assert taken == [{'week': REORGANIZE['week'], 'revision': 3, 'choice': 0,
                       'days': asked[-1]['days']}]
     tab.close()
+
+
+def test_a_day_becomes_a_habit_and_a_week_to_come_is_stated_for_the_review(browser):
+    from notebook_payloads import HABITS, REORGANIZE
+
+    habits, stated = [], []
+    tab = browser.new_page(viewport={'width': 390, 'height': 844})
+    serve(tab)
+    coming = {**REORGANIZE, 'week': '2026-W42', 'written': False, 'revision': 0, 'variants': [],
+              'others': 0, 'days': [{**item, 'sessions': [], 'past': False} for item in REORGANIZE['days']]}
+
+    def answer(route):
+        url, body = route.request.url, route.request.post_data
+        if url.endswith('/habits') and route.request.method == 'GET':
+            data = HABITS
+        elif url.endswith('/habits'):
+            habits.append(json.loads(body))
+            data = {'status': 'ok'}
+        elif url.endswith('/days'):
+            stated.append(json.loads(body))
+            data = {'status': 'ok'}
+        else:
+            data = coming if json.loads(body)['week'] == '2026-W42' else REORGANIZE
+        route.fulfill(content_type='application/json', body=json.dumps(data))
+    for pattern in ('reorganize**', 'habits**', 'days'):
+        tab.route(BASE + '/notebook-api/' + pattern, answer)
+    tab.goto(BASE + '/carnet#t=' + 'x' * 43)
+    tab.locator('button[data-tab="week"]').click()
+    tab.get_by_role('button', name='Réorganiser la semaine').click()
+    tab.locator('button.n-rg-day', has_text='10').click()
+    sheet = tab.locator('#day-sheet')
+    sheet.get_by_role('button', name='Pas de course').click()
+    sheet.get_by_role('checkbox', name='Tous les samedis').check()
+    for _ in range(50):
+        if habits:
+            break
+        tab.wait_for_timeout(100)
+    assert habits == [{'weekday': 6, 'kind': 'off'}]
+    sheet.locator('[data-close]').last.click()
+    tab.get_by_role('button', name='Mes habitudes').click()
+    tab.locator('.n-rg-habit').first.wait_for()
+    assert 'Mercredi · autre sport' in tab.locator('#content').inner_text()
+    tab.locator('button[data-tab="week"]').click()
+    tab.locator('button[data-tab="week"]').click()
+    tab.get_by_role('button', name='Préparer la semaine 42').click()
+    tab.get_by_role('button', name='Enregistrer pour le bilan').wait_for()
+    tab.locator('button.n-rg-day', has_text='11').click()
+    sheet.get_by_role('button', name='Facile seulement').click()
+    sheet.locator('[data-close]').last.click()
+    tab.get_by_role('button', name='Enregistrer pour le bilan').click()
+    tab.wait_for_function('() => !document.querySelector(".n-confirm[disabled]")')
+    assert stated == [{'week': '2026-W42', 'days': [{'date': '2026-10-11', 'kind': 'easy'}]}]
+    tab.close()

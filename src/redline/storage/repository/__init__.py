@@ -9,6 +9,7 @@ from __future__ import annotations
 from ..database import Database
 from ._common import ATHLETE, CORRECTION_ANNOUNCE_WINDOW
 from .conversation import Conversation
+from .days import Days
 from .facts import Facts
 from .maintenance import Maintenance
 from .observations import Observations
@@ -24,7 +25,7 @@ __all__ = ["ATHLETE", "CORRECTION_ANNOUNCE_WINDOW", "OperationalStore"]
 
 class OperationalStore(TurnCommands, Conversation, Observations, StravaIntake,
                        SessionCycles, Strength, Plans, Facts, ProactiveMessages,
-                       Maintenance):
+                       Days, Maintenance):
     """Single fact API. Public calls open exactly one transaction."""
 
     def __init__(self, database: Database, *, athlete_id: str = ATHLETE) -> None:

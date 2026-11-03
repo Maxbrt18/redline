@@ -27,6 +27,7 @@ from .notebook_board import AnswerError
 WEEK = re.compile(r"20\d{2}-W(?:0[1-9]|[1-4]\d|5[0-3])")
 UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 ZONE = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")
+HABIT_ID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 ASK = re.compile(r"(?:cell:[0-9a-f-]{36}:(?:pain:[a-z0-9][a-z0-9-]{0,39}|rpe|enjoyment)"
                  r"|wake-cell:[0-9a-f-]{36}:[a-z0-9][a-z0-9-]{0,39}"
                  r"|reserve:[0-9a-f-]{36}"
@@ -265,6 +266,45 @@ def register(app: Flask, notebook: NotebookService, psid: str,
         except SchemaError:
             return jsonify(error=notebook_text.ERRORS["bad_days"]), 400
         return jsonify(status="ok", revision=number)
+
+    @app.post("/notebook-api/days")
+    def notebook_state_days():
+        body = request.get_json(silent=True)
+        if (not isinstance(body, dict) or set(body) != {"week", "days"}
+                or not isinstance(body["week"], str) or not WEEK.fullmatch(body["week"])):
+            return jsonify(error=notebook_text.ERRORS["bad_request"]), 400
+        try:
+            notebook.state_days(body["week"], body["days"])
+        except SchemaError:
+            return jsonify(error=notebook_text.ERRORS["bad_days"]), 400
+        except reorganize.ReorganizeError:
+            return jsonify(error=notebook_text.ERRORS["week_over"]), 409
+        return jsonify(status="ok")
+
+    @app.get("/notebook-api/habits")
+    def notebook_habits():
+        return jsonify(notebook.habits())
+
+    @app.post("/notebook-api/habits")
+    def notebook_add_habit():
+        body = request.get_json(silent=True)
+        try:
+            notebook.add_habit(body)
+        except SchemaError:
+            return jsonify(error=notebook_text.ERRORS["bad_habit"]), 400
+        return jsonify(status="ok")
+
+    @app.post("/notebook-api/habits/end")
+    def notebook_end_habit():
+        body = request.get_json(silent=True)
+        if (not isinstance(body, dict) or set(body) != {"id"} or not isinstance(body["id"], str)
+                or not HABIT_ID.fullmatch(body["id"])):
+            return jsonify(error=notebook_text.ERRORS["bad_request"]), 400
+        try:
+            notebook.end_habit(body["id"])
+        except reorganize.ReorganizeError:
+            return jsonify(error=notebook_text.ERRORS["no_habit"]), 404
+        return jsonify(status="ok")
 
     @app.post("/notebook-api/answer")
     def notebook_answer():

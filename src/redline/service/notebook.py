@@ -108,6 +108,19 @@ class NotebookService:
         return reorganize.take(self.board().ops, week, {"days": days}, expected, choice,
                                clock.today(), stamp)
 
+    def state_days(self, week: str, days: object) -> None:
+        """Keep the days stated for a week the coach is about to write."""
+        reorganize.state_days(self.board().ops, week, {"days": days}, clock.today())
+
+    def habits(self) -> views.HabitsView:
+        return reorganize.habits_view(self.board().ops, clock.today())
+
+    def add_habit(self, habit: object) -> None:
+        reorganize.add_habit(self.board().ops, habit, clock.today())
+
+    def end_habit(self, habit_id: str) -> None:
+        reorganize.end_habit(self.board().ops, habit_id, clock.today())
+
     def race(self, psid: str) -> views.RaceView:
         archives = [*self.store.list_entries(psid, kind="monthly", limit=12),
                     *self.store.list_entries(psid, kind="weekly", limit=8)]

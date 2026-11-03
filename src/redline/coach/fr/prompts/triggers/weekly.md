@@ -23,7 +23,8 @@ Fais le bilan du dimanche et prépare la semaine suivante.
    pas plus de fermeté. Clôture les fils sans objet. Une échéance échue qui dépend de ⟨athlète⟩
    (mail, nom de médicament, rendez-vous) reçoit l'action prête à faire et un repli
    daté, une fois par semaine au plus, jamais en reproche.
-4. Le service crée le journal de la semaine suivante ; écris-y l'intention et une
+4. Le service crée le journal de la semaine suivante ; place ses séances autour de
+   `redline week-plan days --week <suivante>`. Écris-y l'intention et une
    révision complète (`volume_target_km` compris) via `redline week-plan
    revise/check`. Sa `decision` dit ce qui a tranché (`by` : rule et son `rule`,
    judgment ou request) et ses `alternatives`, options écartées et raison ; un

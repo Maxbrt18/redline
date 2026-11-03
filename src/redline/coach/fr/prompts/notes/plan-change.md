@@ -12,7 +12,8 @@ jamais autorisation de modifier. Une exploration demandée peut utiliser
 enregistrer de changement. Pour une disponibilité qui déplace des séances,
 `redline week-plan variants --input <jours>` calcule sans IA les placements qui
 respectent les filtres, classés, avec ce que chacun plie : pars de ces variantes plutôt
-que d'en inventer une. Une séance qui peut sauter avant les autres porte
+que d'en inventer une ; `redline week-plan days` montre les jours déjà déclarés
+(habitudes comprises). Une séance qui peut sauter avant les autres porte
 `priority` : `optional` (clé : `key`, jamais sautée). Dans ce troisième cas, ne récite pas la semaine et ne plaque
 pas un automatique "rien ne bouge". ⟨athlète⟩ n'a pas à te demander de consigner : la
 trace est ton travail, pas le sien, et il ne devrait jamais avoir à l'expliquer deux

@@ -37,8 +37,7 @@ def _coherent(day: dict) -> list[str]:
     return problems
 
 
-DAY_SCHEMA = Schema("day", [
-    field("date", str, pattern=DATE_RE, note="YYYY-MM-DD"),
+STATE_FIELDS = [
     field("kind", str, choices=tuple(DayKind)),
     field("minutes", int, required=False, minimum=10, maximum=600,
           note="short: the most the day holds; with_others: how long the group runs"),
@@ -52,7 +51,21 @@ DAY_SCHEMA = Schema("day", [
           note="other_sport: it counts as a hard day"),
     field("run_too", bool, required=False,
           note="other_sport: a run may still go on that day"),
-], check=_coherent)
+]
+
+DAY_SCHEMA = Schema("day", [field("date", str, pattern=DATE_RE, note="YYYY-MM-DD"),
+                            *STATE_FIELDS], check=_coherent)
+
+
+def _a_habit_changes_something(habit: dict) -> list[str]:
+    if habit.get("kind") == DayKind.AS_PLANNED:
+        return ["field `kind`: a habit that changes nothing is not one"]
+    return _coherent(habit)
+
+
+HABIT_SCHEMA = Schema("habit", [field("weekday", int, minimum=1, maximum=7,
+                                      note="ISO weekday, 1 = Monday"),
+                                *STATE_FIELDS], check=_a_habit_changes_something)
 
 PIN_SCHEMA = Schema("pinned session", [
     field("session", str, pattern=SESSION_RE, note="the id of a session of the plan"),
@@ -75,6 +88,8 @@ class Day:
     sport: str | None = None
     demanding: bool = False
     run_too: bool = False
+    #: The day comes from a weekly habit rather than from what was stated for it.
+    habit: bool = False
 
     @property
     def closed(self) -> bool:
@@ -129,3 +144,43 @@ def parse(payload: object, week: str) -> Request:
     if problems:
         raise SchemaError(problems)
     return Request(days, pins)
+
+
+def state_row(day: Day) -> dict:
+    """The columns a day state is stored in."""
+    return {"kind": day.kind.value, "minutes": day.minutes,
+            "pace": day.pace.value if day.pace else None,
+            "required": day.required if day.kind is DayKind.WITH_OTHERS else None,
+            "sport": day.sport,
+            "demanding": day.demanding if day.kind is DayKind.OTHER_SPORT else None,
+            "run_too": day.run_too if day.kind is DayKind.OTHER_SPORT else None}
+
+
+def from_row(date: dt.date, row: dict, *, habit: bool = False) -> Day:
+    return Day(date, DayKind(row["kind"]), minutes=row.get("minutes"),
+               pace=GroupPace(row["pace"]) if row.get("pace") else None,
+               required=bool(row.get("required")), sport=row.get("sport"),
+               demanding=bool(row.get("demanding")), run_too=bool(row.get("run_too")),
+               habit=habit)
+
+
+def habit_on(habits: list[dict], date: dt.date) -> dict | None:
+    """The habit in force on `date`, the latest started when two overlap."""
+    found = [row for row in habits if row["weekday"] == date.isoweekday()
+             and row["starts_on"] <= date and (row["ends_on"] is None or row["ends_on"] >= date)]
+    return max(found, key=lambda row: (row["starts_on"], str(row["id"])), default=None)
+
+
+def effective(week: str, habits: list[dict], stated: list[dict], request: Request) -> Request:
+    """Each day as it stands: what was just touched, else what was stated for it, else its
+    habit. A day stated as planned clears its habit for that week."""
+    days: dict[dt.date, Day] = {}
+    for date in week_dates(week):
+        habit = habit_on(habits, date)
+        if habit is not None:
+            days[date] = from_row(date, habit, habit=True)
+    for row in stated:
+        days[row["day"]] = from_row(row["day"], row)
+    days.update(request.days)
+    return Request({date: day for date, day in days.items() if day.kind is not DayKind.AS_PLANNED},
+                   request.pins)

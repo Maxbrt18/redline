@@ -13,7 +13,8 @@ Exit codes of `check` and `show`; the distinction carries everything else:
 - ``1`` invalid: missing or unreadable. Only there is nothing readable and nothing printed.
 
 `variants` reads the athlete's days (`--input`, see `redline.model.week_days`) and prints the
-placements of the remaining sessions those days allow, best first. It writes nothing.
+placements of the remaining sessions those days allow, best first. `days` prints the days
+already known for the week: habits and days stated ahead. Neither writes anything.
 
 Confusing 2 with 1 suppresses the morning message on check days. Confusing 3 with 1 is
 worse: the CLI reports "invalid" with an EMPTY stdout while the service reports "stale,
@@ -114,13 +115,12 @@ def _readback(week: str, revision: dict, outcome) -> str:
 def _variants(store, week: str, input_path: str | None, as_json: bool,
               today: dt.date | None = None) -> int:
     from redline.analysis import reorganize as search
-    from redline.model import week_days
     from redline.service import reorganize
     plan = store.load_plan(week)
     if plan is None:
         raise NoteError(f"{week}: weekly plan missing in PostgreSQL")
     validate(plan)
-    request = week_days.parse(agent_input.read_json(input_path), week)
+    request = reorganize.request_of(store, week, agent_input.read_json(input_path))
     today = today or dt.date.today()
     computation = reorganize.compute(store, plan, week, request, today,
                                      reorganize.pain_signal(store, today))
@@ -218,7 +218,8 @@ def _database_command(store, command: str, week: str, optional: bool,
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("check", "show", "revise", "preview", "variants"))
+    parser.add_argument("command",
+                        choices=("check", "show", "revise", "preview", "variants", "days"))
     parser.add_argument("--week", default=current_week())
     parser.add_argument("--optional", action="store_true")
     parser.add_argument("--input", help="revise/preview JSON, or the days of variants "
@@ -226,6 +227,10 @@ def main() -> int:
     parser.add_argument("--json", action="store_true", help="variants: print JSON")
     args = parser.parse_args()
     try:
+        if args.command == "days":
+            from redline.service import reorganize
+            print(reorganize.days_readback(_database_store(), args.week))
+            return EXIT_OK
         if args.command == "variants":
             return _variants(_database_store(), args.week, args.input, args.json)
         return _database_command(_database_store(), args.command, args.week, args.optional,

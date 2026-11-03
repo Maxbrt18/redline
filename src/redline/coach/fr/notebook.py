@@ -91,6 +91,9 @@ ERRORS = {
     "no_card": "Carte introuvable.",
     "bad_days": "Jours invalides.",
     "week_moved": "La semaine a changé entre-temps. Les variantes sont recalculées.",
+    "week_over": "Cette semaine est terminée.",
+    "bad_habit": "Habitude invalide.",
+    "no_habit": "Habitude introuvable.",
 }
 
 # Why the strength session cannot start.

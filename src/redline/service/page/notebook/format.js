@@ -10,6 +10,14 @@ export const shortDay = value => day(value).toLocaleDateString('fr-FR', {weekday
 export const dm = value => day(value).toLocaleDateString('fr-FR', {day: '2-digit', month: '2-digit'});
 export const humanDate = value => day(value).toLocaleDateString('fr-FR', {day: 'numeric', month: 'long', year: 'numeric'});
 export const weekNumber = label => Number(label.slice(-2));
+// The ISO week after `label`: the Thursday of a week decides its year.
+export function followingWeek(label) {
+  const thursday = new Date(Date.UTC(Number(label.slice(0, 4)), 0, 4));
+  thursday.setUTCDate(thursday.getUTCDate() - (thursday.getUTCDay() + 6) % 7 + 7 * Number(label.slice(-2)) + 3);
+  const year = thursday.getUTCFullYear(), first = new Date(Date.UTC(year, 0, 4));
+  const number = 1 + Math.round(((thursday - first) / 86400000 - 3 + (first.getUTCDay() + 6) % 7) / 7);
+  return year + '-W' + String(number).padStart(2, '0');
+}
 export const isoDate = date => date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
 // Session kinds and their labels come from the service (`window.REDLINE_KINDS`).
 export const kinds = window.REDLINE_KINDS || {};
