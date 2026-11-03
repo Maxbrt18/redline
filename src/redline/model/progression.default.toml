@@ -1,0 +1,302 @@
+# The engine's progression families: the method each kind of session follows from one
+# exposure to the next. An instance's `progression.toml` replaces this file as a whole.
+#
+# A family is a method, not a dose: the bounds and steps of each variable, and the
+# parameters a criterion refers to (`*_ref`), belong to the lineage that uses it.
+# Clauses are read in order and the first that holds gives the move; none, the dose holds.
+
+# Double progression: the rep target climbs to the top of its range, then the load rises
+# one step and the target goes back to the bottom. The count is the instrument; the
+# difficulty only says when a set is too hard.
+[[families]]
+slug = "strength-reps"
+unit = "session"
+requires = ["set_reps_min"]
+vetoes = ["taper", "assimilation", "budget"]
+
+[[families.ladder]]
+name = "reps"
+
+[[families.ladder]]
+name = "load_kg"
+
+[[families.criteria]]
+id = "target-reached"
+signal = "set_reps_min"
+at_least_ref = "reps"
+
+[[families.criteria]]
+id = "not-too-hard"
+signal = "difficulty"
+at_most_ref = "difficulty_regress_above"
+severity = "down"
+
+[[families.criteria]]
+id = "pain-under-cap"
+signal = "effort_pain"
+at_most_ref = "pain_cap"
+severity = "down"
+
+[[families.rule]]
+id = "step-back"
+severe = true
+move = "down"
+
+[[families.rule]]
+id = "keep"
+fails_at_least = 1
+move = "hold"
+
+[[families.rule]]
+id = "wait-reading"
+unknowns_at_least = 1
+move = "hold"
+
+[[families.rule]]
+id = "twice-at-target"
+passes_in_a_row = 2
+move = "up"
+
+# A hold or a fixed set the athlete does not stop on effort: the difficulty is the
+# instrument (progress at or below one score, keep between, regress above).
+[[families]]
+slug = "strength-time"
+unit = "session"
+requires = ["difficulty"]
+vetoes = ["taper", "assimilation", "budget"]
+
+[[families.ladder]]
+name = "seconds"
+
+[[families.criteria]]
+id = "easy-enough"
+signal = "difficulty"
+at_most_ref = "difficulty_progress_up_to"
+
+[[families.criteria]]
+id = "not-too-hard"
+signal = "difficulty"
+at_most_ref = "difficulty_regress_above"
+severity = "down"
+
+[[families.criteria]]
+id = "pain-under-cap"
+signal = "effort_pain"
+at_most_ref = "pain_cap"
+severity = "down"
+
+[[families.rule]]
+id = "step-back"
+severe = true
+move = "down"
+
+[[families.rule]]
+id = "keep"
+fails_at_least = 1
+move = "hold"
+
+[[families.rule]]
+id = "wait-reading"
+unknowns_at_least = 1
+move = "hold"
+
+[[families.rule]]
+id = "twice-easy"
+passes_in_a_row = 2
+move = "up"
+
+# Impact counted in contacts: one step per session the bone tolerated, read on the
+# pain of the session and on the next morning.
+[[families]]
+slug = "strength-contacts"
+unit = "session"
+vetoes = ["taper", "assimilation", "budget"]
+
+[[families.ladder]]
+name = "contacts"
+
+[[families.criteria]]
+id = "pain-under-cap"
+signal = "effort_pain"
+at_most_ref = "pain_cap"
+severity = "down"
+
+[[families.criteria]]
+id = "morning-at-base"
+signal = "wake_above_base"
+at_most = 0
+
+[[families.rule]]
+id = "step-back"
+severe = true
+move = "down"
+
+[[families.rule]]
+id = "keep"
+fails_at_least = 1
+move = "hold"
+
+[[families.rule]]
+id = "wait-reading"
+unknowns_at_least = 1
+move = "hold"
+
+[[families.rule]]
+id = "tolerated"
+passes_in_a_row = 1
+move = "up"
+
+# Repetitions of a quality session: cumulative time first (one more repetition), then a
+# longer repetition with the count back to its minimum; never a faster pace.
+[[families]]
+slug = "intervals"
+unit = "session"
+requires = ["session_rpe"]
+vetoes = ["quality_hold", "taper", "assimilation", "gate", "budget"]
+
+[[families.ladder]]
+name = "reps"
+
+[[families.ladder]]
+name = "rep_seconds"
+
+[[families.criteria]]
+id = "within-band"
+signal = "session_rpe"
+at_most_ref = "rpe_max"
+
+[[families.criteria]]
+id = "reserve-kept"
+signal = "reserve_reps"
+at_least_ref = "reserve_min"
+
+[[families.criteria]]
+id = "pain-under-cap"
+signal = "effort_pain"
+at_most_ref = "pain_cap"
+severity = "down"
+
+[[families.criteria]]
+id = "following-runs"
+signal = "following_pain"
+at_most_ref = "following_pain_max"
+severity = "down"
+
+[[families.criteria]]
+id = "morning-at-base"
+signal = "wake_above_base"
+at_most = 0
+
+[[families.rule]]
+id = "step-back"
+severe = true
+move = "down"
+
+[[families.rule]]
+id = "keep"
+fails_at_least = 1
+move = "hold"
+
+[[families.rule]]
+id = "wait-reading"
+unknowns_at_least = 1
+move = "hold"
+
+[[families.rule]]
+id = "tolerated"
+passes_in_a_row = 1
+move = "up"
+
+# Gut training: the target of the next fuelled session may rise by at most one step
+# after an exposure at or under the symptom ceiling. Only exposures with both readings
+# count, and the step starts from the target that was prescribed.
+[[families]]
+slug = "fuelling"
+unit = "session"
+anchor = "prescribed"
+requires = ["gut_symptoms", "carbs_taken"]
+
+[[families.ladder]]
+name = "carbs_g_h"
+mode = "at_most"
+
+[[families.criteria]]
+id = "gut-under-ceiling"
+signal = "gut_symptoms"
+at_most_ref = "gut_max"
+
+[[families.rule]]
+id = "keep"
+fails_at_least = 1
+move = "hold"
+
+[[families.rule]]
+id = "tolerated"
+passes_in_a_row = 1
+move = "up"
+
+# The gate (rule po): a closed week, box by box. Green opens an easy rise whose size is
+# the prescriber's; one red box freezes the next week; two red weeks in a row step back.
+[[families]]
+slug = "gate"
+unit = "week"
+reentry_steps = 0
+
+[[families.ladder]]
+name = "easy_load"
+mode = "free"
+
+[[families.criteria]]
+id = "effort-peak"
+signal = "week_effort_peak"
+at_most_ref = "gate_effort_peak"
+
+[[families.criteria]]
+id = "peak-not-rising"
+signal = "week_peak_rise"
+at_most = 0
+
+[[families.criteria]]
+id = "wakes-at-base"
+signal = "week_wakes_above_base"
+at_most = 0
+
+[[families.criteria]]
+id = "wake-trend"
+signal = "week_wake_rising"
+at_most = 0
+
+[[families.criteria]]
+id = "no-persistence"
+signal = "week_persistent_wakes"
+at_most = 0
+
+[[families.criteria]]
+id = "easy-hr"
+signal = "week_easy_hr_drifts"
+at_most = 0
+
+[[families.criteria]]
+id = "sleep"
+signal = "week_sleep_debt"
+at_most = 0
+
+[[families.rule]]
+id = "two-red-weeks"
+fails_in_a_row = 2
+move = "down"
+
+[[families.rule]]
+id = "red-box"
+fails_at_least = 1
+move = "hold"
+
+[[families.rule]]
+id = "incomplete"
+unknowns_at_least = 1
+move = "hold"
+
+[[families.rule]]
+id = "green"
+passes_in_a_row = 1
+move = "up"
