@@ -2829,3 +2829,16 @@ def test_a_named_sugar_mix_is_stored_and_read_back(store):
         1, sessions=[long_run], computed_at="2026-08-09T19:10:00+02:00"))
     stored = store.load_plan("2026-W33")["revisions"][0]["sessions"][0]
     assert (stored["carbs_target_g_h"], stored["carbs_mix"]) == (70, "glucose_fructose")
+
+
+def test_a_session_priority_is_stored_and_read_back(store):
+    from test_weekly_plan import revision as build_revision
+    from test_weekly_plan import session
+
+    short = session("w33-sam-ef", "2026-08-15", "easy", priority="optional")
+    plain = session("w33-mar-ef", "2026-08-11", "easy")
+    store.append_plan_revision("2026-W33", build_revision(
+        1, sessions=[plain, short], computed_at="2026-08-09T19:10:00+02:00"))
+    stored = {item["id"]: item for item in store.load_plan("2026-W33")["revisions"][0]["sessions"]}
+    assert stored["w33-sam-ef"]["priority"] == "optional"
+    assert "priority" not in stored["w33-mar-ef"]

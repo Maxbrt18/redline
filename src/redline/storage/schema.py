@@ -469,6 +469,7 @@ planned_sessions = sa.Table(
     sa.Column("hr_cap_bpm", sa.SmallInteger),
     sa.Column("cadence_target", sa.SmallInteger),
     sa.Column("demanding", sa.Boolean, nullable=False),
+    sa.Column("priority", sa.Text),
     # Typed guardrail: the kind that drops out of the last 30 days. NULL = known session.
     sa.Column("transition", sa.Text),
     sa.Column("calibration", sa.Boolean, nullable=False, server_default=sa.false()),
@@ -521,6 +522,9 @@ planned_sessions = sa.Table(
         f"carbs_mix IS NULL OR (carbs_target_g_h IS NOT NULL "
         f"AND carbs_mix IN ({voc.sql_values(voc.CarbMix)}))",
         name="ck_planned_sessions_carbs_mix"),
+    sa.CheckConstraint(
+        f"priority IS NULL OR priority IN ({voc.sql_values(voc.SessionPriority)})",
+        name="ck_planned_sessions_priority"),
     sa.CheckConstraint(
         "strength_spec IS NULL OR jsonb_typeof(strength_spec) = 'object'",
         name="ck_planned_sessions_strength_spec"),

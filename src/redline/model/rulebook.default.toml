@@ -46,6 +46,16 @@ carbs_mix_above_g_h = 60
 taper_cut_min_pct = 41
 # ... and by at most this much: the band where a meta-analysis finds the benefit.
 taper_cut_max_pct = 60
+# A reorganised week puts at most this many runs, and this many sessions (runs and
+# strength together), on one day.
+runs_per_day = 1
+sessions_per_day = 2
+# A reorganised week whose load over 3 days exceeds the plan's own peak by more than this
+# (%) says so: it stays possible, it is ranked after.
+reorganize_load_margin_pct = 25
+# The long run stays on these ISO weekdays (6 = Saturday, 7 = Sunday) unless the athlete
+# pins it elsewhere.
+long_run_weekdays = [6, 7]
 
 # ------------------------------------------------------------------ transitions
 

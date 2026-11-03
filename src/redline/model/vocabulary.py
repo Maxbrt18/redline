@@ -166,6 +166,40 @@ class Decider(StrEnum):
     REQUEST = "request"
 
 
+class DayKind(StrEnum):
+    """How a day presents itself to the athlete when the week is reorganised.
+
+    Named by what the athlete can do that day, never by its cause.
+    """
+
+    AS_PLANNED = "as_planned"
+    OFF = "off"
+    SHORT = "short"
+    EASY = "easy"
+    MORE = "more"
+    WITH_OTHERS = "with_others"
+    OTHER_SPORT = "other_sport"
+
+
+class GroupPace(StrEnum):
+    """How a group the athlete runs with moves: what kind of session it can carry."""
+
+    EASY = "easy"
+    MIXED = "mixed"
+    WORKOUT = "workout"
+
+
+class SessionPriority(StrEnum):
+    """What a planned session weighs when days run short (`priority` of a session).
+
+    A key session is never dropped by a reorganisation; an optional one goes first.
+    """
+
+    KEY = "key"
+    SUPPORT = "support"
+    OPTIONAL = "optional"
+
+
 class ProactiveKind(StrEnum):
     """What a proactive job does (`proactive_jobs.kind`)."""
 

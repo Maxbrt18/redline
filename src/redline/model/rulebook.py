@@ -67,6 +67,18 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
               note="least drop of the taper's mean weekly volume, in %"),
         field("taper_cut_max_pct", int, required=False, minimum=0, maximum=100,
               note="largest drop of the taper's mean weekly volume, in %"),
+        # Optional: absent, a reorganisation keeps one run and two sessions a day, does
+        # not compare its load with the plan's, and lets the long run go any day.
+        field("runs_per_day", int, required=False, minimum=1, maximum=3,
+              note="most runs a reorganisation puts on one day"),
+        field("sessions_per_day", int, required=False, minimum=1, maximum=4,
+              note="most sessions, runs and strength together, on one day"),
+        field("reorganize_load_margin_pct", int, required=False, minimum=0, maximum=200,
+              note="a reorganised week whose load over 3 days exceeds the plan's peak by "
+                   "more than this (%) says so"),
+        field("long_run_weekdays", list, required=False,
+              item=field("weekday", int, minimum=1, maximum=7),
+              note="ISO weekdays the long run stays on unless the athlete pins it elsewhere"),
     ])),
     field("transitions", list, minimum=1, maximum=12, item=field(
         "transition", dict, schema=Schema("[[transitions]]", [
@@ -108,6 +120,10 @@ class Parameters:
     carbs_mix_above_g_h: int | None = None
     taper_cut_min_pct: int | None = None
     taper_cut_max_pct: int | None = None
+    runs_per_day: int = 1
+    sessions_per_day: int = 2
+    reorganize_load_margin_pct: int | None = None
+    long_run_weekdays: tuple[int, ...] = ()
 
     def spoken(self) -> dict[str, str]:
         """Thresholds as a rule's text states them: decimal comma."""
@@ -194,6 +210,7 @@ def parse(text: str, source: Path) -> Rulebook:
     raw = payload["parameters"]
     parameters = Parameters(**{
         **raw, "assimilation_weeks": tuple(raw["assimilation_weeks"]),
+        "long_run_weekdays": tuple(raw.get("long_run_weekdays") or ()),
         "wake_trace_until": dt.time.fromisoformat(raw["wake_trace_until"]),
         **{name: float(raw[name])
            for name in ("gate_effort_peak", "hard_min_hours", "stall_tolerance_km")}})
