@@ -1,14 +1,13 @@
 import {add, button, el} from '../../shared/dom.js';
-import {chevron, content, kindIcon, message, pastille, shape, SVG} from '../ui.js';
+import {chevron, content, hero, kindIcon, message, pastille, sessionLimits, shape, SVG} from '../ui.js';
 import {api} from '../api.js';
 import {dm, fmt, kindName, paceOf, weekNumber} from '../format.js';
-import {gauges} from './week.js';
 import {cellsCard} from './today.js';
 import {ensure, loadToday} from '../data.js';
 
 // ------------------------------------------------------------ Completed session detail
-// Sand palette: cards instead of rules, a head that states the session as a big figure and
-// a bar, HR zone colours wherever an HR is shown, red for repetitions (intensity).
+// On paper, no cards: a head that states the session as a big figure and a bar, planned
+// and done on one red stroke, HR zone colours wherever an HR is shown, red for repetitions.
 // Everything is computed by the service (/notebook-api/session/<id>); here we only format.
 const SD_CHART_W = 340, SD_LABEL_W = 22, SD_PLOT_W = SD_CHART_W - SD_LABEL_W, SD_HR_H = 112, SD_ALT_H = 52;
 const SD_HR_LOW = 100, SD_HR_HIGH = 200;
@@ -84,14 +83,14 @@ function sdStrip(data) {
   return [];
 }
 function sdHero(data) {
-  const fact = data.fact, hero = el('section', null, 'n-dhero');
-  hero.append(add(el('p', null, 'n-dkind'), pastille(kindIcon(data.kind, data.workout)), sdFamily(data)));
-  if (fact.km != null) hero.append(add(el('p', null, 'n-dbig'), el('b', fmt(fact.km, 2)), el('span', 'km')));
+  const fact = data.fact, box = el('section', null, 'n-dhero');
+  box.append(add(el('p', null, 'n-dkind'), pastille(kindIcon(data.kind, data.workout)), sdFamily(data)));
+  if (fact.km != null) box.append(add(el('p', null, 'n-dbig'), el('b', fmt(fact.km, 2)), el('span', 'km')));
   const pair = el('div', null, 'n-dpair');
   if (fact.moving_s != null) pair.append(add(el('div'), el('b', sdDuration(fact.moving_s)), el('span', 'temps')));
   if (fact.km && fact.moving_s) pair.append(add(el('div'), add(el('b', paceOf(fact.moving_s / fact.km)), el('small', '/km')), el('span', 'allure moyenne')));
-  if (pair.childNodes.length) hero.append(pair);
-  return add(hero, ...sdStrip(data));
+  if (pair.childNodes.length) box.append(pair);
+  return add(box, ...sdStrip(data));
 }
 function sdTile(label, icon, value, suffix, sub, cls) {
   const box = el('div', null, 'n-dtile' + (cls ? ' ' + cls : ''));
@@ -172,7 +171,7 @@ function sdFeelings(data) {
 // ---- planned and done
 function sdPlan(data) {
   if (!data.plan) return null;
-  const rules = gauges({fact: data.fact, targets: data.plan.targets});
+  const rules = sessionLimits(data.plan.targets, data.fact);
   const steps = el('div', null, 'n-dsteps');
   const phases = data.phases || [];
   const step = (kind, name, sub, value, valueSub) => add(el('div', null, 'n-dstep' + (kind ? ' ' + kind : '')), el('i'),
@@ -442,7 +441,8 @@ function sdStrava(data) {
   return link;
 }
 export function renderOutcome(data) {
-  content.append(sdHero(data), sdFacts(data), sdFeelings(data));
+  hero.append(sdHero(data));
+  content.append(sdFacts(data), sdFeelings(data));
   [sdPlan(data), sdWork(data), sdZones(data), sdPrevious(data), sdConditions(data), sdWeek(data), sdStrava(data)]
     .forEach(node => { if (node) content.append(node); });
 }

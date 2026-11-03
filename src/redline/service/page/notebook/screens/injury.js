@@ -1,5 +1,5 @@
 import {add, button, el} from '../../shared/dom.js';
-import {SVG, content, shape, zone} from '../ui.js';
+import {SVG, content, hero, shape, zone} from '../ui.js';
 import {day, fmt, weekNumber} from '../format.js';
 import {swap} from '../nav.js';
 
@@ -35,6 +35,10 @@ function painChart(data) {
     class: (item.long ? 'sl' : 'run') + (item.pain > data.cap ? ' out' : '')}, svg));
   // A day's wake-up reading comes just before that day's session: morning first.
   data.wakes.forEach(item => shape('rect', {x: x(item.date) - 8.5, y: y(item.pain) - 3.5, width: 7, height: 7, rx: 1.5, class: 'wk'}, svg));
+  // Named in place, no legend: the last long run and the last wake-up reading.
+  const long = [...data.points].reverse().find(item => item.long), wake = data.wakes[data.wakes.length - 1];
+  if (long) shape('text', {x: x(long.date) + 9, y: y(long.pain) + 4, class: 'nm'}, svg, 'sortie longue');
+  if (wake) shape('text', {x: x(wake.date) - 12, y: y(wake.pain) + 4, 'text-anchor': 'end', class: 'nm'}, svg, 'réveil');
   return svg;
 }
 // Several monitored zones: a selector on top, one zone shown at a time.
@@ -47,15 +51,16 @@ function zonePicker(data) {
 export function renderInjury(data) {
   if (data.zones.length > 1) content.append(zonePicker(data));
   const current = data.weeks[data.weeks.length - 1] || {};
-  add(content, add(el('div', null, 'n-tbig'), el('b', current.peak == null ? '—' : fmt(current.peak), current.peak > data.cap ? 'n-over' : null),
+  add(hero, add(el('div', null, 'n-tbig'), el('b', current.peak == null ? '—' : fmt(current.peak), current.peak > data.cap ? 'n-over' : null),
     add(el('span'), 'pic cette semaine', el('br'), 'plafond ', el('b', fmt(data.cap)))));
   content.append(painChart(data));
-  const legend = el('p', null, 'n-pleg');
-  [['run', 'séance'], ['sl', 'sortie longue'], ['wk', 'réveil']].forEach(([cls, text]) => add(legend, el('i', null, cls), text));
-  content.append(legend);
   if (data.wakes.length) content.append(el('p', 'Le réveil d’un jour est placé juste avant la séance de ce jour.', 'n-pnote'));
   const scale = zone('Ton échelle');
-  data.scale.forEach(item => scale.append(add(el('p', null, 'n-scale'), el('b', String(item.value)), el('span', item.text))));
+  // The athlete's scale, cut by the ceiling's red stroke: what lies beyond it turns --over.
+  data.scale.forEach(item => {
+    scale.append(add(el('p', null, 'n-scale' + (item.value > data.cap ? ' past' : '')), el('b', String(item.value)), el('span', item.text)));
+    if (item.value === data.cap) scale.append(add(el('div', null, 'n-scale-cap'), el('i'), el('em', 'plafond')));
+  });
   const table = zone('Par semaine');
   table.append(add(el('div', null, 'n-trow head'), el('span', 'Semaine'), el('span', 'Pic'), el('span', 'Séances'), el('span', 'Réveil')));
   [...data.weeks].reverse().forEach(item => table.append(add(el('div', null, 'n-trow'),

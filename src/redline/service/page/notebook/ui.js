@@ -1,8 +1,12 @@
 // What all notebook screens share: the content area, the transient message,
 // the section titles.
 import {$, add, el} from '../shared/dom.js';
+import {fmt, rpeRange} from './format.js';
 
 export const content = $('content');
+// The head of the screen under the title: on the three tabs it sits on the track
+// (shell.css, `.n-piste`), on a pushed screen on paper.
+export const hero = $('hero');
 // A transient message floats above the tabs: it never pushes the page.
 // `notice` stays in the flow, for the opening and the locked screen.
 let toastTimer = null;
@@ -71,3 +75,62 @@ const familyOf = kind => (window.REDLINE_KINDS || {})[kind] ? window.REDLINE_KIN
 export const kindIcon = (kind, workout) => kind === 'long' || workout === 'long' ? 'long'
   : familyOf(kind) === 'strength' ? 'str' : familyOf(kind) === 'rest' ? 'rest'
   : familyOf(kind) === 'run' || familyOf(kind) === 'test' ? 'run' : 'other';
+
+// The cursor: a rail, what was done in ink, the allowed band in dots, the limit as a red
+// stroke that names its value, what passes it in red dots. A target that is not a limit
+// is an ink tick. `scale` labels the rail's ends (and its middle when given three).
+export function cursor({label, value, unit, lo, hi, fill = null, cap = null, capLabel = null,
+  target = null, targetLabel = null, band = null, scale = null, below = false}) {
+  const at = number => Math.max(0, Math.min(100, 100 * (number - lo) / (hi - lo)));
+  const over = fill != null && cap != null && fill > cap;
+  const head = add(el('div', null, 'n-cur-head'), el('span', label), add(el('b', value, over ? 'n-over' : null), unit ? el('small', unit) : null));
+  const rail = el('div', null, 'n-cur-rail');
+  const part = (cls, left, width) => { const node = el('span', null, cls); node.style.left = left + '%'; if (width != null) node.style.width = width + '%'; rail.append(node); return node; };
+  if (band) part('band', at(band[0]), at(band[1]) - at(band[0]));
+  if (fill != null) part('fill', 0, at(over ? cap : fill));
+  if (over) part('ex', at(cap), at(fill) - at(cap));
+  if (target != null) add(part('tgt' + (below ? ' below' : ''), at(target)), targetLabel ? el('em', targetLabel) : null);
+  if (cap != null) add(part('lim', at(cap)), el('em', capLabel == null ? String(cap) : capLabel));
+  const ends = add(el('div', null, 'n-cur-scale'), ...(scale || [lo, hi]).map(text => el('span', String(text))));
+  return add(el('div', null, 'n-cur' + (over ? ' crossed' : '')), head, rail, ends);
+}
+// Planned and done, one line per measure: every limit sits at the same place on its
+// rail, so the limits read as one red stroke down the block. What passes it spills in
+// red dots and its figure turns --over. A target that is not a limit is an ink tick.
+export function limits(rows) {
+  const block = el('div', null, 'n-pf');
+  if (rows.some(row => row.cap != null)) block.append(add(el('p', null, 'n-pfh'), el('span'), el('em', 'limite'), el('span')));
+  rows.forEach(row => {
+    const mark = row.cap != null ? row.cap : row.target, lo = row.lo || 0;
+    const hi = lo + (mark - lo) / 0.75;
+    const at = number => Math.max(0, Math.min(100, 100 * (number - lo) / (hi - lo)));
+    const over = row.cap != null && row.fill != null && row.fill > row.cap;
+    const rail = el('span', null, 'n-pf-rail');
+    const part = (cls, left, width) => { const node = el('span', null, cls); node.style.left = left + '%'; if (width != null) node.style.width = width + '%'; rail.append(node); };
+    if (row.band != null) part('band', at(row.band), 75 - at(row.band));
+    if (row.fill != null) part('fill', 0, over ? 75 : at(row.fill));
+    if (over) part('ex', 75, at(row.fill) - 75);
+    part(row.cap != null ? 'lim' : 'tick', 75);
+    block.append(add(el('div', null, 'n-pfr' + (over ? ' over' : '') + (row.cap == null ? ' tg' : '')),
+      el('span', row.label, 'n-pf-l'), rail, add(el('span', null, 'n-pf-v'), el('b', row.value), el('small', row.sub))));
+  });
+  return block;
+}
+// The limits of a session as rows: done when there is a fact, planned otherwise.
+export function sessionLimits(target, fact) {
+  const rows = [], has = value => value != null;
+  const num = (value, digits = 1) => fmt(value, digits);
+  if (has(target.distance_cap_km) || has(target.distance_target_km)) {
+    const cap = target.distance_cap_km, aim = target.distance_target_km;
+    rows.push({label: 'Distance', lo: (cap || aim) / 2, cap, target: cap == null ? aim : null, fill: fact ? fact.km : null,
+      value: fact && has(fact.km) ? num(fact.km, 2) : num(aim != null ? aim : cap), sub: cap != null ? num(cap) + ' max' : 'visés'});
+  }
+  if (has(target.duration_cap_min)) rows.push({label: 'Durée', lo: target.duration_cap_min / 3, cap: target.duration_cap_min,
+    fill: fact ? fact.duration_min : null, value: (fact && has(fact.duration_min) ? fact.duration_min : target.duration_cap_min) + '′',
+    sub: target.duration_cap_min + '′ max'});
+  if (has(target.hr_cap_bpm)) rows.push({label: 'FC moy.', lo: target.hr_cap_bpm - 30, cap: target.hr_cap_bpm,
+    fill: fact ? fact.hr_avg : null, value: fact && has(fact.hr_avg) ? num(fact.hr_avg, 0) : String(target.hr_cap_bpm), sub: target.hr_cap_bpm + ' max'});
+  if (has(target.rpe_max)) rows.push({label: 'Effort', cap: target.rpe_max, band: target.rpe_min, fill: fact ? fact.rpe : null,
+    value: fact && has(fact.rpe) ? num(fact.rpe) : rpeRange(target), sub: 'visé ' + rpeRange(target)});
+  return rows.length ? limits(rows) : null;
+}

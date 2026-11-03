@@ -233,7 +233,7 @@ function reorgCard(data, variant, index) {
   add(card, grid, lines.childNodes.length ? lines : null);
   if (variant.around_min) card.append(el('p', 'Environ ' + reorgHours(variant.around_min) + ' à courir autour du groupe, en allant le rejoindre et en rentrant.', 'n-rg-why'));
   variant.notes.forEach(note => card.append(el('p', reorgNote(note), 'n-rg-why')));
-  const take = button('Prendre cette variante', () => reorgTake(data, index, take), 'n-action');
+  const take = button('Prendre cette variante', () => reorgTake(data, index, take), 'n-go');
   card.append(take);
   return card;
 }
@@ -335,7 +335,7 @@ function reorgProposals(data) {
         message('Proposition prise : ta semaine est à jour.');
         leave(); refresh(true);
       } catch (error) { take.disabled = false; message(error.message); reorgLoad(data.week); }
-    }, 'n-action');
+    }, 'n-go');
     card.append(take);
     node.append(card);
   });
