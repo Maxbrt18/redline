@@ -61,6 +61,9 @@ EXERCISE_SCHEMA = Schema("exercise", [
     field("status", str, required=False, choices=STATUSES, default="active"),
     field("aliases", list, required=False, item=field("alias", str)),
     field("tags", list, required=False, item=field("tag", str)),
+    field("impact", bool, required=False,
+          note="the exercise jumps or lands: a routine that keeps it weighs on the legs "
+               "like an impact, and is kept away from a demanding run"),
 ])
 
 # These keys are the shared contract of the workout notes and of any Obsidian base built
@@ -197,6 +200,13 @@ class Program:
             known = ", ".join(sorted(self.sessions))
             raise NoteError(f'unknown session {key!r} (known: {known})')
         return self.sessions[key]
+
+    def impact(self, key: str, drop: tuple[str, ...] = ()) -> bool:
+        """Whether the routine still jumps or lands once `drop` is taken out of it."""
+        slugs = [entry if isinstance(entry, str) else entry.get("exercise")
+                 for entry in self.session(key)["exercises"]]
+        return any(self.exercises.get(slug, {}).get("impact") for slug in slugs
+                   if slug not in drop)
 
     def prescriptions(self, key: str) -> list:
         """The session, resolved, in order."""

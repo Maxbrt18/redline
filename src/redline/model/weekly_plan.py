@@ -18,7 +18,7 @@ from . import program as strength_program
 from .notes import NoteError
 from .program import GATE_SCHEMA as STRENGTH_GATE_SCHEMA
 from .schema import Schema, SchemaError, field
-from .vocabulary import CarbMix, Decider
+from .vocabulary import CarbMix, Decider, SessionPriority
 
 WEEK_RE = r"20\d{2}-W(?:0[1-9]|[1-4]\d|5[0-3])"
 DATE_RE = r"20\d{2}-\d{2}-\d{2}"
@@ -77,6 +77,10 @@ SESSION_SCHEMA = Schema("planned session", [
                "states in words; required on write with hr_zone"),
     field("cadence_target", int, required=False, minimum=120, maximum=220),
     field("demanding", bool),
+    field("priority", str, required=False, choices=tuple(SessionPriority),
+          note="what the session weighs when days run short: key is never dropped by a "
+               "reorganisation, optional goes first; absent, key when demanding, support "
+               "otherwise"),
     field("transition", str, required=False, pattern=rulebook.SLUG,
           note="a kind absent from the window of rule n8, one of the rulebook's; "
                "absent for a session already known"),
@@ -126,7 +130,7 @@ GATE_SCHEMA = Schema("dated gate", [
 CHANGE_FIELDS = (
     "added", "removed", "title", "date", "start_time", "workout", "status",
     "distance_target_km", "distance_cap_km", "duration_cap_min", "rpe_min",
-    "rpe_max", "hr_zone", "cadence_target", "demanding", "transition",
+    "rpe_max", "hr_zone", "cadence_target", "demanding", "priority", "transition",
     # `calibration` is no longer written; the name stays valid in the `changes` of
     # existing revisions, which are re-read and validated in full.
     "calibration",

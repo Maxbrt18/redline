@@ -12,6 +12,9 @@ Exit codes of `check` and `show`; the distinction carries everything else:
   that unplanned load, not to copy the completed sessions;
 - ``1`` invalid: missing or unreadable. Only there is nothing readable and nothing printed.
 
+`variants` reads the athlete's days (`--input`, see `redline.model.week_days`) and prints the
+placements of the remaining sessions those days allow, best first. It writes nothing.
+
 Confusing 2 with 1 suppresses the morning message on check days. Confusing 3 with 1 is
 worse: the CLI reports "invalid" with an EMPTY stdout while the service reports "stale,
 you may answer", so the coach concludes the program is broken although it is in its
@@ -27,7 +30,9 @@ import os
 import sys
 
 from redline.analysis import decision_state
+from redline.coach import dates
 from redline.coach.fr import plan as wording
+from redline.coach.fr import reorganize as reorganize_text
 from redline.model import (
     agent_input,
     commands,
@@ -37,6 +42,7 @@ from redline.model.errors import ConfigError
 from redline.model.notes import NoteError
 from redline.model.schema import SchemaError
 from redline.model.weekly_plan import (
+    SETTLED_STATUSES,
     active,
     as_json,
     change_evidence_errors,
@@ -87,6 +93,97 @@ def _taper_errors(store, week: str, revision: dict) -> list[str]:
         return []
     return taper.plan_errors(rows, frame, week, revision,
                              f"{week} revision {revision['revision']}")
+
+
+def _pain_signal(store, today: dt.date) -> bool:
+    """An effort pain above the rulebook's cap (rule n3) in the last 7 days."""
+    from redline.analysis import decision_state, ledger
+    from redline.model import ledger as ledger_model
+    from redline.model import rulebook
+    cap = rulebook.current().parameters.pain_cap
+    since = today - dt.timedelta(days=decision_state.PAIN_WINDOW_DAYS)
+    return any(value > cap for row in ledger.parse_ledger(store)
+               if since < row.date <= today and row.type in ledger_model.EFFORT_TYPES
+               for value in row.pains.values())
+
+
+def _day(date: dt.date) -> str:
+    return f"{dates.weekday(date, 'abbreviated')} {date:%d/%m}"
+
+
+def _readback(week: str, revision: dict, outcome) -> str:
+    titles = {session["id"]: session["title"] for session in revision["sessions"]}
+    lines = [reorganize_text.HEADER.format(week=week, revision=revision["revision"])]
+    if not outcome.variants:
+        lines.append(reorganize_text.NONE)
+    for number, variant in enumerate(outcome.variants, 1):
+        parts = []
+        if variant.moves:
+            parts.append(reorganize_text.MOVED_ONE if len(variant.moves) == 1
+                         else reorganize_text.MOVED_MANY.format(count=len(variant.moves)))
+        if variant.dropped:
+            parts.append(reorganize_text.DROPPED_ONE if len(variant.dropped) == 1
+                         else reorganize_text.DROPPED_MANY.format(count=len(variant.dropped)))
+        lines.append(reorganize_text.VARIANT.format(
+            number=number, summary=", ".join(parts) or reorganize_text.UNCHANGED))
+        lines += [reorganize_text.MOVE.format(title=titles[move.session], before=_day(move.before),
+                                              after=_day(move.after)) for move in variant.moves]
+        lines += [reorganize_text.DROP.format(title=titles[item]) for item in variant.dropped]
+        if variant.carried:
+            placed = dict(variant.placement)
+            lines.append(reorganize_text.CARRIED.format(
+                day=_day(placed[variant.carried]), title=titles[variant.carried])
+                + (reorganize_text.AROUND.format(minutes=variant.around_min)
+                   if variant.around_min else ""))
+        lines += [reorganize_text.REMARKS[note.remark].format(
+            title=titles.get(note.session or "", ""), day=_day(note.date) if note.date else "",
+            value=note.value) for note in variant.notes]
+    if outcome.others:
+        lines.append(reorganize_text.OTHERS.format(count=outcome.others))
+    if outcome.held_back:
+        lines.append(reorganize_text.HELD_BACK.format(
+            titles=", ".join(titles[item] for item in outcome.held_back)))
+    return "\n".join(lines)
+
+
+def _variants(store, week: str, input_path: str | None, as_json: bool,
+              today: dt.date | None = None) -> int:
+    from redline.analysis import reorganize
+    from redline.model import paths, rulebook, week_days
+    from redline.model import program as strength_program
+    plan = store.load_plan(week)
+    if plan is None:
+        raise NoteError(f"{week}: weekly plan missing in PostgreSQL")
+    validate(plan)
+    revision = active(plan)
+    request = week_days.parse(agent_input.read_json(input_path), week)
+    vault = paths.vault_root()
+    try:
+        program = strength_program.load(vault)
+        targets = strength_program.rpe_targets(vault)
+    except NoteError:
+        program, targets = None, {}
+    parameters = rulebook.current().parameters
+    today = today or dt.date.today()
+    sessions = revision["sessions"]
+    outcome = reorganize.reorganise(
+        reorganize.items(sessions, revision.get("gates") or [], program, targets),
+        week_days.week_dates(week), today, request,
+        reorganize.Rules(runs_per_day=parameters.runs_per_day,
+                         sessions_per_day=parameters.sessions_per_day,
+                         load_margin_pct=parameters.reorganize_load_margin_pct,
+                         long_run_weekdays=parameters.long_run_weekdays,
+                         pain_signal=_pain_signal(store, today)),
+        rest_days=frozenset(dt.date.fromisoformat(session["date"]) for session in sessions
+                            if session["workout"] == "rest"),
+        settled=frozenset(session["id"] for session in sessions
+                          if session["status"] in SETTLED_STATUSES))
+    if as_json:
+        print(json.dumps({"week": week, "revision": revision["revision"],
+                          **reorganize.as_dict(outcome)}, ensure_ascii=False))
+    else:
+        print(_readback(week, revision, outcome))
+    return EXIT_OK
 
 
 EXIT_OK = 0
@@ -210,12 +307,16 @@ def _database_command(store, command: str, week: str, optional: bool,
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("check", "show", "revise", "preview"))
+    parser.add_argument("command", choices=("check", "show", "revise", "preview", "variants"))
     parser.add_argument("--week", default=current_week())
     parser.add_argument("--optional", action="store_true")
-    parser.add_argument("--input", help="revise/preview JSON (default: stdin outside a turn)")
+    parser.add_argument("--input", help="revise/preview JSON, or the days of variants "
+                                         "(default: stdin outside a turn)")
+    parser.add_argument("--json", action="store_true", help="variants: print JSON")
     args = parser.parse_args()
     try:
+        if args.command == "variants":
+            return _variants(_database_store(), args.week, args.input, args.json)
         return _database_command(_database_store(), args.command, args.week, args.optional,
                                  args.input)
     except (NoteError, SchemaError, StorageError, json.JSONDecodeError,
