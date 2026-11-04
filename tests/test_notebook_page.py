@@ -1238,3 +1238,33 @@ def test_the_athlete_asks_the_coach_then_takes_or_dismisses_a_proposal(browser):
         tab.wait_for_timeout(100)
     assert taken == [{'id': PROPOSAL['id']}]
     tab.close()
+
+
+def test_the_head_of_today_always_carries_a_session_and_its_figure(browser):
+    """The run done today fills the head in solid figures; a day without a run shows the
+    next one, outlined. The thread below does not repeat the title the head shows."""
+    done = ef('w41-ven-ef', '2026-10-09', 'done', {
+        'observation_id': 'obs', 'kind': 'easy', 'date': '2026-10-09',
+        'km': 8.35, 'duration_min': 51, 'hr_avg': 144, 'rpe': 2, 'pains': [], 'enjoyment': None,
+        'dplus': None, 'started_at': '2026-10-09T16:58:00+02:00', 'over': []})
+    tab = browser.new_page(viewport={'width': 393, 'height': 852})
+    serve(tab)
+    tab.route(BASE + '/notebook-api/today', replying({**TODAY, 'sessions': [done], 'asks': []}))
+    tab.goto(BASE + '/carnet')
+    tab.locator('#hero .n-hfig b').wait_for()
+    assert tab.locator('#hero .n-hkick').inner_text() == 'Fait · 16 h 58'
+    assert tab.locator('#hero .n-hfig b').inner_text() == '8,4'
+    assert 'n-plan-num' not in (tab.locator('#hero .n-hfig b').get_attribute('class') or '')
+    assert tab.get_by_text('EF, permis accompagné', exact=True).count() == 1
+    tab.close()
+    later = {**TODAY['sessions'][0], 'id': 'w41-sam-sl', 'date': '2026-10-10', 'title': 'Sortie longue'}
+    tab = browser.new_page(viewport={'width': 393, 'height': 852})
+    serve(tab)
+    tab.route(BASE + '/notebook-api/today', replying(
+        {**TODAY, 'sessions': [{**STRENGTH, 'status': 'done'}], 'asks': [],
+         'tomorrow': {**TODAY['tomorrow'], 'sessions': [later]}}))
+    tab.goto(BASE + '/carnet')
+    tab.locator('#hero .n-hfig b.n-plan-num').wait_for()
+    assert tab.locator('#hero .n-hkick').inner_text() == 'Demain'
+    assert tab.locator('#hero .n-htitle').inner_text() == 'Sortie longue'
+    tab.close()
