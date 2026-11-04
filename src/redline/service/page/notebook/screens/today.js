@@ -255,7 +255,7 @@ function dayFeed(data, items, extras, options) {
       feed.append(node); return;
     }
     const kicker = ['Fait', startedAt(fact), item.extra ? 'hors programme' : null].filter(Boolean).join(' · ');
-    const [node, body] = feedStep('done', kicker, item.extra ? kindName[fact.kind] || fact.kind : item.title, false, item.extra ? kindIcon(fact.kind) : kindIcon(item.kind, item.workout));
+    const [node, body] = feedStep('done', kicker, item === options.hero ? null : item.extra ? kindName[fact.kind] || fact.kind : item.title, false, item.extra ? kindIcon(fact.kind) : kindIcon(item.kind, item.workout));
     const limited = item.extra ? null : sessionLimits(item.targets || {}, fact);
     add(body, limited || tiles(factCells(item)), item.extra ? null : overLine(item));
     if (fact.observation_id) {
@@ -290,7 +290,7 @@ function dayFeed(data, items, extras, options) {
 }
 // On a rest day, tomorrow is the screen's subject: one line for today, then its full
 // card, weather included.
-function restFeed(data) {
+function restFeed(data, hero) {
   const feed = dayFeed(data, [], [], {today: true});
   const [node, body] = feedStep('rest', null, null);
   if (data.plan.status === 'invalid') add(body, el('h2', 'Programme en préparation'), el('p', data.plan.message, 'n-meta'));
@@ -298,9 +298,9 @@ function restFeed(data) {
   feed.append(node);
   const box = add(el('div'), feed), next = data.tomorrow, real = next.sessions.filter(item => item.kind !== 'rest');
   const compact = data.asks.some(ask => ask.type === 'wake' || ask.type === 'daily');
-  if (real.length) add(box, el('p', 'Demain · ' + dayNumber(next.date), 'n-day'), dayFeed(data, real, [], {compact}));
+  if (real.length) add(box, el('p', 'Demain · ' + dayNumber(next.date), 'n-day'), dayFeed(data, real, [], {compact, hero}));
   else if (next.plan === 'invalid') box.append(el('p', 'Le programme de la semaine arrive avec le bilan.', 'n-meta'));
-  else if (next.next.length) add(box, el('p', capital(dayNumber(next.next[0].date)), 'n-day'), dayFeed(data, next.next, [], {compact: true}));
+  else if (next.next.length) add(box, el('p', capital(dayNumber(next.next[0].date)), 'n-day'), dayFeed(data, next.next, [], {compact: true, hero}));
   return [box, real.length ? next.date : next.next.length ? next.next[0].date : null];
 }
 // What is coming: one line per day, as in the Week tab; weather for tomorrow only.
@@ -386,16 +386,30 @@ function installSection() {
   }, 'n-action'));
   return node;
 }
-function todayHero(item) {
+// The head of Today always carries one session and its figure, as Week and Race carry
+// theirs: the run still to do, outlined; else the run done today, solid; else the next run.
+function todayHero(item, kicker) {
   const target = item.targets || {};
   let figure = null, side = [];
   if (target.distance_target_km != null) { figure = fmt(target.distance_target_km); side = ['km visés'].concat(target.distance_cap_km != null ? [fmt(target.distance_cap_km) + ' au plus'] : []); }
   else if (target.distance_cap_km != null) { figure = fmt(target.distance_cap_km); side = ['km au plus']; }
   else if (target.duration_cap_min != null) { figure = target.duration_cap_min + '′'; side = ['au plus']; }
   if (target.rpe_max != null) side.push('RPE ' + rpeRange(target));
-  add(hero, el('p', item.start_time ? 'Au programme · ' + hm(item.start_time) : 'Au programme', 'n-hkick'),
+  add(hero, el('p', [kicker, item.start_time ? hm(item.start_time) : null].filter(Boolean).join(' · '), 'n-hkick'),
     add(el('h2', null, 'n-htitle'), pastille(kindIcon(item.kind, item.workout)), item.title),
     figure ? add(el('p', null, 'n-hfig'), el('b', figure, 'n-plan-num'), add(el('span'), ...side.flatMap((text, index) => index ? [el('br'), text] : [text]))) : null);
+}
+function doneHero(item) {
+  const fact = item.fact, figure = fact.km != null ? fmt(fact.km) : fact.duration_min != null ? fact.duration_min + '′' : null;
+  const side = fact.km != null ? ['km'].concat(fact.duration_min != null ? [fact.duration_min + ' min' + (fact.km ? ' · ' + paceOf(fact.duration_min * 60 / fact.km) + '/km' : '')] : []) : [];
+  add(hero, el('p', ['Fait', startedAt(fact)].filter(Boolean).join(' · '), 'n-hkick'),
+    add(el('h2', null, 'n-htitle'), pastille(kindIcon(item.kind, item.workout)), item.title),
+    figure ? add(el('p', null, 'n-hfig'), el('b', figure), add(el('span'), ...side.flatMap((text, index) => index ? [el('br'), text] : [text]))) : null);
+}
+// The next run after today, from tomorrow's sessions or the days ahead.
+function nextRun(data) {
+  const later = [...data.tomorrow.sessions, ...data.tomorrow.next, ...(data.ahead || [])];
+  return later.find(item => item.date > data.date && item.kind !== 'strength' && item.kind !== 'rest' && item.status !== 'done') || null;
 }
 export function renderToday(data) {
   if (data.plan.status === 'awaiting') content.append(el('p', data.plan.message, 'n-banner'));
@@ -403,10 +417,14 @@ export function renderToday(data) {
   const items = data.sessions.filter(item => item.kind !== 'rest');
   const seen = new Set([data.date]);
   const main = items.find(item => item.kind !== 'strength' && item.status !== 'done' && item.status !== 'held');
-  if (main) todayHero(main);
-  if (items.length || data.extra.length) content.append(dayFeed(data, items, data.extra, {today: true, hero: main}));
+  const ran = main ? null : items.find(item => item.kind !== 'strength' && item.status === 'done' && item.fact);
+  const next = main || ran ? null : nextRun(data);
+  if (main) todayHero(main, 'Au programme');
+  else if (ran) doneHero(ran);
+  else if (next) todayHero(next, next.date === data.tomorrow.date ? 'Demain' : capital(dayNumber(next.date)));
+  if (items.length || data.extra.length) content.append(dayFeed(data, items, data.extra, {today: true, hero: main || ran}));
   else {
-    const [box, heroDate] = restFeed(data);
+    const [box, heroDate] = restFeed(data, next);
     content.append(box);
     if (heroDate) seen.add(heroDate);
   }
