@@ -24,8 +24,9 @@ from __future__ import annotations
 
 import datetime as dt
 import tomllib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from enum import StrEnum
+from functools import lru_cache
 from pathlib import Path
 
 from . import formats
@@ -437,6 +438,115 @@ def parse(text: str, source: Path) -> dict[str, Family]:
     return {family.slug: family for family in families}
 
 
+@lru_cache(maxsize=1)
 def default() -> dict[str, Family]:
     """The engine's generic families; an instance replaces them as a whole."""
     return parse(DEFAULT.read_text(encoding="utf-8"), DEFAULT)
+
+
+# ------------------------------------------------------------------ the instance's lineages
+
+#: The family an exercise sheet follows, by the measure of its dose (`dose.MEASURES`).
+#: A sheet whose measure has no family here (`amrap`) cannot be a lineage.
+STRENGTH_FAMILIES = {"reps": "strength-reps", "time": "strength-time",
+                     "contacts": "strength-contacts"}
+
+#: The lineage parameters the strength criteria cite (`at_most_ref`), from `[progression]`
+#: and the effort-pain scale of the rulebook.
+PROGRESS_UP_TO = "difficulty_progress_up_to"
+REGRESS_ABOVE = "difficulty_regress_above"
+PAIN_CAP = "pain_cap"
+
+
+@dataclass(frozen=True)
+class Lineages:
+    """The `[progression]` table of the instance's `rulebook.toml`, parsed."""
+
+    lineages: tuple[Lineage, ...] = ()
+    #: Rises the lineages of one group may take in one week.
+    rises_per_group_week: int = 1
+
+    def of(self, slug: str) -> Lineage | None:
+        return next((lineage for lineage in self.lineages if lineage.slug == slug), None)
+
+
+def _bound_check(data: dict) -> list[str]:
+    problems = []
+    if data["minimum"] > data["maximum"]:
+        problems.append(f"minimum {data['minimum']:g} is above maximum {data['maximum']:g}")
+    if data["step"] <= 0:
+        problems.append(f"step {data['step']:g} must be positive")
+    return problems
+
+
+def _strength_variables() -> tuple[str, ...]:
+    """Every ladder variable of the strength families, in their declared order."""
+    families = default()
+    return tuple(dict.fromkeys(variable.name for slug in STRENGTH_FAMILIES.values()
+                               for variable in families[slug].ladder))
+
+
+@lru_cache(maxsize=1)
+def _lineages_schema() -> Schema:
+    bound = [spec(item.name, float) for item in fields(Bound)]
+    entry = Schema("[[progression.lineages]]", [
+        spec("slug", str, pattern=formats.SLUG, note="the name of coaching/exercises/<slug>.md"),
+        spec("family", str, choices=tuple(STRENGTH_FAMILIES.values())),
+        spec("group", str, required=False, pattern=formats.SLUG,
+             note="lineages of one group share the weekly rise budget"),
+        *(spec(name, dict, required=False,
+               schema=Schema(f"[[progression.lineages]].{name}", bound, check=_bound_check))
+          for name in _strength_variables()),
+    ])
+    return Schema("[progression]", [
+        spec("rises_per_group_week", int, minimum=0, maximum=7),
+        spec(PROGRESS_UP_TO, int, minimum=0, maximum=10,
+             note="a difficulty at or below this lets a hold rise"),
+        spec(REGRESS_ABOVE, int, minimum=0, maximum=10,
+             note="a difficulty above this steps the exercise back"),
+        spec("lineages", list, maximum=60, item=spec("lineage", dict, schema=entry)),
+    ])
+
+
+def _lineage(entry: dict, families: dict[str, Family],
+             parameters: tuple[tuple[str, float], ...]) -> tuple[Lineage, list[str]]:
+    family = families[entry["family"]]
+    ladder = {variable.name for variable in family.ladder}
+    bounds = tuple((name, Bound(**{key: float(value) for key, value in entry[name].items()}))
+                   for name in _strength_variables() if entry.get(name) is not None)
+    where = f"lineage {entry['slug']}"
+    problems = [f"{where}: {name} is not a variable of {family.slug} "
+                f"({', '.join(sorted(ladder))})"
+                for name, _ in bounds if name not in ladder]
+    first = family.ladder[0]
+    if first.mode != StepMode.FREE and first.name not in dict(bounds):
+        problems.append(f"{where}: {family.slug} moves {first.name} first, which it bounds")
+    return Lineage(entry["slug"], family.slug, bounds, parameters,
+                   entry.get("group") or ""), problems
+
+
+def parse_lineages(raw: dict | None, pain_cap: float) -> Lineages:
+    """The `[progression]` table, or none declared. Every problem is reported at once."""
+    if raw is None:
+        return Lineages()
+    try:
+        clean = _lineages_schema().validate(raw)
+    except SchemaError as exc:
+        raise DeclarationError("\n  - ".join(["[progression]:", *exc.problems])) from None
+    problems = []
+    if clean[PROGRESS_UP_TO] > clean[REGRESS_ABOVE]:
+        problems.append(f"{PROGRESS_UP_TO} {clean[PROGRESS_UP_TO]} is above "
+                        f"{REGRESS_ABOVE} {clean[REGRESS_ABOVE]}")
+    parameters = ((PROGRESS_UP_TO, float(clean[PROGRESS_UP_TO])),
+                  (REGRESS_ABOVE, float(clean[REGRESS_ABOVE])), (PAIN_CAP, pain_cap))
+    built = []
+    for entry in clean["lineages"]:
+        lineage, found = _lineage(entry, default(), parameters)
+        built.append(lineage)
+        problems.extend(found)
+    slugs = [lineage.slug for lineage in built]
+    if doubled := sorted({slug for slug in slugs if slugs.count(slug) > 1}):
+        problems.append(f"duplicate lineage: {', '.join(doubled)}")
+    if problems:
+        raise DeclarationError("\n  - ".join(["[progression]:", *problems]))
+    return Lineages(tuple(built), clean["rises_per_group_week"])
