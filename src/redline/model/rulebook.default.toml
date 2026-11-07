@@ -16,12 +16,10 @@ transition_lookback_days = 30
 # Rule n8: at most this many transitions per week, checked when the program is written.
 transitions_per_week = 1
 # The gate: an easy increase may be added if each zone's weekly effort peak stays at or
-# below this level...
-gate_effort_peak = 1.5
+# below this level of the effort-pain scale (at most its cap)...
+gate_effort_peak = 2
 # ... over this many weeks without an increase.
 gate_trend_weeks = 2
-# Rule n3: pain cap during effort, on its table.
-pain_cap = 2
 # Rule n7: a session at least this long (in hours) counts as a hard day.
 hard_min_hours = 1.25
 # The taper covers the last N weeks, race week included. A typed race may set its own
@@ -56,9 +54,8 @@ reorganize_load_margin_pct = 25
 # The long run stays on these ISO weekdays (6 = Saturday, 7 = Sunday) unless the athlete
 # pins it elsewhere.
 long_run_weekdays = [6, 7]
-# Rule n3: a wake trace at or above this level (1 = light) ...
-persistent_wake_min = 1
-# ... on this many consecutive mornings is pain persisting beyond 48 h.
+# Rule n3: a wake trace at the base of the morning-trace scale or above, on this many
+# consecutive mornings, is pain persisting beyond 48 h.
 persistent_wake_mornings = 3
 # Rule n3: from that morning, no quality session for this many days ...
 pain_no_quality_days = 14
@@ -68,6 +65,46 @@ pain_cut_pct = 30
 poor_nights_streak = 3
 # ... as an abnormally high easy-run HR does, for this many days.
 alarm_no_quality_days = 7
+
+# ------------------------------------------------------------------ pain scales
+
+# The scales the athlete rates pain on. The rules read them by ROLE, never by number,
+# and no value is converted from one scale to another (`redline.model.pain_scales`).
+# This default is a generic 0-10 numeric rating scale whose zones follow the
+# pain-monitoring model of Silbernagel & Crossley (2015): 0-2 safe, 2-5 acceptable,
+# above 5 high risk. An instance whose athlete rates pain on a table of their own
+# declares that table here, with its own roles.
+
+# The morning trace: what a session left the next morning. The athlete picks one level.
+# Roles, from the lowest value up: below_base, exactly one base (the usual morning),
+# above_base. Here the base is the top of the safe zone.
+[scales.morning_trace]
+levels = [
+  { slug = "0", value = 0, label = "0", role = "below_base" },
+  { slug = "1", value = 1, label = "1", role = "below_base" },
+  { slug = "2", value = 2, label = "2", role = "base" },
+  { slug = "3", value = 3, label = "3", role = "above_base" },
+  { slug = "4", value = 4, label = "4", role = "above_base" },
+  { slug = "5", value = 5, label = "5", role = "above_base" },
+  { slug = "6", value = 6, label = "6", role = "above_base" },
+  { slug = "7", value = 7, label = "7", role = "above_base" },
+  { slug = "8", value = 8, label = "8", role = "above_base" },
+  { slug = "9", value = 9, label = "9", role = "above_base" },
+  { slug = "10", value = 10, label = "10", role = "above_base" },
+]
+
+# Pain during effort: any value from the lowest level to the highest, in steps of `step`.
+# The levels label the scale; `cap` is the most a session may reach (stop above it),
+# `severe` the level that means harm already done.
+[scales.effort_pain]
+step = 1
+levels = [
+  { value = 0, label = "Aucune douleur." },
+  { value = 2, label = "Zone sûre : jusqu’à 2." },
+  { value = 5, label = "Zone acceptable : jusqu’à 5, calmée le lendemain matin.", role = "cap" },
+  { value = 6, label = "Au-delà de 5 : zone à risque élevé.", role = "severe" },
+  { value = 10, label = "Pire douleur imaginable." },
+]
 
 # ------------------------------------------------------------------ transitions
 

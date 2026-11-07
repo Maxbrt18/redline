@@ -20,7 +20,7 @@ from redline.coach import dates
 from redline.coach.fr import permit as text
 from redline.model.vocabulary import LifeLoad, Sleep
 
-from . import session_kinds
+from . import rulebook, session_kinds
 
 #: The supervised period lasts this many ISO weeks, including the week of the first
 #: sealed choice; the permit is judged at the end of the last one.
@@ -34,8 +34,6 @@ WITHDRAWAL_DAYS = 14
 #: threshold; it is set when the permit is judged. Until then the signal is displayed
 #: and triggers nothing.
 BIG_FORM_THRESHOLD: float | None = None
-#: Waking trace: 2 = clear (none 0, very light 0.5, light 1, clear 2).
-NET_TRACE = 2
 
 
 @dataclass(frozen=True)
@@ -119,6 +117,7 @@ def evaluate(choices: Iterable[dict], runs: Iterable[Run], traces: dict[dt.date,
     for run in runs:
         if run.type == session_kinds.EASY:
             by_day.setdefault(run.date, []).append(run)
+    trace = rulebook.current().scales.morning_trace
     lines = []
     for choice in sorted(choices, key=lambda row: row["scheduled_on"]):
         day = _day(choice["scheduled_on"])
@@ -133,7 +132,7 @@ def evaluate(choices: Iterable[dict], runs: Iterable[Run], traces: dict[dt.date,
             line.next_trace = traces.get(day + dt.timedelta(days=1))
             if run.strava_id is not None:
                 line.group = groups.get(run.strava_id)
-            if line.next_trace is not None and line.next_trace >= NET_TRACE:
+            if line.next_trace is not None and trace.above_base(line.next_trace):
                 line.triggers.append(text.TRACE_NEXT_DAY)
             if (line.cap_minutes is not None and line.actual_minutes is not None
                     and line.actual_minutes > line.cap_minutes):
@@ -213,6 +212,7 @@ def _fmt_minutes(value: float | None) -> str:
 def render(lines: list[EfLine], current: State, week: str | None = None) -> list[str]:
     """The block the coach reads, at the review or on request."""
     shown = [line for line in lines if week is None or iso_week(line.date) == week]
+    scale = rulebook.current().scales.morning_trace
     out = [text.TITLE.format(phase=text.PHASES[current.phase])]
     if current.withdrawal_until is not None:
         out.append(text.WITHDRAWAL.format(until=current.withdrawal_until))
@@ -221,7 +221,7 @@ def render(lines: list[EfLine], current: State, week: str | None = None) -> list
         agreement = "" if gap is None else text.GAP.format(
             gap=gap, agreement=text.AGREEMENT if line.agrees else text.DISAGREEMENT)
         trace = (text.TRACE_UNKNOWN if line.next_trace is None
-                 else text.TRACE.format(trace=text.TRACES.get(line.next_trace, line.next_trace)))
+                 else text.TRACE.format(trace=scale.said(line.next_trace)))
         group = text.IN_GROUP if line.group else ""
         detail = (text.DETAIL_RUN.format(coach=line.coach_minutes,
                                          actual=_fmt_minutes(line.actual_minutes),

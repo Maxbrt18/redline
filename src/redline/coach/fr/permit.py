@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-TRACE_NEXT_DAY = "trace nette le lendemain"
+TRACE_NEXT_DAY = "trace au-dessus de la base le lendemain"
 OVER_ENVELOPE = "au-delà de l'enveloppe ({cap} min)"
 TOO_FAST = "trop rapide (FC moyenne {hr_avg} > {hr_cap})"
 HIGH_LIFE_LOAD = "charge de vie élevée déclarée le {day:%d/%m}"
@@ -19,8 +19,6 @@ PHASES = {
     "granted": "permis",
     "refused": "conduite accompagnée (obtention refusée)",
 }
-#: The next-morning trace, by its value on the scale.
-TRACES = {0: "aucune", 0.5: "très légère", 1: "légère", 2: "nette"}
 
 TITLE = "Permis EF : {phase}."
 WITHDRAWAL = "Retrait actif jusqu'au {until:%d/%m}."

@@ -47,6 +47,11 @@ aliases: [anamnèse, onboarding athlète, athlete-onboarding]
 
 ## 8. 🔴 Auto-évaluation — le biais
 - « Quand tu dis 2/10, c'est plutôt 1 ou plutôt 3 ? »
+- Ses échelles, telles qu'il les vit : à l'effort, que veut dire chaque chiffre, où il
+  s'arrête (le plafond), où le mal est déjà fait ? Au réveil, quels mots, et lequel est
+  son matin habituel (la base) ? → `[scales]` de `rulebook.toml`, rôles `cap`/`severe` et
+  `below_base`/`base`/`above_base`. Sans table à lui, l'échelle générique 0-10 du moteur
+  (Silbernagel & Crossley 2015 : 0-2 sûr, 2-5 acceptable, au-delà de 5 risque élevé).
 - Historique de minimisation (a-t-il déjà forcé en se voilant la face ?)
 - Ce qui le pousse à forcer (motivation, chrono, reconnaissance)
 

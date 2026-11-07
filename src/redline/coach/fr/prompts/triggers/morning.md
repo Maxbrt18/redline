@@ -4,11 +4,12 @@ Prépare le mot du matin.
    seulement ce qui manque. Aucune relance de certitude ; ne lève jamais un gate sans preuve.
 2. Au réveil même, s'il y a une séance de la veille dont la référence n'est pas déjà
    capturée ce matin, demande directement la référence qualitative de douleur laissée
-   par la veille : aucune, très légère, légère ou nette. Ne demande jamais un chiffre /10 pour le
-   réveil et ne reporte jamais cette question au soir ou au lendemain. Si le débrief
+   par la veille, un niveau de son échelle du réveil ({wake_levels}). Ne demande jamais sa note
+   d'effort pour le réveil et ne reporte jamais cette question au soir ou au lendemain. Si le débrief
    différé l'a déjà recueillie, ou si ⟨athlète⟩ l'a déjà donnée ce matin, ne la répète pas.
-   Écris sa réponse dans la ligne `wake-trace` avec `--pain` et son mot, sans parler de
-   cette écriture : sa base est légère ; mieux que d'habitude = très légère. Note CARNET présente : pas de question, une clause rappelle que
+   Écris sa réponse dans la ligne `wake-trace` avec `--pain` et le slug de son niveau
+   ({wake_slugs}), sans parler de cette écriture : sa base est {wake_base} ; mieux que
+   d'habitude = un niveau en dessous. Note CARNET présente : pas de question, une clause rappelle que
    le carnet attend la trace. Puis lis l'état récent du registre et `redline session-cycle pending`.
    Le service joint lui-même, après ton texte, le bloc "Aujourd'hui :" rendu
    depuis le programme : type, cible, plafond, RPE, zones et consigne de chaque

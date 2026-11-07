@@ -177,13 +177,13 @@ def test_deferred_debrief_is_about_the_morning_after():
 
 
 def test_morning_collects_the_previous_day_wake_reference_immediately():
-    morning = PROACTIVE_TRIGGERS["morning"]
+    morning = _flat(prompts.build_proactive_prompt("morning", ""))
     assert "Au réveil même" in morning
-    assert "aucune, très légère, légère ou nette" in morning
-    assert "Ne demande jamais un chiffre /10 pour le" in morning
-    assert "réveil et ne reporte jamais" in morning
+    assert "(aucune, très légère, légère, nette)" in morning
+    assert "sa base est légère" in morning and "`very-light`" in morning
+    assert "Ne demande jamais sa note d'effort pour le réveil et ne reporte jamais" in morning
     assert "ne reporte jamais cette question au soir ou au lendemain" in morning
-    assert "`--pain` et son mot" in morning
+    assert "`--pain` et le slug de son niveau" in morning
 
 
 def test_morning_checks_plan_threads_and_upcoming_dates():
@@ -293,18 +293,18 @@ def test_the_rating_scales_ride_with_the_levels_where_numbers_are_given():
     pointer = prompts.pain_scale_pointer()
     for level in ("N1", "N2"):
         assert pointer in DEPTH_NOTES[level]
-    # The cap is the rulebook's, not a number written in the text.
+    # The cap and the morning levels are the rulebook's, not words written in the text.
     assert "plafond douleur d'effort = 2," in pointer
-    assert "pas de note /10" in pointer
+    assert "Réveil : aucune, très légère, légère, nette (base légère), jamais la marche" in _flat(pointer)
     assert "séance entière" in pointer
 
 
 def test_the_morning_debrief_never_asks_for_a_mark_out_of_ten():
     """The morning-after wake reading is "completely different and hard to rate". The
     trigger carries the wording, not only the prohibition."""
-    differs = PROACTIVE_TRIGGERS["strava_debrief_late"]
-    assert "NE DEMANDE PAS UNE NOTE SUR 10" in differs
-    assert "(aucune, très légère, légère, nette)" in _flat(differs)
+    differs = _flat(prompts.build_proactive_prompt("strava_debrief_late", ""))
+    assert "NE DEMANDE PAS SA NOTE D'EFFORT" in differs
+    assert "(aucune, très légère, légère, nette)" in differs
 
 
 def test_the_two_examples_differ_only_by_naming_the_machinery():

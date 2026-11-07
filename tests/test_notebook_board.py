@@ -230,12 +230,26 @@ def test_a_quiet_gut_asks_neither_which_trouble_nor_when(store):
     assert measures["gut_onset_min"]["state"] == "not_applicable"
 
 
-def test_a_net_wake_trace_alerts_the_coach_with_the_session_condition(store):
+def test_a_wake_trace_above_the_base_alerts_the_coach_with_the_session_condition(store):
     """The condition lives in the session, the alert triggers it."""
     seed_week(store)
     morning = dt.datetime(2026, 10, 7, 8, 0, tzinfo=PARIS)
     alert = board(store, morning).answer("wake:2026-10-07:knee", "clear")["alert"]
-    assert "trace nette" in alert and "condition écrite dans la séance" in alert
+    assert "« nette »" in alert and "au-dessus de la base" in alert
+    assert "condition écrite dans la séance" in alert
+
+
+def test_a_wake_trace_at_the_base_does_not_alert(store):
+    seed_week(store)
+    morning = dt.datetime(2026, 10, 7, 8, 0, tzinfo=PARIS)
+    assert board(store, morning).answer("wake:2026-10-07:knee", "light") == {"alert": None}
+
+
+def test_a_wake_trace_off_the_declared_scale_is_refused_with_its_levels(store):
+    seed_week(store)
+    morning = dt.datetime(2026, 10, 7, 8, 0, tzinfo=PARIS)
+    with pytest.raises(AnswerError, match="aucune, très légère, légère, nette"):
+        board(store, morning).answer("wake:2026-10-07:knee", "2")
 
 
 def test_a_very_light_wake_trace_is_half_a_point(store):
@@ -251,6 +265,7 @@ def test_the_morning_trace_is_asked_in_the_morning_only_and_in_its_own_words(sto
     morning = dt.datetime(2026, 10, 7, 8, 0, tzinfo=PARIS)
     [wake] = [ask for ask in board(store, morning).asks() if ask["type"] == "wake"]
     assert (wake["id"], wake["after_effort"]) == ("wake:2026-10-07:knee", True)
+    assert [level["slug"] for level in wake["levels"]] == ["none", "very-light", "light", "clear"]
     afternoon = dt.datetime(2026, 10, 7, 15, 0, tzinfo=PARIS)
     assert not [ask for ask in board(store, afternoon).asks() if ask["type"] == "wake"]
     with pytest.raises(AnswerError):
@@ -380,7 +395,7 @@ def test_routes_serve_the_three_screens_and_hand_a_crossing_to_the_coach(
                        headers={"Origin": "https://evil.test"}).status_code == 403
     response = client.post("/notebook-api/answer", json={"ask": ask["id"] + ":pain:knee", "value": 3})
     assert response.json == {"status": "ok", "alert": True}
-    assert bot.inbound and "3/10" in bot.inbound[0][1]
+    assert bot.inbound and "douleur 3 au pic" in bot.inbound[0][1]
     again = client.post("/notebook-api/answer", json={"ask": ask["id"] + ":pain:knee", "value": 1})
     assert again.status_code == 409
     calm = client.post("/notebook-api/answer", json={"ask": ask["id"] + ":rpe", "value": 2})

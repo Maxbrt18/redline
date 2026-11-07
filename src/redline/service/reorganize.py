@@ -50,12 +50,12 @@ class Computation:
 
 
 def pain_signal(store, today: dt.date) -> bool:
-    """An effort pain above the rulebook's cap (rule n3) in the last 7 days."""
+    """An effort pain above the cap of the effort-pain scale (rule n3) in the last 7 days."""
     from redline.analysis import decision_state, ledger
     from redline.model import ledger as ledger_model
-    cap = rulebook.current().parameters.pain_cap
+    effort = rulebook.current().scales.effort_pain
     since = today - dt.timedelta(days=decision_state.PAIN_WINDOW_DAYS)
-    return any(value > cap for row in ledger.parse_ledger(store)
+    return any(effort.above_cap(value) for row in ledger.parse_ledger(store)
                if since < row.date <= today and row.type in ledger_model.EFFORT_TYPES
                for value in row.pains.values())
 

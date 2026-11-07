@@ -15,6 +15,10 @@ It is the SINGLE SOURCE of the thresholds the code applies (`redline ledger`,
 `redline feasibility`, `transitions.py`) and of the transition kinds a program may
 carry. A threshold cited in a rule's text (`{pain_cap}`) is rendered from the same value:
 what the coach reads is what the code applies.
+
+It also declares the instance's pain scales (`[scales]`, `redline.model.pain_scales`):
+the rules compare a pain with the roles of its own scale, never with a number of the
+engine's.
 """
 
 from __future__ import annotations
@@ -31,6 +35,8 @@ from redline.coach.fr import rulebook as text
 
 from . import paths
 from .errors import ConfigError
+from .pain_scales import SCALES_SCHEMA, PainScales
+from .pain_scales import build as build_scales
 from .schema import Schema, SchemaError, field
 
 FILENAME = "rulebook.toml"
@@ -46,9 +52,9 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
     field("parameters", dict, schema=Schema("[parameters]", [
         field("transition_lookback_days", int, minimum=7, maximum=90),
         field("transitions_per_week", int, minimum=0, maximum=7),
-        field("gate_effort_peak", float, minimum=0, maximum=10),
+        field("gate_effort_peak", float, minimum=0, maximum=10,
+              note="on the effort-pain scale, at or below its cap"),
         field("gate_trend_weeks", int, minimum=1, maximum=8),
-        field("pain_cap", int, minimum=0, maximum=10),
         field("hard_min_hours", float, minimum=0.25, maximum=6),
         field("taper_weeks", int, minimum=1, maximum=6),
         field("stall_weeks", int, minimum=1, maximum=12),
@@ -81,10 +87,9 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
               note="ISO weekdays the long run stays on unless the athlete pins it elsewhere"),
         # Optional: absent, rules n3 and n4 stay with the coach alone. Present, the
         # engine refuses the revisions that break their verifiable part.
-        field("persistent_wake_min", float, required=False, minimum=0.5, maximum=10,
-              note="wake trace at or above which a morning counts towards persistence"),
         field("persistent_wake_mornings", int, required=False, minimum=2, maximum=7,
-              note="consecutive mornings at that level: pain persisting beyond 48 h"),
+              note="consecutive mornings at the base of the morning-trace scale or above: "
+                   "pain persisting beyond 48 h"),
         field("pain_no_quality_days", int, required=False, minimum=1, maximum=42,
               note="days without quality from the morning persistence is established"),
         field("pain_cut_pct", int, required=False, minimum=0, maximum=100,
@@ -94,6 +99,7 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
         field("alarm_no_quality_days", int, required=False, minimum=1, maximum=14,
               note="days without quality after poor nights or a high easy-run HR"),
     ])),
+    field("scales", dict, schema=SCALES_SCHEMA),
     field("transitions", list, minimum=1, maximum=12, item=field(
         "transition", dict, schema=Schema("[[transitions]]", [
             field("slug", str, pattern=SLUG),
@@ -123,7 +129,6 @@ class Parameters:
     transitions_per_week: int
     gate_effort_peak: float
     gate_trend_weeks: int
-    pain_cap: int
     hard_min_hours: float
     taper_weeks: int
     stall_weeks: int
@@ -138,7 +143,6 @@ class Parameters:
     sessions_per_day: int = 2
     reorganize_load_margin_pct: int | None = None
     long_run_weekdays: tuple[int, ...] = ()
-    persistent_wake_min: float | None = None
     persistent_wake_mornings: int | None = None
     pain_no_quality_days: int | None = None
     pain_cut_pct: int | None = None
@@ -183,6 +187,7 @@ class Rule:
 @dataclass(frozen=True)
 class Rulebook:
     parameters: Parameters
+    scales: PainScales
     transitions: tuple[TransitionKind, ...]
     rules: tuple[Rule, ...]
     source: Path
@@ -206,12 +211,20 @@ class Rulebook:
                 return kind.label
         return slug
 
+    def spoken(self) -> dict[str, str]:
+        """Every value a rule's text or a reading note may cite, as the coach says it."""
+        return _spoken(self.parameters, self.scales)
+
     def render(self) -> str:
         """The block injected to the coach: the rule in force, never its history."""
         lines = [text.BLOCK_OPEN]
         lines.extend("- " + rule.line() for rule in self.rules)
         lines.append(text.BLOCK_CLOSE)
         return "\n".join(lines)
+
+
+def _spoken(parameters: Parameters, scales: PainScales) -> dict[str, str]:
+    return {**parameters.spoken(), **scales.spoken()}
 
 
 def _duplicates(values: list[str]) -> list[str]:
@@ -233,9 +246,13 @@ def parse(text: str, source: Path) -> Rulebook:
         "long_run_weekdays": tuple(raw.get("long_run_weekdays") or ()),
         "wake_trace_until": dt.time.fromisoformat(raw["wake_trace_until"]),
         **{name: float(raw[name])
-           for name in ("gate_effort_peak", "hard_min_hours", "stall_tolerance_km",
-                        "persistent_wake_min") if name in raw}})
+           for name in ("gate_effort_peak", "hard_min_hours", "stall_tolerance_km")
+           if name in raw}})
+    scales = build_scales(payload["scales"])
     problems = []
+    if parameters.gate_effort_peak > scales.effort_pain.cap:
+        problems.append(f"parameters.gate_effort_peak {parameters.gate_effort_peak:g} is above "
+                        f"the effort-pain cap {scales.effort_pain.cap:g}")
     for what, values in (("transition", [entry["slug"] for entry in payload["transitions"]]),
                          ("rule", [entry["id"] for entry in payload["rules"]])):
         if doubled := _duplicates(values):
@@ -244,7 +261,7 @@ def parse(text: str, source: Path) -> Rulebook:
     if missing := [rule for rule in ENFORCED if rule not in ids]:
         problems.append("rule enforced by the engine missing from the rulebook: "
                         + ", ".join(missing))
-    spoken = parameters.spoken()
+    spoken = _spoken(parameters, scales)
     rules = []
     for entry in payload["rules"]:
         cited = {name for label in ("text", "enforced_by")
@@ -258,6 +275,7 @@ def parse(text: str, source: Path) -> Rulebook:
         raise RulebookError("\n  - ".join([f"{source} :", *problems]))
     return Rulebook(
         parameters=parameters,
+        scales=scales,
         transitions=tuple(TransitionKind(**entry) for entry in payload["transitions"]),
         rules=tuple(rules),
         source=source,

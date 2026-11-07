@@ -12,7 +12,7 @@ import json
 from dataclasses import dataclass
 
 from redline.coach.fr import initiatives, session_labels
-from redline.model import ledger, session_kinds
+from redline.model import ledger, rulebook, session_kinds
 
 
 @dataclass(frozen=True)
@@ -107,13 +107,12 @@ def missing_cells_in_notebook(detail: str) -> ClosedProactive | None:
         markers, notebook=True)
 
 
-#: Re-exported: the question tracked after the wake-trace reminder.
-WAKE_QUESTION = initiatives.WAKE_QUESTION
-
-
 def _wake_trace(detail: str) -> ClosedProactive:
-    """The mid-morning reminder; the notebook takes the answer in one tap."""
-    return ClosedProactive(initiatives.wake_trace(), question=WAKE_QUESTION, notebook=True)
+    """The mid-morning reminder; the notebook takes the answer in one tap. The question
+    names the levels of the instance's morning-trace scale."""
+    levels = [level.label for level in rulebook.current().scales.morning_trace.levels]
+    question = initiatives.wake_question(levels)
+    return ClosedProactive(initiatives.wake_trace(question), question=question, notebook=True)
 
 
 def _missed_session(detail: str) -> ClosedProactive:

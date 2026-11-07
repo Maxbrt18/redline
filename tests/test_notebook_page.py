@@ -9,10 +9,12 @@ from notebook_payloads import (
     DETAIL,
     ENTRY,
     INJURY,
+    PAIN_VALUES,
     RACE,
     RACE_PLAN_VIEW,
     STRENGTH,
     TODAY,
+    TRACE_LEVELS,
     WEEK,
     WEEKS,
     ef,
@@ -328,7 +330,7 @@ def test_the_morning_comes_first_and_a_high_heart_rate_asks_why(browser):
     """Before noon, the morning check-in comes before the session; a high HR asks its question."""
     morning = {**TODAY, 'asks': [
         {'id': 'wake:2026-10-09:injury', 'type': 'wake', 'zone': 'knee', 'label': 'Genou',
-         'date': '2026-10-09', 'after_effort': False},
+         'date': '2026-10-09', 'after_effort': False, 'levels': TRACE_LEVELS},
         {'id': 'daily:2026-10-09', 'type': 'daily', 'date': '2026-10-09', 'fields': ['sleep', 'life_load']},
         {'id': 'hr:2026-10-07', 'type': 'hr', 'date': '2026-10-07', 'hr': 157, 'reference': 151,
          'n': 5, 'pace_s': 406}]}
@@ -853,7 +855,7 @@ def test_the_red_point_moves_from_the_run_to_the_strength_once_done(browser):
     after = {**TODAY, 'sessions': [done, STRENGTH], 'asks': [
         {'id': 'cell:obs', 'type': 'cells', 'date': '2026-10-09', 'kind': 'easy', 'km': 8.35,
          'fields': ['pain:knee', 'rpe', 'enjoyment'], 'labels': {'pain:knee': 'Genou'},
-         'total': 3, 'duration_min': 48}]}
+         'total': 3, 'duration_min': 48, 'pain_values': PAIN_VALUES}]}
     tab = browser.new_page(viewport={'width': 393, 'height': 852})
     answers = []
     serve(tab, answers)
@@ -915,7 +917,8 @@ def test_two_watched_zones_get_two_tiles_and_two_morning_traces(browser):
         {'zone': 'talon', 'label': 'Talon', 'weeks': weeks},
         {'zone': 'cheville', 'label': 'Cheville', 'weeks': weeks}]},
         'asks': [{'id': f'wake:2026-10-09:{zone}', 'type': 'wake', 'zone': zone,
-                  'label': label, 'date': '2026-10-09', 'after_effort': False}
+                  'label': label, 'date': '2026-10-09', 'after_effort': False,
+                  'levels': TRACE_LEVELS}
                  for zone, label in (('talon', 'Talon'), ('cheville', 'Cheville'))]}
     zones = [{'zone': 'talon', 'label': 'Talon'}, {'zone': 'cheville', 'label': 'Cheville'}]
     screens = {zone: {**INJURY, 'zone': zone, 'label': label, 'zones': zones}

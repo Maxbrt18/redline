@@ -261,8 +261,8 @@ SESSION_CYCLE_POINTER = agent_cli(note("session-cycle"))
 
 
 def pain_scale_pointer() -> str:
-    """The pain scale, at the cap the rulebook applies."""
-    return fill(note("pain-scale"), **rulebook.current().parameters.spoken())
+    """The pain scales the rulebook declares: the effort cap and the morning levels."""
+    return fill(note("pain-scale"), **rulebook.current().spoken())
 
 
 class _DepthNotes(Mapping[str, str]):
@@ -313,13 +313,19 @@ def debrief_in_reply(detail: str, *, notebook: bool) -> str:
 
     Two messages (the reply, then the debrief) would repeat each other.
     """
-    instructions = PROACTIVE_TRIGGERS["strava_debrief"].replace("{detail}", detail)
+    instructions = _with_scales(PROACTIVE_TRIGGERS["strava_debrief"].replace("{detail}", detail))
     return agent_cli(fill(prompt("debrief-in-reply"), detail=detail, instructions=instructions,
                           notebook=NOTEBOOK_NOTE + "\n" if notebook else ""))
 
 
+def _with_scales(text: str) -> str:
+    """`text` with the pain scales of the rulebook in force: it is reread without restart,
+    so a trigger is filled when it is built, never at import."""
+    return fill(text, **rulebook.current().spoken())
+
+
 def build_proactive_prompt(kind: str, detail: str) -> str:
-    instructions = PROACTIVE_TRIGGERS[kind].replace("{detail}", detail)
+    instructions = _with_scales(PROACTIVE_TRIGGERS[kind].replace("{detail}", detail))
     if kind == "weekly":
         ending = note("ending-weekly")
     elif kind in MUST_SPEAK_KINDS:

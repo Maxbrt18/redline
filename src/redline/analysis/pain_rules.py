@@ -4,8 +4,8 @@ The two rules used to be applied by the model alone. Their triggers are facts th
 ledger already holds, so the engine computes them and refuses a revision that ignores
 them (`weekly_plan.pain_rule_errors`):
 
-- n3: a zone's wake trace at or above `persistent_wake_min` on
-  `persistent_wake_mornings` consecutive mornings is pain persisting beyond 48 h. From
+- n3: a zone's wake trace at the base of the instance's morning-trace scale or above, on
+  `persistent_wake_mornings` consecutive mornings, is pain persisting beyond 48 h. From
   that morning, no quality session for `pain_no_quality_days` days, and a week planned
   before that morning targets `pain_cut_pct` % less volume.
 - n4: `poor_nights_streak` consecutive poor nights, or an easy run whose HR at pace is
@@ -18,6 +18,9 @@ an assimilation week is shaped.
 
 A morning that was not read breaks a run: persistence is established by readings,
 never assumed across a gap.
+
+Every comparison goes through the instance's scales (`rulebook.toml`, `[scales]`): a
+morning is read against the role `base`, an effort against the role `cap`.
 """
 
 from __future__ import annotations
@@ -28,15 +31,13 @@ from statistics import mean
 
 from redline.model import ledger as table
 from redline.model import rulebook, session_kinds
+from redline.model.pain_scales import LOWEST, EffortPainScale, MorningTraceScale
 from redline.model.vocabulary import Sleep
 from redline.model.weekly_plan import QualityHold, VolumeCeiling
 
 from .ledger import Row
 
 TREND_DAYS = 14
-#: Half the smallest step of the morning scale (0, 0.5, 1, 2): a smaller move between
-#: two halves of the window is noise of the averaging, not a direction.
-TREND_STEP = 0.25
 #: Above this many episodes, a share of pain settled within 48 h can be read.
 FALSIFY_MIN_EPISODES = 5
 #: "Almost always": at or above this share, the n3 cap is too sensitive.
@@ -52,15 +53,18 @@ class WakeTrend:
     readings: tuple[tuple[dt.date, float], ...]
     earlier: float | None
     recent: float | None
+    #: Half the smallest step of the morning scale: a smaller move between the two
+    #: halves of the window is noise of the averaging, not a direction.
+    noise: float
 
     @property
     def direction(self) -> str | None:
         """rising, falling or stable; None when one half has no reading."""
         if self.earlier is None or self.recent is None:
             return None
-        if self.recent - self.earlier > TREND_STEP:
+        if self.recent - self.earlier > self.noise:
             return "rising"
-        if self.earlier - self.recent > TREND_STEP:
+        if self.earlier - self.recent > self.noise:
             return "falling"
         return "stable"
 
@@ -82,12 +86,13 @@ def wake_trend(rows: list[Row], zone: str, today: dt.date,
     recent = [value for day, value in readings if day >= middle]
     return WakeTrend(zone, days, readings,
                      round(mean(earlier), 2) if earlier else None,
-                     round(mean(recent), 2) if recent else None)
+                     round(mean(recent), 2) if recent else None,
+                     rulebook.current().scales.morning_trace.smallest_step / 2)
 
 
 @dataclass(frozen=True)
 class Persistence:
-    """A run of mornings at or above the persistence level, long enough to count."""
+    """A run of mornings at the base or above, long enough to count."""
 
     zone: str
     mornings: tuple[tuple[dt.date, float], ...]
@@ -100,18 +105,20 @@ class Persistence:
         return f"observation: wake-trace {self.zone} persistent ({days}) (rule n3)"
 
 
-def persistences(rows: list[Row], zone: str, minimum: float,
+def persistences(rows: list[Row], zone: str, trace: MorningTraceScale,
                  mornings: int) -> list[Persistence]:
-    """Every run of `mornings` consecutive mornings at or above `minimum`."""
+    """Every run of `mornings` consecutive mornings at the base of `trace` or above."""
     found: list[Persistence] = []
     run: list[tuple[dt.date, float]] = []
-    for day, value in [*_wakes(rows, zone), (dt.date.max, -1.0)]:
-        if value >= minimum and run and (day - run[-1][0]).days == 1:
+    # The sentinel lies below every level (`pain_scales.LOWEST`): it closes the last run.
+    for day, value in [*_wakes(rows, zone), (dt.date.max, LOWEST - 1.0)]:
+        counts = trace.reaches_base(value)
+        if counts and run and (day - run[-1][0]).days == 1:
             run.append((day, value))
             continue
         if len(run) >= mornings:
             found.append(Persistence(zone, tuple(run), run[mornings - 1][0]))
-        run = [(day, value)] if value >= minimum else []
+        run = [(day, value)] if counts else []
     return found
 
 
@@ -132,22 +139,24 @@ class Settling:
         return len(self.settled) / read >= FALSIFY_SETTLED_SHARE
 
 
-def settling(rows: list[Row], zone: str, cap: float, minimum: float) -> Settling:
-    """For each effort above `cap`: did a morning within 48 h fall below `minimum`?
+def settling(rows: list[Row], zone: str, effort: EffortPainScale,
+             trace: MorningTraceScale) -> Settling:
+    """For each effort above the cap of `effort`: did a morning within 48 h fall below the
+    base of `trace`?
 
-    The two mornings after the effort are read; one below the persistence level means the
-    pain settled. Both at or above it, the pain persisted. No reading, the episode is
+    The two mornings after the effort are read; one below the base means the pain
+    settled. Both at the base or above, the pain persisted. No reading, the episode is
     counted apart: an unread morning is not a settled one.
     """
     wakes = dict(_wakes(rows, zone))
     settled, persisted, unread = [], [], []
     for row in sorted(rows, key=lambda r: r.date):
         pain = row.pain_at(zone)
-        if row.type not in table.EFFORT_TYPES or pain is None or pain <= cap:
+        if row.type not in table.EFFORT_TYPES or pain is None or not effort.above_cap(pain):
             continue
         after = [wakes[day] for offset in (1, 2)
                  if (day := row.date + dt.timedelta(days=offset)) in wakes]
-        if any(value < minimum for value in after):
+        if any(trace.below_base(value) for value in after):
             settled.append(row.date)
         elif len(after) == 2:
             persisted.append(row.date)
@@ -176,12 +185,13 @@ def holds(rows: list[Row], daily: list[dict], zones: list[str],
     """The windows, still open on `today`, in which rules n3 and n4 remove quality."""
     from redline.analysis import signals  # signals imports the ledger: deferred import
 
-    parameters = rulebook.current().parameters
+    book = rulebook.current()
+    parameters = book.parameters
     found = []
-    minimum, mornings = parameters.persistent_wake_min, parameters.persistent_wake_mornings
-    if minimum is not None and mornings is not None and parameters.pain_no_quality_days:
+    mornings = parameters.persistent_wake_mornings
+    if mornings is not None and parameters.pain_no_quality_days:
         for zone in zones:
-            for persistence in persistences(rows, zone, minimum, mornings):
+            for persistence in persistences(rows, zone, book.scales.morning_trace, mornings):
                 found.append(QualityHold("n3", persistence.established,
                                          persistence.established + dt.timedelta(
                                              days=parameters.pain_no_quality_days - 1),
@@ -211,15 +221,16 @@ def volume_ceilings(rows: list[Row], zones: list[str], week: str,
     on. A week first planned after that morning has no reference, and its volume is the
     coach's return steps.
     """
-    parameters = rulebook.current().parameters
-    minimum, mornings = parameters.persistent_wake_min, parameters.persistent_wake_mornings
+    book = rulebook.current()
+    parameters = book.parameters
+    mornings = parameters.persistent_wake_mornings
     cut, span = parameters.pain_cut_pct, parameters.pain_no_quality_days
-    if minimum is None or mornings is None or cut is None or not span:
+    if mornings is None or cut is None or not span:
         return []
     sunday = dt.date.fromisocalendar(int(week[:4]), int(week[-2:]), 7)
     found = []
     for zone in zones:
-        for persistence in persistences(rows, zone, minimum, mornings):
+        for persistence in persistences(rows, zone, book.scales.morning_trace, mornings):
             if sunday < persistence.established or not (persistence.established <= today
                     < persistence.established + dt.timedelta(days=span)):
                 continue
