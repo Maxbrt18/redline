@@ -622,7 +622,6 @@ class SessionView(TypedDict):
     fact: DetailFact
     plan: DetailPlan | None
     ask: DetailAsk | None
-    reserve_ask: str | None
     wake: WakeTrace
     phases: list[Phase] | None
     reps: list[Rep] | None

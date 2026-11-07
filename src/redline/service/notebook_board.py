@@ -491,7 +491,12 @@ class Board:
                 continue
             fields = [f"pain:{zone}" for zone in labels
                       if ledger_model.pain_column(zone) in missing]
-            fields += [column for column in ("rpe", "enjoyment") if column in missing]
+            # A quality session's reserve (guardrail 6) is asked next to its effort: a rise
+            # of its dose needs both.
+            quality = row["kind"] in session_kinds.RUN and self._fulfils_quality(row)
+            reserve = quality and _known(row, "reps_in_reserve") is None
+            fields += [column for column in ("rpe", "reserve", "enjoyment")
+                       if column in missing or (column == "reserve" and reserve)]
             fields += [metric for metric in ledger_model.FUELLING_METRICS if metric in missing]
             if fields:
                 measurements = row.get("measurements") or {}
@@ -503,7 +508,7 @@ class Board:
                              "date": day.isoformat(), "kind": row["kind"],
                              "km": _known(row, "distance_km"), "fields": fields,
                              "labels": {f"pain:{zone}": label for zone, label in labels.items()},
-                             "total": len(labels) + 2 + len(fuelled),
+                             "total": len(labels) + 2 + quality + len(fuelled),
                              "duration_min": round(seconds / 60) if seconds else None,
                              "pain_values": _pain_values()})
         daily = self.daily(self.today)
@@ -558,8 +563,6 @@ class Board:
 
     def answer(self, ask_id: str, value: Any) -> dict:
         """Write ONE answer if the request is still open. Return the alert, if any."""
-        if ask_id.startswith("reserve:"):
-            return self._answer_reserve(ask_id, value)
         ask = next((item for item in self.asks()
                     if ask_id == item["id"] or ask_id.startswith(item["id"] + ":")), None)
         if ask is None:
@@ -619,6 +622,12 @@ class Board:
         if metric in ledger_model.FUELLING_METRICS:
             opened = self._answer_fuel(observation_id, metric, value)
             number = 0.0
+        elif metric == "reserve":
+            # One whole repetition left at the same effort, or none: guardrail 6 asks no more.
+            if isinstance(value, bool) or value not in (0, 1):
+                raise AnswerError(notebook_text.UNEXPECTED_ANSWER)
+            self.ops.complete_measurement(observation_id, "reps_in_reserve", value, actor=ACTOR)
+            opened, number = False, 0.0
         else:
             opened = False
             number = _scale(metric, value)
@@ -663,6 +672,14 @@ class Board:
     def _observation(self, observation_id: str) -> dict | None:
         return next((row for row in self.observations if str(row["id"]) == observation_id), None)
 
+    def _fulfils_quality(self, observation: dict) -> bool:
+        """Whether the observation fulfilled a quality session; an unlinked one reads no plan."""
+        links = self.ops.week_session_links(week_label(observation["occurred_on"]))
+        if not any(str(link.get("observation_id")) == str(observation["id"])
+                   for link in links.values()):
+            return False
+        return debrief.is_quality(self._linked_session(observation))
+
     def _linked_session(self, observation: dict) -> dict | None:
         """The program session the observation fulfilled, if any."""
         week = self.week(week_label(observation["occurred_on"]))
@@ -671,24 +688,6 @@ class Board:
         if not session_id or not week.revision:
             return None
         return next((s for s in week.revision["sessions"] if s["id"] == session_id), None)
-
-    def reserve_ask(self, observation: dict, session: dict | None) -> str | None:
-        """A quality session's reserve (guardrail 6) is asked while the session is fresh."""
-        if not debrief.is_quality(session) or _known(observation, "reps_in_reserve") is not None:
-            return None
-        if self.today - observation["occurred_on"] >= ledger_model.COMPLETION_WINDOW:
-            return None
-        return f"reserve:{observation['id']}"
-
-    def _answer_reserve(self, ask_id: str, value: Any) -> dict:
-        observation = self._observation(ask_id.split(":", 1)[1])
-        if observation is None or self.reserve_ask(
-                observation, self._linked_session(observation)) != ask_id:
-            raise AnswerError(notebook_text.QUESTION_CLOSED)
-        if isinstance(value, bool) or value not in (0, 1):
-            raise AnswerError(notebook_text.UNEXPECTED_ANSWER)
-        self.ops.complete_measurement(observation["id"], "reps_in_reserve", value, actor=ACTOR)
-        return {"alert": None}
 
     def _previous(self, observation: dict) -> views.Previous | None:
         """The last session of the same type before this one, for comparison."""
@@ -805,7 +804,6 @@ class Board:
                 "id": ask["id"], "fields": ask["fields"], "labels": ask["labels"],
                 "total": ask["total"], "duration_min": ask["duration_min"],
                 "pain_values": ask["pain_values"]},
-            "reserve_ask": self.reserve_ask(observation, session),
             "wake": self._wake(day),
             "phases": reading["phases"] if reading else None,
             "reps": reading["reps"] if reading else None,

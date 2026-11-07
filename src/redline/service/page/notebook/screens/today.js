@@ -95,6 +95,8 @@ const dailyChoices = {
 const hrChoices = [['sleep', 'Nuit courte'], ['cold', 'Début de rhume'], ['heat', 'Chaleur ou terrain'], ['none', 'Rien de spécial']];
 export const fieldSpec = {
   rpe: {label: 'RPE, séance entière', name: 'le RPE', values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]},
+  reserve: {label: 'À la fin, il t’en restait une ?', name: 'la réserve', hint: 'une répétition entière, au même effort',
+    options: [[1, 'Oui, une entière'], [0, 'Non, j’étais au bout']]},
   enjoyment: {label: 'Plaisir', name: 'le plaisir', values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]},
   carbs_g_h: {label: 'Glucides pris, par heure', name: 'les glucides', values: [0, 20, 30, 40, 50, 60, 70, 80, 90], unit: ' g'},
   fuel_formats: {label: 'Sous quelle forme ?', name: 'la forme', many: true,
@@ -191,6 +193,7 @@ export function cellsCard(ask, target, write = answer) {
   const metric = ask.fields[0], spec = specOf(metric, ask), label = el('span', spec.label);
   if (metric === 'rpe' && target && target.rpe_max != null) label.append(el('small', 'visé ' + rpeRange(target)));
   if (metric === 'carbs_g_h' && target && target.carbs_target_g_h != null) label.append(el('small', 'visé ' + target.carbs_target_g_h + ' g/h'));
+  if (spec.hint) label.append(el('small', spec.hint));
   const total = ask.total;
   const head = add(el('p', null, 'n-check-head'), label, el('span', (total - ask.fields.length + 1) + ' sur ' + total, 'n-of'));
   const key = ask.id + ':' + metric;

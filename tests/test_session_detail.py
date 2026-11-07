@@ -197,14 +197,14 @@ def test_a_threshold_detail_reads_its_reps_and_asks_for_the_reserve_once(store):
     assert [rep["n"] for rep in view["reps"]] == [1, 2, 3, 4]
     assert view["km"] is None and view["zones"]["seconds"][3] > 0
     assert view["week"]["km_target"] == 48.0 and view["week"]["current"]
-    ask = view["reserve_ask"]
-    assert ask == f"reserve:{observation_id}"
+    assert view["ask"]["fields"].index("reserve") == view["ask"]["fields"].index("rpe") + 1
+    ask = f"{view['ask']['id']}:reserve"
     with pytest.raises(AnswerError):
         board.answer(ask, 2)
-    assert board.answer(ask, 1) == {"alert": None}
+    assert board.answer(ask, 1)["alert"] is None
     again = Board(store, Repo(store), ENGINE_ROOT, when.date(), when)
     view = again.session_view(str(observation_id), store.strava_detail(observation_id))
-    assert view["fact"]["reserve"] == 1 and view["reserve_ask"] is None
+    assert view["fact"]["reserve"] == 1 and "reserve" not in view["ask"]["fields"]
     with pytest.raises(AnswerError):
         again.answer(ask, 0)
 
@@ -215,7 +215,7 @@ def test_the_reserve_is_not_asked_once_the_session_is_old(store):
     later = dt.datetime(2026, 10, 29, 9, 0, tzinfo=PARIS)
     board = Board(store, Repo(store), ENGINE_ROOT, later.date(), later)
     view = board.session_view(str(observation_id), store.strava_detail(observation_id))
-    assert view["reserve_ask"] is None and view["series"] is None
+    assert view["ask"] is None and view["series"] is None
 
 
 @pytestmark_db
@@ -247,5 +247,6 @@ def test_the_route_serves_the_detail_and_refuses_what_is_not_an_identifier(
     # The streams fetched on first display are kept: the second one does not ask for them again.
     monkeypatch.setattr(session_detail, "fetch_streams", lambda _: pytest.fail("fetched twice"))
     assert client.get(f"/notebook-api/session/{observation_id}").status_code == 200
-    answer = client.post("/notebook-api/answer", json={"ask": view["reserve_ask"], "value": 0})
+    answer = client.post("/notebook-api/answer",
+                         json={"ask": f"{view['ask']['id']}:reserve", "value": 0})
     assert answer.json == {"status": "ok", "alert": False}

@@ -1,4 +1,4 @@
-import {add, button, el} from '../../shared/dom.js';
+import {add, el} from '../../shared/dom.js';
 import {chevron, content, hero, kindIcon, message, pastille, sessionLimits, shape, SVG} from '../ui.js';
 import {api} from '../api.js';
 import {dm, fmt, kindName, paceOf, weekNumber} from '../format.js';
@@ -297,13 +297,9 @@ function sdReserve(data) {
   if (data.fact.reserve != null) {
     return sdReadRow('ask', data.fact.reserve > 0 ? 'Une répétition en réserve' : 'Pas de réserve', data.fact.reserve > 0 ? 'il t’en restait une à la fin' : 'tu étais au bout');
   }
-  if (!data.reserve_ask) return sdReadRow('ask', 'Réserve non déclarée', null, 'pend');
-  const card = add(el('div', null, 'n-dread-row ask'), add(el('span', null, 'n-dask'), sdIcon('ask'),
-    add(el('span'), el('b', 'À la fin, il t’en restait une ?'), ' Une répétition entière, au même effort.')));
-  const row = el('div', null, 'n-chips n-dchoice');
-  row.style.setProperty('--cols', '2');
-  [[1, 'Oui, une entière'], [0, 'Non, j’étais au bout']].forEach(([value, text]) => row.append(button(text, node => sdAnswer(data.reserve_ask, value, card, node), '')));
-  return add(card, row);
+  // The question itself belongs to the debrief, next to the effort.
+  const asked = data.ask && data.ask.fields.includes('reserve');
+  return sdReadRow('ask', 'Réserve non déclarée', asked ? 'demandée au débrief' : null, 'pend');
 }
 function sdQualityRead(data) {
   const read = el('div', null, 'n-dread'), target = (data.plan || {}).targets || {}, rpe = data.fact.rpe;
