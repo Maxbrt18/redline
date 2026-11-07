@@ -71,22 +71,6 @@ class Exposure(StrEnum):
     OTHER = "other"
 
 
-class MorningTrace(StrEnum):
-    """What a session left the next morning, in the athlete's own scale."""
-
-    NONE = "none"
-    VERY_LIGHT = "very-light"
-    LIGHT = "light"
-    CLEAR = "clear"
-
-
-#: The pain value each morning trace is recorded as.
-MORNING_TRACE_PAIN: dict[str, float] = {
-    MorningTrace.NONE: 0, MorningTrace.VERY_LIGHT: 0.5, MorningTrace.LIGHT: 1,
-    MorningTrace.CLEAR: 2,
-}
-
-
 class CapabilityStatus(StrEnum):
     """A capability's light (`capability_evaluations.status`)."""
 

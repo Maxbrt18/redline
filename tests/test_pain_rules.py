@@ -12,6 +12,9 @@ from redline.model import rulebook, session_kinds, weekly_plan
 from redline.service import plan_revision
 
 MONDAY = dt.date(2026, 10, 5)
+#: The fixture's own scales: base light (1), cap 2.
+SCALES = rulebook.current().scales
+TRACE, EFFORT = SCALES.morning_trace, SCALES.effort_pain
 
 
 def wakes(*values, start=MONDAY):
@@ -49,8 +52,8 @@ def test_the_trend_reads_one_zone_only():
 
 # ------------------------------------------------------------------ persistence
 
-def test_three_mornings_at_light_or_above_establish_persistence_on_the_third():
-    found = pain_rules.persistences(wakes(0, 1, 1, 2, 1, 0), ZONE, 1.0, 3)
+def test_three_mornings_at_the_base_or_above_establish_persistence_on_the_third():
+    found = pain_rules.persistences(wakes(0, 1, 1, 2, 1, 0), ZONE, TRACE, 3)
     assert len(found) == 1
     assert found[0].established == day(3)
     assert [value for _, value in found[0].mornings] == [1, 1, 2, 1]
@@ -58,9 +61,9 @@ def test_three_mornings_at_light_or_above_establish_persistence_on_the_third():
                                "2026-10-07 1, 2026-10-08 2, 2026-10-09 1) (rule n3)")
 
 
-def test_an_unread_morning_or_a_very_light_one_breaks_the_run():
-    assert pain_rules.persistences(wakes(1, 1, None, 1, 1), ZONE, 1.0, 3) == []
-    assert pain_rules.persistences(wakes(1, 0.5, 1, 1), ZONE, 1.0, 3) == []
+def test_an_unread_morning_or_one_below_the_base_breaks_the_run():
+    assert pain_rules.persistences(wakes(1, 1, None, 1, 1), ZONE, TRACE, 3) == []
+    assert pain_rules.persistences(wakes(1, 0.5, 1, 1), ZONE, TRACE, 3) == []
 
 
 # ------------------------------------------------------------------ falsification
@@ -70,7 +73,7 @@ def test_settling_counts_what_followed_each_effort_above_the_cap():
             Row(day(4), "easy", pains=zoned(2.5)), *wakes(1, 1, start=day(5)),
             Row(day(8), "easy", pains=zoned(3.0)),
             Row(day(9), "easy", pains=zoned(2.0))]
-    after = pain_rules.settling(rows, ZONE, 2, 1.0)
+    after = pain_rules.settling(rows, ZONE, EFFORT, TRACE)
     assert after.settled == (day(0),)
     assert after.persisted == (day(4),)
     assert after.unread == (day(8),)
@@ -82,9 +85,9 @@ def test_pain_that_almost_always_settles_says_the_cap_is_too_sensitive():
     for week in range(6):
         effort = day(7 * week)
         rows += [Row(effort, "easy", pains=zoned(3.0)), *wakes(0.5, start=effort + dt.timedelta(days=1))]
-    assert pain_rules.settling(rows, ZONE, 2, 1.0).too_sensitive is True
+    assert pain_rules.settling(rows, ZONE, EFFORT, TRACE).too_sensitive is True
     rows += [Row(day(50), "easy", pains=zoned(3.0)), *wakes(1, 1, start=day(51))]
-    assert pain_rules.settling(rows, ZONE, 2, 1.0).too_sensitive is False
+    assert pain_rules.settling(rows, ZONE, EFFORT, TRACE).too_sensitive is False
 
 
 # ------------------------------------------------------------------ holds
@@ -120,7 +123,7 @@ def test_an_easy_run_with_a_high_hr_at_pace_holds_quality():
 def test_without_their_thresholds_the_rules_stay_with_the_coach(monkeypatch):
     book = rulebook.current()
     bare = replace(book, parameters=replace(
-        book.parameters, persistent_wake_min=None, alarm_no_quality_days=None))
+        book.parameters, persistent_wake_mornings=None, alarm_no_quality_days=None))
     monkeypatch.setattr(pain_rules.rulebook, "current", lambda: bare)
     assert pain_rules.holds(wakes(1, 1, 1), daily("poor", "poor", "poor"), [ZONE],
                             day(2)) == []

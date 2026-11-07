@@ -44,7 +44,7 @@ def test_net_trace_envelope_and_heart_rate_trigger_withdrawal():
         [_ef(tue, 45), _ef(thu, 62, hr=161)],
         {tue + dt.timedelta(days=1): 2}, {"w40-mar-ef": 55, "w40-jeu-ef": 55}, {},
         today=thu + dt.timedelta(days=1), hr_cap=HR_CAP)
-    assert lines[0].triggers == ["trace nette le lendemain"]
+    assert lines[0].triggers == ["trace au-dessus de la base le lendemain"]
     assert len(lines[1].triggers) == 2
     current = permit.state(lines, [], today=thu + dt.timedelta(days=1), period=PERIOD)
     assert current.phase == "withdrawn"

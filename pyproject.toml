@@ -96,9 +96,9 @@ ignore_names = [
     # Named carrier of each rule of the compiled rulebook (CLAUDE.md, "a general rule
     # names its carrier"): data, not a call.
     "enforced_by",
-    # Rulebook thresholds only a rule's text cites (`{pain_cap}`), read by
+    # Rulebook thresholds only a rule's text cites (`{gate_trend_weeks}`), read by
     # `Parameters.spoken`: the code applies none, the coach does.
-    "gate_trend_weeks", "pain_cap",
+    "gate_trend_weeks",
     # Flask setting read by Werkzeug.
     "max_content_length",
     # `Activity` fields only `summary()` reads, through `dataclasses.fields`.

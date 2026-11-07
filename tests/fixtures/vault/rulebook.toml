@@ -1,0 +1,209 @@
+# The rulebook of the fictional test instance: the engine default, with Sam's own pain
+# scales and the gate threshold read on them.
+
+# ------------------------------------------------------------------ applied thresholds
+
+[parameters]
+# Rule n8: a transition is a session whose KIND has been absent for this many days.
+# It is also the window of the longest recent outing, the reference for a long-run step.
+transition_lookback_days = 30
+# Rule n8: at most this many transitions per week, checked when the program is written.
+transitions_per_week = 1
+# The gate: an easy increase may be added if each zone's weekly effort peak stays at or
+# below this level of the effort-pain scale (at most its cap)...
+gate_effort_peak = 1.5
+# ... over this many weeks without an increase.
+gate_trend_weeks = 2
+# Rule n7: a session at least this long (in hours) counts as a hard day.
+hard_min_hours = 1.25
+# The taper covers the last N weeks, race week included. A typed race may set its own
+# (`taper_weeks` in its context): this is the length when it does not.
+taper_weeks = 3
+# A longest outing with no new record over this many CLOSED weeks opens the protocol that
+# investigates drops.
+stall_weeks = 3
+# Below this gap (km), two outings are "the same" longest one: GPS noise.
+stall_tolerance_km = 0.1
+# The waking trace is collected in the morning: after this local time the logbook stops
+# asking for it and the reminder is no longer sent.
+wake_trace_until = "14:00"
+# Rule n2: the planned assimilation weeks (ISO weeks). Nothing new is placed in them.
+assimilation_weeks = []
+# Rule f1: no fuelling target above this ceiling (g/h): no gain is shown beyond it.
+carbs_cap_g_h = 90
+# Rule f1: above this target (g/h), the session names a glucose-fructose mix.
+carbs_mix_above_g_h = 60
+# The taper's mean weekly running volume drops by at least this much (%) from the weeks
+# before it, unless the race sets its own band ...
+taper_cut_min_pct = 41
+# ... and by at most this much: the band where a meta-analysis finds the benefit.
+taper_cut_max_pct = 60
+# A reorganised week puts at most this many runs, and this many sessions (runs and
+# strength together), on one day.
+runs_per_day = 1
+sessions_per_day = 2
+# A reorganised week whose load over 3 days exceeds the plan's own peak by more than this
+# (%) says so: it stays possible, it is ranked after.
+reorganize_load_margin_pct = 25
+# The long run stays on these ISO weekdays (6 = Saturday, 7 = Sunday) unless the athlete
+# pins it elsewhere.
+long_run_weekdays = [6, 7]
+# Rule n3: a wake trace at the base of the morning-trace scale or above, on this many
+# consecutive mornings, is pain persisting beyond 48 h.
+persistent_wake_mornings = 3
+# Rule n3: from that morning, no quality session for this many days ...
+pain_no_quality_days = 14
+# ... and a week planned before it targets at least this much less volume (%).
+pain_cut_pct = 30
+# Rule n4: this many consecutive poor nights remove quality ...
+poor_nights_streak = 3
+# ... as an abnormally high easy-run HR does, for this many days.
+alarm_no_quality_days = 7
+
+# ------------------------------------------------------------------ pain scales
+
+# Sam rates pain on a table of their own, not on the generic default.
+[scales.morning_trace]
+levels = [
+  { slug = "none", value = 0, label = "aucune", role = "below_base" },
+  { slug = "very-light", value = 0.5, label = "très légère", role = "below_base" },
+  { slug = "light", value = 1, label = "légère", role = "base" },
+  { slug = "clear", value = 2, label = "nette", role = "above_base" },
+]
+
+[scales.effort_pain]
+step = 0.5
+levels = [
+  { value = 0, label = "Rien." },
+  { value = 1, label = "Présente, pas gênante." },
+  { value = 2, label = "Le doute s’installe : plafond.", role = "cap" },
+  { value = 3, label = "Trop : la charge est à revoir.", role = "severe" },
+  { value = 10, label = "Insupportable." },
+]
+
+# ------------------------------------------------------------------ transitions
+
+# The session KINDS a transition may carry. The slug is what the program records; the
+# label, what the logbook and the review display. `race_first`: a first time the race
+# requires before the taper (the backward solver places it). `quality`: the session is
+# debriefed as a quality session, repetition by repetition.
+[[transitions]]
+slug = "quality"
+label = "1re qualité"
+quality = true
+
+[[transitions]]
+slug = "descent"
+label = "1er bloc descente"
+
+[[transitions]]
+slug = "night"
+label = "1re nocturne"
+
+[[transitions]]
+slug = "terrain"
+label = "terrain neuf"
+
+[[transitions]]
+slug = "reconnaissance"
+label = "reconnaissance du tracé"
+race_first = true
+
+# ------------------------------------------------------------------ rules
+
+# One line per rule, injected to the coach every turn: short, without history. `text` may
+# cite a threshold in braces (`{pain_cap}`): the applied value and the value told to the
+# coach are thus the same. `owner` names the vault file holding the reasoning;
+# `enforced_by`, what applies the rule.
+#
+# Rules n2, n3, n4, n7, n8, po and s9 are enforced by the engine: they are mandatory.
+# When the engine holds only part of a rule, `enforced_by` names that part and leaves
+# the rest, by name, to the coach.
+
+[[rules]]
+id = "n1"
+title = "Qualité"
+text = "une par semaine au plus, introduite seulement porte ouverte. Zéro VMA."
+grade = "règle de coaching"
+owner = "coaching/current-plan.md"
+enforced_by = "le coach"
+
+[[rules]]
+id = "n2"
+title = "Assimilation"
+text = "-25 à -30 % toutes les 3-4 semaines, fréquence gardée ; on n'y ajoute rien."
+grade = "règle de coaching"
+owner = "coaching/current-plan.md"
+enforced_by = "le coach ; redline feasibility (semaines d'assimilation)"
+
+[[rules]]
+id = "n3"
+title = "Douleur"
+text = "plafond {pain_cap}/10 à l'effort, zone par zone ; au-dessus ou foulée modifiée : arrêt. Persistante > 48 h : -30 %, puis paliers 50/70/85 % et 2 semaines sans qualité."
+grade = "règle de coaching"
+owner = "coaching/current-plan.md"
+enforced_by = "code : trace au réveil persistante → qualité refusée {pain_no_quality_days} j, semaine déjà prévue -{pain_cut_pct} % (redline week-plan revise). Coach : arrêt en séance, foulée modifiée, paliers 50/70/85 %"
+
+[[rules]]
+id = "n4"
+title = "Sommeil et FC"
+text = "2-3 mauvaises nuits consécutives ou FC anormalement haute en footing : qualité supprimée, semaine traitée en assimilation."
+grade = "règle de coaching"
+owner = "coaching/current-plan.md"
+enforced_by = "code : {poor_nights_streak} mauvaises nuits de suite ou FC à allure haute → qualité refusée {alarm_no_quality_days} j (redline week-plan revise). Coach : 2 nuits, volume d'assimilation"
+
+[[rules]]
+id = "n5"
+title = "Pas de rattrapage"
+text = "une séance manquée ne se rattrape jamais."
+grade = "règle de coaching"
+owner = "coaching/philosophy.md"
+enforced_by = "le coach"
+
+[[rules]]
+id = "n6"
+title = "Dernier intervalle"
+text = "une qualité finit dans sa bande RPE, une répétition en réserve ; un all-in final la rate. Allures comparées au sein de la séance seulement."
+grade = "règle de coaching"
+owner = "coaching/current-plan.md"
+enforced_by = "le coach"
+
+[[rules]]
+id = "n7"
+title = "Espacement"
+text = "jamais deux jours exigeants consécutifs (qualité, sortie longue, EF > {hard_min_hours} h). Une semaine à contrainte se réduit, elle ne se condense pas."
+grade = "règle de coaching"
+owner = "coaching/current-plan.md"
+enforced_by = "redline week-plan revise (champ demanding)"
+
+[[rules]]
+id = "n8"
+title = "Transition"
+text = "séance dont la nature sort des {transition_lookback_days} derniers jours (1re qualité, 1er bloc descente, terrain neuf). {transitions_per_week} par semaine au plus, sous-dosée, plafond écrit avant."
+grade = "pari"
+owner = "coaching/current-plan.md"
+enforced_by = "redline week-plan revise (champ transition) ; redline feasibility (à rebours)"
+
+[[rules]]
+id = "po"
+title = "Porte"
+text = "une hausse facile (palier de SL sans pourcentage fixe, EF allongée, sortie de plus) s'ajoute si le pic d'effort hebdo reste au plus {gate_effort_peak}/10 sans hausse sur {gate_trend_weeks} semaines, réveils à la base ; elles se cumulent. Case rouge : semaine suivante figée ; deux : un cran en arrière."
+grade = "règle de coaching"
+owner = "coaching/current-plan.md § La porte"
+enforced_by = "le coach ; écart aux 30 jours affiché par redline week-plan et redline ledger"
+
+[[rules]]
+id = "s9"
+title = "Arrivée à vide"
+text = "plus longue sortie sans nouveau record sur {stall_weeks} semaines closes : le protocole d'instruction des baisses s'ouvre, sans attendre le jalon daté."
+grade = "règle de coaching"
+owner = "athlete/goals.md"
+enforced_by = "redline ledger --week (bloc Trajectoire)"
+
+[[rules]]
+id = "f1"
+title = "Carburant"
+text = "cible au plus {carbs_cap_g_h} g/h ; au-delà de {carbs_mix_above_g_h} g/h, mélange glucose-fructose nommé sur la séance. Jamais de cible de boisson en mL/h."
+grade = "consensus (Plews et al. ; Martinez et al. pour l'entraînement digestif)"
+owner = "coaching/current-plan.md"
+enforced_by = "redline week-plan revise (champs carbs_target_g_h et carbs_mix)"

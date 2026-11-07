@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from redline.model.notebook_views import ScaleStep
-
 #: The answers to the question asked after a high heart rate at a comparable pace.
 HR_REASONS = {"sleep": "nuit courte", "cold": "début de rhume",
               "heat": "chaleur ou terrain", "none": "rien de spécial"}
@@ -16,13 +14,6 @@ PLAN_MESSAGES = {
              "le programme avant la prochaine séance.",
     "AWAITING": "Une question t’attend dans Messenger avant une séance.",
 }
-
-#: Shown beside the pain points so a figure can be read back.
-PAIN_SCALE: list[ScaleStep] = [
-    {"value": 1, "text": "La tension est là, pas gênante."},
-    {"value": 2, "text": "Tu commences à douter, tu changerais ta foulée ; le lendemain, conséquences légères."},
-    {"value": 3, "text": "« J’en ai fait trop » : 1 à 2 semaines de charge à revoir."},
-]
 
 CARBS = "glucides {grams} g/h"
 #: How a named sugar mix reads after the target.
@@ -43,10 +34,11 @@ WAKE_TRACE_NOTE = "trace au réveil déclarée dans le carnet"
 ALERT_HR = ("Carnet : FC haute à allure comparable le {day:%d/%m} ({hr} contre {reference}), "
             "sans explication de sommeil, de maladie ni de chaleur.")
 
-ALERT_WAKE_TRACE = ("Carnet : trace nette au réveil ce matin{where} ({today:%d/%m}). La "
+ALERT_WAKE_TRACE = ("Carnet : trace au réveil « {level} » ce matin{where} ({today:%d/%m}), "
+                    "au-dessus de la base. La "
                     "condition écrite dans la séance du jour s'applique.")
 
-ALERT_PAIN = ("Carnet : douleur {value:g}/10 au pic{where} sur la séance {kind} du {day:%d/%m}, "
+ALERT_PAIN = ("Carnet : douleur {value:g} au pic{where} sur la séance {kind} du {day:%d/%m}, "
               "au-dessus du plafond de {cap:g}.")
 
 ZONE = " ({label})"
@@ -56,7 +48,9 @@ NUMBER_EXPECTED = "Valeur numérique attendue."
 
 OUT_OF_SCALE = "Valeur attendue entre 0 et 10."
 
-HALF_POINTS = "Douleur au demi-point près."
+PAIN_OUT_OF_SCALE = "Douleur attendue entre {lowest:g} et {highest:g}."
+
+PAIN_STEP = "Douleur par pas de {step:g}."
 
 INTEGER_EXPECTED = "Valeur entière attendue."
 
@@ -64,7 +58,7 @@ QUESTION_CLOSED = "Cette question est déjà close. Actualise le carnet."
 
 UNEXPECTED_ANSWER = "Réponse inattendue. Actualise le carnet."
 
-TRACE_EXPECTED = "Trace attendue : aucune, très légère, légère ou nette."
+TRACE_EXPECTED = "Trace attendue : {levels}."
 
 ALREADY_FILLED = "Cette mesure est déjà renseignée. Actualise le carnet."
 

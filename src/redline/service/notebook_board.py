@@ -28,13 +28,12 @@ from redline.coach import dates
 from redline.coach.fr import notebook as notebook_text
 from redline.coach.fr import session_labels
 from redline.coach.fr import weather as weather_labels
-from redline.coach.fr.notebook import HR_REASONS, PAIN_SCALE
+from redline.coach.fr.notebook import HR_REASONS
 from redline.model import (
     debrief,
     local_time,
     program,
     rulebook,
-    session_cycle,
     session_kinds,
     transitions,
 )
@@ -44,7 +43,7 @@ from redline.model import race as race_model
 from redline.model.activity import Activity
 from redline.model.errors import InputError
 from redline.model.instance import Instance, derived_label
-from redline.model.vocabulary import HrDoubt, HrReason, LifeLoad, MorningTrace, Sleep
+from redline.model.vocabulary import HrDoubt, HrReason, LifeLoad, Sleep
 
 from . import race_plan, session_detail
 from .plans import PlanStatus, blocked_session_ids
@@ -122,21 +121,42 @@ def observation_fact(observation: dict, session: dict | None = None,
     return fact
 
 
+def _pain_values() -> list[float]:
+    """The effort pains the debrief offers: from the scale's lowest level to its severe
+    one, in its step. Above severe, the athlete tells the coach."""
+    effort = rulebook.current().scales.effort_pain
+    count = round((effort.severe - effort.lowest) / effort.step)
+    return [round(effort.lowest + index * effort.step, 2) for index in range(count + 1)]
+
+
+def _trace_levels() -> list[views.TraceLevel]:
+    """The levels of the morning-trace scale, as the wake question offers them."""
+    return [{"slug": level.slug or "", "label": level.label}
+            for level in rulebook.current().scales.morning_trace.levels]
+
+
 #: The notebook's answer when the athlete does not know the sugars they took.
 FUEL_MIX_UNKNOWN = "unknown"
 
 
 def _scale(metric: str, value: Any) -> float:
-    """The athlete's scales: integer RPE and enjoyment, pain in half points."""
+    """The athlete's scales: integer RPE and enjoyment on 0-10, pain on the instance's
+    effort-pain scale (its bounds and its step)."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise AnswerError(notebook_text.NUMBER_EXPECTED)
     number = float(value)
+    if metric == "pain":
+        effort = rulebook.current().scales.effort_pain
+        if not effort.within(number):
+            raise AnswerError(notebook_text.PAIN_OUT_OF_SCALE.format(
+                lowest=effort.lowest, highest=effort.highest))
+        if not effort.on_step(number):
+            raise AnswerError(notebook_text.PAIN_STEP.format(step=effort.step))
+        return number
     if not 0 <= number <= 10:
         raise AnswerError(notebook_text.OUT_OF_SCALE)
-    step = 2 if metric == "pain" else 1
-    if number * step != int(number * step):
-        raise AnswerError(notebook_text.HALF_POINTS if metric == "pain"
-                          else notebook_text.INTEGER_EXPECTED)
+    if number != int(number):
+        raise AnswerError(notebook_text.INTEGER_EXPECTED)
     return number
 
 
@@ -379,7 +399,7 @@ class Board:
         }
 
     def pain(self) -> views.PainTrend:
-        return {"cap": ledger.ESCULIER_CAP, "zones": [
+        return {"cap": rulebook.current().scales.effort_pain.cap, "zones": [
             {"zone": zone.slug, "label": zone.label,
              "weeks": [{"week": item.week, "peak": item.effort.peak}
                        for item in ledger.pain_trend(self.rows, 4, zone.slug)]}
@@ -409,6 +429,7 @@ class Board:
             table.append({"week": label, "peak": max(effort, default=None), "n": len(effort),
                           "wake": max(wake, default=None)})
         column = ledger_model.pain_column(slug)
+        scale = rulebook.current().scales.effort_pain
         missing = sorted({obs["occurred_on"] for obs in self.observations
                           if obs["kind"] == session_kinds.WAKE_TRACE and obs["occurred_on"] <= self.today
                           and self.today - obs["occurred_on"] < dt.timedelta(days=14)
@@ -417,13 +438,13 @@ class Board:
         return {
             "zone": slug, "label": chosen.label,
             "zones": [{"zone": item.slug, "label": item.label} for item in self.zones],
-            "cap": ledger.ESCULIER_CAP, "start": start.isoformat(), "today": self.today.isoformat(),
+            "cap": scale.cap, "start": start.isoformat(), "today": self.today.isoformat(),
             "week": week_label(self.today),
             "points": [{"date": row.date.isoformat(), "pain": row.pains[slug], "kind": row.type,
                         "long": row.type == session_kinds.LONG} for row in efforts],
             "wakes": [{"date": row.date.isoformat(), "pain": row.pains[slug]} for row in wakes],
             "weeks": table, "missing": [day.isoformat() for day in missing],
-            "scale": PAIN_SCALE,
+            "scale": [{"value": level.value, "text": level.label} for level in scale.levels],
         }
 
     def race(self) -> views.Race | None:
@@ -463,7 +484,8 @@ class Board:
                 if day == self.today and self._morning:
                     asks.extend({"id": f"wake-cell:{row['id']}:{zone}", "type": "wake",
                                  "zone": zone, "label": labels.get(zone, zone),
-                                 "date": day.isoformat(), "after_effort": effort_yesterday}
+                                 "date": day.isoformat(), "after_effort": effort_yesterday,
+                                 "levels": _trace_levels()}
                                 for zone in labels
                                 if ledger_model.pain_column(zone) in missing)
                 continue
@@ -482,7 +504,8 @@ class Board:
                              "km": _known(row, "distance_km"), "fields": fields,
                              "labels": {f"pain:{zone}": label for zone, label in labels.items()},
                              "total": len(labels) + 2 + len(fuelled),
-                             "duration_min": round(seconds / 60) if seconds else None})
+                             "duration_min": round(seconds / 60) if seconds else None,
+                             "pain_values": _pain_values()})
         daily = self.daily(self.today)
         missing = [field for field in DAILY_FIELDS if not daily.get(field)]
         if missing and self._morning:
@@ -492,7 +515,8 @@ class Board:
         if not woke_today and self._morning:
             asks[0:0] = [{"id": f"wake:{self.today.isoformat()}:{zone}", "type": "wake",
                           "zone": zone, "label": label, "date": self.today.isoformat(),
-                          "after_effort": effort_yesterday} for zone, label in labels.items()]
+                          "after_effort": effort_yesterday, "levels": _trace_levels()}
+                         for zone, label in labels.items()]
         return asks
 
     def daily(self, day: dt.date) -> dict:
@@ -561,10 +585,13 @@ class Board:
                                                       reference=ask["reference"])
             return {"alert": alert}
         if ask["type"] == "wake":
-            if value not in session_cycle.MORNING_TRACES:
-                raise AnswerError(notebook_text.TRACE_EXPECTED)
+            scale = rulebook.current().scales.morning_trace
+            level = scale.level(value) if isinstance(value, str) else None
+            if level is None:
+                raise AnswerError(notebook_text.TRACE_EXPECTED.format(
+                    levels=", ".join(item.label for item in scale.levels)))
             kind, _, key = ask["id"].partition(":")
-            trace = session_cycle.MORNING_TRACE_VALUES[value]
+            trace = level.value
             if kind == "wake-cell":
                 self.ops.complete_measurement(uuid.UUID(key.rsplit(":", 1)[0]), "pain", trace,
                                               zone=ask["zone"], actor=ACTOR)
@@ -579,9 +606,10 @@ class Board:
                     "pains": {ask["zone"]: {"state": "known", "value": trace}},
                 }, actor=ACTOR)
             alert = None
-            if value == MorningTrace.CLEAR:
+            if scale.above_base(trace):
                 where = notebook_text.ZONE.format(label=ask["label"]) if len(self.zones) > 1 else ""
-                alert = notebook_text.ALERT_WAKE_TRACE.format(where=where, today=self.today)
+                alert = notebook_text.ALERT_WAKE_TRACE.format(level=level.label, where=where,
+                                                              today=self.today)
             return {"alert": alert}
         field = ask_id[len(ask["id"]) + 1:]
         if field not in ask["fields"]:
@@ -597,12 +625,13 @@ class Board:
             self.ops.complete_measurement(observation_id, metric, number, zone=zone or None,
                                           actor=ACTOR)
         alert = None
-        if metric == "pain" and number > ledger.ESCULIER_CAP:
+        effort = rulebook.current().scales.effort_pain
+        if metric == "pain" and effort.above_cap(number):
             day = dt.date.fromisoformat(ask["date"])
             where = (notebook_text.ZONE.format(label=ask["labels"][field])
                      if len(self.zones) > 1 else "")
             alert = notebook_text.ALERT_PAIN.format(value=number, where=where, kind=ask["kind"],
-                                                    day=day, cap=ledger.ESCULIER_CAP)
+                                                    day=day, cap=effort.cap)
         # The run's feelings are complete: its debrief no longer has to wait.
         settled = (self.ops.strava_activity_for_observation(observation_id)
                    if set(ask["fields"]) == {field} and not opened else None)
@@ -774,7 +803,8 @@ class Board:
                 "targets": _targets(session), "note": session.get("note")},
             "ask": None if ask is None else {
                 "id": ask["id"], "fields": ask["fields"], "labels": ask["labels"],
-                "total": ask["total"], "duration_min": ask["duration_min"]},
+                "total": ask["total"], "duration_min": ask["duration_min"],
+                "pain_values": ask["pain_values"]},
             "reserve_ask": self.reserve_ask(observation, session),
             "wake": self._wake(day),
             "phases": reading["phases"] if reading else None,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 
-from redline.coach.dates import listing
+from redline.coach.dates import alternatives, listing
 
 UNTITLED_SESSION = "prévue"
 UNNAMED_GEAR = "Ta paire"
@@ -14,10 +14,11 @@ LAST_SESSION = "Comment tu as vécu ta dernière séance ?"
 CELL_LABELS = {"pain": "ton pic de douleur", "rpe": "ton RPE global", "enjoyment": "ton plaisir"}
 NOTEBOOK_CELL_LABELS = {**CELL_LABELS, "rpe": "ton RPE"}
 
-#: The exact question, a substring of the text: tracked as a question asked, it gives
-#: its meaning to a "légère" typed in the chat.
-WAKE_QUESTION = ("quelle trace de douleur au réveil : aucune, très légère, "
-                 "légère ou nette ?")
+def wake_question(levels: list[str]) -> str:
+    """The exact question, a substring of the text: tracked as a question asked, it gives
+    its meaning to a level named in the chat. `levels`: the labels of the instance's
+    morning-trace scale."""
+    return f"quelle trace de douleur au réveil : {alternatives(levels)} ?"
 
 
 def silence(days: int) -> str:
@@ -39,8 +40,8 @@ def missing_cells_in_notebook(label: str, day: dt.date | None, requested: list[s
     return f"{session} attend encore {listing(requested)} : un tap dans le carnet."
 
 
-def wake_trace() -> str:
-    return f"Ce matin, {WAKE_QUESTION} Un tap dans le carnet, ou réponds-moi ici."
+def wake_trace(question: str) -> str:
+    return f"Ce matin, {question} Un tap dans le carnet, ou réponds-moi ici."
 
 
 def missed_session(title: str) -> str:

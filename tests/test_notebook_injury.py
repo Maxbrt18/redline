@@ -38,4 +38,4 @@ def test_injury_counts_each_calendar_week_even_without_a_note():
     assert view['wakes'] == [{'date': '2026-09-18', 'pain': 1.0}]
     # Only the gaps of the last two weeks, most recent first.
     assert view['missing'] == ['2026-10-07']
-    assert [item['value'] for item in view['scale']] == [1, 2, 3]
+    assert [item['value'] for item in view['scale']] == [0, 1, 2, 3, 10]

@@ -50,9 +50,11 @@ def test_an_edited_rulebook_is_read_again_without_restart(tmp_path):
 
 
 def test_a_cited_threshold_is_the_applied_value_said_in_french():
-    book = rulebook.parse(DEFAULT_TEXT, rulebook.DEFAULT)
+    book = rulebook.current()
     gate = next(rule for rule in book.rules if rule.id == "po")
+    pain = next(rule for rule in book.rules if rule.id == "n3")
     assert "1,5/10" in gate.text and "{" not in book.render()
+    assert pain.text.startswith("plafond 2/10")
 
 
 def test_the_wake_trace_cutoff_is_a_local_time():
@@ -62,7 +64,7 @@ def test_the_wake_trace_cutoff_is_a_local_time():
 
 
 @pytest.mark.parametrize("change, message", [
-    (("pain_cap = 2", "pain_cap = 2\ncap_douleur = 3"), "unknown"),
+    (("gate_effort_peak = 2", "gate_effort_peak = 2\ncap_douleur = 3"), "unknown"),
     (("plafond {pain_cap}/10", "plafond {douleur_max}/10"), "unknown threshold douleur_max"),
     (('id = "n8"', 'id = "n9"'), "missing from the rulebook: n8"),
     (('slug = "terrain"', 'slug = "descent"'), "duplicate transition: descent"),
@@ -75,6 +77,53 @@ def test_a_malformed_rulebook_is_refused_with_its_reason(tmp_path, change, messa
     assert old in DEFAULT_TEXT
     with pytest.raises(rulebook.RulebookError, match=message):
         rulebook.load(_variant(tmp_path, DEFAULT_TEXT.replace(old, new, 1)))
+
+
+BASE_LEVEL = '{ slug = "2", value = 2, label = "2", role = "base" }'
+BELOW_LEVEL = '{ slug = "1", value = 1, label = "1", role = "below_base" }'
+CAP_LEVEL = 'label = "Zone acceptable : jusqu’à 5, calmée le lendemain matin.", role = "cap"'
+SEVERE_LEVEL = 'label = "Au-delà de 5 : zone à risque élevé.", role = "severe"'
+
+
+@pytest.mark.parametrize("change, message", [
+    ((BASE_LEVEL, BASE_LEVEL.replace('"base"', '"below_base"')),
+     "exactly one level has role base"),
+    ((BELOW_LEVEL, BELOW_LEVEL.replace('"below_base"', '"above_base"')), "roles out of order"),
+    ((BELOW_LEVEL, BELOW_LEVEL.replace('"below_base"', '"top"')), "unknown"),
+    ((BELOW_LEVEL, BELOW_LEVEL.replace('value = 1', 'value = 3')), "strictly increase"),
+    ((BELOW_LEVEL, BELOW_LEVEL.replace('slug = "1"', 'slug = "0"')), "duplicate slug 0"),
+    ((SEVERE_LEVEL, SEVERE_LEVEL.replace(', role = "severe"', '')),
+     "exactly one level has role severe"),
+    ((CAP_LEVEL + " },\n  { value = 6, " + SEVERE_LEVEL,
+      CAP_LEVEL.replace('"cap"', '"severe"') + " },\n  { value = 6, "
+      + SEVERE_LEVEL.replace('"severe"', '"cap"')), "roles out of order"),
+    (("step = 1", "step = 0.4"), "not a multiple of step"),
+    (("gate_effort_peak = 2", "gate_effort_peak = 6"), "above the effort-pain cap 5"),
+    (("[scales.effort_pain]", "[scales.effort]"), "unknown"),
+])
+def test_a_pain_scale_without_its_roles_in_order_is_refused(tmp_path, change, message):
+    old, new = change
+    assert old in DEFAULT_TEXT
+    with pytest.raises(rulebook.RulebookError, match=message):
+        rulebook.load(_variant(tmp_path, DEFAULT_TEXT.replace(old, new, 1)))
+
+
+def test_the_default_scales_follow_the_pain_monitoring_zones():
+    """Silbernagel & Crossley 2015: 0-2 safe, 2-5 acceptable, above 5 high risk."""
+    scales = rulebook.parse(DEFAULT_TEXT, rulebook.DEFAULT).scales
+    effort, trace = scales.effort_pain, scales.morning_trace
+    assert (effort.lowest, effort.cap, effort.severe, effort.highest) == (0, 5, 6, 10)
+    assert trace.base.value == 2 and trace.above_base(3) and not trace.above_base(2)
+    assert not effort.above_cap(5) and effort.above_cap(5.5)
+
+
+def test_the_rules_read_a_pain_on_its_own_scale_by_role():
+    """The same morning value is the base on one scale and above it on another."""
+    sam = rulebook.current().scales.morning_trace
+    generic = rulebook.parse(DEFAULT_TEXT, rulebook.DEFAULT).scales.morning_trace
+    assert sam.reaches_base(1) and not generic.reaches_base(1)
+    assert sam.above_base(2) and not generic.above_base(2)
+    assert sam.level("very-light").value == 0.5 and generic.level("very-light") is None
 
 
 def test_the_default_rulebook_declares_every_rule_the_engine_enforces():

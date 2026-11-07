@@ -27,7 +27,7 @@ from redline.coach.fr import ledger as wording
 from redline.model import (
     commands,
     entrypoint,
-    session_cycle,
+    rulebook,
     session_kinds,
 )
 from redline.model import ledger as table
@@ -60,8 +60,8 @@ def morning_trace_errors(raw: dict[str, str], pains: dict[str, str],
 
     Without `--pain` the measurement would silently be born `pending` and the athlete's
     answer would live only in the note, leaving the gate "incomplete" and prompting a
-    follow-up on something already answered. The trace slug is accepted as is and converted here
-    (none 0, very-light 0.5, light 1, clear 2).
+    follow-up on something already answered. The trace is given by the slug of a level of
+    the instance's morning-trace scale (`rulebook.toml`), and recorded as that level's value.
     "?" is refused too: a wake-up check without an answer has no row, and the catch-up
     must not turn answers already given into `unavailable`.
     """
@@ -69,20 +69,21 @@ def morning_trace_errors(raw: dict[str, str], pains: dict[str, str],
         return []
     if not zones:
         return ["wake reading without a monitored zone: there is no trace to record"]
+    scale = rulebook.current().scales.morning_trace
     problems = []
     for zone in zones:
         given = pains.get(zone, "")
         word = unicodedata.normalize("NFKD", given.lower()).encode("ascii", "ignore").decode()
         word = "-".join(word.split())
-        if word in session_cycle.MORNING_TRACE_VALUES:
-            pains[zone] = str(session_cycle.MORNING_TRACE_VALUES[word])
+        if (level := scale.level(word)) is not None:
+            pains[zone] = f"{level.value:g}"
             continue
         if given and given != table.UNKNOWN:
             continue
+        levels = ", ".join(f"{level.slug} ({level.value:g})" for level in scale.levels)
         problems.append(
-            f"wake reading without a trace for {zone}: pass --pain {zone}=none, very-light, "
-            "light or clear (0, 0.5, 1 or 2). If the athlete named no trace, write no row "
-            "and ask for it.")
+            f"wake reading without a trace for {zone}: pass --pain {zone}=<level>, one of "
+            f"{levels}. If the athlete named no trace, write no row and ask for it.")
     return problems
 
 

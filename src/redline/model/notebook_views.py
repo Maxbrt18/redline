@@ -139,6 +139,13 @@ class Race(TypedDict):
     target: NotRequired[str]
 
 
+class TraceLevel(TypedDict):
+    """A level of the instance's morning-trace scale: the answer sent back is its slug."""
+
+    slug: str
+    label: str
+
+
 class WakeAsk(TypedDict):
     id: str
     type: Literal["wake"]
@@ -146,6 +153,7 @@ class WakeAsk(TypedDict):
     label: str
     date: str
     after_effort: bool
+    levels: list[TraceLevel]
 
 
 class CellsAsk(TypedDict):
@@ -160,6 +168,8 @@ class CellsAsk(TypedDict):
     total: int
     #: Bounds the onset of digestive trouble, asked in quarter hours.
     duration_min: int | None
+    #: The effort pains offered, from the scale's lowest level to its severe one.
+    pain_values: list[float]
 
 
 class DailyAsk(TypedDict):
@@ -305,7 +315,9 @@ class InjuryWeek(TypedDict):
 
 
 class ScaleStep(TypedDict):
-    value: int
+    """A labelled level of the instance's effort-pain scale."""
+
+    value: float
     text: str
 
 
@@ -462,6 +474,7 @@ class DetailAsk(TypedDict):
     labels: dict[str, str]
     total: int
     duration_min: int | None
+    pain_values: list[float]
 
 
 class WakeZone(TypedDict):

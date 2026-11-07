@@ -88,14 +88,12 @@ function launcher(strength) {
   }
   return add(el('div'), done, row, list);
 }
-const traces = [['none', 'Aucune'], ['very-light', 'Très légère'], ['light', 'Légère'], ['clear', 'Nette']];
 const dailyChoices = {
   sleep: ['Sommeil', [['good', 'Bon'], ['fair', 'Moyen'], ['poor', 'Mauvais']]],
   life_load: ['Charge de vie', [['light', 'Légère'], ['normal', 'Normale'], ['high', 'Élevée']]]
 };
 const hrChoices = [['sleep', 'Nuit courte'], ['cold', 'Début de rhume'], ['heat', 'Chaleur ou terrain'], ['none', 'Rien de spécial']];
 export const fieldSpec = {
-  pain: {label: 'Douleur, au pic', name: 'la douleur', values: [0, 0.5, 1, 1.5, 2, 2.5, 3]},
   rpe: {label: 'RPE, séance entière', name: 'le RPE', values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]},
   enjoyment: {label: 'Plaisir', name: 'le plaisir', values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]},
   carbs_g_h: {label: 'Glucides pris, par heure', name: 'les glucides', values: [0, 20, 30, 40, 50, 60, 70, 80, 90], unit: ' g'},
@@ -112,11 +110,11 @@ export const fieldSpec = {
 const elapsed = minutes => minutes < 60 ? minutes + ' min' : (minutes / 60 | 0) + ' h' + (minutes % 60 ? ' ' + minutes % 60 : '');
 const onsetValues = minutes => Array.from({length: Math.max(1, Math.ceil((minutes || 60) / 15))},
   (_, index) => [(index + 1) * 15, elapsed((index + 1) * 15)]);
-// `pain:<zone>`: a zone's pain, named by its label.
-export function specOf(field, labels) {
+// `pain:<zone>`: a zone's pain, named by its label, offered on the instance's scale.
+export function specOf(field, ask) {
   if (!field.startsWith('pain:')) return fieldSpec[field];
-  const label = (labels || {})[field] || field.slice(5);
-  return {...fieldSpec.pain, label: 'Douleur ' + label + ', au pic', name: 'la douleur (' + label + ')'};
+  const label = (ask.labels || {})[field] || field.slice(5);
+  return {label: 'Douleur ' + label + ', au pic', name: 'la douleur (' + label + ')', values: ask.pain_values};
 }
 async function answer(ask, value, card, picked) {
   card.querySelectorAll('button').forEach(node => { node.disabled = true; });
@@ -172,7 +170,8 @@ function morning(list) {
   if (!wakes.length && !daily) return null;
   const card = el('div', null, 'n-check');
   // One trace per monitored zone, each with its own gesture.
-  wakes.forEach(wake => card.append(choices('Trace · ' + wake.label, wake.after_effort ? 'après la séance d’hier' : 'sans séance hier', traces, wake.id, card)));
+  wakes.forEach(wake => card.append(choices('Trace · ' + wake.label, wake.after_effort ? 'après la séance d’hier' : 'sans séance hier',
+    wake.levels.map(level => [level.slug, capital(level.label)]), wake.id, card)));
   if (daily) daily.fields.forEach(field => card.append(choices(dailyChoices[field][0], '', dailyChoices[field][1], daily.id + ':' + field, card)));
   card.append(el('p', 'Un geste par ligne. Le coach ne t’écrit que si ça sort de l’ordinaire.', 'n-note'));
   return card;
@@ -189,7 +188,7 @@ function hrCard(ask) {
 // session. `write` sends one answer; the session detail passes its own.
 export function cellsCard(ask, target, write = answer) {
   const card = el('div', null, 'n-check');
-  const metric = ask.fields[0], spec = specOf(metric, ask.labels), label = el('span', spec.label);
+  const metric = ask.fields[0], spec = specOf(metric, ask), label = el('span', spec.label);
   if (metric === 'rpe' && target && target.rpe_max != null) label.append(el('small', 'visé ' + rpeRange(target)));
   if (metric === 'carbs_g_h' && target && target.carbs_target_g_h != null) label.append(el('small', 'visé ' + target.carbs_target_g_h + ' g/h'));
   const total = ask.total;
@@ -200,11 +199,11 @@ export function cellsCard(ask, target, write = answer) {
     ...spec.options.map(([value, text]) => button(text, node => write(key, value, card, node), ''))));
   else add(card, head, chips(metric === 'gut_onset_min' ? onsetValues(ask.duration_min) : spec.values, key, card,
     spec.unit ? value => fmt(value) + spec.unit : undefined, write));
-  const next = ask.fields.slice(1).map(field => specOf(field, ask.labels).name);
+  const next = ask.fields.slice(1).map(field => specOf(field, ask).name);
   const notes = [];
   const listed = next.length > 1 ? next.slice(0, -1).join(', ') + ' et ' + next[next.length - 1] : next[0];
   if (next.length) notes.push('Puis ' + listed + (next.length > 1 ? ', un geste chacun.' : '.'));
-  if (metric.startsWith('pain:')) notes.push('Plus de 3 ? Dis-le au coach dans Messenger.');
+  if (metric.startsWith('pain:')) notes.push('Plus de ' + fmt(spec.values[spec.values.length - 1]) + ' ? Dis-le au coach dans Messenger.');
   if (notes.length) card.append(el('p', notes.join(' '), 'n-note'));
   return card;
 }

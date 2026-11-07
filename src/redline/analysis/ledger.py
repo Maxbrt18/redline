@@ -449,9 +449,6 @@ def eq_hours_per_week(rows: list[Row], instruments: dict[str, Instruments],
 
 # ------------------------------------------------------------------------- the trends
 
-ESCULIER_CAP = 2.0        # coaching/protocols.md § Comment lire la douleur
-
-
 @dataclass
 class PainSeries:
     """One week of readings of the SAME nature. `n` is printed with the peak because
@@ -592,6 +589,7 @@ def esculier_check(rows: list[Row], zone: str,
     session is never judged by an ankle morning.
     """
     past = history if history is not None else rows
+    effort = rulebook.current().scales.effort_pain
     wake = {row.date: value for row in rows
             if row.type == session_kinds.WAKE_TRACE and (value := row.pain_at(zone)) is not None}
     flags = []
@@ -602,9 +600,9 @@ def esculier_check(rows: list[Row], zone: str,
         pain = row.pain_at(zone)
         if row.type not in table.EFFORT_TYPES or pain is None:
             continue
-        if pain > ESCULIER_CAP:
+        if effort.above_cap(pain):
             flags.append(EsculierFlag(row.date, text.ESCULIER_OVER_CAP,
-                                      text.ESCULIER_OVER_CAP_DETAIL.format(type=row.type, pain=pain, esculier_cap=ESCULIER_CAP)))
+                                      text.ESCULIER_OVER_CAP_DETAIL.format(type=row.type, pain=pain, esculier_cap=effort.cap)))
         after = wake.get(row.date + dt.timedelta(days=1))
         if after is None:
             if pain > 0 and row.date >= table.completeness_from():
@@ -673,13 +671,13 @@ def _wake_trend_cases(rows: list[Row], as_of: dt.date, zone: str) -> list[tuple[
         cases.append(("✗" if trend.direction == "rising" else "✓", text.GATE_WAKE_TREND.format(
             days=trend.days, earlier=trend.earlier, recent=trend.recent,
             direction=text.WAKE_DIRECTIONS[trend.direction])))
-    parameters = rulebook.current().parameters
-    if parameters.persistent_wake_min is not None and parameters.persistent_wake_mornings:
+    book = rulebook.current()
+    if book.parameters.persistent_wake_mornings:
         start = as_of - dt.timedelta(days=trend.days - 1)
         cases.extend(("✗", text.GATE_WAKE_PERSISTENT.format(day=persistence.established))
                      for persistence in pain_rules.persistences(
-                         rows, zone, parameters.persistent_wake_min,
-                         parameters.persistent_wake_mornings)
+                         rows, zone, book.scales.morning_trace,
+                         book.parameters.persistent_wake_mornings)
                      if start <= persistence.established <= as_of)
     return cases
 
@@ -694,10 +692,10 @@ def wake_lines(rows: list[Row], zone: str, today: dt.date) -> list[str]:
         earlier="—" if trend.earlier is None else f"{trend.earlier:g}",
         recent="—" if trend.recent is None else f"{trend.recent:g}",
         direction=text.WAKE_DIRECTIONS.get(trend.direction or "", text.WAKE_TREND_NONE))]
-    parameters = rulebook.current().parameters
-    if parameters.persistent_wake_min is None:
+    book = rulebook.current()
+    if book.parameters.persistent_wake_mornings is None:
         return lines
-    after = pain_rules.settling(rows, zone, parameters.pain_cap, parameters.persistent_wake_min)
+    after = pain_rules.settling(rows, zone, book.scales.effort_pain, book.scales.morning_trace)
     lines.append(text.SETTLING.format(settled=len(after.settled),
                                       persisted=len(after.persisted), unread=len(after.unread)))
     if after.too_sensitive:

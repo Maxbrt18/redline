@@ -9,6 +9,11 @@ from __future__ import annotations
 CURRENT_WEEK = "2026-W41"
 PREVIOUS_WEEK = "2026-W40"
 KNEE = {"zone": "knee", "label": "Genou"}
+#: The fixture's morning-trace scale, as the wake question offers it.
+TRACE_LEVELS = [{"slug": "none", "label": "aucune"}, {"slug": "very-light", "label": "très légère"},
+                {"slug": "light", "label": "légère"}, {"slug": "clear", "label": "nette"}]
+#: The fixture's effort pains, from its lowest level to its severe one.
+PAIN_VALUES = [0, 0.5, 1, 1.5, 2, 2.5, 3]
 
 
 def ef(identifier, date, status="planned", fact=None):
@@ -171,6 +176,7 @@ TODAY = {
         "labels": {"pain:knee": "Genou"},
         "total": 3,
         "duration_min": None,
+        "pain_values": PAIN_VALUES,
     }],
     "pain": {"cap": 2.0, "zones": [{**KNEE, "weeks": [
         {"week": PREVIOUS_WEEK, "peak": 1.5},

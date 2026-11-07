@@ -50,3 +50,8 @@ def full_date(day: dt.date) -> str:
 def listing(items: list[str]) -> str:
     """`a`, `a et b`, `a, b et c`."""
     return format_list(items, locale=locale())
+
+
+def alternatives(items: list[str]) -> str:
+    """`a`, `a ou b`, `a, b ou c`."""
+    return format_list(items, style="or", locale=locale())
