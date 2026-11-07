@@ -81,6 +81,42 @@ levels = [
   { value = 10, label = "Insupportable." },
 ]
 
+# ------------------------------------------------------------------ progression
+
+# The strength lineages the progression engine follows: one per exercise sheet
+# (`coaching/exercises/<slug>.md`), its family, and the range and step of each variable.
+# The engine proposes from them; it writes no dose and blocks no write.
+[progression]
+# Rule n1: at most this many rises per group of lineages in one week.
+rises_per_group_week = 1
+# A difficulty (0-10) at or below this lets a hold rise ...
+difficulty_progress_up_to = 5
+# ... and one above this steps the exercise back.
+difficulty_regress_above = 7
+
+[[progression.lineages]]
+slug = "calf-raise-bent"
+family = "strength-reps"
+group = "calves"
+reps = { minimum = 12, maximum = 15, step = 1 }
+load_kg = { minimum = 6, maximum = 16, step = 2 }
+
+[[progression.lineages]]
+slug = "calf-raise-straight"
+family = "strength-reps"
+group = "calves"
+reps = { minimum = 18, maximum = 25, step = 1 }
+
+[[progression.lineages]]
+slug = "single-leg-stance"
+family = "strength-time"
+seconds = { minimum = 15, maximum = 45, step = 5 }
+
+[[progression.lineages]]
+slug = "plyometrics"
+family = "strength-contacts"
+contacts = { minimum = 20, maximum = 80, step = 10 }
+
 # ------------------------------------------------------------------ transitions
 
 # The session KINDS a transition may carry. The slug is what the program records; the
