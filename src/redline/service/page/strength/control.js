@@ -81,6 +81,24 @@ function forwardLabel(index) {
   return `${unit(measure)} ${next.n}${next.s ? ' · ' + SIDES[next.s] : ''}`;
 }
 
+/* A reps set is validated by what was done: each count of the prescribed range is a
+ * forward action that banks it, and none is pressed in advance -- a count offered
+ * ahead of time would pass the progression's criterion without a measure. The
+ * destination stays named under the counts. */
+function countChoice(index, progress, counts) {
+  const box = el('div', null, 'p-reps');
+  box.appendChild(el('p', 'Combien de répétitions ?', 'p-reps__ask'));
+  const grid = el('div', null, 'p-reps__counts');
+  grid.setAttribute('role', 'group');
+  grid.setAttribute('aria-label', 'Répétitions réalisées');
+  for (const count of counts) grid.appendChild(button(String(count), () => validateSlot(count), 'p-chip p-num'));
+  box.appendChild(grid);
+  const next = forwardLabel(index);
+  box.appendChild(el('p', next.startsWith('Puis') ? next
+    : next === 'Terminer' ? 'Puis la fin de la séance' : `Puis : ${next.toLowerCase()}`, 'p-reps__next'));
+  return box;
+}
+
 export function bigFigure(value, unit, dim) {
   const node = el('p', null, `p-figure${dim ? ' p-figure--muted' : ''} p-num`);
   node.id = 'figure';
@@ -273,6 +291,28 @@ export function control(index) {
     input.addEventListener('input', () => { progress.draft = input.value; save(); });
     box.appendChild(input);
     actions.appendChild(forward(() => (input.value === '' ? null : input.value)));
+  } else if (mode === 'reps' && dose.counts) {
+    box.appendChild(el('p', dose.text, 'p-ctrl__value'));
+    box.appendChild(countChoice(index, progress, dose.counts));
+    if (progress.otherReps) {
+      const input = el('input', null, 'p-input p-num');
+      input.type = 'number';
+      input.inputMode = 'numeric';
+      input.min = '0';
+      input.placeholder = 'répétitions';
+      input.id = 'reps-other';
+      input.setAttribute('aria-label', 'Répétitions réalisées');
+      input.value = progress.draft || '';
+      input.addEventListener('input', () => { progress.draft = input.value; save(); });
+      box.appendChild(input);
+      actions.appendChild(forward(() => (input.value === '' ? null : input.value)));
+    } else {
+      const low = dose.counts[0], high = dose.counts[dose.counts.length - 1];
+      actions.appendChild(btn(low === high ? 'Autre nombre' : `Moins de ${low}, ou plus de ${high}`, () => {
+        progress.otherReps = true;
+        save(); renderSession();
+      }, 'p-btn--quiet'));
+    }
   } else {
     box.appendChild(el('p', dose.text, 'p-ctrl__value'));
     actions.appendChild(forward(() => null));

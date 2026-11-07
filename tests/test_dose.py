@@ -106,6 +106,14 @@ def test_the_payload_carries_the_walked_out_slots_and_the_rendered_label():
     }
 
 
+@pytest.mark.parametrize("reps,counts", [([12, 15], [12, 13, 14, 15]), (8, [8])])
+def test_a_reps_dose_hands_the_page_every_count_of_its_range(reps, counts):
+    """The count of each set is what lets a load rise: the page offers the prescribed
+    range as answers and computes none of it."""
+    payload = dose(measure="reps", sets=2, reps=reps, side="each").payload()
+    assert payload["counts"] == counts
+
+
 def test_contacts_are_walked_one_block_at_a_time():
     """The prescription is "40 contacts, en blocs de 10, 30 s entre blocs", and
     its whole mechanism is the INTERVAL: bone mechanosensitivity collapses after

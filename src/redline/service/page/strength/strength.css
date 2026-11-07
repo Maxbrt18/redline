@@ -144,6 +144,15 @@
   font-weight: 500;
 }
 
+/* The counts of a reps set: one tap banks the set. Wide ranges wrap to a second row
+ * rather than shrink a target under the thumb. */
+.p-reps { margin-top: 14px; }
+.p-reps__ask { font-size: 15px; font-weight: 600; }
+.p-reps__counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(56px, 1fr)); gap: 6px; margin-top: 10px; }
+.p-chip { min-height: 56px; padding: 0; background: var(--panel); font-size: 22px; font-weight: 700; }
+.p-chip:active { background: var(--tartan); color: var(--on-track); }
+.p-reps__next { margin-top: 8px; font-size: 14px; color: var(--muted); }
+
 .p-count { display: inline-flex; align-items: center; gap: 14px; margin-top: 8px; }
 .p-count .p-btn { flex: 0 0 auto; min-width: 62px; text-align: center; }
 

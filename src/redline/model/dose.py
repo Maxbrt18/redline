@@ -222,11 +222,15 @@ class Dose:
         every one of them existed only so the page could rebuild `slots`, which it
         is now handed. What is left is what is actually displayed (`text`, and the
         per-slot `t`), what paces the session (`rest_s`), and `measure` -- which
-        selects the control, not the structure.
+        selects the control, not the structure. `counts` are the answers a reps set
+        offers, the prescribed range in full: the page counts with one tap and
+        builds nothing.
         """
         data: dict = {"measure": self.measure, "text": self.human(), "slots": self.slots}
         if self.measure == "reps":
-            data["current_text"] = text.REPETITIONS.format(human=_required(self.reps, self.measure, "reps").human())
+            reps = _required(self.reps, self.measure, "reps")
+            data["current_text"] = text.REPETITIONS.format(human=reps.human())
+            data["counts"] = list(range(reps.low, reps.target + 1))
         elif self.measure == "time":
             data["current_text"] = _duration(_required(self.seconds, self.measure, "seconds"))
         elif self.measure == "contacts":

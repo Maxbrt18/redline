@@ -29,6 +29,7 @@ export function validateSlot(value) {
   // one starts from zero.
   progress.count = 0;
   progress.otherCount = false;
+  progress.otherReps = false;
   stopTimer();
   save();
 
