@@ -612,7 +612,7 @@ def test_leaving_a_started_session_asks_and_loses_nothing(browser):
     guided(tab)
     tab.get_by_role('button', name='Séance guidée').click()
     tab.wait_for_selector('.p-step--live')
-    tab.locator('.p-ctrl .p-btn--wide').first.click()    # Step-up done: calf in progress
+    tab.locator('.p-ctrl .p-chip').last.click()    # Step-up done: calf in progress
     tab.wait_for_function("document.querySelector('.p-step--live .p-step__name').textContent === 'Mollet'")
     tab.get_by_role('button', name='Fermer la séance').click()
     sheet = tab.locator('#leave-sheet')

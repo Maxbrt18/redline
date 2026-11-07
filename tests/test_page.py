@@ -115,6 +115,8 @@ def control(tab) -> dict:
         value: document.querySelector('.p-ctrl__value')?.textContent || null,
         input: !!document.getElementById('amrap'),
         buttons: [...document.querySelectorAll('.p-ctrl .p-btn')].map(b => b.textContent),
+        counts: [...document.querySelectorAll('.p-ctrl .p-chip')].map(b => b.textContent),
+        next: document.querySelector('.p-reps__next')?.textContent || null,
         live: document.querySelector('.p-step--live .p-step__name')?.textContent || '',
     })""")
 
@@ -140,15 +142,18 @@ def send(tab) -> None:
 
 
 def forward(tab) -> None:
-    """Take the single forward action, whatever it is called right now.
+    """Take the single forward action, whatever it is called right now. A reps set is
+    banked by its count: the top of the range stands for it.
 
     The `quiet` list enumerates EVERYTHING that does not advance the session. It is the weak
     point of this harness: forgetting a button there does not break a test, it makes the
     click land elsewhere.
     """
     tab.evaluate("""() => {
+        const counts = [...document.querySelectorAll('.p-ctrl .p-chip')];
+        if (counts.length) { counts[counts.length - 1].click(); return; }
         const quiet = ['Passer', 'Démarrer', 'Pause', 'Reprendre', '−1', '+1', '+10',
-                       'Le geste', 'Son'];
+                       'Le geste', 'Son', 'Moins de', 'Autre nombre'];
         const found = [...document.querySelectorAll('.p-ctrl .p-btn')]
             .find(b => !quiet.some(q => b.textContent.startsWith(q)));
         if (!found) throw new Error("aucune action vers l'avant");
@@ -218,8 +223,8 @@ def test_sets_and_sides_are_walked_in_order(open_session):
 def test_one_forward_action_that_says_where_it_goes(open_session):
     """Three buttons with unclear relationships became one forward action naming
     its destination, plus one way out. Nothing else competes with it."""
-    tab = open_session(session(exercise("Step-up", measure="reps", sets=2, reps=8, side="each"),
-                               exercise("Gainage", measure="reps", sets=1, reps=15)))
+    tab = open_session(session(exercise("Step-up", measure="amrap", sets=2, side="each"),
+                               exercise("Gainage", measure="amrap", sets=1)))
     seen = []
     for _ in range(5):
         seen.append(control(tab)["buttons"])
@@ -229,9 +234,25 @@ def test_one_forward_action_that_says_where_it_goes(open_session):
         "Puis la gauche", "Série 2 · droite", "Puis la gauche",
         "Exercice suivant", "Terminer",
     ]
-    assert "Passer l'exercice" in seen[0][1:]
-    assert all(any(label.startswith(('Passer', 'Arrêter ici')) for label in buttons[1:])
-               for buttons in seen)
+
+
+def test_the_counts_of_a_reps_set_say_where_they_go(open_session):
+    """Each count is a forward action: the destination is named once, under them, next
+    to the one way out."""
+    tab = open_session(session(exercise("Step-up", measure="reps", sets=2, reps=8, side="each"),
+                               exercise("Gainage", measure="reps", sets=1, reps=15)))
+    seen = []
+    for _ in range(5):
+        seen.append(control(tab))
+        forward(tab)
+
+    assert [state["next"] for state in seen] == [
+        "Puis la gauche", "Puis : série 2 · droite", "Puis la gauche",
+        "Puis : exercice suivant", "Puis la fin de la séance",
+    ]
+    assert "Passer l'exercice" in seen[0]["buttons"]
+    assert all(any(label.startswith(('Passer', 'Arrêter ici')) for label in state["buttons"])
+               for state in seen)
 
 
 def test_rest_runs_only_when_the_session_prescribes_one(open_session):
@@ -333,6 +354,33 @@ def test_plyometrics_is_walked_one_block_at_a_time(open_session):
     # Four blocks of ten read "40 contacts", not "10 · 10 · 10 · 10".
     assert tab.evaluate(
         "() => document.querySelector('.p-step__dose').textContent") == "40 contacts"
+
+
+def test_a_reps_set_is_banked_by_the_count_tapped(open_session):
+    """Validating a set without its count left every load without a way up: the
+    criterion of a double progression is the count. No count is offered pressed."""
+    tab = open_session(session(exercise("Mollet", measure="reps", sets=2, reps=[12, 15],
+                                        side="each")))
+    state = control(tab)
+    assert state["counts"] == ["12", "13", "14", "15"]
+    assert tab.evaluate("() => document.querySelector('.p-chip[aria-pressed=\"true\"]')") is None
+    tab.evaluate("""() => [...document.querySelectorAll('.p-chip')]
+        .find(b => b.textContent === '14').click()""")
+    assert control(tab)["label"] == "Série 1/2 · gauche"
+    assert tab.evaluate("""() => JSON.parse(localStorage.getItem('redline:strength:test'))
+        .steps[0].slots""") == [14]
+
+
+def test_a_count_outside_the_range_is_typed(open_session):
+    tab = open_session(session(exercise("Mollet", measure="reps", sets=2, reps=[12, 15],
+                                        side="each")))
+    click(tab, "Moins de 12, ou plus de 15")
+    tab.evaluate("() => { document.getElementById('reps-other').value = '10'; }")
+    click(tab, "Puis la gauche")
+    assert tab.evaluate("""() => JSON.parse(localStorage.getItem('redline:strength:test'))
+        .steps[0].slots""") == [10]
+    assert not control(tab)["input"] and tab.evaluate(
+        "() => document.getElementById('reps-other')") is None
 
 
 def test_amrap_counts_are_kept_and_shown_back(open_session):
@@ -1212,7 +1260,7 @@ def test_rest_survives_reload_after_advancing_to_next_exercise(open_session):
     tab.wait_for_selector('.p-step--live')
     assert control(tab)['live'] == 'Suite' and control(tab)['label'] == 'Repos'
     stored = tab.evaluate("JSON.parse(localStorage['redline:strength:test'])")
-    assert stored['timer']['index'] == 1 and stored['steps']['0']['slots'] == [None]
+    assert stored['timer']['index'] == 1 and stored['steps']['0']['slots'] == [8]
     click(tab, 'Reprendre')
     assert control(tab)['label'] != 'Repos'
     assert tab.locator('.p-feedback-disclosure').count() == 1
