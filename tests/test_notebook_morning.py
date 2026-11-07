@@ -56,6 +56,9 @@ class Ops:
     def session_cycle_status(self, week):
         return []
 
+    def week_session_links(self, week):
+        return {}
+
 
 def board(ops, hour=8):
     return Board(ops, None, None, TODAY, dt.datetime.combine(TODAY, dt.time(hour), PARIS))

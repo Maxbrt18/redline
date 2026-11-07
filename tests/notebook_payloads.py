@@ -116,7 +116,6 @@ DETAIL = {
     "fact": {**DONE["fact"], "moving_s": 2880, "hr_max": None, "cadence": None, "reserve": None},
     "plan": {"targets": DONE["targets"], "note": None},
     "ask": None,
-    "reserve_ask": None,
     "wake": {"zones": [{**KNEE, "before": None, "after": None}], "after_due": False},
     "phases": None,
     "reps": None,

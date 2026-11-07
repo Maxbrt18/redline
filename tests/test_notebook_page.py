@@ -171,6 +171,26 @@ def test_the_fuel_registry_takes_several_formats_then_one_sugar(browser):
     tab.close()
 
 
+def test_a_quality_debrief_asks_its_reserve_next_to_the_effort(browser):
+    """The reserve was asked only on the session's detail, where it was never answered:
+    a rise of a quality dose needs it, so it comes in the debrief, in one tap."""
+    tab = browser.new_page(viewport={'width': 393, 'height': 852})
+    answers = []
+    serve(tab, answers)
+    ask = {**TODAY['asks'][0], 'kind': 'threshold', 'fields': ['reserve', 'enjoyment'],
+           'total': 4}
+    tab.route(BASE + '/notebook-api/today', replying({**TODAY, 'asks': [ask]}))
+    tab.goto(BASE + '/carnet')
+    card = tab.locator('.n-check').first
+    card.get_by_text('3 sur 4', exact=True).wait_for()
+    assert 'À la fin, il t’en restait une ?' in card.inner_text()
+    assert 'Puis le plaisir.' in card.inner_text()
+    card.get_by_role('button', name='Oui, une entière').click()
+    tab.get_by_text('Noté').wait_for()
+    assert answers == [{'ask': ask['id'] + ':reserve', 'value': 1}]
+    tab.close()
+
+
 def test_expired_access_clears_private_content(browser):
     tab = browser.new_page(has_touch=True)
     serve(tab)
