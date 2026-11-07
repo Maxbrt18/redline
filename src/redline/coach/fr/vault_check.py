@@ -118,6 +118,14 @@ MODEL_UNAVAILABLE = "couche modèle indisponible ({model_unavailable})"
 
 CAPABILITIES_COUNT = "{capabilities} capacité(s)"
 
+LINEAGES = "lignées de progression du renfo"
+
+NO_LINEAGE = "aucune lignée déclarée dans [progression] de rulebook.toml"
+
+UNLISTED_SHEETS = "{count} fiche(s) active(s) sans lignée : {sheets}"
+
+LINEAGES_COUNT = "{count} lignée(s), chacune sur sa fiche"
+
 FOLDER_EMPTY = "{capabilities_dir}/ est vide"
 
 COCKPIT = "cockpit à jour"

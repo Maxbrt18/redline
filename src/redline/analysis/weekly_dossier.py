@@ -1,9 +1,10 @@
 """The Sunday review dossier, computed by the service BEFORE the model's turn.
 
-Volume, gauge, pain, trajectory, signals, due predictions and deadlines are computed once,
-by the same code as the CLIs (`ledger.week_report`, `signals.signals`,
-`model.predictions`), and handed to the model as data. The model keeps what is its own:
-judging, deciding, writing. It reruns a CLI only to check a specific point.
+Volume, gauge, pain, trajectory, signals, due predictions, deadlines and the strength
+progression proposals are computed once, by the same code as the CLIs
+(`ledger.week_report`, `signals.signals`, `model.predictions`,
+`progression_strength.report`), and handed to the model as data. The model keeps what is
+its own: judging, deciding, writing. It reruns a CLI only to check a specific point.
 
 Not a CLI: no turn calls it, the service imports it (`redline/vault.py`).
 """
@@ -14,10 +15,12 @@ import datetime as dt
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from redline.analysis import feasibility, ledger, permit_report, signals
+from redline.analysis import feasibility, ledger, permit_report, progression_strength, signals
+from redline.coach.fr import progression as progression_text
 from redline.coach.fr import weekly_dossier as text
 from redline.model import predictions as prediction_model
-from redline.model import program
+from redline.model import program, transitions
+from redline.model.errors import RedlineError
 
 if TYPE_CHECKING:
     from redline.storage import OperationalStore
@@ -28,6 +31,14 @@ MAX_LISTED = 12
 
 def _as_date(value: Any) -> dt.date:
     return value if isinstance(value, dt.date) else dt.date.fromisoformat(str(value)[:10])
+
+
+def _progression(store: OperationalStore, root: Path, week: str, today: dt.date) -> list[str]:
+    """The strength proposals for the week the review prepares; a refusal is reported."""
+    try:
+        return progression_strength.report(store, root, today, transitions.shift(week, 1))
+    except RedlineError as exc:
+        return [progression_text.UNAVAILABLE.format(reason=str(exc).replace("\n", " "))]
 
 
 def render(store: OperationalStore, root: Path, week: str, today: dt.date) -> str:
@@ -68,6 +79,7 @@ def render(store: OperationalStore, root: Path, week: str, today: dt.date) -> st
         lines.extend(permit_lines)
 
     lines += ["", *feasibility.report(store, rows, today)]
+    lines += ["", *_progression(store, root, week, today)]
 
     capabilities = store.latest_capabilities()
     if capabilities:
