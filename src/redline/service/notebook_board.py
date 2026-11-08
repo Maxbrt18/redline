@@ -495,7 +495,7 @@ class Board:
             # of its dose needs both.
             quality = row["kind"] in session_kinds.RUN and self._fulfils_quality(row)
             reserve = quality and _known(row, "reps_in_reserve") is None
-            fields += [column for column in ("rpe", "reserve", "enjoyment")
+            fields += [column for column in ledger_model.FEELINGS
                        if column in missing or (column == "reserve" and reserve)]
             fields += [metric for metric in ledger_model.FUELLING_METRICS if metric in missing]
             if fields:
