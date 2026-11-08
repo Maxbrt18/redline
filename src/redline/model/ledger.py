@@ -224,6 +224,9 @@ METRIC_COLUMNS = {
     "gut_onset_min": "gut_onset_min",
 }
 
+#: The feelings asked after a session, besides the pain of each zone, in the order they are
+#: asked. The reserve is asked only after a quality session.
+FEELINGS = ("rpe", "reserve", "enjoyment")
 #: Awaited only after a session that tested a fuelling target: linking it marks them
 #: pending (`session_cycles`), and only that marking makes them due. In the order they are
 #: asked.

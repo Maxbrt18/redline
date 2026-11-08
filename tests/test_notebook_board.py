@@ -209,6 +209,59 @@ def test_a_fuelled_session_asks_its_fuel_registry_one_answer_at_a_time(store):
     assert measures["gut_onset_min"] == {"state": "known", "value": 75}
 
 
+def test_the_answer_route_takes_every_fuel_registry_answer(store, make_config, monkeypatch):
+    """The route's ask filter lets through every field the board asks for, fuel included."""
+    from unittest.mock import MagicMock
+
+    from redline.service import clock
+    from redline.service.notebook import NotebookService
+    from redline.service.web import create_app
+    from redline.storage.notebook import NotebookStore
+
+    seed_week(store)
+    pending = {"state": "pending"}
+    store.add_observation({
+        "occurred_on": dt.date(2026, 10, 7), "kind": "long",
+        "idempotency_key": "test:fuelled", "note": "",
+        "measurements": {
+            "rpe": {"state": "known", "value": 5},
+            "enjoyment": {"state": "known", "value": 7},
+            "carbs_g_h": pending, "fuel_formats": pending, "fuel_mix": pending,
+            "gut_symptoms": pending},
+        "pains": {"knee": {"state": "known", "value": 1.0}},
+    })
+    evening = dt.datetime(2026, 10, 7, 20, 0, tzinfo=PARIS)
+    monkeypatch.setattr(clock, "now", lambda: evening)
+    monkeypatch.setattr(clock, "today", lambda: evening.date())
+    config = make_config()
+    archive = NotebookStore(store.database)
+    service = NotebookService(archive, Repo(store), MagicMock(), ENGINE_ROOT,
+                              "https://coach.test", operational=store)
+    client = create_app(config, MagicMock(), MagicMock(), notebook=service).test_client()
+    client.post("/notebook-api/connect", json={"token": archive.issue(config.allowed_psid)})
+
+    fuelled = next(row["id"] for row in store.observation_rows()
+                   if row["idempotency_key"] == "test:fuelled")
+
+    def open_asks():
+        return [item for item in client.get("/notebook-api/today").json["asks"]
+                if item["id"] == f"cell:{fuelled}"]
+
+    def answer(field, value):
+        [ask] = open_asks()
+        response = client.post("/notebook-api/answer",
+                               json={"ask": f"{ask['id']}:{field}", "value": value})
+        assert response.status_code == 200, (field, response.json)
+
+    answer("carbs_g_h", 60)
+    answer("fuel_formats", ["gel", "drink"])
+    answer("fuel_mix", "unknown")
+    answer("gut_symptoms", 4)
+    answer("gut_symptom_kinds", ["nausea"])
+    answer("gut_onset_min", 50)
+    assert open_asks() == []
+
+
 def test_a_quiet_gut_asks_neither_which_trouble_nor_when(store):
     seed_week(store)
     store.add_observation({

@@ -33,10 +33,10 @@ from test_page_modules import modules
 from test_session_detail import observation_of, seed_threshold, stream
 from test_weekly_plan import revision
 
-from redline.model import instance
+from redline.model import instance, ledger
 from redline.model import notebook_views as views
 from redline.model.activity import Activity
-from redline.service import clock, page, race_plan, session_detail
+from redline.service import clock, notebook_web, page, race_plan, session_detail
 from redline.service.notebook import NotebookService
 from redline.service.web import create_app
 from redline.storage import Database, OperationalStore
@@ -47,11 +47,17 @@ needs_database = pytest.mark.skipif(not URL, reason="TEST_DATABASE_URL absent")
 SAM = instance.load(TEST_VAULT)
 RACE_DAY = {"name": "TargetRace", "date": "2026-11-26", "days": 50}
 
+UUID_SAMPLE = "0b5a1c2e-3d4f-4a6b-8c9d-0e1f2a3b4c5d"
 #: Declared keys the page has no use for: the service sends them, nothing reads them.
 UNREAD = {"created_at", "has_image", "humidity", "strength_done"}
 
 
 # ------------------------------------------------------------ the checker
+@pytest.mark.parametrize("field", ["pain:knee", *ledger.FEELINGS, *ledger.FUELLING_METRICS])
+def test_the_answer_route_accepts_every_field_a_cell_ask_carries(field):
+    assert notebook_web.ASK.fullmatch(f"cell:{UUID_SAMPLE}:{field}")
+
+
 def test_a_declared_object_may_leave_its_optional_keys_out():
     assert contract.problems(views.Race, RACE_DAY) == []
 

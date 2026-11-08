@@ -15,6 +15,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from redline.cards import render
 from redline.coach.fr import notebook as notebook_text
 from redline.coach.fr import session_labels
+from redline.model import ledger as ledger_model
 from redline.model.schema import SchemaError
 from redline.storage.database import StorageError
 from redline.storage.notebook import DEVICE_SECONDS
@@ -28,7 +29,11 @@ WEEK = re.compile(r"20\d{2}-W(?:0[1-9]|[1-4]\d|5[0-3])")
 UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 ZONE = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")
 UUID_TEXT = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
-ASK = re.compile(r"(?:cell:[0-9a-f-]{36}:(?:pain:[a-z0-9][a-z0-9-]{0,39}|rpe|reserve|enjoyment)"
+# Every field a `cell:` ask can carry: its list comes from the model, so a metric the
+# board asks for is never refused here.
+CELL_FIELDS = "|".join(re.escape(field)
+                       for field in ledger_model.FEELINGS + ledger_model.FUELLING_METRICS)
+ASK = re.compile(rf"(?:cell:[0-9a-f-]{{36}}:(?:pain:[a-z0-9][a-z0-9-]{{0,39}}|{CELL_FIELDS})"
                  r"|wake-cell:[0-9a-f-]{36}:[a-z0-9][a-z0-9-]{0,39}"
                  r"|wake:20\d{2}-\d{2}-\d{2}:[a-z0-9][a-z0-9-]{0,39}"
                  r"|daily:20\d{2}-\d{2}-\d{2}:(?:sleep|life_load)|hr:20\d{2}-\d{2}-\d{2})")
