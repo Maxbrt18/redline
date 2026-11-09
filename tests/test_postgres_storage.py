@@ -2389,7 +2389,6 @@ def test_notebook_replay_preserves_the_card_after_a_text_failure(store, tmp_path
 
 
 def test_notebook_current_resolves_the_same_typed_workout_and_rechecks_claims(store, monkeypatch):
-    import json
     from unittest.mock import MagicMock
 
     from redline.service import clock
@@ -2400,7 +2399,7 @@ def test_notebook_current_resolves_the_same_typed_workout_and_rechecks_claims(st
     monkeypatch.setattr(clock, 'today', lambda: dt.date(2026, 10, 2))
     repo = MagicMock()
     repo.validate_weekly_plan.return_value = PlanStatus.VALID
-    repo.weekly_plan_context.return_value = json.dumps({'revision': 1, 'sessions': [{
+    repo.active_revision.return_value = ({'revision': 1, 'sessions': [{
         'id':'a', 'date':'2026-10-02', 'kind':'strength', 'workout':'strength', 'routine': 'a',
         'status':'planned', 'strength':{}}], 'gates':[]})
     state = PostgresStateStore(store.database)

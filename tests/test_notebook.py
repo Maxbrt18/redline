@@ -1,7 +1,6 @@
 """The notebook classifies artifacts without reading their prose and re-reads the plan first."""
 
 import datetime as dt
-import json
 from unittest.mock import MagicMock
 
 import pytest
@@ -61,11 +60,11 @@ def test_current_never_launches_a_stale_or_held_plan(monkeypatch):
     state.issue_strength_link.assert_not_called()
     monkeypatch.setattr(clock, 'today', lambda: dt.date(2026, 10, 2))
     repo.validate_weekly_plan.return_value = PlanStatus.AWAITING
-    repo.weekly_plan_context.return_value = json.dumps({'revision': 1, 'sessions': [{
+    repo.active_revision.return_value = {'revision': 1, 'sessions': [{
         'id': 'a', 'date': '2026-10-02', 'kind': 'strength', 'workout': 'strength', 'routine': 'a',
         'status': 'planned', 'strength': {}}], 'gates': [{
             'id':'hold', 'due':'2026-10-02', 'when':'before', 'holds':['a'],
-            'question':'Comment va la blessure ?', 'on_fail':'Repos'}]})
+            'question':'Comment va la blessure ?', 'on_fail':'Repos'}]}
     assert service.current()['status'] == 'blocked'
     assert service.launch('4242', 'old') is None
 

@@ -658,8 +658,12 @@ def gate_reasons(plan: dict, today: dt.date | None = None) -> list[str]:
             for gate in blocking_gates(plan, today)]
 
 
+def revision_json(revision: dict) -> str:
+    return json.dumps(revision, ensure_ascii=False, indent=2)
+
+
 def as_json(plan: dict) -> str:
-    return json.dumps(active(plan), ensure_ascii=False, indent=2)
+    return revision_json(active(plan))
 
 
 

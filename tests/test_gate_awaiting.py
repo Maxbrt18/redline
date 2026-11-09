@@ -22,7 +22,6 @@ Three locks, one per layer:
 """
 
 import datetime as dt
-import json
 from unittest.mock import MagicMock
 
 from conftest import FakeAgent, git
@@ -51,7 +50,7 @@ def test_due_gates_reads_the_context_already_loaded():
     The service only READS the string: what an overdue check is, and what separates a
     precondition from an observation, is declared by the model.
     """
-    context = json.dumps({"revision": 3, "gates": [
+    context = ({"revision": 3, "gates": [
         {"id": "g1", "due": "2026-08-12", "when": "before", "holds": ["s1"],
          "question": "la blessure ?", "on_fail": "rest"},
         {"id": "g2", "due": "2026-08-14", "when": "after",
@@ -60,8 +59,7 @@ def test_due_gates_reads_the_context_already_loaded():
     blocking, observing = due_gates_by_kind(context, today="2026-08-12")
     assert [g["id"] for g in blocking] == ["g1"]
     assert observing == []
-    assert due_gates_by_kind("pas du json", today="2026-08-12") == ([], [])
-    assert due_gates_by_kind("", today="2026-08-12") == ([], [])
+    assert due_gates_by_kind(None, today="2026-08-12") == ([], [])
 
 
 # ------------------------------------------------------------------ 2. the vault
@@ -133,8 +131,7 @@ def test_the_outbox_survives_a_cleanup(git_clone):
 # -------------------------------------------------------------------- 3. the bot
 
 def plan_context(revision_number=2, gates=None):
-    return json.dumps({"revision": revision_number, "sessions": [],
-                       "gates": gates or []})
+    return {"revision": revision_number, "sessions": [], "gates": gates or []}
 
 
 DUE_GATE = [{"id": "w33-knee", "due": "2000-01-01",
@@ -153,7 +150,7 @@ def test_the_coach_speaks_while_a_gate_holds_the_prescription(make_bot):
     repo.ledger_cells.return_value = ([], [])
     repo.sync.return_value = False
     repo.ensure_clean.return_value = []
-    repo.weekly_plan_context.return_value = plan_context(gates=DUE_GATE)
+    repo.active_revision.return_value = plan_context(gates=DUE_GATE)
     repo.persist_turn.return_value = PersistenceResult(
         True, awaiting=("2026-W33",))
     repo.drain_alerts.return_value = []
@@ -184,7 +181,7 @@ def test_a_due_gate_surfaces_even_on_a_social_message(make_bot):
     repo.ledger_cells.return_value = ([], [])
     repo.sync.return_value = False
     repo.ensure_clean.return_value = []
-    repo.weekly_plan_context.return_value = plan_context(gates=DUE_GATE)
+    repo.active_revision.return_value = plan_context(gates=DUE_GATE)
     repo.persist_turn.return_value = PersistenceResult(True)
     repo.drain_alerts.return_value = []
     agent = FakeAgent(result=RunResult(full_text="salut !"), depth="N0")
@@ -199,7 +196,7 @@ def test_the_morning_asks_the_gate_question_instead_of_reporting_a_failure(make_
     repo.ledger_cells.return_value = ([], [])
     repo.sync.return_value = False
     repo.ensure_clean.return_value = []
-    repo.weekly_plan_context.return_value = plan_context(gates=DUE_GATE)
+    repo.active_revision.return_value = plan_context(gates=DUE_GATE)
     repo.persist_turn.return_value = PersistenceResult(
         True, awaiting=(dt.date.today().strftime("%G-W%V"),))
     repo.drain_alerts.return_value = []
@@ -224,7 +221,7 @@ def test_a_failed_turn_does_not_gag_the_next_one(make_bot):
     repo.sync.return_value = False
     repo.ensure_clean.return_value = []
     repo.head.return_value = "base-head"
-    repo.weekly_plan_context.return_value = ""
+    repo.active_revision.return_value = None
     repo.persist_turn.return_value = PersistenceResult(False)
     repo.drain_alerts.return_value = []
     bot = make_bot(repo=repo, client=MagicMock(),
@@ -239,7 +236,7 @@ def test_a_model_failure_is_rolled_back_too(make_bot):
     repo.sync.return_value = False
     repo.ensure_clean.return_value = []
     repo.head.return_value = "base-head"
-    repo.weekly_plan_context.return_value = plan_context()
+    repo.active_revision.return_value = plan_context()
     bot = make_bot(repo=repo, client=MagicMock(),
                    agent=FakeAgent(result=RunResult(error="process tué"), depth="N1"))
     bot._respond("4242", "quelle séance demain ?")
@@ -259,7 +256,7 @@ def test_a_light_proactive_never_touches_the_conversation_session(make_bot):
     repo.ledger_cells.return_value = ([], [])
     repo.sync.return_value = False
     repo.ensure_clean.return_value = []
-    repo.weekly_plan_context.return_value = plan_context()
+    repo.active_revision.return_value = plan_context()
     repo.weekly_plan_message.return_value = "Aujourd'hui : EF, plafond 9 km."
     repo.persist_turn.return_value = PersistenceResult(True)
     repo.drain_alerts.return_value = []
@@ -297,7 +294,7 @@ def test_the_two_kinds_reach_the_prompt_as_two_separate_instructions():
     an observation."""
     from redline.service.prompts import gate_note
 
-    context = json.dumps({"revision": 3, "gates": [
+    context = ({"revision": 3, "gates": [
         {"id": "g1", "due": "2026-08-18", "when": "before", "holds": ["s1"],
          "question": "la blessure au réveil ?", "on_fail": "rest"},
         {"id": "g2", "due": "2026-08-18", "when": "after",

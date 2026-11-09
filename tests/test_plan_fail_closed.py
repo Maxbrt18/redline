@@ -4,7 +4,6 @@ The deterministic gate holds back the session BLOCK and the unrecorded facts; th
 coach prose always goes out, with a precise line when a limit concerns the athlete.
 """
 
-import json
 from datetime import date, timedelta
 from datetime import time as dtime
 from unittest.mock import MagicMock
@@ -21,8 +20,7 @@ CANONICAL = ("Programme", "Aujourd'hui", "Prochaine séance", "La suite de la se
 
 
 def context(revision, sessions=None):
-    return json.dumps({"revision": revision,
-                       "sessions": [] if sessions is None else sessions})
+    return {"revision": revision, "sessions": [] if sessions is None else sessions}
 
 
 def session(day, **changed) -> dict:
@@ -42,7 +40,7 @@ def test_an_invalid_plan_never_sends_sessions_and_says_so_when_asked(make_bot):
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
     repo.sync.return_value = False
-    repo.weekly_plan_context.return_value = ""
+    repo.active_revision.return_value = None
     repo.persist_turn.return_value = PersistenceResult(True, invalid=("2026-W39",))
     client = MagicMock()
     bot = make_bot(repo=repo, client=client,
@@ -62,7 +60,7 @@ def test_failed_writes_keep_the_answer_but_never_confirm_it(make_bot, store, cla
     what the coach wrote AND what was not recorded. No session is sent."""
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
-    repo.weekly_plan_context.return_value = context(2, [session(date.today())])
+    repo.active_revision.return_value = context(2, [session(date.today())])
     repo.persist_turn.return_value = PersistenceResult(
         False, refused=("observation.add",))
     client = MagicMock()
@@ -86,7 +84,7 @@ def test_a_failed_model_run_never_commits_partial_changes(make_bot):
     repo.ledger_cells.return_value = ([], [])
     repo.sync.return_value = False
     repo.is_clean.return_value = True
-    repo.weekly_plan_context.return_value = context(1)
+    repo.active_revision.return_value = context(1)
     bot = make_bot(repo=repo, client=MagicMock(),
                    agent=FakeAgent(result=RunResult(error="process tué"), depth="N1"))
     bot._respond("4242", "quelle séance demain ?")
@@ -107,7 +105,7 @@ def test_a_plan_changing_message_answers_on_the_active_plan_when_no_revision_is_
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
     repo.sync.return_value = False
-    repo.weekly_plan_context.return_value = context(2)
+    repo.active_revision.return_value = context(2)
     repo.weekly_plan_message.return_value = "Programme 2026-W33 (r2) : dim EF, plafond 9 km"
     repo.persist_turn.return_value = PersistenceResult(True)
     repo.drain_alerts.return_value = []
@@ -128,7 +126,7 @@ def test_a_plan_changing_message_without_a_valid_plan_sends_no_session(make_bot)
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
     repo.sync.return_value = False
-    repo.weekly_plan_context.return_value = ""
+    repo.active_revision.return_value = None
     repo.persist_turn.return_value = PersistenceResult(True, invalid=("2026-W39",))
     repo.drain_alerts.return_value = []
     client = MagicMock()
@@ -145,7 +143,7 @@ def test_a_factual_correction_is_not_blocked_by_an_unrelated_missing_plan(make_b
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
     repo.sync.return_value = False
-    repo.weekly_plan_context.return_value = ""
+    repo.active_revision.return_value = None
     repo.persist_turn.return_value = PersistenceResult(True)
     repo.drain_alerts.return_value = []
     client = MagicMock()
@@ -184,7 +182,7 @@ def test_the_persisted_plan_leaves_in_its_own_message_after_the_coach(make_bot):
     # the week". The test targets a session still to deliver in the current week, not
     # the ISO Sunday -> Monday crossing.
     remaining = date.today() + timedelta(days=1 if date.today().weekday() < 6 else 0)
-    repo.weekly_plan_context.side_effect = [
+    repo.active_revision.side_effect = [
         context(2, [session(yesterday), session(date.today())]),
         context(3, [session(yesterday), session(remaining, title="SL", workout="long")])]
     repo.persist_turn.return_value = PersistenceResult(True)
@@ -208,7 +206,7 @@ def test_the_plan_still_leaves_on_an_n0_replan(make_bot):
     repo.ledger_cells.return_value = ([], [])
     repo.sync.return_value = False
     tomorrow = date.today() + timedelta(days=1)
-    repo.weekly_plan_context.side_effect = [context(2, [session(tomorrow)]),
+    repo.active_revision.side_effect = [context(2, [session(tomorrow)]),
                                             context(3, [session(tomorrow, status="cancelled")])]
     repo.persist_turn.return_value = PersistenceResult(True)
     client = MagicMock()
@@ -226,7 +224,7 @@ def test_a_morning_without_a_valid_plan_speaks_without_sessions_and_arms_the_rep
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
     repo.sync.return_value = False
-    repo.weekly_plan_context.return_value = ""
+    repo.active_revision.return_value = None
     repo.persist_turn.return_value = PersistenceResult(True, invalid=("2026-W39",))
     repo.drain_alerts.return_value = []
     client = MagicMock()
@@ -249,7 +247,7 @@ def test_sunday_requires_both_the_closing_and_next_week(make_bot):
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
     repo.sync.return_value = False
-    repo.weekly_plan_context.return_value = context(2)
+    repo.active_revision.return_value = context(2)
     repo.weekly_plan_message.return_value = "Programme suivant"
     repo.persist_turn.return_value = PersistenceResult(True)
     bot = make_bot(repo=repo,
@@ -266,7 +264,7 @@ def test_a_morning_with_a_broken_render_still_speaks_without_regenerating(make_b
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
     repo.sync.return_value = False
-    repo.weekly_plan_context.return_value = context(2)
+    repo.active_revision.return_value = context(2)
     repo.weekly_plan_message.return_value = ""      # the rendering breaks
     repo.persist_turn.return_value = PersistenceResult(True)
     repo.drain_alerts.return_value = []
@@ -290,7 +288,7 @@ def morning_bot(make_bot, full_text, silent=False):
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
     repo.sync.return_value = False
-    repo.weekly_plan_context.return_value = context(2)
+    repo.active_revision.return_value = context(2)
     repo.weekly_plan_message.return_value = "Aujourd'hui : Renfo A, 30 min"
     repo.persist_turn.return_value = PersistenceResult(True)
     repo.drain_alerts.return_value = []
@@ -331,7 +329,7 @@ def test_a_cell_is_marked_asked_only_when_a_message_really_leaves(make_bot):
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])
     repo.sync.return_value = False
-    repo.weekly_plan_context.return_value = ""          # week without a valid plan
+    repo.active_revision.return_value = None          # week without a valid plan
     repo.persist_turn.return_value = PersistenceResult(False)  # hence fail-closed
     repo.pending_ledger_cells.return_value = [entry]
     repo.drain_alerts.return_value = []

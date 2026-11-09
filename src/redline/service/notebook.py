@@ -213,15 +213,15 @@ class NotebookService:
         if status not in {PlanStatus.VALID, PlanStatus.AWAITING}:
             return {"status": "unavailable", "date": today.isoformat(),
                     "message": notebook_text.STRENGTH_PLAN_UNCHECKED}
-        raw = self.repo.weekly_plan_context(week)
-        if not raw:
+        active = self.repo.active_revision(week)
+        if active is None:
             return {"status": "unavailable", "date": today.isoformat(),
                     "message": notebook_text.STRENGTH_PLAN_MISSING}
-        session = strength_due(raw, today.isoformat())
+        session = strength_due(active, today.isoformat())
         if session is None:
             return {"status": "none", "date": today.isoformat(),
                     "message": notebook_text.STRENGTH_NONE}
-        if session["id"] in blocked_session_ids(raw, today.isoformat()):
+        if session["id"] in blocked_session_ids(active, today.isoformat()):
             return {"status": "blocked", "date": today.isoformat(),
                     "message": notebook_text.STRENGTH_BLOCKED}
         built = load(self.root).build(selection_for(session, today.isoformat()))
@@ -237,7 +237,7 @@ class NotebookService:
         if done:
             return {"status": "done", "date": today.isoformat(),
                     "message": notebook_text.STRENGTH_DONE}
-        revision = json.loads(raw)["revision"]
+        revision = active["revision"]
         canonical = json.dumps(snapshot, sort_keys=True, ensure_ascii=False)
         signature = hashlib.sha256(f"{revision}:{canonical}".encode()).hexdigest()
         return {"status": "ready", "date": today.isoformat(), "session": snapshot,

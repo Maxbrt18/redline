@@ -39,7 +39,7 @@ def _bot(make_bot, client, *, recorded: bool):
     repo.sync.return_value = False
     repo.ensure_clean.return_value = []
     repo.head.return_value = "0123456789abcdef"
-    repo.weekly_plan_context.return_value = ""
+    repo.active_revision.return_value = None
     repo.weekly_plan_message.return_value = "Aujourd'hui : EF, plafond 9 km."
     repo.persist_turn.return_value = PersistenceResult(True)
     repo.drain_alerts.return_value = []

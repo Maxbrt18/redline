@@ -1,4 +1,3 @@
-import json
 from datetime import date
 from datetime import time as dtime
 
@@ -46,7 +45,7 @@ def test_strength_artifact_derives_identity_and_session_from_the_plan(monkeypatc
 def test_morning_card_is_rendered_by_the_service_not_the_agent(
         monkeypatch, make_bot):
     today = date.today().isoformat()
-    context = json.dumps({
+    context = ({
         "revision": 3,
         "sessions": [{
             "id": "strength-a", "title": "Renfo A", "date": today,
@@ -64,7 +63,7 @@ def test_morning_card_is_rendered_by_the_service_not_the_agent(
     agent = FakeAgent()
     bot = make_bot(
         agent=agent, proactive_active_start=dtime(0, 0))
-    bot._repo.weekly_plan_context.return_value = context
+    bot._repo.active_revision.return_value = context
 
     bot._respond_proactive(ProactiveJob(psid="4242", kind="morning", prompt="matin"))
 

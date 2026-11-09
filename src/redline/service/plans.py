@@ -34,19 +34,8 @@ def _sunday(day: date) -> date:
     return day + timedelta(days=6 - day.weekday())
 
 
-def _revision(raw: str) -> dict | None:
-    if not raw:
-        return None
-    try:
-        value = json.loads(raw)
-    except json.JSONDecodeError:
-        return None
-    return value if isinstance(value, dict) else None
-
-
-def due_gates_by_kind(context: str, today: str) -> tuple[list, list]:
-    """Return due blocking gates and due observation gates from loaded context."""
-    revision = _revision(context)
+def due_gates_by_kind(revision: dict | None, today: str) -> tuple[list, list]:
+    """Return due blocking gates and due observation gates of the active revision."""
     if revision is None:
         return [], []
     as_of = date.fromisoformat(today)
@@ -54,15 +43,14 @@ def due_gates_by_kind(context: str, today: str) -> tuple[list, list]:
         weekly_plan_model.due_gates_of(revision, as_of))
 
 
-def blocked_session_ids(context: str, today: str) -> frozenset[str]:
+def blocked_session_ids(revision: dict | None, today: str) -> frozenset[str]:
     """Return the session identifiers explicitly held by due preconditions."""
-    blocking, _ = due_gates_by_kind(context, today)
+    blocking, _ = due_gates_by_kind(revision, today)
     return frozenset(session_id for gate in blocking for session_id in gate["holds"])
 
 
-def strength_due(context: str, today: str) -> dict | None:
+def strength_due(revision: dict | None, today: str) -> dict | None:
     """Return today's unsettled strength session, if any."""
-    revision = _revision(context)
     if revision is None:
         return None
     for session in revision.get("sessions") or []:
@@ -143,10 +131,9 @@ def _covered_lines(shown: list, every: list, span: Iterable[date],
     return lines
 
 
-def prescription_lines(raw: str, since: str, *,
+def prescription_lines(revision: dict | None, since: str, *,
                        exclude_ids: frozenset[str] = frozenset()) -> list[str]:
     """Render the remaining prescription without its revision header."""
-    revision = _revision(raw)
     if revision is None:
         return []
     sessions = weekly_plan_model.remaining(
@@ -167,10 +154,9 @@ def _signature(session: dict) -> tuple:
                  for field in _PRESCRIPTION_FIELDS)
 
 
-def prescription_state(raw: str, since: str, *,
+def prescription_state(revision: dict | None, since: str, *,
                        exclude_ids: frozenset[str] = frozenset()) -> list[tuple]:
     """Full prescriptive state, distinct from the short render sent on Messenger."""
-    revision = _revision(raw)
     if revision is None:
         return []
     sessions = weekly_plan_model.remaining(
@@ -180,16 +166,15 @@ def prescription_state(raw: str, since: str, *,
         for session in sessions if session.get("id") not in exclude_ids)
 
 
-def render_plan_for_scope(raw: str, week: str, scope: str, *, today: str,
+def render_plan_for_scope(revision: dict | None, week: str, scope: str, *, today: str,
                           exclude_ids: frozenset[str] = frozenset()) -> str:
     """Render exactly what the athlete asks for, including when they ask again."""
     if scope == "today":
         return render_plan_message(
-            raw, week, today=today, exclude_ids=exclude_ids)
+            revision, week, today=today, exclude_ids=exclude_ids)
     if scope == "full":
-        return render_plan_message(raw, week, exclude_ids=exclude_ids)
+        return render_plan_message(revision, week, exclude_ids=exclude_ids)
     if scope == "next":
-        revision = _revision(raw)
         if revision is None:
             return ""
         candidates = weekly_plan_model.remaining(
@@ -205,13 +190,12 @@ def render_plan_for_scope(raw: str, week: str, scope: str, *, today: str,
                 + " ; ".join(_full(session) for session in same_day) + ".")
     # `remaining` is also the safe fallback for old clients that carried only a D.
     return render_plan_message(
-        raw, week, since=today, exclude_ids=exclude_ids)
+        revision, week, since=today, exclude_ids=exclude_ids)
 
 
-def render_plan_delta(before_raw: str, after_raw: str, week: str, *, today: str,
+def render_plan_delta(before: dict | None, after: dict | None, week: str, *, today: str,
                       exclude_ids: frozenset[str] = frozenset()) -> str:
     """A reactive revision announces its changes, never the whole week."""
-    before, after = _revision(before_raw), _revision(after_raw)
     if after is None:
         return ""
     old = {session["id"]: session for session in (before or {}).get("sessions", [])}
@@ -248,10 +232,9 @@ def render_plan_delta(before_raw: str, after_raw: str, week: str, *, today: str,
     return "\n".join([wording.MESSENGER_CHANGES, *(f"{line}." for line in changed)])
 
 
-def render_plan_message(raw: str, week: str, *, today: str = "", since: str = "",
+def render_plan_message(revision: dict | None, week: str, *, today: str = "", since: str = "",
                         exclude_ids: frozenset[str] = frozenset()) -> str:
     """Render one validated revision for Messenger."""
-    revision = _revision(raw)
     if revision is None:
         return ""
     all_sessions = weekly_plan_model.scheduled(revision.get("sessions", []))

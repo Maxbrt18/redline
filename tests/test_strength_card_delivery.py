@@ -10,7 +10,6 @@ Three stacked defects, one test per layer:
 """
 
 import datetime as dt
-import json
 from unittest.mock import MagicMock
 
 from conftest import FakeAgent
@@ -23,7 +22,7 @@ TODAY = dt.date.today().isoformat()
 
 
 def context(sessions, gates=()):
-    return json.dumps({"revision": 3, "sessions": sessions, "gates": list(gates)})
+    return {"revision": 3, "sessions": sessions, "gates": list(gates)}
 
 
 def strength_text(status="planned", date=None):
@@ -55,7 +54,7 @@ def test_a_strength_session_already_done_asks_for_nothing():
 def test_a_strength_session_on_another_day_asks_for_nothing():
     assert strength_due(context([strength_text(date="2026-01-01")]), TODAY) is None
     assert strength_due(context([ef()]), TODAY) is None
-    assert strength_due("pas du json", TODAY) is None
+    assert strength_due(None, TODAY) is None
 
 
 # ------------------------------------- 2. the instruction comes first, not as a clause
@@ -70,7 +69,7 @@ def _morning(make_bot, sessions, gates=(), reply="Bonne séance ce matin.",
     repo.sync.return_value = False
     repo.ensure_clean.return_value = []
     repo.head.return_value = "0123456789abcdef"
-    repo.weekly_plan_context.return_value = context(sessions, gates)
+    repo.active_revision.return_value = context(sessions, gates)
     repo.weekly_plan_message.return_value = "Aujourd'hui : renfo A."
     repo.persist_turn.return_value = PersistenceResult(True)
     repo.drain_alerts.return_value = []
@@ -106,7 +105,7 @@ def test_a_day_without_strength_gets_no_such_instruction(make_bot):
 def test_the_scheduler_materializes_a_typed_due_session_without_an_agent(make_bot):
     agent = FakeAgent()
     bot = make_bot(agent=agent)
-    bot._repo.weekly_plan_context.return_value = context([strength_text()])
+    bot._repo.active_revision.return_value = context([strength_text()])
 
     assert bot.materialize_strength_card("4242", dt.datetime.now().astimezone()) is True
 

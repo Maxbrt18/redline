@@ -5,7 +5,6 @@ explicit, one-shot, serialized with every other job, and hands its exchange back
 to the ordinary conversation exactly once.
 """
 
-import json
 import time
 from unittest.mock import MagicMock
 
@@ -76,7 +75,7 @@ def test_a_deep_write_expires_the_stale_ordinary_session(make_bot, store):
     repo.ledger_cells.return_value = ([], [])
     repo.sync.return_value = False
     repo.head.side_effect = ["before", "after"]
-    repo.weekly_plan_context.return_value = ""
+    repo.active_revision.return_value = None
     repo.persist_turn.return_value = PersistenceResult(True)
     repo.pending_ledger_cells.return_value = []
     agent = FakeAgent(result=RunResult(full_text="Décision enregistrée."))
@@ -186,7 +185,7 @@ def test_exact_strength_command_is_deterministic_and_idempotent(
     from redline.service.outbox import Outbox
 
     today = __import__("datetime").date.today().isoformat()
-    context = json.dumps({
+    context = ({
         "revision": 4,
         "sessions": [{
             "id": "w36-strength-a", "title": "Renfo A", "date": today,
@@ -209,7 +208,7 @@ def test_exact_strength_command_is_deterministic_and_idempotent(
     client.send_text.return_value = DeliveryResult.success()
     client.send_image.return_value = DeliveryResult.success()
     bot = make_bot(agent=agent, client=client, outbox=outbox)
-    bot._repo.weekly_plan_context.return_value = context
+    bot._repo.active_revision.return_value = context
 
     assert bot._run_command("4242", "/renfo", message_ids=("mid-renfo",))
     assert bot._run_command("4242", "/renfo", message_ids=("mid-renfo",))
@@ -235,7 +234,7 @@ def test_strength_command_never_translates_an_invalid_plan_to_no_session(make_bo
 
 def test_strength_command_names_a_held_session_instead_of_denying_it(make_bot):
     today = __import__("datetime").date.today().isoformat()
-    context = json.dumps({
+    context = ({
         "revision": 4,
         "sessions": [{
             "id": "w36-strength-a", "title": "Renfo A", "date": today,
@@ -253,7 +252,7 @@ def test_strength_command_names_a_held_session_instead_of_denying_it(make_bot):
     client.send_text.return_value = DeliveryResult.success()
     bot = make_bot(client=client)
     bot._repo.validate_weekly_plan.return_value = PlanStatus.AWAITING
-    bot._repo.weekly_plan_context.return_value = context
+    bot._repo.active_revision.return_value = context
 
     assert bot._run_command("4242", "/renfo", message_ids=("mid-held",))
 

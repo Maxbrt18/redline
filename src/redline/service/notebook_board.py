@@ -19,7 +19,6 @@ write happens only if its request is still open at write time.
 from __future__ import annotations
 
 import datetime as dt
-import json
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -273,9 +272,8 @@ class Board:
 
     def week(self, label: str) -> Week:
         status = self.repo.validate_weekly_plan(label)
-        context = self.repo.weekly_plan_context(label) if status is not PlanStatus.INVALID else ""
-        revision = json.loads(context) if context else None
-        held = blocked_session_ids(context, self.today.isoformat()) if context else frozenset()
+        revision = self.repo.active_revision(label) if status is not PlanStatus.INVALID else None
+        held = blocked_session_ids(revision, self.today.isoformat())
         return Week(
             label=label, status=status if revision else PlanStatus.INVALID,
             revision=revision, held=held, links=self.ops.week_session_links(label),
@@ -905,8 +903,8 @@ class Board:
         for trace in reversed(ledger.trajectory(self.rows, self.today, weeks=limit)):
             if trace.label >= current:
                 continue
-            context = self.repo.weekly_plan_context(trace.label)
-            target = json.loads(context).get("volume_target_km") if context else None
+            revision = self.repo.active_revision(trace.label)
+            target = revision.get("volume_target_km") if revision else None
             out.append({"week": trace.label, "monday": iso_week.monday(trace.label).isoformat(),
                         "km_done": round(trace.km, 2), "km_target": target,
                         "review": reviews.get(trace.label)})

@@ -17,7 +17,7 @@ from redline import cli
 from redline.coach import dates
 from redline.coach.fr import fill, labels, note, prompt
 from redline.coach.fr import plan as plan_text
-from redline.model import agent_input, rulebook, typography
+from redline.model import agent_input, rulebook, typography, weekly_plan
 from redline.model import ledger as ledger_model
 from redline.service.proactive_kinds import policy
 
@@ -225,14 +225,16 @@ def today_note(moment) -> str:
                 tomorrow_weekday=dates.weekday(tomorrow))
 
 
-def canonical_plan_note(context: str) -> str:
+def canonical_plan_note(revision: dict | None) -> str:
     """The canonical plan, put in front of a turn allowed to prescribe."""
-    return fill(prompt("canonical-plan"), context=context or plan_text.CANONICAL_MISSING)
+    return fill(prompt("canonical-plan"), context=weekly_plan.revision_json(revision)
+                if revision else plan_text.CANONICAL_MISSING)
 
 
-def active_revision_note(context: str) -> str:
+def active_revision_note(revision: dict | None) -> str:
     """The same for an initiative, which starts without a message from the athlete."""
-    return fill(prompt("active-revision"), context=context or plan_text.ACTIVE_MISSING)
+    return fill(prompt("active-revision"), context=weekly_plan.revision_json(revision)
+                if revision else plan_text.ACTIVE_MISSING)
 
 
 def deep_handoff_note(handoff: str) -> str:

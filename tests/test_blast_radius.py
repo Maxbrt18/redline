@@ -14,8 +14,10 @@ from redline.service.agent import RunResult
 from redline.service.proactive import ProactiveJob
 from redline.service.vault import PersistenceFailure, PersistenceResult
 
+ACTIVE = {"revision": 8, "sessions": []}
 
-def _bot(make_bot, persistence, *, plan_context="{\"revision\": 8, \"sessions\": []}",
+
+def _bot(make_bot, persistence, *, plan_context=ACTIVE,
          plan_change=False, plan_asked=False, **config):
     client = MagicMock()
     client.send_text.return_value = MagicMock(ok=True)
@@ -26,7 +28,7 @@ def _bot(make_bot, persistence, *, plan_context="{\"revision\": 8, \"sessions\":
     repo.is_clean.return_value = True
     repo.ensure_clean.return_value = []
     repo.head.return_value = "0123456789abcdef"
-    repo.weekly_plan_context.return_value = plan_context
+    repo.active_revision.return_value = plan_context
     repo.weekly_plan_message.return_value = "Aujourd'hui : EF, plafond 9 km."
     repo.persist_turn.return_value = persistence
     bot = make_bot(
@@ -138,7 +140,7 @@ def test_an_absent_plan_holds_the_sessions_but_never_the_answer(make_bot):
     """Without a valid program no session goes out; the coach's reply does, along with a
     precise line when the athlete asked for the program."""
     bot, client = _bot(make_bot, PersistenceResult(True, invalid=("2026-W39",)),
-                       plan_context="", plan_change=True, plan_asked=True)
+                       plan_context=None, plan_change=True, plan_asked=True)
 
     bot._respond("4242", "je fais quoi demain ?")
 
@@ -154,7 +156,7 @@ def test_a_safety_answer_always_leaves_even_without_a_plan(make_bot):
     program."""
     answer = "Arrête maintenant et marche pour rentrer. Si la douleur persiste, avis médical."
     bot, client = _bot(make_bot, PersistenceResult(True, invalid=("2026-W39",)),
-                       plan_context="", plan_change=True)
+                       plan_context=None, plan_change=True)
     bot._agent._result = RunResult(full_text=answer)
 
     bot._respond("4242", "douleur nette au genou en courant, j'arrête ?")

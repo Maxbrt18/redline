@@ -510,14 +510,14 @@ class VaultRepo:
         return (ledger_model.pending_observation_fields(rows, today),
                 ledger_model.lapsed_observation_fields(rows, today))
 
-    def weekly_plan_context(self, week: str) -> str:
-        """Return the active revision unless the week is absent or invalid."""
+    def active_revision(self, week: str) -> dict | None:
+        """The active revision of `week`, unless the week is absent or invalid."""
         if self._store is None:
-            return ""
+            return None
         plan = self._store.load_plan(week)
         if plan is None or self.validate_weekly_plan(week, plan) is PlanStatus.INVALID:
-            return ""
-        return weekly_plan_model.as_json(plan)
+            return None
+        return weekly_plan_model.active(plan)
 
     def day_settled(self, day) -> bool:
         """All sessions planned that day are settled: done, missed or cancelled.
@@ -527,10 +527,10 @@ class VaultRepo:
         if self._store is None:
             return False
         week = iso_week.of(day)
-        context = self.weekly_plan_context(week)
-        if not context:
+        revision = self.active_revision(week)
+        if revision is None:
             return False
-        keys = [session["id"] for session in json.loads(context)["sessions"]
+        keys = [session["id"] for session in revision["sessions"]
                 if session["date"] == day.isoformat() and session["kind"] != "rest"
                 and session.get("status") != SessionStatus.CANCELLED]
         links = self._store.week_session_links(week)
@@ -564,18 +564,15 @@ class VaultRepo:
     def weekly_plan_message(self, week: str, today: str = "", since: str = "",
                             exclude_ids=frozenset()) -> str:
         """Render the persisted plan for today, the remaining week, or the full week."""
-        return render_plan_message(self.weekly_plan_context(week), week,
+        return render_plan_message(self.active_revision(week), week,
                                    today=today, since=since, exclude_ids=exclude_ids)
 
     def render_weekly_plan_card(self, week: str, today: str = "") -> bool:
         """Render the same active revision into the Messenger outbox."""
-        context = self.weekly_plan_context(week)
-        if not context:
+        active = self.active_revision(week)
+        if active is None:
             return False
-        try:
-            revision = json.loads(context)["revision"]
-        except (json.JSONDecodeError, KeyError):
-            return False
+        revision = active["revision"]
         outbox = engine_paths.outbox_dir()
         outbox.mkdir(parents=True, exist_ok=True)
         target = str(outbox / f"plan-{week.lower()}-r{revision}.png")

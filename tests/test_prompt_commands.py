@@ -39,8 +39,8 @@ def _prompts() -> dict[str, str]:
         "STRENGTH_REPORT_NOTE": prompts.STRENGTH_REPORT_NOTE,
         "stale_plan_note": prompts.stale_plan_note("2026-W33"),
         # These cite commands, so they enter here like the others.
-        "canonical_plan_note": prompts.canonical_plan_note(""),
-        "active_revision_note": prompts.active_revision_note(""),
+        "canonical_plan_note": prompts.canonical_plan_note(None),
+        "active_revision_note": prompts.active_revision_note(None),
         "missing_cells_note": prompts.missing_cells_note(
             [{"date": "2026-08-18", "type": "easy", "missing": ["rpe", "dminus"]}],
             [{"date": "2026-08-12", "type": "easy", "missing": ["enjoyment"]}]),

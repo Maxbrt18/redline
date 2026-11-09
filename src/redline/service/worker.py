@@ -523,7 +523,7 @@ class TurnWorker:
         for key in keys:
             self._state.proactive.mark("asked:" + key)
 
-    def _reading_notes(self, triage: Triage, week: str, plan_context: str, *,
+    def _reading_notes(self, triage: Triage, week: str, plan_context: dict | None, *,
                        plan_required: bool, handoff: str, psid: str = "") -> str:
         """Everything the service puts BEFORE the athlete's message, and nothing else.
 
@@ -695,7 +695,7 @@ class TurnWorker:
             plan_required = triage.plan_change or triage.plan_scope != "none"
             # Loaded AT EVERY DEPTH, N0 included: `show` costs 0.13 s, and a dated check is an
             # obligation of the day, not a reading detail.
-            plan_context = self._repo.weekly_plan_context(week)
+            plan_context = self._repo.active_revision(week)
             # WHAT REMAINED TO DO before this turn: this list, not the revision number, tells below
             # whether the prescription moved.
             prescription_before = prescription_state(
@@ -817,7 +817,7 @@ class TurnWorker:
         return delivered
 
     def _reactive_additions(self, psid: str, week: str, triage: Triage,
-                            persisted: PersistenceResult, before_context: str,
+                            persisted: PersistenceResult, before_context: dict | None,
                             prescription_before: list, text: str,
                             ) -> tuple[list[str], str, dict | None]:
         """What the service ADDS to the prose, never replacing it.
@@ -835,7 +835,7 @@ class TurnWorker:
             line = unrecorded_line(persisted.refused)
             if line:
                 lines.append(line)
-        after = self._repo.weekly_plan_context(week)
+        after = self._repo.active_revision(week)
         revision_after = self._revision_of(after)
         if triage.plan_change and revision_after == self._revision_of(before_context):
             # Not a fault in itself: "I slept badly" triggers P and often changes nothing. The
@@ -975,12 +975,9 @@ class TurnWorker:
                 platform_messages=self._platform_messages(delivery))
 
     @staticmethod
-    def _revision_of(context: str) -> int:
-        """The active revision number, 0 if the plan is absent or unreadable."""
-        try:
-            return int(json.loads(context).get("revision", 0))
-        except (json.JSONDecodeError, AttributeError, TypeError, ValueError):
-            return 0
+    def _revision_of(revision: dict | None) -> int:
+        """The active revision number, 0 if the plan is absent."""
+        return int((revision or {}).get("revision", 0))
 
     def _plan_delivery_motive(self, psid: str, week: str, before: list, after: list,
                               revision: int, scope: str) -> str:
@@ -1000,7 +997,7 @@ class TurnWorker:
         return f"plan-shown:{week}:r{revision}:{day}"
 
     def _canonical_block(self, psid: str, week: str, persisted: PersistenceResult,
-                         before_context: str, context: str,
+                         before_context: dict | None, context: dict | None,
                          remaining_before: list, remaining_after: list,
                          revision: int, *, scope: str) -> str | None:
         """Render a deliverable plan, ``""`` when held, or ``None`` on render failure."""
@@ -1311,7 +1308,7 @@ class TurnWorker:
         week = {"weekly": self._iso_week(moment, offset_days=7),
                 "weekly_repair": job.detail or self._iso_week(moment)}.get(
                     job.kind, self._iso_week(moment))
-        revision = self._revision_of(self._repo.weekly_plan_context(week))
+        revision = self._revision_of(self._repo.active_revision(week))
         return {"week": week, "revision": revision} if revision else None
 
     def _proactive_canonical(self, job: ProactiveJob, persisted: PersistenceResult,
@@ -1321,7 +1318,7 @@ class TurnWorker:
         today = moment.date().isoformat()
         if job.kind == "morning":
             week = self._iso_week(moment)
-            context = self._repo.weekly_plan_context(week)
+            context = self._repo.active_revision(week)
             if week in persisted.invalid or not context:
                 log.info("Morning note without sessions: the plan of %s is missing or "
                          "invalid, its dedicated repair is armed", week)
@@ -1385,7 +1382,7 @@ class TurnWorker:
         if job.kind != "morning" or not strength_session:
             return None
         current_week = self._iso_week(moment)
-        refreshed = self._repo.weekly_plan_context(current_week)
+        refreshed = self._repo.active_revision(current_week)
         session = strength_due(refreshed, moment.date().isoformat())
         blocked = blocked_session_ids(refreshed, moment.date().isoformat())
         held = (current_week in persisted.stale
@@ -1426,7 +1423,7 @@ class TurnWorker:
             return False
         check = stored.meta.get("revision_check")
         if check and self._revision_of(
-                self._repo.weekly_plan_context(check["week"])) != check["revision"]:
+                self._repo.active_revision(check["week"])) != check["revision"]:
             # The plan moved since drafting: the text no longer describes the week. Only this
             # deterministic check decides on a rewrite.
             log.info("Prepared initiative %s stale: the plan changed", job.job_id)
@@ -1589,7 +1586,7 @@ class TurnWorker:
         """
         today = moment.date().isoformat()
         week = self._iso_week(moment)
-        context = self._repo.weekly_plan_context(week)
+        context = self._repo.active_revision(week)
         session = strength_due(context, today)
         if (not session or session.get("strength") is None
                 or session.get("id") in blocked_session_ids(context, today)):
@@ -1612,7 +1609,7 @@ class TurnWorker:
     ) -> tuple[str, str, dict | None]:
         """Re-read the active revision without confusing absence and unavailability.
 
-        ``weekly_plan_context`` is empty both for an absent week and for an invalid one. That
+        ``active_revision`` is None both for an absent week and for an invalid one. That
         emptiness therefore never proves there is no strength session. The user command must
         name the limit, whereas an obsolete proactive debt can simply be settled.
         """
@@ -1623,7 +1620,7 @@ class TurnWorker:
             return "unavailable", today, None
         if status is PlanStatus.STALE:
             return "stale", today, None
-        context = self._repo.weekly_plan_context(week)
+        context = self._repo.active_revision(week)
         if not context:
             return "unavailable", today, None
         session = strength_due(context, today)
@@ -1632,10 +1629,7 @@ class TurnWorker:
         if session.get("id") in blocked_session_ids(context, today):
             return "blocked", today, session
         if detail:
-            try:
-                revision = int(json.loads(context).get("revision", 0))
-            except (TypeError, ValueError, json.JSONDecodeError):
-                return "unavailable", today, None
+            revision = self._revision_of(context)
             if (session.get("id") != detail.get("session_id")
                     or revision != int(detail.get("revision", -1))):
                 return "obsolete", today, session
@@ -1834,7 +1828,7 @@ class TurnWorker:
         if job.kind not in {"morning", "weekly"}:
             return prompt, strength_session, required_weeks
 
-        context = self._repo.weekly_plan_context(current)
+        context = self._repo.active_revision(current)
         prompt = active_revision_note(context) + "\n\n" + prompt
         prompt = BATTERY_NOTE + "\n\n" + prompt
         today = moment.date().isoformat()

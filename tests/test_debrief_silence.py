@@ -71,7 +71,7 @@ def test_a_monthly_note_keeps_the_right_to_say_nothing(make_bot):
 def test_a_morning_note_may_also_stay_silent(make_bot, store):
     bot, client = _silent_bot(make_bot)
     bot._repo.weekly_plan_message.return_value = ""
-    bot._repo.weekly_plan_context.return_value = '{"revision": 2, "sessions": []}'
+    bot._repo.active_revision.return_value = {"revision": 2, "sessions": []}
 
     bot._respond_proactive(_claimed(store, "morning"))
 

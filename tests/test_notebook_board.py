@@ -45,9 +45,9 @@ class Repo:
     def validate_weekly_plan(self, week):
         return self.status if self.store.load_plan(week) else PlanStatus.INVALID
 
-    def weekly_plan_context(self, week):
+    def active_revision(self, week):
         plan = self.store.load_plan(week)
-        return weekly_plan.as_json(plan) if plan else ""
+        return weekly_plan.active(plan) if plan else None
 
 
 def ef(identifier, date, **overrides):

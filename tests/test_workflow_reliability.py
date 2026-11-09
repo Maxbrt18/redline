@@ -92,7 +92,7 @@ def test_rwf002_a_safety_answer_leaves_even_when_the_week_is_unreadable(make_bot
               "mérite un avis médical avant de recourir.")
     agent = FakeAgent(result=RunResult(full_text=safety), depth="N2", plan_change=True)
     bot = make_bot(agent=agent)
-    bot._repo.weekly_plan_context.return_value = ""
+    bot._repo.active_revision.return_value = None
     bot._repo.persist_turn.return_value = PersistenceResult(True, invalid=("2026-W39",))
 
     assert bot._respond(PSID, "j'ai une douleur nette au talon en courant",
@@ -106,7 +106,7 @@ def test_rwf002_a_safety_answer_leaves_even_when_the_week_is_unreadable(make_bot
 def test_rwf002_a_program_request_without_a_valid_week_gets_one_precise_line(make_bot):
     agent = FakeAgent(result=RunResult(full_text="Je regarde ça."), plan_scope="today")
     bot = make_bot(agent=agent)
-    bot._repo.weekly_plan_context.return_value = ""
+    bot._repo.active_revision.return_value = None
 
     assert bot._respond(PSID, "je fais quoi aujourd'hui ?", message_ids=("m3b",))
 

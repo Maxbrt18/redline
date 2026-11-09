@@ -6,7 +6,6 @@ Sunday session is not settled.
 """
 
 import datetime as dt
-import json
 from datetime import datetime
 from unittest.mock import MagicMock
 from zoneinfo import ZoneInfo
@@ -20,7 +19,7 @@ PSID = "4242"
 
 
 def _plan(*sessions):
-    return json.dumps({"sessions": [
+    return ({"sessions": [
         {"id": key, "date": day, "kind": kind, "status": "planned"}
         for key, day, kind in sessions]})
 
@@ -30,7 +29,7 @@ def _repo(monkeypatch, plan, links):
     store.week_session_links.return_value = {
         key: {"state": state} for key, state in links.items()}
     repo = VaultRepo("/tmp/vault", "origin", "main", operational_store=store)
-    monkeypatch.setattr(repo, "weekly_plan_context", lambda week: plan)
+    monkeypatch.setattr(repo, "active_revision", lambda week: plan)
     return repo
 
 
@@ -48,7 +47,7 @@ def test_a_sunday_is_settled_once_run_and_strength_are_done(monkeypatch):
 def test_a_rest_sunday_is_settled_and_no_plan_never_is(monkeypatch):
     assert _repo(monkeypatch, _plan(("w42-dim-repos", "2026-10-18", "rest")), {}
                  ).day_settled(SUNDAY)
-    assert not _repo(monkeypatch, "", {}).day_settled(SUNDAY)
+    assert not _repo(monkeypatch, None, {}).day_settled(SUNDAY)
 
 
 def _weekly_queued(store, make_config, at, *, settled=True, debrief=False):
