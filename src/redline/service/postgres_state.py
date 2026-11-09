@@ -18,7 +18,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from redline.analysis import signals as signal_model
 from redline.coach.fr import relationship as wording
 from redline.coach.fr import signals as signal_wording
-from redline.model import commands, local_time
+from redline.model import commands, local_time, rulebook
 from redline.model import vocabulary as voc
 from redline.model.errors import StorageError
 from redline.model.vocabulary import (
@@ -670,9 +670,11 @@ class PostgresStateStore(StateStore):
                 if store.strength_evidence_in(
                         connection, row["scheduled_on"], row["routine"]):
                     continue
-                missed_at = ((row["planned_for"] + dt.timedelta(hours=4))
+                parameters = rulebook.current().parameters
+                missed_at = ((row["planned_for"]
+                              + dt.timedelta(hours=parameters.missed_after_hours))
                              if row["planned_for"] else dt.datetime.combine(
-                                 row["scheduled_on"], dt.time(22, 0),
+                                 row["scheduled_on"], parameters.missed_cutoff,
                                  tzinfo=local_time.zone()))
                 if local >= missed_at:
                     connection.execute(session_cycles.update().where(
@@ -774,11 +776,15 @@ class PostgresStateStore(StateStore):
         # Same read as the CLI and the review dossier: typed ledger and deliberately
         # worked cadence, on a single definition (`signals.current`).
         signals = [str(signal) for signal in signal_model.current(store)]
+        parameters = rulebook.current().parameters
+        window = dt.timedelta(days=parameters.signal_window_days)
         recent_daily = list(connection.execute(sa.select(daily_checkins).where(
             daily_checkins.c.athlete_id == ATHLETE,
-            daily_checkins.c.checked_on >= local.date() - dt.timedelta(days=21),
-        ).order_by(daily_checkins.c.checked_on.desc()).limit(3)).mappings())
-        if len(recent_daily) == 3 and all(row["desire"] == Desire.LOW for row in recent_daily):
+            daily_checkins.c.checked_on >= local.date() - window,
+        ).order_by(daily_checkins.c.checked_on.desc()).limit(
+            parameters.low_desire_checkins)).mappings())
+        if (len(recent_daily) == parameters.low_desire_checkins
+                and all(row["desire"] == Desire.LOW for row in recent_daily)):
             signals.append(signal_wording.DESIRE_LOW)
         due_predictions = [row for row in predictions if row["due_on"] <= local.date()]
         if due_predictions:
@@ -788,13 +794,13 @@ class PostgresStateStore(StateStore):
                 planned_sessions.c.id == session_cycles.c.source_session_id).where(
                 session_cycles.c.athlete_id == ATHLETE,
                 session_cycles.c.state == CycleState.MISSED,
-                session_cycles.c.updated_at >= utc - dt.timedelta(days=21),
+                session_cycles.c.updated_at >= utc - window,
                 ~sa.exists().where(
                     strength_sessions.c.athlete_id == ATHLETE,
                     strength_sessions.c.performed_on == planned_sessions.c.scheduled_on,
                     planned_sessions.c.routine == strength_sessions.c.workout,
                 ))).scalar_one()
-        if missed_count >= 2:
+        if missed_count >= parameters.missed_sessions_signal:
             signals.append(signal_wording.SESSIONS_MISSED.format(count=missed_count))
         if signals:
             created += int(PostgresProactiveState._enqueue(
@@ -804,7 +810,7 @@ class PostgresStateStore(StateStore):
 
     @staticmethod
     def _materialize_gear(connection, utc: dt.datetime) -> int:
-        """An active pair at 90 % of its inspection threshold."""
+        """An active pair past the rulebook's share of its inspection distance."""
         created = 0
         distance = sa.case((observation_metrics.c.distance_km_state == "known",
                             observation_metrics.c.distance_km), else_=0)
@@ -825,7 +831,7 @@ class PostgresStateStore(StateStore):
         ).group_by(gear_items.c.gear_id)).mappings())
         for gear in gear_rows:
             km, limit = float(gear["km"]), float(gear["retire_at_km"])
-            if km >= limit * .9:
+            if km >= limit * rulebook.current().parameters.gear_alert_pct / 100:
                 created += int(PostgresProactiveState._enqueue(
                     connection, f"gear-alert:{gear['gear_id']}:{int(limit)}", "gear_alert",
                     json.dumps({"name": gear["name"], "km": round(km, 1),

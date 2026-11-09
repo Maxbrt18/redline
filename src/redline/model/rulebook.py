@@ -59,6 +59,18 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
         field("stall_tolerance_km", float, minimum=0, maximum=5),
         field("wake_trace_until", str, pattern=formats.TIME,
               note="local time HH:MM"),
+        field("missed_after_hours", float, minimum=0.5, maximum=24,
+              note="hours after its planned start a session still not done counts as missed"),
+        field("missed_cutoff", str, pattern=formats.TIME,
+              note="local time HH:MM after which a session without a start time is missed"),
+        field("signal_window_days", int, minimum=7, maximum=90,
+              note="days the daily signal looks back over"),
+        field("low_desire_checkins", int, minimum=2, maximum=14,
+              note="latest daily check-ins all at low desire that raise a signal"),
+        field("missed_sessions_signal", int, minimum=1, maximum=14,
+              note="sessions missed within the window that raise a signal"),
+        field("gear_alert_pct", int, minimum=50, maximum=100,
+              note="share of its inspection distance at which a pair raises an alert, in %"),
         field("assimilation_weeks", list, item=field("week", str, pattern=iso_week.PATTERN,
                                                      note="ISO week, e.g. 2030-W35")),
         # Optional: an instance rulebook written before them states no fuelling ceiling,
@@ -132,6 +144,12 @@ class Parameters:
     stall_weeks: int
     stall_tolerance_km: float
     wake_trace_until: dt.time
+    missed_after_hours: float
+    missed_cutoff: dt.time
+    signal_window_days: int
+    low_desire_checkins: int
+    missed_sessions_signal: int
+    gear_alert_pct: int
     assimilation_weeks: tuple[str, ...]
     carbs_cap_g_h: int | None = None
     carbs_mix_above_g_h: int | None = None
@@ -243,8 +261,10 @@ def parse(text: str, source: Path) -> Rulebook:
         **raw, "assimilation_weeks": tuple(raw["assimilation_weeks"]),
         "long_run_weekdays": tuple(raw.get("long_run_weekdays") or ()),
         "wake_trace_until": dt.time.fromisoformat(raw["wake_trace_until"]),
+        "missed_cutoff": dt.time.fromisoformat(raw["missed_cutoff"]),
         **{name: float(raw[name])
-           for name in ("gate_effort_peak", "hard_min_hours", "stall_tolerance_km")
+           for name in ("gate_effort_peak", "hard_min_hours", "stall_tolerance_km",
+                        "missed_after_hours")
            if name in raw}})
     scales = build_scales(payload["scales"])
     problems = []
