@@ -5,14 +5,16 @@ import urllib.parse
 
 import pytest
 
+from redline.cli import strava as strava_cli
 from redline.integrations import strava
 from redline.model import activity as activity_model
+from redline.model import entrypoint
 
 # ------------------------------------------------------------------ cadence
 
 def test_a_run_cadence_is_doubled_into_steps_per_minute():
     """Strava counts one foot: 82.5 there, 165 steps per minute."""
-    assert strava._cadence(82.4951, on_foot=True) == {"cadence_spm": 165.0}
+    assert strava.parse_activity({**RUN, "average_cadence": 82.4951}).cadence_spm == 165.0
 
 
 def test_a_trail_run_counts_feet_the_same_way():
@@ -21,11 +23,13 @@ def test_a_trail_run_counts_feet_the_same_way():
 
 
 def test_a_ride_cadence_is_a_crank_and_is_never_doubled():
-    assert strava._cadence(80.0, on_foot=False) == {"cadence_rpm": 80.0}
+    ride = strava.parse_activity({**RUN, "sport_type": "Ride", "average_cadence": 80.0})
+    assert (ride.cadence_rpm, ride.cadence_spm) == (80.0, None)
 
 
 def test_an_absent_cadence_stays_absent_rather_than_becoming_zero():
-    assert strava._cadence(None, on_foot=True) == {}
+    raw = {key: value for key, value in RUN.items() if key != "average_cadence"}
+    assert strava.parse_activity(raw).cadence_spm is None
 
 
 # ------------------------------------------------------------------ activity
@@ -83,7 +87,7 @@ def test_the_local_time_survives_the_guard_that_weather_actually_applies():
 
 def test_the_activity_command_hands_weather_its_query_and_nothing_else(monkeypatch):
     monkeypatch.setattr(strava, "call", lambda *a, **k: RUN)
-    out = strava.cmd_activity(type("Args", (), {"id": "2"})())
+    out = strava_cli.cmd_activity(type("Args", (), {"id": "2"})())
     assert out["weather_query"] == {"polyline": "g|avGsvu[ICGEO", "time": "2026-08-14T07:32:50"}
     assert out["pace_min_per_km"] == "6:11" and "route_polyline" not in out
 
@@ -143,7 +147,7 @@ def test_laps_come_from_the_endpoint_only_when_the_field_is_absent(monkeypatch):
         return {**RUN, "laps": []} if endpoint.endswith("/2") else [
             {"distance": 400.0, "moving_time": 96}]
     monkeypatch.setattr(strava, "call", call)
-    assert strava.cmd_laps(type("Args", (), {"id": "2"})())["laps"] == []
+    assert strava_cli.cmd_laps(type("Args", (), {"id": "2"})())["laps"] == []
     assert calls == ["/activities/2"]
 
 
@@ -154,7 +158,7 @@ def test_streams_are_flattened_into_what_descent_already_eats(monkeypatch):
     object: flattening it here avoids touching descent."""
     monkeypatch.setattr(strava, "call", lambda *a, **k: {
         "altitude": {"data": [262.9, 300.0, 262.6], "series_type": "distance"}})
-    out = strava.cmd_streams(type("Args", (), {"id": "1", "keys": "altitude"})())
+    out = strava_cli.cmd_streams(type("Args", (), {"id": "1", "keys": "altitude"})())
     assert out == {"altitude": [262.9, 300.0, 262.6]}
 
     from redline.analysis import descent
@@ -167,7 +171,7 @@ def test_the_json_flag_works_on_both_sides_of_the_subcommand():
     """`strava activity 42 --json` is the order one naturally types, and argparse
     refused it: "unrecognized arguments" does not say where to put the flag. This
     script exists so that an agent need not guess the syntax."""
-    parser = strava.build_parser()
+    parser = strava_cli.build_parser()
     assert parser.parse_args(["activity", "42", "--json"]).json
     assert parser.parse_args(["--json", "activity", "42"]).json
     assert not parser.parse_args(["activity", "42"]).json
@@ -175,9 +179,9 @@ def test_the_json_flag_works_on_both_sides_of_the_subcommand():
 
 def test_every_subcommand_has_a_handler():
     """A subcommand without a function would crash with a KeyError at the worst moment."""
-    parser = strava.build_parser()
+    parser = strava_cli.build_parser()
     declared = set(parser._subparsers._group_actions[0].choices)
-    assert declared == set(strava.COMMANDS)
+    assert declared == set(strava_cli.COMMANDS)
 
 
 # ------------------------------------------------------------------ tokens
@@ -295,7 +299,7 @@ def test_login_reads_the_code_from_stdin_never_from_the_command_line(monkeypatch
     monkeypatch.setattr(strava.urllib.request, "urlopen", urlopen)
     monkeypatch.setattr(strava, "_write_cache", lambda path, payload: exchanged.update(payload))
 
-    out = strava.cmd_login(_login_args())
+    out = strava_cli.cmd_login(_login_args())
 
     assert "grant_type=authorization_code" in exchanged["body"]
     assert "code=abc123" in exchanged["body"]
@@ -335,7 +339,7 @@ def test_login_accepts_the_whole_redirect_url_pasted_as_is(monkeypatch):
                         or Response())
     monkeypatch.setattr(strava, "_write_cache", lambda path, payload: None)
 
-    strava.cmd_login(_login_args())
+    strava_cli.cmd_login(_login_args())
     assert "code=DEADBEEF" in seen["body"]
 
 
@@ -353,7 +357,7 @@ def test_a_reused_authorisation_code_says_to_start_over(monkeypatch):
 
     monkeypatch.setattr(strava.urllib.request, "urlopen", refuse)
     with pytest.raises(strava.StravaError, match="redo step 1"):
-        strava.cmd_login(_login_args())
+        strava_cli.cmd_login(_login_args())
 
 
 # ------------------------------------------------------------------ failures
@@ -364,9 +368,11 @@ def test_a_revoked_authorisation_says_what_to_do(monkeypatch):
     def refuse(*args, **kwargs):
         raise urllib.error.HTTPError("u", 400, "Bad Request", {}, None)
 
+    monkeypatch.setenv("STRAVA_CLIENT_ID", "1")
+    monkeypatch.setenv("STRAVA_CLIENT_SECRET", "2")
     monkeypatch.setattr(strava.urllib.request, "urlopen", refuse)
     with pytest.raises(strava.StravaError, match="Authorize the application again"):
-        strava._refresh("1", "2", "3")
+        strava._refresh("3")
 
 
 def test_a_rate_limit_is_not_an_absent_activity(monkeypatch):
@@ -406,7 +412,9 @@ def test_a_failure_is_reported_without_ever_printing_a_secret(monkeypatch, capsy
     monkeypatch.setattr(strava, "call",
                         lambda *a, **k: (_ for _ in ()).throw(strava.StravaError("injoignable")))
     monkeypatch.setattr("sys.argv", ["strava", "check"])
-    assert strava.main() == 1
+    with pytest.raises(SystemExit) as exited:
+        entrypoint.run(strava_cli.main)
+    assert exited.value.code == 1
     captured = capsys.readouterr()
     assert "Strava unavailable" in captured.err
     assert "token" not in captured.err.lower()

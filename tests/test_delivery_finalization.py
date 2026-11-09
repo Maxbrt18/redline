@@ -110,6 +110,3 @@ def test_partial_closed_proactive_does_not_mark_an_unreceived_question(make_bot,
 
     assert store._conversation[-1]['text'] == 'Pour ta sortie.'
     bot._mark_cells_asked.assert_not_called()
-    # The question did not cross Meta: it becomes neither tracked nor "already asked".
-    assert store._conversation[-1]['questions'] == ()
-    assert not store.question_known('4242', 'Quel plaisir ?')

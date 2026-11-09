@@ -7,7 +7,6 @@ import {leave, push, render, screen} from '../nav.js';
 import {refresh} from '../data.js';
 import {present} from '../sheet.js';
 
-// ------------------------------------------------------------ Reorganise
 // The athlete says how each day presents itself, in words of what they can do; the
 // variants follow at once, computed by the engine without the coach. A tap takes one:
 // it becomes the next revision of the week. A filter is never shown, only what a variant
@@ -91,7 +90,6 @@ function reorgDayRow(week, item, stated) {
   return row;
 }
 
-// ------------------------------------------------------------ the day sheet
 function reorgSeg(items, chosen, pick) {
   const seg = el('div', null, 'n-seg');
   items.forEach(([value, label]) => {
@@ -199,7 +197,6 @@ async function reorgHabit(week, date, item, stated, toggle) {
   reorgLoad(week);
 }
 
-// ------------------------------------------------------------ the variants
 function reorgNote(note) {
   const when = note.date ? reorgDay(note.date) : '';
   if (note.remark === 'impact_near_hard') return note.title + ' (avec sauts) tombe la veille ou le jour d’une séance exigeante.';
@@ -289,7 +286,6 @@ export function renderReorganize(view) {
   content.append(reorgHabitsLink());
 }
 
-// ------------------------------------------------------------ the coach
 const REORG_WISHES = [['intensity', 'Plus d’intensité'], ['volume', 'Plus de volume'], ['other', 'Autre']];
 function reorgAsk(view, data, plan, known) {
   const node = section('Demander au coach');
@@ -368,7 +364,6 @@ function reorgPrepare(view, data, plan) {
   content.append(keepDays, reorgHabitsLink());
 }
 
-// ------------------------------------------------------------ Habits
 const REORG_WEEKDAYS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
 export function renderHabits(data) {
   content.append(el('p', 'Elles sont cochées d’avance sur tes jours, et le coach les lit quand il écrit ta semaine. Pour en créer une, touche un jour dans Réorganiser puis « Tous les … ».', 'n-rg-intro'));

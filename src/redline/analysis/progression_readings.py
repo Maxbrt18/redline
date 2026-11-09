@@ -4,7 +4,7 @@ Each function reads facts the engine already holds and nothing else. A reading t
 ledger does not hold yet (the morning after, the runs that follow, a count the page did
 not ask for) is returned with no value: the engine treats it as unknown, never as a pass.
 
-The gate's readings mirror `ledger.gate` box by box; `tests/test_progression.py` holds
+The gate's readings mirror `week_review.gate` box by box; `tests/test_progression.py` holds
 the two to the same verdict until the gate is rendered from the engine.
 """
 
@@ -13,18 +13,15 @@ from __future__ import annotations
 import datetime as dt
 from collections.abc import Sequence
 
-from redline.model import rulebook, session_kinds
+from redline.model import iso_week, rulebook, session_kinds
 from redline.model.progression import Dose, Exposure, Reading, Signal
 from redline.model.vocabulary import WeekSleep
 
-from . import pain_rules
+from . import pain_rules, signals
 from .ledger import (
     Instruments,
     PainZone,
     Row,
-    _week_as_of,
-    _week_label,
-    _week_start,
     rest_peak,
     week_volume,
 )
@@ -42,10 +39,9 @@ def _effort_peak(rows: Sequence[Row], week: str, zone: str) -> float | None:
 def gate_exposure(rows: Sequence[Row], label: str, instr: Instruments,
                   zones: Sequence[PainZone], today: dt.date) -> Exposure:
     """A week as the gate reads it: one reading per box and per watched zone."""
-    from . import signals  # signals imports the ledger: deferred import
 
-    previous = _week_label(_week_start(label) - dt.timedelta(days=7))
-    as_of = _week_as_of(label, today)
+    previous = iso_week.of(iso_week.monday(label) - dt.timedelta(days=7))
+    as_of = iso_week.as_of(label, today)
     book = rulebook.current()
     parameters = book.parameters
     readings: list[Reading] = []
@@ -56,7 +52,7 @@ def gate_exposure(rows: Sequence[Row], label: str, instr: Instruments,
                                 None if now is None or before is None else now - before, zone))
         wakes = [row for row in rows if row.week == label and row.type == session_kinds.WAKE_TRACE]
         measured = [value for row in wakes if (value := row.pain_at(zone)) is not None]
-        base = rest_peak(list(rows), _week_start(label), zone)
+        base = rest_peak(list(rows), iso_week.monday(label), zone)
         above = [value for value in measured if value > (base if base is not None else 0.0)]
         complete = bool(measured) and len(measured) == len(wakes)
         readings.append(Reading(Signal.WEEK_WAKES_ABOVE_BASE,
@@ -74,14 +70,14 @@ def gate_exposure(rows: Sequence[Row], label: str, instr: Instruments,
                                  parameters.persistent_wake_mornings))
         readings.append(Reading(Signal.WEEK_PERSISTENT_WAKES, persistent, zone))
     drifts = [drift for drift in signals.hr_at_pace(list(rows))
-              if _week_label(drift.date) in (previous, label)
+              if iso_week.of(drift.date) in (previous, label)
               and drift.delta >= signals.HR_DRIFT_BPM]
     readings.append(Reading(Signal.WEEK_EASY_HR_DRIFTS, len(drifts)))
     readings.append(Reading(Signal.WEEK_SLEEP_DEBT,
                             None if instr.sleep is None else float(instr.sleep != WeekSleep.OK)))
     week_rows = [row for row in rows if row.week == label]
     load = Dose.of(easy_load=round(week_volume(week_rows).km_run, 2))
-    return Exposure(on=_week_start(label) + dt.timedelta(days=6), prescribed=None,
+    return Exposure(on=iso_week.monday(label) + dt.timedelta(days=6), prescribed=None,
                     performed=load, readings=tuple(readings))
 
 

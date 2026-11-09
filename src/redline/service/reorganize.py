@@ -16,12 +16,13 @@ from redline.analysis import reorganize
 from redline.coach import dates
 from redline.coach.fr import reorganize as text
 from redline.coach.fr import session_labels
+from redline.model import iso_week, paths, rulebook, week_days, weekly_plan
 from redline.model import notebook_views as views
-from redline.model import paths, rulebook, week_days, weekly_plan
 from redline.model import program as strength_program
 from redline.model.errors import InputError
 from redline.model.notes import NoteError
-from redline.model.weekly_plan import SETTLED_STATUSES, active, blocking_gates, validate
+from redline.model.vocabulary import SETTLED_STATUSES, SessionStatus
+from redline.model.weekly_plan import active, blocking_gates, validate
 
 from . import plan_revision
 
@@ -35,7 +36,7 @@ class ReorganizeError(InputError):
 def request_of(store, week: str, payload: object) -> week_days.Request:
     """The days as they stand: what the page sends, over what was stated, over habits."""
     sent = week_days.parse(payload, week)
-    dates = week_days.week_dates(week)
+    dates = iso_week.dates(week)
     return week_days.effective(week, store.habits(dates[0], dates[-1]),
                                store.stated_days(dates[0], dates[-1]), sent)
 
@@ -77,7 +78,7 @@ def compute(store, plan: dict, week: str, request: week_days.Request, today: dt.
     sessions = revision["sessions"]
     items = reorganize.items(sessions, revision.get("gates") or [], program, targets)
     outcome = reorganize.reorganise(
-        items, week_days.week_dates(week), today, request,
+        items, iso_week.dates(week), today, request,
         reorganize.Rules(runs_per_day=parameters.runs_per_day,
                          sessions_per_day=parameters.sessions_per_day,
                          load_margin_pct=parameters.reorganize_load_margin_pct,
@@ -94,7 +95,7 @@ Blocked = Literal["awaiting", "missing", "closed"]
 
 
 def _blocked(plan: dict | None, week: str, today: dt.date) -> Blocked | None:
-    if week_days.week_dates(week)[-1] < today:
+    if iso_week.dates(week)[-1] < today:
         return "closed"
     if plan is None:
         return None
@@ -104,8 +105,6 @@ def _blocked(plan: dict | None, week: str, today: dt.date) -> Blocked | None:
         return "awaiting"
     return None
 
-
-# ------------------------------------------------------------------ the screen
 
 def _figure(session: dict) -> str:
     if session.get("distance_target_km"):
@@ -129,10 +128,10 @@ def _state(day: week_days.Day | None) -> views.DayState | None:
 def _days(revision: dict | None, week: str, today: dt.date, request: week_days.Request,
           habits: list[dict]) -> list[views.ReorganizeDay]:
     out: list[views.ReorganizeDay] = []
-    for date in week_days.week_dates(week):
+    for date in iso_week.dates(week):
         iso = date.isoformat()
         here = [session for session in (revision or {}).get("sessions", [])
-                if session["date"] == iso and session["status"] != "cancelled"]
+                if session["date"] == iso and session["status"] != SessionStatus.CANCELLED]
         habit = week_days.habit_on(habits, date)
         out.append({
             "date": iso, "past": date < today,
@@ -154,7 +153,7 @@ def _variant(variant: reorganize.Variant, computation: Computation) -> views.Var
     moved = {move.after for move in variant.moves}
     carried_on = placed.get(variant.carried) if variant.carried else None
     days: list[views.VariantDay] = []
-    for date in week_days.week_dates(computation.week):
+    for date in iso_week.dates(computation.week):
         here = sorted((item_id for item_id, at in placed.items() if at == date),
                       key=lambda item_id: (by_id[item_id].strength, item_id))
         days.append({
@@ -183,7 +182,7 @@ def _variant(variant: reorganize.Variant, computation: Computation) -> views.Var
 
 def view(store, week: str, payload: object, today: dt.date) -> views.ReorganizeView:
     request = request_of(store, week, payload)
-    dates = week_days.week_dates(week)
+    dates = iso_week.dates(week)
     habits = store.habits(dates[0], dates[-1])
     plan = store.load_plan(week)
     if plan is not None:
@@ -207,8 +206,6 @@ def view(store, week: str, payload: object, today: dt.date) -> views.ReorganizeV
         "held_back": [titles[item] for item in computation.outcome.held_back],
     }
 
-
-# ------------------------------------------------------------------ taking a variant
 
 def _day(date: dt.date) -> str:
     return f"{dates.weekday(date, 'abbreviated')} {date:%d/%m}"
@@ -250,12 +247,12 @@ def revision_of(computation: Computation, choice: int, stamp: str) -> dict:
     for session in previous["sessions"]:
         copy = {key: value for key, value in session.items() if key != "db_id"}
         # The read model shows what happened as `done`; a revision states intent only.
-        if copy["status"] not in {"planned", "cancelled"}:
-            copy["status"] = "planned"
+        if copy["status"] not in {SessionStatus.PLANNED, SessionStatus.CANCELLED}:
+            copy["status"] = SessionStatus.PLANNED
         if session["id"] in placed:
             copy["date"] = placed[session["id"]].isoformat()
         if session["id"] in dropped:
-            copy["status"] = "cancelled"
+            copy["status"] = SessionStatus.CANCELLED
         sessions.append(copy)
     number, count = choice + 1, len(variants)
     changes: list[dict] = [{"session_id": move.session, "fields": ["date"], "trigger": evidence,
@@ -312,11 +309,9 @@ def take(store, week: str, payload: object, expected: int, choice: int, today: d
     return current["revision"]
 
 
-# ------------------------------------------------------------------ days stated ahead, habits
-
 def state_days(store, week: str, payload: object, today: dt.date) -> None:
     """Keep the days stated for `week` from today on: the coach writes the week with them."""
-    dates = week_days.week_dates(week)
+    dates = iso_week.dates(week)
     if dates[-1] < today:
         raise ReorganizeError(f"{week}: the week is over")
     sent = week_days.parse(payload, week)
@@ -365,8 +360,6 @@ def days_readback(store, week: str) -> str:
                               habit=text.HABIT if day.habit else "")
         for date, day in sorted(request.days.items()))])
 
-
-# ------------------------------------------------------------------ the coach's proposals
 
 WISHES = ("intensity", "volume", "other")
 CONTEXT_MAX = 500
@@ -421,7 +414,7 @@ def _changes(current: dict, proposed: dict) -> list[str]:
         day = _day(dt.date.fromisoformat(session["date"]))
         if old is None:
             lines.append(text.ADDED.format(title=session["title"], day=day))
-        elif session["status"] == "cancelled" and old["status"] != "cancelled":
+        elif session["status"] == SessionStatus.CANCELLED and old["status"] != SessionStatus.CANCELLED:
             lines.append(text.DROPPED.format(title=old["title"]))
         elif old["date"] != session["date"]:
             lines.append(text.MOVED.format(title=session["title"], after=day,

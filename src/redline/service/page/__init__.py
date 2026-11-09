@@ -14,12 +14,13 @@ No build step, no bundler to install on the VPS; the source reads like modules
 and the page ships as one script. The rules a module follows are
 enforced by tests/test_page_modules.py.
 
-The design tokens and the fonts are READ FROM THE VAULT (src/redline/cards/), which
-is where they already live for the cards -- the page borrows the skin, never
-copies it. If a file is missing the page still renders, just in the system font
-stack: an asset is never a reason to fail.
+The design tokens and the fonts are READ FROM THE CARDS (src/redline/cards/), the
+directory the caller passes -- the page borrows the skin, never copies it. If a file is
+missing the page still renders, just in the system font stack: an asset is never a
+reason to fail.
 
-Leaf module: standard library only.
+Leaf of `redline.service`: it imports only the standard library and its French texts
+from `redline.coach.fr`.
 """
 
 from __future__ import annotations
@@ -42,8 +43,7 @@ log = logging.getLogger("redline")
 PAGE_DIR = Path(__file__).resolve().parent
 
 # (CSS alias, file name, weight or weight range) -- mirrors FONT_FACES in
-# src/redline/cards/render.py. Duplicated rather than imported: the cards live in the
-# vault (a configurable path), the server package must not reach into it to boot.
+# src/redline/cards/render.py: the two must name the same faces.
 FONT_FACES = (
     ("Redline Sans", "Inter-latin.woff2", "100 900"),
     ("Redline Display", "BarlowCondensed-SemiBold.woff2", "600"),
@@ -166,9 +166,9 @@ def _cue_script(cues) -> str:
     served once then answered with a 304; the snapshot only carries the slug, which
     the prescription already owns.
 
-    Consequence: `/s` no longer carries zero data, it carries movement cues. No health
-    data, no name, no dose, nothing personal -- a cue such as "knee bent to ~30
-    degrees, full range" is in any manual. The page is no longer an empty shell.
+    Consequence: `/s` carries movement cues, and nothing else: no health data, no
+    name, no dose, nothing personal -- a cue such as "knee bent to ~30 degrees, full
+    range" is in any manual.
 
     The document is assembled at startup, so the cues are part of the runtime and
     updating them takes a deployment of the service.
@@ -224,7 +224,7 @@ _LAUNCH = re.compile(r"(\d{3,4})x(\d{3,4})-(light|dark)")
 
 
 def _png(width: int, height: int, rgb: tuple[int, int, int]) -> bytes:
-    """A plain-colour PNG, standard library only (leaf module)."""
+    """A plain-colour PNG, standard library only."""
     def chunk(kind: bytes, data: bytes) -> bytes:
         return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
     row = b"\x00" + bytes(rgb) * width

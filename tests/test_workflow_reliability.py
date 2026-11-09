@@ -27,7 +27,6 @@ from redline.service.worker import (
     FAILURE_REPLIES,
     OUTAGE_NOTICE,
     PLAN_UNAVAILABLE_LINE,
-    TurnWorker,
 )
 
 PSID = "4242"
@@ -56,8 +55,6 @@ def _claim(store, key, kind, detail="", *, expire_at=0.0):
     return ProactiveJob(psid=PSID, kind=kind, prompt="p", job_id=record["id"],
                         detail=record["detail"], expire_at=record["expire_at"] or None,
                         attempts=record["attempts"])
-
-
 
 
 def test_rwf001_an_applied_command_never_costs_a_second_model_call(make_bot):
@@ -90,8 +87,6 @@ def test_rwf001_a_finished_answer_is_delivered_as_written(make_bot):
     assert len(agent.calls) == 1
 
 
-
-
 def test_rwf002_a_safety_answer_leaves_even_when_the_week_is_unreadable(make_bot):
     safety = ("Arrête la séance maintenant. Une douleur focale qui augmente "
               "mérite un avis médical avant de recourir.")
@@ -117,8 +112,6 @@ def test_rwf002_a_program_request_without_a_valid_week_gets_one_precise_line(mak
 
     assert PLAN_UNAVAILABLE_LINE in _sent(bot._client)
     bot._repo.weekly_plan_message.assert_not_called()
-
-
 
 
 def test_rwf004_no_adapter_text_ever_reaches_alex(make_bot):
@@ -233,8 +226,6 @@ def test_rwf023_claude_initiatives_return_their_typed_decision(
     assert "--json-schema" in launched[0]
 
 
-
-
 def test_rwf005_a_reply_delivered_before_a_memory_failure_is_never_recomputed(make_bot):
     agent = ScriptedAgent([RunResult(full_text="Réponse A"), RunResult(full_text="Réponse B")])
     bot = make_bot(agent=agent)
@@ -266,8 +257,6 @@ def test_rwf005_a_transport_failure_resends_the_stored_answer_without_the_model(
     assert bot._repo.persist_turn.call_count == 1
     assert client.send_burst.call_args.args[1] == "Réponse A"
     assert bot._state._conversation[-1]["text"] == "Réponse A"
-
-
 
 
 def test_rwf006_a_long_outage_is_announced_once_and_never_leaves_silence(make_bot,
@@ -334,8 +323,6 @@ def test_b20_a_message_overtaken_by_the_previous_reply_is_flagged(make_bot):
     assert "partie après lui" in agent.calls[0]["message"]
 
 
-
-
 def test_rwf007_an_invalid_morning_is_not_regenerated(make_bot, store):
     agent = FakeAgent(result=RunResult(full_text="Bonjour !"))
     bot = make_bot(agent=agent, proactive_active_start=None)
@@ -383,8 +370,6 @@ def test_rwf007_a_released_job_always_carries_an_expiry(make_bot, store):
     assert row["status"] == "pending" and row["expire_at"] > time.time()
 
 
-
-
 def test_rwf009_a_week_without_a_valid_plan_gets_one_repair_job(make_bot, store):
     bot = make_bot()
     bot._repo.validate_weekly_plan.return_value = PlanStatus.INVALID
@@ -430,8 +415,6 @@ def test_rwf009_the_repair_job_must_leave_a_valid_week_behind(make_bot, store):
     assert "Programme 2026-W39" in _sent(bot._client)
 
 
-
-
 def test_rwf013_the_window_starts_in_the_morning_and_runs_to_midnight(make_config):
     config = make_config(proactive_active_start=dt.time(7, 30))
     assert not config.in_active_window(dt.time(6, 59))
@@ -450,8 +433,6 @@ def test_rwf013_a_recent_reactive_reply_keeps_initiatives_quiet(make_bot):
     assert bot.conversation_active(PSID)
 
 
-
-
 def test_rwf014_the_holding_line_is_a_real_remembered_message(make_bot):
     bot = make_bot()
 
@@ -461,8 +442,6 @@ def test_rwf014_the_holding_line_is_a_real_remembered_message(make_bot):
     assert row["text"] == "Je regarde ta semaine."
     assert row["resolve_questions"] is False
     assert row["source_key"].startswith("holding:")
-
-
 
 
 def test_rwf016_a_turn_is_traceable_by_structured_events_without_text(make_bot, caplog):
@@ -494,8 +473,6 @@ def test_rwf016_an_event_cannot_carry_free_text():
         events.emit("turn.stage", message="texte de Sam")
 
 
-
-
 def test_rwf021_an_attachment_that_failed_in_flight_is_not_reanalysed(make_bot):
     from contextlib import contextmanager
 
@@ -517,8 +494,6 @@ def test_rwf021_an_attachment_that_failed_in_flight_is_not_reanalysed(make_bot):
     assert ATTACHMENT_UNREADABLE in _sent(bot._client)
 
 
-
-
 def test_rwf022_an_initiative_shows_no_typing_while_it_is_written(make_bot):
     bot = make_bot(agent=FakeAgent(result=RunResult(full_text="", silent=True)),
                    proactive_active_start=None)
@@ -528,8 +503,6 @@ def test_rwf022_an_initiative_shows_no_typing_while_it_is_written(make_bot):
     assert all(call.args[1] != "typing_on" for call in bot._client.action.call_args_list)
 
 
-
-
 def test_rwf024_a_turn_reads_the_declarative_ledger_once(make_bot):
     bot = make_bot(agent=FakeAgent(result=RunResult(full_text="ok")))
 
@@ -537,8 +510,6 @@ def test_rwf024_a_turn_reads_the_declarative_ledger_once(make_bot):
 
     bot._repo.ledger_cells.assert_called_once()
     bot._repo.pending_ledger_cells.assert_not_called()
-
-
 
 
 def test_rwf025_a_closed_initiative_with_an_unreadable_detail_never_wakes_the_agent(
@@ -551,8 +522,6 @@ def test_rwf025_a_closed_initiative_with_an_unreadable_detail_never_wakes_the_ag
 
     assert agent.calls == []
     assert store.proactive.jobs()[0]["status"] == "failed"
-
-
 
 
 def test_rwf026_a_read_timeout_is_never_resent(make_config, monkeypatch):
@@ -614,13 +583,6 @@ def test_publication_happens_after_delivery_in_the_worker(make_bot):
 
     assert order == ["persist", "deliver", "publish"]
     bot._repo.sync.assert_called_once()
-
-
-def test_retry_delays_are_declared_where_they_are_used():
-    assert TurnWorker.PROACTIVE_MAX_ATTEMPTS == 3
-    assert TurnWorker.REACTIVE_RETRY_DELAYS[0] == 30.0
-
-
 
 
 def test_rwf017_the_documentation_names_no_removed_mechanism():

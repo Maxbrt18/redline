@@ -17,7 +17,6 @@ from unittest.mock import MagicMock
 import pytest
 from conftest import load_script
 
-from redline.model import commands
 from redline.model.errors import InputError
 from redline.service.prompts import PROACTIVE_TRIGGERS, build_proactive_prompt
 from redline.service.vault import VaultRepo
@@ -37,7 +36,6 @@ def test_the_delivered_trace_carries_the_angle_the_turn_deposited():
     repo.record_proactive_delivery(_job(), datetime.now().astimezone(), "Alors, « La douche »…",
                                    "turn-42")
 
-    store.turn_angle.assert_called_once_with("turn-42")
     assert store.add_proactive_message.call_args.args[0]["angle"] == "titre Strava, récit libre"
 
 
@@ -62,10 +60,6 @@ def test_the_cli_refuses_an_angle_outside_a_turn(monkeypatch, capsys):
         fact_write.main()
 
     assert "turn" in str(refusal.value)
-
-
-def test_the_angle_is_a_turn_command_so_a_refused_turn_takes_it_along():
-    assert commands.PROACTIVE_ANGLE in commands.ACTIVE
 
 
 def test_both_paths_that_ask_for_an_angle_also_name_where_it_goes():

@@ -31,9 +31,8 @@ from redline.coach.fr.replies import (
     UNRECORDED_GENERIC,
     UNRECORDED_LABELS,
 )
+from redline.model import iso_week
 from redline.model import ledger as ledger_model
-from redline.model import session_kinds
-from redline.model import weekly_plan as weekly_plan_model
 from redline.storage import StorageError
 
 from . import clock, events
@@ -61,8 +60,14 @@ from .plans import (
     render_plan_message,
     strength_due,
 )
-from .proactive import ACTIVE_SILENCE_SECONDS, ProactiveJob, ProactiveScheduler
-from .proactive import HEAVY_KINDS as HEAVY_PROACTIVE_KINDS
+from .proactive import (
+    ACTIVE_SILENCE_SECONDS,
+    ProactiveJob,
+    ProactiveScheduler,
+    debrief_snapshot,
+    waiting_debriefs,
+)
+from .proactive_kinds import policy
 from .proactive_messages import (
     CLOSED_KINDS,
     ClosedProactive,
@@ -77,7 +82,6 @@ from .prompts import (
     DEPTH_NOTES,
     EMOTION_NOTE,
     HELP_TEXT,
-    MUST_SPEAK_KINDS,
     NOTEBOOK_NOTE,
     PROACTIVE_TRIGGERS,
     STALE_VAULT_NOTE,
@@ -113,11 +117,6 @@ from .work_queue import (
 
 log = logging.getLogger("redline")
 
-# Triggers for which staying silent is NOT an editorial option: they start from an activity
-# that just arrived, so there is always something to say. Their silence is a read failure
-# and is retried once. The others (morning note, check-in) may have nothing to say, and
-# that is the right answer.
-SILENCE_IS_A_FAILURE = frozenset({"strava_debrief", "strava_debrief_late"})
 CONTROL_COMMANDS = frozenset({"/status", "/cancel"})
 #: The motive that sends a plan delta rather than the remaining state.
 PLAN_CHANGED = "the prescription changed"
@@ -140,12 +139,7 @@ def unrecorded_line(kinds: Iterable[str]) -> str:
     return replies.unrecorded(labels) if labels else ""
 
 
-#: Initiatives that asked for feelings the notebook now collects.
-NOTEBOOK_KINDS = frozenset({"strava_debrief", "strava_debrief_late", "morning"})
-
-
 class TurnWorker:
-    HEAVY_KINDS = HEAVY_PROACTIVE_KINDS
     PATIENT_DEPTHS = frozenset({"N2", "N3"})
     PATIENCE_MIN_GAP = 10 * 60
     # A direct inbound already has its route's model fallbacks and each adapter's network
@@ -162,34 +156,6 @@ class TurnWorker:
     PROACTIVE_RETRY_DELAYS: ClassVar[tuple[float, ...]] = (300.0, 900.0, 2700.0)
     PROACTIVE_MAX_ATTEMPTS = 3
     WEEK_REPAIR_CHECK_SECONDS = 15 * 60
-    # How long a proactive stays relevant after its first failed attempt: past that
-    # we drop it rather than replay it (a "good morning" in the afternoon is noise).
-    RETRY_STALENESS_HOURS: ClassVar[dict] = {
-        "strava_debrief": 4.0,
-        # Already a next-morning message: if the agent is down at 07:30 it still makes
-        # sense at 10:00, not the day after.
-        "strava_debrief_late": 4.0,
-        "morning": 3.0,
-        "weekly": 6.0,
-        "weekly_repair": 12.0,
-        "monthly": 24.0,
-        "silence": 24.0,
-        # The cell leaves its window at midnight: a claim replayed the next day no longer asks
-        # for a memory but for a reconstruction. It dies with the night.
-        "ledger_incomplete": 2.0,
-        "missed_session": 8.0,
-        "daily_signal": 12.0,
-        "premortem": 24.0,
-        "correction": 24.0,
-        "decision_challenge": 24.0,
-        "gut_review": 12.0,
-        "gear_alert": 24.0,
-        "race_countdown": 168.0,
-        "strength_card": 12.0,
-        "operator_message": 6.0,
-        # The notebook no longer takes the trace after 14:00: `expires_at` already bounds the job.
-        "wake_trace": 3.5,
-    }
 
     def __init__(self, client: MessengerClient, repo: VaultRepo,
                  agent: AgentRunner, state: StateStore, config: Config,
@@ -260,8 +226,6 @@ class TurnWorker:
         """Exposed for /health, which reports the code the process booted on."""
         return self._repo
 
-    # ---- inputs
-
     def submit_event(self, psid: str, kind: str, text: str, *, message_id: str) -> None:
         """Dispatch one durably claimed Messenger event."""
         if kind in {"text", "postback"}:
@@ -327,8 +291,6 @@ class TurnWorker:
         return (self.has_pending_inbound() or self._reactive_since is not None
                 or now - self._state.last_inbound(psid) < ACTIVE_SILENCE_SECONDS
                 or now - self._last_reactive_reply < ACTIVE_SILENCE_SECONDS)
-
-    # ---- worker
 
     def _worker(self) -> None:
         while True:
@@ -452,8 +414,6 @@ class TurnWorker:
         self._outage_notice_at = time.time()
         self._deliver_limit(psid, "outage", ids, OUTAGE_NOTICE)
 
-    # ---- replies
-
     def _deliver_attachment_text(self, request: AttachmentRequest, text: str,
                                  turn_id: str = "") -> bool:
         source_key = f"attachment:{request.message_id}"
@@ -540,7 +500,7 @@ class TurnWorker:
             pending, asked, notebook=bool(psid) and self._notebook_connected(psid))
 
     def _notebook_connected(self, psid: str) -> bool:
-        """The notebook collects the feelings: Messenger no longer asks for them again."""
+        """The notebook collects the feelings: Messenger does not ask for them again."""
         notebook = self._delivery.notebook
         return notebook is not None and notebook.connected(psid)
 
@@ -657,19 +617,14 @@ class TurnWorker:
         """
         pro = self._state.proactive
         late = ProactiveScheduler.DEBRIEF_MAX_LATE_HOURS * 3600
-        for job in pro.jobs(active_only=True):
-            if (job["kind"] != "strava_debrief" or job["status"] != "pending"
-                    or time.time() - job["due"] > late):
+        for job in waiting_debriefs(pro):
+            if time.time() - job["due"] > late:
                 continue
             record = pro.claim_job(job["id"])
             if record is None:
                 continue
             try:
-                capture = self._state.ingest_strava_activity(
-                    int(record["detail"]), fresh_words=True)
-                snapshot = capture.get("snapshot")
-                if not isinstance(snapshot, dict) or not snapshot.get("activity"):
-                    raise ValueError("empty Strava snapshot after capture")
+                snapshot = debrief_snapshot(self._state, record["detail"])
             except Exception as exc:
                 log.warning("Strava activity %s not folded into the reply (%s): %s",
                             record["detail"], type(exc).__name__, exc)
@@ -1145,8 +1100,7 @@ class TurnWorker:
     @staticmethod
     def _iso_week(moment: datetime, offset_days: int = 0) -> str:
         """The ISO week, computed by the model that declares it everywhere else."""
-        return weekly_plan_model.current_week(
-            moment.date() + timedelta(days=offset_days))
+        return iso_week.of(moment.date() + timedelta(days=offset_days))
 
     def _logical_moment(self, job: ProactiveJob, observed: datetime) -> datetime:
         """Anchor a periodic retry to the period encoded by its durable key.
@@ -1160,19 +1114,15 @@ class TurnWorker:
         if job.kind != "weekly" or not job.job_id.startswith(prefix):
             return observed
         value = job.job_id.removeprefix(prefix)
-        try:
-            year_text, week_text = value.split("-W", 1)
-            sunday = datetime.fromisocalendar(int(year_text), int(week_text), 7).date()
-        except (ValueError, TypeError):
+        if not iso_week.is_label(value):
             log.error("Unreadable weekly review key: %s", job.job_id)
             return observed
+        sunday = iso_week.sunday(value)
         if observed.date() == sunday:
             # Sent as soon as Sunday is settled: the real time, not the fallback time.
             return observed
         scheduled = self._config.proactive_weekly or observed.timetz().replace(tzinfo=None)
         return clock.combine(sunday, scheduled)
-
-    # ---- proactive
 
     def _proactive_key(self, job: ProactiveJob) -> str:
         return (f"proactive:{job.job_id}" if job.job_id
@@ -1231,7 +1181,7 @@ class TurnWorker:
         psid = job.psid
         started = time.monotonic()
         outbox_before = self._outbox.snapshot()
-        heavy = job.kind in self.HEAVY_KINDS
+        heavy = policy(job.kind).heavy
         # A heavy job starts from a blank session. A light proactive starts from a COPY of the
         # conversation: undelivered, it leaves no trace in the main session, so there is never
         # anything to erase.
@@ -1303,7 +1253,7 @@ class TurnWorker:
         if not reply and not canonical:
             self._discard_outbox(outbox_before)
             self._log_vault_alerts()
-            if job.kind in SILENCE_IS_A_FAILURE:
+            if policy(job.kind).debrief:
                 # A debrief exists ONLY because an activity just arrived: its silence means the
                 # output was not read. One retry only.
                 cause = "automatic debrief stayed silent"
@@ -1312,13 +1262,13 @@ class TurnWorker:
                 else:
                     self._buffer_proactive_retry(job, cause=cause)
                 return
-            if job.kind in MUST_SPEAK_KINDS:
+            if policy(job.kind).must_speak:
                 self._fail_job(job, "work finished without a message")
                 return
             log.info("Proactive %s -> silence (nothing useful to say)", job.kind)
             self._complete_job(job)
             return
-        if not reply and job.kind in MUST_SPEAK_KINDS:
+        if not reply and policy(job.kind).must_speak:
             self._log_incident(f"{job.kind}-without-text:{job.job_id}",
                                "The plan goes out without the review that should come with it.")
         message = "\n---\n".join(part for part in (reply, canonical) if part)
@@ -1332,7 +1282,7 @@ class TurnWorker:
                      plan_card=(self._iso_week(now_for_plan, offset_days=7)
                                 if job.kind == "weekly" and canonical else None),
                      workout_card=workout_card,
-                     check_activity=job.kind in SILENCE_IS_A_FAILURE)
+                     check_activity=policy(job.kind).debrief)
         self._send_proactive(job, builder.build())
         log.info("Proactive %s sent in %.0f s", job.kind, time.monotonic() - started)
 
@@ -1550,7 +1500,7 @@ class TurnWorker:
             self._fail_job(job, f"{cause} ; {job.attempts} tentatives")
             return
         now = time.time()
-        budget = self.RETRY_STALENESS_HOURS.get(job.kind, 4.0)
+        budget = policy(job.kind).staleness_hours
         expire = job.expire_at or now + budget * 3600
         delay = self.PROACTIVE_RETRY_DELAYS[
             min(job.attempts, len(self.PROACTIVE_RETRY_DELAYS)) - 1]
@@ -1577,7 +1527,7 @@ class TurnWorker:
         """Put a claimed job back in the queue, always with a deadline."""
         if not job.job_id:
             return
-        budget = self.RETRY_STALENESS_HOURS.get(job.kind, 4.0)
+        budget = policy(job.kind).staleness_hours
         expire = job.expire_at or time.time() + budget * 3600
         if self._state.proactive.release_job(job.job_id, delay, expire_at=expire):
             log.info("Proactive %s released", job.job_id)
@@ -1607,9 +1557,7 @@ class TurnWorker:
         if any(job["kind"] in {"weekly", "weekly_repair"}
                for job in self._state.proactive.jobs(active_only=True)):
             return False
-        year, number = week.split("-W")
-        sunday = datetime.fromisocalendar(int(year), int(number), 7).date()
-        expires = clock.combine(sunday, datetime.max.time().replace(microsecond=0))
+        expires = clock.combine(iso_week.sunday(week), datetime.max.time().replace(microsecond=0))
         inserted = self._state.proactive.enqueue_job(
             f"weekly-repair:{week}", "weekly_repair", week, moment.timestamp(),
             expire_at=max(expires.timestamp(), moment.timestamp() + 3600), priority=True)
@@ -1778,21 +1726,15 @@ class TurnWorker:
             original = {}
         if not isinstance(original, dict):
             original = {}
-        # Old jobs may have been created before the scheduler's guard. They are expired here,
-        # before any delivery, so a wake trace is never asked in the evening as a /10.
-        if original.get("type") == session_kinds.WAKE_TRACE:
-            self._complete_job(job)
-            log.info("Stale wake follow-up ignored: %s", job.job_id or job.kind)
-            return
-        current = next((entry for entry in self.pending_ledger_cells(clock.today())
+        current = next((entry for entry in ledger_model.memory_cells(
+            self.pending_ledger_cells(clock.today()))
                         if str(entry["date"]) == original.get("date")
                         and entry["type"] == original.get("type")), None)
         if current is None:
             self._complete_job(job)
             return
         missing = [column for column in current["missing"]
-                   if ledger_model.column_base(column) in ledger_model.DECLARED_COLUMNS and not
-                   self._state.proactive.marked(
+                   if not self._state.proactive.marked(
                        "asked:" + ledger_model.cell_key(current, column))]
         if not missing:
             self._complete_job(job)
@@ -1884,7 +1826,7 @@ class TurnWorker:
         # Set before the early return: an initiative goes out without a message from the athlete,
         # so it has even less context to guess the day than a reactive turn.
         prompt = today_note(moment) + "\n\n" + prompt
-        if job.kind in NOTEBOOK_KINDS and self._notebook_connected(job.psid):
+        if policy(job.kind).notebook and self._notebook_connected(job.psid):
             prompt = NOTEBOOK_NOTE + "\n\n" + prompt
         if job.kind == "weekly_repair":
             week = job.detail or current
@@ -1918,7 +1860,7 @@ class TurnWorker:
 
     def _check_activity_recorded(self, job: ProactiveJob) -> None:
         """Verify that an activity-driven debrief persisted its exact Strava id."""
-        if job.kind not in SILENCE_IS_A_FAILURE or not job.detail:
+        if not policy(job.kind).debrief or not job.detail:
             return
         recorded = self._repo.activity_recorded(job.detail)
         if recorded is None:
@@ -1939,8 +1881,6 @@ class TurnWorker:
         for path in self._outbox.collect_new(before):
             log.info("Image discarded (no text output): %s", path.name)
             self._outbox.archive(path)
-
-    # ---- commands
 
     def _run_command(self, psid: str, command: str, *,
                      message_ids: tuple[str, ...] = ()) -> bool:

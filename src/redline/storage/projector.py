@@ -12,7 +12,7 @@ from pathlib import Path
 
 import sqlalchemy as sa
 
-from redline.model import strength_log, vault_layout, weekly_plan
+from redline.model import iso_week, strength_log, vault_layout, weekly_plan
 from redline.model.views import apply as apply_view
 
 from .repository import OperationalStore
@@ -95,7 +95,7 @@ def _plan_projections(store: OperationalStore, root: Path):
         plan = store.load_plan(path.stem.upper())
         if plan:
             yield path, weekly_plan.render_journal(plan)
-    plan = store.load_plan(weekly_plan.current_week())
+    plan = store.load_plan(iso_week.of(dt.date.today()))
     # `.exists()` like the glob above: a projection targets a file that EXISTS.
     # Without this guard `plan_drift` would read a missing path and crash instead of
     # reporting drift.
@@ -113,7 +113,7 @@ def ensure_journals(store: OperationalStore, root: Path,
     """
     day = today or dt.date.today()
     created = []
-    for week in (weekly_plan.current_week(day), weekly_plan.next_week(day)):
+    for week in (iso_week.of(day), iso_week.of(day + dt.timedelta(days=7))):
         path = root / vault_layout.journal(week)
         if path.exists() or store.load_plan(week) is None:
             continue

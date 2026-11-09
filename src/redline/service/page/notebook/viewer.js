@@ -3,7 +3,6 @@ import {tintBar} from '../shared/theme.js';
 import {calm} from './state.js';
 import {message} from './ui.js';
 
-// ------------------------------------------------------------ viewer
 // A card enlarges in the app, full screen on black, without going through Safari: pinch
 // or double-tap to zoom, drag down to close.
 // Share opens the phone sheet (Photos, Messages); without it, the image downloads.

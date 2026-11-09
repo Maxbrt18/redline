@@ -14,8 +14,8 @@ from conftest import FakeAgent
 from redline.service.agent import FailureKind, RunResult
 from redline.service.messenger import DeliveryResult
 from redline.service.proactive import ProactiveJob
+from redline.service.proactive_kinds import policy
 from redline.service.vault import PersistenceResult
-from redline.service.worker import TurnWorker
 
 
 def _claimed(store, kind, *, expire_at=0.0, key=None):
@@ -54,7 +54,7 @@ def test_rate_limited_proactive_is_deferred_until_the_provider_returns(make_bot,
     assert pending["status"] == "pending"
     assert pending["due"] == retry_at
     # Expiry anchored on this first attempt, within the weekly staleness budget.
-    assert 0 < pending["expire_at"] - time.time() <= TurnWorker.RETRY_STALENESS_HOURS["weekly"] * 3600
+    assert 0 < pending["expire_at"] - time.time() <= policy("weekly").staleness_hours * 3600
 
 
 def test_expiry_stays_anchored_to_the_first_attempt(make_bot, store):

@@ -114,7 +114,6 @@ DEADLINE_LATE = "{due_on} — {item} (échéance passée, encore à faire)"
 
 CAPABILITY_NOTES = "notes de capacité conformes"
 
-MODEL_UNAVAILABLE = "couche modèle indisponible ({model_unavailable})"
 
 CAPABILITIES_COUNT = "{capabilities} capacité(s)"
 

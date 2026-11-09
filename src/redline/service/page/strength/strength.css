@@ -28,14 +28,12 @@
 :where(#workout) button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .p-num { font-variant-numeric: tabular-nums; }
 
-/* ------------------------------------------------------------------- header */
 .p-note { margin-top: 16px; color: var(--muted); line-height: 1.42; }
 /* The safeguard sentence. Full ink, because it explains why the displayed session is
  * not the announced one -- no frame or pill for that: ink weight is what sets it apart,
  * as everywhere here. */
 .p-note--gate { color: var(--ink); font-weight: 600; }
 
-/* -------------------------------------------------------------------- steps */
 .p-steps {
   display: flex;
   flex-direction: column;
@@ -66,11 +64,11 @@
 .p-step__name { font-weight: 600; line-height: 1.28; overflow-wrap: anywhere; }
 .p-step__sub { margin-top: 5px; font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
 
-/* UNDER the name, on its own full line. It used to be a right-hand cell, like the
- * card rows -- but the card is frozen at 1080 px and this has to hold at 375, where
- * two columns simply cannot both have enough room: "3 min" wrapped to two lines and
- * "40 contacts, en blocs de 10" to three, against a name already using three.
- * Given the whole line, the dose has nothing left to arbitrate. */
+/* UNDER the name, on its own full line, not a right-hand cell like the card rows: the
+ * card is frozen at 1080 px but this has to hold at 375, where two columns cannot both
+ * have enough room ("3 min" would wrap to two lines and "40 contacts, en blocs de 10"
+ * to three, against a name already using three). Given the whole line, the dose has
+ * nothing left to arbitrate. */
 .p-step__dose {
   margin-top: 5px;
   font-size: 14px;
@@ -89,7 +87,6 @@
 .p-step--live .p-step__name { font-size: 21px; line-height: 1.22; }
 .p-step--live .p-step__index { flex-basis: 26px; height: 26px; border-radius: 50%; background: var(--tartan); color: var(--on-track); font-size: 15px; line-height: 26px; text-align: center; }
 
-/* ------------------------------------------------------------------ control */
 .p-ctrl { margin: 18px 0 2px 40px; }
 @media (max-width: 400px) { .p-ctrl { margin-left: 0; } }
 
@@ -213,7 +210,6 @@ textarea.p-input { max-width: none; min-height: 96px; resize: vertical; line-hei
 }
 .p-last__value { margin-top: 3px; font-size: 16px; color: var(--muted); }
 
-/* ---------------------------------------------------------------- opening */
 /* The pain reading from before. Same treatment as the end review: it is the same
  * question, asked at the other end of the session. */
 .p-open { margin-top: 30px; }
@@ -225,7 +221,6 @@ textarea.p-input { max-width: none; min-height: 96px; resize: vertical; line-hei
 }
 .p-open__hint { margin: 10px 0 18px; color: var(--muted); font-size: 15px; line-height: 1.4; }
 
-/* ------------------------------------------------------------------- review */
 .p-rule {
   margin-top: 30px;
   padding-top: 20px;
@@ -298,7 +293,6 @@ textarea.p-input { max-width: none; min-height: 96px; resize: vertical; line-hei
 :where(#workout) button:disabled { cursor: default; opacity: .65; }
 :where(#workout) :is(button, summary):focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
 
-/* --------------------------------------------------------------------- boot */
 .p-boot { padding: 40px 4px; }
 .p-boot__title {
   font-family: var(--display);

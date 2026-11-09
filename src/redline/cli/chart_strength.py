@@ -33,10 +33,9 @@ from redline.model.errors import InputError
 from redline.model.notes import NoteError
 from redline.model.schema import SchemaError
 
-# The only cross-tree import in the repo: the card mints the signed link with the
-# very code the server verifies it with, so the two can never disagree.
-# `redline.service.strength` is a declared leaf (standard library only, imports nothing
-# from its own package), which is what makes reaching into the service safe here.
+# The card mints the signed link with the very code the server verifies it with, so the
+# two can never disagree. `redline.service.strength` imports nothing from the rest of
+# `redline.service`, which is what makes reaching into the service safe here.
 from redline.service import strength
 
 

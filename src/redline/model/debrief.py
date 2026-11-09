@@ -58,8 +58,6 @@ def gaps(row: Any, session: dict | None, drift: Any | None) -> list[str]:
     return out
 
 
-# ------------------------------------------------------------------ repetitions
-
 #: Sessions whose debrief carries the repetitions card. A long run or a race is demanding
 #: without being fractioned: its laps are kilometres, not reps.
 QUALITY_WORKOUTS = session_kinds.REPETITIONS

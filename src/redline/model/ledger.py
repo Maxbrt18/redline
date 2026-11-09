@@ -7,15 +7,18 @@ import re
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from enum import StrEnum
+from typing import Any
 
 from redline.coach.fr import ledger as text
 
-from . import session_kinds
+from . import formats, session_kinds
 from .errors import ConfigError, InputError
 from .schema import Schema, field
-from .vocabulary import CarbMix, FuelFormat, GutSymptom
+from .vocabulary import CarbMix, FuelFormat, GutSymptom, MeasurementState
 
 UNKNOWN = "?"
+#: The states that answer a question: a value, or the fact that it is lost.
+SETTLED_READINGS = frozenset({MeasurementState.KNOWN, MeasurementState.UNAVAILABLE})
 
 SESSION_TYPES = session_kinds.RECORDED
 REST_TYPES = session_kinds.READINGS
@@ -38,9 +41,9 @@ class ObservationInput:
 
 STRAVA_ID_PATTERN = r"\d{9,12}"
 INPUTS = (
-    ObservationInput("date", r"\d{4}-\d{2}-\d{2}", required=True),
+    ObservationInput("date", formats.DATE, required=True),
     ObservationInput("type", "|".join(SESSION_TYPES), required=True),
-    ObservationInput("routine", r"[a-z0-9][a-z0-9-]{0,39}",
+    ObservationInput("routine", formats.SLUG,
                      note="the strength routine, as its note declares it"),
     ObservationInput("km", r"\d+(\.\d{1,2})?", metric="distance_km", decimals=2),
     ObservationInput("time", r"\d{1,2}:\d{2}(:\d{2})?", metric="duration_s"),
@@ -115,7 +118,6 @@ def required_columns(kind: str) -> tuple[str, ...]:
     return tuple(needed)
 
 
-# ------------------------------------------------------------- pain per zone
 #: The pain column of a zone, as a gap names it: « pain:knee ».
 PAIN_COLUMN = "pain"
 #: The columns the athlete declares, in the order they are asked; the others are measured.
@@ -169,16 +171,27 @@ def parse_pains(values: list[str], zones: list[str]) -> dict[str, str]:
     return readings
 
 
+def known(reading: dict | None) -> Any:
+    """The value a reading carries, or None unless its state is `known`.
+
+    The four states reduce to two for a computation: `unavailable` (asked for, then lost)
+    counts as absent, not as zero.
+    """
+    if not reading or reading.get("state") != MeasurementState.KNOWN:
+        return None
+    return reading.get("value")
+
+
 def pain_facts(pains: dict[str, dict]) -> list[str]:
     """`douleur knee=2` for each known zone of an observation."""
     return [text.PAIN_READING.format(zone=zone, value=reading["value"]) for zone, reading in sorted(pains.items())
-            if reading.get("state") == "known"]
+            if known(reading) is not None]
 
 
 def pending_pains(pains: dict[str, dict]) -> list[str]:
     """The zones still expected for an observation, named as ledger-complete names them."""
     return [f"pain:{zone}" for zone, reading in sorted(pains.items())
-            if reading.get("state") == "pending"]
+            if reading.get("state") == MeasurementState.PENDING]
 
 
 def strength_pain_facts(pains: dict[str, dict]) -> list[str]:
@@ -192,7 +205,7 @@ def strength_pain_facts(pains: dict[str, dict]) -> list[str]:
 def pain_reading(value: str) -> dict:
     """A raw pain value -> the typed reading (`?` = asked, then lost)."""
     if value == UNKNOWN:
-        return {"state": "unavailable"}
+        return {"state": MeasurementState.UNAVAILABLE}
     text = value.replace(",", ".")
     try:
         number = Decimal(text).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
@@ -200,7 +213,7 @@ def pain_reading(value: str) -> dict:
         raise LedgerError(f"unreadable pain: {value!r} (0 to 10, by half points)") from None
     if not re.fullmatch(PAIN_PATTERN, str(number)):
         raise LedgerError(f"pain off the scale: {value!r} (0 to 10)")
-    return {"state": "known", "value": float(number)}
+    return {"state": MeasurementState.KNOWN, "value": float(number)}
 
 
 def completeness_from() -> dt.date:
@@ -279,19 +292,19 @@ def missing_observation_fields(observation: dict) -> list[str]:
             required.append("enjoyment")
     missing = [
         METRIC_COLUMNS[metric] for metric in required
-        if (metrics.get(metric) or {}).get("state") not in {"known", "unavailable"}
+        if (metrics.get(metric) or {}).get("state") not in SETTLED_READINGS
     ]
     if requires_pain(kind):
         missing += [pain_column(zone) for zone, reading in sorted(
             (observation.get("pains") or {}).items())
-            if reading.get("state") not in {"known", "unavailable"}]
+            if reading.get("state") not in SETTLED_READINGS]
     missing += [METRIC_COLUMNS[metric] for metric in FUELLING_METRICS
-                if (metrics.get(metric) or {}).get("state") == "pending"]
+                if (metrics.get(metric) or {}).get("state") == MeasurementState.PENDING]
     if observation.get("strava_activity_id") is not None:
         missing += [
             METRIC_COLUMNS[metric]
             for metric in ("elevation_gain_m", "elevation_loss_m")
-            if (metrics.get(metric) or {}).get("state") != "known"
+            if (metrics.get(metric) or {}).get("state") != MeasurementState.KNOWN
         ]
     return missing
 
@@ -329,3 +342,25 @@ def observation_completeness_errors(observations: list[dict], today: dt.date) ->
 def cell_key(entry: dict, column: str) -> str:
     """Stable identity of a rating to request."""
     return f"{entry['date']}:{entry['type']}:{column}"
+
+
+def asked_on_waking(entry: dict) -> bool:
+    """A wake trace is qualitative and asked on waking: never chased later as a figure."""
+    return entry.get("type") == session_kinds.WAKE_TRACE
+
+
+def memory_cells(entries: list[dict]) -> list[dict]:
+    """The missing cells only the athlete's memory can fill, entry by entry.
+
+    D+/D- are Strava computations and the wake trace is asked on waking: neither is
+    chased by a later question.
+    """
+    found = []
+    for entry in entries:
+        if asked_on_waking(entry):
+            continue
+        missing = [column for column in entry["missing"]
+                   if column_base(column) in DECLARED_COLUMNS]
+        if missing:
+            found.append({**entry, "missing": missing})
+    return found

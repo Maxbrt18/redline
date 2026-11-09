@@ -4,8 +4,6 @@ import {COUNTDOWN_BEEP, announce, beep, playSignal} from './sound.js';
 import {markStarted, validateSlot} from './actions.js';
 import {renderSession} from './render.js';
 
-// ------------------------------------------------------------------ timers
-
 let tickId = 0;
 
 export function startTimer(kind, seconds) {

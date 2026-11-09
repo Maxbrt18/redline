@@ -40,11 +40,11 @@ def find(text: str, query: str) -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--root", default=paths.vault_root(), type=Path)
+    parser.add_argument("--root", type=Path)
     parser.add_argument("--find", metavar="TEXT", required=True)
     args = parser.parse_args()
 
-    matches = find((args.root / vault_layout.DECISIONS).read_text(encoding="utf-8"),
+    matches = find(((args.root or paths.vault_root()) / vault_layout.DECISIONS).read_text(encoding="utf-8"),
                    args.find)
     if not matches:
         print(wording.NONE_FOUND.format(find=args.find), file=sys.stderr)

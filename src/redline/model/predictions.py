@@ -28,10 +28,6 @@ OUTCOME_REASON_RULE = (
     f"({', '.join(repr(reason) for reason in VOID_REASONS)}))")
 
 
-def _day(value: Any) -> dt.date:
-    return value if isinstance(value, dt.date) else dt.date.fromisoformat(str(value))
-
-
 def calibration(rows: Iterable[Mapping[str, Any]], today: dt.date) -> list[dict]:
     """One line per domain: settled, of which by observation, void, overdue, Brier, and
     how many carry each outcome reason."""
@@ -48,7 +44,7 @@ def calibration(rows: Iterable[Mapping[str, Any]], today: dt.date) -> list[dict]
             entry["observed"] += bool(row.get("resolves_kind"))
         elif row["status"] == "void":
             entry["void"] += 1
-        elif _day(row["due_on"]) < today:
+        elif row["due_on"] < today:
             entry["overdue"] += 1
     return [{"domain": domain, "resolved": entry["resolved"], "observed": entry["observed"],
              "void": entry["void"], "overdue": entry["overdue"],

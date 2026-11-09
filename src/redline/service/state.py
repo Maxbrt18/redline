@@ -3,12 +3,23 @@
 from __future__ import annotations
 
 from datetime import datetime
+from enum import StrEnum
 from typing import TYPE_CHECKING, Protocol
 
 from .config import Config
 
 if TYPE_CHECKING:
     from .agent import TurnIdentity
+
+
+class Disposition(StrEnum):
+    """What a delivery may do once its envelope is claimed."""
+
+    SEND = "send"
+    #: Meta accepted it already: never resent.
+    DELIVERED = "delivered"
+    #: A send started and its outcome is unknown: at-most-once, never resent.
+    UNCERTAIN = "uncertain"
 
 
 class ProactiveState(Protocol):
@@ -68,7 +79,7 @@ class StateStore(Protocol):
     def question_known(self, psid: str, text: str) -> bool: ...
     def expire_stale_questions(self, psid: str, *, older_than_days: int = 14) -> int: ...
     def begin_outbound_delivery(self, source_key: str, psid: str,
-                                payload_digest: str, payload: dict | None = None) -> str: ...
+                                payload_digest: str, payload: dict | None = None) -> Disposition: ...
     def prepare_outbound_delivery(self, source_key: str, psid: str,
                                   payload_digest: str, payload: dict) -> bool: ...
     def stored_outbound_delivery(self, source_key: str) -> dict | None: ...

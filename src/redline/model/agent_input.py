@@ -19,13 +19,22 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from redline.model import paths
+from redline.model import formats, paths
 from redline.model.errors import InputError
 
 #: Ignored by Git (`.gitignore`): the service runs `git add -A` at the end of a turn.
 DIRECTORY = ".agent-tmp"
 
-_SUFFIX = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
+_SUFFIX = re.compile(formats.SLUG)
+
+
+#: The environment variable naming the turn a command runs in; absent outside a turn.
+TURN_VARIABLE = "REDLINE_TURN_ID"
+
+
+def current_turn() -> str:
+    """The id of the turn this process runs in, or the empty string outside a turn."""
+    return (os.environ.get(TURN_VARIABLE) or "").strip()
 
 
 class AgentInputError(InputError):
@@ -34,7 +43,7 @@ class AgentInputError(InputError):
 
 def turn_path(turn_id: str, suffix: str = "") -> str:
     """The vault-relative path the service announces to the turn."""
-    if suffix and not _SUFFIX.match(suffix):
+    if suffix and not _SUFFIX.fullmatch(suffix):
         raise AgentInputError(f"invalid file suffix: {suffix!r}")
     return f"{DIRECTORY}/{turn_id}{'-' + suffix if suffix else ''}.json"
 
@@ -50,14 +59,14 @@ def resolve(path: str, *, root: Path | None = None, turn_id: str | None = None) 
     if not candidate.is_absolute():
         candidate = root / candidate
     candidate = candidate.resolve()
-    turn_id = (os.environ.get("REDLINE_TURN_ID") or "").strip() if turn_id is None else turn_id
+    turn_id = current_turn() if turn_id is None else turn_id
     if not turn_id:
         return candidate
     name = candidate.name
     stem = name[:-len(".json")] if name.endswith(".json") else ""
     suffix = stem[len(turn_id) + 1:] if stem.startswith(f"{turn_id}-") else None
     if (candidate.parent != (root / DIRECTORY).resolve()
-            or not (stem == turn_id or (suffix and _SUFFIX.match(suffix)))):
+            or not (stem == turn_id or (suffix and _SUFFIX.fullmatch(suffix)))):
         # The refusal says how to succeed: `cp` may be denied by the permission mode,
         # while `Write` is always allowed and is the only gesture to make.
         raise AgentInputError(
@@ -79,8 +88,11 @@ def read_text(path: str | None) -> str:
 
 
 def read_json(path: str | None) -> Any:
-    """The JSON handed over; `json.JSONDecodeError` if unreadable."""
-    return json.loads(read_text(path))
+    """The JSON handed over; `AgentInputError` if it is not JSON."""
+    try:
+        return json.loads(read_text(path))
+    except json.JSONDecodeError as exc:
+        raise AgentInputError(f"--input: unreadable JSON ({exc})") from None
 
 
 def clear(turn_id: str, *, root: Path | None = None) -> None:

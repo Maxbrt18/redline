@@ -33,8 +33,6 @@ DAYS_NONE = "Aucun jour déclaré pour {week} : ni habitude, ni jour dit d'avanc
 DAYS_LINE = "  - {day} : {state}{habit}"
 HABIT = " (habitude)"
 
-# ------------------------------------------------------------------ the request to the coach
-
 #: The message the coach receives when the athlete asks from the notebook. It names the
 #: command that answers it: a request with no field to land in ends up in prose.
 ASK = (
@@ -53,8 +51,6 @@ FOUND_UNWRITTEN = "La semaine n'est pas encore écrite."
 PROPOSED = "Propositions enregistrées pour {week}, sur la révision {based_on} :"
 PROPOSED_STAGED = "Propositions préparées pour {week}, sur la révision {based_on} (enregistrées à la fin du tour) :"
 PROPOSAL = "  {number}. {title}"
-
-# ------------------------------------------------------------------ the revision it writes
 
 REASON = "Semaine réorganisée dans le carnet, variante {number} sur {count} : {summary}."
 #: The fact behind every change: what the athlete said of their days.

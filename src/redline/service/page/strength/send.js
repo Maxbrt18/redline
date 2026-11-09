@@ -3,8 +3,6 @@ import {MAX_NOTE, credentials, localDate, save, session, slotsOf, state} from '.
 import {renderReview} from './review.js';
 import {renderSession} from './render.js';
 
-// --------------------------------------------------------------------- send
-
 function say(text) {
   const status = $('status');
   if (status) status.textContent = text;

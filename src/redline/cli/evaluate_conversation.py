@@ -19,7 +19,7 @@ from redline.evaluation.conversation import (
     instructions,
     shape_checks,
 )
-from redline.model import paths
+from redline.model import entrypoint, paths
 from redline.service.prompts import DEPTH_NOTES
 
 
@@ -121,4 +121,4 @@ def main() -> int:
 
 
 if __name__ == '__main__':
-    raise SystemExit(main())
+    entrypoint.run(main)

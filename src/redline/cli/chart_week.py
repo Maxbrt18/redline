@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Weekly slate -- planned vs done day by day + the review instruments.
 
 Form: one thin column per day (km done, zero baseline, honest), standing in a
@@ -14,14 +13,12 @@ Usage:  redline chart-week -o week-29.png < data.json
 
 from pathlib import Path
 
+from redline.analysis import ledger
 from redline.cards import archive, charts, cli, html, render
 from redline.cards.format import fmt_num
 from redline.coach.fr import cards as wording
 from redline.model import entrypoint
 from redline.model.cards import WEEK_SCHEMA
-
-GAUGE_CAP = 85       # coaching/protocols.md
-RATIO_CAP = 1.3
 
 
 def build_tiles(data: dict) -> list[dict]:
@@ -35,9 +32,9 @@ def build_tiles(data: dict) -> list[dict]:
                               if planned is not None else "")})
     if data.get("gauge_level") is not None:
         level, ratio = data["gauge_level"], data.get("gauge_ratio")
-        over = level > GAUGE_CAP or (ratio or 0) > RATIO_CAP
-        tiles.append({"label": wording.GAUGE, "value": f"{fmt_num(level)} / {GAUGE_CAP}",
-                      "sub": f"ratio {fmt_num(round(ratio, 2))} / 1,3" if ratio is not None else "",
+        over = level > ledger.LEVEL_CAP or (ratio or 0) > ledger.RATIO_CAP
+        tiles.append({"label": wording.GAUGE, "value": f"{fmt_num(level)} / {ledger.LEVEL_CAP}",
+                      "sub": f"ratio {fmt_num(round(ratio, 2))} / {fmt_num(ledger.RATIO_CAP)}" if ratio is not None else "",
                       "status": "bad" if over else "ok"})
     if data.get("pain") is not None:
         tiles.append({"label": wording.PAIN, "value": str(data["pain"]),

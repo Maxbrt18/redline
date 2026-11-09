@@ -6,27 +6,17 @@ caller's.
 
 from __future__ import annotations
 
-from ..database import Database
+from ..database import Database, from_environment
 from ._common import ATHLETE, CORRECTION_ANNOUNCE_WINDOW
 from .conversation import Conversation
-from .days import Days
-from .facts import Facts
 from .maintenance import Maintenance
-from .observations import Observations
-from .plans import Plans
 from .proactive import ProactiveMessages
-from .proposals import Proposals
-from .session_cycles import SessionCycles
-from .strava_intake import StravaIntake
-from .strength import Strength
-from .turns import TurnCommands
+from .turns import Submitted, TurnCommands
 
-__all__ = ["ATHLETE", "CORRECTION_ANNOUNCE_WINDOW", "OperationalStore"]
+__all__ = ["ATHLETE", "CORRECTION_ANNOUNCE_WINDOW", "OperationalStore", "Submitted", "open_store"]
 
 
-class OperationalStore(TurnCommands, Conversation, Observations, StravaIntake,
-                       SessionCycles, Strength, Proposals, Plans, Facts, ProactiveMessages,
-                       Days, Maintenance):
+class OperationalStore(TurnCommands, Conversation, ProactiveMessages, Maintenance):
     """Single fact API. Public calls open exactly one transaction."""
 
     def __init__(self, database: Database, *, athlete_id: str = ATHLETE) -> None:
@@ -38,3 +28,8 @@ class OperationalStore(TurnCommands, Conversation, Observations, StravaIntake,
 
     def schema_revision(self) -> str | None:
         return self.database.schema_revision()
+
+
+def open_store(application: str) -> OperationalStore:
+    """The operational store of a command, on the database `DATABASE_URL` names."""
+    return OperationalStore(from_environment(application))

@@ -10,7 +10,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Connection
 
-from redline.model import ledger, session_cycle, weekly_plan
+from redline.model import iso_week, ledger, session_cycle, weekly_plan
+from redline.model import vocabulary as voc
 
 from ..database import StorageError
 from ..plan_policy import enforce_gate_resolution
@@ -42,7 +43,7 @@ class Plans(StoreBase):
         if intention_problems:
             raise StorageError("\n".join(intention_problems))
         forbidden = [session["id"] for session in revision.get("sessions", [])
-                     if session.get("status") not in weekly_plan.INTENT_STATUSES]
+                     if session.get("status") not in voc.INTENT_STATUSES]
         if forbidden:
             raise StorageError(
                 ("a revision only carries the planned/cancelled intent; execution belongs to the"
@@ -82,9 +83,9 @@ class Plans(StoreBase):
         unavailable = list(connection.execute(sa.select(deadlines).where(
             deadlines.c.athlete_id == self.athlete_id,
             deadlines.c.kind == "availability",
-            deadlines.c.status != "done")).mappings())
+            deadlines.c.status != voc.DeadlineStatus.DONE)).mappings())
         for session in revision.get("sessions", []):
-            if session.get("status") == "cancelled" or not session.get("demanding"):
+            if session.get("status") == voc.SessionStatus.CANCELLED or not session.get("demanding"):
                 continue
             day = session["date"]
             if isinstance(day, str):
@@ -169,7 +170,7 @@ class Plans(StoreBase):
 
     def _enforce_gut_progression(self, connection: Connection, proposed: list[dict]) -> None:
         targets = [session["carbs_target_g_h"] for session in proposed
-                   if session.get("status") != "cancelled"
+                   if session.get("status") != voc.SessionStatus.CANCELLED
                    and session.get("carbs_target_g_h") is not None]
         if not targets:
             return
@@ -205,7 +206,7 @@ class Plans(StoreBase):
         numeric = ("distance_target_km", "distance_cap_km", "duration_cap_min",
                    "carbs_target_g_h")
         for session in proposed:
-            if session.get("status") == "cancelled":
+            if session.get("status") == voc.SessionStatus.CANCELLED:
                 continue
             old = previous.get(session["id"])
             if old is None:
@@ -247,17 +248,17 @@ class Plans(StoreBase):
                     id=uuid.uuid4(), athlete_id=self.athlete_id, plan_id=plan_id,
                     logical_key=logical_key, source_session_id=source_session_id,
                     state=state, planned_for=planned_for, plan_digest=digest,
-                    completed_at=now if state == "completed" else None,
+                    completed_at=now if state == voc.CycleState.COMPLETED else None,
                     updated_at=now))
                 continue
-            if state == "cancelled":
+            if state == voc.CycleState.CANCELLED:
                 self._cancel_gut_review(connection, previous["id"])
             connection.execute(session_cycles.update().where(
                 session_cycles.c.id == previous["id"]
             ).values(
                 source_session_id=source_session_id, state=state,
                 planned_for=planned_for, plan_digest=digest,
-                completed_at=(now if state == "completed" and previous["completed_at"] is None
+                completed_at=(now if state == voc.CycleState.COMPLETED and previous["completed_at"] is None
                               else previous["completed_at"]),
                 updated_at=now))
 
@@ -267,15 +268,15 @@ class Plans(StoreBase):
             self._cancel_gut_review(connection, previous["id"])
             connection.execute(session_cycles.update().where(
                 session_cycles.c.id == previous["id"]
-            ).values(state="cancelled", updated_at=now))
+            ).values(state=voc.CycleState.CANCELLED, updated_at=now))
 
     @staticmethod
     def _cancel_gut_review(connection: Connection, cycle_id: uuid.UUID) -> None:
         """A session cancelled or removed from the plan no longer needs a gut-feedback request."""
         connection.execute(proactive_jobs.update().where(
             proactive_jobs.c.job_key == f"gut-review:{cycle_id}",
-            proactive_jobs.c.status == "pending",
-        ).values(status="done", completed_at=sa.func.now()))
+            proactive_jobs.c.status == voc.JobStatus.PENDING,
+        ).values(status=voc.JobStatus.DONE, completed_at=sa.func.now()))
 
     def load_plan(self, week: str) -> dict | None:
         with self.database.engine.connect() as connection:
@@ -314,8 +315,8 @@ class Plans(StoreBase):
             )}
             for stored in session_rows:
                 visible_status = stored["status"]
-                if cycle_states.get(stored["logical_key"]) in {"completed", "closed"}:
-                    visible_status = "done"
+                if cycle_states.get(stored["logical_key"]) in {voc.CycleState.COMPLETED, voc.CycleState.CLOSED}:
+                    visible_status = voc.SessionStatus.DONE
                 session = {
                     "id": stored["logical_key"], "title": stored["title"],
                     "date": stored["scheduled_on"].isoformat(), "kind": stored["kind"],
@@ -371,9 +372,7 @@ class Plans(StoreBase):
             if persisted_at is None:
                 raise StorageError(
                     f"revision {revision} of plan {week} not found")
-            year, number = week.split("-W")
-            monday = dt.date.fromisocalendar(int(year), int(number), 1)
-            sunday = monday + dt.timedelta(days=6)
+            monday, sunday = iso_week.monday(week), iso_week.sunday(week)
             unlinked = sa.select(observations.c.id).where(
                 observations.c.athlete_id == self.athlete_id,
                 observations.c.occurred_on.between(monday, sunday),

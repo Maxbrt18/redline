@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -10,7 +11,7 @@ import sqlalchemy as sa
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.exc import SQLAlchemyError
 
-from redline.model.errors import StorageError
+from redline.model.errors import ConfigError, StorageError
 
 
 def expected_schema_revision(config_path: Path) -> str:
@@ -23,6 +24,14 @@ def expected_schema_revision(config_path: Path) -> str:
     if not revision:
         raise StorageError("no Alembic head in the deployed code")
     return revision
+
+
+def from_environment(application: str) -> Database:
+    """The database a command works on, named by `DATABASE_URL`."""
+    url = (os.environ.get("DATABASE_URL") or "").strip()
+    if not url:
+        raise ConfigError("DATABASE_URL is required: PostgreSQL holds the facts")
+    return Database(url, application_name=application)
 
 
 class Database:

@@ -16,8 +16,9 @@ from pathlib import Path
 import sqlalchemy as sa
 
 from redline.coach.fr import cards as wording
+from redline.model import entrypoint
 from redline.service import strength
-from redline.service.config import Config, _load_dotenv
+from redline.service.config import Config, load_service_environment
 from redline.service.notebook import period_day, review_period
 from redline.storage import Database
 from redline.storage.notebook import NotebookStore
@@ -63,7 +64,7 @@ def recover(store: NotebookStore, root: Path, psid: str, year: int, apply: bool)
         if snapshot:
             kind, period, title = "strength", snapshot.get("date", ""), snapshot.get("title", "Renfo")
         else:
-            # Frozen legacy boundary: only the names actually inventoried are recognised;
+            # Frozen boundary: only the file names actually inventoried are recognised;
             # no title or review prose is extracted.
             month = re.fullmatch(r"month-(20\d{2}-\d{2})", image.stem)
             week = re.fullmatch(r"(?:bilan-|week-)(?:(20\d{2})-)?[wW](\d{2})", image.stem)
@@ -95,7 +96,7 @@ def main() -> None:
     args = parser.parse_args()
     if not 2020 <= args.year <= 2099:
         parser.error("invalid import year")
-    _load_dotenv(Path("/etc/redline/runtime/coach-messenger.env"))
+    load_service_environment()
     config = Config.from_env()
     database = Database(config.database_url, application_name="redline-notebook-import")
     try:
@@ -106,4 +107,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    entrypoint.run(main)

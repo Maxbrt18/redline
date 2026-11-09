@@ -10,6 +10,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Connection
 
 from redline.model import ledger
+from redline.model.vocabulary import IntakeStatus, MeasurementState
 
 from ..database import StorageError
 from ..schema import (
@@ -18,7 +19,6 @@ from ..schema import (
     observation_metrics,
     observations,
     pain_readings,
-    pain_zones,
     session_exposures,
     strava_activity_intakes,
     weekly_instruments,
@@ -26,19 +26,24 @@ from ..schema import (
 from ._common import (
     HR_DOUBTS,
     RESOLVING_KINDS,
-    StoreBase,
     _audit,
     _jsonable,
     _plain,
     _request_projection,
     _uuid,
 )
+from .facts import Facts
 
 
-class Observations(StoreBase):
+class Observations(Facts):
     def add_observation(self, payload: dict, *, actor: str = "application") -> uuid.UUID:
         with self.database.transaction() as connection:
             return self.add_observation_in(connection, payload, actor=actor)
+
+    def _auto_match_observation_in(self, connection: Connection, observation_id: uuid.UUID,
+                                   session_key: str | None, *, actor: str) -> str | None:
+        """The planned session a new observation fulfils, matched by ."""
+        raise NotImplementedError
 
     def add_observation_in(self, connection: Connection, payload: dict,
                            *, actor: str = "application") -> uuid.UUID:
@@ -99,17 +104,17 @@ class Observations(StoreBase):
         _audit(connection, actor, "observation.created", "observation", observation_id, event)
         if values["kind"] in RESOLVING_KINDS:
             for zone, reading in pains.items():
-                if reading["state"] in ("known", "unavailable"):
+                if reading["state"] in (MeasurementState.KNOWN, MeasurementState.UNAVAILABLE):
                     self.settle_observed_predictions_in(
                         connection, values["kind"], values["occurred_on"], zone,
-                        float(reading["value"]) if reading["state"] == "known" else None,
+                        float(reading["value"]) if reading["state"] == MeasurementState.KNOWN else None,
                         actor=actor)
         if values["strava_activity_id"] and values["started_at"]:
             self._auto_match_observation_in(
                 connection, observation_id, payload.get("session_key"), actor=actor)
             connection.execute(strava_activity_intakes.update().where(
                 strava_activity_intakes.c.activity_id == values["strava_activity_id"]
-            ).values(status="matched", observation_id=observation_id, error="",
+            ).values(status=IntakeStatus.MATCHED, observation_id=observation_id, error="",
                      updated_at=sa.func.now()))
         _request_projection(connection)
         return observation_id
@@ -121,47 +126,11 @@ class Observations(StoreBase):
             raise StorageError("unknown measurement: " + ", ".join(unknown))
         values = {}
         for metric in MEASUREMENT_DEFINITIONS:
-            measurement = measurements.get(metric, {"state": "not_applicable"})
-            state = measurement.get("state", "known")
+            measurement = measurements.get(metric, {"state": MeasurementState.NOT_APPLICABLE})
+            state = measurement.get("state", MeasurementState.KNOWN)
             values[f"{metric}_state"] = state
-            values[metric] = measurement.get("value") if state == "known" else None
+            values[metric] = measurement.get("value") if state == MeasurementState.KNOWN else None
         return values
-
-    def sync_pain_zones(self, zones: list[tuple[str, str]], *,
-                        actor: str = "application") -> None:
-        """Align the reference on `[[injuries]]`: a removed zone becomes inactive.
-
-        Never deleted: its past readings stay attached and readable.
-        """
-        with self.database.transaction() as connection:
-            declared = {slug for slug, _ in zones}
-            for slug, label in zones:
-                connection.execute(pg_insert(pain_zones).values(
-                    athlete_id=self.athlete_id, slug=slug, label=label, active=True,
-                ).on_conflict_do_update(
-                    index_elements=[pain_zones.c.athlete_id, pain_zones.c.slug],
-                    set_={"label": label, "active": True}))
-            connection.execute(pain_zones.update().where(
-                pain_zones.c.athlete_id == self.athlete_id,
-                pain_zones.c.slug.not_in(declared) if declared else sa.true(),
-            ).values(active=False))
-            _audit(connection, actor, "pain_zones.synced", "athlete",
-                   uuid.uuid5(uuid.NAMESPACE_URL, f"athlete:{self.athlete_id}"),
-                   {"zones": sorted(declared)})
-
-    def pain_zones(self) -> list[dict]:
-        """Monitored zones, active first, in declaration order."""
-        with self.database.engine.connect() as connection:
-            return [dict(row) for row in connection.execute(sa.select(
-                pain_zones.c.slug, pain_zones.c.label, pain_zones.c.active,
-            ).where(pain_zones.c.athlete_id == self.athlete_id).order_by(
-                pain_zones.c.active.desc(), pain_zones.c.created_at,
-                pain_zones.c.slug)).mappings()]
-
-    def _active_zones_in(self, connection: Connection) -> list[str]:
-        return list(connection.execute(sa.select(pain_zones.c.slug).where(
-            pain_zones.c.athlete_id == self.athlete_id, pain_zones.c.active,
-        ).order_by(pain_zones.c.created_at, pain_zones.c.slug)).scalars())
 
     def _pain_values_in(self, connection: Connection, kind: str,
                         given: dict) -> dict[str, dict[str, Any]]:
@@ -174,13 +143,13 @@ class Observations(StoreBase):
             raise StorageError("unknown or inactive pain zone: " + ", ".join(unknown)
                                + (f" (active: {', '.join(active)})" if active
                                   else " (no monitored zone)"))
-        default = "pending" if ledger.requires_pain(kind) else "not_applicable"
+        default = MeasurementState.PENDING if ledger.requires_pain(kind) else MeasurementState.NOT_APPLICABLE
         readings = {}
         for zone in active:
             reading = given.get(zone, {"state": default})
-            state = reading.get("state", "known")
+            state = reading.get("state", MeasurementState.KNOWN)
             readings[zone] = {"state": state,
-                              "value": reading.get("value") if state == "known" else None}
+                              "value": reading.get("value") if state == MeasurementState.KNOWN else None}
         return readings
 
     @staticmethod
@@ -199,25 +168,20 @@ class Observations(StoreBase):
             self.complete_measurement_in(connection, observation_id, metric, value,
                                          zone=zone, unavailable=unavailable, actor=actor)
 
-    def doubt_hr(self, observation_id: uuid.UUID, reason: str, note: str,
-                 *, actor: str = "application") -> None:
+    def doubt_hr_in(self, connection: Connection, observation_id: uuid.UUID, reason: str,
+                    note: str, *, actor: str = "application") -> None:
         """Flag a known average HR as doubtful, once, with its reason.
 
         The measurement stays immutable: only the annotation says what it is worth. The
         free-text reason (the athlete's words) goes to the audit log.
         """
-        with self.database.transaction() as connection:
-            self.doubt_hr_in(connection, observation_id, reason, note, actor=actor)
-
-    def doubt_hr_in(self, connection: Connection, observation_id: uuid.UUID, reason: str,
-                    note: str, *, actor: str = "application") -> None:
         if reason not in HR_DOUBTS:
             raise StorageError(f"unknown doubtful heart rate reason: {reason}")
         if not note.strip():
             raise StorageError("a doubtful heart rate carries the declared cause")
         result = connection.execute(observation_metrics.update().where(
             observation_metrics.c.observation_id == observation_id,
-            observation_metrics.c.hr_avg_bpm_state == "known",
+            observation_metrics.c.hr_avg_bpm_state == MeasurementState.KNOWN,
             observation_metrics.c.hr_doubt.is_(None),
         ).values(hr_doubt=reason))
         if result.rowcount != 1:
@@ -246,7 +210,7 @@ class Observations(StoreBase):
                 value = ledger.measurement_value(metric, value)
             except ledger.LedgerError as exc:
                 raise StorageError(str(exc)) from exc
-        state = "unavailable" if unavailable else "known"
+        state = MeasurementState.UNAVAILABLE if unavailable else MeasurementState.KNOWN
         state_column = observation_metrics.c[f"{metric}_state"]
         result = connection.execute(observation_metrics.update().where(
             observation_metrics.c.observation_id == observation_id,
@@ -254,7 +218,7 @@ class Observations(StoreBase):
             # DEFAULT of any column absent at creation (`_metric_values`). Locking it
             # would make a session recorded without its figures permanently
             # incompletable. An absence default is not data: it can be filled in.
-            state_column.in_(("pending", "unavailable", "not_applicable")),
+            state_column.in_((MeasurementState.PENDING, MeasurementState.UNAVAILABLE, MeasurementState.NOT_APPLICABLE)),
         ).values({state_column: state,
                   observation_metrics.c[metric]: None if unavailable else value}))
         if result.rowcount != 1:
@@ -264,7 +228,7 @@ class Observations(StoreBase):
             connection.execute(observation_metrics.update().where(
                 observation_metrics.c.observation_id == observation_id,
             ).values({observation_metrics.c[f"{detail}_state"]: sa.case(
-                (observation_metrics.c[f"{detail}_state"] == "not_applicable", "pending"),
+                (observation_metrics.c[f"{detail}_state"] == MeasurementState.NOT_APPLICABLE, MeasurementState.PENDING),
                 else_=observation_metrics.c[f"{detail}_state"])
                 for detail in ledger.GUT_DETAIL}))
         _audit(connection, actor, "measurement.completed", "observation", observation_id,
@@ -282,11 +246,11 @@ class Observations(StoreBase):
                 raise StorageError("pain: name the zone (" + (", ".join(sorted(zones))
                                    or "no zone on this observation") + ")")
             zone = zones[0]
-        state = "unavailable" if unavailable else "known"
+        state = MeasurementState.UNAVAILABLE if unavailable else MeasurementState.KNOWN
         result = connection.execute(pain_readings.update().where(
             pain_readings.c.observation_id == observation_id,
             pain_readings.c.zone == zone,
-            pain_readings.c.state.in_(("pending", "unavailable", "not_applicable")),
+            pain_readings.c.state.in_((MeasurementState.PENDING, MeasurementState.UNAVAILABLE, MeasurementState.NOT_APPLICABLE)),
         ).values(state=state, value=None if unavailable else value,
                  recorded_at=sa.func.now()))
         if result.rowcount != 1:
@@ -302,8 +266,8 @@ class Observations(StoreBase):
                 None if unavailable or value is None else float(value), actor=actor)
         _request_projection(connection)
 
-    def link_activity(self, idempotency_key: str, strava_activity_id: int, *,
-                      actor: str = "application") -> uuid.UUID:
+    def link_activity_in(self, connection: Connection, idempotency_key: str,
+                         strava_activity_id: int, *, actor: str) -> uuid.UUID:
         """Attach an existing observation to its exact Strava identity.
 
         An observation created in the chat can precede the activity's arrival at Strava.
@@ -311,12 +275,6 @@ class Observations(StoreBase):
         Replaying the same link is idempotent; targeting another activity is an explicit
         conflict.
         """
-        with self.database.transaction() as connection:
-            return self.link_activity_in(
-                connection, idempotency_key, strava_activity_id, actor=actor)
-
-    def link_activity_in(self, connection: Connection, idempotency_key: str,
-                         strava_activity_id: int, *, actor: str) -> uuid.UUID:
         row = connection.execute(sa.select(
             observations.c.id, observations.c.strava_activity_id,
         ).where(
@@ -386,10 +344,6 @@ class Observations(StoreBase):
                     owner["pains"][reading["zone"]] = {
                         "state": reading["state"], "value": _plain(reading["value"])}
             return result
-    def upsert_exposure(self, payload: dict, *, actor: str = "application") -> uuid.UUID:
-        with self.database.transaction() as connection:
-            return self.upsert_exposure_in(connection, payload, actor=actor)
-
     def upsert_exposure_in(self, connection: Connection, payload: dict,
                            *, actor: str = "application") -> uuid.UUID:
         key = str(payload["exposure_key"]).strip()

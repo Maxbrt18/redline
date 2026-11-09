@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 from conftest import FakeAgent
 
-from redline.model.context_packet import render_context_packet
+from redline.service.context_packet import render_context_packet
 from redline.service.proactive import ProactiveJob
 
 

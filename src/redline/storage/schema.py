@@ -107,14 +107,14 @@ strava_activity_intakes = sa.Table(
               server_default=UTC_NOW),
     sa.CheckConstraint("activity_id > 0", name="ck_strava_activity_intakes_id"),
     sa.CheckConstraint(
-        "status IN ('captured','matched','ambiguous','unmatched','failed')",
+        f"status IN ({voc.sql_values(voc.IntakeStatus)})",
         name="ck_strava_activity_intakes_status"),
     sa.CheckConstraint("sport <> ''", name="ck_strava_activity_intakes_sport"),
     sa.CheckConstraint(
-        "elevation_loss_state IN ('pending','known','unavailable','failed')",
+        f"elevation_loss_state IN ({voc.sql_values(voc.EnrichmentState)})",
         name="ck_strava_activity_intakes_elevation_loss_state"),
     sa.CheckConstraint(
-        "wbgt_state IN ('pending','known','unavailable','failed')",
+        f"wbgt_state IN ({voc.sql_values(voc.EnrichmentState)})",
         name="ck_strava_activity_intakes_wbgt_state"),
     sa.CheckConstraint("elevation_loss_attempts >= 0",
                        name="ck_strava_activity_intakes_elevation_loss_attempts"),
@@ -132,7 +132,7 @@ strava_activity_intakes = sa.Table(
 )
 
 
-MEASUREMENT_STATES = "('pending','known','unavailable','not_applicable')"
+MEASUREMENT_STATES = f"({voc.sql_values(voc.MeasurementState)})"
 MEASUREMENT_DEFINITIONS: dict[str, tuple[Any, str]] = {
     "distance_km": (sa.Numeric(7, 3), "value >= 0 AND value <= 1000"),
     "duration_s": (sa.Integer, "value >= 0 AND value <= 604800"),
@@ -255,9 +255,9 @@ session_exposures = sa.Table(
     sa.CheckConstraint(
         f"exposure_type IN ({voc.sql_values(voc.Exposure)})",
         name="ck_session_exposures_type"),
-    sa.CheckConstraint("origin IN ('prescribed','voluntary','spontaneous')",
+    sa.CheckConstraint(f"origin IN ({voc.sql_values(voc.ExposureOrigin)})",
                        name="ck_session_exposures_origin"),
-    sa.CheckConstraint("status IN ('candidate','confirmed','dismissed')",
+    sa.CheckConstraint(f"status IN ({voc.sql_values(voc.ExposureStatus)})",
                        name="ck_session_exposures_status"),
     sa.CheckConstraint("duration_min IS NULL OR duration_min BETWEEN 1 AND 1440",
                        name="ck_session_exposures_duration"),
@@ -265,7 +265,7 @@ session_exposures = sa.Table(
                        name="ck_session_exposures_target_value"),
     sa.CheckConstraint("(target_value IS NULL) = (target_unit IS NULL)",
                        name="ck_session_exposures_target_pair"),
-    sa.CheckConstraint("tolerance IN ('unknown','easy','strained','protective')",
+    sa.CheckConstraint(f"tolerance IN ({voc.sql_values(voc.Tolerance)})",
                        name="ck_session_exposures_tolerance"),
     sa.CheckConstraint("exposure_key <> ''", name="ck_session_exposures_key"),
 )
@@ -495,7 +495,7 @@ planned_sessions = sa.Table(
         name="ck_planned_sessions_routine"),
     # The plan carries the intention. ``done`` belongs exclusively to
     # ``session_cycles.state`` and is only added in the read views.
-    sa.CheckConstraint("status IN ('planned','cancelled')",
+    sa.CheckConstraint(f"status IN ({voc.sql_values(voc.INTENT_STATUSES)})",
                        name="ck_planned_sessions_status"),
     sa.CheckConstraint("rpe_min IS NULL OR rpe_min BETWEEN 0 AND 10",
                        name="ck_planned_sessions_rpe_min"),
@@ -561,8 +561,7 @@ session_cycles = sa.Table(
     sa.CheckConstraint("logical_key ~ '^[a-z0-9][a-z0-9-]*$'",
                        name="ck_session_cycles_logical_key"),
     sa.CheckConstraint(
-        "state IN ('planned','started','completed','missed','cancelled',"
-        "'followup_due','closed')", name="ck_session_cycles_state"),
+        f"state IN ({voc.sql_values(voc.CycleState)})", name="ck_session_cycles_state"),
     sa.CheckConstraint("plan_digest ~ '^[0-9a-f]{64}$'",
                        name="ck_session_cycles_plan_digest"),
 )
@@ -760,7 +759,7 @@ conversation_questions = sa.Table(
     sa.CheckConstraint("length(review_note) <= 500", name="ck_conversation_questions_note"),
     sa.CheckConstraint("status = 'deferred' OR follow_up_on IS NULL",
                        name="ck_conversation_questions_follow_up"),
-    sa.CheckConstraint("status IN ('open','deferred','answered','expired')",
+    sa.CheckConstraint(f"status IN ({voc.sql_values(voc.QuestionStatus)})",
                        name="ck_conversation_questions_status"),
     sa.CheckConstraint("(status IN ('open','deferred')) = (resolved_at IS NULL)",
                        name="ck_conversation_questions_resolution"),
@@ -784,12 +783,12 @@ deadlines = sa.Table(
     # Present = an athlete action, shown in the logbook under this short label.
     # Absent = a coach working deadline, which never leaves the vault.
     sa.Column("athlete_label", sa.Text),
-    sa.CheckConstraint("status IN ('todo','scheduled','done')", name="ck_deadlines_status"),
+    sa.CheckConstraint(f"status IN ({voc.sql_values(voc.DeadlineStatus)})", name="ck_deadlines_status"),
     sa.CheckConstraint("athlete_label IS NULL OR char_length(athlete_label) BETWEEN 3 AND 80",
                        name="ck_deadlines_athlete_label"),
     sa.CheckConstraint("completed_on IS NULL OR status = 'done'",
                        name="ck_deadlines_completed_on"),
-    sa.CheckConstraint("kind IN ('general','medical','availability','race')",
+    sa.CheckConstraint(f"kind IN ({voc.sql_values(voc.DeadlineKind)})",
                        name="ck_deadlines_kind"),
     sa.CheckConstraint("starts_on IS NULL OR ends_on IS NULL OR starts_on <= ends_on",
                        name="ck_deadlines_range"),
@@ -878,7 +877,7 @@ gear_items = sa.Table(
     sa.CheckConstraint("retire_at_km > 0", name="ck_gear_items_retire"),
     sa.CheckConstraint("strava_distance_km IS NULL OR strava_distance_km >= 0",
                        name="ck_gear_items_strava_distance"),
-    sa.CheckConstraint("status IN ('active','retired')", name="ck_gear_items_status"),
+    sa.CheckConstraint(f"status IN ({voc.sql_values(voc.GearStatus)})", name="ck_gear_items_status"),
 )
 
 coach_predictions = sa.Table(
@@ -911,7 +910,7 @@ coach_predictions = sa.Table(
     sa.Column("outcome_reason", sa.Text),
     sa.UniqueConstraint("athlete_id", "prediction_key", name="uq_coach_predictions_key"),
     sa.CheckConstraint("probability BETWEEN 0 AND 1", name="ck_coach_predictions_probability"),
-    sa.CheckConstraint("direction IN ('increase','decrease','neutral')",
+    sa.CheckConstraint(f"direction IN ({voc.sql_values(voc.Direction)})",
                        name="ck_coach_predictions_direction"),
     sa.CheckConstraint("status IN ('open','resolved','void')",
                        name="ck_coach_predictions_status"),
@@ -1041,7 +1040,7 @@ inbound_messages = sa.Table(
     sa.CheckConstraint("message_id <> '' AND psid <> ''", name="ck_inbound_messages_identity"),
     sa.CheckConstraint("reply_to_message_id IS NULL OR reply_to_message_id <> ''",
                        name="ck_inbound_messages_reply"),
-    sa.CheckConstraint("status IN ('pending','done')", name="ck_inbound_messages_status"),
+    sa.CheckConstraint(f"status IN ({voc.sql_values(voc.InboundStatus)})", name="ck_inbound_messages_status"),
     sa.CheckConstraint("kind IN ('text','postback','sticker','attachment')",
                        name="ck_inbound_messages_kind"),
 )
@@ -1088,7 +1087,7 @@ proactive_jobs = sa.Table(
     # Why a job stopped without delivering. `done` means delivered or deliberately silent;
     # `failed` means lost, and the cause stays readable without a log.
     sa.Column("last_error", sa.Text, nullable=False, server_default=""),
-    sa.CheckConstraint("status IN ('pending','running','done','failed')",
+    sa.CheckConstraint(f"status IN ({voc.sql_values(voc.JobStatus)})",
                        name="ck_proactive_jobs_status"),
     sa.CheckConstraint(
         f"kind IN ({voc.sql_values(voc.ProactiveKind)})",
@@ -1186,7 +1185,7 @@ outbound_deliveries = sa.Table(
                        name="ck_outbound_deliveries_identity"),
     sa.CheckConstraint("payload_digest ~ '^[0-9a-f]{64}$'",
                        name="ck_outbound_deliveries_digest"),
-    sa.CheckConstraint("status IN ('prepared','sending','delivered','failed')",
+    sa.CheckConstraint(f"status IN ({voc.sql_values(voc.DeliveryStatus)})",
                        name="ck_outbound_deliveries_status"),
     sa.CheckConstraint("payload IS NULL OR jsonb_typeof(payload) = 'object'",
                        name="ck_outbound_deliveries_payload"),
@@ -1211,7 +1210,7 @@ turn_commands = sa.Table(
     sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=UTC_NOW),
     sa.Column("applied_at", sa.DateTime(timezone=True)),
     # Already-applied `proactive_message.add` rows stay as the idempotence proof of past turns,
-    # but no new intention of this type can be created: it has no handler anymore.
+    # but no new intention of this type can be created: it has no handler.
     sa.CheckConstraint(
         "kind IN (" + ",".join(f"'{kind}'" for kind in commands.ACTIVE) + ") OR "
         "(kind = 'proactive_message.add' AND applied_at IS NOT NULL)",

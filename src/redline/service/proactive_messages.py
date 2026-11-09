@@ -12,7 +12,7 @@ import json
 from dataclasses import dataclass
 
 from redline.coach.fr import initiatives, session_labels
-from redline.model import ledger, rulebook, session_kinds
+from redline.model import ledger, rulebook
 
 
 @dataclass(frozen=True)
@@ -56,13 +56,9 @@ def _missing_cells(detail: str) -> ClosedProactive | None:
     data = _object(detail)
     if not data:
         return ClosedProactive(initiatives.LAST_SESSION)
-    # The wake trace is collected the same morning; the evening net only asks for
-    # effort figures.
-    if data.get("type") == session_kinds.WAKE_TRACE:
-        return None
     names = list(data.get("missing", ()))
     selected = next((name for wanted in ledger.DECLARED_COLUMNS for name in names
-                     if _base(name) == wanted), None)
+                     if ledger.column_base(name) == wanted), None)
     if selected is None:
         return ClosedProactive(initiatives.LAST_SESSION)
     markers = list(data.get("markers", ()))
@@ -74,24 +70,19 @@ def _missing_cells(detail: str) -> ClosedProactive | None:
         question=text)
 
 
-def _base(column: str) -> str:
-    """`pain:zone` -> `pain` (same rule as `ledger.column_base`)."""
-    return column.split(":", 1)[0]
-
-
 def _requested(labels: dict[str, str], column: str) -> str:
     _, _, zone = column.partition(":")
-    return initiatives.cell_label(labels, _base(column), zone)
+    return initiatives.cell_label(labels, ledger.column_base(column), zone)
 
 
 def missing_cells_in_notebook(detail: str) -> ClosedProactive | None:
     """The evening net when the notebook is connected: it names everything missing and
     points to the notebook, where an answer costs no coach turn, without asking."""
     data = _object(detail)
-    if not data or data.get("type") == session_kinds.WAKE_TRACE:
+    if not data:
         return None
     names = [name for wanted in ledger.DECLARED_COLUMNS
-             for name in data.get("missing", ()) if _base(name) == wanted]
+             for name in data.get("missing", ()) if ledger.column_base(name) == wanted]
     if not names:
         return None
     kind = str(data.get("type") or "").strip()

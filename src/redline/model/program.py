@@ -23,13 +23,12 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from . import session_kinds, vault_layout
+from . import formats, session_kinds, vault_layout
 from .dose import DOSE_SCHEMA, Dose
 from .notes import NoteError, frontmatter, read_all
 from .schema import Schema, field
 
 STATUSES = ("active", "retired")
-SLUG_PATTERN = r"[a-z0-9][a-z0-9-]{0,39}"
 WEEK = r"W\d{2}"
 
 LOAD_SCHEMA = Schema("charge", [
@@ -87,7 +86,7 @@ SESSION_SCHEMA = Schema("session", [
     field("variants", dict, required=False,
           note="the declared variants, e.g. degraded"),
     field("status", str, required=False, choices=STATUSES),
-    field("routine", str, pattern=SLUG_PATTERN,
+    field("routine", str, pattern=formats.SLUG,
           note="the routine's id, the one the program and the ledger cite"),
     field("min_gap_h", dict, required=False,
           note="minimum gap in hours from other sessions, by type: {long: 48}"),
@@ -120,7 +119,7 @@ VARIANT_SCHEMA = Schema("variant", [
 # sits in the phone for hours before the first exercise, and the morning state is not
 # the evening state.
 GATE_SCHEMA = Schema("guardrail", [
-    field("zone", str, required=False, pattern=r"[a-z0-9][a-z0-9-]{0,39}",
+    field("zone", str, required=False, pattern=formats.SLUG,
           note="the monitored zone the threshold looks at; absent, all of them"),
     field("pain_max", int, minimum=0, maximum=10,
           note="ABOVE this figure, the guardrail triggers"),
@@ -228,8 +227,6 @@ class Program:
             out.append(Prescription.from_note(slug, note, dose))
         return out
 
-    # ------------------------------------------------------------- selection
-
     def build(self, selection: dict) -> dict:
         """A selection of the program -> the session of the day, resolved.
 
@@ -303,13 +300,11 @@ class Program:
         }
 
 
-# ------------------------------------------------------ the RPE target of a kind
-
 #: The keys a workout note uses to say what it describes. A strength routine declares
 #: `routine:` (its slug); any other note declares the session `kinds:` it covers.
 NOTE_KINDS_SCHEMA = Schema("workout note", [
     field("kinds", list, required=False, item=field("type", str, choices=session_kinds.RECORDED)),
-    field("routine", str, required=False, pattern=SLUG_PATTERN),
+    field("routine", str, required=False, pattern=formats.SLUG),
 ], extra=True)
 
 
@@ -320,7 +315,7 @@ def _workout_notes(vault: Path) -> list[tuple[Path, dict]]:
         data = frontmatter(path)
         try:
             NOTE_KINDS_SCHEMA.validate(data, path.name)
-        except Exception as exc:   # SchemaError names the field
+        except Exception as exc:
             problems.append(f"{path.name} : {exc}")
             continue
         if "routine" in data and "kinds" in data:
@@ -378,7 +373,7 @@ def load(vault: Path) -> Program:
             sessions[routine] = SESSION_SCHEMA.validate(data, path.name)
         except NoteError as exc:
             problems.append(str(exc))
-        except Exception as exc:   # SchemaError carries every field problem
+        except Exception as exc:
             problems.append(f"{path.name} : {exc}")
     if problems:
         raise NoteError("\n".join(problems))

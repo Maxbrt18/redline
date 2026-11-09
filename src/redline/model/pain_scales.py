@@ -26,9 +26,9 @@ from dataclasses import dataclass
 from enum import StrEnum
 from itertools import pairwise
 
+from . import formats
 from .schema import Field, Schema, field
 
-SLUG = r"[a-z0-9][a-z0-9-]{0,39}"
 #: The bounds every pain value is stored within (`pain_readings`, CHECK constraints).
 LOWEST, HIGHEST = 0, 10
 
@@ -124,7 +124,7 @@ def _level(*extra: Field) -> Schema:
 SCALES_SCHEMA = Schema("[scales]", [
     field("morning_trace", dict, schema=Schema("[scales.morning_trace]", [
         field("levels", list, minimum=2, maximum=11, item=field("level", dict, schema=_level(
-            field("slug", str, pattern=SLUG),
+            field("slug", str, pattern=formats.SLUG),
             field("role", str, choices=[role.value for role in TraceRole]),
         ))),
     ], check=_trace_check)),

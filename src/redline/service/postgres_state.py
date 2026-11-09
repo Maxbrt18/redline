@@ -19,7 +19,15 @@ from redline.analysis import signals as signal_model
 from redline.coach.fr import relationship as wording
 from redline.coach.fr import signals as signal_wording
 from redline.model import commands, local_time
-from redline.model.vocabulary import Desire, ThreadStatus
+from redline.model import vocabulary as voc
+from redline.model.errors import StorageError
+from redline.model.vocabulary import (
+    CycleState,
+    DeadlineStatus,
+    Desire,
+    MeasurementState,
+    ThreadStatus,
+)
 from redline.storage.database import Database
 from redline.storage.repository import ATHLETE, CORRECTION_ANNOUNCE_WINDOW, OperationalStore
 from redline.storage.schema import (
@@ -61,7 +69,7 @@ from .attachments import safe_conversation_label
 from .config import Config
 from .race_countdown import compile_deadline
 from .relationship import SERVICE_LINE_PREFIXES, question_fingerprint, render_memory
-from .state import ProactiveState, StateStore
+from .state import Disposition, ProactiveState, StateStore
 
 JOB_KEEP = 100
 
@@ -290,7 +298,7 @@ class PostgresStateStore(StateStore):
                      )).rowcount
 
     def begin_outbound_delivery(self, source_key: str, psid: str,
-                                payload_digest: str, payload: dict | None = None) -> str:
+                                payload_digest: str, payload: dict | None = None) -> Disposition:
         """Reserve the network boundary; `uncertain` forbids a blind replay.
 
         A ``failed`` or ``prepared`` envelope delivered no fragment: it may go out, even
@@ -300,7 +308,7 @@ class PostgresStateStore(StateStore):
         now = dt.datetime.now(dt.UTC)
         with self.database.transaction() as connection:
             connection.execute(outbound_deliveries.delete().where(
-                outbound_deliveries.c.status != "sending",
+                outbound_deliveries.c.status != voc.DeliveryStatus.SENDING,
                 outbound_deliveries.c.updated_at < now - dt.timedelta(days=90)))
             row = connection.execute(sa.select(outbound_deliveries).where(
                 outbound_deliveries.c.source_key == source_key
@@ -308,21 +316,21 @@ class PostgresStateStore(StateStore):
             if row is None:
                 connection.execute(outbound_deliveries.insert().values(
                     source_key=source_key, psid=psid, payload_digest=payload_digest,
-                    payload=payload, status="sending", attempts=1, updated_at=now))
-                return "send"
+                    payload=payload, status=voc.DeliveryStatus.SENDING, attempts=1, updated_at=now))
+                return Disposition.SEND
             if row["psid"] != psid:
-                raise ValueError(f"collision d'enveloppe sortante : {source_key}")
-            if row["status"] == "delivered":
-                return "delivered"
-            if row["status"] == "sending":
-                return "uncertain"
-            attempts = row["attempts"] + (0 if row["status"] == "prepared" else 1)
+                raise StorageError(f"outbound envelope {source_key} already belongs to another conversation")
+            if row["status"] == voc.DeliveryStatus.DELIVERED:
+                return Disposition.DELIVERED
+            if row["status"] == voc.DeliveryStatus.SENDING:
+                return Disposition.UNCERTAIN
+            attempts = row["attempts"] + (0 if row["status"] == voc.DeliveryStatus.PREPARED else 1)
             connection.execute(outbound_deliveries.update().where(
                 outbound_deliveries.c.source_key == source_key).values(
                     payload_digest=payload_digest, payload=payload,
-                    status="sending", attempts=attempts,
+                    status=voc.DeliveryStatus.SENDING, attempts=attempts,
                     last_error="", updated_at=now))
-            return "send"
+            return Disposition.SEND
 
     def prepare_outbound_delivery(self, source_key: str, psid: str,
                                   payload_digest: str, payload: dict) -> bool:
@@ -335,15 +343,15 @@ class PostgresStateStore(StateStore):
             if row is None:
                 connection.execute(outbound_deliveries.insert().values(
                     source_key=source_key, psid=psid, payload_digest=payload_digest,
-                    payload=payload, status="prepared", attempts=1, updated_at=now))
+                    payload=payload, status=voc.DeliveryStatus.PREPARED, attempts=1, updated_at=now))
                 return True
             if row["psid"] != psid:
-                raise ValueError(f"collision d'enveloppe sortante : {source_key}")
-            if row["status"] not in {"prepared", "failed"}:
+                raise StorageError(f"outbound envelope {source_key} already belongs to another conversation")
+            if row["status"] not in voc.RESENDABLE_DELIVERIES:
                 return False
             connection.execute(outbound_deliveries.update().where(
                 outbound_deliveries.c.source_key == source_key).values(
-                    payload_digest=payload_digest, payload=payload, status="prepared",
+                    payload_digest=payload_digest, payload=payload, status=voc.DeliveryStatus.PREPARED,
                     updated_at=now))
             return True
 
@@ -359,15 +367,15 @@ class PostgresStateStore(StateStore):
         with self.database.transaction() as connection:
             connection.execute(outbound_deliveries.delete().where(
                 outbound_deliveries.c.source_key == source_key,
-                outbound_deliveries.c.status.in_(("prepared", "failed"))))
+                outbound_deliveries.c.status.in_(voc.RESENDABLE_DELIVERIES)))
 
     def finish_outbound_delivery(self, source_key: str, *, delivered: bool,
                                  error: str = "") -> None:
         with self.database.transaction() as connection:
             changed = connection.execute(outbound_deliveries.update().where(
                 outbound_deliveries.c.source_key == source_key,
-                outbound_deliveries.c.status == "sending",
-            ).values(status="delivered" if delivered else "failed",
+                outbound_deliveries.c.status == voc.DeliveryStatus.SENDING,
+            ).values(status=voc.DeliveryStatus.DELIVERED if delivered else voc.DeliveryStatus.FAILED,
                      last_error="" if delivered else error[:500],
                      updated_at=dt.datetime.now(dt.UTC))).rowcount
             if changed != 1:
@@ -522,7 +530,7 @@ class PostgresStateStore(StateStore):
             rows = connection.execute(sa.select(
                 inbound_messages.c.message_id, inbound_messages.c.psid,
                 inbound_messages.c.kind, inbound_messages.c.body,
-            ).where(inbound_messages.c.status == "pending").order_by(
+            ).where(inbound_messages.c.status == voc.InboundStatus.PENDING).order_by(
                 inbound_messages.c.received_at)).mappings()
             return [dict(row) for row in rows]
 
@@ -543,7 +551,7 @@ class PostgresStateStore(StateStore):
             connection.execute(inbound_messages.update().where(
                 inbound_messages.c.message_id.in_(message_ids)
             ).values(
-                status="done", completed_at=dt.datetime.now(dt.UTC),
+                status=voc.InboundStatus.DONE, completed_at=dt.datetime.now(dt.UTC),
                 body=sa.case((inbound_messages.c.kind == "attachment", ""),
                              else_=inbound_messages.c.body)))
 
@@ -609,7 +617,7 @@ class PostgresStateStore(StateStore):
                    planned_sessions.c.id == session_cycles.c.source_session_id).where(
                 session_cycles.c.id == cycle_id, session_cycles.c.athlete_id == ATHLETE,
             )).mappings().one_or_none()
-            return bool(row and row["state"] == "missed" and not store.strength_evidence_in(
+            return bool(row and row["state"] == CycleState.MISSED and not store.strength_evidence_in(
                 connection, row["scheduled_on"], row["routine"]))
 
     def materialize_intelligence(self, now: dt.datetime) -> int:
@@ -653,12 +661,12 @@ class PostgresStateStore(StateStore):
             planned_sessions,
             planned_sessions.c.id == session_cycles.c.source_session_id).where(
                 session_cycles.c.athlete_id == ATHLETE,
-                session_cycles.c.state.in_(("planned", "started", "completed", "closed")),
+                session_cycles.c.state.in_((CycleState.PLANNED, CycleState.STARTED, CycleState.COMPLETED, CycleState.CLOSED)),
         ).with_for_update(of=session_cycles)).mappings().all()
         for row in cycles:
             detail = {"session_key": f"{row['iso_week']}:{row['logical_key']}",
                       "title": row["title"], "workout": row["workout"]}
-            if row["state"] == "planned" and row["kind"] != "rest":
+            if row["state"] == CycleState.PLANNED and row["kind"] != "rest":
                 if store.strength_evidence_in(
                         connection, row["scheduled_on"], row["routine"]):
                     continue
@@ -669,7 +677,7 @@ class PostgresStateStore(StateStore):
                 if local >= missed_at:
                     connection.execute(session_cycles.update().where(
                         session_cycles.c.id == row["id"]).values(
-                            state="missed", updated_at=utc))
+                            state=CycleState.MISSED, updated_at=utc))
                     if PostgresProactiveState._enqueue(
                             connection, f"missed-session:{row['id']}", "missed_session",
                             json.dumps(detail, ensure_ascii=False), utc.timestamp()):
@@ -680,7 +688,7 @@ class PostgresStateStore(StateStore):
                     observation_metrics.c.gut_symptoms_state).where(
                         observation_metrics.c.observation_id == row["observation_id"]
                     )).scalar_one()
-                if pending == "pending" and PostgresProactiveState._enqueue(
+                if pending == MeasurementState.PENDING and PostgresProactiveState._enqueue(
                         connection, f"gut-review:{row['id']}", "gut_review",
                         json.dumps({**detail, "target_g_h": row["carbs_target_g_h"]},
                                    ensure_ascii=False), utc.timestamp()):
@@ -698,13 +706,13 @@ class PostgresStateStore(StateStore):
             # A moved date or a closed race cancels the old wake-up: the race identity
             # stays, the calendar identity changes.
             obsolete = proactive_jobs.c.job_key.startswith(prefix, autoescape=True)
-            if race["status"] != "done":
+            if race["status"] != DeadlineStatus.DONE:
                 obsolete = sa.and_(obsolete, ~proactive_jobs.c.job_key.startswith(
                     f"{prefix}{race['due_on'].isoformat()}:", autoescape=True))
             connection.execute(proactive_jobs.update().where(
-                obsolete, proactive_jobs.c.status.in_(("pending", "running"))
-            ).values(status="done", completed_at=utc))
-            if race["status"] == "done":
+                obsolete, proactive_jobs.c.status.in_(voc.LIVE_JOBS)
+            ).values(status=voc.JobStatus.DONE, completed_at=utc))
+            if race["status"] == DeadlineStatus.DONE:
                 continue
             for checkpoint in compile_deadline(dict(race)):
                 if checkpoint.expires_at >= utc:
@@ -726,13 +734,13 @@ class PostgresStateStore(StateStore):
         for correction in corrections:
             expires = correction["registered_at"] + CORRECTION_ANNOUNCE_WINDOW
             if expires <= utc:
-                # An announcement already queued before this rule expires too, as
-                # `_expire_in` does for any overdue deadline.
+                # An announcement already queued expires too once its window has passed,
+                # as `_expire_in` does for any overdue deadline.
                 connection.execute(proactive_jobs.update().where(
                     sa.or_(proactive_jobs.c.job_key == f"correction:{correction['correction_key']}",
                            proactive_jobs.c.job_key.like(f"correction-id:{correction['id']}:%")),
-                    proactive_jobs.c.status == "pending").values(
-                        status="failed", completed_at=utc, last_error="expired before delivery"))
+                    proactive_jobs.c.status == voc.JobStatus.PENDING).values(
+                        status=voc.JobStatus.FAILED, completed_at=utc, last_error="expired before delivery"))
                 continue
             created += int(PostgresProactiveState._enqueue(
                 connection, f"correction:{correction['correction_key']}", "correction",
@@ -779,7 +787,7 @@ class PostgresStateStore(StateStore):
             session_cycles).join(planned_sessions,
                 planned_sessions.c.id == session_cycles.c.source_session_id).where(
                 session_cycles.c.athlete_id == ATHLETE,
-                session_cycles.c.state == "missed",
+                session_cycles.c.state == CycleState.MISSED,
                 session_cycles.c.updated_at >= utc - dt.timedelta(days=21),
                 ~sa.exists().where(
                     strength_sessions.c.athlete_id == ATHLETE,
@@ -883,7 +891,7 @@ class PostgresProactiveState(ProactiveState):
         with self.database.transaction() as connection:
             self._expire_in(connection, current)
             query = sa.select(proactive_jobs).where(
-                proactive_jobs.c.status == "pending", proactive_jobs.c.due_at <= current)
+                proactive_jobs.c.status == voc.JobStatus.PENDING, proactive_jobs.c.due_at <= current)
             if not allow_ordinary:
                 query = query.where(proactive_jobs.c.priority.is_(True))
             rows = connection.execute(query.order_by(
@@ -893,43 +901,43 @@ class PostgresProactiveState(ProactiveState):
                 attempts = row["attempts"] + 1
                 connection.execute(proactive_jobs.update().where(
                     proactive_jobs.c.job_key == row["job_key"]
-                ).values(status="running", attempts=attempts))
-                return self._job(dict(row), attempts=attempts, status="running")
+                ).values(status=voc.JobStatus.RUNNING, attempts=attempts))
+                return self._job(dict(row), attempts=attempts, status=voc.JobStatus.RUNNING)
             return None
 
     def claim_job(self, job_id: str) -> dict | None:
         """Claim ONE pending job, due or not: the turn that absorbs it carries it."""
         with self.database.transaction() as connection:
             row = connection.execute(sa.select(proactive_jobs).where(
-                proactive_jobs.c.job_key == job_id, proactive_jobs.c.status == "pending",
+                proactive_jobs.c.job_key == job_id, proactive_jobs.c.status == voc.JobStatus.PENDING,
             ).with_for_update(skip_locked=True)).mappings().one_or_none()
             if row is None:
                 return None
             attempts = row["attempts"] + 1
             connection.execute(proactive_jobs.update().where(
                 proactive_jobs.c.job_key == job_id
-            ).values(status="running", attempts=attempts))
-            return self._job(dict(row), attempts=attempts, status="running")
+            ).values(status=voc.JobStatus.RUNNING, attempts=attempts))
+            return self._job(dict(row), attempts=attempts, status=voc.JobStatus.RUNNING)
 
     def hasten_job(self, job_id: str, due: float) -> bool:
         """Advance the due time of a still pending job; never push it back."""
         with self.database.transaction() as connection:
             return connection.execute(proactive_jobs.update().where(
-                proactive_jobs.c.job_key == job_id, proactive_jobs.c.status == "pending",
+                proactive_jobs.c.job_key == job_id, proactive_jobs.c.status == voc.JobStatus.PENDING,
                 proactive_jobs.c.due_at > _at(due),
             ).values(due_at=_at(due))).rowcount == 1
 
     @staticmethod
     def _expire_in(connection, current: dt.datetime) -> int:
         rows = connection.execute(sa.select(proactive_jobs).where(
-            proactive_jobs.c.status == "pending",
+            proactive_jobs.c.status == voc.JobStatus.PENDING,
             proactive_jobs.c.expires_at.is_not(None),
             proactive_jobs.c.expires_at < current,
         ).with_for_update(skip_locked=True)).mappings().all()
         for row in rows:
             connection.execute(proactive_jobs.update().where(
                 proactive_jobs.c.job_key == row["job_key"]
-            ).values(status="failed", completed_at=current,
+            ).values(status=voc.JobStatus.FAILED, completed_at=current,
                      last_error="expired before delivery"))
         return len(rows)
 
@@ -950,13 +958,13 @@ class PostgresProactiveState(ProactiveState):
         with self.database.transaction() as connection:
             connection.execute(proactive_jobs.update().where(
                 proactive_jobs.c.job_key == job_id
-            ).values(status="done", completed_at=dt.datetime.now(dt.UTC)))
+            ).values(status=voc.JobStatus.DONE, completed_at=dt.datetime.now(dt.UTC)))
             self._purge_old_jobs(connection)
 
     @staticmethod
     def _purge_old_jobs(connection) -> None:
         done = connection.execute(sa.select(proactive_jobs.c.job_key).where(
-            proactive_jobs.c.status.in_(("done", "failed"))).order_by(
+            proactive_jobs.c.status.in_(voc.FINISHED_JOBS)).order_by(
                 proactive_jobs.c.completed_at.desc()).offset(JOB_KEEP)).scalars().all()
         if done:
             connection.execute(proactive_jobs.delete().where(
@@ -966,8 +974,8 @@ class PostgresProactiveState(ProactiveState):
         with self.database.transaction() as connection:
             result = connection.execute(proactive_jobs.update().where(
                 proactive_jobs.c.job_key == job_id,
-                proactive_jobs.c.status.in_(("pending", "running")),
-            ).values(status="pending", due_at=_at(due), expires_at=_at(expire_at)))
+                proactive_jobs.c.status.in_(voc.LIVE_JOBS),
+            ).values(status=voc.JobStatus.PENDING, due_at=_at(due), expires_at=_at(expire_at)))
             if result.rowcount != 1:
                 raise KeyError(f"proactive job unknown or already settled: {job_id}")
 
@@ -980,8 +988,8 @@ class PostgresProactiveState(ProactiveState):
         with self.database.transaction() as connection:
             result = connection.execute(proactive_jobs.update().where(
                 proactive_jobs.c.job_key == job_id,
-                proactive_jobs.c.status.in_(("done", "failed")),
-            ).values(status="pending", due_at=_at(due), expires_at=_at(expire_at),
+                proactive_jobs.c.status.in_(voc.FINISHED_JOBS),
+            ).values(status=voc.JobStatus.PENDING, due_at=_at(due), expires_at=_at(expire_at),
                      completed_at=None, attempts=0, last_error=""))
             if result.rowcount != 1:
                 raise KeyError(f"unknown finished proactive job: {job_id}")
@@ -997,7 +1005,7 @@ class PostgresProactiveState(ProactiveState):
         fallback = _at(expire_at) if expire_at else None
         with self.database.transaction() as connection:
             row = connection.execute(sa.select(proactive_jobs.c.expires_at).where(
-                proactive_jobs.c.job_key == job_id, proactive_jobs.c.status == "running",
+                proactive_jobs.c.job_key == job_id, proactive_jobs.c.status == voc.JobStatus.RUNNING,
             ).with_for_update()).one_or_none()
             if row is None:
                 return False
@@ -1005,13 +1013,13 @@ class PostgresProactiveState(ProactiveState):
             if expires is not None and due > expires:
                 connection.execute(proactive_jobs.update().where(
                     proactive_jobs.c.job_key == job_id).values(
-                        status="failed", completed_at=dt.datetime.now(dt.UTC),
+                        status=voc.JobStatus.FAILED, completed_at=dt.datetime.now(dt.UTC),
                         last_error="expired before delivery"))
                 return False
             # A deferral is not an attempt: only a failure consumes the cap.
             connection.execute(proactive_jobs.update().where(
                 proactive_jobs.c.job_key == job_id).values(
-                    status="pending", due_at=due, expires_at=expires,
+                    status=voc.JobStatus.PENDING, due_at=due, expires_at=expires,
                     attempts=sa.func.greatest(proactive_jobs.c.attempts - 1, 0)))
             return True
 
@@ -1020,8 +1028,8 @@ class PostgresProactiveState(ProactiveState):
         with self.database.transaction() as connection:
             connection.execute(proactive_jobs.update().where(
                 proactive_jobs.c.job_key == job_id,
-                proactive_jobs.c.status.in_(("pending", "running")),
-            ).values(status="failed", completed_at=dt.datetime.now(dt.UTC),
+                proactive_jobs.c.status.in_(voc.LIVE_JOBS),
+            ).values(status=voc.JobStatus.FAILED, completed_at=dt.datetime.now(dt.UTC),
                      last_error=cause[:500]))
             self._purge_old_jobs(connection)
 
@@ -1029,14 +1037,14 @@ class PostgresProactiveState(ProactiveState):
         """Take over the previous process's claims at service startup."""
         with self.database.transaction() as connection:
             return connection.execute(proactive_jobs.update().where(
-                proactive_jobs.c.status == "running"
-            ).values(status="pending", due_at=sa.func.least(
+                proactive_jobs.c.status == voc.JobStatus.RUNNING
+            ).values(status=voc.JobStatus.PENDING, due_at=sa.func.least(
                 proactive_jobs.c.due_at, dt.datetime.now(dt.UTC)))).rowcount
 
     def jobs(self, *, active_only: bool = False) -> list[dict]:
         query = sa.select(proactive_jobs).order_by(proactive_jobs.c.due_at)
         if active_only:
-            query = query.where(proactive_jobs.c.status.in_(("pending", "running")))
+            query = query.where(proactive_jobs.c.status.in_(voc.LIVE_JOBS))
         with self.database.engine.connect() as connection:
             return [self._job(dict(row)) for row in connection.execute(query).mappings()]
 
@@ -1088,8 +1096,8 @@ class PostgresProactiveState(ProactiveState):
             if job_id:
                 result = connection.execute(proactive_jobs.update().where(
                     proactive_jobs.c.job_key == job_id,
-                    proactive_jobs.c.status == "running",
-                ).values(status="done", completed_at=now))
+                    proactive_jobs.c.status == voc.JobStatus.RUNNING,
+                ).values(status=voc.JobStatus.DONE, completed_at=now))
                 if result.rowcount != 1:
                     raise KeyError(f"proactive job cannot be acknowledged: {job_id}")
                 if job_id.startswith("correction-id:"):

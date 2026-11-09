@@ -8,25 +8,22 @@ coach cannot replay an already acknowledged initiative itself.
 from __future__ import annotations
 
 import argparse
-import os
 import re
 import time
 
-from redline.model import entrypoint
-from redline.model.errors import ConfigError, InputError
+from redline.model import entrypoint, iso_week
+from redline.model.errors import InputError
+from redline.model.vocabulary import FINISHED_JOBS
 from redline.service.postgres_state import PostgresStateStore
-from redline.storage import Database
+from redline.storage.database import from_environment
 
 PERIODIC_KEY = re.compile(
-    r"^((?:weekly|weekly-repair):20\d{2}-W(?:0[1-9]|[1-4]\d|5[0-3])|"
+    rf"^((?:weekly|weekly-repair):{iso_week.PATTERN}|"
     r"monthly:20\d{2}-(?:0[1-9]|1[0-2]))$")
 
 
 def _state() -> PostgresStateStore:
-    url = (os.environ.get("DATABASE_URL") or "").strip()
-    if not url:
-        raise ConfigError("DATABASE_URL is required")
-    return PostgresStateStore(Database(url, application_name="proactive-job"))
+    return PostgresStateStore(from_environment("proactive-job"))
 
 
 def _row(state: PostgresStateStore, key: str) -> dict:
@@ -51,7 +48,7 @@ def main() -> int:
     state = _state()
     before = _row(state, args.job_key)
     if args.command == "reopen":
-        if before["status"] not in {"done", "failed"}:
+        if before["status"] not in FINISHED_JOBS:
             raise InputError(
                 f"{args.job_key}: reopening refused, status {before["status"]}")
         now = time.time()

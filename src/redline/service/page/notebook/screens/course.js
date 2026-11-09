@@ -4,7 +4,6 @@ import {dm, fmt, shortDay} from '../format.js';
 import {push} from '../nav.js';
 import {raceProfile, raceSummary} from './raceplan.js';
 
-// ------------------------------------------------------------ Course
 const archiveLabel = entry => entry.kind === 'monthly' && entry.period
   ? 'Monthly · ' + new Date(entry.period + '-01T12:00:00').toLocaleDateString('fr-FR', {month: 'long', year: 'numeric'})
   : entry.kind === 'weekly' && entry.period ? 'Weekly · W' + entry.period.slice(-2) : entry.title;

@@ -53,8 +53,6 @@ TALLY_GROW_SHARE = 0.9
 TALLY_SHRINK_SHARE = 0.5
 
 
-# ------------------------------------------------------------------ the ladder
-
 def _key(family: Family, dose: Dose) -> tuple[float, ...]:
     """The order of the ladder: the outermost variable weighs most."""
     return tuple(dose.get(variable.name) or 0.0 for variable in reversed(family.ladder))
@@ -126,8 +124,6 @@ def _rises_freely(family: Family, lineage: Lineage, dose: Dose) -> bool:
             return False
     return False
 
-
-# ------------------------------------------------------------------ the verdicts
 
 def _threshold(criterion: Criterion, dose: Dose | None, lineage: Lineage) -> float | None:
     if criterion.ref is None:
@@ -213,8 +209,6 @@ def _severe(judgements: Iterable[Judgement]) -> bool:
 def _failed(judgements: Iterable[Judgement]) -> bool:
     return any(item.verdict == Verdict.FAIL for item in judgements)
 
-
-# ------------------------------------------------------------------ the rule
 
 @dataclass(frozen=True)
 class _Judged:
@@ -347,8 +341,6 @@ def allows(family: Family, proposal: Proposal, dose: Dose) -> bool:
     return not above(family, dose, proposal.ceiling)
 
 
-# ------------------------------------------------------------------ the week
-
 def arbitrate(proposals: Sequence[Proposal], families: dict[str, Family], budget: int,
               rule: str, fact: str) -> list[Proposal]:
     """At most `budget` rises among lineages that share a budget, the others held.
@@ -371,8 +363,6 @@ def arbitrate(proposals: Sequence[Proposal], families: dict[str, Family], budget
         out.append(proposal)
     return out
 
-
-# ------------------------------------------------------------------ the step itself
 
 @dataclass(frozen=True)
 class StepTally:

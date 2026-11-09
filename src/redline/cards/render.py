@@ -42,8 +42,6 @@ class CardOverflow(InputError):
     """The layout could not hold its content. Raised BEFORE writing any PNG."""
 
 
-# --------------------------------------------------------------------- document
-
 def _font_css() -> str:
     rules = []
     missing = []
@@ -73,8 +71,6 @@ def document(body: str, *, width: int = WIDTH) -> str:
         f"</head><body>{body}</body></html>"
     )
 
-
-# ------------------------------------------------------------------ the guard
 
 # Runs in the page once layout has settled. Returns a list of human-readable
 # problems; an empty list is the only acceptable result.
@@ -135,8 +131,6 @@ def _launch_kwargs() -> dict:
     return {"executable_path": path} if path else {}
 
 
-# ---------------------------------------------------------------------- render
-
 def render(body: str, out_path: str, *, width: int = WIDTH, scale: int = SCALE,
            max_height: int = MAX_HEIGHT) -> None:
     """Render a card body to a PNG. Raises CardOverflow instead of writing a
@@ -170,7 +164,7 @@ def render(body: str, out_path: str, *, width: int = WIDTH, scale: int = SCALE,
 
 
 def emit(body: str, out_path: str, *, html_only: bool = False, **kwargs) -> None:
-    """CLI tail shared by the four card scripts.
+    """CLI tail shared by the `chart_*` commands.
 
     Prints the produced path on stdout (the outbox contract) and exits non-zero
     with a readable message if the layout could not hold.

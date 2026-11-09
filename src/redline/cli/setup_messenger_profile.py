@@ -14,22 +14,20 @@ Usage (on the server, with the service environment set):
 """
 
 import os
-import sys
-from pathlib import Path
 
 import requests
 
 from redline.coach.fr import messenger_profile as wording
-from redline.model import paths
-from redline.service.config import _load_dotenv
+from redline.model import entrypoint
+from redline.model.errors import ConfigError, ExternalError
+from redline.service.config import load_service_environment
 
 
 def main() -> None:
-    external_env = Path("/etc/redline/runtime/coach-messenger.env")
-    _load_dotenv(external_env if external_env.is_file() else paths.ENGINE_ROOT / ".env")
+    load_service_environment()
     token = os.environ.get("MESSENGER_PAGE_TOKEN")
     if not token:
-        sys.exit("MESSENGER_PAGE_TOKEN missing from the service environment.")
+        raise ConfigError("MESSENGER_PAGE_TOKEN missing from the service environment.")
     version = os.environ.get("GRAPH_API_VERSION", "v21.0")
 
     response = requests.post(
@@ -37,7 +35,7 @@ def main() -> None:
         headers={"Authorization": f"Bearer {token}"},
         json={
             # Meta requires a Get Started button before a persistent menu is
-            # allowed. Its payload is routed like a typed message (redline/web.py).
+            # allowed. Its payload is routed like a typed message (service/web.py).
             "get_started": {"payload": "/start"},
             "persistent_menu": [{
                 "locale": "default",
@@ -49,10 +47,10 @@ def main() -> None:
         timeout=30,
     )
     if response.status_code >= 400:
-        sys.exit(f"Failed ({response.status_code}): {response.text}")
+        raise ExternalError(f"Failed ({response.status_code}): {response.text}")
     print("Messenger profile configured: persistent menu + ice-breakers. "
           "(Close/reopen the conversation to see the menu.)")
 
 
 if __name__ == "__main__":
-    main()
+    entrypoint.run(main)

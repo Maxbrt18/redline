@@ -15,6 +15,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from redline.cards import render
 from redline.coach.fr import notebook as notebook_text
 from redline.coach.fr import session_labels
+from redline.model import formats, iso_week
 from redline.model import ledger as ledger_model
 from redline.model.schema import SchemaError
 from redline.storage.database import StorageError
@@ -25,18 +26,16 @@ from . import notebook_weather as weather
 from .notebook import NotebookService
 from .notebook_board import AnswerError
 
-WEEK = re.compile(r"20\d{2}-W(?:0[1-9]|[1-4]\d|5[0-3])")
 UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
-ZONE = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")
-UUID_TEXT = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+ZONE = re.compile(formats.SLUG)
 # Every field a `cell:` ask can carry: its list comes from the model, so a metric the
 # board asks for is never refused here.
 CELL_FIELDS = "|".join(re.escape(field)
                        for field in ledger_model.FEELINGS + ledger_model.FUELLING_METRICS)
-ASK = re.compile(rf"(?:cell:[0-9a-f-]{{36}}:(?:pain:[a-z0-9][a-z0-9-]{{0,39}}|{CELL_FIELDS})"
-                 r"|wake-cell:[0-9a-f-]{36}:[a-z0-9][a-z0-9-]{0,39}"
-                 r"|wake:20\d{2}-\d{2}-\d{2}:[a-z0-9][a-z0-9-]{0,39}"
-                 r"|daily:20\d{2}-\d{2}-\d{2}:(?:sleep|life_load)|hr:20\d{2}-\d{2}-\d{2})")
+ASK = re.compile(rf"(?:cell:[0-9a-f-]{{36}}:(?:pain:{formats.SLUG}|{CELL_FIELDS})"
+                 rf"|wake-cell:[0-9a-f-]{{36}}:{formats.SLUG}"
+                 rf"|wake:{formats.DATE}:{formats.SLUG}"
+                 rf"|daily:{formats.DATE}:(?:sleep|life_load)|hr:{formats.DATE})")
 
 COOKIE = "__Host-redline-notebook"
 CSP = ("default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; "
@@ -44,15 +43,15 @@ CSP = ("default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline
        "worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 
 
-PLACE = re.compile(r"[\w' -]{1,60}")
-DAY = re.compile(r"20\d{2}-\d{2}-\d{2}")
-CLOCK = re.compile(r"(?:[01]\d|2[0-3]):[0-5]\d")
+#: A place name to read the weather of; as long as the instance's own `place` may be.
+PLACE = re.compile(r"[\w' -]{1,80}")
+DAY = re.compile(formats.DATE)
+CLOCK = re.compile(formats.TIME)
 
 
-def register(app: Flask, notebook: NotebookService, psid: str,
-             alert: Callable[[str, str], None] | None = None, place: str = "Paris",
-             cues: dict | None = None,
-             settled: Callable[[int], None] | None = None) -> None:
+def register(app: Flask, notebook: NotebookService, psid: str, *,
+             alert: Callable[[str, str], None], place: str, cues: dict,
+             settled: Callable[[int], None]) -> None:
     """`alert(text, key)` wakes the coach when an answer crosses a cap;
     `cues` carries the exercises' execution cues, for the guided session;
     `settled(activity)` advances the debrief of a run whose feelings are complete."""
@@ -190,7 +189,7 @@ def register(app: Flask, notebook: NotebookService, psid: str,
 
     @app.get("/notebook-api/week/<label>")
     def notebook_week(label):
-        if not WEEK.fullmatch(label):
+        if not iso_week.is_label(label):
             return jsonify(error=notebook_text.ERRORS["bad_week"]), 400
         return jsonify(notebook.week(psid, label))
 
@@ -248,7 +247,7 @@ def register(app: Flask, notebook: NotebookService, psid: str,
     def notebook_reorganize():
         body = request.get_json(silent=True)
         if (not isinstance(body, dict) or set(body) != {"week", "days"}
-                or not isinstance(body["week"], str) or not WEEK.fullmatch(body["week"])):
+                or not isinstance(body["week"], str) or not iso_week.is_label(body["week"])):
             return jsonify(error=notebook_text.ERRORS["bad_request"]), 400
         try:
             return jsonify(notebook.reorganize(body["week"], body["days"]))
@@ -259,7 +258,7 @@ def register(app: Flask, notebook: NotebookService, psid: str,
     def notebook_take_variant():
         body = request.get_json(silent=True)
         if (not isinstance(body, dict) or set(body) != {"week", "days", "revision", "choice"}
-                or not isinstance(body["week"], str) or not WEEK.fullmatch(body["week"])
+                or not isinstance(body["week"], str) or not iso_week.is_label(body["week"])
                 or type(body["revision"]) is not int or type(body["choice"]) is not int):
             return jsonify(error=notebook_text.ERRORS["bad_request"]), 400
         try:
@@ -275,7 +274,7 @@ def register(app: Flask, notebook: NotebookService, psid: str,
     def notebook_state_days():
         body = request.get_json(silent=True)
         if (not isinstance(body, dict) or set(body) != {"week", "days"}
-                or not isinstance(body["week"], str) or not WEEK.fullmatch(body["week"])):
+                or not isinstance(body["week"], str) or not iso_week.is_label(body["week"])):
             return jsonify(error=notebook_text.ERRORS["bad_request"]), 400
         try:
             notebook.state_days(body["week"], body["days"])
@@ -302,7 +301,7 @@ def register(app: Flask, notebook: NotebookService, psid: str,
     def notebook_end_habit():
         body = request.get_json(silent=True)
         if (not isinstance(body, dict) or set(body) != {"id"} or not isinstance(body["id"], str)
-                or not UUID_TEXT.fullmatch(body["id"])):
+                or not UUID.fullmatch(body["id"])):
             return jsonify(error=notebook_text.ERRORS["bad_request"]), 400
         try:
             notebook.end_habit(body["id"])
@@ -314,7 +313,7 @@ def register(app: Flask, notebook: NotebookService, psid: str,
     def notebook_ask_coach():
         body = request.get_json(silent=True)
         if (not isinstance(body, dict) or set(body) != {"week", "days", "wish", "context"}
-                or not isinstance(body["week"], str) or not WEEK.fullmatch(body["week"])
+                or not isinstance(body["week"], str) or not iso_week.is_label(body["week"])
                 or not isinstance(body["wish"], str) or not isinstance(body["context"], str)):
             return jsonify(error=notebook_text.ERRORS["bad_request"]), 400
         try:
@@ -323,8 +322,6 @@ def register(app: Flask, notebook: NotebookService, psid: str,
             return jsonify(error=notebook_text.ERRORS["bad_days"]), 400
         except reorganize.ReorganizeError:
             return jsonify(error=notebook_text.ERRORS["bad_request"]), 400
-        if alert is None:
-            return jsonify(error=notebook_text.ERRORS["coach_unreachable"]), 503
         try:
             alert(text, f"notebook:reorganize:{body['week']}:{int(clock.now().timestamp())}")
         except Exception:
@@ -336,7 +333,7 @@ def register(app: Flask, notebook: NotebookService, psid: str,
     def notebook_take_proposal():
         body = request.get_json(silent=True)
         if (not isinstance(body, dict) or set(body) != {"id"} or not isinstance(body["id"], str)
-                or not UUID_TEXT.fullmatch(body["id"])):
+                or not UUID.fullmatch(body["id"])):
             return jsonify(error=notebook_text.ERRORS["bad_request"]), 400
         try:
             number = notebook.take_proposal(body["id"])
@@ -348,7 +345,7 @@ def register(app: Flask, notebook: NotebookService, psid: str,
     def notebook_dismiss_proposals():
         body = request.get_json(silent=True)
         if (not isinstance(body, dict) or set(body) != {"week"}
-                or not isinstance(body["week"], str) or not WEEK.fullmatch(body["week"])):
+                or not isinstance(body["week"], str) or not iso_week.is_label(body["week"])):
             return jsonify(error=notebook_text.ERRORS["bad_request"]), 400
         notebook.dismiss_proposals(body["week"])
         return jsonify(status="ok")
@@ -363,12 +360,12 @@ def register(app: Flask, notebook: NotebookService, psid: str,
             result = notebook.board().answer(body["ask"], body["value"])
         except AnswerError as error:
             return jsonify(error=str(error)), 409
-        if result["alert"] and alert is not None:
+        if result["alert"]:
             try:
                 alert(result["alert"], "notebook:" + body["ask"])
             except Exception:
                 app.logger.exception("Notebook alert not passed to the coach")
-        if result.get("activity") and settled is not None:
+        if result.get("activity"):
             try:
                 settled(int(result["activity"]))
             except Exception:

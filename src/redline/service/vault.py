@@ -17,17 +17,19 @@ from pathlib import Path
 from sqlalchemy import exc as sa_exc
 
 from redline import cli
-from redline.model import agent_input, session_cycle, vault_layout
+from redline.model import agent_input, iso_week, session_cycle, vault_layout
 from redline.model import ledger as ledger_model
 from redline.model import paths as engine_paths
 from redline.model import weekly_plan as weekly_plan_model
-from redline.model.context_packet import render_context_packet
+from redline.model.vocabulary import SessionStatus
+from redline.service.context_packet import render_context_packet
 from redline.storage.database import StorageError
 from redline.storage.repository import OperationalStore
 
 from . import clock
 from .config import sandbox_overrides
 from .plans import PlanStatus, render_plan_message
+from .proactive_kinds import policy
 
 log = logging.getLogger("redline")
 
@@ -39,7 +41,6 @@ GIT_TIMEOUT = 60
 # applying it is retried briefly before it is declared refused.
 APPLY_RETRY_PAUSES = (1.0, 3.0, 8.0)
 # A settled session no longer changes the review: done, missed, cancelled or closed.
-SETTLED_CYCLE_STATES = session_cycle.TERMINAL_STATES | {"completed"}
 
 #: The trees whose fingerprint identifies the deployed code (`/health`, release).
 RUNTIME_TREES = ("deploy", "src", "migrations")
@@ -66,7 +67,7 @@ class VaultAlert:
 class PersistenceFailure(enum.Enum):
     """Why the facts of a turn were not recorded.
 
-    Forbidden files (hand-edited projection, modified code) no longer refuse the turn:
+    Forbidden files (hand-edited projection, modified code) do not refuse the turn:
     they are restored and the rest proceeds. Only a failure to apply the commands
     themselves leaves facts unrecorded.
     """
@@ -247,15 +248,11 @@ class VaultRepo:
         """Record a message only once Messenger has delivered it."""
         if self._store is None:
             raise StorageError("no PostgreSQL storage for the proactive trace")
-        kind = {
-            "morning": "morning", "weekly": "weekly", "monthly": "monthly",
-            "strava_debrief": "debrief", "strava_debrief_late": "debrief",
-        }.get(job.kind, "other")
         source_key = job.job_id or f"{job.kind}:{job.detail}:{sent_at.isoformat()}"
         self._store.add_proactive_message({
             "source_key": source_key,
             "sent_at": sent_at.astimezone(),
-            "kind": kind,
+            "kind": policy(job.kind).trace,
             "angle": self._store.turn_angle(turn_id) or None,
             "summary": message[:2000],
         }, actor="messenger-delivery")
@@ -529,15 +526,15 @@ class VaultRepo:
         """
         if self._store is None:
             return False
-        week = weekly_plan_model.current_week(day)
+        week = iso_week.of(day)
         context = self.weekly_plan_context(week)
         if not context:
             return False
         keys = [session["id"] for session in json.loads(context)["sessions"]
                 if session["date"] == day.isoformat() and session["kind"] != "rest"
-                and session.get("status") != "cancelled"]
+                and session.get("status") != SessionStatus.CANCELLED]
         links = self._store.week_session_links(week)
-        return all((links.get(key) or {}).get("state") in SETTLED_CYCLE_STATES
+        return all((links.get(key) or {}).get("state") in session_cycle.SETTLED_STATES
                    for key in keys)
 
     def coaching_context(self, depth: str) -> str:

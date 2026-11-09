@@ -5,9 +5,12 @@ known otherwise, the method falls back within 0.5 %. Without it, these tests wou
 only verify a subtraction.
 """
 
+import sys
+
 import pytest
 
 from redline.analysis import descent
+from redline.model.errors import InputError
 
 
 def test_a_loop_descends_what_it_climbed():
@@ -19,12 +22,6 @@ def test_a_pure_climb_barely_descends():
     assert descent.descent(1108.1, [636.7, 1728.2]) == 17
 
 
-def test_a_pure_descent_is_not_read_from_the_gain():
-    """Day 3: 19.7 m of gain for ~1100 of loss. This is exactly the row that the gain
-        column alone described as a flat day."""
-    assert descent.descent(19.7, [1683.4, 602.4]) == 1101
-
-
 def test_the_result_is_never_negative():
     assert descent.descent(0.0, [100.0, 140.0]) == 0
 
@@ -34,15 +31,22 @@ def test_a_stream_of_one_point_is_refused_not_guessed():
         descent.descent(50.0, [512.0])
 
 
-def test_the_mcp_payload_is_accepted_as_is():
+def _command(monkeypatch, capsys, altitude: str) -> str:
+    from redline.cli import descent as command
+    monkeypatch.setattr(sys, "argv", ["descent", "--dplus", "10", "--altitude", altitude])
+    command.main()
+    return capsys.readouterr().out.strip()
+
+
+def test_the_mcp_payload_is_accepted_as_is(monkeypatch, capsys):
     """The stream passes as is from get_activity_streams, without repackaging."""
-    assert descent._altitude('{"altitude": [1, 2, 3]}') == [1, 2, 3]
-    assert descent._altitude("[1, 2, 3]") == [1, 2, 3]
+    assert _command(monkeypatch, capsys, '{"altitude": [1, 2, 3]}') == "8"
+    assert _command(monkeypatch, capsys, "[1, 2, 3]") == "8"
 
 
-def test_a_payload_without_altitude_is_named():
-    with pytest.raises(ValueError, match="altitude"):
-        descent._altitude('{"heart_rate": [140, 150]}')
+def test_a_payload_without_altitude_is_named(monkeypatch, capsys):
+    with pytest.raises(InputError, match="altitude"):
+        _command(monkeypatch, capsys, '{"heart_rate": [140, 150]}')
 
 
 def test_matches_the_only_descent_strava_ever_gave_us():

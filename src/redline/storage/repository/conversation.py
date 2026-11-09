@@ -17,9 +17,6 @@ from ._common import StoreBase
 
 
 class Conversation(StoreBase):
-    def review_question(self, payload: dict, *, actor: str = "application") -> None:
-        with self.database.transaction() as connection:
-            self._apply_question_review(connection, payload, actor)
 
     def question_rows(self, limit: int = 20) -> list[dict]:
         with self.database.engine.connect() as connection:

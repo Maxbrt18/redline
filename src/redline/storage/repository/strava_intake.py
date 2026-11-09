@@ -8,8 +8,9 @@ from typing import Any
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from redline.model import ledger, session_cycle, session_kinds
+from redline.model import session_cycle
 from redline.model.activity import Activity
+from redline.model.vocabulary import CycleState, EnrichmentState, IntakeStatus, MeasurementState
 
 from ..database import StorageError
 from ..schema import (
@@ -20,57 +21,11 @@ from ..schema import (
     strava_activity_intakes,
     weekly_plans,
 )
-from ._common import _INTAKE_CORE, StoreBase, _audit, _plain, _uuid
+from ._common import _INTAKE_CORE, _audit, _plain, _uuid
+from .session_cycles import SessionCycles
 
 
-class StravaIntake(StoreBase):
-    @staticmethod
-    def _observation_kind_for_workout(workout: str) -> str | None:
-        kind = session_kinds.BY_SLUG.get(workout)
-        return workout if kind is not None and kind.recorded else None
-
-    @staticmethod
-    def _compatible_workouts(sport: str) -> tuple[str, ...]:
-        return session_kinds.planned_for_sport(sport)
-
-    @staticmethod
-    def _strava_measurements(activity: Activity,
-                             intake: dict | None = None) -> dict[str, dict[str, Any]]:
-        measurements: dict[str, dict[str, Any]] = {
-            "rpe": {"state": "pending"}, "enjoyment": {"state": "pending"},
-            "elevation_loss_m": {"state": "pending"},
-            "wbgt_c": ({"state": "pending"} if activity.weather_query
-                       else {"state": "unavailable"}),
-        }
-        raw = {
-            "distance_km": ("km", activity.distance_km),
-            "duration_s": (None, activity.moving_s or None),
-            "pace_s_per_km": (None, activity.pace_s_per_km),
-            "hr_avg_bpm": ("hr_avg", activity.hr_avg_bpm),
-            "hr_max_bpm": ("hr_max", activity.hr_max_bpm),
-            "cadence_spm": ("cadence", activity.cadence_spm or activity.cadence_rpm),
-            "elevation_gain_m": ("dplus", activity.elevation_gain_m),
-        }
-        for metric, (field, value) in raw.items():
-            if value is None:
-                continue
-            if field:
-                canonical = ledger.canonical_value(field, str(value))
-                value = float(canonical)
-                if ledger.input_field(field).decimals == 0:
-                    value = int(value)
-            measurements[metric] = {"state": "known", "value": value}
-        if intake:
-            for prefix, metric in (("elevation_loss", "elevation_loss_m"),
-                                   ("wbgt", "wbgt_c")):
-                state = intake.get(f"{prefix}_state")
-                if state == "known":
-                    measurements[metric] = {
-                        "state": "known", "value": intake[f"{prefix}_value"]}
-                elif state == "unavailable":
-                    measurements[metric] = {"state": "unavailable"}
-        return measurements
-
+class StravaIntake(SessionCycles):
     def ingest_strava_activity(self, activity: Activity,
                                *, actor: str = "strava-ingestion") -> dict:
         """Capture the objective facts before any coaching reasoning.
@@ -105,7 +60,7 @@ class StravaIntake(StoreBase):
                         planned_sessions.c.id == session_cycles.c.source_session_id).where(
                         session_cycles.c.athlete_id == self.athlete_id,
                         session_cycles.c.observation_id.is_(None),
-                        session_cycles.c.state.not_in(("cancelled", "closed")),
+                        session_cycles.c.state.not_in((CycleState.CANCELLED, CycleState.CLOSED)),
                         planned_sessions.c.scheduled_on == started_at.date(),
                         planned_sessions.c.workout.in_(workouts),
                     ).order_by(session_cycles.c.logical_key).with_for_update(
@@ -120,8 +75,8 @@ class StravaIntake(StoreBase):
 
             observation_id = (existing_observation["id"]
                               if existing_observation is not None else None)
-            status = "matched" if observation_id else (
-                "ambiguous" if len(candidates) > 1 else "unmatched")
+            status = IntakeStatus.MATCHED if observation_id else (
+                IntakeStatus.AMBIGUOUS if len(candidates) > 1 else IntakeStatus.UNMATCHED)
             if existing_observation is not None and len(candidates) == 1:
                 observation_for_link: Any = existing_observation
                 if existing_observation["started_at"] is None and started_at is not None:
@@ -145,7 +100,7 @@ class StravaIntake(StoreBase):
                         "measurements": self._strava_measurements(activity),
                         "session_key": candidate_keys[0],
                     }, actor=actor)
-                    status = "matched"
+                    status = IntakeStatus.MATCHED
 
             core_values = {
                 "activity_id": activity_id, "athlete_id": self.athlete_id,
@@ -156,8 +111,8 @@ class StravaIntake(StoreBase):
             insert_values = {
                 **core_values,
                 "elevation_loss_state": (
-                    "pending" if activity.elevation_gain_m is not None else "unavailable"),
-                "wbgt_state": "pending" if activity.weather_query else "unavailable",
+                    EnrichmentState.PENDING if activity.elevation_gain_m is not None else EnrichmentState.UNAVAILABLE),
+                "wbgt_state": EnrichmentState.PENDING if activity.weather_query else EnrichmentState.UNAVAILABLE,
             }
             connection.execute(pg_insert(strava_activity_intakes).values(
                 **insert_values).on_conflict_do_update(
@@ -186,8 +141,8 @@ class StravaIntake(StoreBase):
         if kind not in definitions:
             raise StorageError(f"unknown Strava enrichment: {kind}")
         metric, cast = definitions[kind]
-        state = "failed" if error else "unavailable" if unavailable else "known"
-        clean_value = None if state != "known" else cast(value)
+        state = EnrichmentState.FAILED if error else EnrichmentState.UNAVAILABLE if unavailable else EnrichmentState.KNOWN
+        clean_value = None if state != EnrichmentState.KNOWN else cast(value)
         with self.database.transaction() as connection:
             intake = connection.execute(sa.select(strava_activity_intakes).where(
                 strava_activity_intakes.c.activity_id == int(activity_id),
@@ -197,9 +152,9 @@ class StravaIntake(StoreBase):
                 raise StorageError(f"Strava activity not captured: {activity_id}")
             current_state = intake[f"{kind}_state"]
             current_value = intake[f"{kind}_value"]
-            if current_state == "known":
+            if current_state == EnrichmentState.KNOWN:
                 if clean_value is not None and float(current_value) == float(clean_value):
-                    return "known"
+                    return EnrichmentState.KNOWN
                 raise StorageError(f"{kind} enrichment already known with another value")
             connection.execute(strava_activity_intakes.update().where(
                 strava_activity_intakes.c.activity_id == int(activity_id)).values({
@@ -212,13 +167,13 @@ class StravaIntake(StoreBase):
             observation_id = intake["observation_id"]
             payload: dict[str, Any] = {"state": state, "value": clean_value,
                                        "error": str(error)[:500]}
-            if observation_id is not None and state in {"known", "unavailable"}:
+            if observation_id is not None and state in {EnrichmentState.KNOWN, EnrichmentState.UNAVAILABLE}:
                 stored = connection.execute(sa.select(
                     observation_metrics.c[f"{metric}_state"],
                     observation_metrics.c[metric],
                 ).where(observation_metrics.c.observation_id == observation_id)
                 ).one()
-                if stored[0] == "known":
+                if stored[0] == MeasurementState.KNOWN:
                     # The coach may have recorded the session before the webhook: its
                     # measurement stays (a known measurement is immutable) and the
                     # discrepancy is only a trace. Raising here would roll back the
@@ -228,7 +183,7 @@ class StravaIntake(StoreBase):
                 else:
                     self.complete_measurement_in(
                         connection, observation_id, metric, clean_value,
-                        unavailable=state == "unavailable", actor=actor)
+                        unavailable=state == EnrichmentState.UNAVAILABLE, actor=actor)
             aggregate_id = uuid.uuid5(
                 uuid.NAMESPACE_URL, f"strava:{int(activity_id)}:{kind}")
             _audit(connection, actor, "strava.enriched", "strava_enrichment",
@@ -241,7 +196,7 @@ class StravaIntake(StoreBase):
         with self.database.transaction() as connection:
             values = {
                 "activity_id": int(activity_id), "athlete_id": self.athlete_id,
-                "sport": "unknown", "distilled": {}, "status": "failed",
+                "sport": "unknown", "distilled": {}, "status": IntakeStatus.FAILED,
                 "candidate_session_keys": [], "error": safe_error,
                 "updated_at": sa.func.now(),
             }
@@ -256,7 +211,7 @@ class StravaIntake(StoreBase):
             strava_activity_intakes.c.athlete_id == self.athlete_id)
         if unresolved_only:
             query = query.where(strava_activity_intakes.c.status.in_((
-                "ambiguous", "unmatched", "failed")))
+                IntakeStatus.AMBIGUOUS, IntakeStatus.UNMATCHED, IntakeStatus.FAILED)))
         with self.database.engine.connect() as connection:
             rows = connection.execute(query.order_by(
                 strava_activity_intakes.c.started_at.desc().nullslast(),
@@ -324,9 +279,9 @@ class StravaIntake(StoreBase):
                 return {}
             pains = {zone: float(reading["value"]) for zone, reading in
                      self._pains_of_in(connection, _uuid(observation_id)).items()
-                     if reading["state"] == "known"}
+                     if reading["state"] == MeasurementState.KNOWN}
         feelings: dict[str, Any] = {metric: float(row[metric]) for metric in metrics
-                                    if row[f"{metric}_state"] == "known"}
+                                    if row[f"{metric}_state"] == MeasurementState.KNOWN}
         if pains:
             feelings["pains"] = pains
         return feelings

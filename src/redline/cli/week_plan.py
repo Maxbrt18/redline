@@ -30,9 +30,9 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
-import os
 import sys
 
+from redline.cli import _args
 from redline.coach import dates
 from redline.coach.fr import plan as wording
 from redline.coach.fr import reorganize as reorganize_text
@@ -40,21 +40,18 @@ from redline.model import (
     agent_input,
     commands,
     entrypoint,
+    iso_week,
 )
-from redline.model.errors import ConfigError
 from redline.model.notes import NoteError
-from redline.model.schema import SchemaError
 from redline.model.weekly_plan import (
     active,
     as_json,
-    current_week,
     gate_reasons,
     now_stamp,
     revision_readback,
     validate,
 )
 from redline.service import plan_revision
-from redline.storage import StorageError
 
 
 def _distance_notes(store, revision: dict) -> str:
@@ -141,14 +138,12 @@ def _propose(store, week: str, input_path: str | None) -> int:
     based_on, proposals = reorganize.checked_proposals(
         store, week, agent_input.read_json(input_path), now_stamp(),
         warn=lambda line: print(line, file=sys.stderr))
-    turn_id = (os.environ.get("REDLINE_TURN_ID") or "").strip()
-    if turn_id:
-        store.stage_command(turn_id, f"propose:{week}:r{based_on}", commands.PLAN_PROPOSE,
-                            {"week": week, "based_on": based_on, "proposals": proposals})
-        print(reorganize_text.PROPOSED_STAGED.format(week=week, based_on=based_on))
-    else:
-        store.add_proposals(week, based_on, proposals, actor="week-plan-cli")
-        print(reorganize_text.PROPOSED.format(week=week, based_on=based_on))
+    submitted = store.submit(
+        commands.PLAN_PROPOSE, {"week": week, "based_on": based_on, "proposals": proposals},
+        command_key=f"propose:{week}:r{based_on}", turn_id=agent_input.current_turn(),
+        actor=ACTOR)
+    line = reorganize_text.PROPOSED_STAGED if submitted.staged else reorganize_text.PROPOSED
+    print(line.format(week=week, based_on=based_on))
     current = active(store.load_plan(week))
     for number, proposal in enumerate(proposals, 1):
         print(reorganize_text.PROPOSAL.format(number=number, title=proposal["title"]))
@@ -158,17 +153,11 @@ def _propose(store, week: str, input_path: str | None) -> int:
 
 
 EXIT_OK = 0
-EXIT_INVALID = 1
 EXIT_AWAITING_GATE = 2
 EXIT_STALE = 3
 
 
-def _database_store():
-    url = (os.environ.get("DATABASE_URL") or "").strip()
-    if not url:
-        raise ConfigError("DATABASE_URL is required: the journal only holds a projection")
-    from redline.storage import Database, OperationalStore
-    return OperationalStore(Database(url, application_name="week-plan"))
+ACTOR = "week-plan-cli"
 
 
 def _database_command(store, command: str, week: str, optional: bool,
@@ -185,7 +174,7 @@ def _database_command(store, command: str, week: str, optional: bool,
         # `stage_command`, which is precisely the coach's path and so the one that must
         # reread; rendering it only on the CLI path would leave production without the
         # guardrail.
-        turn_id = (os.environ.get("REDLINE_TURN_ID") or "").strip()
+        turn_id = agent_input.current_turn()
         if command == "preview":
             store.preview_command(commands.PLAN_REVISE,
                                   {"week": week, "revision": current}, turn_id=turn_id)
@@ -195,18 +184,13 @@ def _database_command(store, command: str, week: str, optional: bool,
             if notes:
                 print(notes)
             return EXIT_OK
-        if turn_id:
-            store.stage_command(turn_id, f"plan:{week}:r{current['revision']}",
-                                commands.PLAN_REVISE,
-                                {"week": week, "revision": current})
+        submitted = store.submit(
+            commands.PLAN_REVISE, {"week": week, "revision": current}, turn_id=turn_id,
+            command_key=f"plan:{week}:r{current['revision']}", actor=ACTOR)
+        if submitted.staged:
             print(wording.CHANGE_STAGED)
-            print(revision_readback(week, previous, current))
-            notes = _distance_notes(store, current)
-            if notes:
-                print(notes)
-            return EXIT_OK
-        saved = store.append_plan_revision(week, current, actor="week-plan-cli")
-        print(revision_readback(week, previous, active(saved)))
+        print(revision_readback(week, previous,
+                                current if submitted.staged else active(submitted.result)))
         notes = _distance_notes(store, current)
         if notes:
             print(notes)
@@ -246,28 +230,23 @@ def main() -> int:
     parser.add_argument("command",
                         choices=("check", "show", "revise", "preview", "variants", "days",
                                  "propose"))
-    parser.add_argument("--week", default=current_week())
+    parser.add_argument("--week", type=_args.week, default=iso_week.of(dt.date.today()))
     parser.add_argument("--optional", action="store_true")
     parser.add_argument("--input", help="revise/preview JSON, or the days of variants "
                                          "(default: stdin outside a turn)")
     parser.add_argument("--json", action="store_true", help="variants: print JSON")
     args = parser.parse_args()
-    try:
-        if args.command == "propose":
-            return _propose(_database_store(), args.week, args.input)
-        if args.command == "days":
-            from redline.service import reorganize
-            print(reorganize.days_readback(_database_store(), args.week))
-            return EXIT_OK
-        if args.command == "variants":
-            return _variants(_database_store(), args.week, args.input, args.json)
-        return _database_command(_database_store(), args.command, args.week, args.optional,
-                                 args.input)
-    except (NoteError, SchemaError, StorageError, json.JSONDecodeError,
-            agent_input.AgentInputError) as exc:
-        print(str(exc), file=sys.stderr)
-        return EXIT_INVALID
-
+    from redline.storage import open_store
+    store = open_store("week-plan")
+    if args.command == "propose":
+        return _propose(store, args.week, args.input)
+    if args.command == "days":
+        from redline.service import reorganize
+        print(reorganize.days_readback(store, args.week))
+        return EXIT_OK
+    if args.command == "variants":
+        return _variants(store, args.week, args.input, args.json)
+    return _database_command(store, args.command, args.week, args.optional, args.input)
 
 if __name__ == "__main__":
     entrypoint.run(main)

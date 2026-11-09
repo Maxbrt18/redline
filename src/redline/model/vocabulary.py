@@ -7,6 +7,7 @@ notebook read them from here. What the athlete reads is a French label, looked u
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from enum import StrEnum
 
 
@@ -210,6 +211,164 @@ class ProactiveKind(StrEnum):
     WAKE_TRACE = "wake_trace"
 
 
-def sql_values(vocabulary: type[StrEnum]) -> str:
-    """`'a','b'`, for a CHECK constraint."""
-    return ",".join(f"'{member.value}'" for member in vocabulary)
+class SessionStatus(StrEnum):
+    """A planned session's status in a revision (`planned_sessions.status`).
+
+    `done` is never written: it is read from the session cycle and kept by old revisions.
+    """
+
+    PLANNED = "planned"
+    CANCELLED = "cancelled"
+    DONE = "done"
+
+
+#: What a new revision may write: `done` is never planned, it happens.
+INTENT_STATUSES = (SessionStatus.PLANNED, SessionStatus.CANCELLED)
+#: The statuses that settle a session: it happened or it never will.
+SETTLED_STATUSES = frozenset({SessionStatus.DONE, SessionStatus.CANCELLED})
+
+
+class CycleState(StrEnum):
+    """Where a planned session stands in its life (`session_cycles.state`)."""
+
+    PLANNED = "planned"
+    STARTED = "started"
+    COMPLETED = "completed"
+    MISSED = "missed"
+    CANCELLED = "cancelled"
+    FOLLOWUP_DUE = "followup_due"
+    CLOSED = "closed"
+
+
+class MeasurementState(StrEnum):
+    """Whether a measured value is known yet (`observation_measurements.state`)."""
+
+    PENDING = "pending"
+    KNOWN = "known"
+    UNAVAILABLE = "unavailable"
+    NOT_APPLICABLE = "not_applicable"
+
+
+class EnrichmentState(StrEnum):
+    """Where a Strava enrichment stands (`strava_activity_intakes.*_state`)."""
+
+    PENDING = "pending"
+    KNOWN = "known"
+    UNAVAILABLE = "unavailable"
+    FAILED = "failed"
+
+
+class IntakeStatus(StrEnum):
+    """What became of a captured Strava activity (`strava_activity_intakes.status`)."""
+
+    CAPTURED = "captured"
+    MATCHED = "matched"
+    AMBIGUOUS = "ambiguous"
+    UNMATCHED = "unmatched"
+    FAILED = "failed"
+
+
+class ExposureOrigin(StrEnum):
+    """Why an exposure happened (`exposures.origin`)."""
+
+    PRESCRIBED = "prescribed"
+    VOLUNTARY = "voluntary"
+    SPONTANEOUS = "spontaneous"
+
+
+class ExposureStatus(StrEnum):
+    """Whether an exposure is established (`exposures.status`)."""
+
+    CANDIDATE = "candidate"
+    CONFIRMED = "confirmed"
+    DISMISSED = "dismissed"
+
+
+class Tolerance(StrEnum):
+    """How an exposure was absorbed (`exposures.tolerance`)."""
+
+    UNKNOWN = "unknown"
+    EASY = "easy"
+    STRAINED = "strained"
+    PROTECTIVE = "protective"
+
+
+class QuestionStatus(StrEnum):
+    """Where a question asked to the athlete stands (`questions.status`)."""
+
+    OPEN = "open"
+    DEFERRED = "deferred"
+    ANSWERED = "answered"
+    EXPIRED = "expired"
+
+
+class DeadlineStatus(StrEnum):
+    """Where a deadline stands (`deadlines.status`)."""
+
+    TODO = "todo"
+    SCHEDULED = "scheduled"
+    DONE = "done"
+
+
+class DeadlineKind(StrEnum):
+    """What a deadline is about (`deadlines.kind`)."""
+
+    GENERAL = "general"
+    MEDICAL = "medical"
+    AVAILABILITY = "availability"
+    RACE = "race"
+
+
+class GearStatus(StrEnum):
+    """Whether a piece of gear is still worn (`gear_items.status`)."""
+
+    ACTIVE = "active"
+    RETIRED = "retired"
+
+
+class Direction(StrEnum):
+    """Which way a prediction expects the load to move (`predictions.direction`)."""
+
+    INCREASE = "increase"
+    DECREASE = "decrease"
+    NEUTRAL = "neutral"
+
+
+class JobStatus(StrEnum):
+    """Where a proactive job stands (`proactive_jobs.status`)."""
+
+    PENDING = "pending"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+
+
+#: The jobs still to run or running.
+LIVE_JOBS = (JobStatus.PENDING, JobStatus.RUNNING)
+#: The jobs that will never run again unless reopened.
+FINISHED_JOBS = (JobStatus.DONE, JobStatus.FAILED)
+
+
+class InboundStatus(StrEnum):
+    """Whether an inbound message has been answered (`inbound_messages.status`)."""
+
+    PENDING = "pending"
+    DONE = "done"
+
+
+class DeliveryStatus(StrEnum):
+    """Where an outbound envelope stands (`outbound_deliveries.status`)."""
+
+    PREPARED = "prepared"
+    SENDING = "sending"
+    DELIVERED = "delivered"
+    FAILED = "failed"
+
+
+#: The envelopes that may be sent again: never started, or failed for certain.
+RESENDABLE_DELIVERIES = (DeliveryStatus.PREPARED, DeliveryStatus.FAILED)
+
+
+def sql_values(members: Iterable[StrEnum]) -> str:
+    """`'a','b'`, for a CHECK constraint: a whole vocabulary, or some of its members."""
+    return ",".join(f"'{member}'" for member in members)

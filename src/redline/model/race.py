@@ -19,8 +19,7 @@ from typing import Protocol
 
 from . import rulebook
 from .schema import Schema, field
-
-KIND = "race"
+from .vocabulary import DeadlineKind, DeadlineStatus
 
 
 def _band_ordered(context: dict) -> list[str]:
@@ -128,11 +127,11 @@ def _number(value: object) -> float | None:
 def typed(store: DeadlineStore) -> list[Race]:
     """Every typed race, run or ahead, by date."""
     return sorted((from_row(row) for row in store.deadline_rows()
-                   if row.get("kind") == KIND and row.get("due_on") is not None),
+                   if row.get("kind") == DeadlineKind.RACE and row.get("due_on") is not None),
                   key=lambda race: race.on)
 
 
 def upcoming(store: DeadlineStore, today: dt.date) -> Race | None:
     """The next typed race still to run, never prose."""
-    ahead = [race for race in typed(store) if race.status != "done" and race.on > today]
+    ahead = [race for race in typed(store) if race.status != DeadlineStatus.DONE and race.on > today]
     return ahead[0] if ahead else None

@@ -14,8 +14,9 @@ import os
 import pytest
 from conftest import ENGINE_ROOT, reset_database
 from test_weekly_plan import revision, session
+from writes import write
 
-from redline.model import weekly_plan
+from redline.model import commands, weekly_plan
 from redline.model.activity import Activity
 from redline.service.notebook_board import AnswerError, Board
 from redline.service.plans import PlanStatus
@@ -323,7 +324,7 @@ def test_the_morning_trace_is_asked_in_the_morning_only_and_in_its_own_words(sto
     assert not [ask for ask in board(store, afternoon).asks() if ask["type"] == "wake"]
     with pytest.raises(AnswerError):
         board(store, morning).answer(wake["id"], 1)
-    store.upsert_prediction({
+    write(store, commands.PREDICTION_UPSERT, {
         "prediction_key": "w41-sl-reveil", "domain": "corps",
         "statement": "trace au plus légère au réveil du lendemain de SL",
         "probability": .75, "due_on": dt.date(2026, 10, 11),
@@ -346,24 +347,24 @@ def test_the_morning_trace_is_asked_after_a_rest_day_too(store):
 
 def test_the_race_and_only_alex_s_deadlines_reach_the_course_tab(store):
     seed_week(store)
-    store.upsert_deadline({
+    write(store, commands.DEADLINE_UPSERT, {
         "deadline_key": "race-targetrace-2026", "due_on": dt.date(2026, 11, 26),
         "item": "TargetRace 45 km — course objectif", "fact_owner": "coaching/race.md",
         "status": "scheduled", "kind": "race", "athlete_label": "TargetRace",
         "context": {"start_time": "09:00", "distance_km": 42.2, "target": "<4 h 30"}})
-    store.upsert_deadline({
+    write(store, commands.DEADLINE_UPSERT, {
         "deadline_key": "frontale", "due_on": dt.date(2026, 10, 14),
         "item": "Frontale achetée avant la première sortie de nuit, 400 lumens réels",
         "fact_owner": "coaching/race.md", "status": "todo",
         "athlete_label": "Frontale ≥400 lm, 5 h d’autonomie"})
-    store.upsert_deadline({
+    write(store, commands.DEADLINE_UPSERT, {
         "deadline_key": "revue-prediction", "due_on": dt.date(2026, 10, 11),
         "item": "Revue de la prédiction du 05/08", "fact_owner": "coaching/decisions.md",
         "status": "todo"})
-    store.evaluate_capability({
+    write(store, commands.CAPABILITY_EVALUATE, {
         "capability_number": 5, "slug": "cap5-knee", "need": "Genou intact",
         "score": 3, "scale": 5, "status": "amber", "evaluated_on": dt.date(2026, 10, 4)})
-    store.evaluate_capability({
+    write(store, commands.CAPABILITY_EVALUATE, {
         "capability_number": 3, "slug": "cap3-fueling", "need": "Digérer",
         "score": 0, "scale": 5, "status": "red", "evaluated_on": dt.date(2026, 10, 4)})
     archives = [

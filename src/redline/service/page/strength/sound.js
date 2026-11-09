@@ -1,6 +1,5 @@
 import {$, button, el} from '../shared/dom.js';
 
-// -------------------------------------------------------------------- sound
 //
 /* Sound cues, because during a 45 s isometric or a plank nobody looks at the screen.
  * A bare oscillator -- no asset, no extra byte in the page, and nothing to allow in

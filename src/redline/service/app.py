@@ -17,7 +17,7 @@ from redline.model.errors import ConfigError, StorageError
 
 from .agent_factory import build_agent
 from .attachments import AttachmentService
-from .config import Config, _load_dotenv
+from .config import Config, load_dotenv
 from .messenger import MessengerClient
 from .notebook import NotebookService
 from .outbox import Outbox
@@ -50,7 +50,7 @@ def main() -> None:
     events_log = logging.getLogger("redline.service.events")
     events_log.addHandler(event_handler)
     events_log.propagate = False
-    _load_dotenv(paths.ENGINE_ROOT / ".env")
+    load_dotenv(paths.ENGINE_ROOT / ".env")
     local_time.apply_to_process()
     config = Config.from_env()
 

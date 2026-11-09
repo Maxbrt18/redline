@@ -127,8 +127,6 @@ class Outcome:
     held_back: tuple[str, ...]
 
 
-# ------------------------------------------------------------------ the plan's sessions
-
 def _minutes(session: dict, program: Program | None) -> int | None:
     if session.get("duration_cap_min"):
         return int(session["duration_cap_min"])
@@ -185,8 +183,6 @@ def items(sessions: list[dict], gates: list[dict], program: Program | None,
             held_until=held.get(session["id"])))
     return out
 
-
-# ------------------------------------------------------------------ the search
 
 @dataclass
 class _Week:

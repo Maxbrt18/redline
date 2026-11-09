@@ -1,58 +1,44 @@
-#!/usr/bin/env python3
 """The ledger, computed: the load gauge that coaching/protocols.md defines.
 
 The gauge is presented as an ARBITER ("the debate becomes a computation, not a
 negotiation"), so it PRINTS ITS INPUTS. A number nobody can reconstruct is a number
 that drifts.
 
-Usage:
-    redline ledger                       # the last week
-    redline ledger --week 2030-W30    # the load line for a weekly review
-    redline ledger --pain-trend 3  # last 3 weeks
-    redline ledger --csv                 # both tables, normalized, on stdout
-
 Reads observations, metrics, daily declarations and instruments directly from
 PostgreSQL. No Markdown ledger is kept in parallel.
 
-The French CLI flags and the CSV column names are a contract with the athlete and with
-whatever reads the export: they stay French while the code around them is English.
+Usage:
+    redline ledger                    # the last week
+    redline ledger --week 2030-W30    # the load line for a weekly review
+    redline ledger --pain-trend 3     # last 3 weeks
+    redline ledger --csv              # both tables, normalized, on stdout
 """
 
 from __future__ import annotations
 
-import argparse
-import csv
 import datetime as dt
-import io
-import os
 import re
-import sys
 from dataclasses import dataclass, field
 from itertools import pairwise
-from pathlib import Path
 from typing import Protocol
 
 from redline.coach.fr import ledger as text
 from redline.model import (
     daily,
-    paths,
+    iso_week,
     program,
     rulebook,
     session_kinds,
 )
 from redline.model import ledger as table
 from redline.model import race as race_model
-from redline.model.errors import InputError
-from redline.model.vocabulary import HrDoubt, WeekLifeLoad, WeekSleep
+from redline.model.vocabulary import HrDoubt, SessionStatus, WeekLifeLoad, WeekSleep
 
 POINTS_PER_EQ_HOUR = 14.0          # calibrated, see coaching/protocols.md
 LEVEL_CAP, RATIO_CAP = 85, 1.3
 
 QUALITY_TYPES = session_kinds.QUALITY
 HALF_TYPES = session_kinds.HALF_LOAD
-
-# The gauge counts the descent, not the climb: the climb is already paid in time.
-# Each kind's share of it is `session_kinds.descent_weight`.
 
 
 @dataclass
@@ -88,8 +74,7 @@ class Row:
 
     @property
     def week(self) -> str:
-        year, week, _ = self.date.isocalendar()
-        return f"{year}-W{week:02d}"
+        return iso_week.of(self.date)
 
     @property
     def hard(self) -> bool:
@@ -108,8 +93,6 @@ class Instruments:
     sleep: str | None = None      # vocabulary.WeekSleep
     life_load: str | None = None  # vocabulary.WeekLifeLoad
 
-
-# --------------------------------------------------------------------------- parsing
 
 class LedgerStore(Protocol):
     """Minimal interface of the computation, provided by PostgreSQL."""
@@ -146,24 +129,14 @@ def zone_prefix(zone: PainZone, zones: list[PainZone]) -> str:
     return f"{zone.label} · " if len(zones) > 1 else ""
 
 
-def open_store() -> LedgerStore:
-    url = (os.environ.get("DATABASE_URL") or "").strip()
-    if not url:
-        raise RuntimeError("DATABASE_URL is required: there is no fallback ledger")
-    from redline.storage import Database, OperationalStore
-    return OperationalStore(Database(url, application_name="ledger-gauge"))
-
-
 def _known(observation: dict, metric: str) -> float | None:
     """The value of a measurement, or None if it is not KNOWN.
 
     The four states reduce to two for a computation: `known` carries a number, everything
     else is absent. `unavailable` (asked for, then lost) counts as absent, not as zero.
     """
-    measurement = observation["measurements"].get(metric)
-    if not measurement or measurement["state"] != "known":
-        return None
-    return float(measurement["value"])
+    value = table.known(observation["measurements"].get(metric))
+    return None if value is None else float(value)
 
 
 def _known_int(observation: dict, metric: str) -> int | None:
@@ -205,7 +178,7 @@ def parse_ledger(store: LedgerStore) -> list[Row]:
             rpe=_known(observation, "rpe"),
             pains={zone: float(reading["value"])
                    for zone, reading in (observation.get("pains") or {}).items()
-                   if reading.get("state") == "known" and reading.get("value") is not None},
+                   if table.known(reading) is not None},
             enjoyment=_known_int(observation, "enjoyment"),
             note=observation["note"] or "",
             wbgt=_known(observation, "wbgt_c"),
@@ -248,7 +221,7 @@ def week_completeness(store: LedgerStore, label: str,
     without a textual sentinel.
     """
     observations = [row for row in store.observation_rows()
-                    if _week_label(row["occurred_on"]) == label]
+                    if iso_week.of(row["occurred_on"]) == label]
     return table.observation_completeness_errors(
         observations, today or dt.date.today())
 
@@ -268,7 +241,7 @@ def load_instruments(store: LedgerStore) -> dict[str, Instruments]:
            for row in store.weekly_instrument_rows()}
     grouped: dict[str, list[dict]] = {}
     for row in store.daily_rows():
-        label = row["checked_on"].strftime("%G-W%V")
+        label = iso_week.of(row["checked_on"])
         grouped.setdefault(label, []).append({
             "date": row["checked_on"].isoformat(), "sleep": row["sleep"],
             "life_load": row["life_load"], "desire": row["desire"]})
@@ -281,13 +254,11 @@ def load_instruments(store: LedgerStore) -> dict[str, Instruments]:
     return out
 
 
-# ------------------------------------------------------------------------- the gauge
-
 def row_weight(row: Row, targets: dict) -> tuple[float, bool]:
     """One row's raw contribution to the gauge, before the week multipliers, and
     whether it was a MISSED quality session (RPE above target, which costs +0.5).
 
-    Exposed rather than inlined because `model/hot_cache.py` needs the same number to
+    Exposed rather than inlined because `analysis/hot_cache.py` needs the same number to
     work out the walking share; a second copy of the formula would drift (a walk share
     from different arithmetic over-states walking and can raise a "red made of hiking"
     the gauge denies).
@@ -298,6 +269,7 @@ def row_weight(row: Row, targets: dict) -> tuple[float, bool]:
     if row.type in table.REST_TYPES or not row.hours:
         return 0.0, False
     weighted = row.hours * (0.5 if row.type in HALF_TYPES else 1.0)
+    # The gauge counts the descent, not the climb: the climb is already paid in time.
     weighted += (row.dminus / 600) * session_kinds.descent_weight(row.type)
     missed = False
     if row.type in QUALITY_TYPES:
@@ -376,16 +348,6 @@ def _two_hard_days_in_a_row(rows: list[Row]) -> bool:
     return any((b - a).days == 1 for a, b in pairwise(hard_days))
 
 
-def _week_start(label: str) -> dt.date:
-    year, week = label.split("-W")
-    return dt.date.fromisocalendar(int(year), int(week), 1)
-
-
-def _week_label(day: dt.date) -> str:
-    year, week, _ = day.isocalendar()
-    return f"{year}-W{week:02d}"
-
-
 def normalize_week(text: str, known: list[str]) -> str:
     """« 31 », « W31 », « 2030-w31 » -> « 2030-W31 », rejecting unknown weeks.
 
@@ -425,13 +387,13 @@ def acute_chronic_ratio(per_week: dict[str, float], label: str) -> float | None:
     """
     if label not in per_week:
         return None
-    first = _week_start(min(per_week))
-    start = _week_start(label)
+    first = iso_week.monday(min(per_week))
+    start = iso_week.monday(label)
     previous = []
     for offset in range(1, 5):
         day = start - dt.timedelta(weeks=offset)
         if day >= first:
-            previous.append(per_week.get(_week_label(day), 0.0))
+            previous.append(per_week.get(iso_week.of(day), 0.0))
     if not previous or sum(previous) == 0:
         return None
     return round(per_week[label] / (sum(previous) / len(previous)), 2)
@@ -446,8 +408,6 @@ def eq_hours_per_week(rows: list[Row], instruments: dict[str, Instruments],
                                          targets)[0], 2)
             for label, rs in weeks.items()}
 
-
-# ------------------------------------------------------------------------- the trends
 
 @dataclass
 class PainSeries:
@@ -620,135 +580,6 @@ def esculier_check(rows: list[Row], zone: str,
     return flags
 
 
-def _pain_gate_cases(rows: list[Row], label: str, previous: str,
-                     zone: str, as_of: dt.date) -> list[tuple[str, str]]:
-    def peak(week: str) -> float | None:
-        values = [value for row in rows if row.week == week and row.type in RUN_TYPES
-                  and (value := row.pain_at(zone)) is not None]
-        return max(values) if values else None
-
-    now, before = peak(label), peak(previous)
-    cases = []
-    if now is None:
-        cases.append(("?", text.GATE_NO_EFFORT_PEAK))
-    else:
-        ceiling = rulebook.current().parameters.gate_effort_peak
-        cases.append(("✓" if now <= ceiling else "✗",
-                      text.GATE_EFFORT_PEAK.format(now=now, ceiling=ceiling)))
-    if now is None or before is None:
-        cases.append(("?", text.GATE_TREND_PARTIAL.format(previous=previous, before=before if before is not None else "—", label=label, now=now if now is not None else "—")))
-    else:
-        cases.append(("✓" if now <= before else "✗",
-                      text.GATE_TREND.format(before=before, now=now)))
-    wakes = [row for row in rows if row.week == label and row.type == session_kinds.WAKE_TRACE]
-    measured = [(row.date, value) for row in wakes
-                if (value := row.pain_at(zone)) is not None]
-    base = rest_peak(rows, _week_start(label), zone)
-    above = [(day, value) for day, value in measured
-             if value > (base if base is not None else 0.0)]
-    detail = (text.GATE_WAKES.format(measured=len(measured), wakes=len(wakes))
-              + (text.GATE_WAKES_REFERENCE.format(base=base) if base is not None else ""))
-    if above:
-        cases.append(("✗", detail + text.GATE_WAKES_ABOVE
-                      + ", ".join(f"{day:%d/%m} {value:g}" for day, value in above)))
-    elif not measured or len(measured) < len(wakes):
-        cases.append(("?", detail))
-    else:
-        cases.append(("✓", detail))
-    cases.extend(_wake_trend_cases(rows, as_of, zone))
-    return cases
-
-
-def _wake_trend_cases(rows: list[Row], as_of: dt.date, zone: str) -> list[tuple[str, str]]:
-    """The morning trend of the 14 days to `as_of`, and a persistence established in them."""
-    from redline.analysis import pain_rules  # pain_rules imports this module
-
-    trend = pain_rules.wake_trend(rows, zone, as_of)
-    cases = []
-    if trend.direction is None:
-        cases.append(("?", text.GATE_WAKE_TREND_UNKNOWN.format(days=trend.days)))
-    else:
-        cases.append(("✗" if trend.direction == "rising" else "✓", text.GATE_WAKE_TREND.format(
-            days=trend.days, earlier=trend.earlier, recent=trend.recent,
-            direction=text.WAKE_DIRECTIONS[trend.direction])))
-    book = rulebook.current()
-    if book.parameters.persistent_wake_mornings:
-        start = as_of - dt.timedelta(days=trend.days - 1)
-        cases.extend(("✗", text.GATE_WAKE_PERSISTENT.format(day=persistence.established))
-                     for persistence in pain_rules.persistences(
-                         rows, zone, book.scales.morning_trace,
-                         book.parameters.persistent_wake_mornings)
-                     if start <= persistence.established <= as_of)
-    return cases
-
-
-def wake_lines(rows: list[Row], zone: str, today: dt.date) -> list[str]:
-    """The morning trend and what followed each effort above the n3 cap, for the coach."""
-    from redline.analysis import pain_rules  # pain_rules imports this module
-
-    trend = pain_rules.wake_trend(rows, zone, today)
-    lines = [text.WAKE_TREND.format(
-        days=trend.days, n=len(trend.readings),
-        earlier="—" if trend.earlier is None else f"{trend.earlier:g}",
-        recent="—" if trend.recent is None else f"{trend.recent:g}",
-        direction=text.WAKE_DIRECTIONS.get(trend.direction or "", text.WAKE_TREND_NONE))]
-    book = rulebook.current()
-    if book.parameters.persistent_wake_mornings is None:
-        return lines
-    after = pain_rules.settling(rows, zone, book.scales.effort_pain, book.scales.morning_trace)
-    lines.append(text.SETTLING.format(settled=len(after.settled),
-                                      persisted=len(after.persisted), unread=len(after.unread)))
-    if after.too_sensitive:
-        lines.append(text.SETTLING_TOO_SENSITIVE)
-    return lines
-
-
-def _week_as_of(label: str, today: dt.date) -> dt.date:
-    """The last day of `label` the ledger can already hold: today in a week in progress.
-
-    The morning trend of the report and of the gate both end here, so a week in progress
-    shows one window, not two.
-    """
-    return min(today, _week_start(label) + dt.timedelta(days=6))
-
-
-def gate(rows: list[Row], label: str, instr: Instruments,
-         zones: list[PainZone], today: dt.date | None = None) -> list[str]:
-    """The gate (rule `po` of the rulebook), computed box by box from the ledger.
-
-    Judging it by eye in the review lets prose claim readings the numeric series does not
-    hold. The computation does not replace the behavioural reading the rule requires: it
-    states what the ledger establishes, and names what it cannot establish (« ? »). The
-    pain boxes are judged zone by zone: the gate opens only if each one passes. Without a
-    monitored zone, they do not exist.
-    """
-    from redline.analysis import signals  # signals imports this module: deferred import
-
-    previous = _week_label(_week_start(label) - dt.timedelta(days=7))
-    as_of = _week_as_of(label, today or dt.date.today())
-    cases: list[tuple[str, str]] = []
-    for zone in zones:
-        cases.extend((mark, zone_prefix(zone, zones) + text)
-                     for mark, text in _pain_gate_cases(rows, label, previous, zone.slug,
-                                                        as_of))
-    drifts = [drift for drift in signals.hr_at_pace(rows)
-              if _week_label(drift.date) in (previous, label)
-              and drift.delta >= signals.HR_DRIFT_BPM]
-    if drifts:
-        cases.append(("✗", text.GATE_HR_HIGH + ", ".join(
-            f"{drift.date:%d/%m} {drift.delta:+.0f}" for drift in drifts)))
-    else:
-        cases.append(("✓", text.GATE_HR_NORMAL))
-    if instr.sleep is None:
-        cases.append(("?", text.GATE_SLEEP_UNDECLARED))
-    else:
-        cases.append(("✗" if instr.sleep != WeekSleep.OK else "✓", text.GATE_SLEEP.format(sleep=instr.sleep)))
-    marks = {mark for mark, _ in cases}
-    verdict = text.GATE_RED if "✗" in marks else text.GATE_INCOMPLETE if "?" in marks else text.GATE_GREEN
-    return [text.GATE_VERDICT.format(verdict=verdict)] + [f"  {mark} {text}"
-                                                           for mark, text in cases]
-
-
 # The ledger types that count as "run", as opposed to walking and strength. The
 # distinction matters for the reading: a red gauge made of hiking does not mean the same
 # as a red gauge made of running.
@@ -762,7 +593,7 @@ class Volume:
 
     The plan carries the INTENTION, the ledger carries the FACT, and nothing tells them
     apart once a figure leaves its table. This computation is the only one allowed to
-    produce a weekly volume: `--week` prints it and `model/hot_cache.py` renders it.
+    produce a weekly volume: `--week` prints it and `analysis/hot_cache.py` renders it.
     """
 
     km_run: float
@@ -802,8 +633,6 @@ def week_descent(rows: list[Row]) -> int:
     the gauge does not weigh it."""
     return sum(row.dminus for row in rows)
 
-
-# ------------------------------------------------------------------ the trajectory
 
 TRAJECTORY_WEEKS = 6      # enough to hold an assimilation week without reading it as a dip
 TRAJECTORY_HALF = 3       # compare 3 closed weeks to the 3 before
@@ -857,7 +686,7 @@ def trajectory(rows: list[Row], today: dt.date,
     The current week is INCOMPLETE by construction and is read as such: on a Thursday it
     holds four days, not seven, and comparing it to closed weeks fabricates a collapse.
     """
-    current = _week_label(today)
+    current = iso_week.of(today)
     # N CLOSED weeks, plus the current week if it exists. Counting the open week among
     # the N would leave N-1 closed ones, so a verdict could never be computed.
     seen = sorted({row.week for row in rows})
@@ -871,7 +700,7 @@ def trajectory(rows: list[Row], today: dt.date,
             label=label,
             km=sum(row.km or 0 for row in _runs(week_rows)),
             longest=max((row.km or 0 for row in _runs(week_rows)), default=0.0),
-            elapsed=(today - _week_start(label)).days + 1 if label == current else None))
+            elapsed=(today - iso_week.monday(label)).days + 1 if label == current else None))
     return traces
 
 
@@ -928,16 +757,16 @@ def long_run_stall(rows: list[Row], today: dt.date) -> Stall | None:
     weeks; we count the latest closed weeks that do not beat it (within the stall
     tolerance: 11.53 against 11.5 is not progress). The current week is never judged.
     """
-    current = _week_label(today)
+    current = iso_week.of(today)
     closed = sorted({row.week for row in _runs(rows)} - {current})
     if not closed:
         return None
     # Weeks without a run count too: not having run is not progressing.
     labels = []
-    week = _week_start(closed[0])
-    last_closed = _week_start(current) - dt.timedelta(weeks=1)
+    week = iso_week.monday(closed[0])
+    last_closed = iso_week.monday(current) - dt.timedelta(weeks=1)
     while week <= last_closed:
-        labels.append(_week_label(week))
+        labels.append(iso_week.of(week))
         week += dt.timedelta(weeks=1)
     longest = {label: max((row.km or 0 for row in _runs(rows) if row.week == label),
                           default=0.0) for label in labels}
@@ -986,19 +815,19 @@ def race_projection(rows: list[Row], today: dt.date, race_on: dt.date,
     longest = longest_recent(rows, today)
     if longest is None or race_on <= today:
         return None
-    race_week = _week_start(_week_label(race_on))
+    race_week = iso_week.monday(iso_week.of(race_on))
     if taper_weeks is None:
         taper_weeks = rulebook.current().parameters.taper_weeks
     taper_start = race_week - dt.timedelta(weeks=taper_weeks - 1)
     # The current week may already have had its long run: start from the next one, a
     # cautious reading on a review day.
-    week = _week_start(_week_label(today)) + dt.timedelta(weeks=1)
+    week = iso_week.monday(iso_week.of(today)) + dt.timedelta(weeks=1)
     weeks = []
     while week < taper_start:
-        weeks.append(_week_label(week))
+        weeks.append(iso_week.of(week))
         week += dt.timedelta(weeks=1)
     return Projection(start_km=longest, weeks=weeks, race_on=race_on,
-                      taper_from=_week_label(taper_start))
+                      taper_from=iso_week.of(taper_start))
 
 
 def next_race_date(store: LedgerStore, today: dt.date) -> dt.date | None:
@@ -1015,7 +844,7 @@ def transition_notes(rows: list[Row], sessions: list[dict], today: dt.date) -> l
     """
     notes = []
     for session in sessions:
-        if session.get("kind") != "run" or session.get("status") == "cancelled":
+        if session.get("kind") != "run" or session.get("status") == SessionStatus.CANCELLED:
             continue
         day = dt.date.fromisoformat(session["date"])
         if day < today:
@@ -1054,167 +883,3 @@ def _median(values: list[float]) -> float:
     if len(ordered) % 2:
         return ordered[middle]
     return (ordered[middle - 1] + ordered[middle]) / 2
-
-
-def week_report(store: LedgerStore, rows: list[Row], instruments: dict, targets: dict,
-                label: str, today: dt.date, *, target_km: float | None = None,
-                closing: bool = False) -> list[str]:
-    """A week's report: volume, gauge, pain, then the slope.
-
-    ONE function for the CLI (`redline ledger --week`) and for the dossier the service
-    computes before the Sunday review (`weekly_dossier.py`): two renderings of the same
-    computation would diverge.
-    """
-    per_week = eq_hours_per_week(rows, instruments, targets)
-    week_rows = [row for row in rows if row.week == label]
-    instr = instruments.get(label, Instruments())
-    h_eq, level, trace = equivalent_hours(week_rows, instr, targets)
-    ratio = acute_chronic_ratio(per_week, label)
-    lines = [text.REPORT_WEEK.format(label=label), ""]
-    # Volume before the gauge: it is the figure the athlete hears most often, and the only
-    # one they can recount themselves. It comes from here or not at all.
-    lines.append(text.REPORT_VOLUME.format(week_volume=week_volume(week_rows)))
-    lines.append(text.REPORT_VOLUME_SOURCE)
-    lines.append("")
-    lines.extend(f"  {line}" for line in trace)
-    over_level = " 🔴" if level > LEVEL_CAP else ""
-    over_ratio = " 🔴" if ratio and ratio > RATIO_CAP else ""
-    lines.append("")
-    lines.append(text.REPORT_GAUGE.format(h_eq=h_eq, level=level, over_level=over_level, ratio=ratio if ratio is not None else "—", over_ratio=over_ratio))
-    lines.append(text.REPORT_INSTRUMENTS.format(sleep=instr.sleep or text.SLEEP_UNDECLARED,
-                                                life_load=instr.life_load or text.LIFE_LOAD_UNDECLARED))
-    dminus = week_descent(week_rows)
-    if dminus:
-        lines.append(text.REPORT_DESCENT.format(dminus=dminus))
-    zones = pain_zones(store)
-    for zone in zones:
-        pain = pain_trend(week_rows, 1, zone.slug)
-        if pain:
-            lines.append(text.REPORT_PAIN.format(label=zone.label, trend=pain[0]))
-        lines.extend(text.REPORT_ESCULIER.format(zone_prefix=zone_prefix(zone, zones), flag=flag)
-                     for flag in esculier_check(week_rows, zone.slug, history=rows))
-        lines.extend(wake_lines(rows, zone.slug, _week_as_of(label, today)))
-    lines.extend(gate(rows, label, instr, zones, today))
-    lines.extend(text.REPORT_OVER_TARGET.format(overshoot=overshoot)
-                 for overshoot in over_target(week_rows, targets))
-    lines.extend(text.REPORT_INCOMPLETE.format(problem=problem)
-                 for problem in week_completeness(store, label, today))
-
-    # The slope comes after the week: a preparation is not judged on seven days.
-    reference = min(today, _week_start(label) + dt.timedelta(days=6))
-    # `closing`: the Sunday-evening review CLOSES the week. Otherwise it would stay "in
-    # progress" for the slope and its long run would only count for the record from
-    # Monday, i.e. after the review that needs it.
-    slope_day = (_week_start(label) + dt.timedelta(days=7)) if closing else today
-    traces = trajectory(rows, slope_day)
-    if traces:
-        lines.append("")
-        lines.append(text.REPORT_TRAJECTORY.format(weeks=len(traces)))
-        lines.extend(f"  {week_trace}" for week_trace in traces)
-        lines.extend(trajectory_verdict(traces))
-        stall = long_run_stall(rows, slope_day)
-        if stall:
-            lines.append(str(stall))
-        longest = longest_recent(rows, reference)
-        if longest is not None:
-            lines.append(text.REPORT_LONGEST.format(longest=longest))
-        race = race_model.upcoming(store, today)
-        projection = race_projection(rows, today, race.on, race.taper_weeks) if race else None
-        if projection:
-            lines.extend(projection_lines(projection, target_km))
-        elif race is None:
-            lines.append(text.REPORT_NO_RACE)
-    # Imported here: the taper reads the ledger's volumes.
-    from redline.analysis import taper
-    lines.extend(taper.report_lines(store, rows, label, today, closing))
-    return lines
-
-
-# -------------------------------------------------------------------------------- CLI
-
-# The export's column names. Pain has one column per zone, `pain_<zone>`, between `rpe`
-# and `enjoyment`: whatever reads this CSV finds every series under its own name.
-CSV_HEADERS = ["date", "week", "type", "km", "duration_h", "hr_avg", "cadence",
-               "dplus", "dminus", "rpe", "enjoyment", "note"]
-
-
-def _export_csv(rows: list[Row], zones: list[PainZone]) -> str:
-    buffer = io.StringIO()
-    writer = csv.writer(buffer)
-    pain_headers = [f"pain_{zone.slug}" for zone in zones]
-    writer.writerow([*CSV_HEADERS[:10], *pain_headers, *CSV_HEADERS[10:]])
-    for row in rows:
-        writer.writerow([row.date, row.week, row.type, row.km,
-                         row.hours and round(row.hours, 3), row.hr_avg, row.cadence,
-                         row.dplus, row.dminus, row.rpe,
-                         *(row.pain_at(zone.slug) for zone in zones),
-                         row.enjoyment, row.note])
-    return buffer.getvalue()
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--root", default=paths.vault_root(), type=Path)
-    parser.add_argument("--week", dest="week", help="e.g. 2030-W30")
-    parser.add_argument("--pain-trend", dest="pain_weeks", type=int, metavar="N")
-    parser.add_argument("--csv", action="store_true", help="normalised export on stdout")
-    parser.add_argument("--long-run-target", dest="target_km", type=float, metavar="KM",
-                        help="long-run distance to reach before the taper")
-    args = parser.parse_args()
-
-    try:
-        store = open_store()
-        rows = parse_ledger(store)
-    except table.LedgerError as exc:
-        raise InputError(f"unreadable ledger -- {exc}") from exc
-    instruments = load_instruments(store)
-    # Targets come from the session sheets, never from a hard-coded table.
-    targets = program.rpe_targets(args.root)
-
-    if args.csv:
-        sys.stdout.write(_export_csv(rows, pain_zones(store)))
-        return 0
-
-    if args.pain_weeks:
-        print(text.TREND_TITLE)
-        print(text.TREND_SERIES)
-        zones = pain_zones(store)
-        if not zones:
-            print(text.TREND_NO_ZONE)
-        for zone in zones:
-            print(f"{zone.label}")
-            weeks = pain_trend(rows, args.pain_weeks, zone.slug)
-            for week in weeks:
-                print(f"  {week}")
-            recent = [row for row in rows if weeks and row.week >= weeks[0].week]
-            flags = esculier_check(recent, zone.slug, history=rows)
-            print(text.TREND_ESCULIER)
-            for flag in flags:
-                print(f"    {flag}")
-            if not flags:
-                print(text.TREND_NOTHING)
-            for line in wake_lines(rows, zone.slug, dt.date.today()):
-                print(line)
-            print()
-        return 0
-
-    per_week = eq_hours_per_week(rows, instruments, targets)
-    if not per_week:
-        print(text.EMPTY_LEDGER)
-        return 0
-    if args.week:
-        try:
-            label = normalize_week(args.week, sorted(per_week))
-        except ValueError as exc:
-            raise InputError(f"week refused -- {exc}") from exc
-    else:
-        label = max(per_week)
-
-    print()
-    for line in week_report(store, rows, instruments, targets, label, dt.date.today(),
-                            target_km=args.target_km):
-        print(f"  {line}" if line else "")
-    print()
-    return 0
-

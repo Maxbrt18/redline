@@ -1,7 +1,7 @@
-"""The CLI head the four card scripts share, as `render.emit` is their shared tail.
+"""The CLI head the `chart_*` commands share, as `render.emit` is their shared tail.
 
-Each script used to repeat the same two argparse arguments and the same hand-rolled
-"JSON invalide" exit, and describe its input in prose that nothing enforced.
+Every card takes the same two arguments and exits the same way on invalid JSON, and its
+input is checked against a schema rather than described in prose.
 """
 
 from __future__ import annotations

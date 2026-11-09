@@ -9,7 +9,9 @@ from datetime import date, datetime, timedelta
 
 from redline.coach import dates
 from redline.coach.fr import plan as wording
+from redline.model import iso_week
 from redline.model import weekly_plan as weekly_plan_model
+from redline.model.vocabulary import SETTLED_STATUSES, SessionStatus
 
 #: A day that empties is named. The prescriptive render filters on `remaining()`,
 #: which drops cancelled sessions: a day whose only session was removed would vanish
@@ -26,11 +28,6 @@ class PlanStatus(enum.Enum):
     #: An unlinked activity appeared since the plan was computed: to reexamine.
     STALE = "stale"
     INVALID = "invalid"
-
-
-def _monday(week: str) -> date:
-    year, _, number = week.partition("-W")
-    return date.fromisocalendar(int(year), int(number), 1)
 
 
 def _sunday(day: date) -> date:
@@ -72,13 +69,13 @@ def strength_due(context: str, today: str) -> dict | None:
         if (isinstance(session, dict)
                 and session.get("kind") == "strength"
                 and session.get("date") == today
-                and session.get("status") not in weekly_plan_model.SETTLED_STATUSES):
+                and session.get("status") not in SETTLED_STATUSES):
             return session
     return None
 
 
 def _done(session: dict) -> str:
-    return wording.MESSENGER_DONE if session.get("status") == "done" else ""
+    return wording.MESSENGER_DONE if session.get("status") == SessionStatus.DONE else ""
 
 
 def _short(session: dict) -> str:
@@ -134,7 +131,7 @@ def _covered_lines(shown: list, every: list, span: Iterable[date],
     for session in shown:
         by_day.setdefault(session["date"], []).append(session)
     held = {session["date"] for session in every if session.get("id") in excluded}
-    facts = {session["date"] for session in every if session.get("status") == "done"}
+    facts = {session["date"] for session in every if session.get("status") == SessionStatus.DONE}
     lines = []
     for day in span:
         stamp = day.isoformat()
@@ -228,7 +225,7 @@ def render_plan_delta(before_raw: str, after_raw: str, week: str, *, today: str,
         if previous is not None and _signature(previous) == _signature(session):
             continue
         day = date.fromisoformat(session["date"])
-        if session.get("status") == "cancelled":
+        if session.get("status") == SessionStatus.CANCELLED:
             changed.append(wording.MESSENGER_CANCELLED.format(day=_label(day), title=session["title"]))
         elif previous is not None and previous.get("date") != session.get("date"):
             old_day = date.fromisoformat(previous["date"])
@@ -278,7 +275,7 @@ def render_plan_message(raw: str, week: str, *, today: str = "", since: str = ""
         text = wording.MESSENGER_TODAY + " ; ".join(_full(session) for session in sessions)
         return text if text.endswith((".", "!", "?")) else text + "."
     every = revision.get("sessions", [])
-    first = date.fromisoformat(since) if since else _monday(week)
+    first = date.fromisoformat(since) if since else iso_week.monday(week)
     header = (wording.MESSENGER_REST_OF_WEEK if since
               else wording.MESSENGER_WEEK.format(first=first, last=_sunday(first)))
     return "\n".join([header,

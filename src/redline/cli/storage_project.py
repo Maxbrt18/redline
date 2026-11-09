@@ -4,26 +4,21 @@
 from __future__ import annotations
 
 import argparse
-import os
 from pathlib import Path
 
 from redline.model import (
     entrypoint,
     paths,
 )
-from redline.storage import Database, OperationalStore
+from redline.storage import open_store
 from redline.storage.projector import project_all
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", type=Path, default=paths.vault_root())
-    parser.add_argument("--database-url", default=os.environ.get("DATABASE_URL", ""))
+    parser.add_argument("--root", type=Path)
     args = parser.parse_args()
-    if not args.database_url:
-        parser.error("DATABASE_URL is required")
-    project_all(OperationalStore(Database(
-        args.database_url, application_name="storage-project")), args.root)
+    project_all(open_store("storage-project"), args.root or paths.vault_root())
     print("Obsidian projections regenerated from PostgreSQL.")
     return 0
 

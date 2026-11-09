@@ -8,16 +8,17 @@ import json
 import random
 
 import pytest
+from writes import write
 
 from redline.analysis import reorganize
 from redline.analysis.reorganize import Item, Remark, Rules
-from redline.model import week_days
+from redline.model import commands, iso_week, week_days
 from redline.model.program import Program
 from redline.model.schema import SchemaError
 from redline.model.vocabulary import SessionPriority
 
 WEEK = "2030-W10"
-DATES = week_days.week_dates(WEEK)
+DATES = iso_week.dates(WEEK)
 MONDAY = DATES[0]
 
 
@@ -88,17 +89,20 @@ def test_the_lightest_session_of_the_lowest_priority_goes_first():
 def test_a_key_session_is_never_dropped():
     closed = [{"date": str(day(offset)), "kind": "off"} for offset in (1, 2, 4, 5)]
     outcome = solve(closed)
+    assert outcome.variants
     for variant in outcome.variants:
         assert not {"thu-threshold", "sun-long"} & set(variant.dropped)
 
 
 def test_an_easy_only_day_refuses_a_demanding_session():
     outcome = solve([{"date": str(day(3)), "kind": "easy"}])
+    assert outcome.variants
     assert all(placed(variant)["thu-threshold"] != day(3) for variant in outcome.variants)
 
 
 def test_a_short_day_takes_only_what_fits_in_its_minutes():
     outcome = solve([{"date": str(day(1)), "kind": "short", "minutes": 40}])
+    assert outcome.variants
     for variant in outcome.variants:
         on_tuesday = [name for name, date in placed(variant).items() if date == day(1)]
         assert sum(next(i.minutes for i in week_items() if i.id == name) for name in on_tuesday) <= 40
@@ -148,6 +152,7 @@ def test_a_pain_signal_lets_a_hard_session_move_later_never_earlier():
     calm = solve(closed)
     assert any(placed(variant)["thu-threshold"] < day(3) for variant in calm.variants)
     signal = solve(closed, rules=Rules(**{**vars(RULES), "pain_signal": True}))
+    assert signal.variants
     assert all(placed(variant)["thu-threshold"] > day(3) for variant in signal.variants)
     assert signal.held_back == ("thu-threshold",)
 
@@ -156,6 +161,7 @@ def test_a_held_session_does_not_go_before_its_gate():
     items = [*(i for i in week_items() if i.id != "thu-threshold"),
              item("thu-threshold", "threshold", 3, 60, effort=6.5, held_until=day(3))]
     outcome = solve([{"date": str(day(3)), "kind": "off"}], items=items)
+    assert outcome.variants
     assert all(placed(variant)["thu-threshold"] > day(3) for variant in outcome.variants)
 
 
@@ -205,6 +211,7 @@ def test_the_same_request_gives_the_same_variants():
 
 def test_nothing_before_today_moves_and_today_still_does():
     outcome = solve([{"date": str(day(3)), "kind": "off"}], today=3)
+    assert outcome.variants
     for variant in outcome.variants:
         assert all(date >= day(3) for date in placed(variant).values())
 
@@ -568,7 +575,7 @@ def test_a_proposal_is_checked_kept_shown_then_taken(seeded):
     based_on, checked = service.checked_proposals(
         seeded, WEEK, {"proposals": [_proposal(seeded), _proposal(seeded, "Variante bis")]}, stamp)
     assert based_on == 1 and checked[0]["revision"]["state_snapshot"]["as_of"] == "2030-03-05"
-    seeded.add_proposals(WEEK, based_on, checked)
+    write(seeded, commands.PLAN_PROPOSE, {"week": WEEK, "based_on": based_on, "proposals": checked})
     shown = service.view(seeded, WEEK, {"days": []}, dt.date(2030, 3, 5))["proposals"]
     assert [item["title"] for item in shown] == ["Le footing passe samedi", "Variante bis"]
     assert shown[0]["lines"][0].startswith("Footing passe du ")
@@ -598,7 +605,7 @@ def test_a_new_set_of_proposals_replaces_the_open_one_and_can_be_dismissed(seede
     for title in ("Premier envoi", "Second envoi"):
         based_on, checked = service.checked_proposals(
             seeded, WEEK, {"proposals": [_proposal(seeded, title)]}, stamp)
-        seeded.add_proposals(WEEK, based_on, checked)
+        write(seeded, commands.PLAN_PROPOSE, {"week": WEEK, "based_on": based_on, "proposals": checked})
     assert [row["title"] for row in seeded.open_proposals(WEEK)] == ["Second envoi"]
     seeded.dismiss_proposals(WEEK)
     assert seeded.open_proposals(WEEK) == []

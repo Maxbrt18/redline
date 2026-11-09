@@ -12,6 +12,7 @@ is already conforming.
 """
 
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -92,8 +93,9 @@ def test_the_typed_writer_refuses_and_names_the_column(monkeypatch, capsys):
 
 def _zones(monkeypatch, add, zones=("knee",)):
     """The monitored zones live in the database: the CLI reads them, the test fixes them."""
-    monkeypatch.setenv("DATABASE_URL", "postgresql://test")
-    monkeypatch.setattr(add, "_active_zones", lambda url: list(zones))
+    import redline.storage
+    store = SimpleNamespace(pain_zones=lambda: [{"slug": zone, "active": True} for zone in zones])
+    monkeypatch.setattr(redline.storage, "open_store", lambda application: store)
 
 
 @pytest.mark.parametrize("trace", ["", "?"])
@@ -163,16 +165,10 @@ def _load_writer():
 def test_existing_observation_is_rejected_before_staging(monkeypatch):
     from unittest.mock import MagicMock
 
-    import redline.storage
-
     writer = _load_writer()
     store = MagicMock()
     store.observation_id.return_value = "existing-id"
     monkeypatch.setenv("REDLINE_TURN_ID", "active-turn")
-    monkeypatch.setattr(redline.storage, "Database", MagicMock())
-    monkeypatch.setattr(redline.storage, "OperationalStore", lambda *args: store)
     with pytest.raises(writer.table.LedgerError, match=r"ledger-complete"):
-        writer._write_database("test", {"date": "2026-09-11", "type": "easy"}, {},
-                               "strava:90000000004")
-    store.stage_command.assert_not_called()
-    store.add_observation.assert_not_called()
+        writer._write(store, {"date": "2026-09-11", "type": "easy"}, {}, "strava:90000000004")
+    store.submit.assert_not_called()

@@ -1,8 +1,7 @@
 """Rules n3 and n4 of the rulebook: the part the ledger can establish.
 
-The two rules used to be applied by the model alone. Their triggers are facts the
-ledger already holds, so the engine computes them and refuses a revision that ignores
-them (`weekly_plan.pain_rule_errors`):
+Their triggers are facts the ledger already holds, so the engine computes them rather
+than leaving them to the model, and refuses a revision that ignores them (`weekly_plan.pain_rule_errors`):
 
 - n3: a zone's wake trace at the base of the instance's morning-trace scale or above, on
   `persistent_wake_mornings` consecutive mornings, is pain persisting beyond 48 h. From
@@ -29,12 +28,13 @@ import datetime as dt
 from dataclasses import dataclass
 from statistics import mean
 
+from redline.model import iso_week, rulebook, session_kinds
 from redline.model import ledger as table
-from redline.model import rulebook, session_kinds
 from redline.model.pain_scales import LOWEST, EffortPainScale, MorningTraceScale
 from redline.model.vocabulary import Sleep
 from redline.model.weekly_plan import QualityHold, VolumeCeiling
 
+from . import signals
 from .ledger import Row
 
 TREND_DAYS = 14
@@ -183,7 +183,6 @@ def poor_night_streaks(daily: list[dict], streak: int) -> list[tuple[dt.date, ..
 def holds(rows: list[Row], daily: list[dict], zones: list[str],
           today: dt.date) -> list[QualityHold]:
     """The windows, still open on `today`, in which rules n3 and n4 remove quality."""
-    from redline.analysis import signals  # signals imports the ledger: deferred import
 
     book = rulebook.current()
     parameters = book.parameters
@@ -227,7 +226,7 @@ def volume_ceilings(rows: list[Row], zones: list[str], week: str,
     cut, span = parameters.pain_cut_pct, parameters.pain_no_quality_days
     if mornings is None or cut is None or not span:
         return []
-    sunday = dt.date.fromisocalendar(int(week[:4]), int(week[-2:]), 7)
+    sunday = iso_week.sunday(week)
     found = []
     for zone in zones:
         for persistence in persistences(rows, zone, book.scales.morning_trace, mornings):

@@ -6,9 +6,9 @@ from dataclasses import replace
 import pytest
 from conftest import ZONE, zoned
 
-from redline.analysis import ledger, pain_rules
+from redline.analysis import ledger, pain_rules, week_review
 from redline.analysis.ledger import Instruments, Row
-from redline.model import rulebook, session_kinds, weekly_plan
+from redline.model import iso_week, rulebook, session_kinds, weekly_plan
 from redline.service import plan_revision
 
 MONDAY = dt.date(2026, 10, 5)
@@ -235,7 +235,7 @@ def test_a_rising_morning_trend_closes_the_gate_within_its_baseline():
             *wakes(0, 0.5, 1, 0.5, 0, 0.5, 0.5),
             Row(day(-6), "easy", km=8, hours=0.8, pains=zoned(1.0)),
             Row(day(1), "easy", km=8, hours=0.8, pains=zoned(1.0))]
-    lines = ledger.gate(rows, "2026-W41", Instruments(sleep="ok"),
+    lines = week_review.gate(rows, "2026-W41", Instruments(sleep="ok"),
                         [ledger.PainZone(ZONE, "Genou")])
     assert lines[0].endswith(": rouge")
     assert any(line.startswith("  ✓ réveils : 7 chiffré(s)") for line in lines)
@@ -244,7 +244,7 @@ def test_a_rising_morning_trend_closes_the_gate_within_its_baseline():
 
 def test_a_persistence_closes_the_gate():
     rows = [*wakes(*[1] * 7, start=day(-7)), *wakes(1, 1, 1, 0, 0, 0, 0)]
-    lines = ledger.gate(rows, "2026-W41", Instruments(sleep="ok"),
+    lines = week_review.gate(rows, "2026-W41", Instruments(sleep="ok"),
                         [ledger.PainZone(ZONE, "Genou")])
     assert "  ✗ réveil persistant établi le 30/09 (règle n3)" in lines
 
@@ -262,7 +262,7 @@ def test_the_rulebook_says_what_the_code_holds_and_what_the_coach_keeps():
 def test_in_a_week_in_progress_the_gate_and_the_report_read_the_same_window():
     rows = [*wakes(*[0.5] * 7, start=day(-7)), *wakes(0, 0, 0, 0)]
     zones = [ledger.PainZone(ZONE, "Genou")]
-    lines = ledger.gate(rows, "2026-W41", Instruments(sleep="ok"), zones, today=day(3))
-    report = ledger.wake_lines(rows, ZONE, ledger._week_as_of("2026-W41", day(3)))
+    lines = week_review.gate(rows, "2026-W41", Instruments(sleep="ok"), zones, today=day(3))
+    report = week_review.wake_lines(rows, ZONE, iso_week.as_of("2026-W41", day(3)))
     assert "  ✓ réveils 14 j : 0.5 → 0.21 (en baisse)" in lines
     assert report[0] == "  réveils 14 j : 11 lecture(s), 0.5 → 0.21 (en baisse)"

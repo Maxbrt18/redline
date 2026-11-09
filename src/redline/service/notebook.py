@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 from redline.cards import archive, strength_card
 from redline.coach.fr import notebook as notebook_text
+from redline.model import iso_week
 from redline.model import notebook_views as views
 from redline.model import race as race_model
 from redline.model.instance import Instance
@@ -20,7 +21,7 @@ from redline.storage.database import StorageError
 from redline.storage.notebook import NotebookStore
 
 from . import clock, race_plan, reorganize, session_detail, strength
-from .notebook_board import Board, week_monday
+from .notebook_board import Board
 from .plans import PlanStatus, blocked_session_ids, strength_due
 from .strength_artifact import selection_for
 
@@ -34,7 +35,7 @@ if TYPE_CHECKING:
 
 def review_period(source_key: str) -> tuple[str, str]:
     """The monthly key names the trigger on the 1st, hence closes the previous month."""
-    match = re.fullmatch(r"proactive:weekly:(20\d{2}-W\d{2})", source_key)
+    match = re.fullmatch(rf"proactive:weekly:({iso_week.PATTERN})", source_key)
     if match:
         return "weekly", match[1]
     match = re.fullmatch(r"proactive:monthly:(20\d{2}-\d{2})", source_key)
@@ -47,8 +48,8 @@ def review_period(source_key: str) -> tuple[str, str]:
 def period_day(kind: str, period: str, fallback: dt.date) -> dt.date:
     if not period:
         return fallback
-    if kind == "weekly" and re.fullmatch(r"20\d{2}-W\d{2}", period):
-        return dt.date.fromisocalendar(int(period[:4]), int(period[-2:]), 7)
+    if kind == "weekly" and iso_week.is_label(period):
+        return iso_week.sunday(period)
     if kind == "monthly" and re.fullmatch(r"20\d{2}-\d{2}", period):
         return dt.date.fromisoformat(period + "-01")
     if kind == "strength":
@@ -75,7 +76,7 @@ class NotebookService:
         return {**self.board().today_view(), "strength": self.current()}
 
     def week(self, psid: str, label: str) -> views.WeekView:
-        monday = week_monday(label)
+        monday = iso_week.monday(label)
         entries = self.store.list_entries(
             psid, limit=100, between=(monday, monday + dt.timedelta(days=6)))
         return self.board().week_view(label, entries)
@@ -207,7 +208,7 @@ class NotebookService:
 
     def current(self) -> views.StrengthOffer:
         today = clock.today()
-        week = today.strftime("%G-W%V")
+        week = iso_week.of(today)
         status = self.repo.validate_weekly_plan(week)
         if status not in {PlanStatus.VALID, PlanStatus.AWAITING}:
             return {"status": "unavailable", "date": today.isoformat(),

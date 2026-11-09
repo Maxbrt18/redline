@@ -10,7 +10,8 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Connection
 
 from redline.coach.fr import gear as gear_text
-from redline.model.vocabulary import ThreadStatus
+from redline.model import vocabulary as voc
+from redline.model.vocabulary import JobStatus, ThreadStatus
 
 from ..database import StorageError
 from ..schema import (
@@ -30,21 +31,19 @@ from ..schema import (
 from ._common import (
     CORRECTION_ANNOUNCE_WINDOW,
     RESOLUTION_COLUMNS,
-    StoreBase,
     _audit,
     _jsonable,
+    _native,
     _plain,
     _request_projection,
     _resolution_rule,
     _rule_holds,
     _uuid,
 )
+from .pain_zones import PainZones
 
 
-class Facts(StoreBase):
-    def evaluate_capability(self, row: dict, *, actor: str = "application") -> bool:
-        with self.database.transaction() as connection:
-            return self.add_capability_evaluation_in(connection, row, actor=actor)
+class Facts(PainZones):
 
     def add_capability_evaluation_in(self, connection: Connection, row: dict,
                                      *, actor: str = "application") -> bool:
@@ -97,9 +96,6 @@ class Facts(StoreBase):
         _audit(connection, actor, "thread.upserted", "thread", actual_id, _jsonable(values))
         _request_projection(connection)
 
-    def upsert_thread(self, row: dict, *, actor: str = "application") -> None:
-        with self.database.transaction() as connection:
-            self.add_thread_in(connection, row, actor=actor)
 
     def add_deadline_in(self, connection: Connection, row: dict,
                         *, actor: str = "application") -> None:
@@ -120,9 +116,6 @@ class Facts(StoreBase):
         _audit(connection, actor, "deadline.upserted", "deadline", actual_id, _jsonable(values))
         _request_projection(connection)
 
-    def upsert_deadline(self, row: dict, *, actor: str = "application") -> None:
-        with self.database.transaction() as connection:
-            self.add_deadline_in(connection, row, actor=actor)
 
     def upsert_gear_in(self, connection: Connection, row: dict,
                        *, actor: str = "application") -> None:
@@ -135,9 +128,6 @@ class Facts(StoreBase):
         aggregate_id = uuid.uuid5(uuid.NAMESPACE_URL, f"gear:{row['gear_id']}")
         _audit(connection, actor, "gear.upserted", "gear", aggregate_id, _jsonable(values))
 
-    def upsert_gear(self, row: dict, *, actor: str = "application") -> None:
-        with self.database.transaction() as connection:
-            self.upsert_gear_in(connection, row, actor=actor)
 
     def sync_strava_gear(self, row: dict, *, actor: str = "strava-gear-sync") -> None:
         """Refresh the provider's distance counter without overwriting the custom role.
@@ -351,13 +341,10 @@ class Facts(StoreBase):
             self._observed_value_in(connection, kind, day, zone), actor=actor)
             for kind, day, zone in pending)
 
-    def upsert_prediction(self, row: dict, *, actor: str = "application") -> None:
-        with self.database.transaction() as connection:
-            self.upsert_prediction_in(connection, row, actor=actor)
 
     def prediction_rows(self) -> list[dict]:
         with self.database.engine.connect() as connection:
-            return [{key: _plain(value) for key, value in dict(row).items()}
+            return [_native(row)
                     for row in connection.execute(sa.select(coach_predictions).where(
                         coach_predictions.c.athlete_id == self.athlete_id).order_by(
                             coach_predictions.c.due_on.desc())).mappings()]
@@ -397,9 +384,6 @@ class Facts(StoreBase):
         _audit(connection, actor, "permit.sealed", "permit_choice", values["id"],
                _jsonable({**values, "id": str(values["id"])}))
 
-    def seal_permit_choice(self, row: dict, *, actor: str = "application") -> None:
-        with self.database.transaction() as connection:
-            self.seal_permit_choice_in(connection, row, actor=actor)
 
     def permit_choice_rows(self) -> list[dict]:
         with self.database.engine.connect() as connection:
@@ -426,7 +410,7 @@ class Facts(StoreBase):
                 proactive_jobs.c.job_key == legacy_key,
                 proactive_jobs.c.job_key.like(revision_prefix + "%"),
             )).with_for_update()).mappings().all()
-            if any(job["status"] == "running" for job in jobs):
+            if any(job["status"] == voc.JobStatus.RUNNING for job in jobs):
                 raise StorageError(
                     "correction being announced: retry after its delivery")
             connection.execute(correction_deliveries.update().where(
@@ -435,7 +419,7 @@ class Facts(StoreBase):
             if jobs:
                 connection.execute(proactive_jobs.update().where(
                     proactive_jobs.c.job_key.in_([job["job_key"] for job in jobs])).values(
-                        status="done", completed_at=now))
+                        status=JobStatus.DONE, completed_at=now))
             revision_job = f"{revision_prefix}{int(now.timestamp() * 1_000_000)}"
             connection.execute(proactive_jobs.insert().values(
                 job_key=revision_job, kind="correction", detail=row["summary"],
@@ -448,9 +432,6 @@ class Facts(StoreBase):
             action = "correction.registered"
         _audit(connection, actor, action, "correction", aggregate_id, _jsonable(values))
 
-    def register_correction(self, row: dict, *, actor: str = "application") -> None:
-        with self.database.transaction() as connection:
-            self.register_correction_in(connection, row, actor=actor)
 
     def correction_rows(self) -> list[dict]:
         """The corrections, with the number of recurrences and the date of the first.

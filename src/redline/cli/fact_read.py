@@ -7,25 +7,22 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
-import os
 from typing import Any
 
 from redline.coach.fr import fact_read as wording
 from redline.coach.fr import plan as plan_wording
 from redline.coach.fr import session_labels
-from redline.model import entrypoint, voice
+from redline.model import agent_input, entrypoint, voice
 from redline.model import ledger as table
 from redline.model import predictions as prediction_model
-from redline.model.errors import ConfigError, InputError
-from redline.model.vocabulary import ThreadStatus
+from redline.model.errors import InputError
+from redline.model.vocabulary import DeadlineStatus, MeasurementState, ThreadStatus
 from redline.service.race_countdown import compile_deadline
 
 
 def _known(row: dict, metric: str, suffix: str = "") -> str | None:
-    measurement = row["measurements"].get(metric)
-    if not measurement or measurement["state"] != "known":
-        return None
-    return f"{measurement['value']}{suffix}"
+    value = table.known(row["measurements"].get(metric))
+    return None if value is None else f"{value}{suffix}"
 
 
 def _fuel(row: dict) -> str | None:
@@ -33,8 +30,7 @@ def _fuel(row: dict) -> str | None:
     measures = row["measurements"]
 
     def known(metric: str) -> Any:
-        measure = measures.get(metric) or {}
-        return measure.get("value") if measure.get("state") == "known" else None
+        return table.known(measures.get(metric))
 
     grams = known("carbs_g_h")
     if grams is None:
@@ -46,7 +42,7 @@ def _fuel(row: dict) -> str | None:
     mix = known("fuel_mix")
     if mix:
         parts.append(plan_wording.CARBS_MIX[mix])
-    elif (measures.get("fuel_mix") or {}).get("state") == "unavailable":
+    elif (measures.get("fuel_mix") or {}).get("state") == MeasurementState.UNAVAILABLE:
         parts.append(wording.SUGARS_UNKNOWN)
     gut = known("gut_symptoms")
     if gut is not None:
@@ -82,7 +78,7 @@ def observations(store: Any, limit: int) -> list[str]:
         if fuel:
             facts.append(fuel)
         pending = sorted(metric for metric, measure in row["measurements"].items()
-                         if measure["state"] == "pending")
+                         if measure["state"] == MeasurementState.PENDING)
         pending += table.pending_pains(row.get("pains") or {})
         if pending:
             facts.append(wording.TO_COMPLETE + ", ".join(pending))
@@ -163,7 +159,7 @@ def threads(store: Any, include_closed: bool) -> list[str]:
 
 
 def deadlines(store: Any, include_done: bool) -> list[str]:
-    rows = [row for row in store.deadline_rows() if include_done or row["status"] != "done"]
+    rows = [row for row in store.deadline_rows() if include_done or row["status"] != DeadlineStatus.DONE]
     scope = wording.ALL_FEMININE if include_done else wording.ACTIVE
     lines = [wording.DEADLINES.format(scope=scope, rows=len(rows))]
     for row in rows:
@@ -279,7 +275,7 @@ def predictions(store: Any, *, due: bool = False, today: dt.date | None = None) 
 
 def roadmap(store: Any) -> list[str]:
     races = [row for row in store.deadline_rows()
-             if row.get("kind") == "race" and row["status"] != "done"]
+             if row.get("kind") == "race" and row["status"] != DeadlineStatus.DONE]
     lines = [wording.RACE_PLAN.format(races=len(races))]
     for race in races:
         lines.append(f"{race['item']} · {race['due_on']}")
@@ -293,7 +289,6 @@ def roadmap(store: Any) -> list[str]:
 
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description=__doc__)
-    root.add_argument("--database-url", default=os.environ.get("DATABASE_URL", ""))
     commands = root.add_subparsers(dest="command", required=True)
     question_parser = commands.add_parser("questions")
     question_parser.add_argument("--limit", type=int, default=20)
@@ -331,12 +326,9 @@ def parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = parser().parse_args()
-    if not args.database_url:
-        raise ConfigError("DATABASE_URL is required")
-    from redline.storage import Database, OperationalStore
+    from redline.storage import open_store
 
-    database = Database(args.database_url, application_name="fact-read")
-    store = OperationalStore(database)
+    store = open_store("fact-read")
     limit = getattr(args, "limit", 1)
     if limit < 1 or limit > 1000:
         raise InputError("limit expected between 1 and 1000")
@@ -347,9 +339,9 @@ def main() -> int:
                                          question=row["question"], review_note=row["review_note"])
                  for row in store.question_rows(args.limit)]
     elif args.command == "conversation":
-        turn_id = os.environ.get("REDLINE_TURN_ID", "").strip()
+        turn_id = agent_input.current_turn()
         if not turn_id:
-            raise InputError("REDLINE_TURN_ID is required for the conversation")
+            raise InputError(f"{agent_input.TURN_VARIABLE} is required for the conversation")
         lines = []
         for group in store.conversation_search_for_turn(turn_id, args.query, min(limit, 12)):
             hit = group["hit"]
@@ -392,7 +384,6 @@ def main() -> int:
             wording.NO_PERMIT]
     else:
         lines = proactive(store, args.limit)
-    database.dispose()
     print("\n".join(lines))
     return 0
 

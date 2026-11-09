@@ -33,7 +33,7 @@ from pathlib import Path
 
 from redline.coach.fr import rulebook as text
 
-from . import paths
+from . import formats, iso_week, paths
 from .errors import ConfigError
 from .pain_scales import SCALES_SCHEMA, PainScales
 from .pain_scales import build as build_scales
@@ -41,8 +41,6 @@ from .schema import Schema, SchemaError, field
 
 FILENAME = "rulebook.toml"
 DEFAULT = Path(__file__).with_name("rulebook.default.toml")
-SLUG = r"[a-z0-9][a-z0-9-]{0,39}"
-WEEK = r"\d{4}-W(0[1-9]|[1-4]\d|5[0-3])"
 
 #: Rules the engine enforces itself: the coach must read them, otherwise the code would
 #: reject from the program what the injected rulebook does not state.
@@ -59,9 +57,9 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
         field("taper_weeks", int, minimum=1, maximum=6),
         field("stall_weeks", int, minimum=1, maximum=12),
         field("stall_tolerance_km", float, minimum=0, maximum=5),
-        field("wake_trace_until", str, pattern=r"([01]\d|2[0-3]):[0-5]\d",
+        field("wake_trace_until", str, pattern=formats.TIME,
               note="local time HH:MM"),
-        field("assimilation_weeks", list, item=field("week", str, pattern=WEEK,
+        field("assimilation_weeks", list, item=field("week", str, pattern=iso_week.PATTERN,
                                                      note="ISO week, e.g. 2030-W35")),
         # Optional: an instance rulebook written before them states no fuelling ceiling,
         # and none applies until it declares one.
@@ -102,7 +100,7 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
     field("scales", dict, schema=SCALES_SCHEMA),
     field("transitions", list, minimum=1, maximum=12, item=field(
         "transition", dict, schema=Schema("[[transitions]]", [
-            field("slug", str, pattern=SLUG),
+            field("slug", str, pattern=formats.SLUG),
             field("label", str, minimum=1, maximum=40),
             field("race_first", bool, required=False),
             field("quality", bool, required=False),

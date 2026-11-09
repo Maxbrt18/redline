@@ -24,8 +24,6 @@ import {cancelRetry, retry} from './send.js';
  *    opening.
  */
 
-// --------------------------------------------------------------------- boot
-
 function fail(title, text) {
   $('boot-title').textContent = title;
   $('boot-msg').textContent = text;

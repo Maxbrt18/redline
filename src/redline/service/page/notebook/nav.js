@@ -14,7 +14,6 @@ import {renderOutcome} from './screens/detail.js';
 import {renderArchive, renderEntry} from './screens/archives.js';
 import {ensure, refresh} from './data.js';
 
-// ------------------------------------------------------------ navigation
 // Three roots always visible; everything else is pushed on top and closes one step
 // back toward where the user came from.
 // A screen already seen is shown from page memory, then recomputed behind; it is

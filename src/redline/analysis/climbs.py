@@ -130,7 +130,6 @@ def detect(distance_m: np.ndarray, elevation_m: np.ndarray) -> list[Climb]:
     return sorted(climbs, key=lambda climb: climb.start_m)
 
 
-# ------------------------------------------------------------ preprocessing
 def _source(distance: np.ndarray, elevation: np.ndarray) -> tuple[np.ndarray, np.ndarray] | None:
     """The samples that move along the route (more than 5 cm), so distance strictly grows."""
     if distance.size < 2:
@@ -216,7 +215,6 @@ def _gain_prefix(z: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return np.cumsum(np.maximum(steps, 0)), np.cumsum(np.maximum(-steps, 0))
 
 
-# ------------------------------------------------------------ structural detection
 @dataclass(frozen=True)
 class _Envelope:
     start: int
@@ -273,7 +271,6 @@ def _envelopes(s: np.ndarray, z: np.ndarray, grade: np.ndarray) -> list[_Envelop
     return envelopes
 
 
-# ------------------------------------------------------------ refinement
 def _index_at(s: np.ndarray, metres: float) -> int:
     """The first sample at or beyond `metres`, clamped to the grid."""
     return min(int(np.searchsorted(s, metres, side="left")), s.size - 1)
@@ -386,7 +383,6 @@ def _refine(envelope: _Envelope, series: _Series) -> tuple[int, int]:
     return start, summit
 
 
-# ------------------------------------------------------------ statistics and sections
 def _saturating(value: float, scale: float) -> float:
     return 1.0 - math.exp(-max(0.0, value) / max(1e-9, scale))
 

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import datetime as dt
 
+from redline.model import iso_week
+
 from . import ledger
 
 PAIN_WINDOW_DAYS = 7
@@ -19,8 +21,7 @@ DAILY_FIELDS = ("sleep", "life_load", "desire")
 
 def snapshot(store: ledger.LedgerStore, today: dt.date) -> dict:
     rows = [row for row in ledger.parse_ledger(store) if row.date <= today]
-    year, week, _ = today.isocalendar()
-    label = f"{year}-W{week:02d}"
+    label = iso_week.of(today)
     volume = ledger.week_volume([row for row in rows if row.week == label])
     since = today - dt.timedelta(days=PAIN_WINDOW_DAYS)
     pains: dict[str, float] = {}

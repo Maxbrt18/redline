@@ -14,31 +14,25 @@ from itertools import pairwise
 from redline.coach import dates
 from redline.coach.fr import plan as text
 
-from . import paths, rulebook, session_kinds, transitions, typography
+from . import formats, iso_week, paths, rulebook, session_kinds, transitions, typography
 from . import program as strength_program
 from .notes import NoteError
 from .program import GATE_SCHEMA as STRENGTH_GATE_SCHEMA
 from .schema import Schema, SchemaError, field
-from .vocabulary import CarbMix, Decider, SessionPriority
+from .vocabulary import (
+    INTENT_STATUSES,
+    SETTLED_STATUSES,
+    CarbMix,
+    Decider,
+    SessionPriority,
+    SessionStatus,
+)
 
-WEEK_RE = r"20\d{2}-W(?:0[1-9]|[1-4]\d|5[0-3])"
-DATE_RE = r"20\d{2}-\d{2}-\d{2}"
-TIME_RE = r"(?:[01]\d|2[0-3]):[0-5]\d"
 STAMP_RE = r"20\d{2}-\d{2}-\d{2}T.+"
 BLOCK = "WEEK_PLAN"
 
 KINDS = tuple(dict.fromkeys(session_kinds.family(slug) for slug in session_kinds.PLANNED))
 WORKOUTS = session_kinds.PLANNED
-INTENT_STATUSES = ("planned", "cancelled")
-# ``done`` exists in the read model rendered from ``session_cycles`` and in historical
-# revisions. A new revision can no longer write it.
-STATUSES = (*INTENT_STATUSES, "done")
-# States that SETTLE a session: it happened or it never will. Either way it belongs to the
-# week's story and is never prescribable again.
-# Written negatively ("not yet settled") rather than positively ("planned") so that a
-# status added later stays prescribable by default: forgetting a session to do is worse
-# than showing one too many.
-SETTLED_STATUSES = frozenset({"done", "cancelled"})
 HARD_WORKOUTS = session_kinds.DEMANDING
 
 
@@ -55,18 +49,18 @@ STRENGTH_SPEC_SCHEMA = Schema("strength modulation", [
 ])
 
 SESSION_SCHEMA = Schema("planned session", [
-    field("id", str, pattern=r"[a-z0-9][a-z0-9-]+"),
+    field("id", str, pattern=formats.KEY),
     # Human-facing text is part of the persisted transaction. Renderers must
     # never maintain a second, incomplete taxonomy of workout labels.
     field("title", str, minimum=1),
-    field("date", str, pattern=DATE_RE, note="YYYY-MM-DD"),
-    field("start_time", str, required=False, pattern=TIME_RE,
+    field("date", str, pattern=formats.DATE, note="YYYY-MM-DD"),
+    field("start_time", str, required=False, pattern=formats.TIME,
           note="HH:MM, the athlete's local time; absent when no slot is set"),
     field("kind", str, choices=KINDS),
     field("workout", str, choices=WORKOUTS),
-    field("routine", str, required=False, pattern=r"[a-z0-9][a-z0-9-]{0,39}",
+    field("routine", str, required=False, pattern=formats.SLUG,
           note="the strength routine, as its note declares it; strength only"),
-    field("status", str, choices=STATUSES),
+    field("status", str, choices=tuple(SessionStatus)),
     field("distance_target_km", float, required=False, minimum=0),
     field("distance_cap_km", float, required=False, minimum=0),
     field("duration_cap_min", int, required=False, minimum=1),
@@ -82,7 +76,7 @@ SESSION_SCHEMA = Schema("planned session", [
           note="what the session weighs when days run short: key is never dropped by a "
                "reorganisation, optional goes first; absent, key when demanding, support "
                "otherwise"),
-    field("transition", str, required=False, pattern=rulebook.SLUG,
+    field("transition", str, required=False, pattern=formats.SLUG,
           note="a kind absent from the window of rule n8, one of the rulebook's; "
                "absent for a session already known"),
     field("location_label", str, required=False),
@@ -113,11 +107,9 @@ GATE_WHEN = ("before", "after")
 #
 # An observation written as a precondition would hold the very session it asks about.
 # A gate must decide, and "before" requires a `holds` that NAMES the held sessions.
-# Legacy rows were normalized once in the database, so the current model has no
-# historical dialect to interpret.
 GATE_SCHEMA = Schema("dated gate", [
-    field("id", str, pattern=r"[a-z0-9][a-z0-9-]+"),
-    field("due", str, pattern=DATE_RE, note="YYYY-MM-DD"),
+    field("id", str, pattern=formats.KEY),
+    field("due", str, pattern=formats.DATE, note="YYYY-MM-DD"),
     field("when", str, choices=GATE_WHEN,
           note="before = precondition, holds the sessions of `holds`; "
                "after = observation, holds nothing"),
@@ -132,8 +124,8 @@ CHANGE_FIELDS = (
     "added", "removed", "title", "date", "start_time", "workout", "status",
     "distance_target_km", "distance_cap_km", "duration_cap_min", "rpe_min",
     "rpe_max", "hr_zone", "cadence_target", "demanding", "priority", "transition",
-    # `calibration` is no longer written; the name stays valid in the `changes` of
-    # existing revisions, which are re-read and validated in full.
+    # `calibration` stays valid: existing revisions carry it in their `changes`, and
+    # they are re-read and validated in full.
     "calibration",
     "carbs_target_g_h", "carbs_mix", "location_label", "strength", "note",
 )
@@ -171,7 +163,7 @@ RESTRICTION_SCHEMA = Schema("restriction premise", [
 ], check=_known_rule)
 
 CHANGE_SCHEMA = Schema("session change evidence", [
-    field("session_id", str, pattern=r"[a-z0-9][a-z0-9-]+"),
+    field("session_id", str, pattern=formats.KEY),
     field("fields", list, minimum=1,
           item=field("field", str, choices=CHANGE_FIELDS)),
     field("trigger", str, minimum=3,
@@ -213,7 +205,7 @@ DECISION_SCHEMA = Schema("decision", [
 
 #: Computed by the engine when the revision is written (`analysis.decision_state`).
 STATE_SNAPSHOT_SCHEMA = Schema("decision state", [
-    field("as_of", str, pattern=r"\d{4}-\d{2}-\d{2}"),
+    field("as_of", str, pattern=formats.DATE),
     field("week_km_done", float, minimum=0),
     field("pain_max_7d", dict),
     field("daily", dict, required=False),
@@ -258,7 +250,7 @@ PROPOSALS_SCHEMA = Schema("proposals", [
 ])
 
 WEEKLY_PLAN_SCHEMA = Schema("weekly plan", [
-    field("week", str, pattern=WEEK_RE, note="YYYY-WNN"),
+    field("week", str, pattern=iso_week.PATTERN, note="YYYY-WNN"),
     field("revisions", list, minimum=1,
           item=field("revision", dict, schema=REVISION_SCHEMA)),
 ])
@@ -267,27 +259,10 @@ WEEKLY_PLAN_SCHEMA = Schema("weekly plan", [
 def now_stamp() -> str:
     """The real instant of the write, in local time with its offset.
 
-    A single function, patchable in tests and called from one place only:
-    `redline week-plan revise`. The `computed_at` field used to be filled by the model, which
-    has no clock -- see the comment in `revise`.
+    A single function, patchable in tests. `computed_at` is the engine's, never the
+    model's: the model has no clock.
     """
     return dt.datetime.now().astimezone().replace(microsecond=0).isoformat()
-
-
-def current_week(today: dt.date | None = None) -> str:
-    iso = (today or dt.date.today()).isocalendar()
-    return f"{iso.year}-W{iso.week:02d}"
-
-
-def next_week(today: dt.date | None = None) -> str:
-    day = (today or dt.date.today()) + dt.timedelta(days=7)
-    return current_week(day)
-
-
-def _week_dates(week: str) -> set[str]:
-    year, number = week.split("-W")
-    monday = dt.date.fromisocalendar(int(year), int(number), 1)
-    return {(monday + dt.timedelta(days=i)).isoformat() for i in range(7)}
 
 
 # `title` and `note` are the ONLY two revision fields sent verbatim to the athlete --
@@ -337,10 +312,9 @@ def written_text_errors(revision: dict, where: str = "revision") -> list[str]:
                 problems += typography.errors(
                     gate[label], f"{where}.gate[{gate.get('id', '?')}]", label)
         # Walking is never asked about: the athlete reports any discomfort unprompted.
-        # A precondition no longer holds any session: blocking gates never failed on their
-        # criterion, and nearly all session changes came from an athlete message. The
-        # condition is written in the session itself, and the logbook's "clear" alert
-        # triggers it.
+        # A precondition holds no session: blocking gates do not fail on their criterion,
+        # and session changes come from athlete messages. The condition is written in the
+        # session itself, and the logbook's "clear" alert triggers it.
         if gate.get("when") == "before":
             problems.append(
                 f"{where}.gate[{gate.get('id', '?')}]: a precondition no longer holds a "
@@ -379,7 +353,7 @@ def typed_target_errors(revision: dict, where: str = "revision") -> list[str]:
     what was run.
     """
     runs = [session for session in revision.get("sessions") or []
-            if session.get("kind") == "run" and session.get("status") != "cancelled"]
+            if session.get("kind") == "run" and session.get("status") != SessionStatus.CANCELLED]
     problems = []
     if runs and revision.get("volume_target_km") is None:
         problems.append(f"{where}.volume_target_km: missing -- the running volume targeted "
@@ -393,7 +367,7 @@ def typed_target_errors(revision: dict, where: str = "revision") -> list[str]:
         f"{where}.{session.get('id', '?')}.hr_cap_bpm: missing -- the AVERAGE heart "
         f"rate cap in bpm that hr_zone `{session['hr_zone']}` states in words"
         for session in revision.get("sessions") or []
-        if session.get("status") != "cancelled" and session.get("hr_zone")
+        if session.get("status") != SessionStatus.CANCELLED and session.get("hr_zone")
         and session.get("hr_cap_bpm") is None)
     return problems
 
@@ -412,7 +386,8 @@ def _session_errors(session: dict, where: str) -> list[str]:
         problems.append(f"{where}: kind must be {session_kinds.family(workout)} "
                         f"for {workout}")
     expected_hard = (workout in HARD_WORKOUTS
-                     or (workout == session_kinds.EASY and duration > 75))
+                     or (workout == session_kinds.EASY
+                         and duration > rulebook.current().parameters.hard_min_hours * 60))
     if session.get("demanding") != expected_hard:
         problems.append(
             f"{where}: demanding must be {str(expected_hard).lower()} for {workout}")
@@ -443,7 +418,7 @@ def _strength_program_errors(session: dict, where: str) -> list[str]:
 
     The schema proves the shape of ``strength``; only ``Program.build`` can prove that
     its variant and exercises exist. Only the active revision is validated: append-only
-    history may hold an old error that can no longer be fixed, but a new revision must
+    history may hold an old error that cannot be fixed, but a new revision must
     never activate it.
     """
     if session.get("workout") != session_kinds.STRENGTH or not session.get("routine"):
@@ -506,12 +481,11 @@ def semantic_errors(plan: dict, where: str = "weekly_plan",
     if problems:
         return problems
     week = plan["week"]
-    allowed = _week_dates(week)
+    allowed = {day.isoformat() for day in iso_week.dates(week)}
     # Strength resolves against the current program: this is a prescription guard.
     # A closed week has nothing left to prescribe, and the program may have changed since
     # -- judging it that way would make its archive unreadable.
-    prescribable = dt.date.fromisocalendar(int(week[:4]), int(week[-2:]), 7) \
-        >= (today or dt.date.today())
+    prescribable = iso_week.sunday(week) >= (today or dt.date.today())
     revisions = plan["revisions"]
     numbers = [revision["revision"] for revision in revisions]
     if numbers != list(range(1, len(numbers) + 1)):
@@ -561,7 +535,7 @@ def semantic_errors(plan: dict, where: str = "weekly_plan",
             problems.extend(_gate_typing_errors(gate, where_gate, sessions))
 
         hard_days = sorted({dt.date.fromisoformat(s["date"]) for s in sessions
-                            if s["status"] != "cancelled" and s["demanding"]})
+                            if s["status"] != SessionStatus.CANCELLED and s["demanding"]})
         for first, second in pairwise(hard_days):
             if (second - first).days == 1:
                 problems.append(
@@ -575,7 +549,7 @@ def _spacing_errors(sessions: list[dict], prefix: str) -> list[str]:
         routines = strength_program.load(paths.vault_root()).sessions
     except NoteError:
         return []   # the program error itself is reported by _strength_program_errors
-    active = [s for s in sessions if s["status"] != "cancelled"]
+    active = [s for s in sessions if s["status"] != SessionStatus.CANCELLED]
     problems, seen = [], set()
     for session in active:
         gaps = (routines.get(session.get("routine") or "") or {}).get("min_gap_h") or {}
@@ -611,16 +585,15 @@ def scheduled(sessions: list[dict]) -> list[dict]:
     DESCRIPTIVE view -- it tells the week's story, completed sessions included. It is the
     one used by the journal, the card and the hot-cache.
     """
-    return [session for session in sessions if session["status"] != "cancelled"]
+    return [session for session in sessions if session["status"] != SessionStatus.CANCELLED]
 
 
 def remaining(sessions: list[dict], *, since: str = "") -> list[dict]:
     """What REMAINS to do from `since`: the PRESCRIPTIVE view.
 
-    A completed or cancelled session commits to nothing, and that rule must live in one
-    place only. Each rendering of the same object used to filter on its own, and the most
-    assertive one ("the rest of the week") filtered on DATE alone, handing back a session
-    already done. A rendering never redefines what a session to do is; it asks here.
+    A completed or cancelled session commits to nothing, and that rule lives in one place
+    only: a rendering never redefines what a session to do is, nor filters on date alone;
+    it asks here.
 
     `since` is an INCLUSIVE bound: the current day stays prescribable until its session
     is done.
@@ -739,7 +712,7 @@ def _session_line(session: dict) -> str:
     day = dt.date.fromisoformat(session["date"])
     label = dates.weekday(day).capitalize()
     suffix = " · ".join(details_of(session, cadence_unit=text.CADENCE_UNIT))
-    status = text.DONE if session["status"] == "done" else session["status"]
+    status = text.DONE if session["status"] == SessionStatus.DONE else session["status"]
     if session.get("transition"):
         status += text.WITH_TRANSITION.format(label=transitions.label(session["transition"]))
     line = text.SESSION_LINE.format(day=label, date=f"{day:%d/%m}", title=session["title"],
@@ -779,9 +752,7 @@ def journal_skeleton(week: str, today: dt.date) -> str:
     Obsidian. The structure follows the existing journals; the program block is filled
     right after by the projection.
     """
-    year, number = week.split("-W")
-    monday = dt.date.fromisocalendar(int(year), int(number), 1)
-    sunday = monday + dt.timedelta(days=6)
+    monday, sunday = iso_week.monday(week), iso_week.sunday(week)
     span = (f"{monday.day}-{dates.day_month(sunday)}" if monday.month == sunday.month
             else f"{dates.day_month(monday)} - {dates.day_month(sunday)}")
     frontmatter = f"---\ntype: weekly-review\nweek: {week}\nupdated: {today.isoformat()}\n---\n\n"
@@ -844,8 +815,8 @@ def _changed_session_fields(previous: dict | None, current: dict,
         # `intention_errors` requires `planned` on write. A session done earlier today
         # must therefore not count as "changed", or it would demand an impossible
         # justification and block every revision of the day.
-        if old.get("status") == "done" and new.get("status") == "planned":
-            old = {**old, "status": "planned"}
+        if old.get("status") == SessionStatus.DONE and new.get("status") == SessionStatus.PLANNED:
+            old = {**old, "status": SessionStatus.PLANNED}
         fields = {name for name in CHANGE_FIELDS if name not in {"added", "removed"}
                   and old.get(name) != new.get(name)}
         if fields:
@@ -857,13 +828,13 @@ def restrictions(old: dict, new: dict | None) -> list[str]:
     """What, from one revision to the next, REMOVES from a future session.
 
     Adding, moving or lengthening is not one: only restriction needs a typed premise.
-    An already cancelled session is no longer restricted.
+    An already cancelled session cannot be restricted further.
     """
-    if old.get("status") == "cancelled":
+    if old.get("status") == SessionStatus.CANCELLED:
         return []
     if new is None:
         return ["removed"]
-    if new.get("status") == "cancelled":
+    if new.get("status") == SessionStatus.CANCELLED:
         return ["cancelled"]
     found = []
     old_cap, new_cap = old.get("distance_cap_km"), new.get("distance_cap_km")
@@ -929,7 +900,7 @@ def fuelling_errors(revision: dict, where: str = "revision") -> list[str]:
     problems = []
     for session in revision.get("sessions") or []:
         target = session.get("carbs_target_g_h")
-        if target is None or session.get("status") == "cancelled":
+        if target is None or session.get("status") == SessionStatus.CANCELLED:
             continue
         label = f"{where}.{session.get('id', '?')}"
         if cap is not None and target > cap:
@@ -982,7 +953,7 @@ def pain_rule_errors(revision: dict, holds: list[QualityHold],
     written_on = str(revision.get("computed_at") or now_stamp())[:10]
     problems = []
     for session in revision.get("sessions") or []:
-        if (session.get("status") == "cancelled" or not _is_quality(session)
+        if (session.get("status") == SessionStatus.CANCELLED or not _is_quality(session)
                 or session.get("date", "") < written_on):
             continue
         for hold in holds:
@@ -1088,7 +1059,7 @@ def revision_diff(previous: dict | None, current: dict) -> list[str]:
             lines.append(text.DIFF["added"].format(**values))
         elif old["date"] != session["date"]:
             lines.append(text.DIFF["moved"].format(**values, old_day=_day_label(old["date"])))
-        elif session["status"] == "cancelled" and old["status"] != "cancelled":
+        elif session["status"] == SessionStatus.CANCELLED and old["status"] != SessionStatus.CANCELLED:
             lines.append(text.DIFF["cancelled"].format(**values))
         elif _comparable(old) != _comparable(session):
             lines.append(text.DIFF["modified"].format(**values))
@@ -1101,7 +1072,7 @@ def revision_diff(previous: dict | None, current: dict) -> list[str]:
 
 def revision_week_lines(week: str, revision: dict) -> list[str]:
     """The resulting week, one day per line, empty and cancelled days included."""
-    monday = dt.date.fromisocalendar(int(week[:4]), int(week[-2:]), 1)
+    monday = iso_week.monday(week)
     by_day: dict[str, list[dict]] = {}
     for session in revision.get("sessions", []):
         by_day.setdefault(session["date"], []).append(session)
@@ -1110,7 +1081,7 @@ def revision_week_lines(week: str, revision: dict) -> list[str]:
         day = monday + dt.timedelta(days=offset)
         same = by_day.get(day.isoformat(), [])
         sessions = " + ".join(
-            s["title"] + ("" if s["status"] == "planned"
+            s["title"] + ("" if s["status"] == SessionStatus.PLANNED
                           else text.SESSION_STATUS.format(status=s["status"]))
             for s in same) or text.NO_SESSION
         lines.append(text.WEEK_DAY.format(day=_day_label(day.isoformat()), sessions=sessions))
@@ -1153,10 +1124,10 @@ def orphan_sessions(previous: dict | None, current: dict) -> list[str]:
         by_day.setdefault(session["date"], []).append(session)
     orphans = []
     for stamp, same in sorted(by_day.items()):
-        if any(s["status"] != "cancelled" for s in same):
+        if any(s["status"] != SessionStatus.CANCELLED for s in same):
             continue
         fresh = [s for s in same
-                  if before.get(s["id"], {}).get("status") != "cancelled"]
+                  if before.get(s["id"], {}).get("status") != SessionStatus.CANCELLED]
         if fresh:
             orphans.append(text.ORPHAN_DAY.format(
                 day=_day_label(stamp), titles=", ".join(s["title"] for s in fresh)))

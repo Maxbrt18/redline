@@ -84,6 +84,7 @@ def test_a_list_split_by_blank_lines_is_still_one_bubble():
 def test_the_explicit_separator_still_cuts():
     """`---` survives as the way to force a cut where no blank line exists."""
     assert burst_parts("Premier\n---\nDeuxième") == ["Premier", "Deuxième"]
+    assert burst_parts("Premier\n---\n   \n---\nDeuxième") == ["Premier", "Deuxième"]
 
 
 def test_paragraphs_are_capped_like_blocks():

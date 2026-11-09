@@ -8,8 +8,9 @@ from typing import Any
 import sqlalchemy as sa
 from sqlalchemy.engine import Connection
 
-from redline.model import ledger, local_time, session_kinds
+from redline.model import iso_week, ledger, local_time, session_kinds
 from redline.model.activity import Activity
+from redline.model.vocabulary import CycleState, EnrichmentState, MeasurementState
 
 from ..database import StorageError
 from ..schema import (
@@ -20,10 +21,58 @@ from ..schema import (
     strava_activity_intakes,
     weekly_plans,
 )
-from ._common import StoreBase, _audit, _plain
+from ._common import _audit, _plain
+from .observations import Observations
 
 
-class SessionCycles(StoreBase):
+class SessionCycles(Observations):
+    @staticmethod
+    def _strava_measurements(activity: Activity,
+                             intake: dict | None = None) -> dict[str, dict[str, Any]]:
+        measurements: dict[str, dict[str, Any]] = {
+            "rpe": {"state": MeasurementState.PENDING}, "enjoyment": {"state": MeasurementState.PENDING},
+            "elevation_loss_m": {"state": MeasurementState.PENDING},
+            "wbgt_c": ({"state": MeasurementState.PENDING} if activity.weather_query
+                       else {"state": MeasurementState.UNAVAILABLE}),
+        }
+        raw = {
+            "distance_km": ("km", activity.distance_km),
+            "duration_s": (None, activity.moving_s or None),
+            "pace_s_per_km": (None, activity.pace_s_per_km),
+            "hr_avg_bpm": ("hr_avg", activity.hr_avg_bpm),
+            "hr_max_bpm": ("hr_max", activity.hr_max_bpm),
+            "cadence_spm": ("cadence", activity.cadence_spm or activity.cadence_rpm),
+            "elevation_gain_m": ("dplus", activity.elevation_gain_m),
+        }
+        for metric, (field, value) in raw.items():
+            if value is None:
+                continue
+            if field:
+                canonical = ledger.canonical_value(field, str(value))
+                value = float(canonical)
+                if ledger.input_field(field).decimals == 0:
+                    value = int(value)
+            measurements[metric] = {"state": MeasurementState.KNOWN, "value": value}
+        if intake:
+            for prefix, metric in (("elevation_loss", "elevation_loss_m"),
+                                   ("wbgt", "wbgt_c")):
+                state = intake.get(f"{prefix}_state")
+                if state == EnrichmentState.KNOWN:
+                    measurements[metric] = {
+                        "state": MeasurementState.KNOWN, "value": intake[f"{prefix}_value"]}
+                elif state == EnrichmentState.UNAVAILABLE:
+                    measurements[metric] = {"state": MeasurementState.UNAVAILABLE}
+        return measurements
+
+    @staticmethod
+    def _observation_kind_for_workout(workout: str) -> str | None:
+        kind = session_kinds.BY_SLUG.get(workout)
+        return workout if kind is not None and kind.recorded else None
+
+    @staticmethod
+    def _compatible_workouts(sport: str) -> tuple[str, ...]:
+        return session_kinds.planned_for_sport(sport)
+
     @staticmethod
     def _split_session_key(session_key: str) -> tuple[str, str]:
         try:
@@ -51,10 +100,6 @@ class SessionCycles(StoreBase):
             raise StorageError(f"unknown session: {session_key}")
         return row
 
-    def declare_session_start(self, payload: dict, *, actor: str = "application") -> None:
-        with self.database.transaction() as connection:
-            self.declare_session_start_in(connection, payload, actor=actor)
-
     def declare_session_start_in(self, connection: Connection, payload: dict,
                                  *, actor: str) -> None:
         cycle = self._cycle_by_key_in(connection, payload["session_key"], lock=True)
@@ -67,8 +112,8 @@ class SessionCycles(StoreBase):
             session_cycles.c.id == cycle["id"]).values(
                 declared_started_at=declared_at,
                 started_at=cycle["observed_started_at"] or declared_at,
-                state=(cycle["state"] if cycle["state"] in {"completed", "closed"}
-                       else "started"), updated_at=sa.func.now()))
+                state=(cycle["state"] if cycle["state"] in {CycleState.COMPLETED, CycleState.CLOSED}
+                       else CycleState.STARTED), updated_at=sa.func.now()))
         _audit(connection, actor, "session.started.declared", "session_cycle", cycle["id"],
                {"declared_at": declared_at.isoformat()})
 
@@ -91,7 +136,7 @@ class SessionCycles(StoreBase):
         ).join(weekly_plans, weekly_plans.c.id == session_cycles.c.plan_id).where(
             session_cycles.c.athlete_id == self.athlete_id,
             session_cycles.c.observation_id.is_(None),
-            session_cycles.c.state.not_in(("cancelled", "closed")),
+            session_cycles.c.state.not_in((CycleState.CANCELLED, CycleState.CLOSED)),
             planned_sessions.c.scheduled_on == local_day,
             planned_sessions.c.workout == workout,
         )
@@ -106,13 +151,7 @@ class SessionCycles(StoreBase):
         if len(candidates) != 1:
             return None
         self._link_cycle_observation_in(connection, candidates[0], observation, actor=actor)
-        return f"{local_day.isocalendar().year}-W{local_day.isocalendar().week:02d}:" \
-               f"{candidates[0]['logical_key']}"
-
-    def match_session(self, session_key: str, strava_activity_id: int,
-                      *, actor: str = "application") -> None:
-        with self.database.transaction() as connection:
-            self.match_session_in(connection, session_key, strava_activity_id, actor=actor)
+        return f"{iso_week.of(local_day)}:{candidates[0]['logical_key']}"
 
     def match_session_in(self, connection: Connection, session_key: str,
                          strava_activity_id: int, *, actor: str) -> None:
@@ -175,9 +214,9 @@ class SessionCycles(StoreBase):
             connection.execute(observation_metrics.update().where(
                 observation_metrics.c.observation_id == observation["id"],
             ).values({observation_metrics.c[f"{metric}_state"]: sa.case(
-                (observation_metrics.c[f"{metric}_state"] == "known", "known"),
-                else_="pending") for metric in ledger.FUELLING_ASKED}))
-        state = "completed"
+                (observation_metrics.c[f"{metric}_state"] == MeasurementState.KNOWN, MeasurementState.KNOWN),
+                else_=MeasurementState.PENDING) for metric in ledger.FUELLING_ASKED}))
+        state = CycleState.COMPLETED
         connection.execute(session_cycles.update().where(
             session_cycles.c.id == cycle["id"]).values(
                 observation_id=observation["id"], observed_started_at=observed_at,
@@ -245,7 +284,7 @@ class SessionCycles(StoreBase):
                                   ).where(
                                       session_cycles.c.athlete_id == self.athlete_id,
                                       session_cycles.c.observation_id.is_(None),
-                                      session_cycles.c.state.not_in(("cancelled", "closed")),
+                                      session_cycles.c.state.not_in((CycleState.CANCELLED, CycleState.CLOSED)),
                                       planned_sessions.c.scheduled_on == local_day,
                                       planned_sessions.c.workout == workout,
                                   ).order_by(weekly_plans.c.iso_week,

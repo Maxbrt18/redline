@@ -20,7 +20,8 @@ from itertools import combinations
 
 from redline.coach.fr import transitions as text
 
-from . import rulebook
+from . import iso_week, rulebook
+from .vocabulary import SessionStatus
 
 #: An untyped, derived novelty: a long outing beyond the longest of the last 30 days. It
 #: is not a transition but an easy increase, which goes through the observable gate and
@@ -39,32 +40,10 @@ def label(kind: str) -> str:
     return rulebook.current().label(kind)
 
 
-# ------------------------------------------------------------------ ISO weeks
-
-def week_of(day: dt.date) -> str:
-    year, number, _ = day.isocalendar()
-    return f"{year}-W{number:02d}"
-
-
-def monday_of(week: str) -> dt.date:
-    year, number = week.split("-W")
-    return dt.date.fromisocalendar(int(year), int(number), 1)
-
-
-def shift(week: str, weeks: int) -> str:
-    return week_of(monday_of(week) + dt.timedelta(weeks=weeks))
-
-
-def short(week: str) -> str:
-    return week.split("-")[1]
-
-
 def day_of(value: dt.date | str) -> dt.date:
     """A session date: ISO text in the JSON, `date` in a turn command."""
     return value if isinstance(value, dt.date) else dt.date.fromisoformat(value)
 
-
-# ------------------------------------------------------------------ windows
 
 @dataclass(frozen=True)
 class Transition:
@@ -74,7 +53,7 @@ class Transition:
 
     @property
     def week(self) -> str:
-        return week_of(self.day)
+        return iso_week.of(self.day)
 
     def __str__(self) -> str:
         return text.SESSION_FIRST.format(label=label(self.kind), day=self.day, session_id=self.session_id)
@@ -89,10 +68,10 @@ def opened(sessions: list[dict], as_of: dt.date) -> list[Transition]:
     found = []
     for session in sessions:
         kind = session.get("transition")
-        if not kind or session.get("status") == "cancelled":
+        if not kind or session.get("status") == SessionStatus.CANCELLED:
             continue
         day = day_of(session["date"])
-        if session.get("status") == "done" or day >= as_of:
+        if session.get("status") == SessionStatus.DONE or day >= as_of:
             found.append(Transition(kind, day, session["id"]))
     return found
 
@@ -106,15 +85,13 @@ def per_week_errors(sessions: list[dict], where: str) -> list[str]:
                 for session in sessions
                 if session.get("transition") and session["transition"] not in book.kinds]
     typed = [session for session in sessions
-             if session.get("transition") and session.get("status") != "cancelled"]
+             if session.get("transition") and session.get("status") != SessionStatus.CANCELLED]
     allowed = book.parameters.transitions_per_week
     if len(typed) <= allowed:
         return problems
     names = ", ".join(f"{s['id']} ({s['transition']})" for s in typed)
     return [*problems, f"{where}: {len(typed)} transitions in the week ({names}), rule n8: {allowed} at most"]
 
-
-# ------------------------------------------------------------------ backward solver
 
 @dataclass(frozen=True)
 class Problem:
@@ -145,7 +122,7 @@ class Schedule:
 
     def line(self, weeks: tuple[str, ...]) -> str:
         return " ; ".join(
-            f"{short(week)} " + (" + ".join(label(item) for item in self.novelties[week])
+            f"{iso_week.short(week)} " + (" + ".join(label(item) for item in self.novelties[week])
                                  or text.NOTHING_NEW)
             for week in weeks)
 
@@ -235,12 +212,12 @@ def _option_lines(option: Option, weeks: tuple[str, ...], prefix: str) -> list[s
 def render(verdict: Verdict) -> list[str]:
     """The verdict as sent to the review: short, assumptions included."""
     problem = verdict.problem
-    lines = [text.RENDER_HEADER.format(race_on=problem.race_on, taper_start=short(problem.taper[0]), taper_end=short(problem.taper[-1]))]
+    lines = [text.RENDER_HEADER.format(race_on=problem.race_on, taper_start=iso_week.short(problem.taper[0]), taper_end=iso_week.short(problem.taper[-1]))]
     if not problem.weeks:
         return [*lines, text.RENDER_NO_WEEK]
-    assimilation = [short(w) for w in problem.weeks if w in problem.assimilation]
+    assimilation = [iso_week.short(w) for w in problem.weeks if w in problem.assimilation]
     lines.append(
-        text.RENDER_WEEKS.format(first=short(problem.weeks[0]), last=short(problem.weeks[-1]))
+        text.RENDER_WEEKS.format(first=iso_week.short(problem.weeks[0]), last=iso_week.short(problem.weeks[-1]))
         + (text.RENDER_ASSIMILATION.format(weeks=", ".join(assimilation)) if assimilation else "")
         + text.RENDER_FIRSTS
         + (", ".join(label(k) for k in problem.required) or text.NO_FIRST)
@@ -248,7 +225,7 @@ def render(verdict: Verdict) -> list[str]:
            if problem.done else "") + ".")
     if problem.fixed:
         lines.append(text.RENDER_FIXED + " ; ".join(
-            f"{short(w)} " + (" + ".join(label(i) for i in items) or text.NOTHING_NEW)
+            f"{iso_week.short(w)} " + (" + ".join(label(i) for i in items) or text.NOTHING_NEW)
             for w, items in sorted(problem.fixed.items())) + ".")
     lines.append(text.RENDER_ASSUMPTIONS.format(transitions_per_week=rulebook.current().parameters.transitions_per_week))
     if verdict.feasible:

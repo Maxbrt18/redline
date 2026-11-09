@@ -1,10 +1,9 @@
-#!/usr/bin/env python3
 """Weak signals, computed: the half of section D of `coaching/protocols.md` that
 can be read from the ledger.
 
-`protocols.md` lists five checks "that cannot lie". None was **computed**: they relied on
-the coach remembering them when rereading on a Sunday. This is the mechanism meant to catch
-the injury before the athlete admits it.
+`protocols.md` lists five checks "that cannot lie". This module computes them, so they do
+not rely on the coach remembering them at the Sunday review: it is meant to catch the
+injury before the athlete admits it.
 
 **What this script does NOT do, and why.** Four of the checks in section D live in Strava,
 not in the ledger: downhill pace on reference segments, shortened routes, unusual pauses at
@@ -21,16 +20,14 @@ doctrine as the gauge: "warning signal, never a guillotine".
 
 from __future__ import annotations
 
-import argparse
 import datetime as dt
 import statistics
 from dataclasses import dataclass
-from pathlib import Path
 
 from redline.analysis import ledger as gauge
 from redline.coach.fr import signals as text
 from redline.model import (
-    paths,
+    iso_week,
     session_kinds,
 )
 
@@ -45,14 +42,14 @@ EASY_TYPES = session_kinds.EASY_RUNS
 # make a group run or a race look like a calm week, and that is exactly the kind of run
 # that makes the load spike.
 RUN_TYPES = session_kinds.RUN
-# Enjoyment is no longer a signal: the claim that it drops one or two runs before pain is
-# admitted had no source and was never verified in the ledger.
-# The longest run has NO jump signal any more: no fixed percentage judges its progression
-# (see `src/redline/model/rulebook.py`). It is still displayed, and its STAGNATION is
-# still reported (scenario 9).
+# Enjoyment is not a signal: the claim that it drops one or two runs before pain is
+# admitted has no source and is not verified in the ledger.
+# The longest run has NO jump signal: no fixed percentage judges its progression
+# (see `src/redline/model/rulebook.py`). It is displayed, and its STAGNATION is
+# reported (scenario 9).
 
-# COMPUTED ALARM no. 4. "Abnormally high HR on an easy run" is the marker that preceded the
-# earlier collapse by one to two weeks; it was computed nowhere. A flat easy run is
+# COMPUTED ALARM no. 4. "Abnormally high HR on an easy run" is a marker that can precede a
+# breakdown by one to two weeks. A flat easy run is
 # compared to its neighbours at the same PACE, never to a global average: otherwise we
 # would be measuring pace.
 HR_DRIFT_BPM = 6            # above the noise of a session-average HR
@@ -75,7 +72,7 @@ class Signal:
         return text.FLAG.format(label=self.label, detail=self.detail)
 
 
-def _weeks(rows: list, count: int) -> list:
+def recent_weeks(rows: list, count: int) -> list:
     """The last `count` week labels present in the ledger, in order."""
     return sorted({row.week for row in rows})[-count:]
 
@@ -96,7 +93,7 @@ def intentional_cadence_keys(store: gauge.LedgerStore) -> frozenset[str]:
 def current(store: gauge.LedgerStore, count: int = 4) -> list:
     """The signals of the last `count` ledger weeks, as every reader sees them."""
     rows = gauge.parse_ledger(store)
-    weeks = _weeks(rows, count)
+    weeks = recent_weeks(rows, count)
     return signals(rows, weeks, intentional_cadence_keys(store)) if weeks else []
 
 
@@ -191,18 +188,13 @@ def signals(rows: list, weeks: list, intentional_keys: frozenset[str]) -> list:
                 text.CADENCE_UP_DETAIL.format(before=before, now=now, label=label)))
 
     drifts = hr_at_pace(rows)
-    recent = [drift for drift in drifts if drift_week(drift) in weeks]
+    recent = [drift for drift in drifts if iso_week.of(drift.date) in weeks]
     if len(recent) >= 2 and all(drift.delta >= HR_DRIFT_BPM for drift in recent[-2:]):
         found.append(Signal(
             text.HR_HIGH,
             " ; ".join(str(drift) for drift in recent[-2:]) + text.HR_HIGH_DETAIL))
 
     return found
-
-
-def drift_week(drift: HrDrift) -> str:
-    year, week, _ = drift.date.isocalendar()
-    return f"{year}-W{week:02d}"
 
 
 def render(rows: list, weeks: list, intentional_keys: frozenset[str],
@@ -218,7 +210,7 @@ def render(rows: list, weeks: list, intentional_keys: frozenset[str],
     stall = gauge.long_run_stall(rows, today or dt.date.today())
     if stall:
         lines.append(f"  {stall}")
-    drifts = [drift for drift in hr_at_pace(rows) if drift_week(drift) in weeks]
+    drifts = [drift for drift in hr_at_pace(rows) if iso_week.of(drift.date) in weeks]
     lines.append(text.HR_AT_PACE_ROW + (" · ".join(
         f"{drift.date:%d/%m} {drift.delta:+.0f}" for drift in drifts)
         or text.NO_COMPARABLE))
@@ -228,22 +220,3 @@ def render(rows: list, weeks: list, intentional_keys: frozenset[str],
     lines += ["", text.STRAVA_CHECKS,
               text.STRAVA_CHECKS_END, ""]
     return "\n".join(lines)
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--root", default=paths.vault_root(), type=Path)
-    parser.add_argument("--weeks", dest="weeks", type=int, default=4)
-    args = parser.parse_args()
-
-    store = gauge.open_store()
-    rows = gauge.parse_ledger(store)
-    intentional = intentional_cadence_keys(store)
-    weeks = _weeks(rows, args.weeks)
-    if not weeks:
-        print(text.EMPTY_LEDGER)
-        return 1
-    print(render(rows, weeks, intentional))
-    return 0
-

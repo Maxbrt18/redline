@@ -323,8 +323,6 @@ def create_app(config: Config, bot: TurnWorker, state: Any,
             hasten_debrief(activity_id, "title renamed")
         return "ok", 200
 
-    # ---- interactive strength session
-
     session_html, session_etag = page.build(render.CARDS_DIR, cues,
                                             session_labels.for_page())
 

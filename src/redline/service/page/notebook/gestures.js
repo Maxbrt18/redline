@@ -5,7 +5,6 @@ import {animate, freeze, freezeBar, leave, pageNode, paintMove, render, startMov
 import {ensure, refresh} from './data.js';
 import {sheetShown} from './sheet.js';
 
-// ------------------------------------------------------------ pull to refresh
 // The iOS PWA has none: at the top of the page, pulling past the threshold recomputes all.
 const ptr = $('ptr');
 const PULL = 64;
@@ -37,7 +36,6 @@ window.addEventListener('touchend', async () => {
   pulled(0);
 });
 
-// ------------------------------------------------------------ swipe back
 // From anywhere on the screen, as since iOS 26: a clearly horizontal rightward gesture.
 // Released past halfway or with momentum, the screen leaves; otherwise it returns, at
 // the same height. A field or sideways-scrolling content keeps its gesture.

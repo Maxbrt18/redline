@@ -9,11 +9,9 @@ from __future__ import annotations
 import datetime as dt
 from dataclasses import dataclass
 
+from . import formats, iso_week
 from .schema import Schema, SchemaError, field
 from .vocabulary import DayKind, GroupPace
-
-DATE_RE = r"20\d{2}-\d{2}-\d{2}"
-SESSION_RE = r"[a-z0-9][a-z0-9-]+"
 
 #: The fields each kind of day carries; every other optional field is refused.
 DETAILS: dict[DayKind, tuple[str, ...]] = {
@@ -53,7 +51,7 @@ STATE_FIELDS = [
           note="other_sport: a run may still go on that day"),
 ]
 
-DAY_SCHEMA = Schema("day", [field("date", str, pattern=DATE_RE, note="YYYY-MM-DD"),
+DAY_SCHEMA = Schema("day", [field("date", str, pattern=formats.DATE, note="YYYY-MM-DD"),
                             *STATE_FIELDS], check=_coherent)
 
 
@@ -68,8 +66,8 @@ HABIT_SCHEMA = Schema("habit", [field("weekday", int, minimum=1, maximum=7,
                                 *STATE_FIELDS], check=_a_habit_changes_something)
 
 PIN_SCHEMA = Schema("pinned session", [
-    field("session", str, pattern=SESSION_RE, note="the id of a session of the plan"),
-    field("date", str, pattern=DATE_RE, note="YYYY-MM-DD"),
+    field("session", str, pattern=formats.KEY, note="the id of a session of the plan"),
+    field("date", str, pattern=formats.DATE, note="YYYY-MM-DD"),
 ])
 
 REQUEST_SCHEMA = Schema("reorganisation request", [
@@ -111,15 +109,10 @@ class Request:
         return self.days.get(date) or Day(date, DayKind.AS_PLANNED)
 
 
-def week_dates(week: str) -> tuple[dt.date, ...]:
-    monday = dt.date.fromisocalendar(int(week[:4]), int(week[-2:]), 1)
-    return tuple(monday + dt.timedelta(days=offset) for offset in range(7))
-
-
 def parse(payload: object, week: str) -> Request:
     """A request read once at the boundary: dates inside `week`, each day stated once."""
     clean = REQUEST_SCHEMA.validate(payload, "request")
-    dates = set(week_dates(week))
+    dates = set(iso_week.dates(week))
     problems, days, pins = [], {}, {}
     for entry in clean["days"]:
         date = dt.date.fromisoformat(entry["date"])
@@ -175,7 +168,7 @@ def effective(week: str, habits: list[dict], stated: list[dict], request: Reques
     """Each day as it stands: what was just touched, else what was stated for it, else its
     habit. A day stated as planned clears its habit for that week."""
     days: dict[dt.date, Day] = {}
-    for date in week_dates(week):
+    for date in iso_week.dates(week):
         habit = habit_on(habits, date)
         if habit is not None:
             days[date] = from_row(date, habit, habit=True)

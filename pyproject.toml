@@ -93,8 +93,6 @@ min_confidence = 60
 # Flask routes: called by the framework, never by the code.
 ignore_decorators = ["@app.get", "@app.post", "@app.before_request", "@app.after_request", "@app.errorhandler"]
 ignore_names = [
-    # Lazy loading of the `redline.storage` package (PEP 562).
-    "__getattr__",
     # Declaration of the triggers the database must carry, checked against it.
     "TRIGGERS",
     # Named carrier of each rule of the compiled rulebook (CLAUDE.md, "a general rule

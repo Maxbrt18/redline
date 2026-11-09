@@ -1,5 +1,10 @@
 """Names of the transactional intents understood by the storage layer."""
 
+from __future__ import annotations
+
+import hashlib
+import json
+
 OBSERVATION_ADD = "observation.add"
 ACTIVITY_LINK = "activity.link"
 MEASUREMENT_COMPLETE = "measurement.complete"
@@ -34,3 +39,10 @@ ACTIVE = (
     PROACTIVE_ANGLE,
     GEAR_UPSERT, PREDICTION_UPSERT, CORRECTION_REGISTER, PERMIT_SEAL, PLAN_PROPOSE,
 )
+
+
+def digest(payload: dict) -> str:
+    """A short fingerprint of a payload: two commands with the same content share it."""
+    canonical = json.dumps(payload, default=lambda value: value.isoformat(), ensure_ascii=False,
+                           sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode()).hexdigest()[:16]

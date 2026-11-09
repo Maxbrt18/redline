@@ -75,14 +75,15 @@ def test_the_check_asks_about_the_activity_of_this_very_job(make_bot, client):
     bot._repo.activity_recorded.assert_called_with(ACTIVITY)
 
 
-def test_a_recorded_activity_raises_nothing(make_bot, client):
+def test_a_recorded_activity_raises_nothing(make_bot, client, caplog):
     """The negative control: a debrief that does its job produces no noise."""
     bot = _bot(make_bot, client, recorded=True)
 
     bot._respond_proactive(ProactiveJob(psid="4242", kind="strava_debrief",
                                         prompt="débriefe", detail=ACTIVITY))
 
-    client.send_text.assert_not_called()
+    assert client.send_burst.called
+    assert "debrief-unrecorded" not in caplog.text
 
 
 def test_the_deferred_debrief_carries_the_same_contract(make_bot, client, caplog):

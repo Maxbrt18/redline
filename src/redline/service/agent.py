@@ -15,6 +15,7 @@ from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import TYPE_CHECKING, Protocol
 
+from . import persona
 from .prompts import DEFAULT_DEPTH, instruction_digest
 
 if TYPE_CHECKING:
@@ -284,6 +285,33 @@ def live_session(state: StateStore, config: Config, provider: str,
         return session_id
     state.clear_session(psid, provider)
     return None
+
+
+class RunnerBase:
+    """What every provider adapter shares: its runs, the athlete's name, its retries."""
+
+    # Attempts with the same profile while no work has started (dead session, binary
+    # crashing at startup); beyond that, the route tries its fallback profile.
+    MAX_ATTEMPTS = 3
+    RETRY_DELAY = 5  # seconds, multiplied by the attempt number
+
+    def __init__(self, config: Config, state: StateStore, label: str) -> None:
+        self._config = config
+        self._state = state
+        self._runs = ActiveRuns(label)
+
+    def activity(self, psid: str) -> AgentActivity | None:
+        return self._runs.activity(psid)
+
+    def cancel(self, psid: str) -> bool:
+        return self._runs.cancel(psid)
+
+    def _personal(self, text: str) -> str:
+        """Substitute the instance athlete name for the token in everything the model reads."""
+        return persona.render(text, self._config.instance.athlete_name)
+
+    def _pause_before_retry(self, attempt: int) -> None:
+        time.sleep(self.RETRY_DELAY * attempt)
 
 
 class AgentRunner(Protocol):

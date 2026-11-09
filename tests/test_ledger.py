@@ -10,10 +10,10 @@ import datetime as dt
 import pytest
 from conftest import RPE_TARGETS, VAULT_ROOT, ZONE, zoned
 
-from redline.analysis import ledger
+from redline.analysis import ledger, week_review
 from redline.analysis.ledger import Instruments, Row
+from redline.model import iso_week, program, session_kinds
 from redline.model import ledger as table
-from redline.model import program, session_kinds
 from redline.model.notes import NoteError
 
 
@@ -479,7 +479,6 @@ def test_the_longest_of_thirty_days_is_a_landmark_not_a_ceiling():
             Row(dt.date(2026, 6, 30), "long", km=22.0, hours=2.5)]   # outside the window
     assert ledger.longest_recent(rows, today) == 10.31
     assert ledger.longest_recent([], today) is None
-    assert not hasattr(ledger, "next_long_run_cap")
 
 
 # ------------------------------------------------ scenario 9: the slope, computed
@@ -488,7 +487,7 @@ def _long_runs(series: dict[str, float]) -> list[Row]:
     """A long run on the Sunday of each week, plus a short easy run on the Tuesday."""
     rows = []
     for label, km in series.items():
-        monday = ledger._week_start(label)
+        monday = iso_week.monday(label)
         rows.append(Row(monday + dt.timedelta(days=1), "easy", km=6.0, hours=0.6))
         rows.append(Row(monday + dt.timedelta(days=6), "long", km=km, hours=km / 8))
     return rows
@@ -618,12 +617,12 @@ def _gate_rows(*, peak_before=1.0, peak_now=1.0, wake_now=(1.0,)):
 
 
 def test_the_gate_is_green_when_every_case_is_established():
-    lines = ledger.gate(_gate_rows(), "2026-W41", Instruments(sleep="ok"), ZONES)
+    lines = week_review.gate(_gate_rows(), "2026-W41", Instruments(sleep="ok"), ZONES)
     assert lines[0] == "Porte (règle po, calculée) : verte"
 
 
 def test_a_rise_of_half_a_point_closes_the_gate():
-    lines = ledger.gate(_gate_rows(peak_now=1.5), "2026-W41", Instruments(sleep="ok"),
+    lines = week_review.gate(_gate_rows(peak_now=1.5), "2026-W41", Instruments(sleep="ok"),
                         ZONES)
     assert lines[0].endswith(": rouge")
     assert "  ✗ tendance : 1 → 1.5" in lines
@@ -631,14 +630,14 @@ def test_a_rise_of_half_a_point_closes_the_gate():
 
 def test_a_wake_told_in_prose_is_not_a_measured_wake():
     # "Wake readings at baseline" read in prose, no numeric value in the ledger.
-    lines = ledger.gate(_gate_rows(wake_now=(None, None)), "2026-W41",
+    lines = week_review.gate(_gate_rows(wake_now=(None, None)), "2026-W41",
                         Instruments(sleep="ok"), ZONES)
     assert lines[0].endswith(": incomplète")
     assert any(line.startswith("  ? réveils : 0 chiffré(s) sur 2") for line in lines)
 
 
 def test_an_undeclared_sleep_leaves_the_gate_incomplete_not_green():
-    lines = ledger.gate(_gate_rows(), "2026-W41", Instruments(), ZONES)
+    lines = week_review.gate(_gate_rows(), "2026-W41", Instruments(), ZONES)
     assert lines[0].endswith(": incomplète")
     assert "  ? sommeil non déclaré" in lines
 
@@ -662,7 +661,7 @@ def test_the_gate_judges_each_zone_and_names_it():
             Row(dt.date(2026, 9, 29), "easy", km=8, hours=0.8, pains={"talon": 1.0, "cheville": 1.0}),
             Row(dt.date(2026, 10, 6), "easy", km=8, hours=0.8, pains={"talon": 1.0, "cheville": 1.5}),
             Row(dt.date(2026, 10, 7), "wake-trace", pains={"talon": 1.0, "cheville": 1.0})]
-    lines = ledger.gate(rows, "2026-W41", Instruments(sleep="ok"), zones)
+    lines = week_review.gate(rows, "2026-W41", Instruments(sleep="ok"), zones)
     assert lines[0].endswith(": rouge")
     assert "  ✗ Cheville · tendance : 1 → 1.5" in lines
     assert "  ✓ Talon · tendance : 1 → 1" in lines
@@ -670,5 +669,5 @@ def test_the_gate_judges_each_zone_and_names_it():
 
 def test_without_a_watched_zone_the_gate_has_no_pain_case():
     rows = [Row(dt.date(2026, 10, 6), "easy", km=8, hours=0.8)]
-    lines = ledger.gate(rows, "2026-W41", Instruments(sleep="ok"), [])
+    lines = week_review.gate(rows, "2026-W41", Instruments(sleep="ok"), [])
     assert not any("pic d'effort" in line or "réveils" in line for line in lines)

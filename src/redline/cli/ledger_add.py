@@ -18,19 +18,22 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
-import os
 import sys
 import unicodedata
 from typing import Any
 
 from redline.coach.fr import ledger as wording
 from redline.model import (
+    agent_input,
     commands,
     entrypoint,
     rulebook,
     session_kinds,
 )
 from redline.model import ledger as table
+from redline.model.vocabulary import MeasurementState
+
+ACTOR = "ledger-add"
 
 
 def option_of(item: table.ObservationInput) -> str:
@@ -87,8 +90,8 @@ def morning_trace_errors(raw: dict[str, str], pains: dict[str, str],
     return problems
 
 
-def _write_database(url: str, raw: dict[str, str], pains: dict[str, str], key: str, *,
-                    start_local: str = "", session_key: str = "") -> str:
+def _write(store, raw: dict[str, str], pains: dict[str, str], key: str, *,
+           start_local: str = "", session_key: str = "") -> str:
     if not key:
         raise table.LedgerError(
             "--idempotency-key is required without a Strava id (the stable identity of the "
@@ -100,15 +103,15 @@ def _write_database(url: str, raw: dict[str, str], pains: dict[str, str], key: s
             continue
         value = raw.get(item.name, "")
         if value == table.UNKNOWN:
-            measurements[item.metric] = {"state": "unavailable"}
+            measurements[item.metric] = {"state": MeasurementState.UNAVAILABLE}
         elif value:
             measurements[item.metric] = {
-                "state": "known", "value": _number(item.name, value)}
+                "state": MeasurementState.KNOWN, "value": _number(item.name, value)}
         else:
             required = item.name in table.required_columns(kind) or (
                 bool(raw.get("strava")) and item.name in ("dplus", "dminus"))
             measurements[item.metric] = {
-                "state": "pending" if required else "not_applicable"}
+                "state": MeasurementState.PENDING if required else MeasurementState.NOT_APPLICABLE}
     payload = {
         "occurred_on": dt.date.fromisoformat(raw["date"]), "kind": kind,
         "idempotency_key": key, "strava_activity_id": raw.get("strava") or None,
@@ -126,31 +129,19 @@ def _write_database(url: str, raw: dict[str, str], pains: dict[str, str], key: s
         raise table.LedgerError("--session-key requires --start-local")
     if session_key:
         payload["session_key"] = session_key
-    turn_id = (os.environ.get("REDLINE_TURN_ID") or "").strip()
-    from redline.storage import Database, OperationalStore, StorageError
-
-    store = OperationalStore(Database(url, application_name="ledger-add"))
+    turn_id = agent_input.current_turn()
     if turn_id and store.observation_id(key) is not None:
         raise table.LedgerError(
             f"observation already recorded: {key}. Read redline fact-read observations; "
             "complete only the missing measurements with redline ledger-complete --key "
             f"{key} --metric <metric> --value <value>. Do not recreate the session and do "
             "not change its key.")
-    if turn_id:
-        store.stage_command(
-            turn_id, f"observation:{key}", commands.OBSERVATION_ADD, payload)
-        return key
-    try:
-        oid = store.add_observation(payload, actor="ledger-add")
-    except StorageError as exc:
-        raise table.LedgerError(str(exc)) from exc
-    return str(oid)
+    submitted = store.submit(commands.OBSERVATION_ADD, payload, command_key=f"observation:{key}",
+                             turn_id=turn_id, actor=ACTOR)
+    return key if submitted.staged else str(submitted.result)
 
 
-def _active_zones(url: str) -> list[str]:
-    from redline.storage import Database, OperationalStore
-
-    store = OperationalStore(Database(url, application_name="ledger-add"))
+def _zones(store) -> list[str]:
     return [zone["slug"] for zone in store.pain_zones() if zone["active"]]
 
 
@@ -187,14 +178,13 @@ def main() -> int:
             corrected.append(wording.ROUNDED.format(name=item.name, raw=raw, good=good))
         raw_values[item.name] = good
 
-    database_url = (os.environ.get("DATABASE_URL") or "").strip()
+    from redline.storage import StorageError, open_store
+
+    store = None
     zones: list[str] = []
     if args.pain or raw_values.get("type") == session_kinds.WAKE_TRACE:
-        if not database_url:
-            print("DATABASE_URL is required: the monitored zones live in the database",
-                  file=sys.stderr)
-            return 2
-        zones = _active_zones(database_url)
+        store = open_store(ACTOR)
+        zones = _zones(store)
     try:
         pains = table.parse_pains([value.strip() for value in args.pain], zones)
     except table.LedgerError as exc:
@@ -219,20 +209,16 @@ def main() -> int:
         print({**raw_values, **({"pain": pains} if pains else {})})
         return 0
 
-    if not database_url:
-        print("DATABASE_URL is required: there is no fallback ledger", file=sys.stderr)
-        return 2
     key = args.idempotency_key.strip()
     if raw_values.get("strava"):
         key = f"strava:{raw_values['strava']}"
     try:
-        oid = _write_database(database_url, raw_values, pains, key,
-                              start_local=args.start_local.strip(),
-                              session_key=args.session_key.strip())
-    except (ValueError, table.LedgerError) as exc:
+        oid = _write(store or open_store(ACTOR), raw_values, pains, key,
+                     start_local=args.start_local.strip(), session_key=args.session_key.strip())
+    except (ValueError, StorageError) as exc:
         print(f"observation not written: {exc}", file=sys.stderr)
         return 1
-    state = wording.STAGED if os.environ.get("REDLINE_TURN_ID") else wording.RECORDED
+    state = wording.STAGED if agent_input.current_turn() else wording.RECORDED
     print(wording.OBSERVATION_WRITTEN.format(date=raw_values["date"], type=raw_values["type"],
                                              oid=oid, state=state))
     return 0

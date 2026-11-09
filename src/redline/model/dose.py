@@ -111,13 +111,13 @@ ONE = Span(1)
 
 @dataclass(frozen=True)
 class Dose:
-    measure: str                      # "reps" | "time" | "amrap" | "contacts"
+    measure: str
     sets: Span = ONE                  # a range of sets is a real prescription
     reps: Span | None = None       # measure = reps
     seconds: Span | None = None    # measure = time, PER SET
     contacts: int | None = None    # measure = contacts
     block: int | None = None       # contacts per block
-    side: str = "both"                # "each" (per leg) | "both"
+    side: str = "both"
     rest_s: int | None = None      # between sets, only if the session says so
 
     @classmethod
@@ -218,10 +218,9 @@ class Dose:
         """What the page receives: the walked-out slots plus the already-rendered
         label. The page has nothing left to guess AND nothing left to format.
 
-        `sets`, `side`, `seconds` and `contacts` used to travel too. They are gone:
-        every one of them existed only so the page could rebuild `slots`, which it
-        is now handed. What is left is what is actually displayed (`text`, and the
-        per-slot `t`), what paces the session (`rest_s`), and `measure` -- which
+        The page is handed `slots` and never rebuilds them, so `sets`, `side`,
+        `seconds` and `contacts` stay here. What travels is what is displayed (`text`,
+        and the per-slot `t`), what paces the session (`rest_s`), and `measure` -- which
         selects the control, not the structure. `counts` are the answers a reps set
         offers, the prescribed range in full: the page counts with one tap and
         builds nothing.
@@ -241,8 +240,6 @@ class Dose:
             data["rest_s"] = self.rest_s
         return data
 
-
-# --------------------------------------------------------------------- schema
 
 def _spans(data: dict) -> list:
     """"an int, or a [low, high] pair" cannot be said with a single type: this
