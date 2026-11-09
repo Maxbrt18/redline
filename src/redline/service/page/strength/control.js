@@ -62,12 +62,11 @@ function slotLabel(slot, measure) {
 
 /* ONE forward action, and it says where it goes.
  *
- * There used to be three buttons -- "Validé", "Repos", "Passer" -- and next to
- * "Validé" the "Repos" one read as if it might validate too. It did not. With
- * sets multiplied by sides, that was three ambiguous controls on top of an
- * already busy state. The rest is prescribed by the session anyway, so the
- * forward button owns it: it banks the set, runs the rest if there is one, and
- * lands on whatever comes next. */
+ * A separate rest button next to the validation one would read as if it validated
+ * too, and with sets multiplied by sides every extra control is ambiguous on an
+ * already busy state. The rest is prescribed by the session, so the forward button
+ * owns it: it banks the set, runs the rest if there is one, and lands on whatever
+ * comes next. */
 function forwardLabel(index) {
   const progress = progressOf(index);
   const slots = slotsOf(index);

@@ -20,7 +20,7 @@ from redline.coach import dates
 from redline.coach.fr import permit as text
 from redline.model.vocabulary import LifeLoad, Sleep
 
-from . import rulebook, session_kinds
+from . import iso_week, rulebook, session_kinds
 
 #: The supervised period lasts this many ISO weeks, including the week of the first
 #: sealed choice; the permit is judged at the end of the last one.
@@ -57,7 +57,7 @@ class EfLine:
     hr_avg: int | None = None
     next_trace: float | None = None
     group: bool | None = None
-    status: str = "upcoming"  # upcoming · run · skipped
+    status: str = "upcoming"
     triggers: list[str] = field(default_factory=list)
 
     @property
@@ -70,16 +70,6 @@ class EfLine:
     def agrees(self) -> bool | None:
         gap = self.gap
         return None if gap is None else abs(gap) <= TOLERANCE_MIN
-
-
-def iso_week(day: dt.date) -> str:
-    year, week, _ = day.isocalendar()
-    return f"{year}-W{week:02d}"
-
-
-def week_end(week: str) -> dt.date:
-    year, number = int(week[:4]), int(week[-2:])
-    return dt.date.fromisocalendar(year, number, 7)
 
 
 def _day(value: dt.date | str) -> dt.date:
@@ -102,7 +92,7 @@ def window(choices: Iterable[dict]) -> Window | None:
         return None
     first = min(days)
     start = first - dt.timedelta(days=first.weekday())
-    return Window(start, iso_week(start + dt.timedelta(weeks=PERMIT_WEEKS - 1)))
+    return Window(start, iso_week.of(start + dt.timedelta(weeks=PERMIT_WEEKS - 1)))
 
 
 def evaluate(choices: Iterable[dict], runs: Iterable[Run], traces: dict[dt.date, float],
@@ -177,14 +167,14 @@ def state(lines: list[EfLine], daily: Iterable[dict], today: dt.date,
         if row.get("sleep") == Sleep.POOR:
             reasons.append(text.POOR_NIGHT.format(day=day))
         if reasons:
-            restricted.setdefault(iso_week(day), []).extend(reasons)
+            restricted.setdefault(iso_week.of(day), []).extend(reasons)
     for line in lines:
         if line.group:
-            restricted.setdefault(iso_week(line.date), []).append(
+            restricted.setdefault(iso_week.of(line.date), []).append(
                 text.GROUP_RUN.format(day=line.date))
 
     grant = None
-    judged_on = week_end(period.granted_week)
+    judged_on = iso_week.sunday(period.granted_week)
     if today > judged_on:
         judged = [line for line in lines if line.date <= judged_on]
         run = [line for line in judged if line.status == "run"]
@@ -211,7 +201,7 @@ def _fmt_minutes(value: float | None) -> str:
 
 def render(lines: list[EfLine], current: State, week: str | None = None) -> list[str]:
     """The block the coach reads, at the review or on request."""
-    shown = [line for line in lines if week is None or iso_week(line.date) == week]
+    shown = [line for line in lines if week is None or iso_week.of(line.date) == week]
     scale = rulebook.current().scales.morning_trace
     out = [text.TITLE.format(phase=text.PHASES[current.phase])]
     if current.withdrawal_until is not None:

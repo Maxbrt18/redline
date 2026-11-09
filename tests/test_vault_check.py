@@ -9,6 +9,9 @@ is what allows the RED cases to be exercised. A checker whose failure has never 
 is a checker that may not know how to fail.
 """
 
+import datetime as dt
+from dataclasses import replace
+
 import pytest
 from conftest import ENGINE_ROOT, TEST_VAULT, load_script
 
@@ -186,11 +189,11 @@ def _predictions(monkeypatch, day, rows):
         def today(cls):
             return cls.fromisoformat(day)
     monkeypatch.setattr(vault_check.dt, "date", FrozenDate)
-    monkeypatch.setattr(vault_check, "_read_postgres", lambda report, label, read: rows)
+    monkeypatch.setattr(vault_check, "_read_postgres", lambda vault, report, label, read: rows)
 
 
-#: As `prediction_rows()` returns it: plain values, the date as ISO text.
-_DUE = {"prediction_key": "sl-20", "status": "open", "due_on": "2026-08-30"}
+#: As `prediction_rows()` returns it: the due date is a date.
+_DUE = {"prediction_key": "sl-20", "status": "open", "due_on": dt.date(2026, 8, 30)}
 
 
 def test_a_prediction_due_within_the_grace_period_is_only_a_warning(report, monkeypatch):
@@ -215,17 +218,15 @@ def test_a_settled_prediction_is_no_debt(report, monkeypatch):
 
 def test_views_in_step_report_the_program_blocks_they_opened(monkeypatch, capsys):
     """The success path names a count: it once called len() on it and crashed the report."""
-    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://unused")
     monkeypatch.setattr(vault_check, "refresh", lambda *args, **kwargs: [])
     monkeypatch.setattr(vault_check, "load_program", lambda root: None)
-    monkeypatch.setattr(vault_check.ledger_gauge, "open_store", lambda: None)
     monkeypatch.setattr(vault_check.ledger_gauge, "parse_ledger", lambda store: [])
     monkeypatch.setattr(vault_check.ledger_gauge, "load_instruments", lambda store: {})
     monkeypatch.setattr(vault_check.hot_cache, "refresh", lambda *args, **kwargs: False)
     monkeypatch.setattr(vault_check, "_plan_view_drift", lambda vault: ([], 3))
     report = vault_check.Report(quiet=False)
 
-    vault_check.check_generated_views(vault({}), report)
+    vault_check.check_generated_views(replace(vault({}), store=object()), report)
 
     assert report.failed == 0
     assert "3 bloc(s) de programme" in capsys.readouterr().out

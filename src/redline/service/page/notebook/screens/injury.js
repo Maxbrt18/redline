@@ -3,7 +3,6 @@ import {SVG, content, hero, shape, zone} from '../ui.js';
 import {day, fmt, weekNumber} from '../format.js';
 import {swap} from '../nav.js';
 
-// ------------------------------------------------------------ Injury
 // Pushed from the landmarks tile: one dot per rated session and each numeric wake-up
 // reading on one graduated scale (wake-up readings under the axis, without a value, were
 // unreadable), the ceiling dashed, the athlete's scale in their own words, then the peak

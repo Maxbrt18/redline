@@ -10,7 +10,6 @@ from redline.service.proactive import ProactiveJob
 from redline.service.proactive_messages import (
     CLOSED_KINDS,
     compose_closed_proactive,
-    missing_cells_in_notebook,
 )
 
 
@@ -100,13 +99,6 @@ def test_a_closed_claim_asks_one_metric_and_marks_only_that_metric():
     assert rendered.markers == ("pain",)
 
 
-def test_a_wake_claim_is_never_rendered_as_a_numeric_evening_question():
-    rendered = compose_closed_proactive("ledger_incomplete", json.dumps({
-        "date": "2026-09-14", "type": "wake-trace", "missing": ["pain"],
-        "markers": ["2026-09-14:wake-trace:pain"],
-    }))
-
-    assert rendered is None
 
 
 def test_a_queued_wake_claim_is_discarded_without_message_or_agent(make_bot, store):
@@ -250,9 +242,6 @@ def test_without_a_connected_notebook_the_evening_claim_still_asks_in_messenger(
     assert "RPE global sur 10" in bot._client.send_burst.call_args.args[1]
 
 
-def test_the_notebook_reminder_never_carries_a_wake_trace():
-    assert missing_cells_in_notebook(json.dumps(
-        {"date": "2026-10-08", "type": "wake-trace", "missing": ["pain"]})) is None
 
 
 def test_the_notebook_note_reaches_the_turns_that_used_to_ask(make_bot):

@@ -221,7 +221,7 @@ def make_bot(make_config, store):
             # Returns a LIST: on a bare MagicMock, "nothing to discard" would be a truthy
             # mock, and the whole suite would log an imaginary residue.
             repo.ensure_clean.return_value = []
-            repo.weekly_plan_context.return_value = ""
+            repo.active_revision.return_value = None
             # `weekly_plan_message` returns a STRING, assembled with the coach text
             # instead of replacing it: a truthy MagicMock was enough when it was only
             # assigned, not once it is concatenated.

@@ -17,12 +17,13 @@ from pathlib import Path
 from typing import Any, Literal
 
 from redline.coach.fr import replies
+from redline.model.vocabulary import RESENDABLE_DELIVERIES, DeliveryStatus
 
 from . import strength
 from .messenger import DeliveredMessage, DeliveryResult, MessengerClient
 from .notebook import NotebookService
 from .outbox import Outbox, OutboxSnapshot
-from .state import StateStore
+from .state import Disposition, StateStore
 
 log = logging.getLogger("redline")
 
@@ -78,7 +79,7 @@ class StoredDelivery:
     @property
     def resendable(self) -> bool:
         """Computed and never accepted by Meta: it can be resent as is."""
-        return self.status in {"prepared", "failed"} and bool(
+        return self.status in RESENDABLE_DELIVERIES and bool(
             (self.payload or {}).get("parts"))
 
 
@@ -213,10 +214,10 @@ class DeliveryService:
 
     def resume(self, stored: StoredDelivery) -> DeliveryReceipt:
         """Resume an already computed output where it stopped."""
-        if stored.status in {"delivered", "sending"}:
+        if stored.status in {DeliveryStatus.DELIVERED, DeliveryStatus.SENDING}:
             # Already accepted by Meta, or possibly so: never resent (at-most-once).
             return DeliveryReceipt(text_ok=True, attachments_ok=True, delivered=1,
-                                   replayed=True, uncertain=stored.status == "sending")
+                                   replayed=True, uncertain=stored.status == DeliveryStatus.SENDING)
         return self.redeliver(stored)
 
     def deliver(self, envelope: OutboundEnvelope) -> DeliveryReceipt:
@@ -224,13 +225,13 @@ class DeliveryService:
         disposition = self.state.begin_outbound_delivery(
             envelope.source_key, envelope.psid, self._digest(envelope),
             envelope_payload(envelope))
-        if disposition in {"delivered", "uncertain"}:
+        if disposition is not Disposition.SEND:
             # The Send API offers no idempotency key. After a crash in the middle of
             # the call, replaying would almost surely create a duplicate; we therefore
             # choose at-most-once and let `uncertain` trigger an internal trace.
             return DeliveryReceipt(
                 text_ok=True, attachments_ok=True, delivered=1, replayed=True,
-                uncertain=disposition == "uncertain")
+                uncertain=disposition is Disposition.UNCERTAIN)
         delivered = 0
         text_delivered = 0
         messages: list[DeliveredMessage] = []

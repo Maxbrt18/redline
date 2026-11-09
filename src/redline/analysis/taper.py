@@ -18,9 +18,9 @@ import datetime as dt
 from dataclasses import dataclass
 
 from redline.coach.fr import ledger as text
+from redline.model import iso_week, rulebook, session_kinds, transitions
 from redline.model import race as race_model
-from redline.model import rulebook, session_kinds, transitions
-from redline.model.vocabulary import Decider
+from redline.model.vocabulary import Decider, SessionStatus
 
 from . import ledger
 
@@ -49,13 +49,13 @@ class Window:
 
 
 def window(race: race_model.Race) -> Window:
-    race_week = transitions.week_of(race.on)
-    weeks = tuple(transitions.shift(race_week, -offset)
+    race_week = iso_week.of(race.on)
+    weeks = tuple(iso_week.shift(race_week, -offset)
                   for offset in reversed(range(race.taper_weeks)))
     skipped = set(rulebook.current().parameters.assimilation_weeks)
     reference: list[str] = []
     for back in range(1, REFERENCE_SEARCH_WEEKS + 1):
-        week = transitions.shift(weeks[0], -back)
+        week = iso_week.shift(weeks[0], -back)
         if week not in skipped:
             reference.insert(0, week)
         if len(reference) == REFERENCE_WEEKS:
@@ -111,7 +111,7 @@ def measured(rows: list[ledger.Row], frame: Window, through: str) -> Cut | None:
 
 def _planned_runs(sessions: list[dict], race_on: dt.date) -> list[dict]:
     return [session for session in sessions
-            if session.get("kind") == "run" and session.get("status") != "cancelled"
+            if session.get("kind") == "run" and session.get("status") != SessionStatus.CANCELLED
             and session.get("workout") != session_kinds.RACE
             and transitions.day_of(session["date"]) < race_on]
 
@@ -120,7 +120,7 @@ def planned(rows: list[ledger.Row], frame: Window, week: str,
             sessions: list[dict]) -> Cut | None:
     """The drop a revision of `week` plans: the weeks before it as run, then its own
     sessions as planned."""
-    before = measured(rows, frame, transitions.shift(week, -1)) \
+    before = measured(rows, frame, iso_week.shift(week, -1)) \
         if week != frame.weeks[0] else None
     reference = _reference(rows, frame)
     if reference is None or week not in frame.weeks:
@@ -167,7 +167,7 @@ def plan_errors(rows: list[ledger.Row], frame: Window, week: str,
 def _closed(frame: Window, week: str, today: dt.date, closing: str | None) -> bool:
     if week == frame.race_week:
         return today >= frame.race_on
-    return week == closing or transitions.monday_of(week) + dt.timedelta(days=7) <= today
+    return week == closing or iso_week.monday(week) + dt.timedelta(days=7) <= today
 
 
 def report_lines(store: ledger.LedgerStore, rows: list[ledger.Row], label: str,
@@ -179,7 +179,7 @@ def report_lines(store: ledger.LedgerStore, rows: list[ledger.Row], label: str,
     frame = race_window(store, label)
     if frame is None:
         return []
-    span = f"{transitions.short(frame.reference[0])}-{transitions.short(frame.reference[-1])}"
+    span = f"{iso_week.short(frame.reference[0])}-{iso_week.short(frame.reference[-1])}"
     cut = measured(rows, frame, label)
     if cut is None:
         return [text.TAPER_NO_REFERENCE.format(span=span)]
@@ -187,7 +187,7 @@ def report_lines(store: ledger.LedgerStore, rows: list[ledger.Row], label: str,
                  if _closed(frame, week, today, label if closing else None))
     weeks = " · ".join(
         (text.TAPER_WEEK if (week, km) in done else text.TAPER_WEEK_OPEN).format(
-            week=transitions.short(week), km=km)
+            week=iso_week.short(week), km=km)
         for week, km in cut.weeks)
     if not done:
         return [text.TAPER_OPENING.format(reference_km=cut.reference_km, span=span,

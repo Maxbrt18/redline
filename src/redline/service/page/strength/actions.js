@@ -3,8 +3,6 @@ import {prepareWork, startTimer, stopTimer} from './timers.js';
 import {btn} from './control.js';
 import {renderSession} from './render.js';
 
-// ------------------------------------------------------------------ actions
-
 /* The session clock starts at the first real gesture -- starting an isometric,
  * counting a contact, validating a set -- and never before. */
 export function markStarted() {

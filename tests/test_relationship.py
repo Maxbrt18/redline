@@ -41,7 +41,7 @@ def test_social_and_emotional_turns_do_not_inherit_a_measurement_questionnaire(m
     from redline.service.agent import Triage
     bot = make_bot()
     for triage in (Triage("N0"), Triage("N2", emotional=True)):
-        note = bot._reading_notes(triage, "2026-W36", "", plan_required=False, handoff="")
+        note = bot._reading_notes(triage, "2026-W36", None, plan_required=False, handoff="")
         assert "Informations encore inconnues" not in note
     bot._repo.pending_ledger_cells.assert_not_called()
 

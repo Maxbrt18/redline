@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Writes the operational facts other than sessions, without touching the projections.
 
-**`--patch` on `thread` and `deadline`.** Both upserts used to require ALL fields on
-every write. Their free-text field can be long, so changing a date meant resending the
+**`--patch` on `thread` and `deadline`.** Without it, both upserts require ALL fields on
+every write. Their free-text field can be long, so changing a date means resending the
 whole text. The failure mode is not a typo in the date, which gets reread: it is a
 2000-character `--item` retyped from memory and silently truncated, because a full
 upsert cannot tell "this field is unchanged" from "this field is now this".
@@ -29,18 +29,18 @@ same key, the second one read the state from BEFORE the first.
 from __future__ import annotations
 
 import argparse
-import datetime as dt
 import hashlib
 import json
-import os
-import re
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import Any, NamedTuple
 
+from redline.cli import _args
 from redline.coach.fr import fact_write as wording
 from redline.model import (
+    agent_input,
     commands,
     entrypoint,
+    iso_week,
     paths,
     session_kinds,
     vault_layout,
@@ -48,10 +48,7 @@ from redline.model import (
 from redline.model import predictions as prediction_model
 from redline.model import race as race_model
 from redline.model import vocabulary as voc
-from redline.model.errors import ConfigError, InputError
-
-if TYPE_CHECKING:
-    from redline.storage import OperationalStore
+from redline.model.errors import InputError
 
 
 class _Unset:
@@ -123,16 +120,6 @@ def _existing(store: Any, command: str, key: str) -> dict:
     return found[0]
 
 
-def day(value: str) -> dt.date:
-    return dt.date.fromisoformat(value)
-
-
-def week(value: str) -> str:
-    if not re.fullmatch(r"20\d{2}-W(?:0[1-9]|[1-4]\d|5[0-3])", value):
-        raise argparse.ArgumentTypeError("ISO week expected: 2030-W33")
-    return value
-
-
 def _angle(args, _) -> dict:
     return {"angle": args.angle.strip()}
 
@@ -148,14 +135,14 @@ def _daily(args, _) -> dict:
 
 def _deadline(args, existing) -> dict:
     payload = merge(DEADLINE_FIELDS, args, existing)
-    payload["kind"] = payload.get("kind") or "general"
+    payload["kind"] = payload.get("kind") or voc.DeadlineKind.GENERAL
     if getattr(args, "context", UNSET) is not UNSET and not isinstance(args.context, dict):
         raise InputError("--context: a JSON object")
     if existing is not None and getattr(args, "context", UNSET) is not UNSET:
         merged = {**(existing.get("context") or {}), **args.context}
         payload["context"] = {key: value for key, value in merged.items() if value is not None}
     payload["context"] = payload.get("context") or {}
-    if payload["kind"] == race_model.KIND:
+    if payload["kind"] == voc.DeadlineKind.RACE:
         race_model.CONTEXT_SCHEMA.validate(payload["context"], "context")
     payload["athlete_label"] = (payload.get("athlete_label") or "").strip() or None
     return payload
@@ -220,7 +207,7 @@ def _correction(args, _) -> dict:
 
 def _permit(args, _) -> dict:
     """The coach's choice for a permit easy run, sealed together with its prediction."""
-    sunday = dt.date.fromisocalendar(int(args.week[:4]), int(args.week[-2:]), 7)
+    sunday = iso_week.sunday(args.week)
     statement = (wording.SEALED_CHOICE.format(week=args.week, session_key=args.session_key,
                                               date=args.date, minutes=args.minutes))
     return {"iso_week": args.week, "session_key": args.session_key,
@@ -246,83 +233,53 @@ def _exposure(args, _) -> dict:
     }
 
 
-#: One command, one row: its entity key, its turn command type, how it assembles its
-#: payload, and the store method that writes it outside a transaction.
-#:
-#: ONE table, not two. A second `if/elif` dispatching the direct write would end in an
-#: `else` sending any unknown type to `upsert_deadline`; two switches over the same set
-#: are bound to drift apart. An unrecognised command refuses instead of being written as
-#: a deadline.
+#: One command, one row: its entity key, its turn command type and how it assembles its
+#: payload. Within a turn and outside one, the store writes it through the same handler.
 class Command(NamedTuple):
-    prefix: str
     kind: str
     build: Callable[[Any, Any], dict]
-    #: The write outside a turn, called by name so that mypy checks the method and its
-    #: signature; None when the command only makes sense within a turn.
-    write: Callable[[OperationalStore, dict], object] | None
+    #: What identifies the targeted entity; `--key` when None.
+    entity: Callable[[Any, dict], str] | None = None
 
 
 ACTOR = "fact-write"
 
+#: The commands that qualify the message of the current turn: outside a turn there is
+#: no message to qualify.
+TURN_ONLY = frozenset({"angle", "ask"})
+
 COMMANDS: dict[str, Command] = {
-    "question": Command("question", commands.QUESTION_REVIEW, _fields((
+    "question": Command(commands.QUESTION_REVIEW, _fields((
         "question_id", "answer_id", "status", "note", "follow_up_on")),
-        lambda store, row: store.review_question(row, actor=ACTOR)),
-    "ask": Command("ask", commands.QUESTION_ASK, _fields(("text", "cells")), None),
-    "thread": Command("thread", commands.THREAD_UPSERT,
-                      lambda args, existing: merge(THREAD_FIELDS, args, existing),
-                      lambda store, row: store.upsert_thread(row, actor=ACTOR)),
-    "deadline": Command("deadline", commands.DEADLINE_UPSERT, _deadline,
-                        lambda store, row: store.upsert_deadline(row, actor=ACTOR)),
-    "daily": Command("daily", commands.DAILY_UPSERT, _daily,
-                     lambda store, row: store.put_daily(row, actor=ACTOR)),
-    "capability": Command("capability", commands.CAPABILITY_EVALUATE, _fields((
+        lambda args, payload: args.question_id),
+    "ask": Command(commands.QUESTION_ASK, _fields(("text", "cells")),
+                   lambda args, payload: hashlib.sha256(args.text.encode()).hexdigest()[:16]),
+    "thread": Command(commands.THREAD_UPSERT,
+                      lambda args, existing: merge(THREAD_FIELDS, args, existing)),
+    "deadline": Command(commands.DEADLINE_UPSERT, _deadline),
+    "daily": Command(commands.DAILY_UPSERT, _daily, lambda args, payload: str(args.date)),
+    "capability": Command(commands.CAPABILITY_EVALUATE, _fields((
         "capability_number", "slug", "need", "score", "scale", "status",
         "evaluated_on", "next_test", "lock_reason")),
-        lambda store, row: store.evaluate_capability(row, actor=ACTOR)),
-    # `angle` has NO direct write: outside a turn there is no proactive message to
-    # qualify. `main()` refuses before reaching `_direct`.
-    "angle": Command("angle", commands.PROACTIVE_ANGLE, _angle, None),
-    "gear": Command("gear", commands.GEAR_UPSERT, _fields((
+        lambda args, payload: f"{args.capability_number}:{args.evaluated_on}"),
+    "angle": Command(commands.PROACTIVE_ANGLE, _angle, lambda args, payload: payload["angle"][:60]),
+    "gear": Command(commands.GEAR_UPSERT, _fields((
         "gear_id", "name", "role", "retire_at_km", "status")),
-        lambda store, row: store.upsert_gear(row, actor=ACTOR)),
-    "prediction": Command("prediction", commands.PREDICTION_UPSERT, _prediction,
-                          lambda store, row: store.upsert_prediction(row, actor=ACTOR)),
-    "correction": Command("correction", commands.CORRECTION_REGISTER, _correction,
-        lambda store, row: store.register_correction(row, actor=ACTOR)),
-    "exposure": Command("exposure", commands.EXPOSURE_UPSERT, _exposure,
-                        lambda store, row: store.upsert_exposure(row, actor=ACTOR)),
-    "permit": Command("permit", commands.PERMIT_SEAL, _permit,
-                      lambda store, row: store.seal_permit_choice(row, actor=ACTOR)),
-}
-
-#: What identifies the targeted entity, when it is not `--key`.
-ENTITY_KEY = {
-    "question": lambda args, payload: args.question_id,
-    "ask": lambda args, payload: hashlib.sha256(args.text.encode()).hexdigest()[:16],
-    "daily": lambda args, payload: str(args.date),
-    "capability": lambda args, payload: f"{args.capability_number}:{args.evaluated_on}",
-    "angle": lambda args, payload: payload["angle"][:60],
-    "gear": lambda args, payload: args.gear_id,
-    "prediction": lambda args, payload: args.key,
-    "correction": lambda args, payload: args.correction_key,
-    "exposure": lambda args, payload: args.key,
-    "permit": lambda args, payload: f"{args.week}:{args.session_key}",
+        lambda args, payload: args.gear_id),
+    "prediction": Command(commands.PREDICTION_UPSERT, _prediction),
+    "correction": Command(commands.CORRECTION_REGISTER, _correction,
+                          lambda args, payload: args.correction_key),
+    "exposure": Command(commands.EXPOSURE_UPSERT, _exposure),
+    "permit": Command(commands.PERMIT_SEAL, _permit,
+                      lambda args, payload: f"{args.week}:{args.session_key}"),
 }
 
 
 def _payload(args, existing: dict | None = None) -> tuple[str, str, dict]:
-    prefix, kind, build, _ = COMMANDS[args.command]
+    kind, build, entity = COMMANDS[args.command]
     payload = build(args, existing)
-    identity = ENTITY_KEY.get(args.command, lambda args, payload: args.key)(args, payload)
-    return f"{prefix}:{identity}", kind, payload
-
-
-def _direct(store, command: str, payload: dict) -> object:
-    write = COMMANDS[command].write
-    if write is None:
-        raise InputError(f"fact-write: {command!r} is only written within a turn")
-    return write(store, payload)
+    identity = entity(args, payload) if entity else args.key
+    return f"{args.command}:{identity}", kind, payload
 
 
 PATCH_HELP = ("--patch: writes only the cited fields and rereads the others from the existing"
@@ -332,11 +289,10 @@ PATCH_HELP = ("--patch: writes only the cited fields and rereads the others from
 
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description=__doc__)
-    root.add_argument("--database-url", default=os.environ.get("DATABASE_URL", ""))
     commands = root.add_subparsers(dest="command", required=True)
 
     daily = commands.add_parser("daily")
-    daily.add_argument("--date", type=day, required=True)
+    daily.add_argument("--date", type=_args.day, required=True)
     daily.add_argument("--sleep", choices=tuple(voc.Sleep))
     daily.add_argument("--life-load", choices=tuple(voc.LifeLoad))
     daily.add_argument("--desire", choices=tuple(voc.Desire))
@@ -349,7 +305,7 @@ def parser() -> argparse.ArgumentParser:
     capability.add_argument("--score", type=int, required=True)
     capability.add_argument("--scale", type=int, required=True)
     capability.add_argument("--status", choices=tuple(voc.CapabilityStatus), required=True)
-    capability.add_argument("--evaluated-on", type=day, required=True)
+    capability.add_argument("--evaluated-on", type=_args.day, required=True)
     capability.add_argument("--next-test")
     capability.add_argument("--lock-reason")
 
@@ -360,37 +316,37 @@ def parser() -> argparse.ArgumentParser:
                                    help="review an answer, without closing it implicitly")
     question.add_argument("--question-id", required=True)
     question.add_argument("--answer-id", required=True)
-    question.add_argument("--status", choices=("open", "deferred", "answered", "expired"),
+    question.add_argument("--status", choices=tuple(voc.QuestionStatus),
                           required=True)
     question.add_argument("--note", required=True)
-    question.add_argument("--follow-up-on", type=day)
+    question.add_argument("--follow-up-on", type=_args.day)
     ask = commands.add_parser("ask", help="declare the exact question planned for this turn")
     ask.add_argument("--text", required=True)
     ask.add_argument("--cell", dest="cells", action="append", default=[])
 
     thread = commands.add_parser("thread", help=PATCH_HELP)
     thread.add_argument("--key", required=True)
-    thread.add_argument("--opened-on", type=day, default=UNSET)
+    thread.add_argument("--opened-on", type=_args.day, default=UNSET)
     thread.add_argument("--kind", choices=tuple(voc.ThreadKind),
                         default=UNSET)
     thread.add_argument("--body", default=UNSET)
-    thread.add_argument("--follow-up-on", type=day, default=UNSET)
+    thread.add_argument("--follow-up-on", type=_args.day, default=UNSET)
     thread.add_argument("--status", choices=tuple(voc.ThreadStatus), default=UNSET)
     thread.add_argument("--patch", action="store_true", help=PATCH_HELP)
 
     deadline = commands.add_parser("deadline", help=PATCH_HELP)
     deadline.add_argument("--key", required=True)
-    deadline.add_argument("--due-on", type=day, default=UNSET)
+    deadline.add_argument("--due-on", type=_args.day, default=UNSET)
     deadline.add_argument("--item", default=UNSET)
     deadline.add_argument("--fact-owner", default=UNSET)
     deadline.add_argument("--blocks", default=UNSET)
-    deadline.add_argument("--status", choices=("todo", "scheduled", "done"),
+    deadline.add_argument("--status", choices=tuple(voc.DeadlineStatus),
                           default=UNSET)
-    deadline.add_argument("--completed-on", type=day, default=UNSET)
-    deadline.add_argument("--kind", choices=("general", "medical", "availability", "race"),
+    deadline.add_argument("--completed-on", type=_args.day, default=UNSET)
+    deadline.add_argument("--kind", choices=tuple(voc.DeadlineKind),
                           default=UNSET)
-    deadline.add_argument("--starts-on", type=day, default=UNSET)
-    deadline.add_argument("--ends-on", type=day, default=UNSET)
+    deadline.add_argument("--starts-on", type=_args.day, default=UNSET)
+    deadline.add_argument("--ends-on", type=_args.day, default=UNSET)
     deadline.add_argument("--context", type=json.loads, default=UNSET,
                           help="JSON object of the deadline's details; a race may set its taper "
                                "(taper_weeks, taper_cut_min_pct, taper_cut_max_pct) and its "
@@ -410,9 +366,9 @@ def parser() -> argparse.ArgumentParser:
     permit = commands.add_parser(
         "permit", help="seals the coach's choice for an easy run of the permit, BEFORE the athlete "
                        "decides")
-    permit.add_argument("--week", type=week, required=True)
+    permit.add_argument("--week", type=_args.week, required=True)
     permit.add_argument("--session-key", required=True)
-    permit.add_argument("--date", type=day, required=True)
+    permit.add_argument("--date", type=_args.day, required=True)
     permit.add_argument("--minutes", type=int, required=True)
     permit.add_argument("--probability", type=float, default=0.6)
     gear = commands.add_parser("gear")
@@ -420,15 +376,15 @@ def parser() -> argparse.ArgumentParser:
     gear.add_argument("--name", required=True)
     gear.add_argument("--role", required=True)
     gear.add_argument("--retire-at-km", type=float, required=True)
-    gear.add_argument("--status", choices=("active", "retired"), default="active")
+    gear.add_argument("--status", choices=tuple(voc.GearStatus), default=voc.GearStatus.ACTIVE)
 
     prediction = commands.add_parser("prediction")
     prediction.add_argument("--key", required=True)
     prediction.add_argument("--domain")
     prediction.add_argument("--statement")
     prediction.add_argument("--probability", type=float)
-    prediction.add_argument("--due-on", type=day)
-    prediction.add_argument("--direction", choices=("increase", "decrease", "neutral"),
+    prediction.add_argument("--due-on", type=_args.day)
+    prediction.add_argument("--direction", choices=tuple(voc.Direction),
                             default="neutral")
     prediction.add_argument("--outcome", choices=("true", "false", "void"))
     prediction.add_argument(
@@ -439,7 +395,7 @@ def parser() -> argparse.ArgumentParser:
         "--resolves", choices=(session_kinds.WAKE_TRACE,),
         help="observation that alone settles the prediction when it is written (void if the "
              "date passes without it)")
-    prediction.add_argument("--resolves-on", type=day, metavar="AAAA-MM-JJ")
+    prediction.add_argument("--resolves-on", type=_args.day, metavar="AAAA-MM-JJ")
     prediction.add_argument(
         "--resolves-zone", metavar="ZONE",
         help="the monitored zone whose trace decides; required when there are several")
@@ -467,54 +423,51 @@ def parser() -> argparse.ArgumentParser:
         choices=tuple(voc.Exposure),
         required=True)
     exposure.add_argument(
-        "--origin", choices=("prescribed", "voluntary", "spontaneous"), required=True)
+        "--origin", choices=tuple(voc.ExposureOrigin), required=True)
     exposure.add_argument(
-        "--status", choices=("candidate", "confirmed", "dismissed"), required=True)
+        "--status", choices=tuple(voc.ExposureStatus), required=True)
     exposure.add_argument("--duration-min", type=int)
     exposure.add_argument("--target-value", type=float)
     exposure.add_argument("--target-unit")
     exposure.add_argument(
-        "--tolerance", choices=("unknown", "easy", "strained", "protective"),
-        default="unknown")
+        "--tolerance", choices=tuple(voc.Tolerance),
+        default=voc.Tolerance.UNKNOWN)
     exposure.add_argument("--note", default="")
     return root
 
 
 def main() -> int:
     args = parser().parse_args()
-    turn_id = (os.environ.get("REDLINE_TURN_ID") or "").strip()
-    if not args.database_url:
-        raise ConfigError("DATABASE_URL is required: projections are read-only")
-    from redline.storage import Database, OperationalStore, StorageError
+    turn_id = agent_input.current_turn()
+    from redline.storage import StorageError, open_store
 
-    store = OperationalStore(Database(args.database_url, application_name="fact-write"))
+    store = open_store(ACTOR)
     # The merge precedes the hash: the queued payload stays complete, so `command_key`
     # and `apply_turn_with_receipts` keep the contract they had before `--patch`.
     existing = _existing(store, args.command, args.key) if getattr(
         args, "patch", False) else None
-    if args.command in {"angle", "ask"} and not turn_id:
+    if args.command in TURN_ONLY and not turn_id:
         raise InputError(
             "This command qualifies the message of the current turn: outside a turn "
-            "(REDLINE_TURN_ID missing) there is no message to qualify.")
+            f"({agent_input.TURN_VARIABLE} missing) there is no message to qualify.")
     entity_key, kind, payload = _payload(args, existing)
-    canonical = json.dumps(payload, default=lambda value: value.isoformat(),
-                           ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    command_key = f"{entity_key}:{hashlib.sha256(canonical.encode()).hexdigest()[:16]}"
+    command_key = f"{entity_key}:{commands.digest(payload)}"
     if turn_id and args.command in {"ask", "question"}:
         command_key = f"{turn_id}:{command_key}"
     # A store refusal exits as a named error, never as a success: a write ignored because
     # of a conflict must not be announced as recorded.
     try:
-        if turn_id:
-            store.stage_command(turn_id, command_key, kind, payload)
-            print(wording.STAGED.format(entity_key=entity_key))
-            return 0
-        written = _direct(store, args.command, payload)
+        submitted = store.submit(kind, payload, command_key=command_key, turn_id=turn_id,
+                                 actor=ACTOR)
     except StorageError as exc:
         raise StorageError(f"fact-write: {entity_key} refused: {exc}") from exc
+    if submitted.staged:
+        print(wording.STAGED.format(entity_key=entity_key))
     # False = the same row already existed; nothing was written.
-    print(wording.ALREADY_RECORDED.format(entity_key=entity_key) if written is False
-          else wording.RECORDED.format(entity_key=entity_key))
+    elif submitted.result is False:
+        print(wording.ALREADY_RECORDED.format(entity_key=entity_key))
+    else:
+        print(wording.RECORDED.format(entity_key=entity_key))
     return 0
 
 

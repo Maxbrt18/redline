@@ -41,7 +41,6 @@ STOP_MARK_S = 60
 HR_DROP_S = 60
 
 
-# ------------------------------------------------------------ readings
 def compact(raw: dict, laps: list) -> dict:
     """Slimmed-down Strava streams (integers or rounded) and the bounds of each lap."""
     def data(key: str) -> list:
@@ -98,13 +97,7 @@ def fetch_streams(activity_id: int) -> dict:
 
 def weather_at(query: dict) -> dict:
     """Hourly weather at the start point and time (WBGT included when it converges)."""
-    points = weather.decode_polyline(query["polyline"])
-    if not points:
-        raise ValueError("empty polyline")
-    lat, lon = points[0]
-    local = weather.parse_time(query["time"], local=True)
-    moment, _ = weather.resolve_offset(lat, lon, local)
-    return weather.get_weather(lat, lon, moment)
+    return weather.weather_of_run(query["polyline"], query["time"])
 
 
 def ensure(store: Any, intake: dict) -> dict:
@@ -134,7 +127,6 @@ def ensure(store: Any, intake: dict) -> dict:
     return {**intake, "streams": streams, "weather": conditions}
 
 
-# ------------------------------------------------------------ stream readings
 def _steps(s: dict):
     """(k, interval duration, moving?) for each sample after the first."""
     time, speed = s["t"], s.get("v")
@@ -260,7 +252,6 @@ def _at(s: dict, second: float) -> int | None:
     return hr[k]
 
 
-# ------------------------------------------------------------ quality session
 def _lap_bounds(laps: Sequence[Lap], s: dict | None) -> list[list[float]]:
     """The [start, end] bounds of each lap: timestamped, else the cumulated durations."""
     if s and len(s.get("lap_times") or []) == len(laps):

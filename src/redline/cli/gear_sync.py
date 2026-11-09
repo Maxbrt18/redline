@@ -1,23 +1,15 @@
-#!/usr/bin/env python3
 """Syncs the mileage of every Strava shoe into PostgreSQL."""
-
-
 
 from __future__ import annotations
 
-import os
-
 from redline.integrations import strava
 from redline.model import entrypoint
-from redline.model.errors import ConfigError
-from redline.storage import Database, OperationalStore
+from redline.storage import OperationalStore
+from redline.storage.database import from_environment
 
 
 def main() -> int:
-    database_url = os.environ.get("DATABASE_URL", "").strip()
-    if not database_url:
-        raise ConfigError("DATABASE_URL absent")
-    database = Database(database_url, application_name="gear-sync")
+    database = from_environment("gear-sync")
     try:
         store = OperationalStore(database)
         rows = strava.gear_rows()

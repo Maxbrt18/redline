@@ -13,13 +13,12 @@ from typing import Any
 
 from redline.model import paths
 
-from . import persona
 from .agent import (
     PROACTIVE_REPLY_SCHEMA,
     TRIAGE_SCHEMA,
-    ActiveRuns,
     AgentActivity,
     FailureKind,
+    RunnerBase,
     RunResult,
     RunSpec,
     SessionMode,
@@ -86,16 +85,12 @@ def _load_sdk() -> Any:
     )
 
 
-class CodexRunner:
+class CodexRunner(RunnerBase):
     """Adapter from the official SDK to the bot's minimal contract."""
 
     provider = "codex"
-    MAX_ATTEMPTS = 3
-    RETRY_DELAY = 5
-
     def __init__(self, config: Config, state: StateStore, *, sdk: Any = None) -> None:
-        self._config = config
-        self._state = state
+        super().__init__(config, state, "Codex")
         self._sdk = sdk
         # Tooled process of the current turn: `REDLINE_TURN_ID` is tied to the lifetime
         # of `codex app-server`, so one turn = one process.
@@ -105,7 +100,6 @@ class CodexRunner:
         # Long-lived process with no shell and no project document: the triage of each
         # message reuses it instead of relaunching an `app-server`.
         self._one_shot_client: Any = None
-        self._runs = ActiveRuns("Codex")
 
     def _start(self, overrides: tuple[str, ...], turn_id: str | None) -> Any:
         self._sdk = self._sdk or _load_sdk()
@@ -176,12 +170,6 @@ class CodexRunner:
             log.exception("Codex outage classification unavailable")
             return False
 
-    def activity(self, psid: str) -> AgentActivity | None:
-        return self._runs.activity(psid)
-
-    def cancel(self, psid: str) -> bool:
-        return self._runs.cancel(psid)
-
     def _thread_options(self, model: str | None, *,
                         instructions: str | None = STYLE_PROMPT) -> dict:
         return {
@@ -196,10 +184,6 @@ class CodexRunner:
             # the vault and the state directory only. Interactive approvals stay denied.
             "sandbox": self._sdk.Sandbox.workspace_write,
         }
-
-    def _personal(self, text: str) -> str:
-        """Substitute the instance athlete name for the token in everything the model reads."""
-        return persona.render(text, self._config.instance.athlete_name)
 
     def _open_thread(self, psid: str, model: str | None, mode: SessionMode,
                      turn_id: str | None, *, shell_enabled: bool = True) -> Any:
@@ -325,7 +309,7 @@ class CodexRunner:
                             attempt, self.MAX_ATTEMPTS, retryable, exc)
                 if not retryable or attempt == self.MAX_ATTEMPTS:
                     break
-                time.sleep(self.RETRY_DELAY * attempt)
+                self._pause_before_retry(attempt)
 
         if session_mode is SessionMode.CONTINUE:
             self._state.clear_session(psid, self.provider)

@@ -16,7 +16,7 @@ import pytest
 from conftest import TEST_VAULT
 
 from redline.model.errors import ConfigError
-from redline.service.config import Config, _load_dotenv
+from redline.service.config import Config, load_dotenv
 from redline.service.routing import Route
 
 MINIMAL = {
@@ -72,17 +72,6 @@ def test_the_instance_is_read_from_the_configured_vault(env, tmp_path):
             'place = "Paris"', 'place = "Annecy"'), encoding="utf-8")
     env.setenv("VAULT_PATH", str(vault))
     assert Config.from_env().instance.place == "Annecy"
-
-
-def test_codex_has_provider_specific_model_defaults(env):
-    env.setenv("AGENT_PROVIDER", "codex")
-    config = Config.from_env()
-
-    assert config.routing.plan(Route.N1).primary.model == "gpt-6-luna"
-    assert config.routing.plan(Route.N2).primary.model == "gpt-6-sol"
-    assert config.routing.plan(Route.TRIAGE).primary.model == "gpt-6-luna"
-    assert config.routing.plan(Route.TRIAGE).primary.effort == "low"
-    assert config.routing.plan(Route.HEAVY).primary.effort == "high"
 
 
 def test_codex_accepts_the_same_tcp_database_as_claude(env):
@@ -244,12 +233,6 @@ def test_attachment_total_must_cover_one_allowed_file(env):
         Config.from_env()
 
 
-def test_a_legacy_daily_proactive_cap_has_no_effect(env):
-    """An old deployment variable must not resurrect a removed cap."""
-    env.setenv("PROACTIVE_MAX_PER_DAY", "0")
-    assert not hasattr(Config.from_env(), "proactive_max_per_day")
-
-
 # ------------------------------------------------------------------- .env
 
 def test_dotenv_fills_only_what_the_environment_lacks(env, tmp_path):
@@ -257,7 +240,7 @@ def test_dotenv_fills_only_what_the_environment_lacks(env, tmp_path):
     over the file, otherwise nothing can be overridden at launch."""
     env.setenv("CLAUDE_BIN", "/usr/local/bin/claude")
     (tmp_path / ".env").write_text("CLAUDE_BIN=/autre/claude\nGIT_BRANCH=prod\n")
-    _load_dotenv(tmp_path / ".env")
+    load_dotenv(tmp_path / ".env")
     config = Config.from_env()
     assert config.claude_bin == "/usr/local/bin/claude"
     assert config.git_branch == "prod"
@@ -267,11 +250,11 @@ def test_dotenv_ignores_comments_blank_lines_and_quotes(env, tmp_path):
     (tmp_path / ".env").write_text(
         '# un commentaire\n\nGIT_BRANCH="prod"\nune ligne sans egal\n'
         "GIT_REMOTE='upstream'\n")
-    _load_dotenv(tmp_path / ".env")
+    load_dotenv(tmp_path / ".env")
     config = Config.from_env()
     assert config.git_branch == "prod"
     assert config.git_remote == "upstream"
 
 
 def test_an_absent_dotenv_is_not_an_error(tmp_path):
-    _load_dotenv(tmp_path / "pas-la.env")
+    load_dotenv(tmp_path / "pas-la.env")

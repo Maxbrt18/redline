@@ -10,7 +10,6 @@ import {push, render, select} from '../nav.js';
 import {loadToday} from '../data.js';
 import {launchWorkout, openWorkout} from '../workout.js';
 
-// ------------------------------------------------------------ Today
 // The day's thread: what is done today, in order, then what is coming, then the landmarks.
 // Detail decreases with distance: the current step has everything, tomorrow one line, the
 // week a tile. A single red dot marks the current step; it moves from wake-up to evening.
@@ -184,10 +183,9 @@ function hrCard(ask) {
   head.append(el('small', ask.hr + ' bpm à ' + paceOf(ask.pace_s) + '/km, contre ' + ask.reference + ' sur tes ' + ask.n + ' EF à allure voisine (+' + (ask.hr - ask.reference) + ').'));
   return add(card, head, choices('Une explication ?', '', hrChoices, ask.id, card));
 }
-// The debrief, one question at a time: the first missing one, its rank among the total,
-// and what follows. Each answer recomputes the screen, which moves on to the next. The
-// service counts the total: pains, RPE and enjoyment, then the fuel registry of a fuelled
-// session. `write` sends one answer; the session detail passes its own.
+// Each answer recomputes the screen, which moves on to the next question; the service
+// orders the questions and counts the total. `write` sends one answer; the session
+// detail passes its own.
 export function cellsCard(ask, target, write = answer) {
   const card = el('div', null, 'n-check');
   const metric = ask.fields[0], spec = specOf(metric, ask), label = el('span', spec.label);

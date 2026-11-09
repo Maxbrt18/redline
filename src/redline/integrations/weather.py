@@ -2,7 +2,7 @@
 """Weather of a run, to inform the coach's judgement.
 
 Combines the place and start time of an activity with Open-Meteo (free, no API key)
-and returns a compact French summary: temperature, humidity, wind, precipitation,
+and returns the weather of the run: temperature, humidity, wind, precipitation,
 and the **WBGT**, the real heat load, which is what goes into the ledger. Standard
 library only, WBGT included, so nothing has to be installed on the server.
 
@@ -39,16 +39,15 @@ airport METAR observations, the model matches real thermometers to about +-0.5 C
 when a figure looks wrong, suspect the call (time, place), not the model.
 """
 
-import argparse
 import contextlib
 import json
 import math
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import UTC, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from redline.coach.fr import weather as wording
-from redline.coach.fr.weather import FLAGS, sky
 from redline.model.errors import ExternalError, InputError
 
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
@@ -62,7 +61,6 @@ HOURLY = ("temperature_2m,apparent_temperature,relative_humidity_2m,"
 MIDPOINT_GAP_C = 2.0
 
 
-# ---------------------------------------------------------------------------
 # Outdoor WBGT: faithful port of Liljegren et al. (2008)
 #
 # "Modeling the Wet Bulb Globe Temperature Using Standard Meteorological
@@ -77,7 +75,6 @@ MIDPOINT_GAP_C = 2.0
 # direct fraction, cosine of the zenith angle. No infrared radiation input: the
 # atmospheric emissivity is estimated internally (`emis_atm`). Open-Meteo serves
 # exactly these variables.
-# ---------------------------------------------------------------------------
 
 STEFANB = 5.6696e-8
 CP = 1003.5
@@ -171,6 +168,10 @@ def h_cylinder_in_air(tair, pair, speed):
     re = max(speed, MIN_SPEED) * density * D_WICK / viscosity(tair)
     nu = 0.281 * re ** 0.6 * PR ** 0.44
     return nu * thermal_cond(tair) / D_WICK
+
+
+class WeatherError(ExternalError):
+    """Open-Meteo did not answer, or answered nothing usable."""
 
 
 class WBGTError(InputError):
@@ -397,14 +398,13 @@ def resolve_offset(lat, lon, naive_local):
     name = data.get("timezone")
     if name:
         try:
-            from zoneinfo import ZoneInfo
             return naive_local.replace(tzinfo=ZoneInfo(name)), name
-        except Exception:
+        except (ZoneInfoNotFoundError, ValueError):
             pass  # tz database missing on the system: fall back to the served offset.
 
     offset = data.get("utc_offset_seconds")
     if offset is None:
-        raise RuntimeError(
+        raise WeatherError(
             "Open-Meteo returned neither a zone name nor an offset for these "
             "coordinates. Pass --time again with an explicit offset, without --local."
         )
@@ -419,13 +419,25 @@ def fetch(url, params):
             return json.load(resp)
     except urllib.error.HTTPError as exc:
         if exc.code == 400 and "start_date" in params:
-            raise RuntimeError(
+            raise WeatherError(
                 f"Open-Meteo refuses the range {params['start_date']} → "
                 f"{params['end_date']}: outside the window it serves. The "
                 "forecast only reaches ~16 days; a distant race date cannot "
                 "be read yet."
             ) from exc
-        raise
+        raise WeatherError(f"Open-Meteo refused the request (HTTP {exc.code})") from exc
+    except (urllib.error.URLError, OSError, ValueError) as exc:
+        raise WeatherError(f"Open-Meteo unreachable or unreadable: {exc}") from exc
+
+
+def weather_of_run(polyline: str, local_time: str) -> dict:
+    """The weather at the start of a run, from its Strava polyline and local start time."""
+    points = decode_polyline(polyline)
+    if not points:
+        raise InputError("empty polyline")
+    lat, lon = points[0]
+    moment, _ = resolve_offset(lat, lon, parse_time(local_time, local=True))
+    return get_weather(lat, lon, moment)
 
 
 def get_weather(lat, lon, when):
@@ -453,7 +465,7 @@ def get_weather(lat, lon, when):
     hourly = data.get("hourly") or {}
     times = hourly.get("time") or []
     if not times:
-        raise RuntimeError("Open-Meteo returned no hourly data "
+        raise WeatherError("Open-Meteo returned no hourly data "
                            "(date too recent for the archive, or outside coverage?)")
 
     target = when.astimezone(UTC).replace(tzinfo=None)
@@ -493,100 +505,3 @@ def get_weather(lat, lon, when):
                                     out["wind"], out["radiation"],
                                     lat, lon, when))
     return out
-
-
-def format_summary(w, when, midpoint=None):
-    parts = [sky(w)]
-    if w["temp"] is not None:
-        s = wording.TEMPERATURE.format(temp=w["temp"])
-        if w["feels_like"] is not None and abs(w["feels_like"] - w["temp"]) >= 1:
-            s += wording.FEELS_LIKE.format(feels_like=w["feels_like"])
-        parts.append(s)
-    if w["humidity"] is not None:
-        parts.append(wording.HUMIDITY.format(humidity=w["humidity"]))
-    if w["wind"] is not None:
-        parts.append(wording.WIND.format(wind=w["wind"]))
-    if w["precip"] is not None and w["precip"] > 0:
-        parts.append(wording.PRECIPITATION.format(precip=w["precip"]))
-    if w.get("wbgt") is not None:
-        parts.append(wording.WBGT.format(wbgt=w["wbgt"], flag=FLAGS[w["band"]]))
-    local = when.strftime("%Y-%m-%d %H:%M %Z")
-    out = wording.AT_START.format(local=local, parts=", ".join(parts))
-
-    # The start is only one point. When the middle of the route differs markedly
-    # (hillsides to town, valley floor to ridge), the start weather no longer
-    # describes the session and would be wrongly quoted as the weather of the run.
-    if midpoint and midpoint["temp"] is not None and w["temp"] is not None:
-        gap = midpoint["temp"] - w["temp"]
-        if abs(gap) >= MIDPOINT_GAP_C:
-            out += wording.MIDPOINT.format(temp=midpoint["temp"], gap=gap)
-    return out
-
-
-def main():
-    ap = argparse.ArgumentParser(description="The weather of a run, from Open-Meteo.")
-    ap.add_argument("--polyline", help="Strava encoded polyline (summary_polyline).")
-    ap.add_argument("--lat", type=float, help="Start latitude.")
-    ap.add_argument("--lon", type=float, help="Start longitude.")
-    ap.add_argument("--time", required=True,
-                    help="ISO 8601 start time. With --local: Strava's "
-                         "`start_local` as is, without a zone.")
-    ap.add_argument("--local", action="store_true",
-                    help="--time is the wall-clock time at the start "
-                         "(= `start_local` of redline strava). The offset is "
-                         "resolved from the coordinates. Never add a `Z` "
-                         "instead.")
-    ap.add_argument("--json", action="store_true", help="Raw JSON output.")
-    args = ap.parse_args()
-
-    midpoint_point = None
-    if args.polyline:
-        try:
-            pts = decode_polyline(args.polyline)
-        except ValueError as exc:
-            raise InputError(str(exc)) from exc
-        if not pts:
-            raise InputError("Empty or unreadable polyline.")
-        lat, lon = pts[0]
-        if len(pts) >= 3:
-            midpoint_point = pts[len(pts) // 2]
-    elif args.lat is not None and args.lon is not None:
-        lat, lon = args.lat, args.lon
-    else:
-        raise InputError("Give --polyline, or --lat and --lon.")
-
-    try:
-        when = parse_time(args.time, local=args.local)
-    except ValueError as exc:
-        raise InputError(str(exc)) from exc
-
-    zone_name = None
-    if args.local:
-        try:
-            when, zone_name = resolve_offset(lat, lon, when)
-        except Exception as exc:
-            raise ExternalError(f"Time zone of the start cannot be determined: {exc}") from exc
-
-    try:
-        w = get_weather(lat, lon, when)
-    except Exception as exc:
-        raise ExternalError(f"Weather unavailable: {exc}") from exc
-
-    midpoint = None
-    if midpoint_point:
-        try:
-            midpoint = get_weather(midpoint_point[0], midpoint_point[1], when)
-        except Exception:
-            # The second point is a convenience, not the data: its failure must never
-            # deprive the coach of the start weather.
-            midpoint = None
-
-    if args.json:
-        payload = {"lat": lat, "lon": lon, "timezone": zone_name, **w, "conditions": sky(w)}
-        if midpoint:
-            payload["midpoint"] = {"lat": midpoint_point[0], "lon": midpoint_point[1], **midpoint,
-                                   "conditions": sky(midpoint)}
-        print(json.dumps(payload, ensure_ascii=False))
-    else:
-        print(format_summary(w, when, midpoint))
-

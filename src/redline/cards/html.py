@@ -1,12 +1,12 @@
-"""HTML building blocks shared by the four Redline cards.
+"""HTML building blocks shared by the Redline cards.
 
 Every user-supplied string goes through esc(): the JSON is compiled by Claude from
 the vault, so it is trusted-ish, but an unescaped "&" or "<" would silently break
 the layout -- and a card that renders wrong is worse than no card.
 
 The components here own the MARKUP; theme.css owns the LOOK. Nothing in this file
-computes a position or a size: that is the whole point of the move away from
-matplotlib. If you find yourself adding a pixel here, put it in the stylesheet.
+computes a position or a size: the browser lays the card out. If you find yourself
+adding a pixel here, put it in the stylesheet.
 """
 
 from html import escape

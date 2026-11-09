@@ -17,17 +17,19 @@ from pathlib import Path
 from sqlalchemy import exc as sa_exc
 
 from redline import cli
-from redline.model import agent_input, session_cycle, vault_layout
+from redline.model import agent_input, iso_week, session_cycle, vault_layout
 from redline.model import ledger as ledger_model
 from redline.model import paths as engine_paths
 from redline.model import weekly_plan as weekly_plan_model
-from redline.model.context_packet import render_context_packet
+from redline.model.vocabulary import SessionStatus
+from redline.service.context_packet import render_context_packet
 from redline.storage.database import StorageError
 from redline.storage.repository import OperationalStore
 
 from . import clock
 from .config import sandbox_overrides
 from .plans import PlanStatus, render_plan_message
+from .proactive_kinds import policy
 
 log = logging.getLogger("redline")
 
@@ -39,7 +41,6 @@ GIT_TIMEOUT = 60
 # applying it is retried briefly before it is declared refused.
 APPLY_RETRY_PAUSES = (1.0, 3.0, 8.0)
 # A settled session no longer changes the review: done, missed, cancelled or closed.
-SETTLED_CYCLE_STATES = session_cycle.TERMINAL_STATES | {"completed"}
 
 #: The trees whose fingerprint identifies the deployed code (`/health`, release).
 RUNTIME_TREES = ("deploy", "src", "migrations")
@@ -66,7 +67,7 @@ class VaultAlert:
 class PersistenceFailure(enum.Enum):
     """Why the facts of a turn were not recorded.
 
-    Forbidden files (hand-edited projection, modified code) no longer refuse the turn:
+    Forbidden files (hand-edited projection, modified code) do not refuse the turn:
     they are restored and the rest proceeds. Only a failure to apply the commands
     themselves leaves facts unrecorded.
     """
@@ -247,15 +248,11 @@ class VaultRepo:
         """Record a message only once Messenger has delivered it."""
         if self._store is None:
             raise StorageError("no PostgreSQL storage for the proactive trace")
-        kind = {
-            "morning": "morning", "weekly": "weekly", "monthly": "monthly",
-            "strava_debrief": "debrief", "strava_debrief_late": "debrief",
-        }.get(job.kind, "other")
         source_key = job.job_id or f"{job.kind}:{job.detail}:{sent_at.isoformat()}"
         self._store.add_proactive_message({
             "source_key": source_key,
             "sent_at": sent_at.astimezone(),
-            "kind": kind,
+            "kind": policy(job.kind).trace,
             "angle": self._store.turn_angle(turn_id) or None,
             "summary": message[:2000],
         }, actor="messenger-delivery")
@@ -513,14 +510,14 @@ class VaultRepo:
         return (ledger_model.pending_observation_fields(rows, today),
                 ledger_model.lapsed_observation_fields(rows, today))
 
-    def weekly_plan_context(self, week: str) -> str:
-        """Return the active revision unless the week is absent or invalid."""
+    def active_revision(self, week: str) -> dict | None:
+        """The active revision of `week`, unless the week is absent or invalid."""
         if self._store is None:
-            return ""
+            return None
         plan = self._store.load_plan(week)
         if plan is None or self.validate_weekly_plan(week, plan) is PlanStatus.INVALID:
-            return ""
-        return weekly_plan_model.as_json(plan)
+            return None
+        return weekly_plan_model.active(plan)
 
     def day_settled(self, day) -> bool:
         """All sessions planned that day are settled: done, missed or cancelled.
@@ -529,15 +526,15 @@ class VaultRepo:
         """
         if self._store is None:
             return False
-        week = weekly_plan_model.current_week(day)
-        context = self.weekly_plan_context(week)
-        if not context:
+        week = iso_week.of(day)
+        revision = self.active_revision(week)
+        if revision is None:
             return False
-        keys = [session["id"] for session in json.loads(context)["sessions"]
+        keys = [session["id"] for session in revision["sessions"]
                 if session["date"] == day.isoformat() and session["kind"] != "rest"
-                and session.get("status") != "cancelled"]
+                and session.get("status") != SessionStatus.CANCELLED]
         links = self._store.week_session_links(week)
-        return all((links.get(key) or {}).get("state") in SETTLED_CYCLE_STATES
+        return all((links.get(key) or {}).get("state") in session_cycle.SETTLED_STATES
                    for key in keys)
 
     def coaching_context(self, depth: str) -> str:
@@ -567,18 +564,15 @@ class VaultRepo:
     def weekly_plan_message(self, week: str, today: str = "", since: str = "",
                             exclude_ids=frozenset()) -> str:
         """Render the persisted plan for today, the remaining week, or the full week."""
-        return render_plan_message(self.weekly_plan_context(week), week,
+        return render_plan_message(self.active_revision(week), week,
                                    today=today, since=since, exclude_ids=exclude_ids)
 
     def render_weekly_plan_card(self, week: str, today: str = "") -> bool:
         """Render the same active revision into the Messenger outbox."""
-        context = self.weekly_plan_context(week)
-        if not context:
+        active = self.active_revision(week)
+        if active is None:
             return False
-        try:
-            revision = json.loads(context)["revision"]
-        except (json.JSONDecodeError, KeyError):
-            return False
+        revision = active["revision"]
         outbox = engine_paths.outbox_dir()
         outbox.mkdir(parents=True, exist_ok=True)
         target = str(outbox / f"plan-{week.lower()}-r{revision}.png")

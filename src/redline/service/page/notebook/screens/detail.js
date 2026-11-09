@@ -5,7 +5,6 @@ import {dm, fmt, kindName, paceOf, weekNumber} from '../format.js';
 import {cellsCard} from './today.js';
 import {ensure, loadToday} from '../data.js';
 
-// ------------------------------------------------------------ Completed session detail
 // On paper, no cards: a head that states the session as a big figure and a bar, planned
 // and done on one red stroke, HR zone colours wherever an HR is shown, red for repetitions.
 // Everything is computed by the service (/notebook-api/session/<id>); here we only format.
@@ -44,7 +43,6 @@ function sdFamily(data) {
   return kindName[data.kind] || data.kind;
 }
 
-// ---- the head: the big figure, then the session as a bar
 function sdStrip(data) {
   if (data.phases && data.phases.length) {
     const total = data.phases.reduce((sum, phase) => sum + phase.time_s, 0) || 1;
@@ -112,7 +110,6 @@ function sdFacts(data) {
   return grid;
 }
 
-// ---- the feel: three tiles, and the one-gesture question while any is missing
 function sdSegments(value) {
   const bar = el('span', null, 'n-dseg');
   for (let index = 1; index <= 10; index++) {
@@ -168,7 +165,6 @@ function sdFeelings(data) {
   return box;
 }
 
-// ---- planned and done
 function sdPlan(data) {
   if (!data.plan) return null;
   const rules = sessionLimits(data.plan.targets, data.fact);
@@ -196,7 +192,6 @@ function sdPlan(data) {
   return add(el('section', null, 'n-dsec'), sdHead('Prévu et fait'), card);
 }
 
-// ---- charts: HR over the background of its zones, altitude below
 const sdX = (seconds, duration) => SD_PLOT_W * seconds / (duration || 1);
 const sdY = hr => SD_HR_H * (SD_HR_HIGH - Math.max(SD_HR_LOW, Math.min(SD_HR_HIGH, hr))) / (SD_HR_HIGH - SD_HR_LOW);
 // `joined`: an area is not cut at stops, only a line shows them.
@@ -269,7 +264,6 @@ function sdChart(data) {
   return box;
 }
 
-// ---- repetitions (quality) or kilometres (the rest)
 function sdReps(data) {
   const bounds = sdBounds(data), table = el('div', null, 'n-dreps');
   table.append(add(el('div', null, 'n-drh'), el('span'), el('span', 'Durée'), el('span', 'D+'), el('span', 'Allure'), el('span', 'FC moy'), el('span', 'Cad.')));
@@ -359,7 +353,6 @@ function sdWork(data) {
   return add(el('section', null, 'n-dsec'), sdHead('Au kilomètre', 'temps en mouvement'), card);
 }
 
-// ---- time per zone, comparison, conditions, week
 function sdZones(data) {
   if (!data.zones) return null;
   const seconds = data.zones.seconds, total = seconds.reduce((a, b) => a + b, 0) || 1, top = Math.max(...seconds) || 1;

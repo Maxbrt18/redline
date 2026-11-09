@@ -19,7 +19,6 @@ export let watchedZones = [];   // [{zone, label}]: the monitored zones, to ask 
 export let credentials = null;  // {token}
 export let state = null;        // progress, persisted
 export let timer = null;        // {kind:'work'|'rest', endsAt|startedAt, paused}
-// ------------------------------------------------------------------- model
 
 /* THE SLOTS ARRIVE WALKED OUT. An exercise carries the list of validations it
  * asks for -- one per set, doubled when the dose is per leg, one per BLOCK for
@@ -49,8 +48,6 @@ export function firstUnfinished() {
   for (let i = 0; i < session.exercises.length; i++) if (!isDone(i)) return i;
   return -1;
 }
-
-// ------------------------------------------------------------------- state
 
 const storageKey = () => `redline:strength:${session.sid || 'session'}`;
 

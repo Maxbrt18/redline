@@ -17,8 +17,9 @@ from redline import cli
 from redline.coach import dates
 from redline.coach.fr import fill, labels, note, prompt
 from redline.coach.fr import plan as plan_text
-from redline.model import agent_input, rulebook, session_kinds, typography
+from redline.model import agent_input, rulebook, typography, weekly_plan
 from redline.model import ledger as ledger_model
+from redline.service.proactive_kinds import policy
 
 #: Re-exported so the check that no injected text uses them reads the same list as the
 #: guard that refuses to write them.
@@ -138,9 +139,8 @@ def _label(column: str) -> str:
 
 def missing_cells_note(pending: list, lapsed: list, *, notebook: bool = False) -> str:
     """Build the invisible instruction for declarative ledger cells."""
-    # A wake trace is qualitative and asked on waking; it is not a figure to chase.
-    pending = [entry for entry in pending if entry.get("type") != session_kinds.WAKE_TRACE]
-    lapsed = [entry for entry in lapsed if entry.get("type") != session_kinds.WAKE_TRACE]
+    pending = [entry for entry in pending if not ledger_model.asked_on_waking(entry)]
+    lapsed = [entry for entry in lapsed if not ledger_model.asked_on_waking(entry)]
     if not pending and not lapsed:
         return ""
     to_ask, to_fetch = _split_cells(pending)
@@ -225,14 +225,16 @@ def today_note(moment) -> str:
                 tomorrow_weekday=dates.weekday(tomorrow))
 
 
-def canonical_plan_note(context: str) -> str:
+def canonical_plan_note(revision: dict | None) -> str:
     """The canonical plan, put in front of a turn allowed to prescribe."""
-    return fill(prompt("canonical-plan"), context=context or plan_text.CANONICAL_MISSING)
+    return fill(prompt("canonical-plan"), context=weekly_plan.revision_json(revision)
+                if revision else plan_text.CANONICAL_MISSING)
 
 
-def active_revision_note(context: str) -> str:
+def active_revision_note(revision: dict | None) -> str:
     """The same for an initiative, which starts without a message from the athlete."""
-    return fill(prompt("active-revision"), context=context or plan_text.ACTIVE_MISSING)
+    return fill(prompt("active-revision"), context=weekly_plan.revision_json(revision)
+                if revision else plan_text.ACTIVE_MISSING)
 
 
 def deep_handoff_note(handoff: str) -> str:
@@ -304,8 +306,6 @@ PROACTIVE_TRIGGERS = {
                  "weekly_repair", "weekly", "monthly")
 }
 
-#: Initiatives that may not stay silent: they must produce a text.
-MUST_SPEAK_KINDS = frozenset({"weekly", "weekly_repair"})
 
 
 def debrief_in_reply(detail: str, *, notebook: bool) -> str:
@@ -328,7 +328,7 @@ def build_proactive_prompt(kind: str, detail: str) -> str:
     instructions = _with_scales(PROACTIVE_TRIGGERS[kind].replace("{detail}", detail))
     if kind == "weekly":
         ending = note("ending-weekly")
-    elif kind in MUST_SPEAK_KINDS:
+    elif policy(kind).must_speak:
         ending = note("ending-must-speak")
     else:
         ending = note("ending-may-stay-silent")

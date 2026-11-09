@@ -3,8 +3,9 @@
 Links carry only an opaque capability (`/s#t=<token>`). The exact prescription lives
 in PostgreSQL and the raw token never does.
 
-Leaf module: standard library only, imports nothing from the package. The card script
-uses it to write a snapshot sidecar, while the service alone mints capabilities.
+Leaf of `redline.service`: it imports only from `redline.model` and `redline.coach`,
+never from the rest of the service. The card script uses it to write a snapshot sidecar,
+while the service alone mints capabilities.
 """
 
 from __future__ import annotations
@@ -20,7 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from redline.coach.fr import strength_report as wording
-from redline.model import strength_log
+from redline.model import formats, strength_log
 from redline.model.errors import InputError
 
 PAGE_PATH = "/s"
@@ -33,7 +34,7 @@ LINK_TTL_SECONDS = 7 * 24 * 60 * 60
 TOKEN_BYTES = 24             # 192 bits; the URL itself is the capability
 TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{32}$")
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]+")
-ROUTINE = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")
+ROUTINE = re.compile(formats.SLUG)
 
 
 class ReportError(InputError):
@@ -43,8 +44,6 @@ class ReportError(InputError):
 class ExpiredLink(InputError):
     """The capability has outlived its validity period."""
 
-
-# ------------------------------------------------------------------------ URL
 
 def new_token() -> str:
     """Capability put in the fragment; only its SHA-256 digest is persisted."""
@@ -86,8 +85,6 @@ def sidecar_enabled() -> bool:
     return bool((os.environ.get("COACH_BASE_URL") or "").strip())
 
 
-# -------------------------------------------------------------------- sidecar
-
 def sidecar_for(image: Path) -> Path:
     """The link file riding alongside a card in the outbox."""
     return image.with_name(image.name + SIDECAR_SUFFIX)
@@ -120,8 +117,6 @@ def read_sidecar(image: Path) -> tuple | None:
         return None
     return str(data.get("text") or wording.DEFAULT_TEXT), session
 
-
-# --------------------------------------------------------------------- report
 
 def validate_session(session: dict, *, now: int | None = None) -> None:
     """Refuse a snapshot that is expired or foreign to the generator contract."""

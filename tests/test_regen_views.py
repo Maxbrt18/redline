@@ -15,7 +15,8 @@ import sys
 from conftest import ENGINE_ROOT, VAULT_ROOT, load_script
 
 from redline import cli
-from redline.model import hot_cache, program, strength_tables, views, weekly_plan
+from redline.analysis import hot_cache
+from redline.model import program, strength_tables, views, weekly_plan
 from redline.service.vault import VaultRepo
 
 MARKER = re.compile(r"<!-- ([A-Z_]+)_START -->")

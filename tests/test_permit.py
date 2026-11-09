@@ -2,7 +2,7 @@
 
 import datetime as dt
 
-from redline.model import permit
+from redline.model import iso_week, permit
 
 MON = dt.date(2026, 9, 28)
 #: Top of Z2 for the test athlete: what `Instance.hr_bounds[1]` provides.
@@ -12,7 +12,7 @@ PERIOD = permit.Window(MON, "2026-W42")
 
 def _choice(key, day, minutes):
     return {"session_key": key, "scheduled_on": day, "coach_minutes": minutes,
-            "iso_week": permit.iso_week(day)}
+            "iso_week": iso_week.of(day)}
 
 
 def _ef(day, minutes, hr=150, strava_id=None):
@@ -66,7 +66,7 @@ def test_the_grant_is_judged_after_w42_on_five_clean_easy_runs():
     days = [MON + dt.timedelta(days=offset) for offset in (1, 3, 8, 10, 15)]
     choices = [_choice(f"ef-{index}", day, 40) for index, day in enumerate(days)]
     runs = [_ef(day, 42) for day in days]
-    after = permit.week_end(PERIOD.granted_week) + dt.timedelta(days=1)
+    after = iso_week.sunday(PERIOD.granted_week) + dt.timedelta(days=1)
     lines = permit.evaluate(choices, runs, {}, {}, {}, today=after, hr_cap=HR_CAP)
     current = permit.state(lines, [], today=after, period=PERIOD)
     assert current.grant["granted"] is True and current.phase == "granted"

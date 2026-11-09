@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 from conftest import FakeAgent
 
 from redline.service.agent import RunResult
-from redline.service.messenger import MessengerClient
+from redline.service.textutils import burst_parts
 
 
 def test_a_reply_with_a_separator_goes_out_bursted(make_bot):
@@ -24,5 +24,5 @@ def test_a_reply_with_a_separator_goes_out_bursted(make_bot):
     # The reply goes out through send_burst (not send_text), and no text contains `---`.
     client.send_burst.assert_called_once()
     assert client.send_burst.call_args.args[1] == reply
-    parts = MessengerClient._burst_parts(reply)
+    parts = burst_parts(reply)
     assert len(parts) == 2 and all("---" not in p for p in parts)

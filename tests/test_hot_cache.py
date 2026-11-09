@@ -1,4 +1,4 @@
-"""model/hot_cache.py: the hot-cache Form block, generated from the ledger.
+"""analysis/hot_cache.py: the hot-cache Form block, generated from the ledger.
 
 What these tests protect: the hot-cache can no longer carry a WRONG figure silently.
 Values typed by hand go stale as soon as a ledger line is added, until someone reruns
@@ -16,9 +16,8 @@ import datetime as dt
 
 from conftest import RPE_TARGETS
 
-from redline.analysis import ledger
+from redline.analysis import hot_cache, ledger
 from redline.analysis.ledger import Instruments, Row
-from redline.model import hot_cache
 
 
 def test_the_block_carries_the_gauge_of_the_last_week():
@@ -26,7 +25,7 @@ def test_the_block_carries_the_gauge_of_the_last_week():
         that passes (W30 becomes W31...), for a reason unrelated to a bug in `render()`."""
     rows = [Row(dt.date(2026, 3, 2), "easy", km=10, hours=5.0),
             Row(dt.date(2026, 3, 4), "easy", km=10, hours=5.0)]
-    block = hot_cache.render(ledger, rows, {}, RPE_TARGETS)
+    block = hot_cache.render(rows, {}, RPE_TARGETS)
     assert "W10" in block
     assert "10 h-éq · 140/100" in block   # h_eq = 5+5 ; level = round(10 * 14)
     assert "au rouge" in block           # 140 > LEVEL_CAP (85)
@@ -38,7 +37,7 @@ def test_a_red_made_of_walking_says_so():
         hand every week -- and lost."""
     rows = [Row(dt.date(2026, 3, 2), "easy", km=10, hours=2.0),
             Row(dt.date(2026, 3, 4), "hike", km=15, hours=6.0, dplus=300)]
-    assert "% de marche" in hot_cache.render(ledger, rows, {}, RPE_TARGETS)
+    assert "% de marche" in hot_cache.render(rows, {}, RPE_TARGETS)
 
 
 def test_the_walk_share_uses_the_gauge_formula_not_a_copy_of_it():
@@ -54,20 +53,20 @@ def test_the_walk_share_uses_the_gauge_formula_not_a_copy_of_it():
     rows = [Row(dt.date(2026, 3, 2), "threshold", km=10, hours=1.0, rpe=8.0),
             Row(dt.date(2026, 3, 4), "hike", km=8, hours=2.0)]
     assert ledger.row_weight(rows[0], RPE_TARGETS) == (2.0, True)
-    assert "33 % de marche" in hot_cache.render(ledger, rows, {}, RPE_TARGETS)
+    assert "33 % de marche" in hot_cache.render(rows, {}, RPE_TARGETS)
 
 
 def test_a_quiet_week_carries_no_red_verdict():
     rows = [Row(dt.date(2026, 3, 2), "easy", km=8.0, hours=0.8, pains={"knee": 0.0}),
             Row(dt.date(2026, 3, 4), "easy", km=8.0, hours=0.8, pains={"knee": 0.0})]
-    block = hot_cache.render(ledger, rows, {"2026-W10": Instruments()}, RPE_TARGETS)
+    block = hot_cache.render(rows, {"2026-W10": Instruments()}, RPE_TARGETS)
     assert "au rouge" not in block
     assert "% de marche" not in block   # zero hiking: the mention has no reason to appear
     assert "2 sorties" in block
 
 
 def test_an_empty_ledger_does_not_crash():
-    assert "vide" in hot_cache.render(ledger, [], {}, RPE_TARGETS)
+    assert "vide" in hot_cache.render([], {}, RPE_TARGETS)
 
 
 # ------------------------------------------- open week and State block
@@ -76,9 +75,9 @@ def test_the_week_in_progress_is_never_announced_as_closed():
     """On a Saturday, the block announced «W39 closed -- 13 km, ratio 0.3»."""
     rows = [Row(dt.date(2026, 9, 22), "easy", km=7.0, hours=0.75),
             Row(dt.date(2026, 9, 24), "easy", km=6.0, hours=0.65)]
-    saturday = hot_cache.render(ledger, rows, {}, RPE_TARGETS, today=dt.date(2026, 9, 26))
+    saturday = hot_cache.render(rows, {}, RPE_TARGETS, today=dt.date(2026, 9, 26))
     assert "W39 en cours" in saturday and "bouclée" not in saturday
-    monday = hot_cache.render(ledger, rows, {}, RPE_TARGETS, today=dt.date(2026, 9, 28))
+    monday = hot_cache.render(rows, {}, RPE_TARGETS, today=dt.date(2026, 9, 28))
     assert "W39 bouclée" in monday
 
 
@@ -100,7 +99,7 @@ def _state(**overrides):
         "race_on": dt.date(2026, 11, 26), "today": dt.date(2026, 10, 5),
     }
     inputs.update(overrides)
-    return hot_cache.render_state(ledger, rows, **inputs)
+    return hot_cache.render_state(rows, **inputs)
 
 
 def test_the_state_block_carries_what_decides_the_next_weeks():
@@ -140,11 +139,11 @@ def test_refresh_fills_the_state_block_only_where_it_is_declared(tmp_path):
             return [{"slug": "knee", "label": "Genou", "active": True}]
 
     rows = [Row(dt.date(2026, 9, 20), "long", km=10.8, hours=1.3)]
-    assert hot_cache.refresh(tmp_path, ledger, rows, {}, store=Store(),
+    assert hot_cache.refresh(tmp_path, rows, {}, store=Store(),
                              today=dt.date(2026, 9, 27))
     text = cache.read_text(encoding="utf-8")
     assert "knee 3/5" in text and "Prédictions à solder** : 1" in text
-    assert not hot_cache.refresh(tmp_path, ledger, rows, {}, store=Store(),
+    assert not hot_cache.refresh(tmp_path, rows, {}, store=Store(),
                                  today=dt.date(2026, 9, 27), check=True)
 
 
@@ -152,10 +151,10 @@ def test_each_watched_zone_has_its_own_trend_in_the_form_block():
     rows = [Row(dt.date(2026, 3, 2), "easy", km=8.0, hours=0.8,
                 pains={"talon": 2.0, "cheville": 0.5})]
     zones = [ledger.PainZone("talon", "Talon"), ledger.PainZone("cheville", "Cheville")]
-    block = hot_cache.render(ledger, rows, {}, RPE_TARGETS, zones=zones)
+    block = hot_cache.render(rows, {}, RPE_TARGETS, zones=zones)
     assert "Talon W10 2/—" in block and "Cheville W10 0,5/—" in block
 
 
 def test_without_a_watched_zone_the_form_block_says_so():
     rows = [Row(dt.date(2026, 3, 2), "easy", km=8.0, hours=0.8)]
-    assert "aucune zone surveillée" in hot_cache.render(ledger, rows, {}, RPE_TARGETS)
+    assert "aucune zone surveillée" in hot_cache.render(rows, {}, RPE_TARGETS)

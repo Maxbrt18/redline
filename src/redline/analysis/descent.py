@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """The descent (D-) of an activity, which Strava does not return.
 
 The API gives POSITIVE elevation gain (`elevation_gain`) and nothing for the negative side.
@@ -29,45 +28,9 @@ The stream is passed as is: either the JSON returned by `redline strava streams`
 
 from __future__ import annotations
 
-import argparse
-import json
-
-from redline.model import (
-    agent_input,
-)
-from redline.model.errors import InputError
-
 
 def descent(dplus: float, altitude: list) -> int:
     """The D- in metres, rounded. Flat terrain returns 0, never nothing."""
     if len(altitude) < 2:
         raise ValueError("elevation stream too short: two points at least")
     return max(0, round(dplus + altitude[0] - altitude[-1]))
-
-
-def _altitude(payload: str) -> list:
-    data = json.loads(payload)
-    if isinstance(data, dict):
-        data = data.get("altitude")
-    if not isinstance(data, list):
-        raise ValueError("elevation stream not found: expected a list, or an object "
-                         "{\"altitude\": [...]} as returned by `redline strava streams`")
-    return data
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--dplus", type=float, required=True,
-                        help="the activity's elevation_gain, in metres (Strava)")
-    parser.add_argument("--altitude", help="elevation stream as JSON (default: stdin)")
-    parser.add_argument("--input", help="file of the elevation stream as JSON")
-    args = parser.parse_args()
-
-    try:
-        altitude = _altitude(args.altitude or agent_input.read_text(args.input))
-        print(descent(args.dplus, altitude))
-    except ValueError as exc:
-        raise InputError(f"D- cannot be computed -- {exc}") from exc
-    return 0
-

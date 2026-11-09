@@ -16,23 +16,22 @@ A gut above 0/10 opens `gut_symptom_kinds` and `gut_onset_min` (minutes into the
 from __future__ import annotations
 
 import argparse
-import hashlib
-import json
-import os
-import sys
 
 from redline.coach.fr import ledger as wording
 from redline.model import (
+    agent_input,
     commands,
     entrypoint,
     ledger,
 )
 from redline.model.errors import InputError
 from redline.model.vocabulary import HrDoubt
+from redline.storage.schema import MEASUREMENT_DEFINITIONS
 
-METRICS = ("rpe", "pain", "enjoyment", "distance_km", "duration_s", "pace_s_per_km",
-           "hr_avg_bpm", "hr_max_bpm", "cadence_spm", "elevation_gain_m",
-           "elevation_loss_m", "wbgt_c", *ledger.FUELLING_METRICS)
+#: Every measurement an observation carries, and the pain of a zone.
+METRICS = ("pain", *MEASUREMENT_DEFINITIONS)
+
+ACTOR = "ledger-complete"
 
 
 def resolve_key(store, key: str, date: str, kind: str) -> str:
@@ -78,12 +77,9 @@ def main() -> int:
                         help="a number; comma-separated slugs for fuel_formats and "
                              "gut_symptom_kinds, one slug for fuel_mix")
     values.add_argument("--unavailable", action="store_true")
-    parser.add_argument("--database-url", default=os.environ.get("DATABASE_URL", ""))
     args = parser.parse_args()
-    turn_id = (os.environ.get("REDLINE_TURN_ID") or "").strip()
-    if not args.database_url:
-        parser.error("DATABASE_URL is required")
-    from redline.storage import Database, OperationalStore, StorageError
+    turn_id = agent_input.current_turn()
+    from redline.storage import open_store
 
     if not args.key and not args.date:
         parser.error("--key or --date is required (see `redline fact-read observations`)")
@@ -106,7 +102,7 @@ def main() -> int:
             except ValueError:
                 parser.error(f"--value: a number is expected for {args.metric}")
 
-    store = OperationalStore(Database(args.database_url, application_name="ledger-complete"))
+    store = open_store(ACTOR)
     # Resolved BEFORE staging: a turn command prepared on a nonexistent key only fails
     # at validation, well after the coach's reply.
     key = resolve_key(store, args.key, args.date, args.kind)
@@ -121,37 +117,21 @@ def main() -> int:
         raise InputError(f"unknown observation: {key}. Recent -- {recent}")
     if args.hr_doubt:
         payload = {"idempotency_key": key, "reason": args.hr_doubt, "note": args.cause.strip()}
-        if turn_id:
-            digest = hashlib.sha256(json.dumps(
-                payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()[:16]
-            store.stage_command(turn_id, f"hr-doubt:{key}:{digest}", commands.HR_DOUBT,
-                                payload)
-            print(wording.HR_DOUBT_STAGED.format(key=key, hr_doubt=args.hr_doubt))
-            return 0
-        try:
-            store.doubt_hr(observation_id, args.hr_doubt, args.cause, actor="ledger-complete")
-        except StorageError as exc:
-            print(str(exc), file=sys.stderr)
-            return 1
-        print(wording.HR_DOUBT_RECORDED.format(key=key, hr_doubt=args.hr_doubt))
+        submitted = store.submit(commands.HR_DOUBT, payload, turn_id=turn_id, actor=ACTOR,
+                                 command_key=f"hr-doubt:{key}:{commands.digest(payload)}")
+        line = wording.HR_DOUBT_STAGED if submitted.staged else wording.HR_DOUBT_RECORDED
+        print(line.format(key=key, hr_doubt=args.hr_doubt))
         return 0
-    if turn_id:
-        payload = {"idempotency_key": key, "metric": args.metric,
-                   "value": value, "unavailable": args.unavailable}
-        if args.zone is not None:
-            payload["zone"] = args.zone
-        digest = hashlib.sha256(json.dumps(
-            payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()[:16]
-        store.stage_command(turn_id, f"measurement:{key}:{args.metric}:{digest}",
-                            commands.MEASUREMENT_COMPLETE, payload)
+    payload = {"idempotency_key": key, "metric": args.metric,
+               "value": value, "unavailable": args.unavailable}
+    if args.zone is not None:
+        payload["zone"] = args.zone
+    submitted = store.submit(
+        commands.MEASUREMENT_COMPLETE, payload, turn_id=turn_id, actor=ACTOR,
+        command_key=f"measurement:{key}:{args.metric}:{commands.digest(payload)}")
+    if submitted.staged:
         print(wording.MEASUREMENT_STAGED.format(key=key, metric=args.metric))
         return 0
-    try:
-        store.complete_measurement(observation_id, args.metric, value, zone=args.zone,
-                                   unavailable=args.unavailable, actor="ledger-complete")
-    except StorageError as exc:
-        print(str(exc), file=sys.stderr)
-        return 1
     what = f"{args.metric} {args.zone}" if args.zone else args.metric
     print(wording.MEASUREMENT_RECORDED.format(key=key, what=what))
     return 0

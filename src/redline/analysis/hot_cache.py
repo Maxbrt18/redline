@@ -3,8 +3,8 @@
 Only this line is generated: it is the only derived state in the status block. The rest
 is editorial judgement, and generating it would derive prose from prose.
 
-The point is not saving space but preventing drift: figures typed by hand went silently
-stale each time a row was added to the ledger.
+The point is not saving space but preventing drift: figures typed by hand would go silently
+stale each time a row is added to the ledger.
 """
 
 from __future__ import annotations
@@ -15,9 +15,11 @@ from typing import TYPE_CHECKING, Any
 
 from redline.coach.fr import hot_cache as text
 from redline.coach.fr import ledger as ledger_text
+from redline.model import iso_week, program, vault_layout
+from redline.model.views import apply
+from redline.model.vocabulary import DeadlineStatus
 
-from . import program, vault_layout
-from .views import apply
+from . import ledger
 
 if TYPE_CHECKING:
     from redline.storage import OperationalStore
@@ -36,14 +38,9 @@ def _round(value: float) -> str:
     return f"{value:.2f}".rstrip("0").rstrip(".").replace(".", ",")
 
 
-def render(ledger, rows: list, instruments: dict, targets: dict,
+def render(rows: list, instruments: dict, targets: dict,
            today: dt.date | None = None, zones: list | None = None) -> str:
-    """The Forme paragraph for the latest week of the ledger.
-
-    `ledger` is the `redline ledger` module, passed in rather than imported:
-    `model/` depends on nothing above it, which keeps this layer importable on a machine
-    without dependencies.
-    """
+    """The Forme paragraph for the latest week of the ledger."""
     per_week = ledger.eq_hours_per_week(rows, instruments, targets)
     if not per_week:
         return text.EMPTY_LEDGER
@@ -77,7 +74,7 @@ def render(ledger, rows: list, instruments: dict, targets: dict,
 
     # One trend per monitored zone, never a single one for all.
     trends = [(zone.label, " → ".join(
-        f"{w.week.split('-')[-1]} {peak(w.effort)}/{peak(w.rest)}"
+        f"{iso_week.short(w.week)} {peak(w.effort)}/{peak(w.rest)}"
         for w in ledger.pain_trend(rows, 3, zone.slug))) for zone in zones or []]
     trend = (" · ".join(f"{label} {text or '—'}" for label, text in trends) if len(trends) > 1
              else (trends[0][1] or "—") if trends else text.NO_ZONE)
@@ -90,12 +87,11 @@ def render(ledger, rows: list, instruments: dict, targets: dict,
     verdict = text.RED.format(join=text.AND.join(red)) if red else ""
     walk_note = (text.WALK_SHARE.format(walk_share=walk_share) if walk_share >= 25 else "")
 
-    short = label.split("-")[-1]          # « 2030-W30 » -> « W30 »
+    short = iso_week.short(label)
     # A week is closed only once it is over: mid-week the missing days would fake a
     # collapse in volume and ratio.
     day = today or dt.date.today()
-    iso = day.isocalendar()
-    if label == f"{iso.year}-W{iso.week:02d}":
+    if label == iso_week.of(day):
         # Nothing that changes daily: the view is checked against its regeneration, and a
         # current date would make it drift every day.
         state = text.WEEK_OPEN.format(week=short)
@@ -114,11 +110,7 @@ def _short(text: str, limit: int = 60) -> str:
     return text if len(text) <= limit else text[:limit - 1].rstrip() + "…"
 
 
-def _as_date(value: Any) -> dt.date:
-    return value if isinstance(value, dt.date) else dt.date.fromisoformat(str(value)[:10])
-
-
-def render_state(ledger, rows: list, *, deadlines: list[dict], capabilities: list[dict],
+def render_state(rows: list, *, deadlines: list[dict], capabilities: list[dict],
                  typed_due: int, race_on: dt.date | None,
                  today: dt.date) -> str:
     """The STATE block: the computed state that drives the coming weeks."""
@@ -133,15 +125,15 @@ def render_state(ledger, rows: list, *, deadlines: list[dict], capabilities: lis
         flag = text.STALL_PROTOCOL if stall.triggered else ""
         trajectory.append(text.STALL.format(weeks=stall.weeks, flag=flag))
     if race_on is not None:
-        weeks = (ledger._week_start(ledger._week_label(race_on))
-                 - ledger._week_start(ledger._week_label(today))).days // 7
+        weeks = (iso_week.monday(iso_week.of(race_on))
+                 - iso_week.monday(iso_week.of(today))).days // 7
         trajectory.append(text.RACE.format(race_on=race_on, weeks=weeks))
     if trajectory:
         lines.append(text.TRAJECTORY + " · ".join(trajectory) + ".")
     overdue = [row for row in deadlines
-               if row.get("status") != "done" and _as_date(row["due_on"]) < today]
+               if row.get("status") != DeadlineStatus.DONE and row["due_on"] < today]
     if overdue:
-        shown = " · ".join(f"{row['deadline_key']} ({_as_date(row['due_on']):%d/%m})"
+        shown = " · ".join(f"{row['deadline_key']} ({row['due_on']:%d/%m})"
                            + (text.DEADLINE_BLOCKS.format(blocks=_short(row["blocks"])) if row.get("blocks") else "")
                            for row in overdue[:4])
         more = f" · +{len(overdue) - 4}" if len(overdue) > 4 else ""
@@ -158,17 +150,17 @@ def state_inputs(store: OperationalStore, vault: Path, today: dt.date) -> dict:
     """Read what the ÉTAT block displays, from each owner."""
     predictions = store.prediction_rows()
     typed_due = sum(1 for row in predictions if row.get("status") == "open"
-                    and _as_date(row["due_on"]) <= today)
+                    and row["due_on"] <= today)
     deadlines = store.deadline_rows()
-    races = [_as_date(row["due_on"]) for row in deadlines
-             if row.get("kind") == "race" and row.get("status") != "done"
-             and _as_date(row["due_on"]) > today]
+    races = [row["due_on"] for row in deadlines
+             if row.get("kind") == "race" and row.get("status") != DeadlineStatus.DONE
+             and row["due_on"] > today]
     return {"deadlines": deadlines, "capabilities": store.latest_capabilities(),
             "typed_due": typed_due,
             "race_on": min(races) if races else None}
 
 
-def refresh(vault: Path, ledger, rows: list, instruments: dict,
+def refresh(vault: Path, rows: list, instruments: dict,
             *, store: Any = None, check: bool = False,
             today: dt.date | None = None) -> bool:
     """True if a block had drifted. With `check`, nothing is written.
@@ -182,11 +174,11 @@ def refresh(vault: Path, ledger, rows: list, instruments: dict,
     targets = program.rpe_targets(vault)
     zones = ledger.pain_zones(store) if store is not None else []
     drifted = apply(target(vault), BLOCK,
-                    render(ledger, rows, instruments, targets, today=day, zones=zones),
+                    render(rows, instruments, targets, today=day, zones=zones),
                     check=check)
     path = target(vault)
     if store is not None and f"<!-- {STATE_BLOCK}_START -->" in path.read_text(
             encoding="utf-8"):
-        state = render_state(ledger, rows, today=day, **state_inputs(store, vault, day))
+        state = render_state(rows, today=day, **state_inputs(store, vault, day))
         drifted = apply(path, STATE_BLOCK, state, check=check) or drifted
     return drifted

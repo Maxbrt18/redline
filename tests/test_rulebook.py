@@ -71,6 +71,8 @@ def test_the_wake_trace_cutoff_is_a_local_time():
     (("assimilation_weeks = []", 'assimilation_weeks = ["W35"]'), "ISO week"),
     (('slug = "terrain"', 'slug = "Terrain neuf"'), "slug"),
     (('wake_trace_until = "14:00"', 'wake_trace_until = "14h"'), "HH:MM"),
+    (("gear_alert_pct = 90\n", ""), "gear_alert_pct"),
+    (('missed_cutoff = "22:00"', 'missed_cutoff = "22h"'), "HH:MM"),
 ])
 def test_a_malformed_rulebook_is_refused_with_its_reason(tmp_path, change, message):
     old, new = change

@@ -14,13 +14,13 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from . import clock, persona
+from . import clock
 from .agent import (
     PROACTIVE_REPLY_SCHEMA,
     TRIAGE_SCHEMA,
-    ActiveRuns,
     AgentActivity,
     FailureKind,
+    RunnerBase,
     RunResult,
     RunSpec,
     SessionMode,
@@ -103,25 +103,13 @@ class _Stream:
     model: str | None = None
 
 
-class ClaudeCodeRunner:
+class ClaudeCodeRunner(RunnerBase):
     """Runs `claude -p` with session continuity and terminal result semantics."""
 
     provider = "claude"
-    # Attempts with the same profile while no work has started (dead session, binary
-    # crashing at startup); beyond that, the route tries its fallback profile.
-    MAX_ATTEMPTS = 3
-    RETRY_DELAY = 5  # seconds, multiplied by the attempt number
 
     def __init__(self, config: Config, state: StateStore) -> None:
-        self._config = config
-        self._state = state
-        self._runs = ActiveRuns("Claude")
-
-    def activity(self, psid: str) -> AgentActivity | None:
-        return self._runs.activity(psid)
-
-    def cancel(self, psid: str) -> bool:
-        return self._runs.cancel(psid)
+        super().__init__(config, state, "Claude")
 
     def _agent_env(self, turn_id: str | None = None) -> dict:
         """The CLI environment, scrubbed of what it has no need to know.
@@ -245,7 +233,7 @@ class ClaudeCodeRunner:
                 # ("No conversation found"). The next attempt restarts without it.
                 self._state.clear_session(psid, self.provider)
             if attempt < self.MAX_ATTEMPTS:
-                time.sleep(self.RETRY_DELAY * attempt)
+                self._pause_before_retry(attempt)
 
         return RunResult(error=f"Claude unavailable before any work: {last_detail}"[:500],
                          failure=FailureKind.PREFLIGHT)
@@ -260,44 +248,33 @@ class ClaudeCodeRunner:
         """
         if not self._config.triage_enabled:
             return Triage()
-        route = self._config.routing.plan(Route.TRIAGE)
-        candidates = (spec or route.primary, *route.fallbacks)
-        for attempt, candidate in enumerate(candidates, start=1):
-            command = [self._config.claude_bin, "-p", self._personal(TRIAGE_PROMPT + message),
-                       "--output-format", "json", "--json-schema", json.dumps(TRIAGE_SCHEMA),
-                       *CONFINEMENT]
-            if candidate.model:
-                command += ["--model", candidate.model]
-            if candidate.read_only:
-                command += ["--permission-mode", "dontAsk", "--tools", "Read,Glob,Grep"]
-            # Triage is also a Claude request: without this flag, every message would
-            # pay a first call at the default (highest) effort before the real reply.
-            if candidate.effort:
-                command += ["--effort", candidate.effort]
-            try:
-                proc = subprocess.run(command, cwd=self._config.vault_path,
-                                      env=self._agent_env(), capture_output=True,
-                                      text=True, timeout=candidate.timeout)
-            except subprocess.TimeoutExpired as exc:
-                log.warning("Claude triage timed out (%d/%d, %s)",
-                            attempt, len(candidates), exc)
-                continue
-            except OSError as exc:
-                log.warning("Claude triage failed (%d/%d, %s)",
-                            attempt, len(candidates), exc)
-                continue
-            if proc.returncode != 0:
-                log.warning("Claude triage failed (%d/%d, code %d)",
-                            attempt, len(candidates), proc.returncode)
-                continue
-            try:
-                return parse_triage(json.loads(proc.stdout or "{}")["structured_output"])
-            except (ValueError, TypeError, KeyError) as exc:
-                log.warning("Claude triage unreadable (%d/%d, %s)",
-                            attempt, len(candidates), exc)
-        log.warning("Claude triage unavailable after %d profiles; falling back to N1",
-                    len(candidates))
-        return Triage()
+        candidate = spec or self._config.routing.plan(Route.TRIAGE).primary
+        command = [self._config.claude_bin, "-p", self._personal(TRIAGE_PROMPT + message),
+                   "--output-format", "json", "--json-schema", json.dumps(TRIAGE_SCHEMA),
+                   *CONFINEMENT]
+        if candidate.model:
+            command += ["--model", candidate.model]
+        if candidate.read_only:
+            command += ["--permission-mode", "dontAsk", "--tools", "Read,Glob,Grep"]
+        # Triage is also a Claude request: without this flag, every message would pay a
+        # first call at the default (highest) effort before the real reply.
+        if candidate.effort:
+            command += ["--effort", candidate.effort]
+        try:
+            proc = subprocess.run(command, cwd=self._config.vault_path,
+                                  env=self._agent_env(), capture_output=True,
+                                  text=True, timeout=candidate.timeout)
+        except (subprocess.TimeoutExpired, OSError) as exc:
+            log.warning("Claude triage unavailable (%s); falling back to N1", exc)
+            return Triage()
+        if proc.returncode != 0:
+            log.warning("Claude triage failed (code %d); falling back to N1", proc.returncode)
+            return Triage()
+        try:
+            return parse_triage(json.loads(proc.stdout or "{}")["structured_output"])
+        except (ValueError, TypeError, KeyError) as exc:
+            log.warning("Claude triage unreadable (%s); falling back to N1", exc)
+            return Triage()
 
     def one_shot(self, message: str, *, spec: RunSpec, output_schema: dict | None = None,
                  instructions: str | None = None, label: str = "__one_shot__") -> str:
@@ -408,10 +385,6 @@ class ClaudeCodeRunner:
                       "CLAUDE_CODE_OAUTH_TOKEN in the service environment")
             return FailureKind.PREFLIGHT, None
         return None, None
-
-    def _personal(self, text: str) -> str:
-        """Substitute the instance athlete name for the token in everything the model reads."""
-        return persona.render(text, self._config.instance.athlete_name)
 
     def _command(self, message: str, session_id: str | None,
                  model: str | None = None, effort: str | None = None,

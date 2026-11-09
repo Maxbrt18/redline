@@ -10,8 +10,8 @@ from typing import TYPE_CHECKING, Any
 from redline.coach.fr import context_packet as text
 from redline.model import ledger as ledger_model
 from redline.model import rulebook, session_kinds
-from redline.model.vocabulary import ThreadStatus
-from redline.storage import StorageError
+from redline.model.errors import StorageError
+from redline.model.vocabulary import DeadlineStatus, MeasurementState, ThreadStatus
 
 if TYPE_CHECKING:
     from redline.storage import OperationalStore
@@ -35,12 +35,12 @@ def _as_date(value: Any) -> dt.date:
 def _observation(row: dict) -> str:
     parts = [_day(row["occurred_on"]), str(row["kind"])]
     for key, label in METRICS:
-        measure = (row.get("measurements") or {}).get(key) or {}
-        if measure.get("state") == "known":
-            parts.append(f"{label}={measure.get('value')}")
+        value = ledger_model.known((row.get("measurements") or {}).get(key))
+        if value is not None:
+            parts.append(f"{label}={value}")
     parts.extend(ledger_model.pain_facts(row.get("pains") or {}))
     pending = [key for key, measure in (row.get("measurements") or {}).items()
-               if measure.get("state") == "pending"]
+               if measure.get("state") == MeasurementState.PENDING]
     pending += ledger_model.pending_pains(row.get("pains") or {})
     if pending:
         parts.append(text.AWAITS + ",".join(sorted(pending)))
@@ -134,7 +134,7 @@ def render_context_packet(store: OperationalStore, depth: str, today: dt.date) -
             lines.extend(
                 text.THREAD_LINE.format(thread_key=row["thread_key"], body=row["body"][:180], follow_up=_day(row["follow_up_on"]) if row["follow_up_on"] else text.NO_FOLLOW_UP)
                 for row in threads)
-        deadlines = [row for row in read(store.deadline_rows, text.DEADLINES) if row["status"] != "done"][:8]
+        deadlines = [row for row in read(store.deadline_rows, text.DEADLINES) if row["status"] != DeadlineStatus.DONE][:8]
         if deadlines:
             lines.append(text.ACTIVE_DEADLINES)
             lines.extend(

@@ -103,7 +103,7 @@ class MessengerClient:
                    messaging_type: str = "RESPONSE", tag: str | None = None) -> DeliveryResult:
         delivered = 0
         messages: list[DeliveredMessage] = []
-        for index, part in enumerate(self._burst_parts(text)):
+        for index, part in enumerate(burst_parts(text)):
             if index:
                 self.pause_before(psid, part)
             result = self.send_text(psid, part, messaging_type=messaging_type, tag=tag)
@@ -264,11 +264,6 @@ class MessengerClient:
             result.ok, result.delivered, result.detail,
             tuple(DeliveredMessage(item.message_id, text) for item in result.messages))
 
-    @classmethod
-    def _burst_parts(cls, text: str) -> list:
-        """Kept as the transport's name for the shared rule (`textutils.burst_parts`),
-        which both codepaths must apply identically."""
-        return burst_parts(text)
 
     @classmethod
     def _split(cls, text: str, limit: int = MAX_LEN) -> list:

@@ -24,8 +24,6 @@ from .routing import RoutingConfig
 SHARED_SECRET_MIN_LENGTH = 32
 
 
-# --------------------------------------------------------- sandbox environment
-
 # The SDKs copy the service environment into the agent sandbox. Secret-looking names
 # are therefore blanked by default and exceptions are declared explicitly below.
 SECRET_MARKERS = ("TOKEN", "SECRET", "PASSWORD", "PSID", "CREDENTIAL", "API_KEY")
@@ -54,6 +52,16 @@ SANDBOX_NEEDS = frozenset({
 })
 
 
+#: The service environment systemd loads (deploy/systemd/coach-messenger.service).
+SERVICE_ENV = Path("/etc/redline/runtime/coach-messenger.env")
+
+
+def load_service_environment() -> None:
+    """The service's environment for an operator command run beside it: the deployed
+    file when there is one, the checkout's `.env` otherwise."""
+    load_dotenv(SERVICE_ENV if SERVICE_ENV.is_file() else paths.ENGINE_ROOT / ".env")
+
+
 def sandbox_overrides(environ: Mapping[str, str] | None = None, *,
                       keep: tuple[str, ...] = ()) -> dict[str, str]:
     """Return secrets to blank; ``keep`` declares provider-specific exceptions."""
@@ -67,7 +75,7 @@ def sandbox_overrides(environ: Mapping[str, str] | None = None, *,
     }
 
 
-def _load_dotenv(path: Path) -> None:
+def load_dotenv(path: Path) -> None:
     """Load a minimal .env (key=value) without overriding the environment."""
     if not path.exists():
         return

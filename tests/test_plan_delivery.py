@@ -13,7 +13,6 @@ run. The contexts of these tests therefore carry real sessions, and the real ren
 runs: the seam between "what the block says" and "when it is sent" is what is under test.
 """
 
-import json
 from datetime import date, datetime, timedelta
 from unittest.mock import MagicMock
 
@@ -38,9 +37,9 @@ def session(**changed) -> dict:
 
 
 def context(revision, sessions=None, gates=None):
-    return json.dumps({"revision": revision,
-                       "sessions": [session()] if sessions is None else sessions,
-                       "gates": gates or []})
+    return {"revision": revision,
+            "sessions": [session()] if sessions is None else sessions,
+            "gates": gates or []}
 
 
 @pytest.fixture
@@ -51,7 +50,7 @@ def repo():
     repo.sync.return_value = False
     repo.ensure_clean.return_value = []
     repo.head.return_value = "0123456789abcdef"
-    repo.weekly_plan_context.return_value = context(5)
+    repo.active_revision.return_value = context(5)
     # Only the PROACTIVE path still goes through the repo method; the reactive one
     # renders itself, from the two contexts it compares.
     repo.weekly_plan_message.return_value = "Programme de la semaine suivante"
@@ -117,7 +116,7 @@ def test_the_reactive_path_never_renders_the_plan_card(repo, client, make_bot):
     due_gate = {"id": "g1", "due": "2000-01-01", "when": "before",
                 "holds": ["w33-r1-jour-ef"],
                 "question": "La blessure ?", "on_fail": "rest"}
-    repo.weekly_plan_context.side_effect = [context(5), context(
+    repo.active_revision.side_effect = [context(5), context(
         6, [session(date=TOMORROW.isoformat())], [due_gate])]
     bot = make_bot(repo=repo, client=client,
                    agent=FakeAgent(result=RunResult(full_text="Je décale ton renfo"),
@@ -133,7 +132,7 @@ def test_the_reactive_path_never_renders_the_plan_card(repo, client, make_bot):
 def test_a_new_revision_leaves_once_and_only_once(repo, client, make_bot):
     """The fact justifying the send is consumed by the send: it does not replay."""
     moved = [session(date=TOMORROW.isoformat())]
-    repo.weekly_plan_context.side_effect = [context(5), context(6, moved),  # turn 1
+    repo.active_revision.side_effect = [context(5), context(6, moved),  # turn 1
                                             context(6, moved), context(6, moved)]  # turn 2
     bot = make_bot(repo=repo, client=client,
                    agent=FakeAgent(result=RunResult(full_text="Je décale ton renfo"),
@@ -156,7 +155,7 @@ def test_a_revision_that_only_records_the_past_says_nothing(repo, client, make_b
     ignored `status`. This test holds both ends.
     """
     done = [session(status="done")]
-    repo.weekly_plan_context.side_effect = [context(11, done), context(12, done)]
+    repo.active_revision.side_effect = [context(11, done), context(12, done)]
     bot = make_bot(repo=repo, client=client,
                    agent=FakeAgent(result=RunResult(full_text="Très bien, genou discret."),
                                      depth="N1", plan_change=True))
@@ -214,7 +213,7 @@ def test_a_program_lost_in_transport_is_still_owed_on_the_next_turn(repo, client
     text twice, concludes "nothing new", and the prescription stays on the server.
     """
     moved = [session(date=TOMORROW.isoformat())]
-    repo.weekly_plan_context.side_effect = [context(5), context(6, moved),
+    repo.active_revision.side_effect = [context(5), context(6, moved),
                                             context(6, moved), context(6, moved)]
     client.send_text.return_value = DeliveryResult.failure("graph 500")
     bot = make_bot(repo=repo, client=client,
@@ -234,7 +233,7 @@ def test_a_program_lost_in_transport_is_still_owed_on_the_next_turn(repo, client
 
 
 def test_a_settled_program_leaves_nothing_owed(repo, client, make_bot):
-    repo.weekly_plan_context.side_effect = [context(5), context(6)]
+    repo.active_revision.side_effect = [context(5), context(6)]
     bot = make_bot(repo=repo, client=client,
                    agent=FakeAgent(result=RunResult(full_text="Je décale ton renfo"),
                                      depth="N2", plan_change=True))
@@ -264,7 +263,7 @@ def test_a_replan_announced_in_one_line_still_validates_its_week(repo, client, m
     Now that "P" no longer triggers a send, this is exactly -- and only -- what it
     commands: re-read the plan, and engage validation.
     """
-    repo.weekly_plan_context.side_effect = [context(5), context(6)]
+    repo.active_revision.side_effect = [context(5), context(6)]
     agent = FakeAgent(result=RunResult(full_text="Noté"), depth="N0", plan_change=True)
     bot = make_bot(repo=repo, client=client, agent=agent)
     bot._respond("4242", "je saute demain finalement")
@@ -282,7 +281,7 @@ def test_a_gate_still_holds_the_prescription_even_on_a_fresh_revision(repo, clie
     due_gate = {"id": "g1", "due": TODAY.isoformat(), "when": "before",
                 "holds": ["w33-r1-jour-ef"], "question": "la blessure ?",
                 "on_fail": "rest"}
-    repo.weekly_plan_context.side_effect = [
+    repo.active_revision.side_effect = [
         context(5),
         context(6, [session(date=TOMORROW.isoformat())], gates=[due_gate]),
     ]
@@ -299,7 +298,7 @@ def test_a_gate_still_holds_the_prescription_even_on_a_fresh_revision(repo, clie
 def test_an_invalid_week_prescribes_nothing_at_all(repo, client, make_bot):
     """Without a valid revision, no session block: the coach reply goes out, followed
     by a line telling precisely the limit to whoever asked for the program."""
-    repo.weekly_plan_context.return_value = ""
+    repo.active_revision.return_value = None
     repo.persist_turn.return_value = PersistenceResult(False)
     bot = make_bot(repo=repo, client=client,
                    agent=FakeAgent(result=RunResult(full_text="Je regarde ta semaine."),
@@ -318,7 +317,7 @@ def test_applied_facts_do_not_open_the_gate_when_the_plan_is_invalid(
     """Fact success and prescribability are two distinct verdicts."""
     bot = make_bot(repo=repo, client=client)
     week = current_week(bot)
-    repo.weekly_plan_context.return_value = ""
+    repo.active_revision.return_value = None
     repo.persist_turn.return_value = PersistenceResult(
         True, invalid=(week,))
     bot = make_bot(repo=repo, client=client,

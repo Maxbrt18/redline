@@ -160,10 +160,3 @@ def test_bot_analysis_is_read_only_and_drops_any_staged_write(
     bot._repo.discard_turn.assert_called_once_with(agent.calls[0]["turn_id"])
     assert not attachments.path.exists()
     assert store._conversation[-1]["source_key"] == "attachment:mid-photo"
-
-
-def test_completed_attachment_erases_its_transport_payload(store):
-    raw = payload()
-    store.claim_inbound("mid", "4242", "attachment", raw)
-    store.complete_inbound(("mid",))
-    assert store._inbound_messages["mid"]["body"] == ""

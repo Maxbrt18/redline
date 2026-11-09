@@ -91,7 +91,6 @@ class RacePlan:
     stop_minutes: float
     flat_equivalent_km: float
     passages: tuple[Passage, ...]
-    #: The finish is the last passage.
 
     @property
     def finish(self) -> Passage:

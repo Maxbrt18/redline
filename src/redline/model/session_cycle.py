@@ -12,11 +12,14 @@ import hashlib
 import json
 
 from .local_time import zone as local_time_zone
+from .vocabulary import CycleState, SessionStatus
 
-TERMINAL_STATES = frozenset({"missed", "cancelled", "closed"})
+TERMINAL_STATES = frozenset({CycleState.MISSED, CycleState.CANCELLED, CycleState.CLOSED})
 # A cycle whose execution has already left a trace never reverts to a mere intention
 # because the program is revised afterwards.
-OBSERVED_STATES = frozenset({"started", "completed"})
+OBSERVED_STATES = frozenset({CycleState.STARTED, CycleState.COMPLETED})
+#: The states after which nothing about the session is still awaited.
+SETTLED_STATES = TERMINAL_STATES | {CycleState.COMPLETED}
 
 
 def scheduled_for(day: str | dt.date, start_time: str | None) -> dt.datetime | None:
@@ -32,7 +35,7 @@ def scheduled_for(day: str | dt.date, start_time: str | None) -> dt.datetime | N
 def plan_digest(session: dict) -> str:
     """Fingerprint of the fields that make a reminder attached to the session stale."""
     visible = {key: session.get(key) for key in (
-        # `calibration` no longer exists; its key stays in the fingerprint so that
+        # No session carries `calibration`; its key stays in the fingerprint so that
         # stored cycles keep theirs and do not appear revised.
         "title", "date", "start_time", "kind", "workout", "routine", "status", "calibration",
         "location_label", "carbs_target_g_h",
@@ -49,21 +52,19 @@ def plan_digest(session: dict) -> str:
 
 def synchronized_state(current: str | None, plan_status: str, *, changed: bool) -> str:
     """Reconcile a cycle with the latest revision without resurrecting a terminal state."""
-    if current == "closed":
+    if current in {CycleState.CLOSED, CycleState.COMPLETED}:
         return current
-    if current == "completed":
-        return current
-    if plan_status == "cancelled":
-        return "cancelled"
-    if plan_status == "done":
-        return "completed"
+    if plan_status == SessionStatus.CANCELLED:
+        return CycleState.CANCELLED
+    if plan_status == SessionStatus.DONE:
+        return CycleState.COMPLETED
     if current in TERMINAL_STATES:
         return current
-    if current in OBSERVED_STATES and plan_status == "planned":
+    if current in OBSERVED_STATES and plan_status == SessionStatus.PLANNED:
         return current
     if changed:
-        return "planned"
-    return current or "planned"
+        return CycleState.PLANNED
+    return current or CycleState.PLANNED
 
 
 def local_wall_clock(value: str) -> dt.datetime:

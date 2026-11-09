@@ -14,14 +14,12 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import time
 
 from redline.model import entrypoint
-from redline.model.errors import ConfigError
 from redline.service.postgres_state import PostgresStateStore
-from redline.storage import Database
+from redline.storage.database import from_environment
 
 KEY = re.compile(r"^[a-z0-9][a-z0-9-]{2,60}$")
 VALID_HOURS = 6.0
@@ -37,10 +35,7 @@ def main() -> int:
     text = args.text.strip()
     if not text:
         parser.error("empty --text")
-    url = (os.environ.get("DATABASE_URL") or "").strip()
-    if not url:
-        raise ConfigError("DATABASE_URL is required")
-    state = PostgresStateStore(Database(url, application_name="operator-message"))
+    state = PostgresStateStore(from_environment("operator-message"))
     now = time.time()
     job_key = f"operator:{args.key}"
     queued = state.proactive.enqueue_job(

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Backward feasibility of the plan, read from PostgreSQL: same code for the review and the CLI.
 
 The computation lives in `src/redline/model/transitions.py`; this module gathers the facts:
@@ -15,23 +14,21 @@ The verdict is informational: it refuses nothing and decides nothing.
 
 from __future__ import annotations
 
-import argparse
 import datetime as dt
-import os
-import re
 from typing import Any
 
 from redline.analysis import ledger
 from redline.coach.fr import transitions as text
 from redline.model import (
-    race as race_model,
-)
-from redline.model import (
+    iso_week,
     rulebook,
     session_kinds,
     transitions,
 )
-from redline.model.errors import ConfigError
+from redline.model import (
+    race as race_model,
+)
+from redline.model.vocabulary import SessionStatus
 
 
 def novelties(sessions: list[dict], rows: list, as_of: dt.date) -> tuple[str, ...]:
@@ -39,7 +36,7 @@ def novelties(sessions: list[dict], rows: list, as_of: dt.date) -> tuple[str, ..
     when a long run exceeds the longest of the 30 days before it."""
     found = [transition.kind for transition in transitions.opened(sessions, as_of)]
     for session in sessions:
-        if session.get("workout") != session_kinds.LONG or session.get("status") == "cancelled":
+        if session.get("workout") != session_kinds.LONG or session.get("status") == SessionStatus.CANCELLED:
             continue
         planned = session.get("distance_cap_km") or session.get("distance_target_km")
         day = transitions.day_of(session["date"])
@@ -57,18 +54,18 @@ def build_problem(store: Any, rows: list, today: dt.date,
         return None
     race_on = race.on
     book = rulebook.current()
-    race_week = transitions.week_of(race_on)
-    taper = tuple(transitions.shift(race_week, -offset)
+    race_week = iso_week.of(race_on)
+    taper = tuple(iso_week.shift(race_week, -offset)
                   for offset in reversed(range(race.taper_weeks)))
     weeks: list[str] = []
-    week = transitions.week_of(today)
+    week = iso_week.of(today)
     while week < taper[0]:
         weeks.append(week)
-        week = transitions.shift(week, 1)
+        week = iso_week.shift(week, 1)
     plans = store.active_plans()
     done = sorted({session["transition"] for revision in plans.values()
                    for session in revision["sessions"]
-                   if session.get("transition") and session.get("status") == "done"})
+                   if session.get("transition") and session.get("status") == SessionStatus.DONE})
     fixed = {plan_week: novelties(revision["sessions"], rows, today)
              for plan_week, revision in plans.items()
              if plan_week in weeks and plan_week not in free}
@@ -85,30 +82,3 @@ def report(store: Any, rows: list, today: dt.date,
     if problem is None:
         return [text.NO_RACE]
     return transitions.render(transitions.diagnose(problem))
-
-
-def _week(text: str) -> str:
-    if not re.fullmatch(r"20\d{2}-W\d{2}", text):
-        raise argparse.ArgumentTypeError(f"week expected as YYYY-WNN, got {text!r}")
-    return text
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--unwritten", action="append", default=[], type=_week,
-                        metavar="AAAA-WNN",
-                        help="programmed week to treat as still to be written")
-    parser.add_argument("--date", type=dt.date.fromisoformat, default=None,
-                        help="reference day YYYY-MM-DD (default: today)")
-    args = parser.parse_args()
-    url = (os.environ.get("DATABASE_URL") or "").strip()
-    if not url:
-        raise ConfigError("DATABASE_URL is required: plans live in PostgreSQL")
-    from redline.storage import Database, OperationalStore
-    store = OperationalStore(Database(url, application_name="feasibility"))
-    today = args.date or dt.date.today()
-    print("\n".join(report(store, ledger.parse_ledger(store), today,
-                           frozenset(args.unwritten))))
-    return 0
-

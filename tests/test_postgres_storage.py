@@ -7,12 +7,15 @@ import hashlib
 import os
 import subprocess
 import sys
+import time
 import uuid
 
 import pytest
 import sqlalchemy as sa
 from conftest import ADMIN_URL, ENGINE_ROOT, VAULT_ROOT, cli_command, reset_database
+from writes import write
 
+from redline.model import commands
 from redline.model import predictions as prediction_model
 from redline.model.activity import Activity
 from redline.service import strength
@@ -162,11 +165,11 @@ def test_a_messenger_observation_can_be_linked_to_strava_once(store):
     oid = store.add_observation(payload)
 
     assert store.activity_recorded(90000000001) is False
-    assert store.link_activity("messenger:m1:ef", 90000000001) == oid
-    assert store.link_activity("messenger:m1:ef", 90000000001) == oid
+    assert write(store, commands.ACTIVITY_LINK, {"idempotency_key": "messenger:m1:ef", "strava_activity_id": 90000000001}) == oid
+    assert write(store, commands.ACTIVITY_LINK, {"idempotency_key": "messenger:m1:ef", "strava_activity_id": 90000000001}) == oid
     assert store.activity_recorded(90000000001) is True
     with pytest.raises(StorageError, match="already attached"):
-        store.link_activity("messenger:m1:ef", 90000000009)
+        write(store, commands.ACTIVITY_LINK, {"idempotency_key": "messenger:m1:ef", "strava_activity_id": 90000000009})
 
 
 def test_activity_link_obeys_the_transactional_turn_boundary(store):
@@ -208,21 +211,21 @@ def test_a_known_heart_rate_is_doubted_once_with_its_cause(store):
     payload["measurements"]["hr_avg_bpm"] = {"state": "known", "value": 157}
     oid = store.add_observation(payload)
     with pytest.raises(StorageError):
-        store.doubt_hr(oid, "no_sensor", "  ")
+        write(store, commands.HR_DOUBT, {"idempotency_key": "test:90000000008", "reason": "no_sensor", "note": "  "})
     with pytest.raises(StorageError):
-        store.doubt_hr(oid, "poignet", "pas de brassard")
-    store.doubt_hr(oid, "no_sensor", "pas de capteur FC, 95 % des points ratés")
+        write(store, commands.HR_DOUBT, {"idempotency_key": "test:90000000008", "reason": "poignet", "note": "pas de brassard"})
+    write(store, commands.HR_DOUBT, {"idempotency_key": "test:90000000008", "reason": "no_sensor", "note": "pas de capteur FC, 95 % des points ratés"})
     row = next(r for r in store.observation_rows() if r["id"] == oid)
     assert row["hr_doubt"] == "no_sensor"
     assert row["measurements"]["hr_avg_bpm"]["value"] == 157
     with pytest.raises(StorageError):
-        store.doubt_hr(oid, "context", "repas")
+        write(store, commands.HR_DOUBT, {"idempotency_key": "test:90000000008", "reason": "context", "note": "repas"})
 
 
 def test_an_unknown_heart_rate_cannot_be_doubted(store):
-    oid = store.add_observation(observation())
+    store.add_observation(observation())
     with pytest.raises(StorageError):
-        store.doubt_hr(oid, "context", "repas une heure avant")
+        write(store, commands.HR_DOUBT, {"idempotency_key": "test:90000000008", "reason": "context", "note": "repas une heure avant"})
 
 
 def test_a_metric_never_recorded_can_still_be_filled_later(store):
@@ -545,17 +548,17 @@ def test_exposure_is_confirmed_then_can_be_completed_or_corrected_without_duplic
         "duration_min": 44, "target_value": 172, "target_unit": "spm",
         "tolerance": "easy", "note": "à confirmer",
     }
-    store.upsert_exposure(candidate)
+    write(store, commands.EXPOSURE_UPSERT, candidate)
     assert store.exposure_rows(confirmed_only=True) == []
 
     confirmed = {**candidate, "status": "confirmed", "note": "confirmé par Sam"}
-    store.upsert_exposure(confirmed)
+    write(store, commands.EXPOSURE_UPSERT, confirmed)
     assert store.exposure_rows(confirmed_only=True)[0]["origin"] == "voluntary"
 
-    store.upsert_exposure({**confirmed, "tolerance": "easy"})
+    write(store, commands.EXPOSURE_UPSERT, {**confirmed, "tolerance": "easy"})
     assert store.exposure_rows(confirmed_only=True)[0]["tolerance"] == "easy"
     assert len(store.exposure_rows()) == 1
-    store.upsert_exposure({**confirmed, "status": "dismissed"})
+    write(store, commands.EXPOSURE_UPSERT, {**confirmed, "status": "dismissed"})
     assert store.exposure_rows(confirmed_only=True) == []
 
 
@@ -570,7 +573,7 @@ def test_intelligence_ignores_a_confirmed_intentional_cadence_jump(store):
                 "cadence_spm": {"state": "known", "value": cadence},
             },
         })
-    store.upsert_exposure({
+    write(store, commands.EXPOSURE_UPSERT, {
         "exposure_key": "cadence:worked", "observation_key": "cadence:worked",
         "exposure_type": "cadence", "origin": "voluntary", "status": "confirmed",
         "duration_min": 40, "target_value": 170, "target_unit": "spm",
@@ -628,6 +631,9 @@ def test_a_due_gate_can_close_on_its_precommitted_fallback(store):
         evidence=["gate:w33-knee=fallback:repli-applique"])
     store.append_plan_revision("2026-W33", second)
 
+    current = store.load_plan("2026-W33")["revisions"][-1]
+    assert current["revision"] == 2 and current["gates"] == []
+
 
 def test_a_timed_plan_session_survives_storage_and_creates_one_stable_cycle(store):
     from test_weekly_plan import revision as build_revision
@@ -664,12 +670,12 @@ def test_a_load_increase_waits_for_and_consumes_one_challenge(store):
     with pytest.raises(StorageError, match="load increase blocked"):
         store.append_plan_revision("2026-W33", increased)
 
-    store.upsert_prediction({
+    write(store, commands.PREDICTION_UPSERT, {
         "prediction_key": "w33-charge", "domain": "charge",
         "statement": "8 km restent assimilables sans douleur le lendemain",
         "probability": .7, "due_on": dt.date(2026, 8, 12), "direction": "increase",
     })
-    store.upsert_prediction({"prediction_key": "w33-charge", "operation": "challenge",
+    write(store, commands.PREDICTION_UPSERT, {"prediction_key": "w33-charge", "operation": "challenge",
                              "challenge": "La hausse suit une semaine incomplète."})
     store.append_plan_revision("2026-W33", increased)
     with store.database.engine.connect() as connection:
@@ -680,20 +686,20 @@ def test_a_load_increase_waits_for_and_consumes_one_challenge(store):
 def test_a_prediction_resolved_without_its_observation_is_rectified_to_void(store):
     # A prediction settled false while its condition was not met and its wake-up question
     # was still open must be rectifiable to void.
-    store.upsert_prediction({
+    write(store, commands.PREDICTION_UPSERT, {
         "prediction_key": "w40-dim", "domain": "charge", "statement": "trace à la base",
         "probability": .65, "due_on": dt.date(2026, 10, 5)})
     with pytest.raises(StorageError, match="only a settled prediction"):
-        store.upsert_prediction({"prediction_key": "w40-dim", "operation": "rectify",
+        write(store, commands.PREDICTION_UPSERT, {"prediction_key": "w40-dim", "operation": "rectify",
                                  "reason": "condition non tenue"})
-    store.upsert_prediction({"prediction_key": "w40-dim", "operation": "resolve",
+    write(store, commands.PREDICTION_UPSERT, {"prediction_key": "w40-dim", "operation": "resolve",
                              "outcome": False})
     with pytest.raises(StorageError, match="requires its reason"):
-        store.upsert_prediction({"prediction_key": "w40-dim", "operation": "rectify",
+        write(store, commands.PREDICTION_UPSERT, {"prediction_key": "w40-dim", "operation": "rectify",
                                  "reason": " "})
-    store.upsert_prediction({"prediction_key": "w40-dim", "operation": "rectify",
+    write(store, commands.PREDICTION_UPSERT, {"prediction_key": "w40-dim", "operation": "rectify",
                              "reason": "8,81 km pour un plafond de 8,5 km"})
-    store.upsert_prediction({"prediction_key": "w40-dim", "operation": "rectify",
+    write(store, commands.PREDICTION_UPSERT, {"prediction_key": "w40-dim", "operation": "rectify",
                              "reason": "rejouée"})
     (row,) = store.prediction_rows()
     assert (row["status"], row["outcome"], row["brier_score"]) == ("void", None, None)
@@ -703,12 +709,12 @@ def test_a_prediction_resolved_without_its_observation_is_rectified_to_void(stor
 
 def test_a_settled_prediction_keeps_why_it_failed_and_the_calibration_counts_it(store):
     for key in ("refuted", "untested"):
-        store.upsert_prediction({
+        write(store, commands.PREDICTION_UPSERT, {
             "prediction_key": key, "domain": "corps", "statement": "trace légère",
             "probability": .7, "due_on": dt.date(2026, 10, 5)})
-    store.upsert_prediction({"prediction_key": "refuted", "operation": "resolve",
+    write(store, commands.PREDICTION_UPSERT, {"prediction_key": "refuted", "operation": "resolve",
                              "outcome": False, "reason": "optimistic"})
-    store.upsert_prediction({"prediction_key": "untested", "operation": "resolve",
+    write(store, commands.PREDICTION_UPSERT, {"prediction_key": "untested", "operation": "resolve",
                              "outcome": None, "void": True, "reason": "exposure"})
     reasons = {row["prediction_key"]: row["outcome_reason"] for row in store.prediction_rows()}
     assert reasons == {"refuted": "optimistic", "untested": "exposure"}
@@ -717,11 +723,11 @@ def test_a_settled_prediction_keeps_why_it_failed_and_the_calibration_counts_it(
 
 
 def test_a_reason_that_does_not_fit_the_outcome_is_refused_by_the_database(store):
-    store.upsert_prediction({
+    write(store, commands.PREDICTION_UPSERT, {
         "prediction_key": "held", "domain": "corps", "statement": "trace légère",
         "probability": .7, "due_on": dt.date(2026, 10, 5)})
     with pytest.raises(StorageError):
-        store.upsert_prediction({"prediction_key": "held", "operation": "resolve",
+        write(store, commands.PREDICTION_UPSERT, {"prediction_key": "held", "operation": "resolve",
                                  "outcome": True, "reason": "optimistic"})
 
 
@@ -731,21 +737,21 @@ def test_a_sealed_permit_choice_creates_its_prediction_and_cannot_be_rewritten(s
               "prediction_key": "easy-permit-w40-mar-ef",
               "statement": "Choix scellé : 40 min.", "probability": .6,
               "due_on": dt.date(2026, 10, 4)}
-    store.seal_permit_choice(choice)
-    store.seal_permit_choice(choice)  # replayed identically: idempotent
+    write(store, commands.PERMIT_SEAL, choice)
+    write(store, commands.PERMIT_SEAL, choice)  # replayed identically: idempotent
     assert [row["coach_minutes"] for row in store.permit_choice_rows()] == [40]
     prediction = next(row for row in store.prediction_rows()
                       if row["prediction_key"] == "easy-permit-w40-mar-ef")
     assert prediction["domain"] == "easy-permit" and prediction["status"] == "open"
     with pytest.raises(StorageError, match="it is not corrected"):
-        store.seal_permit_choice({**choice, "coach_minutes": 50})
+        write(store, commands.PERMIT_SEAL, {**choice, "coach_minutes": 50})
 
 
 def test_a_typed_unavailability_blocks_a_demanding_session(store):
     from test_weekly_plan import revision as build_revision
     from test_weekly_plan import session
 
-    store.upsert_deadline({
+    write(store, commands.DEADLINE_UPSERT, {
         "deadline_key": "examens", "due_on": dt.date(2026, 8, 5),
         "starts_on": dt.date(2026, 8, 4), "ends_on": dt.date(2026, 8, 7),
         "kind": "availability", "item": "examens", "fact_owner": "athlete/athlete.md",
@@ -869,7 +875,7 @@ def test_deterministic_strava_capture_preserves_ambiguity_without_inventing_a_ty
     assert len(result["candidate_session_keys"]) == 2
     assert store.activity_recorded(90000000014) is False
     assert store.strava_intakes(unresolved_only=True)[0]["activity_id"] == 90000000014
-    store.match_session("2026-W33:w33-ef-b", 90000000014)
+    write(store, commands.SESSION_MATCH, {"session_key": "2026-W33:w33-ef-b", "strava_activity_id": 90000000014})
     assert store.activity_recorded(90000000014) is True
     assert store.strava_intakes(unresolved_only=True) == []
 
@@ -882,7 +888,7 @@ def test_observed_time_wins_but_keeps_the_optional_declared_clock(store):
     store.append_plan_revision("2026-W33", build_revision(
         1, sessions=[session("w33-ven-ef", date="2026-08-14")],
         computed_at="2026-08-09T19:10:00+02:00"))
-    store.declare_session_start({
+    write(store, commands.SESSION_START, {
         "session_key": "2026-W33:w33-ven-ef",
         "declared_at": dt.datetime(2026, 8, 14, 7, 55, tzinfo=paris),
     })
@@ -923,7 +929,7 @@ def test_ambiguous_strava_match_is_left_for_alex_to_decide(store):
     assert unmatched[0]["strava_activity_id"] == 90000000016
     assert unmatched[0]["candidates"] == [
         "2026-W33:w33-ven-ef-a", "2026-W33:w33-ven-ef-b"]
-    store.match_session("2026-W33:w33-ven-ef-b", 90000000016)
+    write(store, commands.SESSION_MATCH, {"session_key": "2026-W33:w33-ven-ef-b", "strava_activity_id": 90000000016})
     with store.database.engine.connect() as connection:
         linked = connection.execute(sa.select(session_cycles.c.logical_key).where(
             session_cycles.c.observation_id.is_not(None))).scalar_one()
@@ -1114,7 +1120,7 @@ def _review_question(store, question, message_key, status="answered", **extra):
             conversation_messages.c.source_key == "inbound:" + message_key)).scalar_one()
     payload = {"question_id": str(question_id), "answer_id": str(answer_id),
                "status": status, "note": "Réponse examinée.", **extra}
-    store.review_question(payload)
+    write(store, commands.QUESTION_REVIEW, payload)
     return payload
 
 
@@ -1190,7 +1196,7 @@ def test_review_rejects_another_persons_answer_and_rolls_back_a_failed_turn(stor
     question = "La blessure au réveil ?"
     _ask(store, state, question, "q")
     state.claim_inbound("foreign", "9999", "text", "aucune gêne")
-    with pytest.raises(ValueError, match="cannot belong"):
+    with pytest.raises(StorageError, match="cannot belong"):
         _review_question(store, question, "foreign")
     state.claim_inbound("own", "4242", "text", "aucune gêne")
     payload = _review_question(store, question, "own", "open")
@@ -1338,7 +1344,7 @@ def test_projection_cannot_acknowledge_a_concurrent_write(store):
 
 def test_database_constraints_reject_invalid_typed_domains(store):
     with pytest.raises(StorageError):
-        store.evaluate_capability({
+        write(store, commands.CAPABILITY_EVALUATE, {
             "capability_number": 1, "slug": "test", "need": "test",
             "score": 6, "scale": 5, "status": "green",
             "evaluated_on": dt.date(2026, 8, 13)})
@@ -1585,7 +1591,7 @@ def test_less_frequent_operational_facts_share_the_staged_boundary(store):
 
 def test_deadlines_with_the_same_date_have_a_deterministic_projection_order(store):
     for key in ("z-last", "a-first"):
-        store.upsert_deadline({
+        write(store, commands.DEADLINE_UPSERT, {
             "deadline_key": key, "due_on": dt.date(2026, 8, 17),
             "item": key, "fact_owner": "test", "status": "todo",
         })
@@ -1601,7 +1607,7 @@ def test_strava_gear_sync_owns_distance_but_preserves_the_curated_role(store):
     assert float(first["distance_km"]) == 98.2
     assert first["role"] == "à qualifier"
 
-    store.upsert_gear({
+    write(store, commands.GEAR_UPSERT, {
         "gear_id": "g-cat", "name": "Trail Shoe 3",
         "role": "trail et course", "retire_at_km": 650, "status": "active",
     })
@@ -1636,7 +1642,7 @@ def test_repeated_daily_shoes_do_not_open_rotation_check(store):
 
 
 def test_race_deadline_materializes_the_complete_surviving_roadmap(store):
-    store.upsert_deadline({
+    write(store, commands.DEADLINE_UPSERT, {
         "deadline_key": "race-test", "due_on": dt.date(2026, 11, 26),
         "item": "Course test", "fact_owner": "coach", "status": "scheduled",
         "kind": "race", "context": {"distance_km": 45},
@@ -1657,11 +1663,11 @@ def test_moving_a_race_date_cancels_the_old_roadmap(store):
         "item": "Course déplacée", "fact_owner": "coach", "status": "scheduled",
         "kind": "race", "context": {},
     }
-    store.upsert_deadline(base)
+    write(store, commands.DEADLINE_UPSERT, base)
     state = PostgresStateStore(store.database)
     now = dt.datetime(2026, 8, 23, 12, tzinfo=dt.UTC)
     state.materialize_intelligence(now)
-    store.upsert_deadline({**base, "due_on": dt.date(2026, 12, 5)})
+    write(store, commands.DEADLINE_UPSERT, {**base, "due_on": dt.date(2026, 12, 5)})
     state.materialize_intelligence(now)
     jobs = [row for row in state.proactive.jobs()
             if row["id"].startswith("race:")]
@@ -1713,7 +1719,7 @@ def test_a_false_correction_is_revised_under_the_same_key_and_reannounced(store)
     announceable again.
     """
     key = "2026-08-27-ef-intermittente"
-    store.register_correction({"correction_key": key,
+    write(store, commands.CORRECTION_REGISTER, {"correction_key": key,
                                "summary": "Le repos devait être maintenu."})
     state = PostgresStateStore(store.database)
     first_due = dt.datetime.now(dt.UTC)
@@ -1722,7 +1728,7 @@ def test_a_false_correction_is_revised_under_the_same_key_and_reannounced(store)
     assert first and first["id"] == f"correction:{key}"
     state.proactive.finish_delivery(first["id"], first_due + dt.timedelta(seconds=2))
 
-    store.register_correction({
+    write(store, commands.CORRECTION_REGISTER, {
         "correction_key": key,
         "summary": "Le pic intermittent ne suffisait pas à retirer l'EF conditionnelle.",
     })
@@ -1741,8 +1747,8 @@ def test_a_false_correction_is_revised_under_the_same_key_and_reannounced(store)
 
 def test_a_correction_not_announced_within_its_week_expires(store):
     # A stale correction must not be delivered long after the error.
-    store.register_correction({"correction_key": "ancienne", "summary": "Erreur ancienne."})
-    store.register_correction({"correction_key": "recente", "summary": "Erreur récente."})
+    write(store, commands.CORRECTION_REGISTER, {"correction_key": "ancienne", "summary": "Erreur ancienne."})
+    write(store, commands.CORRECTION_REGISTER, {"correction_key": "recente", "summary": "Erreur récente."})
     with store.database.transaction() as connection:
         connection.execute(sa.text(
             "UPDATE redline.correction_deliveries SET registered_at = now() - interval '10 days'"
@@ -1764,13 +1770,13 @@ def test_a_correction_not_announced_within_its_week_expires(store):
 
 def test_rewriting_the_same_correction_verbatim_does_not_reannounce_it(store):
     row = {"correction_key": "stable", "summary": "Résumé juste."}
-    store.register_correction(row)
+    write(store, commands.CORRECTION_REGISTER, row)
     with store.database.transaction() as connection:
         connection.execute(sa.text(
             "UPDATE redline.correction_deliveries SET delivered_at = now() "
             "WHERE correction_key = 'stable'"))
 
-    store.register_correction(row)
+    write(store, commands.CORRECTION_REGISTER, row)
 
     assert store.correction_rows()[0]["delivered_at"] is not None
 
@@ -1778,10 +1784,10 @@ def test_rewriting_the_same_correction_verbatim_does_not_reannounce_it(store):
 def test_a_recurring_correction_keeps_its_count_of_recurrences(store):
     # A recurrence replaces the summary: without this count, the row would no longer say
     # that the error came back.
-    store.register_correction({"correction_key": "wake-trace", "summary": "06/09 : oui franc exigé."})
-    store.register_correction({"correction_key": "wake-trace", "summary": "Récidive le 01/10."})
-    store.register_correction({"correction_key": "wake-trace", "summary": "Récidive le 08/10."})
-    store.register_correction({"correction_key": "autre", "summary": "Une seule fois."})
+    write(store, commands.CORRECTION_REGISTER, {"correction_key": "wake-trace", "summary": "06/09 : oui franc exigé."})
+    write(store, commands.CORRECTION_REGISTER, {"correction_key": "wake-trace", "summary": "Récidive le 01/10."})
+    write(store, commands.CORRECTION_REGISTER, {"correction_key": "wake-trace", "summary": "Récidive le 08/10."})
+    write(store, commands.CORRECTION_REGISTER, {"correction_key": "autre", "summary": "Une seule fois."})
     rows = {row["correction_key"]: row for row in store.correction_rows()}
     assert rows["wake-trace"]["revisions"] == 2
     assert rows["wake-trace"]["summary"] == "Récidive le 08/10."
@@ -2110,7 +2116,7 @@ def test_the_weekly_dossier_is_computed_from_the_same_functions_as_the_clis(stor
             "note": "", "measurements": {
                 "distance_km": {"state": "known", "value": km},
                 "duration_s": {"state": "known", "value": int(km * 400)}}})
-    store.upsert_deadline({"deadline_key": "verdict-cortex", "due_on": dt.date(2026, 9, 6),
+    write(store, commands.DEADLINE_UPSERT, {"deadline_key": "verdict-cortex", "due_on": dt.date(2026, 9, 6),
                            "item": "confirmer le verdict oral", "fact_owner": "athlete.md",
                            "status": "todo", "blocks": "descente courue"})
     text = weekly_dossier.render(store, VAULT_ROOT, "2026-W39", dt.date(2026, 9, 27))
@@ -2123,7 +2129,7 @@ def test_the_weekly_dossier_is_computed_from_the_same_functions_as_the_clis(stor
     assert "verdict-cortex (due le 06/09)" in text and "bloque descente courue" in text
     assert "--reason optimistic" in text and "narrative" not in text
     assert "Faisabilité à rebours : aucune course typée" in text
-    store.upsert_deadline({"deadline_key": "targetrace", "due_on": dt.date(2026, 11, 26),
+    write(store, commands.DEADLINE_UPSERT, {"deadline_key": "targetrace", "due_on": dt.date(2026, 11, 26),
                            "kind": "race", "item": "TargetRace",
                            "fact_owner": "athlete/goals.md", "status": "scheduled"})
     text = weekly_dossier.render(store, VAULT_ROOT, "2026-W39", dt.date(2026, 9, 27))
@@ -2146,7 +2152,7 @@ def test_the_weekly_dossier_does_not_flag_cadence_work_that_was_asked_for(store)
         return weekly_dossier.render(store, VAULT_ROOT, "2026-W39", dt.date(2026, 9, 27))
 
     assert "cadence en hausse" in dossier()
-    store.upsert_exposure({
+    write(store, commands.EXPOSURE_UPSERT, {
         "exposure_key": "cadence:worked", "observation_key": "cadence:worked",
         "exposure_type": "cadence", "origin": "prescribed", "status": "confirmed",
         "duration_min": 40, "target_value": 170, "target_unit": "spm",
@@ -2214,7 +2220,7 @@ def test_service_lines_do_not_push_the_real_exchange_out_of_memory(store):
 def test_memory_leaves_threads_to_the_packet_when_asked(store):
     state = PostgresStateStore(store.database)
     state.claim_inbound("m", "4242", "text", "Salut")
-    store.upsert_thread({"thread_key": "chaussures", "status": "open",
+    write(store, commands.THREAD_UPSERT, {"thread_key": "chaussures", "status": "open",
                          "body": "Essai de la nouvelle paire à reprendre.",
                          "opened_on": dt.date(2026, 9, 20), "kind": "open_loop",
                          "follow_up_on": None})
@@ -2383,7 +2389,6 @@ def test_notebook_replay_preserves_the_card_after_a_text_failure(store, tmp_path
 
 
 def test_notebook_current_resolves_the_same_typed_workout_and_rechecks_claims(store, monkeypatch):
-    import json
     from unittest.mock import MagicMock
 
     from redline.service import clock
@@ -2394,7 +2399,7 @@ def test_notebook_current_resolves_the_same_typed_workout_and_rechecks_claims(st
     monkeypatch.setattr(clock, 'today', lambda: dt.date(2026, 10, 2))
     repo = MagicMock()
     repo.validate_weekly_plan.return_value = PlanStatus.VALID
-    repo.weekly_plan_context.return_value = json.dumps({'revision': 1, 'sessions': [{
+    repo.active_revision.return_value = ({'revision': 1, 'sessions': [{
         'id':'a', 'date':'2026-10-02', 'kind':'strength', 'workout':'strength', 'routine': 'a',
         'status':'planned', 'strength':{}}], 'gates':[]})
     state = PostgresStateStore(store.database)
@@ -2431,7 +2436,7 @@ def _wake(store, day, value, *, state="known"):
 
 
 def _bound(store, key, day, success_if="<=1", probability=.8):
-    store.upsert_prediction({
+    write(store, commands.PREDICTION_UPSERT, {
         "prediction_key": key, "domain": "corps", "statement": "trace au plus légère",
         "probability": probability, "due_on": day + dt.timedelta(days=2),
         "resolves_on": {"kind": "wake-trace", "date": day.isoformat(), "success_if": success_if}})
@@ -2462,12 +2467,12 @@ def test_a_wake_prediction_is_written_before_its_outcome_and_reads_a_closed_rule
     with pytest.raises(StorageError, match="unreadable success criterion"):
         _bound(store, "illisible", day + dt.timedelta(days=1), success_if="peu")
     with pytest.raises(StorageError, match="unknown settling observation"):
-        store.upsert_prediction({
+        write(store, commands.PREDICTION_UPSERT, {
             "prediction_key": "inconnue", "domain": "corps", "statement": "x",
             "probability": .5, "due_on": day,
             "resolves_on": {"kind": "seance", "date": day.isoformat(), "success_if": "<=1"}})
     with pytest.raises(StorageError, match="after the prediction's due date"):
-        store.upsert_prediction({
+        write(store, commands.PREDICTION_UPSERT, {
             "prediction_key": "apres", "domain": "corps", "statement": "x",
             "probability": .5, "due_on": day,
             "resolves_on": {"kind": "wake-trace", "date": "2026-10-20", "success_if": "<=1"}})
@@ -2543,7 +2548,7 @@ def test_a_wake_prediction_waits_for_the_zone_it_names(store):
     day = dt.date(2026, 10, 12)
     with pytest.raises(StorageError, match="names its zone"):
         _bound(store, "sans-zone", day)
-    store.upsert_prediction({
+    write(store, commands.PREDICTION_UPSERT, {
         "prediction_key": "talon-calme", "domain": "corps", "statement": "talon calme",
         "probability": .7, "due_on": day + dt.timedelta(days=2),
         "resolves_on": {"kind": "wake-trace", "date": day.isoformat(), "success_if": "<=1",
@@ -2842,3 +2847,31 @@ def test_a_session_priority_is_stored_and_read_back(store):
     stored = {item["id"]: item for item in store.load_plan("2026-W33")["revisions"][0]["sessions"]}
     assert stored["w33-sam-ef"]["priority"] == "optional"
     assert "priority" not in stored["w33-mar-ef"]
+
+
+def test_the_due_predictions_are_read_from_the_store_as_dates(store):
+    """`fact-read predictions --due` compares the due date with today."""
+    from redline.cli import fact_read
+    write(store, commands.PREDICTION_UPSERT, {
+        "prediction_key": "w33-due", "domain": "charge", "statement": "8 km assimilables",
+        "probability": .7, "due_on": dt.date(2026, 8, 12), "direction": "increase"})
+    lines = fact_read.predictions(store, due=True, today=dt.date(2026, 8, 20))
+    assert any("w33-due" in line for line in lines)
+
+
+def test_startup_recovers_a_job_left_running(store):
+    state = PostgresStateStore(store.database)
+    state.proactive.enqueue_job("weekly:2026-W29", "weekly", "", 0)
+    assert state.proactive.claim_due_job(1)["status"] == "running"
+
+    assert state.proactive.recover_running_jobs() == 1
+
+    recovered = state.proactive.claim_due_job(time.time())
+    assert recovered["id"] == "weekly:2026-W29"
+    assert recovered["attempts"] == 2
+
+
+def test_a_stable_job_id_deduplicates_the_trigger(store):
+    state = PostgresStateStore(store.database)
+    assert state.proactive.enqueue_job("morning:2026-07-14", "morning", "", 0)
+    assert not state.proactive.enqueue_job("morning:2026-07-14", "morning", "", 0)

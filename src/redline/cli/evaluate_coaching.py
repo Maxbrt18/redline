@@ -16,7 +16,7 @@ from redline.coach.fr import evaluation as wording
 from redline.evaluation.conversation import shape_checks
 from redline.evaluation.review import judge, review_prompt
 from redline.evaluation.runner import bench_runner, check_model
-from redline.model import correction_replay, paths
+from redline.model import correction_replay, entrypoint, paths
 from redline.service.config import Config
 from redline.service.prompts import DEPTH_NOTES, EMOTION_NOTE, STYLE_PROMPT, gate_note
 from redline.service.relationship import render_memory
@@ -104,4 +104,4 @@ def main() -> int:
 
 
 if __name__ == '__main__':
-    raise SystemExit(main())
+    entrypoint.run(main)

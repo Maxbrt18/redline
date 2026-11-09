@@ -7,6 +7,8 @@ from typing import ClassVar
 
 import sqlalchemy as sa
 
+from redline.model import vocabulary as voc
+
 from ..schema import (
     agent_sessions,
     agent_turns,
@@ -127,7 +129,7 @@ class Maintenance(StoreBase):
                  self.EXPIRY_DAYS["proactive_markers"], ()),
                 (inbound_messages, inbound_messages.c.received_at,
                  self.EXPIRY_DAYS["inbound_messages"],
-                 (inbound_messages.c.status == "done",)),
+                 (inbound_messages.c.status == voc.InboundStatus.DONE,)),
                 (strength_session_links, strength_session_links.c.expires_at,
                  self.EXPIRY_DAYS["strength_session_links"], ()),
             ):

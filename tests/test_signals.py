@@ -103,7 +103,7 @@ def test_the_strava_half_is_named_in_the_output():
 @pytest.mark.parametrize("count", [1, 3])
 def test_it_never_crashes_on_a_short_history(count):
     rows = [_row(f"2026-08-{2 + week * 7:02d}", cadence=160) for week in range(count)]
-    signals.render(rows, _labels(rows), frozenset())
+    assert signals.render(rows, _labels(rows), frozenset()).strip()
 
 
 # ------------------------------------------ HR at comparable pace (alarm no. 4)

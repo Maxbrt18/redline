@@ -15,8 +15,9 @@ import pytest
 from conftest import ENGINE_ROOT, TEST_VAULT, reset_database
 from test_notebook_board import Repo
 from test_weekly_plan import revision, session
+from writes import write
 
-from redline.model import hr_zones, instance
+from redline.model import commands, hr_zones, instance
 from redline.model.activity import Activity, Lap
 from redline.service import session_detail
 from redline.service.notebook_board import AnswerError, Board
@@ -176,7 +177,7 @@ def seed_threshold(store):
         elevation_gain_m=151.7, hr_avg_bpm=163.2, hr_max_bpm=195.0, cadence_spm=163.8,
         laps=tuple(THRESHOLD_LAPS)))
     if observation_of(store, 90000000006) is None:
-        store.match_session("2026-W44:w44-lun-seuil", 90000000006)
+        write(store, commands.SESSION_MATCH, {"session_key": "2026-W44:w44-lun-seuil", "strava_activity_id": 90000000006})
     return observation_of(store, 90000000006)
 
 

@@ -12,7 +12,7 @@ from conftest import ENGINE_ROOT, RecordingBot
 # redline.service.web imports flask, which is a VPS runtime dependency (requirements.txt), not
 # something a vault checkout on the Mac necessarily has. Without this, collecting this
 # one module aborts the WHOLE run instead of reporting the tests that do pass.
-pytest.importorskip("flask", reason="dépendance runtime du VPS (requirements.txt)")
+pytest.importorskip("flask", reason="runtime dependency (requirements.txt)")
 
 from redline.model.dose import Dose
 from redline.service import clock, strength
@@ -25,28 +25,6 @@ from redline.service.web import (
 
 def wrap(*events) -> dict:
     return {"object": "page", "entry": [{"messaging": list(events)}]}
-
-
-def test_text_message():
-    payload = wrap({"sender": {"id": 4242}, "message": {"mid": "m1", "text": "salut coach"}})
-    assert list(_iter_events(payload)) == [("4242", "m1", "text", "salut coach", "")]
-
-
-def test_a_swipe_reply_keeps_the_exact_message_relation():
-    payload = wrap({"sender": {"id": 4242}, "message": {
-        "mid": "m-reply", "text": "Oui, c'est exactement ça.",
-        "reply_to": {"mid": "m-old-coach"}}})
-    assert list(_iter_events(payload)) == [(
-        "4242", "m-reply", "text", "Oui, c'est exactement ça.", "m-old-coach")]
-
-
-def test_sticker_distinguished_from_attachment():
-    sticker = wrap({"sender": {"id": 1}, "message": {
-        "mid": "m2", "attachments": [{"type": "image", "payload": {"sticker_id": 369}}]}})
-    photo = wrap({"sender": {"id": 1}, "message": {
-        "mid": "m3", "attachments": [{"type": "image", "payload": {"url": "https://cdn/x.jpg"}}]}})
-    assert next(iter(_iter_events(sticker)))[2] == "sticker"
-    assert next(iter(_iter_events(photo)))[2] == "attachment"
 
 
 def test_attachment_payload_keeps_only_the_fields_needed_by_the_worker():

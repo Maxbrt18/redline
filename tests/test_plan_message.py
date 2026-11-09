@@ -6,7 +6,6 @@ internal `note` fields, dated-check identifiers included -- doubled shortly afte
 card saying the same thing better.
 """
 
-import json
 
 import pytest
 
@@ -31,8 +30,8 @@ SESSIONS = [
 @pytest.fixture
 def repo(monkeypatch):
     vault = VaultRepo(path=".", remote="origin", branch="main")
-    monkeypatch.setattr(vault, "weekly_plan_context",
-                        lambda week: json.dumps({"revision": 2, "sessions": SESSIONS}))
+    monkeypatch.setattr(vault, "active_revision",
+                        lambda week: ({"revision": 2, "sessions": SESSIONS}))
     return vault
 
 
@@ -75,8 +74,8 @@ def test_the_rest_of_the_week_never_contains_a_session_already_run(repo, monkeyp
     """
     ran = [{**session, "status": "done"} if session["date"] == "2026-08-16" else session
            for session in SESSIONS]
-    monkeypatch.setattr(repo, "weekly_plan_context",
-                        lambda week: json.dumps({"revision": 11, "sessions": ran}))
+    monkeypatch.setattr(repo, "active_revision",
+                        lambda week: ({"revision": 11, "sessions": ran}))
     message = repo.weekly_plan_message("2026-W33", since="2026-08-16")
     assert message == "Rien de prévu d'ici dimanche."
     assert "SL vallonnée" not in message
@@ -87,8 +86,8 @@ def test_a_cancelled_session_is_never_a_prescription(repo, monkeypatch):
     drops it from the three renderings, this one included."""
     dropped = [{**session, "status": "cancelled"} if session["date"] == "2026-08-16"
                else session for session in SESSIONS]
-    monkeypatch.setattr(repo, "weekly_plan_context",
-                        lambda week: json.dumps({"revision": 3, "sessions": dropped}))
+    monkeypatch.setattr(repo, "active_revision",
+                        lambda week: ({"revision": 3, "sessions": dropped}))
     assert "SL vallonnée" not in repo.weekly_plan_message("2026-W33")
     assert "SL vallonnée" not in repo.weekly_plan_message("2026-W33", since="2026-08-16")
     assert "SL vallonnée" not in repo.weekly_plan_message("2026-W33", today="2026-08-16")
@@ -100,8 +99,8 @@ def test_the_morning_names_a_session_already_run_rather_than_prescribing_it(repo
     "the rest of the week" that prescribes, and it alone excludes it."""
     ran = [{**session, "status": "done"} if session["date"] == "2026-08-16" else session
            for session in SESSIONS]
-    monkeypatch.setattr(repo, "weekly_plan_context",
-                        lambda week: json.dumps({"revision": 11, "sessions": ran}))
+    monkeypatch.setattr(repo, "active_revision",
+                        lambda week: ({"revision": 11, "sessions": ran}))
     assert repo.weekly_plan_message("2026-W33", today="2026-08-16").startswith(
         "Aujourd'hui : SL vallonnée (fait), cible 10 km")
 
@@ -118,8 +117,8 @@ def test_the_morning_carries_everything_because_nothing_else_will(repo):
 
 def test_two_sessions_on_the_same_day_share_their_line(repo, monkeypatch):
     doubled = [SESSIONS[1], {**SESSIONS[0], "id": "w33-r1-mar-ef", "date": "2026-08-11"}]
-    monkeypatch.setattr(repo, "weekly_plan_context",
-                        lambda week: json.dumps({"revision": 2, "sessions": doubled}))
+    monkeypatch.setattr(repo, "active_revision",
+                        lambda week: ({"revision": 2, "sessions": doubled}))
     lines = repo.weekly_plan_message("2026-W33").splitlines()
     assert lines[2] == ("mar. 11/08 : Repos (Renfo A reporté) + EF, cible 7 km, "
                         "plafond 9 km (fait)")
@@ -153,11 +152,6 @@ def test_an_empty_scope_says_which_scope_is_empty(repo):
         "2026-W33", today="2026-08-12")
 
 
-def test_an_unreadable_context_renders_nothing_rather_than_half_a_plan(repo, monkeypatch):
-    monkeypatch.setattr(repo, "weekly_plan_context", lambda week: "pas du json")
-    assert repo.weekly_plan_message("2026-W33") == ""
-
-
 def test_an_emptied_day_is_named_instead_of_vanishing(repo, monkeypatch):
     """The only rendering the athlete reads kept silent on the amputated day.
 
@@ -168,8 +162,8 @@ def test_an_emptied_day_is_named_instead_of_vanishing(repo, monkeypatch):
     """
     shortened = [{**session, "status": "cancelled"} if session["date"] == "2026-08-16"
               else session for session in SESSIONS]
-    monkeypatch.setattr(repo, "weekly_plan_context",
-                        lambda week: json.dumps({"revision": 4, "sessions": shortened}))
+    monkeypatch.setattr(repo, "active_revision",
+                        lambda week: ({"revision": 4, "sessions": shortened}))
 
     message = repo.weekly_plan_message("2026-W33", since="2026-08-11")
 
@@ -191,8 +185,8 @@ def test_a_day_already_run_is_not_called_empty(repo, monkeypatch):
     """A day behind us has nothing left to prescribe, and is not a gap."""
     ran = [{**session, "status": "done"} if session["date"] == "2026-08-11"
              else session for session in SESSIONS]
-    monkeypatch.setattr(repo, "weekly_plan_context",
-                        lambda week: json.dumps({"revision": 5, "sessions": ran}))
+    monkeypatch.setattr(repo, "active_revision",
+                        lambda week: ({"revision": 5, "sessions": ran}))
 
     message = repo.weekly_plan_message("2026-W33", since="2026-08-11")
 
@@ -201,8 +195,8 @@ def test_a_day_already_run_is_not_called_empty(repo, monkeypatch):
 
 def test_a_fully_empty_week_stays_one_sentence(repo, monkeypatch):
     """Seven "nothing planned" lines would say the same thing worse."""
-    monkeypatch.setattr(repo, "weekly_plan_context",
-                        lambda week: json.dumps({"revision": 6, "sessions": [
+    monkeypatch.setattr(repo, "active_revision",
+                        lambda week: ({"revision": 6, "sessions": [
                             {**SESSIONS[0], "status": "cancelled"}]}))
 
     assert repo.weekly_plan_message("2026-W33", since="2026-08-10") == (
@@ -210,7 +204,7 @@ def test_a_fully_empty_week_stays_one_sentence(repo, monkeypatch):
 
 
 def test_requested_scope_is_rendered_without_reciting_the_week():
-    raw = json.dumps({"revision": 2, "sessions": SESSIONS})
+    raw = ({"revision": 2, "sessions": SESSIONS})
 
     today = render_plan_for_scope(raw, "2026-W33", "today", today="2026-08-11")
     next_session = render_plan_for_scope(raw, "2026-W33", "next", today="2026-08-11")
@@ -221,10 +215,10 @@ def test_requested_scope_is_rendered_without_reciting_the_week():
 
 
 def test_reactive_revision_renders_only_its_delta():
-    before = json.dumps({"revision": 2, "sessions": SESSIONS})
+    before = ({"revision": 2, "sessions": SESSIONS})
     changed = [{**session, "date": "2026-08-15"}
                if session["id"] == "w33-r1-dim-sl" else session for session in SESSIONS]
-    after = json.dumps({"revision": 3, "sessions": changed})
+    after = ({"revision": 3, "sessions": changed})
 
     message = render_plan_delta(before, after, "2026-W33", today="2026-08-11")
 

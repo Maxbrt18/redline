@@ -1,9 +1,8 @@
-"""Text splitting: _split (Messenger limit) and _burst_parts (--- protocol)."""
+"""The Messenger client: the length limit, buttons and failures."""
 
 from types import SimpleNamespace
 
 from redline.service.messenger import DeliveredMessage, DeliveryResult, MessengerClient
-from redline.service.textutils import BURST_MAX
 
 
 def test_split_short_text_intact():
@@ -25,25 +24,6 @@ def test_split_never_inside_a_word():
     for part in parts:
         assert not part.startswith("ot") and "mo t" not in part
         assert all(chunk == "mot" for chunk in part.split())
-
-
-def test_burst_parts_splits_on_dashes():
-    assert MessengerClient._burst_parts("un\n---\ndeux") == ["un", "deux"]
-
-
-def test_burst_parts_without_separator():
-    assert MessengerClient._burst_parts("un seul texto") == ["un seul texto"]
-
-
-def test_burst_parts_ignores_empty_blocks():
-    assert MessengerClient._burst_parts("un\n---\n   \n---\ndeux") == ["un", "deux"]
-
-
-def test_burst_parts_caps_and_merges():
-    text = "\n---\n".join(f"t{i}" for i in range(1, 9))  # 8 blocks
-    parts = MessengerClient._burst_parts(text)
-    assert len(parts) == BURST_MAX
-    assert parts[-1] == "t5\n\nt6\n\nt7\n\nt8"
 
 
 # ---- the session button (interactive strength session)

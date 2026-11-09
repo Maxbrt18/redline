@@ -5,13 +5,13 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
-import os
 
 from redline.cards import html, render
 from redline.coach import dates
 from redline.coach.fr import cards as wording
 from redline.model import entrypoint
-from redline.model.errors import ConfigError, InputError
+from redline.model.errors import InputError
+from redline.model.vocabulary import SessionStatus
 from redline.model.weekly_plan import (
     active,
     details_of,
@@ -41,7 +41,7 @@ def rows(sessions: list) -> str:
         day = dt.date.fromisoformat(date_text)
         rendered = []
         for index, session in enumerate(day_sessions, 1):
-            status = wording.DONE if session["status"] == "done" else ""
+            status = wording.DONE if session["status"] == SessionStatus.DONE else ""
             rendered.append(
                 '<li class="row">'
                 f'<span class="row__index">{index:02d}</span>'
@@ -64,11 +64,8 @@ def main() -> None:
     parser.add_argument("-o", "--out", required=True)
     parser.add_argument("--html", action="store_true")
     args = parser.parse_args()
-    database_url = (os.environ.get("DATABASE_URL") or "").strip()
-    if not database_url:
-        raise ConfigError("DATABASE_URL is required: the journal only holds a projection")
-    from redline.storage import Database, OperationalStore
-    store = OperationalStore(Database(database_url, application_name="chart-plan"))
+    from redline.storage import open_store
+    store = open_store("chart-plan")
     plan = store.load_plan(args.week)
     if plan is None:
         raise InputError(f"plan {args.week} missing in PostgreSQL")

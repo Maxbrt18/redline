@@ -23,7 +23,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from babel import Locale, UnknownLocaleError
 
-from . import hr_zones
+from . import formats, hr_zones
 from .errors import ConfigError
 from .schema import Schema, SchemaError, field
 from .startup_budget import Tier, ceiling_errors
@@ -33,7 +33,6 @@ EXAMPLE = "config/redline.example.toml"
 
 #: An unfilled template value (`[Prénom]`, `[ville]`...). Never a legitimate value here.
 PLACEHOLDER = re.compile(r"\[[^\]]*\]")
-SLUG = r"[a-z0-9][a-z0-9-]{0,39}"
 
 #: The locale of dates and lists (`redline.coach.dates`) when `[athlete]` declares none.
 DEFAULT_LOCALE = "fr_FR"
@@ -63,19 +62,19 @@ INSTANCE_SCHEMA = Schema("redline.toml", [
     # Zero or more zones: an athlete with no injury has nothing to declare.
     field("injuries", list, required=False, item=field(
         "zone", dict, schema=Schema("[[injuries]]", [
-            field("slug", str, pattern=SLUG),
+            field("slug", str, pattern=formats.SLUG),
             field("label", str, minimum=1, maximum=40,
                   note="the displayed name of the monitored zone, e.g. Knee"),
         ]))),
     field("capabilities", list, minimum=1, maximum=9, item=field(
         "capability", dict, schema=Schema("[[capabilities]]", [
-            field("slug", str, pattern=SLUG),
+            field("slug", str, pattern=formats.SLUG),
             field("label", str, minimum=1, maximum=30),
             field("icon", str, required=False, choices=CAPABILITY_ICONS,
                   note="the capability's pictogram in the notebook"),
         ]))),
     field("ledger", dict, required=False, schema=Schema("[ledger]", [
-        field("complete_from", str, required=False, pattern=r"\d{4}-\d{2}-\d{2}",
+        field("complete_from", str, required=False, pattern=formats.DATE,
               note=("the first day whose sessions must be complete; earlier ones are never asked "
                     "for")),
     ])),

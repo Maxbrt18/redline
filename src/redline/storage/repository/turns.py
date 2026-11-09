@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
+from collections.abc import Callable
+from dataclasses import dataclass
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Connection
 
 from redline.model import commands, ledger
+from redline.model.errors import InputError
 
 from ..database import StorageError
 from ..schema import (
@@ -18,10 +21,22 @@ from ..schema import (
     observations,
     turn_commands,
 )
-from ._common import StoreBase, _audit, _jsonable, _uuid
+from ._common import _audit, _jsonable, _uuid
+from .days import Days
+from .proposals import Proposals
+from .strava_intake import StravaIntake
+from .strength import Strength
 
 
-class TurnCommands(StoreBase):
+@dataclass(frozen=True)
+class Submitted:
+    """A command either waits for the end of its turn, or was applied with this result."""
+
+    staged: bool
+    result: object = None
+
+
+class TurnCommands(StravaIntake, Strength, Proposals, Days):
     def stage_command(self, turn_id: str, command_key: str, kind: str,
                       payload: dict) -> uuid.UUID:
         """Record an intent only if the whole turn remains applicable.
@@ -114,13 +129,26 @@ class TurnCommands(StoreBase):
             ).order_by(turn_commands.c.created_at, turn_commands.c.id)).scalars()
             return tuple(dict.fromkeys(kinds))
 
-    def _apply_turn_in(self, connection: Connection, turn_id: str) -> int:
-        rows = list(connection.execute(sa.select(turn_commands).where(
-            turn_commands.c.turn_id == _uuid(turn_id),
-            turn_commands.c.applied_at.is_(None),
-        ).order_by(turn_commands.c.created_at, turn_commands.c.id).with_for_update()).mappings())
-        rows.sort(key=lambda row: row["kind"] == commands.PLAN_REVISE)
-        handlers = {
+    def submit(self, kind: str, payload: dict, *, command_key: str, turn_id: str,
+               actor: str) -> Submitted:
+        """Within a turn, stage the command; outside one, apply it now.
+
+        Both paths go through the same handler with the same canonical payload, so a
+        command behaves the same whether the coach or the operator runs it.
+        """
+        if turn_id:
+            self.stage_command(turn_id, command_key, kind, payload)
+            return Submitted(staged=True)
+        handler = self._handlers().get(kind)
+        if handler is None:
+            raise StorageError(f"unknown command: {kind}")
+        with self.database.transaction() as connection:
+            result = self._applied(connection, kind, handler, _jsonable(payload), actor)
+            self._validate_revised(connection, self._revised_week(kind, payload))
+        return Submitted(staged=False, result=result)
+
+    def _handlers(self) -> dict[str, Callable[[Connection, dict, str], object]]:
+        return {
             commands.OBSERVATION_ADD: self._apply_observation,
             commands.ACTIVITY_LINK: self._apply_activity_link,
             commands.MEASUREMENT_COMPLETE: self._apply_measurement,
@@ -142,47 +170,64 @@ class TurnCommands(StoreBase):
             commands.CORRECTION_REGISTER: self._apply_correction,
             commands.PERMIT_SEAL: self._apply_permit_seal,
         }
-        applied = 0
-        revised_weeks: list[str] = []
-        for row in rows:
-            payload = dict(row["payload"])
-            handler = handlers.get(row["kind"])
-            if handler is None:
-                raise StorageError(f"unknown turn command: {row["kind"]}")
-            try:
-                revised = handler(connection, payload, f"turn:{turn_id}")
-            except (KeyError, TypeError, ValueError) as exc:
-                raise StorageError(
-                    f"invalid {row["kind"]} command: {exc}") from exc
-            if revised:
-                revised_weeks.append(revised)
-            connection.execute(turn_commands.update().where(
-                turn_commands.c.id == row["id"]).values(applied_at=sa.func.now()))
-            applied += 1
-        # Only the weeks THIS turn revised are re-read: writing an invalid plan is a
-        # write fault. The state of a week that was not touched is unrelated to the
-        # facts just recorded.
+
+    @staticmethod
+    def _applied(connection: Connection, kind: str,
+                 handler: Callable[[Connection, dict, str], object], payload: dict,
+                 actor: str) -> object:
+        try:
+            return handler(connection, dict(payload), actor)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise StorageError(f"invalid {kind} command: {exc}") from exc
+
+    @staticmethod
+    def _revised_week(kind: str, payload: dict) -> list[str]:
+        return [payload["week"]] if kind in {commands.PLAN_REVISE, commands.PLAN_PROPOSE} else []
+
+    def _validate_revised(self, connection: Connection, weeks: list[str]) -> None:
+        """Re-read the weeks a write revised: writing an invalid plan is a write fault.
+
+        The state of a week that was not touched is unrelated to the facts just recorded.
+        """
         from redline.model import weekly_plan as weekly_plan_model
-        for week in revised_weeks:
+        for week in weeks:
             plan = self._load_plan_connection(connection, week)
             if plan is None:
                 raise StorageError(f"plan {week} missing after its revision")
             try:
                 weekly_plan_model.validate(plan)
-            except Exception as exc:
+            except (InputError, KeyError, TypeError, ValueError) as exc:
                 raise StorageError(f"revision refused, plan {week} invalid: {exc}") from exc
-        return applied
+
+    def _apply_turn_in(self, connection: Connection, turn_id: str) -> int:
+        rows = list(connection.execute(sa.select(turn_commands).where(
+            turn_commands.c.turn_id == _uuid(turn_id),
+            turn_commands.c.applied_at.is_(None),
+        ).order_by(turn_commands.c.created_at, turn_commands.c.id).with_for_update()).mappings())
+        rows.sort(key=lambda row: row["kind"] == commands.PLAN_REVISE)
+        handlers = self._handlers()
+        revised_weeks: list[str] = []
+        for row in rows:
+            handler = handlers.get(row["kind"])
+            if handler is None:
+                raise StorageError(f"unknown turn command: {row["kind"]}")
+            self._applied(connection, row["kind"], handler, row["payload"], f"turn:{turn_id}")
+            revised_weeks += self._revised_week(row["kind"], row["payload"])
+            connection.execute(turn_commands.update().where(
+                turn_commands.c.id == row["id"]).values(applied_at=sa.func.now()))
+        self._validate_revised(connection, revised_weeks)
+        return len(rows)
 
     def _apply_observation(self, connection: Connection, payload: dict,
-                           actor: str) -> None:
+                           actor: str) -> uuid.UUID:
         payload["occurred_on"] = dt.date.fromisoformat(payload["occurred_on"])
         if isinstance(payload.get("started_at"), str):
             payload["started_at"] = dt.datetime.fromisoformat(payload["started_at"])
-        self.add_observation_in(connection, payload, actor=actor)
+        return self.add_observation_in(connection, payload, actor=actor)
 
     def _apply_activity_link(self, connection: Connection, payload: dict,
-                             actor: str) -> None:
-        self.link_activity_in(connection, payload["idempotency_key"],
+                             actor: str) -> object:
+        return self.link_activity_in(connection, payload["idempotency_key"],
                               int(payload["strava_activity_id"]), actor=actor)
 
     def _apply_measurement(self, connection: Connection, payload: dict,
@@ -209,33 +254,30 @@ class TurnCommands(StoreBase):
                          actor=actor)
 
     def _apply_exposure(self, connection: Connection, payload: dict,
-                        actor: str) -> None:
-        self.upsert_exposure_in(connection, payload, actor=actor)
+                        actor: str) -> object:
+        return self.upsert_exposure_in(connection, payload, actor=actor)
 
-    def _apply_plan(self, connection: Connection, payload: dict, actor: str) -> str:
+    def _apply_plan(self, connection: Connection, payload: dict, actor: str) -> dict:
         revision = dict(payload["revision"])
         revision["computed_at"] = dt.datetime.fromisoformat(revision["computed_at"])
         for session in revision.get("sessions", []):
             session["date"] = dt.date.fromisoformat(session["date"])
         for gate in revision.get("gates", []):
             gate["due"] = dt.date.fromisoformat(gate["due"])
-        week = payload["week"]
-        self.append_plan_revision_in(connection, week, revision, actor=actor)
-        return week
+        return self.append_plan_revision_in(connection, payload["week"], revision, actor=actor)
 
-    def _apply_proposals(self, connection: Connection, payload: dict, actor: str) -> str:
-        self.add_proposals_in(connection, payload["week"], payload["based_on"],
-                              payload["proposals"], actor=actor)
-        return payload["week"]
+    def _apply_proposals(self, connection: Connection, payload: dict, actor: str) -> list[uuid.UUID]:
+        return self.add_proposals_in(connection, payload["week"], payload["based_on"],
+                                     payload["proposals"], actor=actor)
 
     def _apply_daily(self, connection: Connection, payload: dict, actor: str) -> None:
         payload["day"] = dt.date.fromisoformat(payload["day"])
         self.put_daily_in(connection, payload, actor=actor)
 
     def _apply_capability(self, connection: Connection, payload: dict,
-                          actor: str) -> None:
+                          actor: str) -> bool:
         payload["evaluated_on"] = dt.date.fromisoformat(payload["evaluated_on"])
-        self.add_capability_evaluation_in(connection, payload, actor=actor)
+        return self.add_capability_evaluation_in(connection, payload, actor=actor)
 
     def _apply_proactive_angle(self, connection: Connection, payload: dict,
                                actor: str) -> None:

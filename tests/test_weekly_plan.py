@@ -8,6 +8,8 @@ import pytest
 
 from redline.model import session_kinds, weekly_plan
 from redline.model.schema import SchemaError
+from redline.model.vocabulary import SETTLED_STATUSES, SessionStatus
+from redline.storage.repository import Submitted
 
 
 def session(identifier="w32-lun-ef", date="2026-08-03", workout="easy", **overrides):
@@ -93,10 +95,10 @@ def test_remaining_drops_what_is_settled_and_what_is_behind():
 def test_only_a_settled_status_leaves_the_prescription():
     """Written as a negative on purpose: a status added later stays prescribable, because
     forgetting a session to do is worse than showing one too many."""
-    assert set(weekly_plan.STATUSES) > weekly_plan.SETTLED_STATUSES
-    for status in weekly_plan.STATUSES:
+    assert set(SessionStatus) > SETTLED_STATUSES
+    for status in SessionStatus:
         kept = weekly_plan.remaining([session(status=status)], since="2026-08-01")
-        assert bool(kept) is (status not in weekly_plan.SETTLED_STATUSES)
+        assert bool(kept) is (status not in SETTLED_STATUSES)
 
 
 def test_valid_plan_passes():
@@ -352,7 +354,6 @@ def test_a_week_to_review_still_prints_its_plan_and_exits_three(capsys):
 
     output = capsys.readouterr()
     assert code == cli.EXIT_STALE
-    assert code != cli.EXIT_INVALID
     assert "w32-lun-ef" in output.out, "the plan must stay readable"
     assert "arbitrage obligatoire" in output.err
     assert "activité non rattachée" in output.err
@@ -473,9 +474,10 @@ def test_a_new_revision_does_not_persist_a_schema_version(monkeypatch, capsys):
         def load_plan(self, week):
             return None
 
-        def append_plan_revision(self, week, revision, actor=""):
-            written["revision"] = revision
-            return {"week": week, "revisions": [revision]}
+        def submit(self, kind, payload, **_):
+            written["revision"] = payload["revision"]
+            return Submitted(staged=False, result={"week": payload["week"],
+                                                   "revisions": [payload["revision"]]})
 
     fresh = written_today(number=1, sessions=[session()])
     fresh["gates"] = [gate(when="after")]
@@ -499,7 +501,7 @@ def test_a_new_revision_may_no_longer_carry_an_untyped_gate(monkeypatch):
         def load_plan(self, week):
             return None
 
-        def append_plan_revision(self, week, revision, actor=""):
+        def submit(self, kind, payload, **_):
             raise AssertionError("an invalid revision must never be written")
 
     fresh = written_today(number=1, sessions=[session()])
@@ -509,10 +511,7 @@ def test_a_new_revision_may_no_longer_carry_an_untyped_gate(monkeypatch):
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(fresh)))
     monkeypatch.delenv("REDLINE_TURN_ID", raising=False)
 
-    # `week_plan.SchemaError`, not the one imported at the top: loaded as a file, the
-    # script resolves `model.*` where the suite resolves `redline.model.*`. Two identities
-    # for the same class, and the script decides which one it raises.
-    with pytest.raises(week_plan.SchemaError, match="when"):
+    with pytest.raises(SchemaError, match="when"):
         frozen_clock(monkeypatch, week_plan)
         week_plan._database_command(FakeStore(), "revise", "2026-W32", optional=False)
 
@@ -535,14 +534,13 @@ def test_plan_cli_distinguishes_preview_from_pending_application(command, monkey
     assert cli._database_command(store, command, "2026-W32", False) == 0
 
     output = capsys.readouterr().out
-    store.append_plan_revision.assert_not_called()
     if command == "preview":
         store.preview_command.assert_called_once()
-        store.stage_command.assert_not_called()
+        store.submit.assert_not_called()
         assert "SIMULATION VALIDÉE" in output
         assert "aucun changement préparé ou enregistré" in output
     else:
-        store.stage_command.assert_called_once()
+        assert store.submit.call_args.kwargs["turn_id"] == "01d5be59-401b-4268-a418-e24d56029fbe"
         store.preview_command.assert_not_called()
         assert "CHANGEMENT PRÉPARÉ" in output
         assert "application en fin de tour encore requise" in output

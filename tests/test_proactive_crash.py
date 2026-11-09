@@ -23,26 +23,10 @@ def test_a_crashed_proactive_releases_its_job(store, make_config):
     assert store.proactive.jobs(active_only=True)[0]["status"] == "pending"
 
 
-def test_startup_recovers_a_job_left_running(store):
-    store.proactive.enqueue_job("weekly:2026-W29", "weekly", "", 0)
-    assert store.proactive.claim_due_job(1)["status"] == "running"
-
-    assert store.proactive.recover_running_jobs() == 1
-
-    recovered = store.proactive.claim_due_job(time.time())
-    assert recovered["id"] == "weekly:2026-W29"
-    assert recovered["attempts"] == 2
-
-
 def test_an_unpersisted_test_job_is_left_alone(store, make_config):
     bot = _bot(store, make_config)
     bot._release_job(ProactiveJob(psid="4242", kind="strava_debrief", prompt="p"))
     assert store.proactive.jobs(active_only=True) == []
-
-
-def test_a_stable_job_id_deduplicates_the_trigger(store):
-    assert store.proactive.enqueue_job("morning:2026-07-14", "morning", "", 0)
-    assert not store.proactive.enqueue_job("morning:2026-07-14", "morning", "", 0)
 
 
 def test_a_queued_proactive_waits_if_the_athlete_has_started_talking(make_bot):

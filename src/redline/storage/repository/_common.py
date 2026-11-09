@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -30,6 +30,12 @@ _INTAKE_CORE = tuple(column for column in strava_activity_intakes.c
 
 def _uuid(value: Any = None) -> uuid.UUID:
     return value if isinstance(value, uuid.UUID) else uuid.UUID(str(value)) if value else uuid.uuid4()
+
+
+def _native(row: Any) -> dict:
+    """A row as Python reads it: dates stay dates, numerics become floats."""
+    return {key: float(value) if isinstance(value, Decimal) else value
+            for key, value in dict(row).items()}
 
 
 def _plain(value: Any) -> Any:
@@ -123,6 +129,3 @@ class StoreBase:
 
     database: Database
     athlete_id: str
-
-    if TYPE_CHECKING:
-        def __getattr__(self, name: str) -> Any: ...

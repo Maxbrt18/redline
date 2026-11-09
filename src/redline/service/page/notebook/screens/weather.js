@@ -1,4 +1,3 @@
-// ------------------------------------------------------------ weather
 import {add, el} from '../../shared/dom.js';
 import {flights, skies} from '../state.js';
 import {api} from '../api.js';

@@ -1,8 +1,7 @@
 """What each card script accepts on stdin, declared instead of described.
 
-These contracts used to live in the docstring of every `chart-*.py`: 58 lines of
-prose that nothing enforced, so a key Claude mistyped in the morning produced a
-wrong card or a KeyError rather than a refusal naming the field.
+These contracts are schemas, not prose in each `chart_*` docstring: a key Claude
+mistypes produces a refusal naming the field, not a wrong card or a KeyError.
 
 The strength card is absent on purpose: its input is a SELECTION of the program,
 already declared as `SELECTION_SCHEMA` in `program.py` next to what it selects.
@@ -17,9 +16,9 @@ with a measurement, and the measurement wins.
 
 from __future__ import annotations
 
+from . import formats, iso_week
 from .schema import Schema, field
 
-DATE = r"\d{4}-\d{2}-\d{2}"
 STATUS = ("ok", "warn", "bad")
 
 DAY_SCHEMA = Schema("day", [
@@ -30,7 +29,7 @@ DAY_SCHEMA = Schema("day", [
 ])
 
 WEEK_SCHEMA = Schema("week", [
-    field("period", str, required=False, pattern=r"20\d{2}-W\d{2}", note="the review's canonical period, e.g. 2030-W39"),
+    field("period", str, required=False, pattern=iso_week.PATTERN, note="the review's canonical period, e.g. 2030-W39"),
     field("week", str, note="the short title, e.g. W30"),
     field("dates", str, required=False),
     field("days", list, minimum=1, maximum=7, item=field("day", dict, schema=DAY_SCHEMA),
@@ -65,7 +64,7 @@ MONTH_SCHEMA = Schema("month", [
           note="capability name -> score, see redline fact-read capabilities"),
     field("cap_scale", float, required=False, minimum=1, default=5),
     field("race_name", str, required=False),
-    field("race_date", str, required=False, pattern=DATE),
+    field("race_date", str, required=False, pattern=formats.DATE),
 ])
 
 RECOVERY_SCHEMA = Schema("recovery", [

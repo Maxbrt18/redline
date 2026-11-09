@@ -26,7 +26,6 @@
 
 :root { --pad: 64px; }   /* card gutter; the page has its own */
 
-/* -------------------------------------------------------------- foundation */
 *, *::before, *::after { box-sizing: border-box; }
 
 html, body {
@@ -59,7 +58,6 @@ body {
 
 p, h1, h2, ol, ul { margin: 0; padding: 0; list-style: none; }
 
-/* ------------------------------------------------------------------ header */
 .head { padding-bottom: 8px; }
 
 .head__wordmark {
@@ -91,7 +89,6 @@ p, h1, h2, ol, ul { margin: 0; padding: 0; list-style: none; }
 /* Air between the header and a block that follows it without a section label. */
 .stack { margin-top: 34px; }
 
-/* ---------------------------------------------------------------- sections */
 .section {
   margin: 44px 0 16px;
   font-size: 19px;
@@ -100,7 +97,6 @@ p, h1, h2, ol, ul { margin: 0; padding: 0; list-style: none; }
 }
 .section::first-letter { text-transform: uppercase; }
 
-/* ------------------------------------------------------- exercise rows */
 .rows { margin-top: 18px; display: flex; flex-direction: column; gap: 30px; }
 
 .day-group { display: flex; flex-direction: column; }
@@ -169,7 +165,6 @@ p, h1, h2, ol, ul { margin: 0; padding: 0; list-style: none; }
 }
 .row__dose .row__sub { color: var(--faint); }
 
-/* ------------------------------------------------------------------- tiles */
 /* A strip of figures between two hairlines, read left to right like a line of a
  * training log. No boxes: a tile is a column, its neighbour is across a rule. */
 .tiles {
@@ -222,7 +217,6 @@ p, h1, h2, ol, ul { margin: 0; padding: 0; list-style: none; }
   overflow-wrap: anywhere;
 }
 
-/* ----------------------------------------------------------------- verdict */
 /* The closing judgement is a line of prose under a rule, not a boxed alert. A
  * verdict that reports a crossing is set in red; any other is plain ink. */
 .verdict {
@@ -235,7 +229,6 @@ p, h1, h2, ol, ul { margin: 0; padding: 0; list-style: none; }
 }
 .verdict--over { color: var(--over); }
 
-/* ------------------------------------------------------------------ legend */
 .legend {
   display: flex;
   flex-wrap: wrap;
@@ -251,7 +244,6 @@ p, h1, h2, ol, ul { margin: 0; padding: 0; list-style: none; }
 .legend__swatch--effort { background: var(--red); }
 .legend__swatch--over  { background: var(--over); }
 
-/* ------------------------------------------------------------------- plots */
 .plot { display: block; width: 100%; margin-top: 22px; overflow: visible; }
 .plot__grid    { stroke: var(--grid); stroke-width: 1; }
 .plot__bar     { fill: var(--data); }
@@ -291,7 +283,6 @@ p, h1, h2, ol, ul { margin: 0; padding: 0; list-style: none; }
 .plot__note    { fill: var(--faint); font-size: 15px; }
 .plot__sub     { fill: var(--muted); font-size: 16px; }
 
-/* -------------------------------------------------- capability tracks */
 .tracks { display: flex; flex-direction: column; }
 
 .track {
@@ -331,7 +322,6 @@ p, h1, h2, ol, ul { margin: 0; padding: 0; list-style: none; }
   font-weight: 700;
 }
 
-/* --------------------------------------------------------------- countdown */
 .countdown {
   margin-top: 40px;
   padding-top: 34px;
@@ -346,12 +336,11 @@ p, h1, h2, ol, ul { margin: 0; padding: 0; list-style: none; }
 }
 .countdown__sub { margin-top: 12px; font-size: 20px; color: var(--muted); }
 
-/* ------------------------------------------------------------------ footer */
 .foot { margin-top: 30px; }
 .foot__note {
   font-size: 20px;
   line-height: 1.42;
-  overflow-wrap: anywhere;   /* the 25/07 bug: this used to run off the canvas */
+  overflow-wrap: anywhere;   /* a long unbroken word never runs off the canvas */
 }
 .foot__rule {
   margin-top: 12px;

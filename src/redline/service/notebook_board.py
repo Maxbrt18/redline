@@ -9,15 +9,16 @@ Prescription rules stay those of the service: an absent program prescribes nothi
 due dated check withholds its sessions, a revision to re-arbitrate is stated. The
 notebook has no fallback on the macro plan.
 
-Writes: only the feelings the ledger already requests (RPE, pain, enjoyment, wake
-trace), through the same methods as `redline ledger-complete`, and only if the request is
-still open at write time.
+Writes: only the answers to the questions the notebook asks -- the feelings the ledger
+requests (RPE, pain, enjoyment, wake trace), the fuel registry and the reserve of a
+quality session, through the same methods as `redline ledger-complete`; the daily state;
+and the reason given for a high heart rate, as a note on that day's daily state. Each
+write happens only if its request is still open at write time.
 """
 
 from __future__ import annotations
 
 import datetime as dt
-import json
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,6 +32,7 @@ from redline.coach.fr import weather as weather_labels
 from redline.coach.fr.notebook import HR_REASONS
 from redline.model import (
     debrief,
+    iso_week,
     local_time,
     program,
     rulebook,
@@ -43,7 +45,15 @@ from redline.model import race as race_model
 from redline.model.activity import Activity
 from redline.model.errors import InputError
 from redline.model.instance import Instance, derived_label
-from redline.model.vocabulary import HrDoubt, HrReason, LifeLoad, Sleep
+from redline.model.vocabulary import (
+    DeadlineStatus,
+    HrDoubt,
+    HrReason,
+    LifeLoad,
+    MeasurementState,
+    SessionStatus,
+    Sleep,
+)
 
 from . import race_plan, session_detail
 from .plans import PlanStatus, blocked_session_ids
@@ -62,19 +72,9 @@ class AnswerError(InputError):
     """A refused answer: a closed request, or a value off the scale or unknown."""
 
 
-def week_label(day: dt.date) -> str:
-    return day.strftime("%G-W%V")
-
-
-def week_monday(week: str) -> dt.date:
-    return dt.date.fromisocalendar(int(week[:4]), int(week[-2:]), 1)
-
-
 def _known(observation: dict, metric: str) -> float | None:
-    measure = (observation.get("measurements") or {}).get(metric) or {}
-    if measure.get("state") != "known" or measure.get("value") is None:
-        return None
-    return float(measure["value"])
+    value = ledger_model.known((observation.get("measurements") or {}).get(metric))
+    return None if value is None else float(value)
 
 
 def _activity(intake: dict | None) -> Activity | None:
@@ -89,7 +89,7 @@ def known_pains(observation: dict, labels: dict[str, str]) -> list[views.PainRea
     ordered: list[str] = [zone for zone in labels if zone in pains] + sorted(set(pains) - set(labels))
     return [{"zone": zone, "label": labels.get(zone, zone),
              "value": float(pains[zone]["value"])} for zone in ordered
-            if pains[zone].get("state") == "known" and pains[zone].get("value") is not None]
+            if ledger_model.known(pains[zone]) is not None]
 
 
 def observation_fact(observation: dict, session: dict | None = None,
@@ -216,7 +216,7 @@ class Week:
 
     @property
     def days(self) -> list[dt.date]:
-        monday = week_monday(self.label)
+        monday = iso_week.monday(self.label)
         return [monday + dt.timedelta(days=offset) for offset in range(7)]
 
 
@@ -252,7 +252,6 @@ class Board:
     def _capability_icon(self, slug: str) -> str:
         return "run" if self.instance is None else self.instance.capability_icon(slug)
 
-    # ------------------------------------------------------------ lectures
     @property
     def observations(self) -> list[dict]:
         if self._observations is None:
@@ -273,23 +272,21 @@ class Board:
 
     def week(self, label: str) -> Week:
         status = self.repo.validate_weekly_plan(label)
-        context = self.repo.weekly_plan_context(label) if status is not PlanStatus.INVALID else ""
-        revision = json.loads(context) if context else None
-        held = blocked_session_ids(context, self.today.isoformat()) if context else frozenset()
+        revision = self.repo.active_revision(label) if status is not PlanStatus.INVALID else None
+        held = blocked_session_ids(revision, self.today.isoformat())
         return Week(
             label=label, status=status if revision else PlanStatus.INVALID,
             revision=revision, held=held, links=self.ops.week_session_links(label),
             observations=[row for row in self.observations
-                          if week_label(row["occurred_on"]) == label],
+                          if iso_week.of(row["occurred_on"]) == label],
             rows=[row for row in self.rows if row.week == label],
             strength=[row for row in self.strength_history
-                      if week_label(row["performed_on"]) == label])
+                      if iso_week.of(row["performed_on"]) == label])
 
-    # ------------------------------------------------------------ sessions
     def session_item(self, week: Week, session: dict,
                      entries: dict[str, str]) -> views.SessionItem:
         status = session["status"]
-        if status == "planned" and session["id"] in week.held:
+        if status == SessionStatus.PLANNED and session["id"] in week.held:
             status = "held"
         item: views.SessionItem = {
             "id": session["id"], "date": session["date"], "title": session["title"],
@@ -347,15 +344,14 @@ class Board:
                 for row in week.observations
                 if row["kind"] in MOVING_TYPES and row["id"] not in linked]
 
-    # ------------------------------------------------------------ aggregates
     def strip(self, week: Week, sessions: list[views.SessionItem]) -> list[views.StripDay]:
         days: list[views.StripDay] = []
         for day in week.days:
             iso = day.isoformat()
-            same = [s for s in sessions if s["date"] == iso and s["status"] != "cancelled"]
+            same = [s for s in sessions if s["date"] == iso and s["status"] != SessionStatus.CANCELLED]
             done = sum(row.km or 0 for row in week.rows
                        if row.date == day and row.type in ledger.RUN_TYPES)
-            pending = [s for s in same if s["kind"] == "run" and s["status"] != "done"]
+            pending = [s for s in same if s["kind"] == "run" and s["status"] != SessionStatus.DONE]
             planned_km: float | None = None
             planned_label: str | None = None
             if pending and not done:
@@ -376,7 +372,7 @@ class Board:
 
     def totals(self, week: Week, sessions: list[views.SessionItem]) -> views.Totals:
         volume = ledger.week_volume(week.rows)
-        live = [s for s in sessions if s["status"] != "cancelled"]
+        live = [s for s in sessions if s["status"] != SessionStatus.CANCELLED]
         runs = [s for s in live if s["kind"] == "run"]
         strength = [s for s in live if s["kind"] == "strength"]
         instruments = ledger.load_instruments(self.ops).get(week.label, ledger.Instruments())
@@ -387,7 +383,7 @@ class Board:
             "km_target": (week.revision or {}).get("volume_target_km"),
             "runs_done": volume.runs, "runs_planned": len(runs),
             "dplus": volume.dplus,
-            "strength_done": sum(1 for s in strength if s["status"] == "done"),
+            "strength_done": sum(1 for s in strength if s["status"] == SessionStatus.DONE),
             "strength_planned": len(strength),
             "load": level,
             "pain_peaks": [
@@ -416,14 +412,14 @@ class Board:
         if chosen is None:
             return None
         slug = chosen.slug
-        start = week_monday(week_label(self.today)) - dt.timedelta(weeks=weeks - 1)
+        start = iso_week.monday(iso_week.of(self.today)) - dt.timedelta(weeks=weeks - 1)
         rows = [row for row in self.rows
                 if start <= row.date <= self.today and row.pain_at(slug) is not None]
         efforts = [row for row in rows if row.type in ledger_model.EFFORT_TYPES]
         wakes = [row for row in rows if row.type == session_kinds.WAKE_TRACE]
         table: list[views.InjuryWeek] = []
         for index in range(weeks):
-            label = week_label(start + dt.timedelta(weeks=index))
+            label = iso_week.of(start + dt.timedelta(weeks=index))
             effort = [row.pains[slug] for row in efforts if row.week == label]
             wake = [row.pains[slug] for row in wakes if row.week == label]
             table.append({"week": label, "peak": max(effort, default=None), "n": len(effort),
@@ -439,7 +435,7 @@ class Board:
             "zone": slug, "label": chosen.label,
             "zones": [{"zone": item.slug, "label": item.label} for item in self.zones],
             "cap": scale.cap, "start": start.isoformat(), "today": self.today.isoformat(),
-            "week": week_label(self.today),
+            "week": iso_week.of(self.today),
             "points": [{"date": row.date.isoformat(), "pain": row.pains[slug], "kind": row.type,
                         "long": row.type == session_kinds.LONG} for row in efforts],
             "wakes": [{"date": row.date.isoformat(), "pain": row.pains[slug]} for row in wakes],
@@ -453,7 +449,7 @@ class Board:
             return None
         row = next(row for row in self.ops.deadline_rows()
                    if row.get("kind") == "race" and row["due_on"] == race_on
-                   and row["status"] != "done")
+                   and row["status"] != DeadlineStatus.DONE)
         context = row.get("context") or {}
         return cast("views.Race", {
             "name": row.get("athlete_label") or "Course objectif",
@@ -461,7 +457,6 @@ class Board:
             **{key: context[key] for key in views.Race.__optional_keys__
                if context.get(key) is not None}})
 
-    # ------------------------------------------------------------ demandes
     def asks(self) -> list[views.Ask]:
         """The feelings the ledger requests and the athlete can give in one tap."""
         asks: list[views.Ask] = []
@@ -502,7 +497,7 @@ class Board:
                 measurements = row.get("measurements") or {}
                 fuelled = [metric for metric in ledger_model.FUELLING_METRICS
                            if (measurements.get(metric) or {}).get("state")
-                           not in (None, "not_applicable")]
+                           not in (None, MeasurementState.NOT_APPLICABLE)]
                 seconds = _known(row, "duration_s")
                 asks.append({"id": f"cell:{row['id']}", "type": "cells",
                              "date": day.isoformat(), "kind": row["kind"],
@@ -606,7 +601,7 @@ class Board:
                     "idempotency_key": f"notebook:wake-trace:{self.today.isoformat()}",
                     "note": notebook_text.WAKE_TRACE_NOTE, "source": ACTOR,
                     "measurements": {},
-                    "pains": {ask["zone"]: {"state": "known", "value": trace}},
+                    "pains": {ask["zone"]: {"state": MeasurementState.KNOWN, "value": trace}},
                 }, actor=ACTOR)
             alert = None
             if scale.above_base(trace):
@@ -668,13 +663,12 @@ class Board:
         self.ops.complete_measurement(observation_id, metric, value, actor=ACTOR)
         return metric == "gut_symptoms" and bool(value)
 
-    # ------------------------------------------------------------ session detail
     def _observation(self, observation_id: str) -> dict | None:
         return next((row for row in self.observations if str(row["id"]) == observation_id), None)
 
     def _fulfils_quality(self, observation: dict) -> bool:
         """Whether the observation fulfilled a quality session; an unlinked one reads no plan."""
-        links = self.ops.week_session_links(week_label(observation["occurred_on"]))
+        links = self.ops.week_session_links(iso_week.of(observation["occurred_on"]))
         if not any(str(link.get("observation_id")) == str(observation["id"])
                    for link in links.values()):
             return False
@@ -682,7 +676,7 @@ class Board:
 
     def _linked_session(self, observation: dict) -> dict | None:
         """The program session the observation fulfilled, if any."""
-        week = self.week(week_label(observation["occurred_on"]))
+        week = self.week(iso_week.of(observation["occurred_on"]))
         session_id = next((key for key, link in week.links.items()
                            if str(link.get("observation_id")) == str(observation["id"])), None)
         if not session_id or not week.revision:
@@ -736,11 +730,11 @@ class Board:
                 "after_due": after > self.today}
 
     def _week_context(self, day: dt.date) -> views.WeekContext:
-        week = self.week(week_label(day))
+        week = self.week(iso_week.of(day))
         sessions = self.sessions(week)
         totals = self.totals(week, sessions)
         out: views.WeekContext = {
-            "week": week.label, "current": week.label == week_label(self.today),
+            "week": week.label, "current": week.label == iso_week.of(self.today),
             "km_done": totals["km_done"], "km_target": totals["km_target"],
             "runs_done": totals["runs_done"], "runs_planned": totals["runs_planned"],
             "next": None}
@@ -824,32 +818,31 @@ class Board:
             "week": self._week_context(day),
         }
 
-    # ------------------------------------------------------------ screens
     def ahead(self, week: Week, sessions: list[views.SessionItem],
               days: int = 3) -> list[views.SessionItem]:
         """The sessions of the coming days, across the week boundary if needed."""
         horizon = self.today + dt.timedelta(days=days)
         pool = list(sessions)
-        if week_label(horizon) != week.label:
-            pool += self.sessions(self.week(week_label(horizon)))
+        if iso_week.of(horizon) != week.label:
+            pool += self.sessions(self.week(iso_week.of(horizon)))
         return [s for s in pool if self.today.isoformat() < s["date"] <= horizon.isoformat()
-                and s["kind"] != "rest" and s["status"] not in {"cancelled", "done"}]
+                and s["kind"] != "rest" and s["status"] not in {SessionStatus.CANCELLED, SessionStatus.DONE}]
 
     def today_view(self) -> views.BoardToday:
-        week = self.week(week_label(self.today))
+        week = self.week(iso_week.of(self.today))
         sessions = self.sessions(week)
         tomorrow = self.today + dt.timedelta(days=1)
-        if week_label(tomorrow) == week.label:
+        if iso_week.of(tomorrow) == week.label:
             ahead, ahead_sessions = week, sessions
         else:
-            ahead = self.week(week_label(tomorrow))
+            ahead = self.week(iso_week.of(tomorrow))
             ahead_sessions = self.sessions(ahead)
         upcoming = [s for s in ahead_sessions if s["date"] > tomorrow.isoformat()
-                    and s["kind"] != "rest" and s["status"] not in {"cancelled", "done"}]
+                    and s["kind"] != "rest" and s["status"] not in {SessionStatus.CANCELLED, SessionStatus.DONE}]
         # The whole next training DAY: "easy run + strength", not the run alone.
         upcoming = [s for s in upcoming if upcoming and s["date"] == upcoming[0]["date"]]
         today_items = [s for s in sessions if s["date"] == self.today.isoformat()
-                       and s["status"] != "cancelled"]
+                       and s["status"] != SessionStatus.CANCELLED]
         return {
             "date": self.today.isoformat(), "week": week.label,
             "plan": {"status": week.status.name.lower(),
@@ -860,7 +853,7 @@ class Board:
             "tomorrow": {
                 "date": tomorrow.isoformat(), "plan": ahead.status.name.lower(),
                 "sessions": [s for s in ahead_sessions if s["date"] == tomorrow.isoformat()
-                             and s["status"] != "cancelled"],
+                             and s["status"] != SessionStatus.CANCELLED],
                 "next": upcoming},
             "strip": self.strip(week, sessions),
             "totals": self.totals(week, sessions),
@@ -879,9 +872,9 @@ class Board:
                        if entry["kind"] == "weekly" and entry["period"] == label), None)
         return {
             "week": label, "monday": week.days[0].isoformat(),
-            "current": week_label(self.today),
+            "current": iso_week.of(self.today),
             "plan": {"status": week.status.name.lower(),
-                     "message": PLAN_MESSAGES.get(week.status, "") if label >= week_label(self.today) else "",
+                     "message": PLAN_MESSAGES.get(week.status, "") if label >= iso_week.of(self.today) else "",
                      "revision": (week.revision or {}).get("revision")},
             "sessions": sessions, "extra": self.unplanned(week),
             "totals": self.totals(week, sessions),
@@ -889,13 +882,13 @@ class Board:
             "review": review,
             "cards": [entry for entry in entries
                       if entry["kind"] not in {"weekly", "strength"}],
-            "next": self.next_week() if label == week_label(self.today) else None,
+            "next": self.next_week() if label == iso_week.of(self.today) else None,
         }
 
     def next_week(self) -> views.NextWeek | None:
         """The following week as soon as its program exists: on Sunday, it is the one
         being organized. Without a valid program, nothing is announced."""
-        week = self.week(week_label(self.today + dt.timedelta(days=7)))
+        week = self.week(iso_week.of(self.today + dt.timedelta(days=7)))
         if week.status is PlanStatus.INVALID:
             return None
         totals = self.totals(week, self.sessions(week))
@@ -905,22 +898,22 @@ class Board:
     def weeks_view(self, reviews: dict[str, str], limit: int = 52) -> list[views.PastWeek]:
         """The closed weeks, most recent first: the ledger fact and the target of the
         active revision. The current week is not in it; it is the root of the Week tab."""
-        current = week_label(self.today)
+        current = iso_week.of(self.today)
         out: list[views.PastWeek] = []
         for trace in reversed(ledger.trajectory(self.rows, self.today, weeks=limit)):
             if trace.label >= current:
                 continue
-            context = self.repo.weekly_plan_context(trace.label)
-            target = json.loads(context).get("volume_target_km") if context else None
-            out.append({"week": trace.label, "monday": week_monday(trace.label).isoformat(),
+            revision = self.repo.active_revision(trace.label)
+            target = revision.get("volume_target_km") if revision else None
+            out.append({"week": trace.label, "monday": iso_week.monday(trace.label).isoformat(),
                         "km_done": round(trace.km, 2), "km_target": target,
                         "review": reviews.get(trace.label)})
         return out
 
     def race_view(self, archives: list[views.Entry]) -> views.RaceView:
-        week = self.week(week_label(self.today))
+        week = self.week(iso_week.of(self.today))
         planned = [s for s in self.sessions(week) if s["kind"] == "run"
-                   and s["status"] not in {"done", "cancelled"}
+                   and s["status"] not in {SessionStatus.DONE, SessionStatus.CANCELLED}
                    and s["date"] >= self.today.isoformat()]
         milestones: list[views.Milestone] = []
         key = max(planned, key=lambda s: _distance(s) or 0, default=None)
@@ -928,7 +921,7 @@ class Board:
             milestones.append({"date": key["date"], "label": key["title"], "kind": "session",
                                "km": key_km})
         for row in self.ops.deadline_rows():
-            if not row.get("athlete_label") or row["status"] == "done" or row["kind"] == "race":
+            if not row.get("athlete_label") or row["status"] == DeadlineStatus.DONE or row["kind"] == "race":
                 continue
             milestones.append({"date": row["due_on"].isoformat(), "label": row["athlete_label"],
                                "kind": "deadline", "overdue": row["due_on"] < self.today})

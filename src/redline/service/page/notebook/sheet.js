@@ -1,4 +1,3 @@
-// ------------------------------------------------------------ settings
 import {$, add, button, el} from '../shared/dom.js';
 import {remembered} from '../shared/storage.js';
 import {chooseTheme, tintBar} from '../shared/theme.js';
@@ -47,7 +46,6 @@ logoutRow.addEventListener('click', () => {
     }, 'n-action'), button('Annuler', () => device.replaceChildren(logoutRow), 'n-quiet')));
   device.replaceChildren(box);
 });
-// ------------------------------------------------------------ sheets
 // A sheet rising from the bottom, as on iOS: it closes by dragging it down, by tapping
 // outside, with the cross or Escape. The page does not scroll beneath.
 // Four sheets share this gesture: the settings, a day of the week being reorganised, the

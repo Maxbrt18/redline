@@ -14,11 +14,6 @@ from .plans import Plans
 
 
 class Proposals(Plans):
-    def add_proposals(self, week: str, based_on: int, proposals: list[dict],
-                      *, actor: str = "application") -> list[uuid.UUID]:
-        with self.database.transaction() as connection:
-            return self.add_proposals_in(connection, week, based_on, proposals, actor=actor)
-
     def add_proposals_in(self, connection: Connection, week: str, based_on: int,
                          proposals: list[dict], *, actor: str = "application") -> list[uuid.UUID]:
         """The new set replaces the proposals still open for the week."""

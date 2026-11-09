@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 from conftest import ZONE, zoned
 
-from redline.analysis import ledger, progression, progression_readings
+from redline.analysis import ledger, progression, progression_readings, week_review
 from redline.analysis.ledger import Instruments, Row
 from redline.coach.fr import ledger as gate_text
 from redline.model import session_kinds
@@ -368,7 +368,7 @@ def _random_weeks(seed):
 def test_the_gate_on_the_engine_gives_the_verdict_of_the_ledger(seed):
     rows, instr = _random_weeks(seed)
     today = dt.date(2026, 10, 12)
-    expected = _verdict(ledger.gate(rows, "2026-W41", instr, ZONES, today))
+    expected = _verdict(week_review.gate(rows, "2026-W41", instr, ZONES, today))
     exposure = progression_readings.gate_exposure(rows, "2026-W41", instr, ZONES, today)
     assert _engine_verdict(exposure) == expected
 
@@ -378,7 +378,7 @@ def test_the_gate_without_a_watched_zone_judges_heart_rate_and_sleep_only():
     exposure = progression_readings.gate_exposure(rows, "2026-W41", Instruments(sleep="ok"),
                                                   [], dt.date(2026, 10, 12))
     assert _engine_verdict(exposure) == _verdict(
-        ledger.gate(rows, "2026-W41", Instruments(sleep="ok"), [], dt.date(2026, 10, 12)))
+        week_review.gate(rows, "2026-W41", Instruments(sleep="ok"), [], dt.date(2026, 10, 12)))
     assert {item.criterion for item in progression.judge(FAMILIES["gate"], GATE, exposure)} == {
         "easy-hr", "sleep"}
 

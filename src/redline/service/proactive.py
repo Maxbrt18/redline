@@ -20,11 +20,14 @@ from typing import TYPE_CHECKING
 import requests
 
 from redline.integrations import strava
+from redline.model import iso_week, rulebook
 from redline.model import ledger as ledger_model
-from redline.model import rulebook, session_kinds
+from redline.model.errors import ExternalError
+from redline.model.vocabulary import JobStatus, ProactiveKind
 
 from . import clock
 from .config import Config
+from .proactive_kinds import policy
 from .prompts import PROACTIVE_TRIGGERS, build_proactive_prompt, strava_snapshot_note
 from .state import StateStore
 
@@ -35,8 +38,22 @@ log = logging.getLogger("redline")
 
 ACTIVE_SILENCE_SECONDS = 8 * 60
 
-HEAVY_KINDS = frozenset({"weekly", "weekly_repair", "monthly", "decision_challenge",
-                         "premortem"})
+
+def waiting_debriefs(proactive) -> list[dict]:
+    """The Strava debriefs still waiting for their moment."""
+    return [job for job in proactive.jobs(active_only=True)
+            if job["kind"] == ProactiveKind.STRAVA_DEBRIEF and job["status"] == JobStatus.PENDING]
+
+
+def debrief_snapshot(state, activity_id: str) -> dict:
+    """Capture the activity with the athlete's fresh words; its snapshot for the debrief."""
+    capture = state.ingest_strava_activity(int(activity_id), fresh_words=True)
+    log.info("Strava activity %s captured before debrief: %s", activity_id, capture["status"])
+    snapshot = capture.get("snapshot")
+    if not isinstance(snapshot, dict) or not snapshot.get("activity"):
+        raise ExternalError("empty Strava snapshot after capture")
+    return snapshot
+
 
 @dataclass
 class ProactiveJob:
@@ -192,9 +209,8 @@ class ProactiveScheduler:
         message) or its delay. One attempt per activity here: a failure is retried at
         debrief time, with bounded retries.
         """
-        for job in self._state.proactive.jobs(active_only=True):
-            if (job["kind"] != "strava_debrief" or job["status"] != "pending"
-                    or job["id"] in self._captured_on_arrival):
+        for job in waiting_debriefs(self._state.proactive):
+            if job["id"] in self._captured_on_arrival:
                 continue
             self._captured_on_arrival.add(job["id"])
             try:
@@ -234,8 +250,7 @@ class ProactiveScheduler:
         weekly = self._config.proactive_weekly
         if weekly and now.weekday() == 6 and (
                 now.time() >= weekly or self._sunday_settled(now)):
-            key = now.strftime("%G-W%V")
-            pro.enqueue_job(f"weekly:{key}", "weekly", "", now.timestamp())
+            pro.enqueue_job(f"weekly:{iso_week.of(now.date())}", "weekly", "", now.timestamp())
 
         monthly = self._config.proactive_monthly
         if monthly and now.day == 1 and now.time() >= monthly:
@@ -262,19 +277,7 @@ class ProactiveScheduler:
 
         if now.hour >= self.CELLS_CLAIM_HOUR and self._bot is not None:
             # The Messenger last resort only claims what lives in the athlete's memory.
-            # D+/D- are Strava computations: letting them arm this job would produce a
-            # generic question after all the feelings were already given.
-            claimable = []
-            for entry in self._bot.pending_ledger_cells(now.date()):
-                # The `wake-trace` is collected on waking, as none/light/clear. Letting
-                # it in here would turn it into a `/10` request in the evening, i.e. a
-                # memory solicited too late.
-                if entry.get("type") == session_kinds.WAKE_TRACE:
-                    continue
-                missing = [column for column in entry["missing"]
-                           if ledger_model.column_base(column) in ledger_model.DECLARED_COLUMNS]
-                if missing:
-                    claimable.append({**entry, "missing": missing})
+            claimable = ledger_model.memory_cells(self._bot.pending_ledger_cells(now.date()))
             if claimable:
                 oldest = claimable[0]
                 detail = json.dumps({
@@ -304,7 +307,7 @@ class ProactiveScheduler:
         """
         if self._bot is None or now.time() < self.WEEKLY_EARLIEST:
             return False
-        if any(job["kind"] in {"strava_debrief", "strava_debrief_late"}
+        if any(policy(job["kind"]).debrief
                for job in self._state.proactive.jobs(active_only=True)):
             return False
         return self._bot.day_settled(now.date())
@@ -318,15 +321,9 @@ class ProactiveScheduler:
             return None
 
         snapshot = None
-        if record["kind"] in {"strava_debrief", "strava_debrief_late"}:
+        if policy(record["kind"]).debrief:
             try:
-                capture = self._state.ingest_strava_activity(
-                    int(record["detail"]), fresh_words=True)
-                log.info("Strava activity %s captured before debrief: %s",
-                         record["detail"], capture["status"])
-                snapshot = capture.get("snapshot")
-                if not isinstance(snapshot, dict) or not snapshot.get("activity"):
-                    raise ValueError("empty Strava snapshot after capture")
+                snapshot = debrief_snapshot(self._state, record["detail"])
             except strava.StravaNotFound as exc:
                 # Deleted or private: retrying every 5 min only burns API calls and
                 # never changes the outcome.

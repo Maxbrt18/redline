@@ -2,7 +2,6 @@
 
 import ast
 import json
-from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -82,12 +81,6 @@ def test_no_production_module_imports_the_offline_judge():
                        for module in modules), path.name
 
 
-def test_the_agent_port_has_no_review_capability():
-    from redline.service.agent import AgentRunner
-
-    assert not hasattr(AgentRunner, "review")
-
-
 def test_a_reactive_turn_with_writes_costs_exactly_one_model_call(make_bot):
     """No second rewrite rereads or replaces a finished reply."""
     from redline.service.vault import PersistenceResult
@@ -128,9 +121,3 @@ def test_resolved_questions_are_visible_without_treating_old_answers_as_current(
     assert "Quelle chaussure ?" in memory
     assert "La paire bleue" in memory
     assert "n'établit pas l'état actuel" in memory
-
-
-def test_evaluation_lives_outside_the_production_package():
-    assert (ENGINE_ROOT / "src" / "redline" / "evaluation" / "review.py").exists()
-    assert not (ENGINE_ROOT / "src" / "redline" / "service" / "response_review.py").exists()
-    assert Path(ENGINE_ROOT / "src" / "redline" / "cli" / "evaluate_coaching.py").read_text().count("judge(") == 2

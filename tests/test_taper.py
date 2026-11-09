@@ -5,8 +5,8 @@ from dataclasses import replace
 
 from redline.analysis import taper
 from redline.analysis.ledger import Row
+from redline.model import iso_week, rulebook
 from redline.model import race as race_model
-from redline.model import rulebook, transitions
 
 RACE_ON = dt.date(2030, 11, 30)      # Saturday of 2030-W48: taper W46-W48
 RACE_ROW = {"kind": "race", "status": "scheduled", "due_on": RACE_ON.isoformat()}
@@ -14,7 +14,7 @@ RACE = race_model.from_row(RACE_ROW)
 
 
 def _week(week, km_each, runs=5):
-    monday = transitions.monday_of(week)
+    monday = iso_week.monday(week)
     return [Row(monday + dt.timedelta(days=day), "easy", km=km_each) for day in range(runs)]
 
 
@@ -34,7 +34,7 @@ class Store:
 
 
 def _runs(week, km_each, runs, workout="easy"):
-    monday = transitions.monday_of(week)
+    monday = iso_week.monday(week)
     return [{"id": f"run-{day}", "kind": "run", "workout": workout, "status": "planned",
              "date": (monday + dt.timedelta(days=day)).isoformat(),
              "distance_target_km": km_each} for day in range(runs)]

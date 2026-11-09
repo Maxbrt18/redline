@@ -5,7 +5,6 @@ import {push} from '../nav.js';
 import {app} from '../state.js';
 import {skyIcon, skyOf} from './weather.js';
 
-// ------------------------------------------------------------ race plan
 // The service times the passages at one reference pace. Running time is proportional to
 // the pace and the stops are not, so any pace retimes them here, with no request: the
 // − / + of the plan screen explores and records nothing. Without a pace chosen with the

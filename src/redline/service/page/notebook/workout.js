@@ -1,4 +1,3 @@
-// ------------------------------------------------------------ guided session
 // Strength opens full screen over the notebook: the notebook bar with a close button on
 // the left and sound on the right, the large title of the other screens, no tabs. During
 // the session, no swipe back and no pull to refresh: close is the only exit, and a started

@@ -1,6 +1,6 @@
 """Reply judge of the evaluation bench, outside production.
 
-It is no longer part of the Messenger reply path, because refusals and timeouts would
+It is not part of the Messenger reply path, because refusals and timeouts would
 replace already written replies with generic sentences. It only serves
 `redline.cli.evaluate_coaching`, on scenarios.
 """

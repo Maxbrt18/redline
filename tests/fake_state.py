@@ -7,6 +7,8 @@ import secrets
 import time
 from datetime import datetime
 
+from redline.service.state import Disposition
+
 
 class FakeProactiveState:
     def __init__(self) -> None:
@@ -66,7 +68,7 @@ class FakeProactiveState:
         expired = [job for job in self._jobs if job["status"] == "pending"
                    and job["expire_at"] and now > job["expire_at"]]
         for job in expired:
-            job.update(status="failed", last_error="expiré avant livraison")
+            job.update(status="failed", last_error="expired before delivery")
         return len(expired)
 
     def complete_job(self, job_id: str) -> None:
@@ -91,7 +93,7 @@ class FakeProactiveState:
         due = time.time() + delay
         expires = job["expire_at"] or expire_at
         if expires and due > expires:
-            job.update(status="failed", last_error="expiré avant livraison")
+            job.update(status="failed", last_error="expired before delivery")
             return False
         job.update(status="pending", due=due, expire_at=expires,
                    attempts=max(0, job["attempts"] - 1))
@@ -185,22 +187,22 @@ class FakeStateStore:
         return text in self._questions
 
     def begin_outbound_delivery(self, source_key: str, psid: str,
-                                payload_digest: str, payload=None) -> str:
+                                payload_digest: str, payload=None) -> Disposition:
         row = self._deliveries.get(source_key)
         if row is None:
             self._deliveries[source_key] = {
                 "psid": psid, "digest": payload_digest, "status": "sending",
                 "attempts": 1, "payload": payload}
-            return "send"
+            return Disposition.SEND
         if row["psid"] != psid:
             raise ValueError("collision d'enveloppe sortante")
         if row["status"] == "delivered":
-            return "delivered"
+            return Disposition.DELIVERED
         if row["status"] == "sending":
-            return "uncertain"
+            return Disposition.UNCERTAIN
         row.update(digest=payload_digest, status="sending", payload=payload,
                    attempts=row["attempts"] + (row["status"] != "prepared"))
-        return "send"
+        return Disposition.SEND
 
     def prepare_outbound_delivery(self, source_key: str, psid: str,
                                   payload_digest: str, payload: dict) -> bool:

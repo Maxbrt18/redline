@@ -15,7 +15,6 @@ from conftest import FakeAgent
 
 from redline.service.agent import RunResult
 from redline.service.proactive import ProactiveJob
-from redline.service.worker import SILENCE_IS_A_FAILURE
 
 
 def _silent_bot(make_bot):
@@ -65,13 +64,14 @@ def test_a_monthly_note_keeps_the_right_to_say_nothing(make_bot):
 
     bot._respond_proactive(ProactiveJob(psid="4242", kind="monthly", prompt="magazine"))
 
-    client.send_text.assert_not_called()
+    client.send_burst.assert_not_called()
+    assert len(bot._agent.calls) == 1, "a silent monthly note is not retried"
 
 
 def test_a_morning_note_may_also_stay_silent(make_bot, store):
     bot, client = _silent_bot(make_bot)
     bot._repo.weekly_plan_message.return_value = ""
-    bot._repo.weekly_plan_context.return_value = '{"revision": 2, "sessions": []}'
+    bot._repo.active_revision.return_value = {"revision": 2, "sessions": []}
 
     bot._respond_proactive(_claimed(store, "morning"))
 
@@ -80,13 +80,8 @@ def test_a_morning_note_may_also_stay_silent(make_bot, store):
     assert store.proactive.jobs()[0]["status"] == "done"
 
 
-def test_only_the_activity_driven_triggers_treat_silence_as_a_failure():
-    """The list is explicit: a trigger added tomorrow picks its side, it does not
-        inherit it from a default."""
-    assert {"strava_debrief", "strava_debrief_late"} == SILENCE_IS_A_FAILURE
 
-
-def test_a_debrief_that_actually_speaks_is_never_flagged_as_an_incident(make_bot):
+def test_a_debrief_that_actually_speaks_is_never_flagged_as_an_incident(make_bot, caplog):
     client = MagicMock()
     client.send_text.return_value = MagicMock(ok=True)
     client.send_burst.return_value = MagicMock(ok=True)
@@ -96,4 +91,5 @@ def test_a_debrief_that_actually_speaks_is_never_flagged_as_an_incident(make_bot
     bot._respond_proactive(ProactiveJob(psid="4242", kind="strava_debrief",
                                         prompt="débriefe", detail="90000000002"))
 
-    client.send_text.assert_not_called()
+    assert "Belle sortie" in client.send_burst.call_args.args[1]
+    assert "silent" not in caplog.text

@@ -17,7 +17,6 @@ from __future__ import annotations
 
 from .vocabulary import LifeLoad, Sleep, WeekLifeLoad, WeekSleep
 
-# ------------------------------------------------------------------ aggregation
 #
 # The thresholds below are the only numbers in this module that arbitrate (the gauge).
 # They are named here rather than buried in a comprehension, so they can be challenged.

@@ -33,6 +33,18 @@ stall_tolerance_km = 0.1
 # The waking trace is collected in the morning: after this local time the logbook stops
 # asking for it and the reminder is no longer sent.
 wake_trace_until = "14:00"
+# A planned session still not done this many hours after its start counts as missed ...
+missed_after_hours = 4
+# ... and one without a start time, at this local time.
+missed_cutoff = "22:00"
+# The daily signal looks back over this many days ...
+signal_window_days = 21
+# ... raises low desire when the latest this many check-ins all say so ...
+low_desire_checkins = 3
+# ... and missed sessions from this many within the window.
+missed_sessions_signal = 2
+# A pair of shoes raises an alert at this share of its inspection distance (%).
+gear_alert_pct = 90
 # Rule n2: the planned assimilation weeks (ISO weeks). Nothing new is placed in them.
 assimilation_weeks = []
 # Rule f1: no fuelling target above this ceiling (g/h): no gain is shown beyond it.

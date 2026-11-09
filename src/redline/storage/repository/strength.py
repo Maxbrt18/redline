@@ -10,6 +10,8 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Connection
 
 from redline.model import session_kinds
+from redline.model import vocabulary as voc
+from redline.model.vocabulary import CycleState
 
 from ..database import StorageError
 from ..schema import (
@@ -25,10 +27,11 @@ from ..schema import (
     strength_sessions,
     strength_sets,
 )
-from ._common import StoreBase, _audit, _request_projection, _uuid
+from ._common import _audit, _request_projection, _uuid
+from .pain_zones import PainZones
 
 
-class Strength(StoreBase):
+class Strength(PainZones):
     def strength_evidence_in(self, connection: Connection, day: dt.date,
                              routine: str | None) -> list:
         """Compatible reports; their presence alone does not identify a session."""
@@ -52,7 +55,7 @@ class Strength(StoreBase):
         ).join(planned_sessions,
                planned_sessions.c.id == session_cycles.c.source_session_id).where(
             session_cycles.c.athlete_id == self.athlete_id,
-            session_cycles.c.state != "cancelled",
+            session_cycles.c.state != CycleState.CANCELLED,
             planned_sessions.c.workout == session_kinds.STRENGTH,
         ).order_by(session_cycles.c.id).with_for_update(of=session_cycles)).mappings().all()
         groups: dict[tuple, list] = {}
@@ -65,14 +68,14 @@ class Strength(StoreBase):
             if len(candidates) != 1 or len(reports) != 1:
                 continue
             row = candidates[0]
-            if row["state"] not in {"planned", "started", "missed"}:
+            if row["state"] not in {CycleState.PLANNED, CycleState.STARTED, CycleState.MISSED}:
                 continue
             connection.execute(session_cycles.update().where(
-                session_cycles.c.id == row["id"]).values(state="completed", updated_at=now))
+                session_cycles.c.id == row["id"]).values(state=CycleState.COMPLETED, updated_at=now))
             connection.execute(proactive_jobs.update().where(
                 proactive_jobs.c.job_key == f"missed-session:{row['id']}",
-                proactive_jobs.c.status.in_(("pending", "running")),
-            ).values(status="done", completed_at=now))
+                proactive_jobs.c.status.in_(voc.LIVE_JOBS),
+            ).values(status=voc.JobStatus.DONE, completed_at=now))
             _audit(connection, actor, "session.completed.strength", "session_cycle", row["id"],
                    {"strength_session_id": str(reports[0]), "match": "unique-date-workout"})
             changed += 1

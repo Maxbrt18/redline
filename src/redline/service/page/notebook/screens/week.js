@@ -4,7 +4,6 @@ import {SVG, chevron, content, hero, kindIcon, pastille, section, shape} from '.
 import {day, dm, fmt, followingWeek, isoDate, kindName, plannedValue, shortTitle, weekNumber, weekSpan} from '../format.js';
 import {push} from '../nav.js';
 
-// ------------------------------------------------------------ Week
 // One figure, one bar, seven lines. Each day fits on one line: the session and a single
 // figure, the fact in ink, the plan in grey, an overshoot in one red phrase. The detail
 // unfolds on touch, one day at a time.

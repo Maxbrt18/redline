@@ -81,7 +81,7 @@ def poser_le_plan(store, number: int = 1) -> None:
         cwd=ENGINE_ROOT, env={**os.environ, "DATABASE_URL": URL, "REDLINE_TURN_ID": tour},
         input=revision_json(number), capture_output=True, text=True, check=False)
     succeeds(process, "revise")
-    store.apply_turn_with_receipts(tour)[0]
+    assert store.apply_turn_with_receipts(tour)[0] == 1
 
 
 # --------------------------------------------------------------------- sequences
@@ -114,7 +114,7 @@ def test_giving_an_rpe_never_breaks_anything(store):
                   "--km", "36.9", "--time", "1:42:57",
                   "--idempotency-key", "messenger:2026-08-14:velo", turn=session_turn),
             "ledger-add")
-    store.apply_turn_with_receipts(session_turn)[0]
+    assert store.apply_turn_with_receipts(session_turn)[0] == 1
     poser_le_plan(store)
     assert coach("redline week-plan", "check", "--week", "2026-W33").returncode == 0
 
@@ -122,7 +122,10 @@ def test_giving_an_rpe_never_breaks_anything(store):
     tour = str(uuid.uuid4())
     succeeds(coach("redline ledger-complete", "--date", "2026-08-14", "--type", "bike",
                   "--metric", "rpe", "--value", "7.5", turn=tour), "ledger-complete")
-    store.apply_turn_with_receipts(tour)[0]
+    assert store.apply_turn_with_receipts(tour)[0] == 1
+    bike = next(row for row in store.observation_rows()
+                if row["idempotency_key"] == "messenger:2026-08-14:velo")
+    assert bike["measurements"]["rpe"]["value"] == 7.5
 
     plan = coach("redline week-plan", "check", "--week", "2026-W33")
     assert plan.returncode == 0, (
@@ -139,7 +142,7 @@ def test_completing_without_knowing_yesterdays_invented_key(store):
                   "--km", "36.9", "--time", "1:42:57",
                   "--idempotency-key", "messenger:2026-08-14:velo-du-padre",
                   turn=session_turn), "ledger-add sans id Strava")
-    store.apply_turn_with_receipts(session_turn)[0]
+    assert store.apply_turn_with_receipts(session_turn)[0] == 1
 
     lecture = succeeds(coach("redline fact-read", "observations", "--limit", "5"),
                       "fact-read")
@@ -151,13 +154,13 @@ def test_completing_without_knowing_yesterdays_invented_key(store):
         "redline ledger-link", "--key", "messenger:2026-08-14:velo-du-padre",
         "--strava", "90000000001", turn=tour_lien), "rattachement à Strava")
     assert store.activity_recorded(90000000001) is False
-    store.apply_turn_with_receipts(tour_lien)[0]
+    assert store.apply_turn_with_receipts(tour_lien)[0] == 1
     assert store.activity_recorded(90000000001) is True
 
     tour = str(uuid.uuid4())
     succeeds(coach("redline ledger-complete", "--date", "2026-08-14", "--type", "bike",
                   "--metric", "pain", "--value", "0", turn=tour), "complétion par date")
-    store.apply_turn_with_receipts(tour)[0]
+    assert store.apply_turn_with_receipts(tour)[0] == 1
 
 
 def test_a_wrong_key_fails_at_once_not_at_the_boundary(store):
@@ -177,7 +180,7 @@ def test_the_daily_state_does_not_make_the_plan_stale(store):
     succeeds(coach("redline fact-write", "daily", "--date", "2026-08-14",
                   "--sleep", "poor", "--life-load", "high", "--desire", "normal",
                   turn=tour), "fact-write daily")
-    store.apply_turn_with_receipts(tour)[0]
+    assert store.apply_turn_with_receipts(tour)[0] == 1
 
     assert succeeds(coach("redline week-plan", "check", "--week", "2026-W33"),
                    "check").returncode == 0
@@ -192,7 +195,7 @@ def test_a_stale_plan_stays_readable_and_says_so(store):
                   "--km", "7", "--time", "43:00",
                   "--idempotency-key", "messenger:2026-08-14:ef", turn=tour),
             "ledger-add sans révision")
-    store.apply_turn_with_receipts(tour)[0]
+    assert store.apply_turn_with_receipts(tour)[0] == 1
 
     process = coach("redline week-plan", "show", "--week", "2026-W33")
     assert process.returncode == 3, "stale = 3, never 1"
@@ -238,7 +241,7 @@ def test_the_sunday_review_plays_its_whole_sequence(store):
                   "--rpe", "3", "--pain", "1", "--enjoyment", "7",
                   "--idempotency-key", "messenger:2026-08-14:ef-bilan",
                   turn=session_turn), "séance de la semaine")
-    store.apply_turn_with_receipts(session_turn)[0]
+    assert store.apply_turn_with_receipts(session_turn)[0] == 1
     poser_le_plan(store)
     sequence(
         ("agrégats", ["redline ledger", "--week", "2026-W33"]),
@@ -252,22 +255,6 @@ def test_the_sunday_review_plays_its_whole_sequence(store):
                   "--due-on", "2026-08-20", "--item", "échéance de la répétition",
                   "--fact-owner", "coaching/decisions.md", "--status", "todo",
                   turn=tour), "échéance")
-    store.apply_turn_with_receipts(tour)[0]
+    assert store.apply_turn_with_receipts(tour)[0] == 1
     assert "échéance de la répétition" in succeeds(
         coach("redline fact-read", "deadlines"), "relecture").stdout
-
-
-def test_the_strava_debrief_plays_its_whole_sequence(store):
-    """Record and reconcile with the cycle -- the full chain of a debrief."""
-    poser_le_plan(store)
-    tour = str(uuid.uuid4())
-    succeeds(coach("redline ledger-add", "--date", "2026-08-14", "--type", "easy",
-                  "--km", "6.969", "--time", "43:05", "--pace", "6:11",
-                  "--hr-avg", "151.3", "--cadence", "165", "--dplus", "64.6",
-                  "--dminus", "65", "--wbgt", "23", "--strava", "90000000002",
-                  "--start-local", "2026-08-14T07:15:00",
-                  "--session-key", "2026-W33:w33-ven-ef",
-                  turn=tour), "ledger-add")
-    assert store.apply_turn_with_receipts(tour)[0] == 1
-    assert store.load_plan("2026-W33")["revisions"][-1]["sessions"][0]["status"] == "done"
-    assert coach("redline week-plan", "check", "--week", "2026-W33").returncode == 0

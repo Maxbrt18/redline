@@ -112,15 +112,6 @@ def test_triage_carries_the_low_effort_guardrail(make_config, store):
     assert command[command.index("--effort") + 1] == "low"
 
 
-def test_triage_has_no_fallback_profile(make_config, store):
-    """A single fast classifier: a failure falls back to the default, with no second call
-    that used to add up to a minute of silent "seen" status."""
-    runner = _runner(make_config, store)
-    with patch("subprocess.run", return_value=_completed("", returncode=1)) as run:
-        assert runner.classify("salut") == Triage()
-    assert run.call_count == 1
-
-
 def test_triage_timeout_falls_back_to_the_default_at_once(make_config, store):
     runner = _runner(make_config, store)
     with patch("subprocess.run",

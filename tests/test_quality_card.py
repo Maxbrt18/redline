@@ -85,7 +85,7 @@ def _bot(make_bot, tmp_path):
     repo.sync.return_value = False
     repo.is_clean.return_value = True
     repo.ensure_clean.return_value = []
-    repo.weekly_plan_context.return_value = ""
+    repo.active_revision.return_value = None
     repo.persist_turn.return_value = PersistenceResult(True)
     repo.ledger_cells.return_value = ([], [])
     repo.drain_alerts.return_value = []

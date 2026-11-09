@@ -28,12 +28,12 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 
+from . import formats
 from .errors import ConfigError
 from .schema import Schema, SchemaError
 from .schema import field as spec
 
 DEFAULT = Path(__file__).with_name("progression.default.toml")
-SLUG = r"[a-z0-9][a-z0-9-]{0,39}"
 
 
 class Move(StrEnum):
@@ -136,8 +136,6 @@ class Disruption(StrEnum):
     OTHER = "other"
 
 
-# ------------------------------------------------------------------ the dose
-
 @dataclass(frozen=True)
 class Dose:
     """A point of a ladder: one value per variable, in the ladder's order."""
@@ -179,8 +177,6 @@ class Bound:
     step: float
 
 
-# ------------------------------------------------------------------ the response
-
 @dataclass(frozen=True)
 class Reading:
     """One reading of an exposure. `value` None: expected, but not taken (yet)."""
@@ -211,8 +207,6 @@ class Exposure:
             return self.performed
         return self.prescribed
 
-
-# ------------------------------------------------------------------ the method
 
 class Side(StrEnum):
     AT_MOST = "at_most"
@@ -293,8 +287,6 @@ class Veto:
     fact: str
 
 
-# ------------------------------------------------------------------ the proposal
-
 @dataclass(frozen=True)
 class Judgement:
     """One criterion judged on one exposure."""
@@ -338,8 +330,6 @@ class Proposal:
     evidence: tuple[dt.date, ...] = field(default=())
 
 
-# ------------------------------------------------------------------ declaration
-
 THRESHOLDS = ("at_most", "at_least", "at_most_ref", "at_least_ref")
 
 
@@ -359,7 +349,7 @@ CONDITIONS = ("fails_at_least", "severe", "unknowns_at_least", "passes_in_a_row"
               "fails_in_a_row")
 
 FAMILY_SCHEMA = Schema("[[families]]", [
-    spec("slug", str, pattern=SLUG),
+    spec("slug", str, pattern=formats.SLUG),
     spec("unit", str, choices=tuple(Unit)),
     spec("anchor", str, required=False, choices=tuple(Anchor)),
     spec("reentry_steps", int, required=False, minimum=0, maximum=4),
@@ -373,7 +363,7 @@ FAMILY_SCHEMA = Schema("[[families]]", [
         ]))),
     spec("criteria", list, minimum=1, maximum=12, item=spec("criterion", dict, schema=Schema(
         "[[families.criteria]]", [
-            spec("id", str, pattern=SLUG),
+            spec("id", str, pattern=formats.SLUG),
             spec("signal", str, choices=tuple(Signal)),
             spec("at_most", float, required=False),
             spec("at_least", float, required=False),
@@ -385,7 +375,7 @@ FAMILY_SCHEMA = Schema("[[families]]", [
         ], check=_criterion_check))),
     spec("rule", list, minimum=1, maximum=8, item=spec("clause", dict, schema=Schema(
         "[[families.rule]]", [
-            spec("id", str, pattern=SLUG),
+            spec("id", str, pattern=formats.SLUG),
             spec("move", str, choices=tuple(Move)),
             spec("fails_at_least", int, required=False, minimum=1, maximum=12),
             spec("severe", bool, required=False),

@@ -15,44 +15,36 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
-import os
 import re
 import subprocess
 from dataclasses import dataclass
 from itertools import pairwise
 from pathlib import Path
+from typing import Any
 
 import yaml
 
+from redline.analysis import hot_cache
+from redline.analysis import ledger as ledger_gauge
 from redline.coach.fr import vault_check as wording
 from redline.model import (
     correction_replay,
     entrypoint,
+    iso_week,
     ledger,
     paths,
     vault_layout,
+    weekly_plan,
 )
 from redline.model import instance as instance_model
 from redline.model import startup_budget as budget
+from redline.model.capabilities import load as load_capabilities
+from redline.model.errors import ConfigError
+from redline.model.notes import NoteError
+from redline.model.program import load as load_program
+from redline.model.strength_tables import refresh
+from redline.model.views import ViewDrift
 from redline.model.vocabulary import ThreadStatus
-
-# The program layer needs PyYAML to read a note's frontmatter, which a bare vault
-# checkout on the Mac may not have. `model.ledger` above has no dependency at all:
-# the ledger stays checkable everywhere, which is the point of it being typed.
-try:
-    from redline.analysis import (
-        ledger as ledger_gauge,  # the gauge, not the format
-    )
-    from redline.model import hot_cache, weekly_plan
-    from redline.model.capabilities import load as load_capabilities
-    from redline.model.notes import NoteError
-    from redline.model.program import load as load_program
-    from redline.model.strength_tables import refresh
-    from redline.model.views import ViewDrift
-except ImportError as exc:
-    MODEL_UNAVAILABLE = str(exc)
-else:
-    MODEL_UNAVAILABLE = ""
 
 SKIP_DIRS = {".git", ".obsidian", ".pytest_cache", ".venv", "inbox", "sources",
              "node_modules", "__pycache__", "server", "scripts", "templates"}
@@ -116,6 +108,8 @@ class Vault:
     files: dict
     #: The vault's `redline.toml`; None when it cannot be read.
     instance: instance_model.Instance | None = None
+    #: The operational store; None without a database, and the checks reading it skip.
+    store: Any = None
 
     def text(self, relative: str):
         return self.files.get(relative)
@@ -216,24 +210,16 @@ def check_frontmatter(vault: Vault, report: Report) -> None:
 NO_DATABASE = wording.NO_DATABASE
 
 
-def _read_postgres(report: Report, label: str, read):
+def _read_postgres(vault: Vault, report: Report, label: str, read):
     """`read(store)`, or None after reporting the skip or the failure under `label`.
 
-    One database opening for all operational checks: absence is reported one way, and a
-    read failure is a KO, never a traceback.
+    Absence is reported one way, and a read failure is a KO, never a traceback.
     """
-    url = (os.environ.get("DATABASE_URL") or "").strip()
-    if not url:
+    if vault.store is None:
         report.skip(label, NO_DATABASE)
         return None
     try:
-        from redline.storage import Database, OperationalStore
-
-        database = Database(url, application_name="vault-check")
-        try:
-            return read(OperationalStore(database))
-        finally:
-            database.dispose()
+        return read(vault.store)
     except Exception as exc:
         report.fail(label,
                     [wording.POSTGRES_UNREADABLE.format(name=exc.__class__.__name__, exc=exc)])
@@ -257,7 +243,7 @@ def check_postgres_storage(vault: Vault, report: Report) -> None:
             )).scalar_one_or_none() or 0)
         return head, current, unpublished, store.counts()
 
-    state = _read_postgres(report, wording.STORAGE, read)
+    state = _read_postgres(vault, report, wording.STORAGE, read)
     if state is None:
         return
     head, current, unpublished, counts = state
@@ -274,11 +260,9 @@ def check_postgres_storage(vault: Vault, report: Report) -> None:
                   wording.STORAGE_OK.format(current=current, observations=counts["observations"]))
 
 
-# ------------------------------------------------------------ observations PostgreSQL
-
 def check_observations(vault: Vault, report: Report) -> None:
     """Business completeness of the canonical ledger, with no intermediate Markdown view."""
-    observations = _read_postgres(report, wording.OBSERVATIONS,
+    observations = _read_postgres(vault, report, wording.OBSERVATIONS,
                                   lambda store: store.observation_rows())
     if observations is None:
         return
@@ -297,8 +281,6 @@ def check_observations(vault: Vault, report: Report) -> None:
         report.ok(wording.OBSERVATIONS,
                   wording.OBSERVATIONS_OK.format(observations=len(observations)))
 
-
-# ----------------------------------------------------------------- one fact, one home
 
 def check_no_duplicate_facts(vault: Vault, report: Report) -> None:
     """A canonical Strava identifier must not survive in the Git notes."""
@@ -412,8 +394,6 @@ def _is_clean(root: Path, path: str) -> bool:
     return not out.strip()
 
 
-# -------------------------------------------------------------- structure and dates
-
 def check_decisions_order(vault: Vault, report: Report) -> None:
     """decisions.md is append-only and declares "Ordre antéchronologique": the order
     IS the structure, so it gets checked."""
@@ -436,12 +416,10 @@ PREDICTION_GRACE_DAYS = 14
 
 def check_prediction_debt(vault: Vault, report: Report) -> None:
     """A due prediction receives its verdict: amber at first, red after two reviews."""
-    rows = _read_postgres(report, wording.PREDICTIONS, lambda store: store.prediction_rows())
+    rows = _read_postgres(vault, report, wording.PREDICTIONS, lambda store: store.prediction_rows())
     if rows is None:
         return
     today = dt.date.today()
-    # The store returns its rows as plain values: the date arrives as ISO text.
-    rows = [{**row, "due_on": dt.date.fromisoformat(str(row["due_on"]))} for row in rows]
     due = sorted((row for row in rows if row["status"] == "open" and row["due_on"] < today),
                  key=lambda row: row["due_on"])
     lines = [wording.PREDICTION_LATE.format(prediction_key=row["prediction_key"],
@@ -463,7 +441,7 @@ def check_prediction_debt(vault: Vault, report: Report) -> None:
 
 def check_threads(vault: Vault, report: Report) -> None:
     """A past follow-up stays visible without a Markdown projection."""
-    rows = _read_postgres(report, wording.THREADS, lambda store: store.thread_rows())
+    rows = _read_postgres(vault, report, wording.THREADS, lambda store: store.thread_rows())
     if rows is None:
         return
     late = [row for row in rows if row["status"] == ThreadStatus.OPEN and row["follow_up_on"]
@@ -528,7 +506,7 @@ def check_corrections_replay(vault: Vault, report: Report) -> None:
 def check_deadlines(vault: Vault, report: Report) -> None:
     """An échéance past its date and still open (⬜) makes noise on its own, rather
     than waiting for someone to reread a throwaway cache."""
-    rows = _read_postgres(report, wording.DEADLINES, lambda store: store.deadline_rows())
+    rows = _read_postgres(vault, report, wording.DEADLINES, lambda store: store.deadline_rows())
     if rows is None:
         return
     today = dt.date.today()
@@ -542,10 +520,6 @@ def check_deadlines(vault: Vault, report: Report) -> None:
 
 def check_capability_notes(vault: Vault, report: Report) -> None:
     """Analysis notes have a stable identity and carry no operational state."""
-    if MODEL_UNAVAILABLE:
-        report.skip(wording.CAPABILITY_NOTES,
-                    wording.MODEL_UNAVAILABLE.format(model_unavailable=MODEL_UNAVAILABLE))
-        return
     try:
         capabilities = load_capabilities(vault.root)
     except NoteError as exc:
@@ -561,7 +535,7 @@ def check_capability_notes(vault: Vault, report: Report) -> None:
 
 def check_cockpit_freshness(vault: Vault, report: Report) -> None:
     """Checks the freshness of the PostgreSQL source of truth."""
-    capabilities = _read_postgres(report, wording.COCKPIT,
+    capabilities = _read_postgres(vault, report, wording.COCKPIT,
                                   lambda store: store.latest_capabilities())
     if capabilities is None:
         return
@@ -584,11 +558,7 @@ def check_cockpit_freshness(vault: Vault, report: Report) -> None:
 
 def check_weekly_plans(vault: Vault, report: Report) -> None:
     """Every PostgreSQL plan validates and the current week cannot be missing."""
-    if MODEL_UNAVAILABLE:
-        report.skip(wording.WEEKLY_PLAN,
-                    wording.MODEL_UNAVAILABLE.format(model_unavailable=MODEL_UNAVAILABLE))
-        return
-    current = weekly_plan.current_week()
+    current = iso_week.of(dt.date.today())
 
     def read(store):
         import sqlalchemy as sa
@@ -614,7 +584,7 @@ def check_weekly_plans(vault: Vault, report: Report) -> None:
                 problems.append(wording.PLAN_RECOMPUTE.format(week=week))
         return plans, problems
 
-    state = _read_postgres(report, wording.WEEKLY_PLAN, read)
+    state = _read_postgres(vault, report, wording.WEEKLY_PLAN, read)
     if state is None:
         return
     plans, problems = state
@@ -646,14 +616,7 @@ def check_generated_views(vault: Vault, report: Report) -> None:
 
     A check's success message is a promise: it names only what it actually opened.
     """
-    if MODEL_UNAVAILABLE:
-        report.warn(wording.VIEWS,
-                    wording.MODEL_UNAVAILABLE.format(model_unavailable=MODEL_UNAVAILABLE))
-        return
-    if not (os.environ.get("DATABASE_URL") or "").strip():
-        # Every view here is regenerated FROM PostgreSQL: without a database there is
-        # nothing to compare. Letting the RuntimeError escape the `except` below would
-        # abort the whole report with a traceback.
+    if vault.store is None:
         report.skip(wording.VIEWS, NO_DATABASE)
         return
     problems = []
@@ -661,10 +624,10 @@ def check_generated_views(vault: Vault, report: Report) -> None:
         problems += [wording.STRENGTH_DRIFT.format(name=name)
                      for name in refresh(vault.root, load_program(vault.root),
                                          check=True)]
-        store = ledger_gauge.open_store()
+        store = vault.store
         rows = ledger_gauge.parse_ledger(store)
         instruments = ledger_gauge.load_instruments(store)
-        if hot_cache.refresh(vault.root, ledger_gauge, rows, instruments,
+        if hot_cache.refresh(vault.root, rows, instruments,
                              store=store, check=True):
             problems.append(wording.HOT_CACHE_DRIFT)
         drifted, seen = _plan_view_drift(vault)
@@ -686,17 +649,10 @@ def _plan_view_drift(vault: Vault) -> tuple:
     announced coverage is the observed coverage. A missing database is handled by the
     caller, which skips the whole check.
     """
-    url = (os.environ.get("DATABASE_URL") or "").strip()
-    from redline.storage import Database, OperationalStore
     from redline.storage.projector import plan_drift, plan_view_count
 
-    database = Database(url, application_name="vault-check-plans")
-    try:
-        store = OperationalStore(database)
-        drifted = plan_drift(store, vault.root)
-        seen = plan_view_count(store, vault.root)
-    finally:
-        database.dispose()
+    drifted = plan_drift(vault.store, vault.root)
+    seen = plan_view_count(vault.store, vault.root)
     return ([wording.PLAN_DRIFT.format(name=name) for name in drifted], seen)
 
 
@@ -749,7 +705,14 @@ def main() -> int:
         loaded = None
     else:
         report.ok(wording.INSTANCE)
-    vault = Vault(root, markdown_files(root), loaded)
+    store = None
+    if not args.static_only:
+        from redline.storage import open_store
+        try:
+            store = open_store("vault-check")
+        except ConfigError:
+            store = None
+    vault = Vault(root, markdown_files(root), loaded, store)
     selected = [check for check in CHECKS
                 if not args.static_only or check not in OPERATIONAL_CHECKS]
     for check in selected:

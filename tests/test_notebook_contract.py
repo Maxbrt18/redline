@@ -32,8 +32,9 @@ from test_notebook_board import WEEK as SEEDED_WEEK
 from test_page_modules import modules
 from test_session_detail import observation_of, seed_threshold, stream
 from test_weekly_plan import revision
+from writes import write
 
-from redline.model import instance, ledger
+from redline.model import commands, instance, ledger
 from redline.model import notebook_views as views
 from redline.model.activity import Activity
 from redline.service import clock, notebook_web, page, race_plan, session_detail
@@ -135,16 +136,16 @@ def served(client, path: str):
 
 
 def seed_race_tab(store):
-    store.upsert_deadline({
+    write(store, commands.DEADLINE_UPSERT, {
         "deadline_key": "race-targetrace-2026", "due_on": dt.date(2026, 11, 26),
         "item": "TargetRace 45 km", "fact_owner": "coaching/race.md", "status": "scheduled",
         "kind": "race", "athlete_label": "TargetRace",
         "context": {"start_time": "09:00", "distance_km": 42.2, "elevation_gain_m": 900,
                     "elevation_loss_m": 900, "elevation_approximate": True, "target": "<4 h 30"}})
-    store.upsert_deadline({
+    write(store, commands.DEADLINE_UPSERT, {
         "deadline_key": "frontale", "due_on": dt.date(2026, 10, 14), "item": "Frontale",
         "fact_owner": "coaching/race.md", "status": "todo", "athlete_label": "Frontale"})
-    store.evaluate_capability({
+    write(store, commands.CAPABILITY_EVALUATE, {
         "capability_number": 5, "slug": "cap5-knee", "need": "Genou intact", "score": 3,
         "scale": 5, "status": "amber", "evaluated_on": dt.date(2026, 10, 4)})
 
@@ -235,7 +236,7 @@ def seed_easy_run(store, activity_id, session_id, day):
         moving_s=3000, elevation_gain_m=120.0, hr_avg_bpm=150.0, hr_max_bpm=165.0,
         cadence_spm=82.0, gear_id="g-shoe"))
     if observation_of(store, activity_id) is None:
-        store.match_session(f"2026-W43:{session_id}", activity_id)
+        write(store, commands.SESSION_MATCH, {"session_key": f"2026-W43:{session_id}", "strava_activity_id": activity_id})
     observation_id = observation_of(store, activity_id)
     store.store_strava_detail(activity_id, weather={
         "temp": 18.0, "feels_like": 17.0, "humidity": 60, "wind": 9.0, "wbgt": 15.0,
@@ -256,7 +257,7 @@ def test_a_quality_session_detail_serves_its_declared_shape(store, connect):
 
 @needs_database
 def test_an_easy_session_detail_serves_its_declared_shape(store, connect, monkeypatch):
-    store.upsert_gear({"gear_id": "g-shoe", "name": "Trail Shoe 3", "role": "trail",
+    write(store, commands.GEAR_UPSERT, {"gear_id": "g-shoe", "name": "Trail Shoe 3", "role": "trail",
                        "retire_at_km": 650, "status": "active"})
     store.append_plan_revision("2026-W43", revision(
         sessions=[ef("w43-lun-ef", "2026-10-19"), ef("w43-mar-ef", "2026-10-20")],

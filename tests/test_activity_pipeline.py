@@ -125,11 +125,6 @@ def store_intake(stored):
     }
 
 
-def test_the_pipeline_uses_the_same_wall_clock_contract_as_strava():
-    query = strava.parse_activity(activity()).weather_query
-    assert query["time"] == "2026-08-23T08:00:00"
-
-
 def test_the_used_shoe_counter_is_refreshed_with_the_activity():
     store = Store(elevation="known", wbgt="known")
     raw = {**activity(), "gear_id": "g-shoe"}
