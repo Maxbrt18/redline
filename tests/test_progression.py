@@ -264,6 +264,18 @@ def test_a_session_without_its_count_is_no_absence():
     assert proposal.unread == (day(40),)
 
 
+def test_a_reading_older_than_the_window_decides_no_move():
+    """A severe failure two months old, unread sessions since: the dose holds."""
+    hard = strength(day(0), 15, 6, 15, difficulty=10)
+    history = [hard, strength(day(40), 15, 6, None)]
+    proposal = propose("strength-reps", CALF, history, today=day(45), lookback_days=30)
+    assert (proposal.move, proposal.clause, proposal.stale) == (Move.HOLD, "stale-reading", True)
+    assert proposal.dose == proposal.ceiling == Dose.of(reps=15, load_kg=6)
+    # Read within the window, the same failure still steps back.
+    recent = propose("strength-reps", CALF, [hard], today=day(20), lookback_days=30)
+    assert recent.move == Move.DOWN and not recent.stale
+
+
 def test_a_newest_exposure_without_its_reading_waits_for_it():
     unread = Exposure(day(7), Dose.of(reps=5, rep_seconds=180), None,
                       (Reading(Signal.SESSION_RPE, None),))

@@ -323,6 +323,9 @@ class Proposal:
     unread: tuple[dt.date, ...] = ()
     #: The lineage comes back after a gap: the dose steps down, never up.
     reentry: bool = False
+    #: The newest evidence is older than the transition window, while sessions were done
+    #: since without their reading: it decides no move, the dose holds.
+    stale: bool = False
     #: The rule's move fell off the ladder: a rise needs a new exercise or range, a step
     #: down an easier variant.
     ladder_end: bool = False

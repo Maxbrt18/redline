@@ -250,6 +250,14 @@ def test_the_coach_reads_the_move_the_clause_the_verdicts_and_the_veto(no_ledger
     assert "plyometrics (strength-contacts) : tenir" in out
 
 
+def test_the_coach_is_told_when_the_last_reading_is_too_old(no_ledger):
+    history = [report(TODAY - dt.timedelta(days=70), "calf-raise-bent", (20, 20), difficulty=10),
+               report(TODAY - dt.timedelta(days=3), "calf-raise-bent", ())]
+    out = "\n".join(progression_strength.report(Store(history), TEST_VAULT, TODAY))
+    assert "calf-raise-bent (strength-reps, groupe calves) : tenir · clause stale-reading" in out
+    assert "lecture trop ancienne : la dernière séance lue date du 04/01" in out
+
+
 def test_without_lineage_the_coach_is_told_so(tmp_path):
     assert progression_strength.render([], Lineages()) == [text.NONE_DECLARED]
 

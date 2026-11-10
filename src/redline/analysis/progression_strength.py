@@ -191,6 +191,8 @@ def render(found: Sequence[Proposal], declared: Lineages) -> list[str]:
                 for veto in proposal.vetoes)))
         if proposal.reentry:
             lines.append(text.REENTRY)
+        if proposal.stale and proposal.evidence:
+            lines.append(text.STALE.format(day=proposal.evidence[-1]))
         if proposal.ladder_end:
             lines.append(text.LADDER_END)
     return lines
