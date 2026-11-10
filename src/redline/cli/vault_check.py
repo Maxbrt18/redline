@@ -26,6 +26,7 @@ import yaml
 
 from redline.analysis import hot_cache
 from redline.analysis import ledger as ledger_gauge
+from redline.analysis.progression_strength import coverage
 from redline.coach.fr import vault_check as wording
 from redline.model import (
     correction_replay,
@@ -33,6 +34,7 @@ from redline.model import (
     iso_week,
     ledger,
     paths,
+    rulebook,
     vault_layout,
     weekly_plan,
 )
@@ -533,6 +535,28 @@ def check_capability_notes(vault: Vault, report: Report) -> None:
                     wording.FOLDER_EMPTY.format(capabilities_dir=CAPABILITIES_DIR))
 
 
+def check_progression_lineages(vault: Vault, report: Report) -> None:
+    """Each strength lineage of the rulebook follows an exercise sheet of its measure;
+    an active sheet no lineage follows is reported, never refused."""
+    try:
+        declared = rulebook.load(vault.root).progression
+        sheets = load_program(vault.root).exercises if declared.lineages else {}
+    except (rulebook.RulebookError, NoteError) as exc:
+        report.fail(wording.LINEAGES, str(exc).splitlines())
+        return
+    if not declared.lineages:
+        report.skip(wording.LINEAGES, wording.NO_LINEAGE)
+        return
+    found = coverage(declared, sheets)
+    if found.refused:
+        report.fail(wording.LINEAGES, found.refused)
+    elif found.unlisted:
+        report.warn(wording.LINEAGES, wording.UNLISTED_SHEETS.format(
+            count=len(found.unlisted), sheets=", ".join(found.unlisted)))
+    else:
+        report.ok(wording.LINEAGES, wording.LINEAGES_COUNT.format(count=len(declared.lineages)))
+
+
 def check_cockpit_freshness(vault: Vault, report: Report) -> None:
     """Checks the freshness of the PostgreSQL source of truth."""
     capabilities = _read_postgres(vault, report, wording.COCKPIT,
@@ -670,6 +694,7 @@ CHECKS = (
     check_decisions_order,
     check_prediction_debt,
     check_capability_notes,
+    check_progression_lineages,
     check_cockpit_freshness,
     check_weekly_plans,
     check_corrections_replay,

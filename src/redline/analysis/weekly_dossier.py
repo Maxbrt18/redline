@@ -1,9 +1,10 @@
 """The Sunday review dossier, computed by the service BEFORE the model's turn.
 
-Volume, gauge, pain, trajectory, signals, due predictions and deadlines are computed once,
-by the same code as the CLIs (`week_review.week_report`, `signals.signals`,
-`model.predictions`), and handed to the model as data. The model keeps what is its own:
-judging, deciding, writing. It reruns a CLI only to check a specific point.
+Volume, gauge, pain, trajectory, signals, due predictions, deadlines and the strength
+progression proposals are computed once, by the same code as the CLIs
+(`week_review.week_report`, `signals.signals`, `model.predictions`,
+`progression_strength.report`), and handed to the model as data. The model keeps what is
+its own: judging, deciding, writing. It reruns a CLI only to check a specific point.
 
 Not a CLI: no turn calls it, the service imports it (`service/vault.py`).
 """
@@ -14,10 +15,19 @@ import datetime as dt
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from redline.analysis import feasibility, ledger, permit_report, signals, week_review
+from redline.analysis import (
+    feasibility,
+    ledger,
+    permit_report,
+    progression_strength,
+    signals,
+    week_review,
+)
+from redline.coach.fr import progression as progression_text
 from redline.coach.fr import weekly_dossier as text
+from redline.model import iso_week, program
 from redline.model import predictions as prediction_model
-from redline.model import program
+from redline.model.errors import RedlineError
 from redline.model.vocabulary import DeadlineStatus
 
 if TYPE_CHECKING:
@@ -25,6 +35,14 @@ if TYPE_CHECKING:
 
 #: Beyond this, the dossier summarises instead of listing: it is injected into a prompt.
 MAX_LISTED = 12
+
+
+def _progression(store: OperationalStore, root: Path, week: str, today: dt.date) -> list[str]:
+    """The strength proposals for the week the review prepares; a refusal is reported."""
+    try:
+        return progression_strength.report(store, root, today, iso_week.shift(week, 1))
+    except RedlineError as exc:
+        return [progression_text.UNAVAILABLE.format(reason=str(exc).replace("\n", " "))]
 
 
 def render(store: OperationalStore, root: Path, week: str, today: dt.date) -> str:
@@ -65,6 +83,7 @@ def render(store: OperationalStore, root: Path, week: str, today: dt.date) -> st
         lines.extend(permit_lines)
 
     lines += ["", *feasibility.report(store, rows, today)]
+    lines += ["", *_progression(store, root, week, today)]
 
     capabilities = store.latest_capabilities()
     if capabilities:

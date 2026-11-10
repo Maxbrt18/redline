@@ -19,6 +19,10 @@ what the coach reads is what the code applies.
 It also declares the instance's pain scales (`[scales]`, `redline.model.pain_scales`):
 the rules compare a pain with the roles of its own scale, never with a number of the
 engine's.
+
+And the strength lineages the progression engine follows (`[progression]`,
+`redline.model.progression`): one per exercise sheet, with the range and step of each
+variable. Those numbers constrain a method, so they live here, never in a sheet.
 """
 
 from __future__ import annotations
@@ -28,6 +32,7 @@ import hashlib
 import string
 import tomllib
 from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from functools import lru_cache
 from pathlib import Path
 
@@ -37,6 +42,7 @@ from . import formats, iso_week, paths
 from .errors import ConfigError
 from .pain_scales import SCALES_SCHEMA, PainScales
 from .pain_scales import build as build_scales
+from .progression import DeclarationError, Lineages, parse_lineages
 from .schema import Schema, SchemaError, field
 
 FILENAME = "rulebook.toml"
@@ -110,6 +116,10 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
               note="days without quality after poor nights or a high easy-run HR"),
     ])),
     field("scales", dict, schema=SCALES_SCHEMA),
+    # Optional: absent, no lineage is followed. Its schema is derived from the ladders of
+    # the progression families (`redline.model.progression`), which validate it.
+    field("progression", dict, required=False,
+          note="the strength lineages the progression engine follows"),
     field("transitions", list, minimum=1, maximum=12, item=field(
         "transition", dict, schema=Schema("[[transitions]]", [
             field("slug", str, pattern=formats.SLUG),
@@ -207,6 +217,7 @@ class Rulebook:
     transitions: tuple[TransitionKind, ...]
     rules: tuple[Rule, ...]
     source: Path
+    progression: Lineages = dataclass_field(default_factory=Lineages)
 
     @property
     def kinds(self) -> tuple[str, ...]:
@@ -268,6 +279,11 @@ def parse(text: str, source: Path) -> Rulebook:
            if name in raw}})
     scales = build_scales(payload["scales"])
     problems = []
+    progression = Lineages()
+    try:
+        progression = parse_lineages(payload.get("progression"), scales.effort_pain.cap)
+    except DeclarationError as exc:
+        problems.append(str(exc))
     if parameters.gate_effort_peak > scales.effort_pain.cap:
         problems.append(f"parameters.gate_effort_peak {parameters.gate_effort_peak:g} is above "
                         f"the effort-pain cap {scales.effort_pain.cap:g}")
@@ -297,6 +313,7 @@ def parse(text: str, source: Path) -> Rulebook:
         transitions=tuple(TransitionKind(**entry) for entry in payload["transitions"]),
         rules=tuple(rules),
         source=source,
+        progression=progression,
     )
 
 

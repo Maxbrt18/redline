@@ -83,12 +83,10 @@ known-first-party = ["redline"]
 paths = ["src"]
 # The stored vocabularies are reached by iterating their enums (CLI choices, CHECK
 # constraints, the notebook's answers), never member by member. The notebook's views are
-# JSON shapes: their keys are read as strings, and by the page.
-# The progression engine runs beside the guards it will replace and is not called yet:
-# only its tests reach it, and its vocabularies are iterated like the stored ones.
+# JSON shapes: their keys are read as strings, and by the page. The progression
+# vocabularies are iterated the same way, by their declaration's schema.
 exclude = ["*/tests/*", "*/model/vocabulary.py", "*/model/notebook_views.py",
-           "*/model/progression.py", "*/analysis/progression.py",
-           "*/analysis/progression_readings.py"]
+           "*/model/progression.py"]
 min_confidence = 60
 # Flask routes: called by the framework, never by the code.
 ignore_decorators = ["@app.get", "@app.post", "@app.before_request", "@app.after_request", "@app.errorhandler"]
@@ -105,6 +103,11 @@ ignore_names = [
     "max_content_length",
     # `Activity` fields only `summary()` reads, through `dataclasses.fields`.
     "relative_effort", "calories",
+    # Parts of the progression engine no command reaches yet: the guard on write, the
+    # tally of a lineage's steps, and the readings of the gate, quality sessions and
+    # fuelling. Only strength is wired, read-only; its tests reach the rest.
+    "allows", "tally", "suggestion", "gate_exposure", "interval_exposure",
+    "fuelling_exposure",
 ]
 
 [tool.mypy]
