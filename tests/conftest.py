@@ -210,7 +210,8 @@ def make_bot(make_config, store):
     The mocks are the ones every caller wired by hand: a repo that pulled nothing and
     an outbox that held nothing.
     """
-    def factory(agent=None, repo=None, outbox=None, client=None, attachments=None, **config):
+    def factory(agent=None, repo=None, outbox=None, client=None, attachments=None,
+                transcriber=None, **config):
         if agent is None:
             agent = FakeAgent()
         if repo is None:
@@ -251,7 +252,7 @@ def make_bot(make_config, store):
         return TurnWorker(client=client,
                         repo=repo, agent=agent, state=store,
                         config=make_config(**config), outbox=outbox,
-                        attachments=attachments)
+                        attachments=attachments, transcriber=transcriber)
     return factory
 
 

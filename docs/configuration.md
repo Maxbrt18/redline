@@ -104,6 +104,22 @@ A test checks that every variable the service reads is in this table.
 | `STRENGTH_REPORTS_PER_DAY` | `8` | strength reports accepted per day |
 | `CHROMIUM_PATH` | Playwright's | a system Chromium, where Playwright ships none |
 
+### Voice notes
+
+A voice note is transcribed by a speech-to-text provider, then answered like a text;
+the coach is told the words were heard, not typed. The words the athlete is likely to
+say (places, races, gear) go in `redline.toml` under `[transcription] vocabulary`.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `TRANSCRIPTION_PROVIDER` | empty | `groq` or `openai`; empty refuses voice notes, like videos |
+| `TRANSCRIPTION_API_KEY` | empty | the provider's key, required with a provider |
+| `TRANSCRIPTION_MODEL` | the provider's | `whisper-large-v3` for Groq, `gpt-4o-transcribe` for OpenAI |
+
+Switching provider is these three lines. A new provider is an entry in
+`src/redline/integrations/speech/providers.py`, plus a module beside `openai_api.py`
+when its API is not the OpenAI transcription API.
+
 ## The routing file
 
 `REDLINE_ROUTING` names a TOML file that overrides the [routes](architecture.md#routing).

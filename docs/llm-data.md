@@ -33,13 +33,18 @@ opens is sent to the provider:
 
 - **Triage**: each incoming message is classified by a small model with no tools and
   an empty working directory; it receives the message text only.
+- **Voice notes**, when `TRANSCRIPTION_PROVIDER` is set: the audio goes to that
+  speech-to-text provider (not the agent's), with a hint of the words to expect (the
+  athlete's first name, the `[transcription]` vocabulary, the monitored zones and
+  capabilities of `redline.toml`). The coach then receives the transcript as a message.
 - **Proactive messages** (morning, weekly and monthly reviews, debrief after a Strava
   upload) are ordinary turns with the same inputs as above.
 
 ## Not sent
 
 - Messages from other Messenger users: they are dropped before any turn.
-- Raw attachments after their turn: the temporary file is deleted.
+- Raw attachments after their turn, and voice notes once transcribed: the temporary
+  file is deleted.
 - Secrets: the service environment (tokens, `DATABASE_URL`) and `REDLINE_STATE_DIR` (the
   Strava token cache) are outside the vault checkout and never put in a prompt.
   Claude's file tools are confined to the vault (`--restricted`), and the attachment
