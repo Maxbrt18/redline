@@ -22,6 +22,7 @@ in force and their thresholds. The engine applies the rulebook; it does not writ
 flowchart LR
     Meta[Messenger] --> Web[web.py]
     Strava[Strava] --> Web
+    Pages[notebook and strength page] --> Web
     Web --> Inbox[(inbound_messages)]
     Inbox --> Bot[TurnWorker, the one worker]
     Scheduler[ProactiveScheduler] --> Jobs[(proactive_jobs)]
@@ -45,7 +46,13 @@ flowchart LR
 
 Webhooks answer quickly and store what they receive. A single worker then serializes
 messages, commands and initiatives, so two turns never share an agent session, a
-working tree or a delivery.
+working tree or a delivery. The same web app serves the athlete's two pages: the
+notebook and the strength page.
+
+Around this core, `src/redline/analysis/` computes over the ledger (load, signals,
+descent, feasibility, progression, reviews), `src/redline/integrations/` talks to Strava,
+the weather and IGN altimetry, and `src/redline/cards/` draws the PNG cards and charts.
+The layout table of [`AGENTS.md`](../AGENTS.md) lists every package.
 
 ## One owner per fact
 
@@ -66,8 +73,9 @@ regenerated after each change, never edited. A turn that edits one sees it resto
 
 ### Storage
 
-PostgreSQL 17 is mandatory: the service refuses to start without `DATABASE_URL`, and
-there is no fallback to files. Its schema, `redline`, follows a few rules:
+PostgreSQL is mandatory: the service refuses to start without `DATABASE_URL`, and there
+is no fallback to files. CI and the deployment run PostgreSQL 17; the service does not
+check the version. Its schema, `redline`, follows a few rules:
 
 - tables in the plural, `snake_case`; a UUID `id`; natural keys `*_key`, foreign keys
   `*_id`, civil dates `*_on`, UTC instants `*_at`;
@@ -82,6 +90,11 @@ there is no fallback to files. Its schema, `redline`, follows a few rules:
   names the fields it touches and the typed evidence and rule behind it;
 - an idempotency key reused with different content is an error, never a silent success.
 
+A CHECK judges one row; an invariant that compares the old row to the new one is a
+trigger. `TRIGGERS` in `schema.py` names them all: the history of measures and pain
+readings, contiguous and immutable plan revisions, and immutable audit events, proactive
+messages and strength links. A test compares that list to `pg_trigger` both ways.
+
 Three roles split the rights: `redline_owner` (no login) owns the schema,
 `redline_migrator` takes that role for Alembic, `redline_app` reads and writes the
 business tables and nothing else. The audit log is append-only.
@@ -90,27 +103,34 @@ business tables and nothing else. The audit log is append-only.
 
 ## A turn
 
-An agent turn is one model call, wrapped in a transaction:
+An agent turn is the work of one model, wrapped in a transaction:
 
 1. `web.py` checks the Meta signature and the allowed sender, and stores the message
    (`inbound_messages`, `pending`).
-2. `TurnWorker` groups messages sent close together and **triages** them: a few exact
-   greetings locally, anything else by a small model that answers a JSON schema. The
-   result is a reading level, N0 to N3, plus flags (emotion, plan change, plan
-   requested). A failed or late triage counts as N1.
+2. `TurnWorker` groups messages sent close together and **triages** them: an empty
+   message or an exact greeting or thanks locally (`service/triage_rules.py`), anything
+   else by a small model that answers a JSON schema (`TRIAGE_SCHEMA` in
+   `service/agent.py`). The result is a reading level, N0 to N3, plus whether the
+   message is emotional, whether the plan must be reread before answering
+   (`plan_change`), which part of the plan the athlete asks for (`plan_scope`: today,
+   next, remaining, full) and an optional holding sentence, delivered while the turn
+   runs. A failed or late triage counts as N1.
 3. The service injects what that level needs: today's date, a bounded packet of
    PostgreSQL facts, the active plan when the turn may prescribe, the rulebook, the open
    questions.
 4. `TurnExecutor` gives the turn a `turn_id` and runs the agent. Every command the agent
    runs carries `REDLINE_TURN_ID`: its writes are **staged** in `turn_commands`, not
-   applied.
-5. After the call, all the staged commands are applied in **one PostgreSQL
-   transaction**, retried three times on a transient failure. An invalid command
-   cancels the batch. A projection or capability note edited during the turn is
-   restored file by file, without losing the other notes or the commands; so is code
-   (Python, a script, the vault's Git hooks or CI), which a turn never writes.
-6. The weeks the reply depends on are reread and validated. The vault notes are
-   committed locally, without network.
+   applied. Each staged command is replayed with the ones before it inside a savepoint
+   that is rolled back: an inconsistent command is refused at once, and the coach sees
+   the error while the turn is still running.
+5. After the call, a projection or capability note edited during the turn is restored
+   file by file, without losing the other notes or the commands; so is code (Python, a
+   script, the vault's Git hooks or CI), which a turn never writes. Then all the staged
+   commands are applied in **one PostgreSQL transaction**, which repeats the check. A
+   transient failure (connection, lock) is retried three times, after 1, 3 and 8
+   seconds; a business refusal never is. An invalid command cancels the batch.
+6. The vault notes are committed locally, without network. Then the weeks the reply
+   depends on, and every week the turn revised, are reread and validated.
 7. `TurnWorker` decides whether the canonical plan goes with the prose.
 8. `DeliveryService` stores the full envelope (text, buttons) in
    `outbound_deliveries`, then sends it. A retry resends this envelope, never a new turn.
@@ -122,6 +142,11 @@ An agent error or a refused persistence drops the staged commands and restores t
 working tree. Facts already committed are never presented as rolled back because a
 projection or a push failed afterwards. If persistence is refused, the prose is still
 sent, with a line naming what was not recorded, and no plan goes with it.
+
+A turn may still take more than one model call. If the first attempt fails before any
+useful work, the staged commands and the working tree are reset, a continued session is
+cleared, and the route's fallback runs ([routing](#routing)). A reply that comes back
+empty from a continued session gets one follow-up call in the same session.
 
 `redline week-plan preview` runs the same transaction inside a savepoint that it rolls
 back: the coach can explore a change without preparing it.
@@ -172,6 +197,9 @@ fingerprint of its instructions (the style prompt, the vault's `CLAUDE.md`,
 `AGENTS.md` and `redline.toml`). A change to any of them starts a new session at the
 next turn; a commit of notes does not.
 
+Each turn records what produced it in `agent_turns`: the provider, the route, the model,
+the effort, the digests of the instructions and of the rulebook, and the engine tree.
+
 ## What the agent may do
 
 The agent works in the vault and runs only the commands listed in
@@ -207,19 +235,39 @@ start on an invalid rulebook and rereads it when it changes. An increase of a ta
 a cap needs a prediction already challenged (`direction=increase`), consumed by one
 revision: the refusal is transactional, not an instruction the model may forget.
 
+How a dose moves from one exposure to the next is declared too
+(`src/redline/model/progression.py`). The engine's families (the ladder of dose
+variables, the criteria an exposure must meet, the ordered rule, the vetoes) live in
+`src/redline/model/progression.default.toml`; the instance's lineages (each exercise
+followed, its family, bounds, steps and group) live in the `[progression]` table of the
+vault's `rulebook.toml`. `redline progression` shows what the engine proposes for
+strength, with the clause and the facts behind each move. It is read-only: it writes no
+dose.
+
 ## Initiatives and delivery
 
 The scheduler turns facts into jobs with a stable key: the Strava debrief, the morning
-message, the weekly and monthly reviews, a check-in after a silence, a missing rating,
-a missed session, a race countdown, gear wear, a correction. Each job has a priority and
-an expiry; there is no daily cap.
+message, the weekly and monthly reviews, a check-in after a silence, missing ledger
+cells, the waking trace, a missed session, a premortem, a decision challenge, a race
+countdown, gear wear, the strength card, a correction. `ProactiveKind` in
+`src/redline/model/vocabulary.py` holds the full list, and `service/proactive_kinds.py`
+declares per kind how long a job stays relevant, whether it takes the heavy route and
+whether it must speak.
 
-- Jobs that need no judgment (a missing rating, a missed session, an operator message)
-  are rendered by code, without the model.
+Each job has a priority flag and an expiry. There is no daily cap, but an initiative goes
+out only from `PROACTIVE_ACTIVE_START` until midnight (one ready later is held until the
+next opening), and, unless its job is a priority, at least `PROACTIVE_MIN_GAP_HOURS`
+after the previous one.
+
+- Jobs that need no judgment (a check-in after a silence, missing ledger cells, a missed
+  session, a gut review, gear wear, the waking trace, an operator message) are rendered
+  by code, without the model: `CLOSED_KINDS` in `service/proactive_messages.py`.
 - The others are turns that answer `{send, text}`: `send=false` is a deliberate silence.
-- A job is acknowledged only after an effective delivery. A failed job is retried three
-  times, then marked `failed` with its cause. The weekly review of a week without a valid
-  plan also opens a repair job, which must leave a valid revision.
+- A job is acknowledged only after an effective delivery. A failed job gets at most
+  three attempts, spaced out; it is marked `failed` with its cause after the third, or as
+  soon as the next attempt would come after the time its kind stays relevant. A job
+  still pending at its expiry is marked `failed` too. The weekly review of a week
+  without a valid plan also opens a repair job, which must leave a valid revision.
 - Before preparing and before sending, an initiative checks that no message is waiting
   and no reactive turn is running; a resumed conversation holds the prepared envelope
   without a new turn.
@@ -248,6 +296,9 @@ context. `redline fact-read conversation --query` searches past exchanges.
 and its sessions, the pain over time and the race countdown, and collects in one tap
 what the ledger still lacks: ratings, the waking trace, sleep and life load. It computes
 everything at read time from the plan and the ledger, and stores no figure of its own.
+It also carries the reorganization of the week, the coach's proposals to take or
+dismiss, habits, the answers to open questions, the race plan, the weather and the
+archive of cards. What it reads is declared in `src/redline/model/notebook_views.py`.
 Access is a device cookie obtained from a one-time link sent over Messenger, revocable
 from the notebook or with `/carnet-revoquer`. Its routes are under `/notebook-api/`,
 without HTTP cache or CORS.
@@ -280,6 +331,7 @@ a valid local commit and is retried.
 | a text the service injects | `src/redline/coach/fr/prompts/`; when it is injected: `service/prompts.py` |
 | whether a reply goes out, and with what | `service/worker.py` |
 | the shape of the plan | `model/weekly_plan.py`; its Messenger rendering: `service/plans.py` |
+| how a dose progresses | the families: `model/progression.default.toml`; the lineages: `[progression]` in the vault's `rulebook.toml` |
 | how a fact is stored | its aggregate in `storage/repository/` |
 | when an initiative runs | `service/proactive.py` |
 | a model or an effort | the operator's `REDLINE_ROUTING` file |
@@ -287,6 +339,7 @@ a valid local commit and is retried.
 ## The evaluation bench
 
 `redline evaluate-coaching` and `redline evaluate-conversation` judge the coach's
-wording on fixed scenarios (`tests/fixtures/coaching-*.json`), with real model calls,
+wording on fixed scenarios (`src/redline/evaluation/coaching-scenarios.json` and
+`conversation-scenarios.json`), with real model calls,
 outside CI. Their verdict never holds back a Messenger reply: delivery depends only on
 the deterministic checks above.
