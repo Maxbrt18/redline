@@ -114,6 +114,11 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
               note="consecutive poor nights that remove quality"),
         field("alarm_no_quality_days", int, required=False, minimum=1, maximum=14,
               note="days without quality after poor nights or a high easy-run HR"),
+        field("comparable_duration_pct", int, required=False, minimum=1, maximum=100,
+              note="two sessions of an accumulating kind compare when their durations "
+                   "differ by at most this share of the longer one, in %"),
+        field("comparable_sessions", int, required=False, minimum=1, maximum=20,
+              note="the most recent comparable sessions an accumulating one is read against"),
     ])),
     field("scales", dict, schema=SCALES_SCHEMA),
     # Optional: absent, no lineage is followed. Its schema is derived from the ladders of
@@ -174,6 +179,8 @@ class Parameters:
     pain_cut_pct: int | None = None
     poor_nights_streak: int | None = None
     alarm_no_quality_days: int | None = None
+    comparable_duration_pct: int | None = None
+    comparable_sessions: int | None = None
 
     def spoken(self) -> dict[str, str]:
         """Thresholds as a rule's text states them: decimal comma."""

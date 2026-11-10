@@ -38,6 +38,7 @@ from redline.model import (
     rulebook,
     session_kinds,
     transitions,
+    weekly_plan,
 )
 from redline.model import ledger as ledger_model
 from redline.model import notebook_views as views
@@ -113,11 +114,13 @@ def observation_fact(observation: dict, session: dict | None = None,
         "over": [],
     }
     if session:
+        band = weekly_plan.rpe_band(session)
         fact["over"] = [key for key, value, cap in (
-            ("hr_avg", fact["hr_avg"], "hr_cap_bpm"), ("rpe", fact["rpe"], "rpe_max"),
-            ("duration_min", fact["duration_min"], "duration_cap_min"),
-            ("km", fact["km"], "distance_cap_km"))
-            if value is not None and session.get(cap) is not None and value > float(session[cap])]
+            ("hr_avg", fact["hr_avg"], session.get("hr_cap_bpm")),
+            ("rpe", fact["rpe"], band[1] if band else None),
+            ("duration_min", fact["duration_min"], session.get("duration_cap_min")),
+            ("km", fact["km"], session.get("distance_cap_km")))
+            if value is not None and cap is not None and value > float(cap)]
     return fact
 
 
@@ -186,10 +189,10 @@ def _planned(session: dict) -> list[str]:
         parts.append(f"≤{_fr(cap)} km")
     elif session.get("duration_cap_min"):
         parts.append(f"≤{session['duration_cap_min']} min")
-    if session.get("rpe_max") is not None:
-        low = session.get("rpe_min")
-        parts.append(f"RPE {low}-{session['rpe_max']}" if low is not None and low != session["rpe_max"]
-                     else f"RPE ≤{session['rpe_max']}")
+    band = weekly_plan.rpe_band(session)
+    if band is not None:
+        low, high = band
+        parts.append(f"RPE {low}-{high}" if low is not None and low != high else f"RPE ≤{high}")
     if session.get("hr_zone"):
         parts.append(session["hr_zone"])
     if session.get("cadence_target"):

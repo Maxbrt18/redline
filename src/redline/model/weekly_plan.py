@@ -369,6 +369,16 @@ def typed_target_errors(revision: dict, where: str = "revision") -> list[str]:
         for session in revision.get("sessions") or []
         if session.get("status") != SessionStatus.CANCELLED and session.get("hr_zone")
         and session.get("hr_cap_bpm") is None)
+    # A session whose effort accumulates with its duration has no fixed RPE band: its
+    # intensity is prescribed by HR or pace, its RPE is read against comparable sessions.
+    # Refused on write only, so the revisions already stored stay readable.
+    problems.extend(
+        f"{where}.{session.get('id', '?')}: no rpe_min/rpe_max for a {session['workout']} "
+        "session -- its RPE grows with its duration; prescribe its intensity with "
+        "hr_zone/hr_cap_bpm"
+        for session in revision.get("sessions") or []
+        if session.get("workout") in session_kinds.ACCUMULATING
+        and (session.get("rpe_min") is not None or session.get("rpe_max") is not None))
     return problems
 
 
@@ -687,6 +697,20 @@ def distance_of(session: dict) -> str:
     return ""
 
 
+def rpe_band(session: dict) -> tuple[int | None, int] | None:
+    """The (minimum, maximum) RPE a session commits to, or None.
+
+    The one reading of `rpe_min`/`rpe_max`: a band stored on a session whose effort
+    accumulates (`session_kinds.ACCUMULATING`) is neither shown nor compared.
+    """
+    if session.get("workout") in session_kinds.ACCUMULATING:
+        return None
+    low, high = session.get("rpe_min"), session.get("rpe_max")
+    if high is None:
+        return None if low is None else (low, low)
+    return low, high
+
+
 def details_of(session: dict, *, cadence_unit: str = "") -> list[str]:
     """Everything a session commits to, in order, without its title or status.
 
@@ -696,9 +720,9 @@ def details_of(session: dict, *, cadence_unit: str = "") -> list[str]:
     implicit.
     """
     details = [distance_of(session)]
-    if session.get("rpe_min") is not None:
-        high = session.get("rpe_max", session["rpe_min"])
-        details.append(text.RPE.format(low=session["rpe_min"], high=high))
+    band = rpe_band(session)
+    if band is not None and band[0] is not None:
+        details.append(text.RPE.format(low=band[0], high=band[1]))
     if session.get("hr_zone"):
         details.append(session["hr_zone"])
     if session.get("cadence_target"):

@@ -76,7 +76,16 @@ def compute(store, plan: dict, week: str, request: week_days.Request, today: dt.
     program, targets = _program()
     parameters = rulebook.current().parameters
     sessions = revision["sessions"]
-    items = reorganize.items(sessions, revision.get("gates") or [], program, targets)
+    from redline.analysis import comparable, ledger
+    history: list[ledger.Row] = []
+
+    def typical(kind: str, minutes: int) -> float | None:
+        # The ledger is read only for a week that holds an accumulating session.
+        if not history:
+            history.extend(ledger.parse_ledger(store))
+        return comparable.typical_rpe(history, kind, minutes, today)
+
+    items = reorganize.items(sessions, revision.get("gates") or [], program, targets, typical)
     outcome = reorganize.reorganise(
         items, iso_week.dates(week), today, request,
         reorganize.Rules(runs_per_day=parameters.runs_per_day,

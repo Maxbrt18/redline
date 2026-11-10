@@ -58,6 +58,14 @@ status: active       # active | retired
 ---
 ```
 
+A kind whose effort accumulates with its duration (`long`, declared `accumulating` in
+`session_kinds.py`) takes no `target_rpe`, and a plan gives its sessions no
+`rpe_min`/`rpe_max`: its session RPE grows faster than its duration, so no single figure
+holds. Its intensity is prescribed by `hr_zone`/`hr_cap_bpm`, and its RPE is read against
+the athlete's previous sessions of the same kind and a comparable duration
+(`comparable_duration_pct` and `comparable_sessions` in `rulebook.toml`). A `target_rpe`
+left on such a note is ignored.
+
 A **strength routine** declares `routine:` instead of `kinds:`, and its exercises in
 order:
 
