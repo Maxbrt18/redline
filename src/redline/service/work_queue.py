@@ -43,6 +43,16 @@ class AttachmentRequest:
 
 
 @dataclass(frozen=True)
+class VoiceRequest:
+    """A voice note to transcribe; its transcript then joins the texts of the burst."""
+
+    psid: str
+    payload: str
+    message_id: str
+    attempts: int = 1
+
+
+@dataclass(frozen=True)
 class MaintenanceRequest:
     """Git publication and vault sync, once nothing else is waiting.
 
@@ -52,7 +62,7 @@ class MaintenanceRequest:
 
 
 WorkItem = (ProactiveJob | DeepRequest | CommandRequest | InboundRequest
-            | AttachmentRequest | MaintenanceRequest)
+            | AttachmentRequest | VoiceRequest | MaintenanceRequest)
 
 
 @dataclass
@@ -76,6 +86,7 @@ class WorkQueue:
         self._deep: collections.deque[DeepRequest] = collections.deque()
         self._commands: collections.deque[CommandRequest] = collections.deque()
         self._attachments: collections.deque[AttachmentRequest] = collections.deque()
+        self._voices: collections.deque[VoiceRequest] = collections.deque()
         self._retries: collections.deque[WorkItem] = collections.deque()
         self._proactive: collections.deque[ProactiveJob] = collections.deque()
         self._maintenance = False
@@ -143,6 +154,11 @@ class WorkQueue:
             self._attachments.append(AttachmentRequest(psid, payload, message_id))
             self._cv.notify()
 
+    def submit_voice(self, psid: str, payload: str, message_id: str) -> None:
+        with self._cv:
+            self._voices.append(VoiceRequest(psid, payload, message_id))
+            self._cv.notify()
+
     def retry(self, item: WorkItem) -> None:
         """Requeue a failed inbound without going through the debounce again.
 
@@ -159,13 +175,17 @@ class WorkQueue:
     def has_pending_inbound(self) -> bool:
         with self._cv:
             return bool(self._buffers or self._deep or self._commands
-                        or self._attachments or self._retries)
+                        or self._attachments or self._voices or self._retries)
 
     def next(self) -> WorkItem | None:
         with self._cv:
             while not self._closed:
                 if self._commands:
                     return self._commands.popleft()
+                # Before anything slower: a transcript must reach the burst it belongs
+                # to while that burst is still being debounced.
+                if self._voices:
+                    return self._voices.popleft()
                 if self._deep:
                     return self._deep.popleft()
                 if self._attachments:

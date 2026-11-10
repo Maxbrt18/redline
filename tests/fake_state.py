@@ -348,6 +348,11 @@ class FakeStateStore:
             "received_at": time.time()}
         return True
 
+    def transcribe_inbound(self, message_id: str, text: str, *, trace: str) -> None:
+        row = self._inbound_messages[message_id]
+        if row["kind"] == "attachment":
+            row.update(kind="text", body=text, trace=trace)
+
     def inbound_received_at(self, message_ids: tuple[str, ...]):
         stamps = [self._inbound_messages[message_id]["received_at"]
                   for message_id in message_ids

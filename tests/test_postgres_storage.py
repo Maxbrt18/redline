@@ -1085,6 +1085,24 @@ def test_messenger_reply_resolves_the_exact_outbound_chunk():
     assert "message antérieur du coach" in context
 
 
+def test_a_transcribed_voice_note_is_replayed_as_text_and_searched_by_its_words(store):
+    state = PostgresStateStore(store.database)
+    payload = ('{"attachments":[{"type":"audio","url":"https://cdn.fbsbx.com/a.mp4"}],'
+               '"caption":"","version":1}')
+    assert state.claim_inbound("mid-voice", "4242", "attachment", payload)
+
+    state.transcribe_inbound("mid-voice", "[vocal]\nSeuil fait, jambes lourdes",
+                             trace="[Vocal] Seuil fait, jambes lourdes")
+
+    assert state.pending_inbound() == [{
+        "message_id": "mid-voice", "psid": "4242", "kind": "text",
+        "body": "[vocal]\nSeuil fait, jambes lourdes"}]
+    [result] = store.conversation_search("4242", "lourdes", limit=4)
+    assert result["hit"]["body"] == "[Vocal] Seuil fait, jambes lourdes"
+    state.complete_inbound(("mid-voice",))
+    assert state.pending_inbound() == []
+
+
 def test_messenger_reply_to_an_existing_inbound_is_backed_by_the_same_relation():
     database = Database(URL, application_name="pytest-replies-inbound")
     state = PostgresStateStore(database)

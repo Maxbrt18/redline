@@ -36,7 +36,8 @@ def env(monkeypatch, tmp_path):
                                   "PROACTIVE", "STRAVA",
                                   "GIT", "VAULT", "TRIAGE", "DEBOUNCE", "SESSION",
                                   "STRENGTH", "COACH", "WEBHOOK", "HEALTHCHECK",
-                                  "GRAPH", "STATE", "DATABASE", "ATTACHMENT", "HEALTH"):
+                                  "GRAPH", "STATE", "DATABASE", "ATTACHMENT", "HEALTH",
+                                  "TRANSCRIPTION"):
             monkeypatch.delenv(name, raising=False)
     monkeypatch.chdir(tmp_path)
     # The vault is a temporary folder carrying the fictional instance.
@@ -258,3 +259,34 @@ def test_dotenv_ignores_comments_blank_lines_and_quotes(env, tmp_path):
 
 def test_an_absent_dotenv_is_not_an_error(tmp_path):
     load_dotenv(tmp_path / "pas-la.env")
+
+
+def test_voice_notes_are_off_until_a_provider_is_named(env):
+    config = Config.from_env()
+    assert config.transcription_provider == ""
+
+
+def test_a_named_transcription_provider_boots_with_its_key(env):
+    env.setenv("TRANSCRIPTION_PROVIDER", "Groq")
+    env.setenv("TRANSCRIPTION_API_KEY", "gsk-test")
+    config = Config.from_env()
+    assert (config.transcription_provider, config.transcription_model) == ("groq", "")
+
+
+def test_an_unknown_transcription_provider_stops_startup(env):
+    env.setenv("TRANSCRIPTION_PROVIDER", "nope")
+    env.setenv("TRANSCRIPTION_API_KEY", "key")
+    with pytest.raises(ConfigError, match="TRANSCRIPTION_PROVIDER invalid: 'nope'"):
+        Config.from_env()
+
+
+def test_a_transcription_provider_without_its_key_stops_startup(env):
+    env.setenv("TRANSCRIPTION_PROVIDER", "groq")
+    with pytest.raises(ConfigError, match="TRANSCRIPTION_API_KEY is required"):
+        Config.from_env()
+
+
+def test_the_transcription_key_never_reaches_the_agent_sandbox():
+    from redline.service.config import sandbox_overrides
+    assert sandbox_overrides({"TRANSCRIPTION_API_KEY": "gsk-test"}) == {
+        "TRANSCRIPTION_API_KEY": ""}

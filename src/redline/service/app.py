@@ -23,6 +23,7 @@ from .notebook import NotebookService
 from .outbox import Outbox
 from .postgres_state import PostgresStateStore
 from .proactive import ProactiveScheduler
+from .transcription import build_transcriber
 from .vault import REGEN_COMMAND, VaultRepo
 from .web import create_app
 from .worker import TurnWorker
@@ -91,8 +92,9 @@ def main() -> None:
     notebook = NotebookService(NotebookStore(database), repo, state,
                                Path(config.vault_path), config.coach_base_url,
                                operational=operational_store, instance=config.instance)
+    transcriber = build_transcriber(config)
     bot = TurnWorker(client, repo, agent, state, config, Outbox(paths.outbox_dir()),
-                   attachments=attachments, notebook=notebook)
+                   attachments=attachments, notebook=notebook, transcriber=transcriber)
     bot.start()
 
     scheduler = ProactiveScheduler(bot, state, config)
@@ -100,6 +102,10 @@ def main() -> None:
     log.info("Redline started. Vault: %s -- port %d -- proactive %s",
              config.vault_path, config.webhook_port,
              "ON" if config.proactive_enabled else "OFF")
+    if transcriber is None:
+        log.warning("Voice notes refused: TRANSCRIPTION_PROVIDER is empty.")
+    else:
+        log.info("Voice notes transcribed by %s", transcriber.provider)
     if config.proactive_enabled and not config.strava_verify_token:
         log.warning("Strava webhook disabled: STRAVA_VERIFY_TOKEN is empty.")
     if config.proactive_enabled and not config.strava_owner_id:

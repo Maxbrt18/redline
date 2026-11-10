@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from redline.coach.fr import replies
+from redline.coach.fr import transcription as voice_wording
 from redline.coach.fr.replies import (
     ATTACHMENT_UNREADABLE,
     EMPTY_REPLY,
@@ -31,13 +32,15 @@ from redline.coach.fr.replies import (
     UNRECORDED_GENERIC,
     UNRECORDED_LABELS,
 )
+from redline.integrations.speech.contract import AudioClip, Transcriber
 from redline.model import iso_week
 from redline.model import ledger as ledger_model
+from redline.model.errors import ExternalError, InputError
 from redline.storage import StorageError
 
-from . import clock, events
+from . import clock, events, transcription
 from .agent import AgentRunner, FailureKind, SessionMode, Triage
-from .attachments import AttachmentError, AttachmentService
+from .attachments import AttachmentError, AttachmentService, is_voice_note
 from .config import Config
 from .delivery import (
     DeliveryReceipt,
@@ -112,6 +115,7 @@ from .work_queue import (
     DeepRequest,
     InboundRequest,
     MaintenanceRequest,
+    VoiceRequest,
     WorkQueue,
 )
 
@@ -160,7 +164,8 @@ class TurnWorker:
     def __init__(self, client: MessengerClient, repo: VaultRepo,
                  agent: AgentRunner, state: StateStore, config: Config,
                  outbox: Outbox, attachments: AttachmentService | None = None,
-                 notebook: NotebookService | None = None) -> None:
+                 notebook: NotebookService | None = None,
+                 transcriber: Transcriber | None = None) -> None:
         self._client = client
         self._repo = repo
         self._agent = agent
@@ -170,6 +175,8 @@ class TurnWorker:
         self._attachments = attachments or AttachmentService(
             Path(config.attachment_dir), max_bytes=config.attachment_max_bytes,
             total_bytes=config.attachment_total_bytes)
+        self._transcriber = transcriber
+        self._voice_hints = transcription.hints(config.instance)
         self._delivery = DeliveryService(client, outbox, state, config.coach_base_url, notebook)
         self._turns = TurnExecutor(agent, repo, state, vault_path=config.vault_path)
         self._queue = WorkQueue(config.debounce_seconds, config.debounce_max_seconds)
@@ -264,8 +271,14 @@ class TurnWorker:
             self._state.complete_inbound(message_ids)
 
     def submit_attachment(self, psid: str, payload: str, *, message_id: str) -> None:
-        """Reading happens in the worker; the webhook is immediately free again."""
-        self._queue.submit_attachment(psid, payload, message_id)
+        """Reading happens in the worker; the webhook is immediately free again.
+
+        Without a transcriber, a voice note takes the attachment path, which refuses it.
+        """
+        if self._transcriber is not None and is_voice_note(payload):
+            self._queue.submit_voice(psid, payload, message_id)
+        else:
+            self._queue.submit_attachment(psid, payload, message_id)
 
     def acknowledge(self, psid: str) -> None:
         """Sticker / thumbs-up: marking as seen is enough, a human does not reply."""
@@ -315,6 +328,8 @@ class TurnWorker:
                         message_ids=job.message_ids)
                 elif isinstance(job, AttachmentRequest):
                     processed = self._respond_attachment(job)
+                elif isinstance(job, VoiceRequest):
+                    processed = self._transcribe_voice(job)
                 else:
                     processed = self._respond(
                         job.psid, job.text, message_ids=job.message_ids)
@@ -339,6 +354,8 @@ class TurnWorker:
                     self._state.complete_inbound(job.message_ids)
                 elif isinstance(job, AttachmentRequest):
                     self._state.complete_inbound((job.message_id,))
+                # A processed VoiceRequest is acknowledged by `_transcribe_voice` when the
+                # service answered it, or by the turn that answers its transcript.
             except Exception:
                 # The inbound stays `pending`: its reply is already persisted and is never
                 # recomputed on retry.
@@ -374,7 +391,7 @@ class TurnWorker:
 
     @staticmethod
     def _job_ids(job) -> tuple[str, ...]:
-        if isinstance(job, AttachmentRequest):
+        if isinstance(job, (AttachmentRequest, VoiceRequest)):
             return (job.message_id,)
         return tuple(getattr(job, "message_ids", ()))
 
@@ -414,7 +431,51 @@ class TurnWorker:
         self._outage_notice_at = time.time()
         self._deliver_limit(psid, "outage", ids, OUTAGE_NOTICE)
 
-    def _deliver_attachment_text(self, request: AttachmentRequest, text: str,
+    def _transcribe_voice(self, request: VoiceRequest) -> bool:
+        """Turn a voice note into the athlete's text, then let it join the conversation.
+
+        The transcript replaces the durable inbound message before it is queued: from then
+        on it is a text like any other, debounced with the texts around it, replayed as
+        text after a restart, and acknowledged by the turn that answers it.
+        """
+        transcriber = self._transcriber
+        if transcriber is None:
+            raise RuntimeError("a voice note was queued without a transcriber")
+        self._client.action(request.psid, "mark_seen")
+        try:
+            with self._attachments.materialize_voice(
+                    request.payload, request.message_id) as clips:
+                spoken = [transcriber.transcribe(AudioClip(clip.path, clip.media_type),
+                                                 self._voice_hints)
+                          for clip in clips]
+        except AttachmentError as exc:
+            return self._answer_voice(request, str(exc))
+        except InputError as exc:
+            log.warning("Voice note refused by %s: %s", transcriber.provider, exc)
+            return self._answer_voice(request, voice_wording.UNREADABLE)
+        except ExternalError as exc:
+            self._log_incident("transcription",
+                               f"voice note not transcribed by {transcriber.provider}: {exc}")
+            return False
+        text = "\n".join(part.strip() for part in spoken if part.strip())
+        if not text:
+            return self._answer_voice(request, voice_wording.SILENT)
+        message = voice_wording.MESSAGE.format(text=text)
+        self._state.transcribe_inbound(request.message_id, message,
+                                       trace=voice_wording.TRACE.format(text=text))
+        self._queue.submit_inbound(request.psid, message, request.message_id)
+        log.info("Voice note transcribed by %s: %d characters",
+                 transcriber.provider, len(text))
+        return True
+
+    def _answer_voice(self, request: VoiceRequest, text: str) -> bool:
+        """The service answers a voice note it could not hear, and acknowledges it."""
+        delivered = self._deliver_attachment_text(request, text)
+        if delivered:
+            self._state.complete_inbound((request.message_id,))
+        return delivered
+
+    def _deliver_attachment_text(self, request: AttachmentRequest | VoiceRequest, text: str,
                                  turn_id: str = "") -> bool:
         source_key = f"attachment:{request.message_id}"
         envelope = (EnvelopeBuilder(request.psid, source_key)

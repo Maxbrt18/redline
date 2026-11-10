@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import shutil
 from collections.abc import Iterator
@@ -38,7 +39,17 @@ ALLOWED_DOCUMENT_TYPES = {
     "text/plain": ".txt",
     "text/csv": ".csv",
 }
+#: The labels a voice note may be served under. The container is then read from the
+#: bytes: it, not the label, names the file a speech-to-text provider receives.
+ALLOWED_AUDIO_TYPES = frozenset({
+    "audio/mp4", "audio/m4a", "audio/x-m4a", "audio/mpeg", "audio/mp3", "audio/ogg",
+    "audio/wav", "audio/wave", "audio/x-wav", "audio/webm", "video/mp4",
+})
+#: Extension of an audio download until its container is known.
+AUDIO_PENDING_SUFFIX = ".audio"
 REDIRECT_CODES = frozenset({301, 302, 303, 307, 308})
+
+log = logging.getLogger("redline")
 
 
 class AttachmentError(ExternalError):
@@ -91,9 +102,20 @@ def safe_conversation_label(raw: str) -> str:
         labels.append(wording.PHOTO)
     if "file" in kinds:
         labels.append(wording.DOCUMENT)
-    if kinds & {"video", "audio"}:
+    if "audio" in kinds:
+        labels.append(wording.VOICE)
+    if "video" in kinds:
         labels.append(wording.UNSUPPORTED_MEDIA)
     return wording.LABEL.format(kinds=" + ".join(labels) or wording.UNKNOWN_FORMAT)
+
+
+def is_voice_note(raw: str) -> bool:
+    """Every attachment of the message is audio: Messenger's voice notes."""
+    try:
+        remotes, _ = _remote_rows(raw)
+    except AttachmentError:
+        return False
+    return all(row.kind == "audio" for row in remotes)
 
 
 def _remote_rows(raw: str) -> tuple[list[RemoteAttachment], str]:
@@ -141,8 +163,41 @@ def _content_matches(path: Path, media_type: str) -> bool:
     return False
 
 
+def _audio_container(head: bytes) -> tuple[str, str] | None:
+    """The extension and media type of an audio file, read from its first bytes.
+
+    Only containers every provider of `redline.integrations.speech` accepts. A raw AAC
+    stream (ADTS, layer bits 00) is not one of them and is told apart from an MP3 frame.
+    """
+    if head[4:8] == b"ftyp":
+        return ".m4a", "audio/mp4"
+    if head.startswith(b"ID3") or (len(head) >= 2 and head[0] == 0xFF
+                                   and head[1] & 0xE0 == 0xE0 and head[1] & 0x06):
+        return ".mp3", "audio/mpeg"
+    if head.startswith(b"OggS"):
+        return ".ogg", "audio/ogg"
+    if head[:4] == b"RIFF" and head[8:12] == b"WAVE":
+        return ".wav", "audio/wav"
+    if head.startswith(b"\x1a\x45\xdf\xa3"):
+        return ".webm", "audio/webm"
+    return None
+
+
+def _extension(kind: str, media_type: str) -> str | None:
+    """The extension a download of this kind and label is written under; None refuses it."""
+    if kind == "image":
+        return ALLOWED_IMAGE_TYPES.get(media_type)
+    if kind == "audio":
+        return AUDIO_PENDING_SUFFIX if media_type in ALLOWED_AUDIO_TYPES else None
+    return ALLOWED_DOCUMENT_TYPES.get(media_type)
+
+
+ACCEPTED_FORMATS = {"image": wording.IMAGE_FORMATS, "file": wording.DOCUMENT_FORMATS,
+                    "audio": wording.AUDIO_FORMATS}
+
+
 class AttachmentService:
-    """Download photos/PDF/text under quota and destroy them after reading."""
+    """Download photos, documents and voice notes under quota; destroy them after reading."""
 
     def __init__(self, directory: Path, *, max_bytes: int, total_bytes: int,
                  session: requests.Session | None = None) -> None:
@@ -178,7 +233,22 @@ class AttachmentService:
             if ignored_video:
                 raise AttachmentError(wording.NO_VIDEO)
             raise AttachmentError(wording.WHAT_TO_SEND)
+        with self._downloaded(allowed, message_id) as files:
+            yield MaterializedAttachments(files, ignored_video=ignored_video)
 
+    @contextmanager
+    def materialize_voice(self, raw: str, message_id: str
+                          ) -> Iterator[tuple[LocalAttachment, ...]]:
+        """The audio clips of a voice note, for as long as they are transcribed."""
+        remotes, _ = _remote_rows(raw)
+        if any(row.kind != "audio" for row in remotes):
+            raise ValueError("a voice note carries only audio")
+        with self._downloaded(remotes, message_id) as files:
+            yield files
+
+    @contextmanager
+    def _downloaded(self, remotes: list[RemoteAttachment], message_id: str
+                    ) -> Iterator[tuple[LocalAttachment, ...]]:
         self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
         os.chmod(self.directory, 0o700)
         key = hashlib.sha256(message_id.encode("utf-8")).hexdigest()[:20]
@@ -186,13 +256,13 @@ class AttachmentService:
         files: list[LocalAttachment] = []
         total = 0
         try:
-            for index, remote in enumerate(allowed):
+            for index, remote in enumerate(remotes):
                 local = self._download(remote, key, index,
                                        remaining=max(0, self.total_bytes - total))
                 created.append(local.path)
                 files.append(local)
                 total += local.size
-            yield MaterializedAttachments(tuple(files), ignored_video=ignored_video)
+            yield tuple(files)
         finally:
             for path in created:
                 with suppress(OSError):
@@ -241,13 +311,13 @@ class AttachmentService:
             response.close()
             raise AttachmentError(wording.TOO_LARGE.format(megabytes=self.max_bytes // (1024 * 1024)))
         content_type = _media_type(response.headers.get("Content-Type", ""))
-        allowed_types = ALLOWED_IMAGE_TYPES if remote.kind == "image" else ALLOWED_DOCUMENT_TYPES
-        if content_type not in allowed_types:
+        extension = _extension(remote.kind, content_type)
+        if extension is None:
             response.close()
-            accepted = (wording.IMAGE_FORMATS if remote.kind == "image"
-                        else wording.DOCUMENT_FORMATS)
-            raise AttachmentError(wording.FORMAT.format(accepted=accepted))
-        extension = allowed_types[content_type]
+            # The label only, never the URL: enough to widen an allowlist Meta outgrew.
+            log.warning("Attachment refused: %s served as %r", remote.kind, content_type)
+            raise AttachmentError(wording.FORMAT.format(
+                accepted=ACCEPTED_FORMATS.get(remote.kind, wording.DOCUMENT_FORMATS)))
         path = self.directory / f"inbound-{key}-{index}{extension}"
         size = 0
         try:
@@ -269,7 +339,21 @@ class AttachmentService:
         if size == 0:
             path.unlink(missing_ok=True)
             raise AttachmentError(wording.EMPTY)
+        if remote.kind == "audio":
+            return _settle_audio(path, size)
         if not _content_matches(path, content_type):
             path.unlink(missing_ok=True)
             raise AttachmentError(wording.MISMATCH)
         return LocalAttachment(remote.kind, path.resolve(), content_type, size)
+
+
+def _settle_audio(path: Path, size: int) -> LocalAttachment:
+    """Name the audio file after the container its bytes declare."""
+    container = _audio_container(path.read_bytes()[:16])
+    if container is None:
+        path.unlink(missing_ok=True)
+        raise AttachmentError(wording.MISMATCH)
+    extension, media_type = container
+    settled = path.with_suffix(extension)
+    path.rename(settled)
+    return LocalAttachment("audio", settled.resolve(), media_type, size)

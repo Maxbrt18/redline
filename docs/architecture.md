@@ -51,7 +51,7 @@ notebook and the strength page.
 
 Around this core, `src/redline/analysis/` computes over the ledger (load, signals,
 descent, feasibility, progression, reviews), `src/redline/integrations/` talks to Strava,
-the weather and IGN altimetry, and `src/redline/cards/` draws the PNG cards and charts.
+the weather, IGN altimetry and the speech-to-text provider of voice notes, and `src/redline/cards/` draws the PNG cards and charts.
 The layout table of [`AGENTS.md`](../AGENTS.md) lists every package.
 
 ## One owner per fact

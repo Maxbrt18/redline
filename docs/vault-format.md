@@ -12,7 +12,7 @@ Paths are relative to the vault root and declared once, in
 
 | File | Owner | Content |
 |---|---|---|
-| `redline.toml` | you | the instance: athlete, heart rates, time zone, injuries, capabilities, optional `[ledger]` and `[vault]`. Documented field by field in `config/redline.example.toml`. Required: the service does not start without it |
+| `redline.toml` | you | the instance: athlete, heart rates, time zone, injuries, capabilities, optional `[ledger]`, `[pace]`, `[transcription]` and `[vault]`. Documented field by field in `config/redline.example.toml`. Required: the service does not start without it |
 | `rulebook.toml` | you, optional | the coaching rules in force and their thresholds. Replaces `src/redline/model/rulebook.default.toml` entirely |
 | `CLAUDE.md` | you | the coach's instructions, read at the start of every session. Template: `templates/vault/CLAUDE.md` |
 | `AGENTS.md` | you, optional | the same for Codex, which loads it natively |

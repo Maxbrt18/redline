@@ -196,6 +196,24 @@ class PostgresStateStore(StateStore):
                         body=conversation_body).on_conflict_do_nothing())
         return claimed is not None
 
+    def transcribe_inbound(self, message_id: str, text: str, *, trace: str) -> None:
+        """A voice note becomes the text it says, before its turn runs.
+
+        A restart then replays the text and never downloads the audio again, and the
+        conversation keeps what was said (`trace`) instead of an attachment label.
+        """
+        with self.database.transaction() as connection:
+            connection.execute(inbound_messages.update().where(
+                inbound_messages.c.message_id == message_id,
+                inbound_messages.c.kind == "attachment",
+            ).values(kind="text", body=text))
+            connection.execute(conversation_messages.update().where(
+                conversation_messages.c.source_key == f"inbound:{message_id}",
+                conversation_messages.c.role == "athlete",
+            ).values(body=trace))
+            connection.execute(messenger_message_refs.update().where(
+                messenger_message_refs.c.message_id == message_id).values(body=trace))
+
     def record_outbound(self, psid: str, text: str, *, source_key: str,
                         proactive: bool = False,
                         resolve_questions: bool = True,

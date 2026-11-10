@@ -10,6 +10,8 @@ PHOTO = "photo"
 
 DOCUMENT = "document"
 
+VOICE = "message vocal"
+
 UNSUPPORTED_MEDIA = "média non pris en charge"
 
 UNKNOWN_FORMAT = "format inconnu"
@@ -45,6 +47,8 @@ TOO_LARGE = "Ce fichier dépasse la limite de {megabytes} Mo."
 IMAGE_FORMATS = "JPEG, PNG ou WebP"
 
 DOCUMENT_FORMATS = "PDF, TXT ou CSV"
+
+AUDIO_FORMATS = "M4A, MP3, OGG, WAV ou WebM"
 
 FORMAT = "Format non pris en charge. Formats acceptés : {accepted}."
 

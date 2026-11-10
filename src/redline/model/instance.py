@@ -85,6 +85,12 @@ INSTANCE_SCHEMA = Schema("redline.toml", [
         field("training_climb", list, required=False, item=field("point", list),
               note="climbs as run in training, grades from 0 to 30: the fast bound of a plan"),
     ])),
+    # The athlete's own words for the speech-to-text of voice notes.
+    field("transcription", dict, required=False, schema=Schema("[transcription]", [
+        field("vocabulary", list, required=False, maximum=60, item=field(
+            "word", str, minimum=1, maximum=40),
+              note="names, places, races, gear: words a generic model would misspell"),
+    ])),
     # What `redline vault-check` holds the vault to; without it, nothing is checked for it.
     field("vault", dict, required=False, schema=Schema("[vault]", [
         field("note_types", list, required=False, item=field(
@@ -141,6 +147,8 @@ class Instance:
     #: not declared.
     descent_speed: tuple[tuple[float, float], ...] = ()
     training_climb_speed: tuple[tuple[float, float], ...] = ()
+    #: Words the speech-to-text of voice notes is told to expect.
+    vocabulary: tuple[str, ...] = ()
 
     @property
     def hr_bounds(self) -> tuple[int, ...]:
@@ -262,6 +270,7 @@ def parse(text: str) -> Instance:
                        if "complete_from" in ledger else dt.date.min),
         descent_speed=_curve(pace.get("descent", []), "descent", -30, 0),
         training_climb_speed=_curve(pace.get("training_climb", []), "training_climb", 0, 30),
+        vocabulary=tuple(payload.get("transcription", {}).get("vocabulary", [])),
     )
 
 

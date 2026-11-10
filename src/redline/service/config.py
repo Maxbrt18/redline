@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import time as dtime
 from pathlib import Path
 
+from redline.integrations.speech import providers as speech_providers
 from redline.model import instance as instance_model
 from redline.model import paths
 from redline.model import rulebook as rulebook_model
@@ -197,6 +198,12 @@ class Config:
     strava_webhook_secret: str = ""
     #: `127.0.0.1` behind a proxy on the same host; `0.0.0.0` in a container.
     webhook_host: str = "127.0.0.1"
+    #: The speech-to-text provider of voice notes (`redline.integrations.speech.providers`);
+    #: empty refuses voice notes like videos.
+    transcription_provider: str = ""
+    transcription_api_key: str = ""
+    #: Empty: the provider's default model.
+    transcription_model: str = ""
 
     @classmethod
     def from_env(cls) -> Config:
@@ -267,6 +274,10 @@ class Config:
             attachment_total_bytes=_envint("ATTACHMENT_TOTAL_BYTES", 20 * 1024 * 1024),
             instance=_load_instance(vault_path),
             strava_webhook_secret=os.environ.get("STRAVA_WEBHOOK_SECRET", "").strip(),
+            transcription_provider=(
+                os.environ.get("TRANSCRIPTION_PROVIDER") or "").strip().lower(),
+            transcription_api_key=(os.environ.get("TRANSCRIPTION_API_KEY") or "").strip(),
+            transcription_model=(os.environ.get("TRANSCRIPTION_MODEL") or "").strip(),
         )
         config._validate()
         config._validate_shared_secrets()
@@ -321,6 +332,14 @@ class Config:
             raise ConfigError(
                 "AGENT_PROVIDER invalid: the routing belongs to "
                 f"{self.routing.provider!r}, not {self.agent_provider!r}")
+        if self.transcription_provider:
+            if self.transcription_provider not in speech_providers.PROVIDERS:
+                raise ConfigError(
+                    f"TRANSCRIPTION_PROVIDER invalid: {self.transcription_provider!r} "
+                    f"(expected one of {', '.join(speech_providers.PROVIDERS)}, or empty)")
+            if not self.transcription_api_key:
+                raise ConfigError(
+                    "TRANSCRIPTION_API_KEY is required when TRANSCRIPTION_PROVIDER is set")
         self.routing.validate()
         for route in self.routing.plans:
             plan = self.routing.plan(route)

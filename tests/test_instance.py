@@ -108,3 +108,12 @@ def test_the_process_clock_follows_the_instance_zone(monkeypatch):
     finally:
         monkeypatch.undo()
         time.tzset()
+
+
+def test_the_transcription_vocabulary_is_optional_and_bounded():
+    text = (TEST_VAULT / instance.FILENAME).read_text(encoding="utf-8")
+    assert instance.parse(text).vocabulary == ()
+    declared = instance.parse(text + '\n[transcription]\nvocabulary = ["col du Loup"]\n')
+    assert declared.vocabulary == ("col du Loup",)
+    with pytest.raises(instance.InstanceError, match=r"vocabulary\[0\].*maximum 40"):
+        instance.parse(text + f'\n[transcription]\nvocabulary = ["{"x" * 41}"]\n')

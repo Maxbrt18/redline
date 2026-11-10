@@ -14,6 +14,7 @@ from redline.service.attachments import (
     LocalAttachment,
     MaterializedAttachments,
     encode_payload,
+    is_voice_note,
     safe_conversation_label,
 )
 from redline.service.messenger import DeliveredMessage, DeliveryResult
@@ -160,3 +161,64 @@ def test_bot_analysis_is_read_only_and_drops_any_staged_write(
     bot._repo.discard_turn.assert_called_once_with(agent.calls[0]["turn_id"])
     assert not attachments.path.exists()
     assert store._conversation[-1]["source_key"] == "attachment:mid-photo"
+
+
+M4A = b"\x00\x00\x00\x18ftypM4A voice note"
+
+
+def voice_payload(*kinds):
+    return encode_payload([{"type": kind, "payload": {
+        "url": f"https://cdn.fbsbx.com/audioclip-{index}.mp4"}}
+        for index, kind in enumerate(kinds or ("audio",))])
+
+
+def test_a_message_of_audio_only_is_a_voice_note():
+    assert is_voice_note(voice_payload("audio"))
+    assert is_voice_note(voice_payload("audio", "audio"))
+    assert not is_voice_note(voice_payload("audio", "image"))
+    assert not is_voice_note(payload())
+    assert not is_voice_note("not json")
+
+
+def test_a_voice_note_is_labelled_as_such_in_the_conversation():
+    assert safe_conversation_label(voice_payload()) == "[Pièce jointe : message vocal]"
+
+
+def test_a_voice_note_is_named_after_the_container_its_bytes_declare(tmp_path):
+    service = AttachmentService(tmp_path, max_bytes=1024, total_bytes=2048,
+                                session=Session(Response(M4A, "video/mp4")))
+
+    with service.materialize_voice(voice_payload(), "mid-voice") as clips:
+        clip = clips[0]
+        assert clip.path.suffix == ".m4a" and clip.media_type == "audio/mp4"
+        assert clip.path.read_bytes() == M4A
+        assert clip.path.stat().st_mode & 0o777 == 0o600
+
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_a_raw_aac_stream_is_not_taken_for_an_mp3(tmp_path):
+    service = AttachmentService(tmp_path, max_bytes=1024, total_bytes=2048,
+                                session=Session(Response(b"\xff\xf1\x50\x80aac", "audio/mpeg")))
+    with pytest.raises(AttachmentError, match="contenu réel"), service.materialize_voice(
+            voice_payload(), "mid-aac"):
+        pass
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_an_audio_label_outside_the_allowlist_names_the_accepted_formats(tmp_path):
+    service = AttachmentService(tmp_path, max_bytes=1024, total_bytes=2048,
+                                session=Session(Response(M4A, "audio/amr")))
+    with pytest.raises(AttachmentError, match="M4A, MP3"), service.materialize_voice(
+            voice_payload(), "mid-amr"):
+        pass
+
+
+def test_a_voice_note_never_goes_through_the_photo_reading(tmp_path):
+    session = Session()
+    service = AttachmentService(tmp_path, max_bytes=1024, total_bytes=2048,
+                                session=session)
+    with pytest.raises(AttachmentError, match="l'audio"), service.materialize(
+            voice_payload(), "mid-voice"):
+        pass
+    assert session.urls == []
