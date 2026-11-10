@@ -256,6 +256,14 @@ def test_a_comeback_after_the_transition_window_steps_down():
     assert proposal.dose == Dose.of(reps=5, rep_seconds=180)
 
 
+def test_a_session_without_its_count_is_no_absence():
+    """The last count is old, but the exercise was done since: no comeback to step down."""
+    history = [strength(day(0), 15, 6, 15), strength(day(40), 15, 6, None)]
+    proposal = propose("strength-reps", CALF, history, today=day(45), lookback_days=30)
+    assert not proposal.reentry and proposal.move == Move.HOLD
+    assert proposal.unread == (day(40),)
+
+
 def test_a_newest_exposure_without_its_reading_waits_for_it():
     unread = Exposure(day(7), Dose.of(reps=5, rep_seconds=180), None,
                       (Reading(Signal.SESSION_RPE, None),))
