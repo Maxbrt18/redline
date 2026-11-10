@@ -10,7 +10,9 @@ exposures, the vetoes in force and the day. What the engine guarantees:
 - **safety is never excused**: an exposure disrupted by a cause outside training stops
   counting for or against the dose, except for the failures that call for a step down;
 - **a comeback steps down**: past the transition window, the dose goes back before it
-  goes up again.
+  goes up again;
+- **an old reading decides nothing**: when the newest evidence is older than the window
+  but sessions were done since, the dose holds until a session is read again.
 
 The ceiling of a proposal is what a guard on write compares a prescribed dose with: a
 plan may always prescribe less, never more.
@@ -309,6 +311,9 @@ def propose(family: Family, lineage: Lineage, history: Sequence[Exposure], *,
             dose = step_down(family, lineage, dose, seen) or dose
         return replace(base, rule_move=Move.DOWN, move=Move.DOWN, clause="reentry",
                        dose=dose, ceiling=dose, reentry=True)
+    if (lookback_days is not None and family.unit == Unit.SESSION
+            and (today - latest.exposure.on).days > lookback_days):
+        return replace(base, clause="stale-reading", stale=True)
 
     fails = _fails_in_a_row(judged)
     clause = next((clause for clause in family.rule

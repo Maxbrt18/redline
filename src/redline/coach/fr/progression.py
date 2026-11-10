@@ -58,6 +58,9 @@ VETO_KINDS = {"gate": "porte", "quality_hold": "qualité retirée", "taper": "af
 
 REENTRY = "  retour après une absence : la dose redescend avant de remonter"
 
+STALE = ("  lecture trop ancienne : la dernière séance lue date du {day:%d/%m}, les "
+         "suivantes n'ont pas leur lecture ; la dose tient jusqu'à la prochaine séance lue")
+
 LADDER_END = "  bout de l'échelle : une hausse demande une variante ou une nouvelle plage"
 
 #: The readings the engine can ask for, as the coach asks for them.
