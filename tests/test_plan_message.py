@@ -106,9 +106,11 @@ def test_the_morning_names_a_session_already_run_rather_than_prescribing_it(repo
 
 
 def test_the_morning_carries_everything_because_nothing_else_will(repo):
-    """The morning message sends no card: this text is the only channel of the day."""
+    """The morning message sends no card: this text is the only channel of the day.
+
+    The long run's stored RPE band is not told: its effort accumulates with its duration."""
     message = repo.weekly_plan_message("2026-W33", today="2026-08-16")
-    assert message == ("Aujourd'hui : SL vallonnée, cible 10 km, plafond 11 km, RPE 4-4, "
+    assert message == ("Aujourd'hui : SL vallonnée, cible 10 km, plafond 11 km, "
                        "Z2 143-157 bpm, Premier D+ SL, D+ doux 150-250 m, terrain Hameau.")
     # An already punctuated note does not get a second full stop.
     assert repo.weekly_plan_message("2026-W33", today="2026-08-10").endswith("cadence ~168, "

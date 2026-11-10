@@ -111,6 +111,9 @@ class ActivityPipeline:
         gaps, session, day = self._gaps(activity_id, captured.get("observation_id"))
         if gaps:
             snapshot["gaps"] = gaps
+        comparables = self._comparables(activity_id)
+        if comparables:
+            snapshot["comparables"] = comparables
         from redline.model import debrief
 
         if debrief.is_quality(session):
@@ -177,6 +180,26 @@ class ActivityPipeline:
         except Exception as exc:
             log.warning("Gaps of activity %s not computed: %s", activity_id, exc)
             return [], None, None
+
+    def _comparables(self, activity_id: int) -> list[dict]:
+        """The athlete's previous sessions this one compares with, if its effort accumulates.
+
+        Its RPE has no fixed target: the coach reads it against these. A failed read
+        deprives the debrief of the reference, never of its departure.
+        """
+        try:
+            from redline.analysis import comparable, ledger
+
+            rows = ledger.parse_ledger(self.store)
+            row = next((row for row in rows
+                        if row.idempotency_key == f"strava:{activity_id}"), None)
+            if row is None or not row.hours:
+                return []
+            return [item.as_json() for item in
+                    comparable.comparables(rows, row.type, row.hours * 60, row.date)]
+        except Exception as exc:
+            log.warning("Comparable sessions of activity %s not read: %s", activity_id, exc)
+            return []
 
     @staticmethod
     def _quality_card(activity_id: int, laps: tuple[Lap, ...], session: dict | None,

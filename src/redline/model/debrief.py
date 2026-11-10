@@ -16,7 +16,7 @@ from typing import Any
 from redline.coach.fr import debrief as text
 from redline.model.vocabulary import HrDoubt
 
-from . import rulebook, session_kinds
+from . import rulebook, session_kinds, weekly_plan
 from .activity import Lap
 
 
@@ -42,10 +42,11 @@ def planned_vs_done(row: Any, session: dict | None) -> list[str]:
     hr = row.hr_avg if getattr(row, "hr_doubt", None) != HrDoubt.NO_SENSOR else None
     if hr is not None and session.get("hr_cap_bpm") is not None:
         out.append(text.HR_GAP.format(hr=hr, hr_cap_bpm=session["hr_cap_bpm"], signed=text.signed(hr - session["hr_cap_bpm"])))
-    if row.rpe is not None and session.get("rpe_max") is not None:
-        low = session.get("rpe_min")
-        span = f"{text.number(low)}-{text.number(session["rpe_max"])}" if low is not None else \
-            text.AT_MOST.format(high=text.number(session["rpe_max"]))
+    band = weekly_plan.rpe_band(session)
+    if row.rpe is not None and band is not None:
+        low, high = band
+        span = f"{text.number(low)}-{text.number(high)}" if low is not None else \
+            text.AT_MOST.format(high=text.number(high))
         out.append(text.RPE_GAP.format(rpe=text.number(row.rpe), span=span))
     return out
 

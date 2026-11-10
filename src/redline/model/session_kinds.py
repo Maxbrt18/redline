@@ -33,12 +33,16 @@ class SessionKind:
     demanding: bool = False
     #: Long enough to rehearse race fuelling.
     fuelled: bool = False
+    #: Its session RPE grows with its duration, faster than the duration: no fixed RPE
+    #: band or target applies. It is read against the athlete's own sessions of the same
+    #: kind and a comparable duration (`analysis.comparable`).
+    accumulating: bool = False
 
 
 KINDS = (
     SessionKind("easy", "run", planned=True, recorded=True, easy=True),
     SessionKind("long", "run", planned=True, recorded=True, easy=True, demanding=True,
-                fuelled=True),
+                fuelled=True, accumulating=True),
     SessionKind("threshold", "run", planned=True, recorded=True, quality=True,
                 repetitions=True, demanding=True),
     SessionKind("hills", "run", planned=True, recorded=True, quality=True,
@@ -82,6 +86,7 @@ QUALITY = frozenset(kind.slug for kind in KINDS if kind.quality)
 REPETITIONS = frozenset(kind.slug for kind in KINDS if kind.repetitions)
 DEMANDING = frozenset(kind.slug for kind in KINDS if kind.demanding)
 FUELLED = frozenset(kind.slug for kind in KINDS if kind.fuelled)
+ACCUMULATING = frozenset(kind.slug for kind in KINDS if kind.accumulating)
 
 #: Share of the descent that counts in the load gauge: a run descent in full, a
 #: walked one at half, none for anything that does not descend on foot.

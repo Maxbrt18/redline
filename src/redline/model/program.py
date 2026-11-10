@@ -331,7 +331,8 @@ def rpe_targets(vault: Path) -> dict[tuple[str, str | None], float]:
     """The RPE target of each (kind, routine), read from the workout notes.
 
     A kind without a declared `target_rpe` is absent: the caller compares nothing
-    rather than inventing a target.
+    rather than inventing a target. So is a kind whose effort accumulates with its
+    duration (`session_kinds.ACCUMULATING`): one figure cannot hold for every duration.
     """
     targets: dict[tuple[str, str | None], float] = {}
     for _, data in _workout_notes(vault):
@@ -341,7 +342,8 @@ def rpe_targets(vault: Path) -> dict[tuple[str, str | None], float]:
         if "routine" in data:
             targets[(session_kinds.STRENGTH, data["routine"])] = float(target)
         for kind in data.get("kinds") or ():
-            targets[(kind, None)] = float(target)
+            if kind not in session_kinds.ACCUMULATING:
+                targets[(kind, None)] = float(target)
     return targets
 
 

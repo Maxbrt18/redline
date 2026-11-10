@@ -54,7 +54,7 @@ os.environ["VAULT_PATH"] = str(VAULT_ROOT)
 # which changes several times a day (same reason as
 # `test_the_checker_runs_on_the_real_vault_and_reports`). That they still match the
 # sheets is checked separately, once, by `test_the_targets_come_from_the_workout_notes`.
-RPE_TARGETS = {("easy", None): 3.0, ("long", None): 4.5, ("threshold", None): 6.0,
+RPE_TARGETS = {("easy", None): 3.0, ("threshold", None): 6.0,
                ("hills", None): 6.0, ("strides", None): 3.0, ("cadence", None): 3.0,
                ("bike", None): 3.0, ("strength", "a"): 6.0, ("strength", "b"): 6.0,
                ("strength", "assimilation"): 3.0}

@@ -358,6 +358,12 @@ class _Store:
     def stated_days(self, first, last):
         return []
 
+    def observation_rows(self):
+        return []
+
+    def strength_history(self):
+        return []
+
 
 def _run_variants(monkeypatch, tmp_path, days, as_json):
     from conftest import load_script

@@ -71,6 +71,12 @@ pain_cut_pct = 30
 poor_nights_streak = 3
 # ... as an abnormally high easy-run HR does, for this many days.
 alarm_no_quality_days = 7
+# A long run's session RPE grows with its duration, faster than the duration: it has no
+# fixed target. It is read against the athlete's own long runs whose duration differs by
+# at most this share (%) ...
+comparable_duration_pct = 15
+# ... the most recent ones, at most this many.
+comparable_sessions = 5
 
 # ------------------------------------------------------------------ pain scales
 
