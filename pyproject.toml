@@ -11,7 +11,7 @@ build-backend = "setuptools.build_meta"
 # tests (then `playwright install chromium`), `dev` for the checks.
 [project]
 name = "redline"
-version = "0.1.0"
+version = "0.2.0"
 description = "A running coach on a language model, with its memory in a Markdown vault and PostgreSQL."
 readme = "README.md"
 license = "AGPL-3.0-or-later"
