@@ -265,7 +265,8 @@ def propose(family: Family, lineage: Lineage, history: Sequence[Exposure], *,
 
     `current` is the dose the program prescribes now: it stands when there is no
     evidence yet. `lookback_days` is the transition window (rule n8): a session lineage
-    whose last evidence is older comes back a step lower.
+    whose last exposure is older comes back a step lower. The gap runs from the last
+    session done, read or not: a session without its reading is no absence.
     """
     ordered = sorted((exposure for exposure in history if exposure.on <= today),
                      key=lambda exposure: exposure.on)
@@ -302,7 +303,7 @@ def propose(family: Family, lineage: Lineage, history: Sequence[Exposure], *,
         return replace(base, clause="no-dose")
 
     if (lookback_days is not None and family.unit == Unit.SESSION and family.reentry_steps
-            and (today - latest.exposure.on).days > lookback_days):
+            and (today - ordered[-1].on).days > lookback_days):
         dose = anchor
         for _ in range(family.reentry_steps):
             dose = step_down(family, lineage, dose, seen) or dose
