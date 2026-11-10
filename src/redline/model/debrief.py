@@ -10,7 +10,10 @@ numeric phrases come out. Nothing is written.
 
 from __future__ import annotations
 
+import statistics
 from collections.abc import Sequence
+from dataclasses import dataclass
+from enum import StrEnum
 from typing import Any
 
 from redline.coach.fr import debrief as text
@@ -18,6 +21,7 @@ from redline.model.vocabulary import HrDoubt
 
 from . import rulebook, session_kinds, weekly_plan
 from .activity import Lap
+from .notebook_views import KmSplit
 
 
 def planned_vs_done(row: Any, session: dict | None) -> list[str]:
@@ -51,12 +55,116 @@ def planned_vs_done(row: Any, session: dict | None) -> list[str]:
     return out
 
 
-def gaps(row: Any, session: dict | None, drift: Any | None) -> list[str]:
-    """The gaps of an outing, in the order they are used: planned/done, then HR."""
+def gaps(row: Any, session: dict | None, drift: Any | None,
+         splits: Sequence[KmSplit] = ()) -> list[str]:
+    """The gaps of an outing, in the order they are used: planned/done, HR, kilometres."""
     out = planned_vs_done(row, session)
     if drift is not None:
         out.append(text.HR_AT_PACE + str(drift))
+    workout = session.get("workout") if session else getattr(row, "type", None)
+    if workout in session_kinds.EASY_RUNS:
+        trusted = getattr(row, "hr_doubt", None) != HrDoubt.NO_SENSOR
+        cap = session.get("hr_cap_bpm") if session else None
+        out.extend(render(gap) for gap in split_gaps(splits, cap if trusted else None,
+                                                    hr_trusted=trusted))
     return out
+
+
+class SplitGapKind(StrEnum):
+    HR_ABOVE_CAP = "hr_above_cap"
+    FAST_START = "fast_start"
+    FADE = "fade"
+    DECOUPLING = "decoupling"
+
+
+@dataclass(frozen=True)
+class SplitGap:
+    """What the kilometres of an easy or long run show against its own rules.
+
+    `value` is what was done and `reference` what it is compared with: bpm for
+    `HR_ABOVE_CAP` (peak and cap), s/km for `FAST_START` and `FADE`, the speed-to-HR
+    ratio drop in % for `DECOUPLING` (reference: the threshold). `kms` names the
+    kilometres concerned.
+    """
+
+    kind: SplitGapKind
+    value: float
+    reference: float
+    kms: tuple[int, ...] = ()
+
+
+def _pace(rows: Sequence[KmSplit]) -> float | None:
+    metres = sum(row["dist_m"] for row in rows)
+    return sum(row["moving_s"] for row in rows) * 1000 / metres if metres else None
+
+
+def _efficiency(rows: Sequence[KmSplit]) -> float | None:
+    """Metres per heartbeat over the rows: speed over moving-time-weighted HR."""
+    seconds = sum(row["moving_s"] for row in rows)
+    if not seconds or any(row["hr"] is None for row in rows):
+        return None
+    hr = sum((row["hr"] or 0) * row["moving_s"] for row in rows) / seconds
+    return sum(row["dist_m"] for row in rows) / seconds / hr if hr else None
+
+
+def _percent(value: float, reference: float) -> float:
+    return (value - reference) / reference * 100
+
+
+def split_gaps(splits: Sequence[KmSplit], hr_cap: int | None, *,
+               hr_trusted: bool = True) -> list[SplitGap]:
+    """The kilometres of an easy or long run read against the rulebook's thresholds.
+
+    A threshold absent from the rulebook reads no gap of its kind. HR gaps need a cap
+    (above cap) or a trusted HR (decoupling); start, fade and decoupling need
+    `split_min_km` kilometres.
+    """
+    book = rulebook.current().parameters
+    rows = list(splits)
+    out: list[SplitGap] = []
+    margin = book.split_hr_margin_bpm
+    if hr_cap is not None and margin is not None:
+        above = [row for row in rows if row["hr"] is not None and row["hr"] > hr_cap + margin]
+        if above:
+            peak = max(above, key=lambda row: row["hr"] or 0)
+            out.append(SplitGap(SplitGapKind.HR_ABOVE_CAP, float(peak["hr"] or 0),
+                                float(hr_cap), tuple(row["n"] for row in above)))
+    if book.split_min_km is None or len(rows) < book.split_min_km:
+        return out
+    if book.split_fast_start_pct is not None:
+        first, median = rows[0]["pace_s"], statistics.median(row["pace_s"] for row in rows[1:])
+        if median and -_percent(first, median) >= book.split_fast_start_pct:
+            out.append(SplitGap(SplitGapKind.FAST_START, float(first), float(median), (1,)))
+    third = max(1, len(rows) // 3)
+    before, last = _pace(rows[:-third]), _pace(rows[-third:])
+    if (book.split_fade_pct is not None and before and last
+            and _percent(last, before) >= book.split_fade_pct):
+        out.append(SplitGap(SplitGapKind.FADE, last, before,
+                            tuple(row["n"] for row in rows[-third:])))
+    half = len(rows) // 2
+    if hr_trusted and book.split_decoupling_pct is not None:
+        early, late = _efficiency(rows[:half]), _efficiency(rows[half:])
+        if early and late and -_percent(late, early) >= book.split_decoupling_pct:
+            out.append(SplitGap(SplitGapKind.DECOUPLING, -_percent(late, early),
+                                book.split_decoupling_pct))
+    return out
+
+
+def render(gap: SplitGap) -> str:
+    """The gap as the coach reads it in `ecarts`."""
+    if gap.kind is SplitGapKind.HR_ABOVE_CAP:
+        return text.SPLIT_HR_ABOVE_CAP.format(cap=round(gap.reference), count=len(gap.kms),
+                                              kms=text.kilometres(gap.kms),
+                                              peak=round(gap.value))
+    if gap.kind is SplitGapKind.FAST_START:
+        return text.SPLIT_FAST_START.format(
+            first=text.pace(gap.value), median=text.pace(gap.reference),
+            signed=text.signed(round(_percent(gap.value, gap.reference))))
+    if gap.kind is SplitGapKind.FADE:
+        return text.SPLIT_FADE.format(
+            kms=text.kilometres(gap.kms), last=text.pace(gap.value), before=text.pace(gap.reference),
+            signed=text.signed(round(_percent(gap.value, gap.reference))))
+    return text.SPLIT_DECOUPLING.format(value=text.number(round(gap.value, 1)))
 
 
 #: Sessions whose debrief carries the repetitions card. A long run or a race is demanding

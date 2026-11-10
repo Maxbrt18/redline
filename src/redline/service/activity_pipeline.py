@@ -14,10 +14,12 @@ from redline.model.activity import Activity, Lap
 from redline.storage import StorageError
 from redline.storage.repository import OperationalStore
 
+from . import session_detail
 from .session_detail import weather_at
 
 ActivityFetch = Callable[[int], dict]
 StreamFetch = Callable[[int], list]
+DetailFetch = Callable[[int], dict]
 WeatherFetch = Callable[[dict], float | None]
 GearFetch = Callable[[str], dict]
 
@@ -39,6 +41,10 @@ def _altitude(activity_id: int) -> list:
     return values
 
 
+def _detail(activity_id: int) -> dict:
+    return session_detail.fetch_streams(activity_id)
+
+
 def _wbgt(query: dict) -> float | None:
     return weather_at(query).get("wbgt")
 
@@ -58,6 +64,7 @@ class ActivityPipeline:
     store: OperationalStore
     activity_fetch: ActivityFetch = _activity
     stream_fetch: StreamFetch = _altitude
+    detail_fetch: DetailFetch = _detail
     weather_fetch: WeatherFetch = _wbgt
     gear_fetch: GearFetch = _gear
 
@@ -97,18 +104,20 @@ class ActivityPipeline:
                 log.warning("Strava gear %s sync failed: %s",
                             gear_id, exc)
         intake = self.store.strava_intake(activity_id)
+        streams = self._streams(activity_id)
 
         if intake["elevation_loss_state"] in {"pending", "failed"}:
-            self._elevation_loss(activity)
+            self._elevation_loss(activity, streams)
         if intake["wbgt_state"] in {"pending", "failed"}:
             self._weather(activity)
 
         enrichments = self.store.strava_enrichment_state(activity_id)
         snapshot = self._snapshot(activity, captured, enrichments)
+        splits = self._reading(snapshot, streams)
         feelings = self._feelings(captured.get("observation_id"))
         if feelings:
             snapshot["feelings"] = feelings
-        gaps, session, day = self._gaps(activity_id, captured.get("observation_id"))
+        gaps, session, day = self._gaps(activity_id, captured.get("observation_id"), splits)
         if gaps:
             snapshot["gaps"] = gaps
         comparables = self._comparables(activity_id)
@@ -129,6 +138,52 @@ class ActivityPipeline:
             "snapshot": snapshot,
         }
 
+    def _streams(self, activity_id: int) -> dict | None:
+        """The run's streams, fetched once at capture and kept for the notebook too.
+
+        The debrief and the notebook detail read the same kept streams. A provider or
+        storage failure leaves the debrief without its kilometres, never without its
+        departure; the notebook retries on display (`session_detail.ensure`).
+        """
+        try:
+            kept = self.store.strava_streams(activity_id)
+        except Exception as exc:
+            log.warning("Kept streams of %s unreadable: %s", activity_id, exc)
+            kept = None
+        if session_detail.is_current(kept):
+            return kept
+        try:
+            streams = self.detail_fetch(activity_id)
+        except Exception as exc:
+            log.warning("Strava streams of %s not fetched: %s", activity_id, exc)
+            return None
+        try:
+            self.store.store_strava_detail(activity_id, streams=streams,
+                                           actor="strava-ingestion")
+        except Exception as exc:
+            log.warning("Strava streams of %s not kept: %s", activity_id, exc)
+        return streams
+
+    @staticmethod
+    def _reading(snapshot: dict, streams: dict | None) -> list:
+        """Kilometres, HR halves and stops into the snapshot; returns the kilometres."""
+        if not streams:
+            return []
+        try:
+            splits = session_detail.km_splits(streams) or []
+            if splits:
+                snapshot["km_splits"] = session_detail.km_table(splits)
+            drift = session_detail.drift(streams)
+            if drift:
+                snapshot["drift"] = drift
+            stops = session_detail.stop_summary(streams)
+            if stops:
+                snapshot["stops"] = stops
+            return splits
+        except Exception as exc:
+            log.warning("Kilometres of the streams not read: %s", exc)
+            return []
+
     def _reread_words(self, activity: Activity) -> Activity:
         try:
             fresh = strava.parse_activity(self.activity_fetch(activity.id))
@@ -148,9 +203,9 @@ class ActivityPipeline:
             log.warning("Feelings of observation %s unreadable: %s", observation_id, exc)
             return {}
 
-    def _gaps(self, activity_id: int,
-              observation_id: Any) -> tuple[list[str], dict | None, Any]:
-        """Planned vs done and HR at comparable pace, computed before the turn.
+    def _gaps(self, activity_id: int, observation_id: Any,
+              splits: list) -> tuple[list[str], dict | None, Any]:
+        """Planned vs done, HR at comparable pace and kilometres, computed before the turn.
 
         Also returns the planned session and the run date, which the repetitions card
         reuses. A failed read deprives the debrief of its gaps, never of its departure.
@@ -176,7 +231,7 @@ class ActivityPipeline:
                                 if item["id"] == session_id), None)
             drift = next((item for item in signals.hr_at_pace(rows)
                           if item.date == row.date and item.hr == row.hr_avg), None)
-            return debrief.gaps(row, session, drift), session, row.date
+            return debrief.gaps(row, session, drift, splits), session, row.date
         except Exception as exc:
             log.warning("Gaps of activity %s not computed: %s", activity_id, exc)
             return [], None, None
@@ -252,14 +307,18 @@ class ActivityPipeline:
             "enrichments": enrichments,
         }
 
-    def _elevation_loss(self, activity: Activity) -> None:
+    def _elevation_loss(self, activity: Activity, streams: dict | None) -> None:
+        """D- from the kept altitude when it has both ends, else from its own call."""
         activity_id, gain = activity.id, activity.elevation_gain_m
         if gain is None:
             self.store.finish_strava_enrichment(
                 activity_id, "elevation_loss", unavailable=True)
             return
+        altitude = (streams or {}).get("alt") or []
         try:
-            value = descent.descent(float(gain), self.stream_fetch(activity_id))
+            if len(altitude) < 2 or altitude[0] is None or altitude[-1] is None:
+                altitude = self.stream_fetch(activity_id)
+            value = descent.descent(float(gain), altitude)
         except Exception as exc:
             self.store.finish_strava_enrichment(
                 activity_id, "elevation_loss", error=str(exc))

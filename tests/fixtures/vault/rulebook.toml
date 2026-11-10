@@ -77,6 +77,19 @@ alarm_no_quality_days = 7
 comparable_duration_pct = 15
 # ... the most recent ones, at most this many.
 comparable_sessions = 5
+# The debrief of an easy or long run reads its kilometres. A kilometre whose mean HR
+# exceeds the session's HR cap by more than this (bpm) is named ...
+split_hr_margin_bpm = 0
+# ... a first kilometre faster than the median of the others by at least this (%) is a
+# fast start ...
+split_fast_start_pct = 5.0
+# ... a last third slower than the kilometres before it by at least this (%) is a fade ...
+split_fade_pct = 5.0
+# ... a speed-to-HR ratio that drops by at least this (%) from the first half to the
+# second is a decoupling ...
+split_decoupling_pct = 5.0
+# ... and the start, the fade and the decoupling are read from this many kilometres.
+split_min_km = 4
 
 # ------------------------------------------------------------------ pain scales
 
