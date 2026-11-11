@@ -12,7 +12,7 @@ from writes import write
 
 from redline.analysis import reorganize
 from redline.analysis.reorganize import Item, Remark, Rules
-from redline.model import commands, iso_week, week_days
+from redline.model import commands, iso_week, session_kinds, week_days
 from redline.model.program import Program
 from redline.model.schema import SchemaError
 from redline.model.vocabulary import SessionPriority
@@ -334,10 +334,11 @@ def test_the_outcome_reads_as_json():
 
 def _plan() -> dict:
     def run(identifier, date, workout, minutes, **extra):
+        band = {} if workout in session_kinds.ACCUMULATING else {"rpe_min": 2, "rpe_max": 3}
         return {"id": identifier, "title": extra.pop("title", identifier), "date": date,
                 "kind": "run", "workout": workout, "status": "planned",
                 "demanding": workout in {"long", "threshold"}, "duration_cap_min": minutes,
-                "rpe_min": 2, "rpe_max": 3, "sources": ["[[current-plan]]"], **extra}
+                **band, "sources": ["[[current-plan]]"], **extra}
     sessions = [run("w10-tue-ef", "2030-03-05", "easy", 50, title="EF"),
                 run("w10-thu-seuil", "2030-03-07", "threshold", 60, title="Seuil"),
                 run("w10-sat-foot", "2030-03-09", "easy", 35, title="Footing",
