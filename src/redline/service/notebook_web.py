@@ -17,6 +17,7 @@ from redline.coach.fr import notebook as notebook_text
 from redline.coach.fr import session_labels
 from redline.model import formats, iso_week
 from redline.model import ledger as ledger_model
+from redline.model import notebook_views as views
 from redline.model.schema import SchemaError
 from redline.storage.database import StorageError
 from redline.storage.notebook import DEVICE_SECONDS
@@ -195,7 +196,7 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
 
     @app.get("/notebook-api/weeks")
     def notebook_weeks():
-        return jsonify(weeks=notebook.weeks(psid))
+        return jsonify(views.WeeksView(weeks=notebook.weeks(psid)))
 
     @app.get("/notebook-api/injury")
     def notebook_injury():

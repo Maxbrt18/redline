@@ -78,10 +78,12 @@ Parse once at the boundary (Strava, LLM output, config, frontmatter) into frozen
 dataclasses and pass typed objects inward. Derived values (pace, zones, weekly load) are
 computed, never stored.
 
-What the notebook page reads is declared in `src/redline/model/notebook_views.py`.
-`tests/test_notebook_contract.py` holds the real routes, the browser payloads of
-`tests/notebook_payloads.py` and the page's modules to it: change a key there, in its
-builder and in the page together.
+What the notebook page and the iOS app read is declared in
+`src/redline/model/notebook_views.py`. `tests/test_notebook_contract.py` holds the real
+routes, the browser payloads of `tests/notebook_payloads.py` and the page's modules to it:
+change a key there, in its builder and in the page together, then run
+`python tests/ios_contract.py`, which rewrites the app's Swift models and fixtures from the
+same declarations (`tests/test_ios_contract.py` fails while they are stale).
 
 ## Failures
 

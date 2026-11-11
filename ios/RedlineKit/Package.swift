@@ -14,6 +14,10 @@ let package = Package(
     ],
     targets: [
         .target(name: "RedlineKit"),
-        .testTarget(name: "RedlineKitTests", dependencies: ["RedlineKit"]),
+        .testTarget(
+            name: "RedlineKitTests",
+            dependencies: ["RedlineKit"],
+            resources: [.copy("Fixtures")]
+        ),
     ]
 )

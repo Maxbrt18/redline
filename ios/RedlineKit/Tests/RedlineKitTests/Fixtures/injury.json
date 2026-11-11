@@ -1,0 +1,63 @@
+{
+  "zone": "knee",
+  "label": "Genou",
+  "zones": [
+    {
+      "zone": "knee",
+      "label": "Genou"
+    }
+  ],
+  "cap": 2.0,
+  "start": "2026-09-28",
+  "today": "2026-10-09",
+  "week": "2026-W41",
+  "points": [
+    {
+      "date": "2026-10-03",
+      "pain": 1.5,
+      "kind": "long",
+      "long": true
+    },
+    {
+      "date": "2026-10-06",
+      "pain": 0.5,
+      "kind": "easy",
+      "long": false
+    },
+    {
+      "date": "2026-10-07",
+      "pain": 2.5,
+      "kind": "easy",
+      "long": false
+    }
+  ],
+  "wakes": [
+    {
+      "date": "2026-10-08",
+      "pain": 0.0
+    }
+  ],
+  "weeks": [
+    {
+      "week": "2026-W40",
+      "peak": 1.5,
+      "n": 1,
+      "wake": null
+    },
+    {
+      "week": "2026-W41",
+      "peak": 2.5,
+      "n": 2,
+      "wake": 0.0
+    }
+  ],
+  "missing": [
+    "2026-10-07"
+  ],
+  "scale": [
+    {
+      "value": 1,
+      "text": "Pas gênante."
+    }
+  ]
+}

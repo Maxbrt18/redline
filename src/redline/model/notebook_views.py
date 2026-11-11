@@ -63,6 +63,11 @@ class UnplannedFact(Fact):
     title: str
 
 
+#: What a session's line shows once it happened: a run's measures, or a strength report.
+#: Nothing tags them; a strength report carries no `observation_id`.
+SessionFact = Fact | StrengthFact
+
+
 class SessionItem(TypedDict):
     id: str
     date: str
@@ -74,7 +79,7 @@ class SessionItem(TypedDict):
     location: str | None
     note: str | None
     planned: list[str]
-    fact: Fact | StrengthFact | None
+    fact: SessionFact | None
     entry_id: str | None
     transition: str | None
     targets: Targets
@@ -288,6 +293,10 @@ class PastWeek(TypedDict):
     km_done: float
     km_target: float | None
     review: str | None
+
+
+class WeeksView(TypedDict):
+    weeks: list[PastWeek]
 
 
 class ZoneName(TypedDict):

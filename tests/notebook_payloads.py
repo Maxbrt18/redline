@@ -6,6 +6,8 @@ so a key the service renames breaks a fixture too.
 
 from __future__ import annotations
 
+from redline.model import notebook_views as views
+
 CURRENT_WEEK = "2026-W41"
 PREVIOUS_WEEK = "2026-W40"
 KNEE = {"zone": "knee", "label": "Genou"}
@@ -356,3 +358,18 @@ HABITS = {"habits": [{
     "id": "5d1c0c5e-8a4b-4f1e-9a43-2f0b8f3c1a77", "weekday": 3, "starts_on": "2026-09-01",
     "ends_on": None, "kind": "other_sport", "minutes": None, "pace": None, "required": None,
     "sport": "Volley", "demanding": False, "run_too": False, "habit": True}]}
+
+
+#: Each screen's payload and the shape its route declares, by the name of the route. The
+#: iOS app decodes the same payloads (tests/ios_contract.py exports them).
+SCREENS = {
+    "today": (views.TodayView, TODAY),
+    "week": (views.WeekView, WEEK),
+    "weeks": (views.WeeksView, WEEKS),
+    "injury": (views.InjuryView, INJURY),
+    "race": (views.RaceView, RACE),
+    "session": (views.SessionView, DETAIL),
+    "race-plan": (views.RacePlanView, RACE_PLAN_VIEW),
+    "reorganize": (views.ReorganizeView, REORGANIZE),
+    "habits": (views.HabitsView, HABITS),
+}

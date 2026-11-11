@@ -1,0 +1,336 @@
+{
+  "plan": {
+    "source": "ign",
+    "length_km": 42.2,
+    "dplus_m": 905,
+    "dminus_m": 910,
+    "dplus_band_m": [
+      890,
+      921
+    ],
+    "profile": [
+      [
+        0,
+        320
+      ],
+      [
+        5,
+        410
+      ],
+      [
+        10,
+        620
+      ],
+      [
+        15,
+        540
+      ],
+      [
+        20,
+        700
+      ],
+      [
+        25,
+        480
+      ],
+      [
+        30,
+        520
+      ],
+      [
+        35,
+        390
+      ],
+      [
+        40,
+        350
+      ],
+      [
+        42.2,
+        330
+      ]
+    ],
+    "highest": [
+      700,
+      20.0
+    ],
+    "stretches": [
+      {
+        "to_km": 14.0,
+        "dplus_m": 340,
+        "dminus_m": 120
+      },
+      {
+        "to_km": 28.0,
+        "dplus_m": 380,
+        "dminus_m": 400
+      },
+      {
+        "to_km": 42.2,
+        "dplus_m": 185,
+        "dminus_m": 390
+      }
+    ],
+    "passages": [
+      {
+        "km": 14.0,
+        "name": "Le Col",
+        "hours": 1.42,
+        "running_hours": 1.42
+      },
+      {
+        "km": 28.0,
+        "name": "Le Lac",
+        "hours": 2.85,
+        "running_hours": 1.39
+      },
+      {
+        "km": 42.2,
+        "name": "",
+        "hours": 4.21,
+        "running_hours": 1.32
+      }
+    ],
+    "climbs": [
+      {
+        "start_km": 6.0,
+        "end_km": 10.0,
+        "gain_m": 210,
+        "grade_pct": 5.3,
+        "steepest_pct": 11.0,
+        "steepest_m": 400,
+        "main": true,
+        "hours": 0.6,
+        "running_hours": 0.6
+      },
+      {
+        "start_km": 16.5,
+        "end_km": 20.0,
+        "gain_m": 160,
+        "grade_pct": 4.6,
+        "steepest_pct": 5.5,
+        "steepest_m": 900,
+        "main": true,
+        "hours": 1.75,
+        "running_hours": 1.7083
+      },
+      {
+        "start_km": 29.0,
+        "end_km": 29.4,
+        "gain_m": 18,
+        "grade_pct": 4.5,
+        "steepest_pct": 4.5,
+        "steepest_m": 400,
+        "main": false,
+        "hours": 3.0,
+        "running_hours": 2.9167
+      }
+    ],
+    "reference_pace_s": 330.0,
+    "pace_s_per_km": 330.0,
+    "stop_minutes": 2.5,
+    "carbs_g_h": 60,
+    "model_error": [
+      0.04,
+      0.085
+    ],
+    "start": "2026-11-26T09:00"
+  },
+  "weather": [
+    [
+      {
+        "time": "2026-11-26T09:00",
+        "temp": 3,
+        "feels": 0,
+        "rain": 10,
+        "wind": 14,
+        "code": 2,
+        "day": true
+      },
+      {
+        "time": "2026-11-26T10:00",
+        "temp": 4,
+        "feels": 1,
+        "rain": 10,
+        "wind": 14,
+        "code": 2,
+        "day": true
+      },
+      {
+        "time": "2026-11-26T11:00",
+        "temp": 5,
+        "feels": 2,
+        "rain": 10,
+        "wind": 14,
+        "code": 2,
+        "day": true
+      },
+      {
+        "time": "2026-11-26T12:00",
+        "temp": 6,
+        "feels": 3,
+        "rain": 10,
+        "wind": 14,
+        "code": 2,
+        "day": true
+      },
+      {
+        "time": "2026-11-26T13:00",
+        "temp": 7,
+        "feels": 4,
+        "rain": 10,
+        "wind": 14,
+        "code": 2,
+        "day": true
+      },
+      {
+        "time": "2026-11-26T14:00",
+        "temp": 8,
+        "feels": 5,
+        "rain": 10,
+        "wind": 14,
+        "code": 2,
+        "day": true
+      },
+      {
+        "time": "2026-11-26T15:00",
+        "temp": 9,
+        "feels": 6,
+        "rain": 10,
+        "wind": 14,
+        "code": 2,
+        "day": true
+      }
+    ],
+    [
+      {
+        "time": "2026-11-26T09:00",
+        "temp": 3,
+        "feels": 0,
+        "rain": 10,
+        "wind": 14,
+        "code": 2,
+        "day": true
+      },
+      {
+        "time": "2026-11-26T10:00",
+        "temp": 4,
+        "feels": 1,
+        "rain": 10,
+        "wind": 14,
+        "code": 2,
+        "day": true
+      },
+      {
+        "time": "2026-11-26T11:00",
+        "temp": 5,
+        "feels": 2,
+        "rain": 10,
+        "wind": 14,
+        "code": 2,
+        "day": true
+      },
+      {
+        "time": "2026-11-26T12:00",
+        "temp": 6,
+        "feels": 3,
+        "rain": 10,
+        "wind": 14,
+        "code": 2,
+        "day": true
+      },
+      {
+        "time": "2026-11-26T13:00",
+        "temp": 7,
+        "feels": 4,
+        "rain": 10,
+        "wind": 14,
+        "code": 2,
+        "day": true
+      },
+      {
+        "time": "2026-11-26T14:00",
+        "temp": 8,
+        "feels": 5,
+        "rain": 10,
+        "wind": 14,
+        "code": 2,
+        "day": true
+      },
+      {
+        "time": "2026-11-26T15:00",
+        "temp": 9,
+        "feels": 6,
+        "rain": 10,
+        "wind": 14,
+        "code": 2,
+        "day": true
+      }
+    ],
+    [
+      {
+        "time": "2026-11-26T09:00",
+        "temp": 3,
+        "feels": 0,
+        "rain": 10,
+        "wind": 14,
+        "code": 2,
+        "day": true
+      },
+      {
+        "time": "2026-11-26T10:00",
+        "temp": 4,
+        "feels": 1,
+        "rain": 10,
+        "wind": 14,
+        "code": 2,
+        "day": true
+      },
+      {
+        "time": "2026-11-26T11:00",
+        "temp": 5,
+        "feels": 2,
+        "rain": 10,
+        "wind": 14,
+        "code": 2,
+        "day": true
+      },
+      {
+        "time": "2026-11-26T12:00",
+        "temp": 6,
+        "feels": 3,
+        "rain": 10,
+        "wind": 14,
+        "code": 2,
+        "day": true
+      },
+      {
+        "time": "2026-11-26T13:00",
+        "temp": 7,
+        "feels": 4,
+        "rain": 10,
+        "wind": 14,
+        "code": 2,
+        "day": true
+      },
+      {
+        "time": "2026-11-26T14:00",
+        "temp": 8,
+        "feels": 5,
+        "rain": 10,
+        "wind": 14,
+        "code": 2,
+        "day": true
+      },
+      {
+        "time": "2026-11-26T15:00",
+        "temp": 9,
+        "feels": 6,
+        "rain": 10,
+        "wind": 14,
+        "code": 2,
+        "day": true
+      }
+    ]
+  ]
+}

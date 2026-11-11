@@ -16,17 +16,7 @@ from unittest.mock import MagicMock
 import contract
 import pytest
 from conftest import TEST_VAULT, reset_database
-from notebook_payloads import (
-    DETAIL,
-    HABITS,
-    INJURY,
-    RACE,
-    RACE_PLAN_VIEW,
-    REORGANIZE,
-    TODAY,
-    WEEK,
-    WEEKS,
-)
+from notebook_payloads import SCREENS
 from test_notebook_board import PARIS, Repo, ef, seed_week
 from test_notebook_board import WEEK as SEEDED_WEEK
 from test_page_modules import modules
@@ -83,13 +73,7 @@ def test_a_tagged_union_reports_its_closest_shape():
 
 
 # ------------------------------------------------------------ the browser fixtures
-@pytest.mark.parametrize(("shape", "payload"), [
-    (views.TodayView, TODAY), (views.WeekView, WEEK), (list[views.PastWeek], WEEKS["weeks"]),
-    (views.InjuryView, INJURY), (views.RaceView, RACE), (views.SessionView, DETAIL),
-    (views.RacePlanView, RACE_PLAN_VIEW), (views.ReorganizeView, REORGANIZE),
-    (views.HabitsView, HABITS),
-], ids=["today", "week", "weeks", "injury", "race", "detail", "race-plan", "reorganize",
-        "habits"])
+@pytest.mark.parametrize(("shape", "payload"), SCREENS.values(), ids=SCREENS.keys())
 def test_a_browser_payload_is_what_the_service_serves(shape, payload):
     assert contract.problems(shape, payload) == []
 
@@ -199,7 +183,7 @@ def test_the_screens_serve_their_declared_shapes(store, connect):
     seed_archives(archive, psid)
     assert contract.problems(views.TodayView, served(client, "today")) == []
     assert contract.problems(views.WeekView, served(client, f"week/{SEEDED_WEEK}")) == []
-    assert contract.problems(list[views.PastWeek], served(client, "weeks")["weeks"]) == []
+    assert contract.problems(views.WeeksView, served(client, "weeks")) == []
     assert contract.problems(views.InjuryView, served(client, "injury")) == []
     assert contract.problems(views.RaceView, served(client, "race")) == []
 
