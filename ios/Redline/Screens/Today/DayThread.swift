@@ -84,6 +84,7 @@ struct DayThread: View {
             } else {
                 if today { TargetCursors(targets: item.targets) }
                 if let note = item.note, today { Text(note).font(.subheadline).foregroundStyle(Palette.muted) }
+                SessionWeather(item: item, size: today ? .full : .line)
             }
         }
     }

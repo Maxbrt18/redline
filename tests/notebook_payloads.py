@@ -362,6 +362,17 @@ HABITS = {"habits": [{
 
 #: Each screen's payload and the shape its route declares, by the name of the route. The
 #: iOS app decodes the same payloads (tests/ios_contract.py exports them).
+#: The forecast of a session to come: the hours from its start, and the night.
+WEATHER = {
+    "place": "Paris",
+    "date": "2026-10-09",
+    "hours": [{"hour": hour, "temp": 21 - hour, "feels": 19 - hour, "rain": 10 * (hour - 16),
+               "wind": 12, "code": 2, "day": True} for hour in (17, 18, 19)],
+    "sunrise": "07:55",
+    "sunset": "19:05",
+}
+
+
 SCREENS = {
     "today": (views.TodayView, TODAY),
     "week": (views.WeekView, WEEK),
@@ -372,4 +383,5 @@ SCREENS = {
     "race-plan": (views.RacePlanView, RACE_PLAN_VIEW),
     "reorganize": (views.ReorganizeView, REORGANIZE),
     "habits": (views.HabitsView, HABITS),
+    "weather": (views.Forecast, WEATHER),
 }

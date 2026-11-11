@@ -24,4 +24,9 @@ struct NumbersTests {
         #expect(Numbers.duration(3870) == "1:04:30")
         #expect(Numbers.minutes(719) == "12′")
     }
+
+    @Test func aRaceTimeReadsInHoursAndMinutes() {
+        #expect(Numbers.hours(4.21) == "4\u{00a0}h\u{00a0}13")
+        #expect(Numbers.hours(0.99) == "0\u{00a0}h\u{00a0}59")
+    }
 }

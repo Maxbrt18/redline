@@ -28,6 +28,12 @@ public enum Numbers {
         "\(Int((seconds / 60).rounded()))′"
     }
 
+    /// A long duration from hours, to the minute: `4 h 07`, with non-breaking spaces.
+    public static func hours(_ hours: Double) -> String {
+        let minutes = Int((hours * 60).rounded())
+        return "\(minutes / 60)\u{00a0}h\u{00a0}" + String(format: "%02d", minutes % 60)
+    }
+
     /// A wall-clock time from `HH:MM`, or from the time of an ISO date-time: `19 h 05`,
     /// `7 h`, with non-breaking spaces. Nil when the text holds no time.
     public static func clock(_ text: String) -> String? {

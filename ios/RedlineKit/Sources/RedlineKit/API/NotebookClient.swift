@@ -33,9 +33,15 @@ public enum NotebookError: Error, Equatable {
 /// A read route of the notebook API and the view it serves.
 public struct Endpoint<Value: Decodable & Sendable>: Sendable {
     let path: [String]
+    var query: [URLQueryItem] = []
+    /// Whether the device keeps the answer for the next opening; an old forecast would
+    /// mislead, so a forecast is never kept.
+    var kept = true
 
-    /// Where the cache keeps this route's last answer.
-    var cacheKey: String { path.joined(separator: "/") }
+    /// Where the cache keeps this route's last answer; it names the request, query included.
+    public var cacheKey: String {
+        ([path.joined(separator: "/")] + query.map { "\($0.name)=\($0.value ?? "")" }).joined(separator: "?")
+    }
 }
 
 public extension Endpoint where Value == Notebook.TodayView {
@@ -70,6 +76,17 @@ public extension Endpoint where Value == Notebook.HabitsView {
     static var habits: Self { Self(path: ["habits"]) }
 }
 
+public extension Endpoint where Value == Notebook.Forecast? {
+    /// The forecast of a session to come: at its place, else the notebook's; around its
+    /// start, else the moments of the day. Nil when there is none to give.
+    static func weather(date: String, time: String? = nil, place: String? = nil) -> Self {
+        let query = [URLQueryItem(name: "date", value: date)]
+            + (time.map { [URLQueryItem(name: "time", value: $0)] } ?? [])
+            + (place.map { [URLQueryItem(name: "place", value: $0)] } ?? [])
+        return Self(path: ["weather"], query: query, kept: false)
+    }
+}
+
 /// The notebook API, as one connected device.
 public struct NotebookClient: Sendable {
     public let server: Server
@@ -96,19 +113,21 @@ public struct NotebookClient: Sendable {
 
     /// The route's view from the server; the answer replaces the cached one.
     public func get<Value>(_ endpoint: Endpoint<Value>) async throws(NotebookError) -> Value {
-        var request = URLRequest(url: Self.url(endpoint.path, server: server))
+        var request = URLRequest(url: Self.url(endpoint.path, query: endpoint.query, server: server))
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("Bearer \(device)", forHTTPHeaderField: "Authorization")
         let data = try await Self.exchange(request, transport: transport)
         let value = try Self.decode(Value.self, from: data)
-        cache?.write(data, for: endpoint.cacheKey)
+        if endpoint.kept {
+            cache?.write(data, for: endpoint.cacheKey)
+        }
         return value
     }
 
     /// The route's last answer kept on the device, and when it came; nil if there is none
     /// or if this build no longer reads it.
     public func cached<Value>(_ endpoint: Endpoint<Value>) -> (value: Value, savedAt: Date)? {
-        guard let kept = cache?.read(endpoint.cacheKey),
+        guard endpoint.kept, let kept = cache?.read(endpoint.cacheKey),
               let value = try? JSONDecoder().decode(Value.self, from: kept.data)
         else { return nil }
         return (value, kept.savedAt)
@@ -126,13 +145,14 @@ public struct NotebookClient: Sendable {
     }
 
     /// Each segment is escaped on its own: a `/` inside one never adds a level.
-    private static func url(_ path: [String], server: Server) -> URL {
+    private static func url(_ path: [String], query: [URLQueryItem] = [], server: Server) -> URL {
         var segment = CharacterSet.urlPathAllowed
         segment.remove("/")
         var components = URLComponents(url: server.baseURL, resolvingAgainstBaseURL: false)!
         components.percentEncodedPath = (["notebook-api"] + path)
             .map { "/" + ($0.addingPercentEncoding(withAllowedCharacters: segment) ?? "") }
             .joined()
+        components.queryItems = query.isEmpty ? nil : query
         return components.url!
     }
 

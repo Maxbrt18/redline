@@ -32,12 +32,14 @@ enum Family: CaseIterable {
 struct FamilyBadge: View {
     let family: Family
     var small = false
+    /// A finer glyph than the family's, keeping its tint.
+    var symbol: String?
     @Environment(\.colorScheme) private var scheme
     @Environment(\.onTrack) private var onTrack
 
     var body: some View {
         let side: CGFloat = small ? 24 : 30
-        Image(systemName: family.symbol)
+        Image(systemName: symbol ?? family.symbol)
             .font(.system(size: small ? 12 : 15, weight: .medium))
             .foregroundStyle(onTrack ? Palette.onTrack : family.tint)
             .frame(width: side, height: side)

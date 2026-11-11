@@ -82,6 +82,7 @@ struct RootView: View {
                             }
                         }
                         .environment(\.openSettings) { showingSettings = true }
+                        .environment(\.notebook, session)
                         .navigationDestination(for: SessionLink.self) { link in
                             SessionDetailScreen(session: session, link: link)
                         }

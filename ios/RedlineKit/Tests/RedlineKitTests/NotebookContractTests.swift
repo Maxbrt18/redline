@@ -40,4 +40,8 @@ struct NotebookContractTests {
     @Test func habits() throws {
         try expectRoundTrip(Notebook.HabitsView.self, fixture: "habits")
     }
+
+    @Test func weather() throws {
+        try expectRoundTrip(Notebook.Forecast.self, fixture: "weather")
+    }
 }

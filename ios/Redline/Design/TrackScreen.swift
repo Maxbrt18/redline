@@ -70,6 +70,8 @@ extension EnvironmentValues {
     @Entry var onTrack = false
     /// Opens the settings sheet; the tabs' bars carry its button.
     @Entry var openSettings: (() -> Void)?
+    /// The connected notebook, for what a screen loads on its own (the weather).
+    @Entry var notebook: NotebookSession?
 }
 
 /// The red surface: the track's mean colour under the bar, deepening to the tartan, a

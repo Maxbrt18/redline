@@ -1,13 +1,20 @@
 import RedlineKit
 import SwiftUI
 
-/// A section title on a rule, never a box.
+/// A section title on a rule, never a box; a few words may follow it on the right.
 struct SectionTitle: View {
     let text: String
+    var meta: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(text).font(.title3.bold()).accessibilityAddTraits(.isHeader)
+            HStack(alignment: .firstTextBaseline) {
+                Text(text).font(.title3.bold()).accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 8)
+                if let meta {
+                    Text(meta).font(.footnote).foregroundStyle(Palette.muted).multilineTextAlignment(.trailing)
+                }
+            }
             Rectangle().fill(Palette.grid).frame(height: 0.5)
         }
         .padding(.top, 30)
@@ -17,6 +24,8 @@ struct SectionTitle: View {
 /// What is coming: one line per day for the next three days, as the Week tab lists them.
 struct AheadList: View {
     let items: [Notebook.SessionItem]
+    /// The day whose line carries the weather: tomorrow.
+    var tomorrow: String?
 
     var body: some View {
         let dates = items.map(\.date).reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }.prefix(3)
@@ -46,7 +55,15 @@ struct AheadList: View {
             .frame(width: 40)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.subheadline.weight(.semibold))
-                if !sub.isEmpty { Text(sub).font(.caption).foregroundStyle(Palette.muted) }
+                HStack(spacing: 0) {
+                    if !sub.isEmpty { Text(sub) }
+                    if date == tomorrow, !main.isStrength {
+                        if !sub.isEmpty { Text(" · ") }
+                        InlineWeather(item: main)
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(Palette.muted)
             }
             Spacer(minLength: 8)
             Text(main.plannedValue).font(.figure(17, weight: .semibold)).foregroundStyle(Palette.muted)

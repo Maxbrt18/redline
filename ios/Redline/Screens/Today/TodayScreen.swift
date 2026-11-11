@@ -54,7 +54,7 @@ private struct TodayContent: View {
             }
             if !items.isEmpty || !today.extra.isEmpty {
                 DayThread(items: items, extra: today.extra, hero: hero, strength: today.strength)
-                AheadList(items: today.ahead.filter { $0.date != today.date })
+                AheadList(items: today.ahead.filter { $0.date != today.date }, tomorrow: today.tomorrow.date)
             } else {
                 RestDay(today: today, hero: hero)
             }
@@ -91,7 +91,7 @@ private struct RestDay: View {
                 DayHeading(date: first.date, prefix: nil)
                 DayThread(items: next.next, extra: [], hero: hero, today: false)
             }
-            AheadList(items: today.ahead.filter { $0.date != today.date && $0.date != shown })
+            AheadList(items: today.ahead.filter { $0.date != today.date && $0.date != shown }, tomorrow: next.date)
         }
     }
 }

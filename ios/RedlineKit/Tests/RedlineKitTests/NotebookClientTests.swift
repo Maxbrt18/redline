@@ -58,6 +58,19 @@ struct NotebookClientTests {
         #expect(request.url?.path(percentEncoded: true) == "/notebook-api/week/2026-W41%2F..%2Fx")
     }
 
+    @Test func aForecastCarriesItsQueryAndIsNeverKept() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let cache = FileResponseCache(directory: directory)
+        let transport = StubTransport(body: Data("null".utf8))
+        let client = NotebookClient(server: server, device: "d3v1ce", transport: transport, cache: cache)
+        let endpoint = Endpoint.weather(date: "2026-10-09", time: "17:00", place: "Le Parc")
+        #expect(try await client.get(endpoint) == nil)
+        let request = try #require(await transport.requests.first)
+        #expect(request.url?.absoluteString == "https://coach.example.org/notebook-api/weather?date=2026-10-09&time=17:00&place=Le%20Parc")
+        #expect(cache.read(endpoint.cacheKey) == nil)
+    }
+
     @Test func aRevokedDeviceIsSignedOutWithTheServersWords() async {
         let transport = StubTransport(status: 401, body: Data(#"{"error": "Ouvre un nouveau lien."}"#.utf8))
         let client = NotebookClient(server: server, device: "old", transport: transport)

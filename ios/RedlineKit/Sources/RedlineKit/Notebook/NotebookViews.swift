@@ -2465,6 +2465,100 @@ public extension Notebook {
         }
     }
 
+    struct ForecastHour: Codable, Hashable, Sendable {
+        public let hour: Int
+        public let temp: Int
+        public let feels: Int
+        public let rain: Int?
+        public let wind: Int
+        public let code: Int?
+        public let day: Bool
+
+        public init(hour: Int, temp: Int, feels: Int, rain: Int? = nil, wind: Int, code: Int? = nil, day: Bool) {
+            self.hour = hour
+            self.temp = temp
+            self.feels = feels
+            self.rain = rain
+            self.wind = wind
+            self.code = code
+            self.day = day
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case hour = "hour"
+            case temp = "temp"
+            case feels = "feels"
+            case rain = "rain"
+            case wind = "wind"
+            case code = "code"
+            case day = "day"
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            hour = try container.decode(Int.self, forKey: .hour)
+            temp = try container.decode(Int.self, forKey: .temp)
+            feels = try container.decode(Int.self, forKey: .feels)
+            rain = try container.decode(Int?.self, forKey: .rain)
+            wind = try container.decode(Int.self, forKey: .wind)
+            code = try container.decode(Int?.self, forKey: .code)
+            day = try container.decode(Bool.self, forKey: .day)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(hour, forKey: .hour)
+            try container.encode(temp, forKey: .temp)
+            try container.encode(feels, forKey: .feels)
+            try container.encode(rain, forKey: .rain)
+            try container.encode(wind, forKey: .wind)
+            try container.encode(code, forKey: .code)
+            try container.encode(day, forKey: .day)
+        }
+    }
+
+    struct Forecast: Codable, Hashable, Sendable {
+        public let place: String
+        public let date: String
+        public let hours: [ForecastHour]
+        public let sunrise: String?
+        public let sunset: String?
+
+        public init(place: String, date: String, hours: [ForecastHour], sunrise: String? = nil, sunset: String? = nil) {
+            self.place = place
+            self.date = date
+            self.hours = hours
+            self.sunrise = sunrise
+            self.sunset = sunset
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case place = "place"
+            case date = "date"
+            case hours = "hours"
+            case sunrise = "sunrise"
+            case sunset = "sunset"
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            place = try container.decode(String.self, forKey: .place)
+            date = try container.decode(String.self, forKey: .date)
+            hours = try container.decode([ForecastHour].self, forKey: .hours)
+            sunrise = try container.decode(String?.self, forKey: .sunrise)
+            sunset = try container.decode(String?.self, forKey: .sunset)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(place, forKey: .place)
+            try container.encode(date, forKey: .date)
+            try container.encode(hours, forKey: .hours)
+            try container.encode(sunrise, forKey: .sunrise)
+            try container.encode(sunset, forKey: .sunset)
+        }
+    }
+
     struct RacePlanView: Codable, Hashable, Sendable {
         public let plan: RacePlan
         public let weather: [[PassageHour]]?

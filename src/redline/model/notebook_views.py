@@ -457,6 +457,29 @@ class PassageHour(TypedDict):
     day: bool
 
 
+class ForecastHour(TypedDict):
+    """One hour of a session's forecast; `code` is the WMO sky code."""
+
+    hour: int
+    temp: int
+    feels: int
+    rain: int | None
+    wind: int
+    code: int | None
+    day: bool
+
+
+class Forecast(TypedDict):
+    """The forecast of an upcoming session: the hours around its start, and the night;
+    `sunrise` and `sunset` are local, HH:MM."""
+
+    place: str
+    date: str
+    hours: list[ForecastHour]
+    sunrise: str | None
+    sunset: str | None
+
+
 class RacePlanView(TypedDict):
     plan: RacePlan
     #: For each passage, the hours of the race night at its place; None until the

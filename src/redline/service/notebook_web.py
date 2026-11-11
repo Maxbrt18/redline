@@ -264,7 +264,9 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
             when = dt.date.fromisoformat(day)
         except ValueError:
             return jsonify(error=notebook_text.ERRORS["bad_date"]), 400
-        return jsonify(weather.forecast(where, when, start, clock.now()) or {})
+        # No forecast is `null`: the session is too far off, the place unknown, the
+        # network down.
+        return jsonify(weather.forecast(where, when, start, clock.now()))
 
     @app.post("/notebook-api/reorganize")
     def notebook_reorganize():
