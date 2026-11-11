@@ -35,8 +35,8 @@ final class StrengthModel {
     private(set) var sending = false
     /// The kept progress could not be written: the athlete keeps the screen open until sent.
     private(set) var unsaved = false
-    /// The last signal the session gave on its own, for the screen's haptics.
-    private(set) var signal: (StrengthSignal, Int)?
+    /// The signals of the last change, numbered so that the same ones twice still play twice.
+    private(set) var signals: (list: [StrengthSignal], count: Int)?
     /// The athlete is typing: a rest does not chain into the next set on its own.
     var editing = false
 
@@ -45,7 +45,7 @@ final class StrengthModel {
     private var ticking: Task<Void, Never>?
     private var retrying: Task<Void, Never>?
     private var retry = StrengthRetry()
-    private var signals = 0
+    private var signalCount = 0
 
     init(launch: StrengthLaunch, session: NotebookSession) {
         self.launch = launch
@@ -107,9 +107,9 @@ final class StrengthModel {
         let signals = body(&run)
         self.run = run
         save()
-        if let last = signals.last {
-            self.signals += 1
-            signal = (last, self.signals)
+        if !signals.isEmpty {
+            signalCount += 1
+            self.signals = (signals, signalCount)
         }
     }
 

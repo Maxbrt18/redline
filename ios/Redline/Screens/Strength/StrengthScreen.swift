@@ -9,6 +9,9 @@ struct StrengthScreen: View {
     let session: NotebookSession
     @State private var model: StrengthModel
     @State private var leaving = false
+    @State private var sound = StrengthSound()
+    @State private var soundSettings = false
+    @AppStorage(StrengthSound.enabledKey) private var soundOn = true
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
 
@@ -29,6 +32,11 @@ struct StrengthScreen: View {
                             if model.run?.isUnfinished == true { leaving = true } else { close() }
                         }
                     }
+                    ToolbarItem(placement: .primaryAction) {
+                        Button(soundOn ? "Son" : "Son coupé", systemImage: soundOn ? "speaker.wave.2" : "speaker.slash") {
+                            soundSettings = true
+                        }
+                    }
                     // The number pad has no key to close it, and it covers the button forward.
                     ToolbarItemGroup(placement: .keyboard) {
                         Spacer()
@@ -38,6 +46,7 @@ struct StrengthScreen: View {
                         .fontWeight(.semibold)
                     }
                 }
+                .sheet(isPresented: $soundSettings) { StrengthSoundSettings(sound: sound) }
                 .confirmationDialog("Quitter la séance ?", isPresented: $leaving, titleVisibility: .visible) {
                     Button("Quitter", role: .destructive) { close() }
                     Button("Rester", role: .cancel) {}
@@ -46,18 +55,38 @@ struct StrengthScreen: View {
                 }
         }
         .interactiveDismissDisabled()
-        .task { await model.open() }
-        .onAppear { UIApplication.shared.isIdleTimerDisabled = true }
-        .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
+        .task {
+            await model.open()
+            await StrengthNotifier.ask()
+        }
+        .onAppear {
+            UIApplication.shared.isIdleTimerDisabled = true
+            sound.start()
+        }
+        .onDisappear {
+            UIApplication.shared.isIdleTimerDisabled = false
+            sound.stop()
+            StrengthNotifier.withdraw()
+        }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
-            case .background: model.enterBackground()
-            case .active: Task { await model.enterForeground() }
+            case .background:
+                model.enterBackground()
+                StrengthNotifier.schedule(for: model.run)
+            case .active:
+                StrengthNotifier.withdraw()
+                sound.start()
+                Task { await model.enterForeground() }
             default: break
             }
         }
-        .sensoryFeedback(trigger: model.signal?.1) { _, _ in
-            switch model.signal?.0 {
+        .onChange(of: model.signals?.count) {
+            for signal in model.signals?.list ?? [] {
+                sound.play(signal, saying: Self.announcement(signal))
+            }
+        }
+        .sensoryFeedback(trigger: model.signals?.count) { _, _ in
+            switch model.signals?.list.last {
             case .workStart?, .restEnd?: .impact(weight: .heavy)
             case .workEnd?: .success
             case .changeSide?: .warning
@@ -87,6 +116,15 @@ struct StrengthScreen: View {
                     }
                 }
             }
+        }
+    }
+
+    /// What the voice says, when the athlete asked for it: the side of a set, or a change of side.
+    private static func announcement(_ signal: StrengthSignal) -> String? {
+        switch signal {
+        case .workStart(let side): StrengthWords.side(side)
+        case .changeSide: "Change de côté"
+        default: nil
         }
     }
 
