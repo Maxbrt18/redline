@@ -264,7 +264,7 @@ the existing view machinery (`model/views.py` markers, `regen-views`), never edi
 restored if a turn edits them:
 
 - In each `coaching/exercises/<slug>.md` and `coaching/workouts/<slug>.md`, a generated
-  block (`<!-- PROGRAM_START -->` … `<!-- PROGRAM_END -->`) at the top of the body: the
+  `PROGRAM` block (between its `PROGRAM_START` and `PROGRAM_END` markers) at the top of the body: the
   version in force, its `valid_from` and `reason`, and the last few versions. Obsidian
   shows the current dose next to the reasoning; the body below the block stays the
   coach's.

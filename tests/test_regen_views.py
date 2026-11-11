@@ -45,8 +45,9 @@ class TestTheEntryPoint:
                  weekly_plan.BLOCK,
                  strength_tables.LOG_BLOCK,
                  *strength_tables.blocks(program.load(VAULT_ROOT))}
+        # `.claude/worktrees` holds other checkouts of the engine, not this one's notes.
         found = {name for note in ENGINE_ROOT.rglob("*.md")
-                 if ".git" not in note.parts
+                 if not {".git", ".claude"} & set(note.parts)
                  for name in MARKER.findall(note.read_text(encoding="utf-8"))}
         assert found, "no marker found: the test would prove nothing"
         assert found <= owned, f"block without a generator: {sorted(found - owned)}"
