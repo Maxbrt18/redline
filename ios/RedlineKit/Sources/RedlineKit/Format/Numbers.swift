@@ -16,6 +16,18 @@ public enum Numbers {
         return "\(rounded / 60):" + String(format: "%02d", rounded % 60)
     }
 
+    /// A duration from seconds: `52:07`, `1:04:30`.
+    public static func duration(_ seconds: Double) -> String {
+        let total = Int(seconds.rounded()), hours = total / 3600, minutes = total % 3600 / 60
+        let head = hours > 0 ? "\(hours):" + String(format: "%02d", minutes) : "\(minutes)"
+        return head + ":" + String(format: "%02d", total % 60)
+    }
+
+    /// Whole minutes from seconds, with the prime: `12′`.
+    public static func minutes(_ seconds: Double) -> String {
+        "\(Int((seconds / 60).rounded()))′"
+    }
+
     /// A wall-clock time from `HH:MM`, or from the time of an ISO date-time: `19 h 05`,
     /// `7 h`, with non-breaking spaces. Nil when the text holds no time.
     public static func clock(_ text: String) -> String? {

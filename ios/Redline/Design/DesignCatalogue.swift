@@ -1,4 +1,5 @@
 #if DEBUG
+import RedlineKit
 import SwiftUI
 
 /// Every Redline component on one screen, light and dark, to judge them side by side
@@ -88,6 +89,10 @@ struct DesignCatalogue: View {
                 }
             }
 
+            Section("Courbe de fréquence cardiaque") {
+                HeartChart(series: Self.sampleSeries, bounds: [128, 142, 156, 170], dplus: 64)
+            }
+
             Section("États") {
                 ContentUnavailableView("Rien de prévu", systemImage: "calendar",
                                        description: Text("Le coach n’a pas encore écrit cette semaine."))
@@ -95,6 +100,19 @@ struct DesignCatalogue: View {
         }
         .navigationTitle("Catalogue")
     }
+
+    /// Forty minutes of a session with three repetitions, a stop and a small hill.
+    private static let sampleSeries: Notebook.Series = {
+        let times = Array(stride(from: 0, through: 2400, by: 30))
+        let hearts: [Int?] = times.map { time in
+            if (1290...1320).contains(time) { return nil }
+            let rep = [(600, 900), (1080, 1380), (1560, 1860)].contains { $0.0...$0.1 ~= time }
+            return rep ? 162 + time % 7 : 132 + time % 9
+        }
+        let altitudes: [Double?] = times.map { 210 + 30 * sin(Double($0) / 2400 * .pi) }
+        return Notebook.Series(t: times, duration: 2400, hr: hearts, alt: altitudes,
+                               bands: [[600, 900], [1080, 1380], [1560, 1860]], stops: [[1290, 1320]])
+    }()
 
     private static let swatches: [(String, Color)] = [
         ("bg", Palette.bg), ("panel", Palette.panel), ("grid", Palette.grid), ("ink", Palette.ink),

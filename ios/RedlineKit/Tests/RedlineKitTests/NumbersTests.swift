@@ -18,4 +18,10 @@ struct NumbersTests {
         #expect(Numbers.clock("2026-10-06T07:12:00") == "7\u{00a0}h\u{00a0}12")
         #expect(Numbers.clock("bientôt") == nil)
     }
+
+    @Test func aDurationShowsHoursOnlyWhenThereAreSome() {
+        #expect(Numbers.duration(3127) == "52:07")
+        #expect(Numbers.duration(3870) == "1:04:30")
+        #expect(Numbers.minutes(719) == "12′")
+    }
 }

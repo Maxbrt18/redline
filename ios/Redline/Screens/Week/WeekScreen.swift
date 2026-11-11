@@ -172,8 +172,11 @@ private struct WeekDayRow: View {
     var body: some View {
         let row = describe()
         VStack(alignment: .leading, spacing: 6) {
-            // A row with nothing to unfold is no button: a disabled one would grey it.
-            if row.detail.isEmpty {
+            // A done run opens its detail; a row with nothing to unfold is no button (a
+            // disabled one would grey it).
+            if let link = row.link {
+                NavigationLink(value: link) { line(row) }.buttonStyle(.plain)
+            } else if row.detail.isEmpty {
                 line(row)
             } else {
                 Button { withAnimation(.snappy) { open.toggle() } } label: { line(row) }
@@ -208,7 +211,7 @@ private struct WeekDayRow: View {
                 .font(row.style == .done ? .figure(17, weight: .semibold) : .subheadline)
                 .foregroundStyle(row.style == .done ? Palette.ink : Palette.faint)
                 .strikethrough(row.style == .skipped)
-            if !row.detail.isEmpty {
+            if !row.detail.isEmpty || row.link != nil {
                 Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(Palette.faint)
                     .rotationEffect(.degrees(open ? 90 : 0))
             }
@@ -219,7 +222,7 @@ private struct WeekDayRow: View {
     private enum Style { case done, plan, rest, skipped }
 
     private typealias Row = (title: String, value: String, style: Style, families: [Family], tags: [String],
-                             alert: String?, beside: [String], detail: [String])
+                             alert: String?, beside: [String], detail: [String], link: SessionLink?)
 
     private func describe() -> Row {
         let live = items.filter { $0.kind != "rest" }
@@ -228,23 +231,26 @@ private struct WeekDayRow: View {
         var beside: [String] = [], detail: [String] = []
         guard let main = runs.first ?? strengths.first else {
             guard let first = extra.first else {
-                return ("Repos", "", .rest, [.rest], [], nil, [], [])
+                return ("Repos", "", .rest, [.rest], [], nil, [], [], nil)
             }
             let value = first.km.map { "\(Numbers.text($0)) km" } ?? first.durationMin.map { "\($0) min" } ?? ""
             return ("\(Notebook.kindName(first.kind)) · hors programme", value, .done, [Family(kind: first.kind)], [], nil,
-                    extra.dropFirst().map(Self.unplannedLine), [])
+                    extra.dropFirst().map(Self.unplannedLine), [],
+                    SessionLink(id: first.observationId, title: Notebook.kindName(first.kind)))
         }
         let title = ([main.title.split(separator: ",").first.map(String.init) ?? main.title]
                      + (!main.isStrength && !strengths.isEmpty ? ["renfo"] : [])).joined(separator: " + ")
         let families = [main.family] + (!main.isStrength && !strengths.isEmpty ? [Family.strength] : [])
         var value = "", style = Style.plan, tags: [String] = [], alert: String?
         var observed = false
+        var link: SessionLink?
         if main.isDone {
             style = .done
             if let fact = main.runFact {
                 value = fact.km.map { "\(Numbers.text($0)) km" } ?? fact.durationMin.map { "\($0) min" } ?? "fait"
                 tags = Self.crossing(fact, main.targets)
                 observed = true
+                link = SessionLink(id: fact.observationId, title: main.title.shortTitle)
             } else {
                 value = main.strengthFact?.durationMin.map { "\($0) min" } ?? "fait"
             }
@@ -267,7 +273,7 @@ private struct WeekDayRow: View {
         for fact in extra {
             observed ? beside.append(Self.unplannedLine(fact)) : detail.append(Self.unplannedLine(fact))
         }
-        return (title, value, style, families, tags, alert, beside, detail)
+        return (title, value, style, families, tags, alert, beside, detail, link)
     }
 
     private static func unplannedLine(_ fact: Notebook.UnplannedFact) -> String {

@@ -18,6 +18,11 @@ extension Family {
     }
 }
 
+extension String {
+    /// A session's title up to its first comma: « EF » for « EF, permis accompagné ».
+    var shortTitle: String { split(separator: ",").first.map { $0.trimmingCharacters(in: .whitespaces) } ?? self }
+}
+
 extension Notebook {
     /// A kind's name as the athlete reads it; the slug when the table does not know it.
     static func kindName(_ kind: String) -> String { kinds[kind]?.name ?? kind }

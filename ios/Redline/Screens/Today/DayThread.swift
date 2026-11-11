@@ -58,12 +58,14 @@ struct DayThread: View {
                 if let fact {
                     if let rows = LimitRows(targets: item.targets, fact: fact) { rows } else { FactTiles(fact: fact, targets: item.targets) }
                     OverLine(fact: fact, targets: item.targets)
+                    DetailLink(link: SessionLink(id: fact.observationId, title: item.title.shortTitle))
                 }
             }
         case .unplanned(let fact):
             ThreadStep(kicker: ["Fait", fact.startedAt.flatMap(Numbers.clock), "hors programme"].compactMap { $0 }.joined(separator: " · "),
                        title: Notebook.kindName(fact.kind), family: Family(kind: fact.kind)) {
                 FactTiles(fact: Notebook.Fact(unplanned: fact), targets: Notebook.Targets.none)
+                DetailLink(link: SessionLink(id: fact.observationId, title: Notebook.kindName(fact.kind)))
             }
         }
     }
@@ -172,4 +174,22 @@ extension Notebook.Fact {
 extension Notebook.Targets {
     /// No target at all.
     static var none: Notebook.Targets { Notebook.Targets() }
+}
+
+/// The way into a done run's detail, under its step.
+struct DetailLink: View {
+    let link: SessionLink
+
+    var body: some View {
+        NavigationLink(value: link) {
+            HStack {
+                Text("Détail de la séance").font(.subheadline.weight(.semibold))
+                Spacer()
+                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(Palette.faint)
+            }
+            .padding(.vertical, 10)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+    }
 }
