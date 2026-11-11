@@ -3,14 +3,15 @@ import SwiftUI
 
 @main
 struct RedlineApp: App {
-    /// Read once: the host is fixed when the app is built.
-    private static let server = Result<Server, ServerError> { () throws(ServerError) in
-        try Server(bundle: .main)
-    }
+    /// Nil when the build carries no valid server host: the app then says so.
+    @State private var session: NotebookSession? = {
+        guard let server = try? Server(bundle: .main) else { return nil }
+        return NotebookSession(server: server, store: KeychainDeviceTokenStore(server: server))
+    }()
 
     var body: some Scene {
         WindowGroup {
-            RootView(server: Self.server)
+            RootView(session: session)
         }
     }
 }

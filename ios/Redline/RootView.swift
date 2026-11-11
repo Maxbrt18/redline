@@ -24,23 +24,25 @@ enum NotebookTab: Hashable, CaseIterable {
 }
 
 struct RootView: View {
-    let server: Result<Server, ServerError>
+    let session: NotebookSession?
     @State private var selection: NotebookTab = .today
+    @State private var showingSettings = false
 
     var body: some View {
-        switch server {
-        case .success:
-            TabView(selection: $selection) {
-                ForEach(NotebookTab.allCases, id: \.self) { tab in
-                    Tab(tab.title, systemImage: tab.symbol, value: tab) {
-                        NavigationStack {
-                            ScrollView {}
-                                .navigationTitle(tab.title)
-                        }
-                    }
+        if let session {
+            Group {
+                switch session.state {
+                case .signedOut:
+                    ConnectView(session: session)
+                case .signedIn:
+                    tabs
+                        .sheet(isPresented: $showingSettings) { SettingsView(session: session) }
                 }
             }
-        case .failure:
+            .onOpenURL { url in
+                Task { await session.connect(with: url.absoluteString) }
+            }
+        } else {
             ContentUnavailableView {
                 Label("Serveur non configuré", systemImage: "network.slash")
             } description: {
@@ -48,8 +50,40 @@ struct RootView: View {
             }
         }
     }
+
+    private var tabs: some View {
+        TabView(selection: $selection) {
+            ForEach(NotebookTab.allCases, id: \.self) { tab in
+                Tab(tab.title, systemImage: tab.symbol, value: tab) {
+                    NavigationStack {
+                        ScrollView {}
+                            .navigationTitle(tab.title)
+                            .toolbar {
+                                ToolbarItem(placement: .topBarTrailing) {
+                                    Button("Réglages", systemImage: "gearshape") { showingSettings = true }
+                                }
+                            }
+                    }
+                }
+            }
+        }
+    }
 }
 
-#Preview {
-    RootView(server: .success(try! Server(host: "coach.example.org")))
+#Preview("Connecté") {
+    let server = try! Server(host: "coach.example.org")
+    RootView(session: NotebookSession(server: server, store: PreviewTokenStore(token: "preview")))
+}
+
+#Preview("À connecter") {
+    let server = try! Server(host: "coach.example.org")
+    RootView(session: NotebookSession(server: server, store: PreviewTokenStore(token: nil)))
+}
+
+/// A store that never touches the keychain, for previews.
+private struct PreviewTokenStore: DeviceTokenStore {
+    let token: String?
+    func read() -> String? { token }
+    func save(_ token: String) throws {}
+    func delete() {}
 }

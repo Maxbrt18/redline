@@ -39,6 +39,7 @@ ASK = re.compile(rf"(?:cell:[0-9a-f-]{{36}}:(?:pain:{formats.SLUG}|{CELL_FIELDS}
                  rf"|daily:{formats.DATE}:(?:sleep|life_load)|hr:{formats.DATE})")
 
 COOKIE = "__Host-redline-notebook"
+BEARER = "Bearer "
 CSP = ("default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; "
        "font-src data:; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; "
        "worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
@@ -48,6 +49,15 @@ CSP = ("default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline
 PLACE = re.compile(r"[\w' -]{1,80}")
 DAY = re.compile(formats.DATE)
 CLOCK = re.compile(formats.TIME)
+
+
+def device_token() -> str:
+    """The device's token: the iOS app sends it in `Authorization`, the page in its cookie.
+    An `Authorization` header that is not a bearer token counts as no token at all."""
+    header = request.headers.get("Authorization", "")
+    if header:
+        return header.removeprefix(BEARER) if header.startswith(BEARER) else ""
+    return request.cookies.get(COOKIE, "")
 
 
 def register(app: Flask, notebook: NotebookService, psid: str, *,
@@ -86,10 +96,10 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
                 return jsonify(error=notebook_text.ERRORS["forbidden"]), 403
             if request.headers.get("Sec-Fetch-Site") == "cross-site":
                 return jsonify(error=notebook_text.ERRORS["forbidden"]), 403
-        if request.path == "/notebook-api/connect":
+        if request.path in ("/notebook-api/connect", "/notebook-api/devices"):
             return None
         try:
-            authenticated = notebook.store.authenticate(psid, request.cookies.get(COOKIE, ""))
+            authenticated = notebook.store.authenticate(psid, device_token())
         except (StorageError, SQLAlchemyError):
             return jsonify(error=notebook_text.ERRORS["unavailable"]), 503
         if not authenticated:
@@ -160,9 +170,21 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
                             max_age=DEVICE_SECONDS, path="/")
         return response
 
+    @app.post("/notebook-api/devices")
+    def notebook_device():
+        """The app's connection: the link buys a device token, returned in the body for the
+        app's keychain instead of a cookie."""
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict) or set(body) != {"token"} or not isinstance(body["token"], str):
+            return jsonify(error=notebook_text.ERRORS["bad_link"]), 400
+        device = notebook.store.exchange(psid, body["token"])
+        if not device:
+            return jsonify(error=notebook_text.ERRORS["link_used"]), 401
+        return jsonify(views.DeviceGrant(device=device))
+
     @app.post("/notebook-api/logout")
     def notebook_logout():
-        notebook.store.revoke(psid, request.cookies.get(COOKIE, ""))
+        notebook.store.revoke(psid, device_token())
         response = jsonify(status="ok")
         response.delete_cookie(COOKIE, path="/", secure=True, httponly=True, samesite="Strict")
         return response

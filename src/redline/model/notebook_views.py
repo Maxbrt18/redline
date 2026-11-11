@@ -295,6 +295,13 @@ class PastWeek(TypedDict):
     review: str | None
 
 
+class DeviceGrant(TypedDict):
+    """What `/notebook-api/devices` gives the iOS app: its device token, sent back in
+    `Authorization: Bearer` on every later request."""
+
+    device: str
+
+
 class WeeksView(TypedDict):
     weeks: list[PastWeek]
 

@@ -1355,6 +1355,24 @@ public extension Notebook {
         }
     }
 
+    struct DeviceGrant: Codable, Hashable, Sendable {
+        public let device: String
+
+        enum CodingKeys: String, CodingKey {
+            case device = "device"
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            device = try container.decode(String.self, forKey: .device)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(device, forKey: .device)
+        }
+    }
+
     struct WeeksView: Codable, Hashable, Sendable {
         public let weeks: [PastWeek]
 

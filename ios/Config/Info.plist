@@ -4,5 +4,16 @@
 <dict>
 	<key>RedlineServerHost</key>
 	<string>$(REDLINE_SERVER_HOST)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>redline</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
