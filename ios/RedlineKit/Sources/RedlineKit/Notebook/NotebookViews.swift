@@ -1565,6 +1565,7 @@ public extension Notebook {
         public let session: StrengthSession
         public let previousSession: [String: JSONValue]?
         public let zones: [WatchedZone]
+        public let cues: [String: [String]]
 
         public enum Status: Codable, Hashable, Sendable {
             case ok
@@ -1595,11 +1596,12 @@ public extension Notebook {
             }
         }
 
-        public init(status: Status, session: StrengthSession, previousSession: [String: JSONValue]? = nil, zones: [WatchedZone]) {
+        public init(status: Status, session: StrengthSession, previousSession: [String: JSONValue]? = nil, zones: [WatchedZone], cues: [String: [String]]) {
             self.status = status
             self.session = session
             self.previousSession = previousSession
             self.zones = zones
+            self.cues = cues
         }
 
         enum CodingKeys: String, CodingKey {
@@ -1607,6 +1609,7 @@ public extension Notebook {
             case session = "session"
             case previousSession = "previous_session"
             case zones = "zones"
+            case cues = "cues"
         }
 
         public init(from decoder: any Decoder) throws {
@@ -1615,6 +1618,7 @@ public extension Notebook {
             session = try container.decode(StrengthSession.self, forKey: .session)
             previousSession = try container.decode([String: JSONValue]?.self, forKey: .previousSession)
             zones = try container.decode([WatchedZone].self, forKey: .zones)
+            cues = try container.decode([String: [String]].self, forKey: .cues)
         }
 
         public func encode(to encoder: any Encoder) throws {
@@ -1623,6 +1627,7 @@ public extension Notebook {
             try container.encode(session, forKey: .session)
             try container.encode(previousSession, forKey: .previousSession)
             try container.encode(zones, forKey: .zones)
+            try container.encode(cues, forKey: .cues)
         }
     }
 
@@ -1782,6 +1787,28 @@ public extension Notebook {
             try container.encode(minutes, forKey: .minutes)
             try container.encode(note, forKey: .note)
             try container.encode(exercises, forKey: .exercises)
+        }
+    }
+
+    struct Launched: Codable, Hashable, Sendable {
+        public let url: String
+
+        public init(url: String) {
+            self.url = url
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case url = "url"
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            url = try container.decode(String.self, forKey: .url)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(url, forKey: .url)
         }
     }
 

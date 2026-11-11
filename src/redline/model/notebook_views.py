@@ -299,6 +299,8 @@ class StrengthSessionView(TypedDict):
     #: The last reported prescription of the same routine, as it was stored then.
     previous_session: dict[str, Any] | None
     zones: list[WatchedZone]
+    #: The movement cues of the session's exercises, by slug; an exercise without any is absent.
+    cues: dict[str, list[str]]
 
 
 class StrengthReportExercise(TypedDict):
@@ -327,6 +329,12 @@ class StrengthReportPosted(TypedDict):
     minutes: int | None
     note: str
     exercises: list[StrengthReportExercise]
+
+
+class Launched(TypedDict):
+    """Today's strength session handed out as a link, `/s#t=<token>`."""
+
+    url: str
 
 
 class StrengthClosed(TypedDict):

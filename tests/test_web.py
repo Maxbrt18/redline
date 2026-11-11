@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 
 import pytest
-from conftest import ENGINE_ROOT, RecordingBot
+from conftest import ENGINE_ROOT, TEST_VAULT, RecordingBot
 
 # redline.service.web imports flask, which is a VPS runtime dependency (requirements.txt), not
 # something a vault checkout on the Mac necessarily has. Without this, collecting this
@@ -177,6 +177,15 @@ def test_opaque_capability_resolves_the_exact_session(app_bot, store):
     assert resolved["sid"] == SESSION["sid"]
     assert resolved["exercises"] == SESSION["exercises"]
     assert resolved["expires_at"] > int(time.time())
+
+
+def test_a_resolved_session_carries_the_cues_of_its_own_exercises(app_bot, store):
+    client, _, _ = app_bot(vault_path=str(TEST_VAULT))
+    session = {**SESSION, "exercises": [{**SESSION["exercises"][0], "slug": "step-up"}]}
+    token = store.issue_strength_link("4242", session)
+    cues = client.post("/strength-session", json={"token": token}).get_json()["cues"]
+    assert list(cues) == ["step-up"]
+    assert cues["step-up"][1] == "Monter avec la jambe du dessus, sans pousser sur celle du bas."
 
 
 def test_unknown_or_revoked_capability_never_leaks_a_session(app_bot, store):

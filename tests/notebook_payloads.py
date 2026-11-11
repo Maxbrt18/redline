@@ -197,12 +197,13 @@ STRENGTH_SESSION_OF_DAY = {
 #: The same session resolved from its link, with the previous one of its routine.
 STRENGTH_SESSION = {
     "status": "ok",
-    "session": {**STRENGTH_SESSION_OF_DAY, "expires_at": 1_760_400_000},
+    "session": {**STRENGTH_SESSION_OF_DAY, "expires_at": 4_102_444_800},
     "previous_session": {**STRENGTH_SESSION_OF_DAY, "sid": "w40-renfo-a", "exercises": [
         {**exercise, "dose": {**exercise["dose"], "text": "2 × 10 par jambe"}}
         if exercise["slug"] == "mollets" else exercise
         for exercise in STRENGTH_SESSION_OF_DAY["exercises"] if exercise["slug"] != "pompes"]},
     "zones": [KNEE],
+    "cues": {"mollets": ["Genou tendu, monter sur la pointe.", "Trois secondes pour redescendre."]},
 }
 
 TODAY = {
@@ -487,4 +488,5 @@ SCREENS = {
     "done": (views.Done, DONE),
     "revised": (views.Revised, REVISED),
     "strength-session": (views.StrengthSessionView, STRENGTH_SESSION),
+    "launch": (views.Launched, {"url": "https://coach.example.org/s#t=" + "A" * 32}),
 }

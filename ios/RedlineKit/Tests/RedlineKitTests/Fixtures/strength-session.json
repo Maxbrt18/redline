@@ -143,7 +143,7 @@
         }
       }
     ],
-    "expires_at": 1760400000
+    "expires_at": 4102444800
   },
   "previous_session": {
     "sid": "w40-renfo-a",
@@ -272,5 +272,11 @@
       "zone": "knee",
       "label": "Genou"
     }
-  ]
+  ],
+  "cues": {
+    "mollets": [
+      "Genou tendu, monter sur la pointe.",
+      "Trois secondes pour redescendre."
+    ]
+  }
 }

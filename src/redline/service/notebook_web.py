@@ -408,7 +408,8 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
         url = notebook.launch(psid, body["signature"])
         if not url:
             return jsonify(error=notebook_text.ERRORS["session_changed"]), 409
-        return jsonify(url=url)
+        launched: views.Launched = {"url": url}
+        return jsonify(launched)
 
     @app.get("/notebook-api/entries/<entry_id>")
     def notebook_entry(entry_id):
