@@ -1,7 +1,7 @@
-# The conventions of pyproject.toml only hold while something runs them. Three jobs: the
+# The conventions of pyproject.toml only hold while something runs them. Four jobs: the
 # gate (lint, types, dead code, shell scripts, schema, tests), the same tests under the
-# service role, and the pages (the PNG cards and the notebook, in Chromium), which need a
-# browser the gate does without.
+# service role, the pages (the PNG cards and the notebook, in Chromium), which need a
+# browser the gate does without, and the iOS app, which needs a macOS runner.
 name: Code checks
 
 on:
@@ -19,6 +19,7 @@ on:
       - "src/**"
       - "templates/**"
       - "tests/**"
+      - "ios/**"
   pull_request:
   workflow_dispatch:
 
@@ -65,7 +66,8 @@ jobs:
       - name: Shell scripts
         run: |
           shellcheck .githooks/pre-commit templates/vault/.githooks/pre-commit \
-                     deploy/agent-cli/redline-agent-cli deploy/postgres/*.sh
+                     deploy/agent-cli/redline-agent-cli deploy/postgres/*.sh \
+                     ios/scripts/install-on-device
 
       - name: Database schema
         env:
@@ -163,3 +165,21 @@ jobs:
 
       - name: Pages
         run: python -m pytest -q -rs tests/test_charts.py tests/test_page.py tests/test_notebook_page.py
+
+  ios:
+    name: iOS app (swift test · xcodebuild)
+    # The iOS SDK exists only on macOS. The app builds unsigned: signing needs an Apple
+    # team, which each instance sets in its own ignored Local.xcconfig.
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: RedlineKit tests
+        working-directory: ios/RedlineKit
+        run: swift test
+
+      - name: App build
+        run: |
+          xcodebuild -project ios/Redline.xcodeproj -scheme Redline \
+                     -destination 'generic/platform=iOS Simulator' \
+                     CODE_SIGNING_ALLOWED=NO -quiet build

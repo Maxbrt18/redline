@@ -13,12 +13,15 @@ from pathlib import Path
 
 from conftest import ENGINE_ROOT
 
-ROOTS = ("src", "deploy", "migrations", "tests", ".github", ".githooks", "pyproject.toml")
+ROOTS = ("src", "deploy", "migrations", "tests", ".github", ".githooks", "ios", "pyproject.toml")
 HASH_COMMENTED = {".sh", ".toml", ".yml", ".yaml", ".ini", ".txt", ".example", ".cfg",
                   ".service", ".timer", ".conf"}
 HASH_COMMENTED_NAMES = {"Caddyfile", "Dockerfile"}
-SLASH_COMMENTED = {".js", ".css", ".html"}
-SKIPPED = ("tests/fixtures/",)
+SLASH_COMMENTED = {".js", ".css", ".html", ".swift", ".xcconfig"}
+# Fixtures imitate the coach; the iOS build outputs and the instance's own
+# `Local.xcconfig` are ignored by Git.
+SKIPPED = ("tests/fixtures/", "ios/.build/", "ios/RedlineKit/.build/", "ios/RedlineKit/.swiftpm/",
+           "ios/Config/Local.xcconfig")
 
 DATE = re.compile(r"\b20\d\d-\d\d-\d\d\b")
 EMOJI = re.compile("[\u2600-\u27bf\U0001f300-\U0001faff]")
