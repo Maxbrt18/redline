@@ -52,4 +52,8 @@ struct NotebookContractTests {
     @Test func entry() throws {
         try expectRoundTrip(Notebook.EntryView.self, fixture: "entry")
     }
+
+    @Test func answer() throws {
+        try expectRoundTrip(Notebook.Answered.self, fixture: "answer")
+    }
 }

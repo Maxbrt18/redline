@@ -165,9 +165,16 @@ public struct NotebookClient: Sendable {
         cache?.clear()
     }
 
+    /// Answers one question of the notebook: `ask` names it (and its field), `value` is
+    /// what the page would send. True when the answer went on to the coach.
+    public func answer(_ ask: String, value: JSONValue) async throws(NotebookError) -> Bool {
+        let request = Self.post(["answer"], body: AnswerBody(ask: ask, value: value), server: server, device: device)
+        return try await Self.send(request, as: Notebook.Answered.self, transport: transport).alert
+    }
+
     /// Revokes this device's token on the server.
     public func signOut() async throws(NotebookError) {
-        let request = Self.post(["logout"], body: [:], server: server, device: device)
+        let request = Self.post(["logout"], body: [String: String](), server: server, device: device)
         _ = try await Self.send(request, as: JSONValue.self, transport: transport)
     }
 
@@ -183,7 +190,7 @@ public struct NotebookClient: Sendable {
         return components.url!
     }
 
-    private static func post(_ path: [String], body: [String: String], server: Server, device: String?) -> URLRequest {
+    private static func post(_ path: [String], body: some Encodable, server: Server, device: String?) -> URLRequest {
         var request = URLRequest(url: url(path, server: server))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -224,6 +231,11 @@ public struct NotebookClient: Sendable {
             throw .unreadable
         }
     }
+}
+
+private struct AnswerBody: Encodable {
+    let ask: String
+    let value: JSONValue
 }
 
 /// The body of every refusal: `{"error": "..."}`.

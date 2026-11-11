@@ -397,7 +397,8 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
                 settled(int(result["activity"]))
             except Exception:
                 app.logger.exception("The run's debrief was not brought forward")
-        return jsonify(status="ok", alert=bool(result["alert"]))
+        answered: views.Answered = {"status": "ok", "alert": bool(result["alert"])}
+        return jsonify(answered)
 
     @app.post("/notebook-api/launch")
     def notebook_launch():

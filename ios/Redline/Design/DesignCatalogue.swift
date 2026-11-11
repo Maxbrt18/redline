@@ -89,6 +89,20 @@ struct DesignCatalogue: View {
                 }
             }
 
+            Section("Questions") {
+                MorningCard(wakes: [Notebook.WakeAsk(id: "wake:sample:knee", type: .wake, zone: "knee", label: "Genou",
+                                                     date: "2030-01-01", afterEffort: true, levels: [
+                                                         .init(slug: "none", label: "rien"), .init(slug: "trace", label: "trace"),
+                                                         .init(slug: "stiff", label: "raide"), .init(slug: "pain", label: "douleur")])],
+                            daily: Notebook.DailyAsk(id: "daily:sample", type: .daily, date: "2030-01-01", fields: ["sleep", "life_load"]))
+                HeartCard(ask: Notebook.HrAsk(id: "hr:sample", type: .hr, date: "2030-01-01", hr: 152, reference: 144, n: 6, paceS: 342))
+                DebriefCard(ask: Notebook.DetailAsk(id: "cell:sample", fields: ["fuel_formats", "fuel_mix"], labels: [:], total: 4,
+                                                    durationMin: 95, painValues: [0, 0.5, 1, 1.5, 2, 2.5, 3]))
+                DebriefCard(ask: Notebook.DetailAsk(id: "cell:sample", fields: ["gut_onset_min"], labels: [:], total: 6,
+                                                    durationMin: 95, painValues: []))
+            }
+            .listRowBackground(Palette.bg)
+
             Section("Courbe de fréquence cardiaque") {
                 HeartChart(series: Self.sampleSeries, bounds: [128, 142, 156, 170], dplus: 64)
             }

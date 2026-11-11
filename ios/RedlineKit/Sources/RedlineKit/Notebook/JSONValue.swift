@@ -32,6 +32,9 @@ public enum JSONValue: Codable, Hashable, Sendable {
         switch self {
         case .null: try container.encodeNil()
         case .bool(let value): try container.encode(value)
+        // A whole number goes out as an integer: the server tells grams or minutes,
+        // which must be integers, from a value on a scale.
+        case .number(let value) where value.rounded() == value && abs(value) < 1e15: try container.encode(Int(value))
         case .number(let value): try container.encode(value)
         case .string(let value): try container.encode(value)
         case .array(let value): try container.encode(value)

@@ -95,6 +95,19 @@ struct NotebookClientTests {
         #expect(request.url?.absoluteString == "https://coach.example.org/notebook-api/entries?offset=40")
     }
 
+    @Test func anAnswerSendsItsQuestionAndAWholeNumberAsAnInteger() async throws {
+        let transport = StubTransport(body: Data(#"{"status": "ok", "alert": true}"#.utf8))
+        let client = NotebookClient(server: server, device: "d3v1ce", transport: transport)
+        let alerted = try await client.answer("cell:\(UUID().uuidString.lowercased()):carbs_g_h", value: .number(60))
+        #expect(alerted)
+        let request = try #require(await transport.requests.first)
+        #expect(request.httpMethod == "POST" && request.url?.path() == "/notebook-api/answer")
+        let body = try #require(request.httpBody.flatMap { String(data: $0, encoding: .utf8) })
+        #expect(body.contains(#""value":60"#) && !body.contains("60.0"))
+        let half = String(data: try JSONEncoder().encode(JSONValue.number(1.5)), encoding: .utf8)
+        #expect(half == "1.5")
+    }
+
     @Test func aRevokedDeviceIsSignedOutWithTheServersWords() async {
         let transport = StubTransport(status: 401, body: Data(#"{"error": "Ouvre un nouveau lien."}"#.utf8))
         let client = NotebookClient(server: server, device: "old", transport: transport)

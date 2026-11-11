@@ -54,7 +54,8 @@ private struct TodayContent: View {
                     .padding(.bottom, 20)
             }
             if !items.isEmpty || !today.extra.isEmpty {
-                DayThread(items: items, extra: today.extra, hero: hero, strength: today.strength)
+                DayThread(items: items, extra: today.extra, hero: hero, strength: today.strength,
+                          asks: today.asks, date: today.date)
                 AheadList(items: today.ahead.filter { $0.date != today.date }, tomorrow: today.tomorrow.date)
             } else {
                 RestDay(today: today, hero: hero)
@@ -75,6 +76,8 @@ private struct RestDay: View {
         let real = next.sessions.filter { $0.kind != "rest" }
         let shown = !real.isEmpty ? next.date : next.next.first?.date
         VStack(alignment: .leading, spacing: 18) {
+            // The day's questions come before the rest.
+            DayThread(items: [], extra: [], asks: today.asks, date: today.date)
             if today.plan.status == "invalid" {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Programme en préparation").font(.title3.weight(.semibold))

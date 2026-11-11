@@ -57,6 +57,9 @@ struct DetailFeelings: View {
                     }
                 }
             }
+            if let ask {
+                DebriefCard(ask: ask, targets: detail.plan?.targets).padding(.top, 14)
+            }
             ForEach(detail.wake.zones, id: \.zone) { wake in
                 let who = detail.wake.zones.count > 1 ? " · \(wake.label)" : ""
                 let parts = [wake.before.map { "Réveil du jour\(who) \(Numbers.text($0))/10" },

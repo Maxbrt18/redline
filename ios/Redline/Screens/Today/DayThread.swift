@@ -12,9 +12,21 @@ struct DayThread: View {
     var strength: Notebook.StrengthOffer?
     /// Today's thread names its steps by role; another day's thread only lists them.
     var today = true
+    /// Today's questions: the morning's first, then those about an earlier run, each under
+    /// its own run when that run is today's.
+    var asks: [Notebook.Ask] = []
+    var date: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
+            if !wakes.isEmpty || daily != nil {
+                ThreadStep(kicker: "Ce matin", now: true, title: "Comment tu te réveilles ?", family: nil, small: true) {
+                    MorningCard(wakes: wakes, daily: daily)
+                }
+            }
+            ForEach(Array(loose.enumerated()), id: \.offset) { index, ask in
+                looseStep(ask, now: index == 0 && wakes.isEmpty && daily == nil)
+            }
             ForEach(Array(done.enumerated()), id: \.offset) { _, entry in
                 doneStep(entry)
             }
@@ -22,6 +34,59 @@ struct DayThread: View {
                 pendingStep(item, index: index)
             }
         }
+    }
+
+    private var wakes: [Notebook.WakeAsk] {
+        asks.compactMap { if case .wake(let wake) = $0 { wake } else { nil } }
+    }
+
+    private var daily: Notebook.DailyAsk? {
+        asks.lazy.compactMap { if case .daily(let daily) = $0 { daily } else { nil } }.first
+    }
+
+    /// Today's done runs carry their own debrief and heart question.
+    private var ownRuns: [String] { items.filter { !$0.isStrength && $0.isDone }.compactMap { $0.runFact?.observationId } }
+
+    private var loose: [Notebook.Ask] {
+        let own = Set(ownRuns.map { "cell:\($0)" })
+        return asks.filter { ask in
+            switch ask {
+            case .cells(let cells): !own.contains(cells.id)
+            case .hr(let hr): !(hr.date == date && !ownRuns.isEmpty)
+            default: false
+            }
+        }
+    }
+
+    @ViewBuilder private func looseStep(_ ask: Notebook.Ask, now: Bool) -> some View {
+        switch ask {
+        case .cells(let cells):
+            ThreadStep(kicker: "À compléter", now: now, title: Self.askTitle(Notebook.kindName(cells.kind), cells.date, km: cells.km),
+                       family: Family(kind: cells.kind), small: true) {
+                DebriefCard(ask: cells)
+            }
+        case .hr(let hr):
+            ThreadStep(kicker: "À compléter", now: now, title: Self.askTitle(Notebook.kindName("easy"), hr.date, km: nil),
+                       family: .run, small: true) {
+                HeartCard(ask: hr)
+            }
+        default:
+            EmptyView()
+        }
+    }
+
+    /// « EF de mardi 7 · 5,7 km ».
+    private static func askTitle(_ what: String, _ date: String, km: Double?) -> String {
+        "\(what) de \(Day(date)?.weekdayAndNumber ?? date)" + (km.map { " · \(Numbers.text($0)) km" } ?? "")
+    }
+
+    private func ownCells(_ observation: String) -> Notebook.CellsAsk? {
+        asks.lazy.compactMap { if case .cells(let cells) = $0, cells.id == "cell:\(observation)" { cells } else { nil } }.first
+    }
+
+    private var ownHeart: Notebook.HrAsk? {
+        guard !ownRuns.isEmpty else { return nil }
+        return asks.lazy.compactMap { if case .hr(let hr) = $0, hr.date == date { hr } else { nil } }.first
     }
 
     private enum Done {
@@ -59,6 +124,8 @@ struct DayThread: View {
                     if let rows = LimitRows(targets: item.targets, fact: fact) { rows } else { FactTiles(fact: fact, targets: item.targets) }
                     OverLine(fact: fact, targets: item.targets)
                     DetailLink(link: SessionLink(id: fact.observationId, title: item.title.shortTitle))
+                    if today, fact.observationId == ownRuns.first, let heart = ownHeart { HeartCard(ask: heart) }
+                    if today, let cells = ownCells(fact.observationId) { DebriefCard(ask: cells, targets: item.targets) }
                 }
             }
         case .unplanned(let fact):
@@ -71,7 +138,7 @@ struct DayThread: View {
     }
 
     @ViewBuilder private func pendingStep(_ item: Notebook.SessionItem, index: Int) -> some View {
-        let now = today && index == 0
+        let now = today && index == 0 && wakes.isEmpty && daily == nil && loose.isEmpty
         let role = !today ? nil : now ? "À faire" : index > 0 ? "Puis" : "Ensuite"
         let kicker = [role, item.startTime.flatMap(Numbers.clock), item.location].compactMap { $0 }.joined(separator: " · ")
         ThreadStep(kicker: kicker, now: now, title: item.id == hero?.id ? nil : item.title, family: item.family,
@@ -95,7 +162,8 @@ struct ThreadStep<Body: View>: View {
     let kicker: String
     var now = false
     let title: String?
-    let family: Family
+    /// Nil for a step that is no session, such as the morning's questions.
+    let family: Family?
     var small = false
     @ViewBuilder var content: Body
 
@@ -108,7 +176,7 @@ struct ThreadStep<Body: View>: View {
             }
             if let title {
                 HStack(spacing: 10) {
-                    FamilyBadge(family: family, small: small)
+                    if let family { FamilyBadge(family: family, small: small) }
                     Text(title).font(small ? .body.weight(.semibold) : .title3.weight(.semibold))
                 }
             }
@@ -119,7 +187,7 @@ struct ThreadStep<Body: View>: View {
 }
 
 extension ThreadStep where Body == EmptyView {
-    init(kicker: String, now: Bool = false, title: String?, family: Family, small: Bool = false) {
+    init(kicker: String, now: Bool = false, title: String?, family: Family?, small: Bool = false) {
         self.init(kicker: kicker, now: now, title: title, family: family, small: small) { EmptyView() }
     }
 }

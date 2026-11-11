@@ -417,6 +417,10 @@ ENTRY_VIEW = {
 }
 
 
+#: An answer written that went on to the coach.
+ANSWERED = {"status": "ok", "alert": True}
+
+
 SCREENS = {
     "today": (views.TodayView, TODAY),
     "week": (views.WeekView, WEEK),
@@ -430,4 +434,5 @@ SCREENS = {
     "weather": (views.Forecast, WEATHER),
     "entries": (views.EntriesView, ENTRIES),
     "entry": (views.EntryView, ENTRY_VIEW),
+    "answer": (views.Answered, ANSWERED),
 }

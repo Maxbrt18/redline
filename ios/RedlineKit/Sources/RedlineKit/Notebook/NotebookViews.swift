@@ -1028,6 +1028,62 @@ public extension Notebook {
         }
     }
 
+    struct Answered: Codable, Hashable, Sendable {
+        public let status: Status
+        public let alert: Bool
+
+        public enum Status: Codable, Hashable, Sendable {
+            case ok
+            /// A value this build does not know yet: the server is newer than the app.
+            case unknown(String)
+    
+            public init(rawValue: String) {
+                switch rawValue {
+                case "ok": self = .ok
+                default: self = .unknown(rawValue)
+                }
+            }
+    
+            public var rawValue: String {
+                switch self {
+                case .ok: "ok"
+                case .unknown(let rawValue): rawValue
+                }
+            }
+    
+            public init(from decoder: any Decoder) throws {
+                self.init(rawValue: try decoder.singleValueContainer().decode(String.self))
+            }
+    
+            public func encode(to encoder: any Encoder) throws {
+                var container = encoder.singleValueContainer()
+                try container.encode(rawValue)
+            }
+        }
+
+        public init(status: Status, alert: Bool) {
+            self.status = status
+            self.alert = alert
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case status = "status"
+            case alert = "alert"
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            status = try container.decode(Status.self, forKey: .status)
+            alert = try container.decode(Bool.self, forKey: .alert)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(status, forKey: .status)
+            try container.encode(alert, forKey: .alert)
+        }
+    }
+
     struct StrengthClosed: Codable, Hashable, Sendable {
         public let status: Status
         public let date: String

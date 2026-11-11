@@ -13,6 +13,8 @@ struct NotebookScreen<Value: Decodable & Sendable, Hero: View, Content: View>: V
     var heading: ((Value) -> String)?
     @ViewBuilder var hero: (Value) -> Hero
     @ViewBuilder var content: (Value) -> Content
+    /// What the last answer did, said at the top of the page until the next one.
+    @State private var notice: String?
 
     var body: some View {
         let title = model.value.flatMap { value in heading.map { LocalizedStringKey($0(value)) } } ?? title
@@ -37,6 +39,13 @@ struct NotebookScreen<Value: Decodable & Sendable, Hero: View, Content: View>: V
 
     private var page: some View {
             VStack(alignment: .leading, spacing: 0) {
+                if let notice {
+                    Label(notice, systemImage: "checkmark.circle.fill")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Palette.ink)
+                        .padding(.bottom, 12)
+                        .transition(.opacity)
+                }
                 if model.stale, let savedAt = model.savedAt {
                     Label("Hors ligne · à jour \(savedAt, format: .relative(presentation: .named))",
                           systemImage: "icloud.slash")
@@ -58,6 +67,12 @@ struct NotebookScreen<Value: Decodable & Sendable, Hero: View, Content: View>: V
                 } else {
                     ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
                 }
+            }
+            .environment(\.answered) { alert in
+                let words = alert ? "Noté. Le coach te répond dans Messenger." : "Noté."
+                withAnimation { notice = words }
+                AccessibilityNotification.Announcement(words).post()
+                await model.load(with: session)
             }
     }
 }

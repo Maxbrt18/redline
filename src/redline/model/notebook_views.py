@@ -197,6 +197,13 @@ class HrAsk(TypedDict):
 Ask = WakeAsk | CellsAsk | DailyAsk | HrAsk
 
 
+class Answered(TypedDict):
+    """One answer written; `alert` says it went on to the coach."""
+
+    status: Literal["ok"]
+    alert: bool
+
+
 class StrengthClosed(TypedDict):
     """Why no guided session is offered today."""
 
