@@ -9,8 +9,8 @@ The views stay declared once, in Python. This module derives, under `ios/Redline
 - `Tests/RedlineKitTests/NotebookContractTests.swift`: one test per screen, which decodes its
   payload and encodes it back to the same JSON, so that no key is dropped in silence.
 
-`python tests/ios_contract.py` rewrites them; tests/test_ios_contract.py fails while any of
-them differs from what this module writes.
+It also writes the palette of tests/ios_palette.py. `python tests/ios_contract.py` rewrites
+everything; tests/test_ios_contract.py fails while any file differs from what is written.
 """
 
 from __future__ import annotations
@@ -24,11 +24,13 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
+import ios_palette
 from notebook_payloads import SCREENS
 
 from redline.model import notebook_views as views
 
-ROOT = Path(__file__).resolve().parents[1] / "ios" / "RedlineKit"
+IOS = Path(__file__).resolve().parents[1] / "ios"
+ROOT = IOS / "RedlineKit"
 MODELS = ROOT / "Sources" / "RedlineKit" / "Notebook" / "NotebookViews.swift"
 FIXTURES = ROOT / "Tests" / "RedlineKitTests" / "Fixtures"
 CONTRACT_TESTS = ROOT / "Tests" / "RedlineKitTests" / "NotebookContractTests.swift"
@@ -337,28 +339,35 @@ def outputs() -> Iterator[tuple[Path, str]]:
     yield CONTRACT_TESTS, contract_tests()
     for screen, (_, payload) in SCREENS.items():
         yield FIXTURES / f"{screen}.json", fixture(payload)
+    yield from ios_palette.outputs()
+
+
+def strays() -> list[Path]:
+    """Fixtures and colour sets this module no longer writes."""
+    expected = dict(outputs())
+    return [path for path in sorted(FIXTURES.glob("*.json")) if path not in expected] + ios_palette.stray()
 
 
 def stale_or_stray() -> list[str]:
     """The written files that differ from what this module writes, and fixtures it no
     longer writes."""
-    expected = dict(outputs())
-    found = [path.relative_to(ROOT).as_posix() for path, text in expected.items()
+    found = [path.relative_to(IOS).as_posix() for path, text in outputs()
              if not path.is_file() or path.read_text(encoding="utf-8") != text]
-    found += [path.relative_to(ROOT).as_posix() for path in sorted(FIXTURES.glob("*.json"))
-              if path not in expected]
-    return found
+    return found + [path.relative_to(IOS).as_posix() for path in strays()]
 
 
 def main() -> None:
-    expected = dict(outputs())
-    for path in FIXTURES.glob("*.json"):
-        if path not in expected:
+    for path in strays():
+        if path.is_dir():
+            for child in path.iterdir():
+                child.unlink()
+            path.rmdir()
+        else:
             path.unlink()
-    for path, text in expected.items():
+    for path, text in outputs():
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
-        print(path.relative_to(ROOT.parents[1]))
+        print(path.relative_to(IOS.parent))
 
 
 if __name__ == "__main__":

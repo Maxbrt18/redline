@@ -9,6 +9,10 @@ struct RedlineApp: App {
         return NotebookSession(server: server, store: KeychainDeviceTokenStore(server: server))
     }()
 
+    init() {
+        Fonts.register()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView(session: session)

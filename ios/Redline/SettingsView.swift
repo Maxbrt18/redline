@@ -21,6 +21,12 @@ struct SettingsView: View {
                     LabeledContent("Serveur", value: session.server.baseURL.host() ?? "")
                     LabeledContent("Version", value: Self.version)
                 }
+
+                #if DEBUG
+                Section {
+                    NavigationLink("Catalogue des composants") { DesignCatalogue() }
+                }
+                #endif
             }
             .navigationTitle("Réglages")
             .navigationBarTitleDisplayMode(.inline)

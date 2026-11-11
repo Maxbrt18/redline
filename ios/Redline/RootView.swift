@@ -29,6 +29,19 @@ struct RootView: View {
     @State private var showingSettings = false
 
     var body: some View {
+        #if DEBUG
+        // `-RedlineCatalogue all` (or `track`) at launch opens the components, connected or not.
+        switch UserDefaults.standard.string(forKey: "RedlineCatalogue") {
+        case "all": NavigationStack { DesignCatalogue() }
+        case "track": NavigationStack { TrackPreview() }
+        default: notebook
+        }
+        #else
+        notebook
+        #endif
+    }
+
+    @ViewBuilder private var notebook: some View {
         if let session {
             Group {
                 switch session.state {

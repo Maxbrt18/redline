@@ -24,6 +24,12 @@ MARKETING_VERSION = 0.1.0
 CURRENT_PROJECT_VERSION = 1
 CODE_SIGN_STYLE = Automatic
 
+// The palette is named in Design/Palette.swift, generated from tokens.css; Xcode's own
+// symbols would collide with SwiftUI's (`Color.red`).
+ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor
+ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS = NO
+ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO
+
 GENERATE_INFOPLIST_FILE = YES
 INFOPLIST_FILE = Config/Info.plist
 INFOPLIST_KEY_CFBundleDisplayName = Redline
