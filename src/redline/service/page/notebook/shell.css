@@ -195,17 +195,12 @@ button, .n-nav, .n-krow, summary { touch-action: manipulation; }
  * and the data. A blue spread over a large card clashed with the warm paper and the logo
  * red. Family tints are very desaturated, at equal lightness (OKLCH L 0.50 C ~ 0.045 in
  * light, L 0.80 in dark); none comes close to red or orange. A new family takes a tint
- * from the same band, at the same lightness.
- * HR zones climb toward red, which stays intensity: Z5 is --red. */
-:root { --h-run: #4c677b; --h-pain: #705a75; --h-race: #436b6f; --h-str: #7a5867; --h-rest: #69625a;
-  --sand: #f0eae3; --card: #fffdfb; --pas-mix: 20%; --tile-pas-mix: 18%;
-  --z1: #c7bbb7; --z2: #bc9392; --z3: #bb6c6f; --z4: #b54245; --z5: var(--red); }
-:root[data-theme="dark"] { --h-run: #a6c2d7; --h-pain: #ccb4d1; --h-race: #9ec6cb; --h-str: #d7b2c2; --h-rest: #c4bcb4;
-  --sand: #231e1b; --card: #1c1817; --pas-mix: 24%; --tile-pas-mix: 28%;
-  --z1: #7a6f6b; --z2: #a87877; --z3: #d37b7e; --z4: #f47a79; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --h-run: #a6c2d7; --h-pain: #ccb4d1; --h-race: #9ec6cb;
-  --h-str: #d7b2c2; --h-rest: #c4bcb4; --sand: #231e1b; --card: #1c1817; --pas-mix: 24%; --tile-pas-mix: 28%;
-  --z1: #7a6f6b; --z2: #a87877; --z3: #d37b7e; --z4: #f47a79; } }
+ * from the same band, at the same lightness. The tints and the HR zones are declared in
+ * cards/tokens.css, which the iOS app reads too. */
+:root { --sand: #f0eae3; --card: #fffdfb; --pas-mix: 20%; --tile-pas-mix: 18%; }
+:root[data-theme="dark"] { --sand: #231e1b; --card: #1c1817; --pas-mix: 24%; --tile-pas-mix: 28%; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --sand: #231e1b; --card: #1c1817; --pas-mix: 24%; --tile-pas-mix: 28%; } }
 .n-pas { --h: var(--h-run); display: inline-grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 50%;
   background: color-mix(in oklab, var(--h) var(--pas-mix), var(--bg)); color: var(--h); }
 .n-pas svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -224,13 +219,11 @@ button, .n-nav, .n-krow, summary { touch-action: manipulation; }
  * paper. Red elsewhere is a limit (the cursor's stroke), or the main action under the
  * thumb. --track-flat is the mean color of the track once grained, measured in the
  * browser: the top bar and the iOS status bar take it, since neither can carry a texture.
- * Change it with --tartan or the grain.
+ * Change it with --tartan or the grain; the colours live in cards/tokens.css.
  * Below the bar the grain fades in down to the lanes while the base fades from
  * --track-flat to --tartan, so the mean color stays constant and only the relief appears:
  * the bar joins the track with no seam. */
-:root { --tartan: #c8102e; --tartan-deep: #a50d24; --track-flat: #cd183b; --on-track: #fff6f0; --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.3' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
-:root[data-theme="dark"] { --tartan: #b30f28; --tartan-deep: #8c0b1f; --track-flat: #ba1635; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --tartan: #b30f28; --tartan-deep: #8c0b1f; --track-flat: #ba1635; } }
+:root { --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.3' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
 .n-hero:empty { display: none; }
 .n-lanes { display: none; }
 :root.n-piste .n-track { --under-bar: calc(var(--bar) + env(safe-area-inset-top)); --lanes-top: calc(100% - 46px);
