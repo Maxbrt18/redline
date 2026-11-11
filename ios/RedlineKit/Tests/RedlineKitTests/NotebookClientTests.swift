@@ -81,8 +81,16 @@ struct NotebookClientTests {
         let transport = StubTransport(status: 503, body: Data(#"{"error": "Indisponible."}"#.utf8))
         let client = NotebookClient(server: server, device: "d3v1ce", transport: transport)
         await #expect(throws: NotebookError.refused(status: 503, message: "Indisponible.")) {
-            try await client.get(.injury)
+            try await client.get(.injury())
         }
+    }
+
+    @Test func aZoneIsAskedByName() async throws {
+        let transport = StubTransport(status: 404, body: Data())
+        let client = NotebookClient(server: server, device: "d3v1ce", transport: transport)
+        _ = try? await client.get(.injury(zone: "knee"))
+        let request = try #require(await transport.requests.first)
+        #expect(request.url?.absoluteString == "https://coach.example.org/notebook-api/injury?zone=knee")
     }
 
     @Test func noNetworkIsUnreachable() async {

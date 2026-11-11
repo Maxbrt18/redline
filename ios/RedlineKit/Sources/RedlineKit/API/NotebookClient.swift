@@ -57,7 +57,10 @@ public extension Endpoint where Value == Notebook.WeeksView {
 }
 
 public extension Endpoint where Value == Notebook.InjuryView {
-    static var injury: Self { Self(path: ["injury"]) }
+    /// A watched zone's pain over the last weeks; without a zone, the first one.
+    static func injury(zone: String? = nil) -> Self {
+        Self(path: ["injury"], query: zone.map { [URLQueryItem(name: "zone", value: $0)] } ?? [])
+    }
 }
 
 public extension Endpoint where Value == Notebook.SessionView {

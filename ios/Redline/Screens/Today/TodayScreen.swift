@@ -4,7 +4,8 @@ import SwiftUI
 /// Today: the day's session in the head, the day's thread, what is coming, the landmarks.
 struct TodayScreen: View {
     let session: NotebookSession
-    let openWeek: () -> Void
+    /// Leads to another tab: the week's landmark to Week, the race's to Race.
+    let openTab: (NotebookTab) -> Void
 
     var body: some View {
         NotebookScreen(title: NotebookTab.today.title, session: session, model: ScreenModel(.today)) { today in
@@ -14,7 +15,7 @@ struct TodayScreen: View {
                 Kicker(text: Day(today.date)?.spelled().capitalizedFirst ?? today.date)
             }
         } content: { today in
-            TodayContent(today: today, openWeek: openWeek)
+            TodayContent(today: today, openTab: openTab)
         }
     }
 
@@ -38,7 +39,7 @@ struct TodayScreen: View {
 
 private struct TodayContent: View {
     let today: Notebook.TodayView
-    let openWeek: () -> Void
+    let openTab: (NotebookTab) -> Void
 
     var body: some View {
         let items = today.sessions.filter { $0.kind != "rest" }
@@ -58,7 +59,7 @@ private struct TodayContent: View {
             } else {
                 RestDay(today: today, hero: hero)
             }
-            Landmarks(today: today, openWeek: openWeek)
+            Landmarks(today: today, openTab: openTab)
         }
         .padding(.bottom, 24)
     }

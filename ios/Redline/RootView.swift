@@ -76,7 +76,7 @@ struct RootView: View {
                     NavigationStack {
                         Group {
                             switch tab {
-                            case .today: TodayScreen(session: session) { selection = .week }
+                            case .today: TodayScreen(session: session) { selection = $0 }
                             case .week: WeekScreen(session: session)
                             case .race: RaceScreen(session: session)
                             }
@@ -85,6 +85,9 @@ struct RootView: View {
                         .environment(\.notebook, session)
                         .navigationDestination(for: SessionLink.self) { link in
                             SessionDetailScreen(session: session, link: link)
+                        }
+                        .navigationDestination(for: PainLink.self) { link in
+                            PainScreen(session: session, link: link)
                         }
                     }
                 }

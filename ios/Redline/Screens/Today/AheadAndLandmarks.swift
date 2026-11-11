@@ -75,10 +75,11 @@ struct AheadList: View {
 }
 
 /// The landmarks, on paper: the week with its bars, each watched zone against its ceiling,
-/// the race. The week leads to its tab.
+/// the race. Each leads to its screen: the week and the race to their tab, a zone to its
+/// pain.
 struct Landmarks: View {
     let today: Notebook.TodayView
-    let openWeek: () -> Void
+    let openTab: (NotebookTab) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
@@ -95,8 +96,8 @@ struct Landmarks: View {
         let totals = today.totals
         let runs = "\(totals.runsDone) sortie\(totals.runsDone > 1 ? "s" : "")" + (totals.runsPlanned > 0 ? " sur \(totals.runsPlanned)" : "")
         return VStack(alignment: .leading, spacing: 10) {
-            Button(action: openWeek) {
-                LandmarkLabel(text: "Semaine \(Int(today.week.suffix(2)) ?? 0)", family: .run)
+            Button { openTab(.week) } label: {
+                LandmarkLabel(text: "Semaine \(Int(today.week.suffix(2)) ?? 0)", family: .run, opens: true)
             }
             .buttonStyle(.plain)
             HStack(alignment: .lastTextBaseline, spacing: 6) {
@@ -116,7 +117,10 @@ struct Landmarks: View {
         let peak = zone.weeks.last?.peak
         let top = max(3, ((peak ?? 0) + 0.5).rounded(.up))
         return VStack(alignment: .leading, spacing: 10) {
-            LandmarkLabel(text: zone.label, family: .pain)
+            NavigationLink(value: PainLink(zone: zone.zone, label: zone.label)) {
+                LandmarkLabel(text: zone.label, family: .pain, opens: true)
+            }
+            .buttonStyle(.plain)
             RedLineCursor(label: "Pic d’effort, cette semaine", value: peak ?? 0, unit: "sur 10", scale: 0...top,
                           limit: today.pain.cap, limitLabel: "plafond \(Numbers.text(today.pain.cap))",
                           format: { Numbers.text($0) }, planned: peak == nil)
@@ -130,7 +134,10 @@ struct Landmarks: View {
                      race.distanceKm.map { "\(Numbers.text($0)) km" }, race.target.map { "cible \($0)" }]
             .compactMap { $0 }.joined(separator: " · ")
         return VStack(alignment: .leading, spacing: 8) {
-            LandmarkLabel(text: race.name, family: .race)
+            Button { openTab(.race) } label: {
+                LandmarkLabel(text: race.name, family: .race, opens: true)
+            }
+            .buttonStyle(.plain)
             HStack(alignment: .lastTextBaseline, spacing: 6) {
                 Text("\(race.days)").font(.figure(40))
                 Text(race.days > 1 ? "jours" : "jour").font(.subheadline).foregroundStyle(Palette.muted)
@@ -145,12 +152,19 @@ struct Landmarks: View {
 private struct LandmarkLabel: View {
     let text: String
     let family: Family
+    /// The landmark leads to its screen: a chevron says so.
+    var opens = false
 
     var body: some View {
         HStack(spacing: 8) {
             FamilyBadge(family: family, small: true)
             Text(text).font(.subheadline.weight(.semibold))
+            if opens {
+                Spacer()
+                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(Palette.faint)
+            }
         }
+        .contentShape(.rect)
     }
 }
 
