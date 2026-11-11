@@ -161,7 +161,7 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
             return jsonify(error=notebook_text.ERRORS["bad_link"]), 400
         # An old notification stays openable on an already connected device.
         if notebook.store.authenticate(psid, request.cookies.get(COOKIE, "")):
-            return jsonify(status="ok")
+            return jsonify(views.Done(status="ok"))
         device = notebook.store.exchange(psid, body["token"])
         if not device:
             return jsonify(error=notebook_text.ERRORS["link_used"]), 401
@@ -295,7 +295,7 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
             return jsonify(error=notebook_text.ERRORS["week_moved"]), 409
         except SchemaError:
             return jsonify(error=notebook_text.ERRORS["bad_days"]), 400
-        return jsonify(status="ok", revision=number)
+        return jsonify(views.Revised(status="ok", revision=number))
 
     @app.post("/notebook-api/days")
     def notebook_state_days():
@@ -309,7 +309,7 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
             return jsonify(error=notebook_text.ERRORS["bad_days"]), 400
         except reorganize.ReorganizeError:
             return jsonify(error=notebook_text.ERRORS["week_over"]), 409
-        return jsonify(status="ok")
+        return jsonify(views.Done(status="ok"))
 
     @app.get("/notebook-api/habits")
     def notebook_habits():
@@ -322,7 +322,7 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
             notebook.add_habit(body)
         except SchemaError:
             return jsonify(error=notebook_text.ERRORS["bad_habit"]), 400
-        return jsonify(status="ok")
+        return jsonify(views.Done(status="ok"))
 
     @app.post("/notebook-api/habits/end")
     def notebook_end_habit():
@@ -334,7 +334,7 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
             notebook.end_habit(body["id"])
         except reorganize.ReorganizeError:
             return jsonify(error=notebook_text.ERRORS["no_habit"]), 404
-        return jsonify(status="ok")
+        return jsonify(views.Done(status="ok"))
 
     @app.post("/notebook-api/reorganize/ask")
     def notebook_ask_coach():
@@ -354,7 +354,7 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
         except Exception:
             app.logger.exception("Reorganisation request not passed to the coach")
             return jsonify(error=notebook_text.ERRORS["coach_unreachable"]), 503
-        return jsonify(status="ok")
+        return jsonify(views.Done(status="ok"))
 
     @app.post("/notebook-api/proposals/take")
     def notebook_take_proposal():
@@ -366,7 +366,7 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
             number = notebook.take_proposal(body["id"])
         except (reorganize.ReorganizeError, SchemaError, StorageError):
             return jsonify(error=notebook_text.ERRORS["proposal_gone"]), 409
-        return jsonify(status="ok", revision=number)
+        return jsonify(views.Revised(status="ok", revision=number))
 
     @app.post("/notebook-api/proposals/dismiss")
     def notebook_dismiss_proposals():
@@ -375,7 +375,7 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
                 or not isinstance(body["week"], str) or not iso_week.is_label(body["week"])):
             return jsonify(error=notebook_text.ERRORS["bad_request"]), 400
         notebook.dismiss_proposals(body["week"])
-        return jsonify(status="ok")
+        return jsonify(views.Done(status="ok"))
 
     @app.post("/notebook-api/answer")
     def notebook_answer():

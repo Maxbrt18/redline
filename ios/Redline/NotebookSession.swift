@@ -17,6 +17,8 @@ final class NotebookSession {
     /// A card the last link pointed at, for Today to open on top of itself; the screen
     /// that opens it clears it.
     var pendingEntry: String?
+    /// What a screen that closed itself did, for the screen under it to say once.
+    var notice: String?
     private let store: any DeviceTokenStore
     private let cache: (any ResponseCache)?
     private let transport: any HTTPTransport

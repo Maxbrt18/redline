@@ -172,6 +172,51 @@ public struct NotebookClient: Sendable {
         return try await Self.send(request, as: Notebook.Answered.self, transport: transport).alert
     }
 
+    /// The week's variants for the days stated on the screen, computed by the engine
+    /// without the coach. Never kept: it answers what is on screen now.
+    public func reorganize(_ week: String, days: [StatedDay]) async throws(NotebookError) -> Notebook.ReorganizeView {
+        try await write(["reorganize"], WeekDays(week: week, days: days))
+    }
+
+    /// Takes one variant: it becomes the week's next revision.
+    public func takeVariant(_ week: String, days: [StatedDay], revision: Int, choice: Int) async throws(NotebookError) -> Int {
+        let body = Taken(week: week, days: days, revision: revision, choice: choice)
+        let revised: Notebook.Revised = try await write(["reorganize", "take"], body)
+        return revised.revision
+    }
+
+    /// Keeps the days of a week the coach has not written yet, for the review.
+    public func stateDays(_ week: String, days: [StatedDay]) async throws(NotebookError) {
+        let _: Notebook.Done = try await write(["days"], WeekDays(week: week, days: days))
+    }
+
+    /// Makes a day a weekly habit, from today on; `weekday` is ISO (1 = Monday).
+    public func addHabit(_ day: StatedDay, weekday: Int) async throws(NotebookError) {
+        let _: Notebook.Done = try await write(["habits"], day.habit(weekday: weekday))
+    }
+
+    public func endHabit(_ id: String) async throws(NotebookError) {
+        let _: Notebook.Done = try await write(["habits", "end"], ["id": id])
+    }
+
+    /// Hands the request to the coach, with the days stated and what the notebook computed.
+    public func askCoach(_ week: String, days: [StatedDay], wish: String, context: String) async throws(NotebookError) {
+        let _: Notebook.Done = try await write(["reorganize", "ask"], Asked(week: week, days: days, wish: wish, context: context))
+    }
+
+    public func takeProposal(_ id: String) async throws(NotebookError) -> Int {
+        let revised: Notebook.Revised = try await write(["proposals", "take"], ["id": id])
+        return revised.revision
+    }
+
+    public func dismissProposals(_ week: String) async throws(NotebookError) {
+        let _: Notebook.Done = try await write(["proposals", "dismiss"], ["week": week])
+    }
+
+    private func write<Value: Decodable>(_ path: [String], _ body: some Encodable) async throws(NotebookError) -> Value {
+        try await Self.send(Self.post(path, body: body, server: server, device: device), as: Value.self, transport: transport)
+    }
+
     /// Revokes this device's token on the server.
     public func signOut() async throws(NotebookError) {
         let request = Self.post(["logout"], body: [String: String](), server: server, device: device)
@@ -231,6 +276,25 @@ public struct NotebookClient: Sendable {
             throw .unreadable
         }
     }
+}
+
+private struct WeekDays: Encodable {
+    let week: String
+    let days: [StatedDay]
+}
+
+private struct Taken: Encodable {
+    let week: String
+    let days: [StatedDay]
+    let revision: Int
+    let choice: Int
+}
+
+private struct Asked: Encodable {
+    let week: String
+    let days: [StatedDay]
+    let wish: String
+    let context: String
 }
 
 private struct AnswerBody: Encodable {

@@ -133,6 +133,7 @@ private struct WeekContent: View {
                                extra: week.extra.filter { $0.date == date }, today: Day(.now).text)
                 }
             }
+            reorganize
             if root, let next = week.next {
                 SectionTitle(text: "Semaine prochaine")
                 NavigationLink(value: WeekLink(label: next.week)) {
@@ -165,6 +166,30 @@ private struct WeekContent: View {
             if root { PastWeeks(session: session) }
         }
         .padding(.bottom, 24)
+    }
+}
+
+extension WeekContent {
+    /// Moving sessions while the week is open and something is left to do; on the current
+    /// week before the next is written, saying how the next one's days present themselves.
+    @ViewBuilder var reorganize: some View {
+        let today = Day(.now).text
+        if week.open, week.plan.status == "valid",
+           week.sessions.contains(where: { !["done", "cancelled"].contains($0.status) && $0.kind != "rest" && $0.date >= today }) {
+            NavigationLink(value: ReorganizeLink(week: week.week)) {
+                EntryLine(title: "Réorganiser la semaine", detail: "déplacer des séances selon tes jours")
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 12)
+        }
+        if root, week.next == nil, week.week == week.current, let monday = Day(week.monday) {
+            let coming = monday.adding(7).isoWeek
+            NavigationLink(value: ReorganizeLink(week: coming)) {
+                EntryLine(title: "Préparer la semaine \(Int(coming.suffix(2)) ?? 0)", detail: "dire au coach comment se présentent tes jours")
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 12)
+        }
     }
 }
 

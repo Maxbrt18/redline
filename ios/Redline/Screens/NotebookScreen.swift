@@ -68,6 +68,13 @@ struct NotebookScreen<Value: Decodable & Sendable, Hero: View, Content: View>: V
                     ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
                 }
             }
+            .environment(\.reloadScreen) { await model.load(with: session) }
+            .onAppear {
+                if let words = session.notice {
+                    session.notice = nil
+                    withAnimation { notice = words }
+                }
+            }
             .environment(\.answered) { alert in
                 let words = alert ? "Noté. Le coach te répond dans Messenger." : "Noté."
                 withAnimation { notice = words }

@@ -417,6 +417,10 @@ ENTRY_VIEW = {
 }
 
 
+#: A write accepted, and one that made the week's next revision.
+DONE = {"status": "ok"}
+REVISED = {"status": "ok", "revision": 3}
+
 #: An answer written that went on to the coach.
 ANSWERED = {"status": "ok", "alert": True}
 
@@ -435,4 +439,6 @@ SCREENS = {
     "entries": (views.EntriesView, ENTRIES),
     "entry": (views.EntryView, ENTRY_VIEW),
     "answer": (views.Answered, ANSWERED),
+    "done": (views.Done, DONE),
+    "revised": (views.Revised, REVISED),
 }

@@ -109,6 +109,9 @@ struct RootView: View {
                     .navigationDestination(for: ArchivesLink.self) { _ in
                         ArchivesScreen(session: session)
                     }
+                    .navigationDestination(for: ReorganizeLink.self) { link in
+                        ReorganizeScreen(session: session, week: link.week)
+                    }
                 }
                 // On the stack, not its root: the screens pushed on it read them too.
                 .environment(\.openSettings) { showingSettings = true }

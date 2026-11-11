@@ -197,6 +197,18 @@ class HrAsk(TypedDict):
 Ask = WakeAsk | CellsAsk | DailyAsk | HrAsk
 
 
+class Done(TypedDict):
+    """A write the service accepted."""
+
+    status: Literal["ok"]
+
+
+class Revised(Done):
+    """A write that made the week's next revision."""
+
+    revision: int
+
+
 class Answered(TypedDict):
     """One answer written; `alert` says it went on to the coach."""
 

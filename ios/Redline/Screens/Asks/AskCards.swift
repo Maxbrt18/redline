@@ -88,6 +88,8 @@ extension EnvironmentValues {
     /// What a screen does once one of its questions is answered: say so, and load itself
     /// again so that the next question takes its place.
     @Entry var answered: ((_ alert: Bool) async -> Void)?
+    /// Loads the screen again, after a change made from it.
+    @Entry var reloadScreen: (() async -> Void)?
 }
 
 /// Sends answers for one card, keeps its buttons still while one is on its way, and says

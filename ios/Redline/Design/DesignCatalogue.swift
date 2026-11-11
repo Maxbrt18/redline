@@ -7,6 +7,8 @@ import SwiftUI
 struct DesignCatalogue: View {
     @State private var pain = 1.0
     @State private var theme = 0
+    /// The demo notebook the screens opened from here read.
+    @State private var demo = DemoNotebook.session()
 
     var body: some View {
         List {
@@ -84,6 +86,7 @@ struct DesignCatalogue: View {
                     .controlSize(.large)
                     .frame(maxWidth: .infinity)
                 NavigationLink("L’en-tête tartan") { TrackPreview() }
+                NavigationLink("Réorganiser (démo)", value: ReorganizeLink(week: DemoNotebook.reorganizedWeek))
                 DisclosureGroup("Préparer la séance") {
                     Text("Échauffement, 10 min").foregroundStyle(Palette.muted)
                 }
@@ -113,6 +116,9 @@ struct DesignCatalogue: View {
             }
         }
         .navigationTitle("Catalogue")
+        .navigationDestination(for: ReorganizeLink.self) { link in
+            ReorganizeScreen(session: demo, week: link.week).environment(\.notebook, demo)
+        }
     }
 
     /// Forty minutes of a session with three repetitions, a stop and a small hill.

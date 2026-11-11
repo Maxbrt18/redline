@@ -56,4 +56,12 @@ struct NotebookContractTests {
     @Test func answer() throws {
         try expectRoundTrip(Notebook.Answered.self, fixture: "answer")
     }
+
+    @Test func done() throws {
+        try expectRoundTrip(Notebook.Done.self, fixture: "done")
+    }
+
+    @Test func revised() throws {
+        try expectRoundTrip(Notebook.Revised.self, fixture: "revised")
+    }
 }
