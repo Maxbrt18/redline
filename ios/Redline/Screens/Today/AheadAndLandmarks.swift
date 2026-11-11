@@ -137,27 +137,42 @@ private struct LandmarkLabel: View {
     }
 }
 
-/// The week's seven days as bars: done in ink, planned in dots, today's letter in red.
+/// The week's seven days as bars: done solid, planned in dots, today's letter in red. On
+/// the track the bars turn white.
 struct WeekBars: View {
     let days: [Notebook.StripDay]
-    private let height: CGFloat = 52
+    var height: CGFloat = 52
+    /// Under each letter, the day's session in a word (or « repos »).
+    var abbreviations = false
+    @Environment(\.onTrack) private var onTrack
 
     var body: some View {
         let peak = max(1, days.map { max($0.doneKm ?? 0, $0.plannedKm ?? 0) }.max() ?? 1)
         HStack(alignment: .bottom, spacing: 6) {
             ForEach(days, id: \.date) { day in
                 VStack(spacing: 4) {
-                    Text(label(day)).font(.caption2.weight(.semibold)).foregroundStyle(day.doneKm != nil ? Palette.ink : Palette.faint)
+                    Text(label(day)).font(.caption2.weight(.semibold))
+                        .foregroundStyle(day.doneKm != nil ? ink : faint)
                         .lineLimit(1).minimumScaleFactor(0.7)
                     bar(day, peak: peak)
                     Text(day.letter).font(.caption2.weight(day.today ? .bold : .regular))
-                        .foregroundStyle(day.today ? Palette.red : Palette.muted)
+                        .foregroundStyle(day.today ? (onTrack ? Palette.onTrack : Palette.red) : muted)
+                        .underline(day.today && onTrack)
+                    if abbreviations {
+                        Text(day.abbr.isEmpty ? (day.rest ? "repos" : "—") : day.abbr)
+                            .font(.system(size: 9)).foregroundStyle(faint).lineLimit(1).minimumScaleFactor(0.6)
+                    }
                 }
                 .frame(maxWidth: .infinity)
             }
         }
-        .frame(height: height + 40, alignment: .bottom)
+        .frame(height: height + (abbreviations ? 54 : 40), alignment: .bottom)
+        .accessibilityHidden(true)
     }
+
+    private var ink: Color { onTrack ? Palette.onTrack : Palette.ink }
+    private var muted: Color { onTrack ? Palette.onTrack.opacity(0.8) : Palette.muted }
+    private var faint: Color { onTrack ? Palette.onTrack.opacity(0.7) : Palette.faint }
 
     private func label(_ day: Notebook.StripDay) -> String {
         if let done = day.doneKm, done > 0 { return Numbers.text(done) }
@@ -168,13 +183,13 @@ struct WeekBars: View {
     @ViewBuilder private func bar(_ day: Notebook.StripDay, peak: Double) -> some View {
         let shape = RoundedRectangle(cornerRadius: 3)
         if let done = day.doneKm, done > 0 {
-            shape.fill(Palette.data).frame(width: 18, height: max(4, height * done / peak))
+            shape.fill(onTrack ? Palette.onTrack : Palette.data).frame(width: 18, height: max(4, height * done / peak))
         } else if day.plannedKm != nil || day.plannedLabel != nil {
-            DotPattern.planned
+            DotPattern(color: onTrack ? Palette.onTrack.opacity(0.85) : Palette.data.opacity(0.75), spacing: 4, radius: 1.05)
                 .frame(width: 18, height: day.plannedKm.map { max(4, height * $0 / peak) } ?? height / 2)
                 .clipShape(shape)
         } else {
-            shape.fill(Palette.ghost).frame(width: 18, height: 2)
+            shape.fill(onTrack ? Palette.onTrack.opacity(0.5) : Palette.ghost).frame(width: 18, height: 2)
         }
     }
 }

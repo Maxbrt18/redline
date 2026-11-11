@@ -46,6 +46,14 @@ public struct Day: Sendable, Hashable, Comparable {
         return date.formatted(style)
     }
 
+    /// The day `count` days later (earlier when negative).
+    public func adding(_ count: Int) -> Day {
+        Day(Self.calendar.date(byAdding: .day, value: count, to: date)!, calendar: Self.calendar)
+    }
+
+    /// The ISO-format text of the day, as the API writes it.
+    public var text: String { String(format: "%04d-%02d-%02d", year, month, day) }
+
     public static func < (lhs: Day, rhs: Day) -> Bool {
         (lhs.year, lhs.month, lhs.day) < (rhs.year, rhs.month, rhs.day)
     }

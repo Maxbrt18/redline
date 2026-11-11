@@ -31,4 +31,9 @@ struct DayTests {
         let lateEvening = try #require(paris.date(from: DateComponents(year: 2026, month: 11, day: 11, hour: 23, minute: 30)))
         #expect(Day(lateEvening, calendar: paris) == Day("2026-11-11"))
     }
+
+    @Test func aDayMovesAcrossMonthsAndYears() throws {
+        #expect(try #require(Day("2026-10-31")).adding(1).text == "2026-11-01")
+        #expect(try #require(Day("2027-01-01")).adding(-1).text == "2026-12-31")
+    }
 }

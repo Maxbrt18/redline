@@ -1,27 +1,6 @@
 import RedlineKit
 import SwiftUI
 
-/// Week: the week judged so far, and the rest prescribed.
-struct WeekScreen: View {
-    let session: NotebookSession
-
-    var body: some View {
-        NotebookScreen(title: NotebookTab.week.title, session: session,
-                       model: ScreenModel(.week(Day(.now).isoWeek))) { week in
-            Kicker(text: Self.span(of: week))
-        } content: { _ in
-            EmptyView()
-        }
-    }
-
-    /// « Semaine 46 · du 9 novembre » from the week's label and its Monday.
-    private static func span(of week: Notebook.WeekView) -> String {
-        let number = week.week.split(separator: "W").last.flatMap { Int($0) }.map { "Semaine \($0)" } ?? week.week
-        guard let monday = Day(week.monday) else { return number }
-        return "\(number) · du \(monday.spelled(weekday: false))"
-    }
-}
-
 /// Race: what the training aims at.
 struct RaceScreen: View {
     let session: NotebookSession
