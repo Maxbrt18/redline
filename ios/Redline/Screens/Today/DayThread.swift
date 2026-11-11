@@ -16,6 +16,7 @@ struct DayThread: View {
     /// its own run when that run is today's.
     var asks: [Notebook.Ask] = []
     var date: String?
+    @Environment(\.notebook) private var session
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
@@ -139,15 +140,20 @@ struct DayThread: View {
 
     @ViewBuilder private func pendingStep(_ item: Notebook.SessionItem, index: Int) -> some View {
         let now = today && index == 0 && wakes.isEmpty && daily == nil && loose.isEmpty
-        let role = !today ? nil : now ? "À faire" : index > 0 ? "Puis" : "Ensuite"
-        let kicker = [role, item.startTime.flatMap(Numbers.clock), item.location].compactMap { $0 }.joined(separator: " · ")
+        let started: StrengthResume? = if item.isStrength, today, case .ready(let ready)? = strength {
+            StrengthLauncher.resume(of: ready, in: session)
+        } else { nil }
+        let role = !today ? nil : started != nil ? "En cours" : now ? "À faire" : index > 0 ? "Puis" : "Ensuite"
+        let time = started.map { "commencée à " + $0.startedAt.formatted(date: .omitted, time: .shortened) }
+            ?? item.startTime.flatMap(Numbers.clock)
+        let kicker = [role, time, item.location].compactMap { $0 }.joined(separator: " · ")
         ThreadStep(kicker: kicker, now: now, title: item.id == hero?.id ? nil : item.title, family: item.family,
                    small: item.isStrength || !today) {
             if item.status == "held" {
                 Text("Une question t’attend dans Messenger avant cette séance.").font(.subheadline).foregroundStyle(Palette.muted)
             } else if item.isStrength {
                 if let note = item.note { Text(note).font(.subheadline).foregroundStyle(Palette.muted) }
-                if today, case .ready(let ready)? = strength { ExerciseList(session: ready.session) }
+                if today, case .ready(let ready)? = strength { StrengthLauncher(ready: ready) }
             } else {
                 if today { TargetCursors(targets: item.targets) }
                 if let note = item.note, today { Text(note).font(.subheadline).foregroundStyle(Palette.muted) }

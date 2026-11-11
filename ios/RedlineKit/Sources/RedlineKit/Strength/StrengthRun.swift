@@ -478,6 +478,16 @@ public struct StrengthRun: Sendable {
         progress.delivery = .composing
     }
 
+    /// What the server answered: kept as sent, kept pending to retry, or back to the review.
+    public mutating func apply(_ outcome: StrengthReportOutcome) {
+        switch outcome {
+        case .accepted: delivered(duplicate: false)
+        case .duplicate: delivered(duplicate: true)
+        case .unreachable: break
+        case .expired, .quota, .forbidden, .invalid: refused()
+        }
+    }
+
     private func reported(_ index: Int) -> Notebook.StrengthReportExercise? {
         guard let step = progress.steps[index], !step.isUntouched else { return nil }
         let status: Notebook.StrengthReportExercise.Status =

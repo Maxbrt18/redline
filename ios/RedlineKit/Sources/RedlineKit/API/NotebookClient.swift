@@ -105,7 +105,7 @@ public extension Endpoint where Value == Notebook.Forecast? {
 public struct NotebookClient: Sendable {
     public let server: Server
     private let device: String
-    private let transport: any HTTPTransport
+    let transport: any HTTPTransport
     private let cache: (any ResponseCache)?
 
     public init(server: Server, device: String, transport: any HTTPTransport = URLSessionTransport(),
@@ -213,7 +213,7 @@ public struct NotebookClient: Sendable {
         let _: Notebook.Done = try await write(["proposals", "dismiss"], ["week": week])
     }
 
-    private func write<Value: Decodable>(_ path: [String], _ body: some Encodable) async throws(NotebookError) -> Value {
+    func write<Value: Decodable>(_ path: [String], _ body: some Encodable) async throws(NotebookError) -> Value {
         try await Self.send(Self.post(path, body: body, server: server, device: device), as: Value.self, transport: transport)
     }
 

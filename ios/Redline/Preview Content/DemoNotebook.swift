@@ -7,7 +7,9 @@ import RedlineKit
 enum DemoNotebook {
     static func session() -> NotebookSession {
         let server = try! Server(host: "demo.invalid")
-        return NotebookSession(server: server, store: DemoTokenStore(), transport: DemoTransport())
+        let strength = FileManager.default.temporaryDirectory.appending(path: "demo-strength")
+        return NotebookSession(server: server, store: DemoTokenStore(), transport: DemoTransport(),
+                               strengthStore: FileStrengthProgressStore(directory: strength))
     }
 
     /// The week the reorganisation fixture is about.
@@ -21,15 +23,23 @@ enum DemoNotebook {
 /// Answers each route with the fixture of the same name; `week/<label>` and
 /// `session/<id>` share one fixture each, every card is `entry`, and every card's image
 /// is `card.png`, a sample card of the engine. A write is accepted and changes nothing.
+/// Every strength link opens the `strength-session` fixture, and its report is accepted.
 struct DemoTransport: HTTPTransport {
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        switch request.url!.path() {
+        case "/strength-session": return try await answer(request, name: "strength-session")
+        case "/strength-report":
+            return (Data(#"{"status": "accepted"}"#.utf8),
+                    HTTPURLResponse(url: request.url!, statusCode: 201, httpVersion: nil, headerFields: nil)!)
+        default: break
+        }
         let parts = Array(request.url!.pathComponents.dropFirst(2))
         let path = parts.joined(separator: "/")
         let name = if request.httpMethod == "POST" {
             // A write answers as the service does: a revision, the variants, or done.
             switch path {
             case "reorganize/take", "proposals/take": "revised"
-            case "reorganize", "answer": path
+            case "reorganize", "answer", "launch": path
             default: "done"
             }
         } else if parts.first == "entries" && parts.count > 1 {
@@ -37,6 +47,10 @@ struct DemoTransport: HTTPTransport {
         } else {
             parts.first ?? ""
         }
+        return try await answer(request, name: name)
+    }
+
+    private func answer(_ request: URLRequest, name: String) async throws -> (Data, URLResponse) {
         let fixture = Bundle.main.url(forResource: name, withExtension: name == "card" ? "png" : "json")
         try await Task.sleep(for: .milliseconds(300))
         let body = fixture.flatMap { try? Data(contentsOf: $0) } ?? Data(#"{"error": "Pas de démo pour cette page."}"#.utf8)

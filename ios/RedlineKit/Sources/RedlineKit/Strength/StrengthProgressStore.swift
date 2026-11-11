@@ -1,11 +1,30 @@
 import Foundation
 
-/// Where a session's progress stays between two openings of the app, by session id.
+/// Where a session's progress stays between two openings of the app, by session id, with
+/// the link that opened it: a session opened once reopens without a network, and its
+/// report leaves when the network comes back.
 public protocol StrengthProgressStore: Sendable {
     /// Nil when nothing is kept, or when this build no longer reads what is.
     func load(sid: String) -> StrengthProgress?
     func save(_ progress: StrengthProgress, sid: String) throws
     func remove(sid: String)
+    func loadOpened(sid: String) -> OpenedStrength?
+    func saveOpened(_ opened: OpenedStrength) throws
+    /// Every kept session whose report waits for the network.
+    func pendingReports() -> [(opened: OpenedStrength, progress: StrengthProgress)]
+}
+
+/// A strength link as it opened: its token and what the server answered.
+public struct OpenedStrength: Codable, Hashable, Sendable {
+    public let token: StrengthToken
+    public let view: Notebook.StrengthSessionView
+
+    public init(token: StrengthToken, view: Notebook.StrengthSessionView) {
+        self.token = token
+        self.view = view
+    }
+
+    public var sid: String { view.session.sid }
 }
 
 /// One file per session in the app's private support folder.
@@ -36,10 +55,39 @@ public struct FileStrengthProgressStore: StrengthProgressStore {
 
     public func remove(sid: String) {
         try? FileManager.default.removeItem(at: file(sid))
+        try? FileManager.default.removeItem(at: link(sid))
     }
+
+    public func loadOpened(sid: String) -> OpenedStrength? {
+        guard let data = try? Data(contentsOf: link(sid)) else { return nil }
+        return try? JSONDecoder().decode(OpenedStrength.self, from: data)
+    }
+
+    public func saveOpened(_ opened: OpenedStrength) throws {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try JSONEncoder().encode(opened)
+            .write(to: link(opened.sid), options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+    }
+
+    public func pendingReports() -> [(opened: OpenedStrength, progress: StrengthProgress)] {
+        let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+        return files.filter { $0.lastPathComponent.hasSuffix(Self.linkSuffix) }.compactMap { url in
+            guard let data = try? Data(contentsOf: url),
+                  let opened = try? JSONDecoder().decode(OpenedStrength.self, from: data),
+                  let progress = load(sid: opened.sid), case .pending = progress.delivery
+            else { return nil }
+            return (opened, progress)
+        }
+    }
+
+    private static let linkSuffix = ".link.json"
 
     private func file(_ sid: String) -> URL {
         directory.appending(path: FileResponseCache.fileName(sid) + ".json")
+    }
+
+    private func link(_ sid: String) -> URL {
+        directory.appending(path: FileResponseCache.fileName(sid) + Self.linkSuffix)
     }
 }
 
@@ -78,5 +126,19 @@ public struct StrengthRetry: Sendable {
 
     public mutating func reset() {
         delay = Self.first
+    }
+}
+
+/// Sends the reports left waiting for the network, from wherever the app is.
+public enum StrengthOutbox {
+    /// What each kept report became; a report the server still does not answer stays pending.
+    public static func flush(client: NotebookClient, store: any StrengthProgressStore,
+                             now: Date = .now) async {
+        for (opened, progress) in store.pendingReports() {
+            var run = StrengthRun(session: opened.view.session, zones: opened.view.zones, saved: progress)
+            guard let report = run.reportToSend(at: now) else { continue }
+            run.apply(await client.sendStrengthReport(report, token: opened.token))
+            try? store.save(run.progress, sid: opened.sid)
+        }
     }
 }

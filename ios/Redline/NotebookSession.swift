@@ -19,16 +19,21 @@ final class NotebookSession {
     var pendingEntry: String?
     /// What a screen that closed itself did, for the screen under it to say once.
     var notice: String?
+    /// The strength session open over the notebook.
+    var strength: StrengthLaunch?
+    /// Where strength sessions keep their progress and their link.
+    let strengthStore: any StrengthProgressStore
     private let store: any DeviceTokenStore
     private let cache: (any ResponseCache)?
     private let transport: any HTTPTransport
 
     init(server: Server, store: any DeviceTokenStore, cache: (any ResponseCache)? = nil,
-         transport: any HTTPTransport = URLSessionTransport()) {
+         transport: any HTTPTransport = URLSessionTransport(), strengthStore: (any StrengthProgressStore)? = nil) {
         self.server = server
         self.store = store
         self.cache = cache
         self.transport = transport
+        self.strengthStore = strengthStore ?? FileStrengthProgressStore(server: server)
         state = store.read().map {
             .signedIn(NotebookClient(server: server, device: $0, transport: transport, cache: cache))
         } ?? .signedOut

@@ -57,6 +57,17 @@ struct RootView: View {
                 case .signedIn:
                     tabs(session)
                         .sheet(isPresented: $showingSettings) { SettingsView(session: session) }
+                        .fullScreenCover(item: Binding(get: { session.strength }, set: { session.strength = $0 })) { launch in
+                            StrengthScreen(session: session, launch: launch)
+                        }
+                        #if DEBUG
+                        // `-RedlineStrength YES` with the demo opens its strength session at launch.
+                        .task {
+                            if UserDefaults.standard.bool(forKey: "RedlineStrength"), let token = StrengthToken(String(repeating: "A", count: 32)) {
+                                session.strength = StrengthLaunch(token: token, sid: nil)
+                            }
+                        }
+                        #endif
                 }
             }
             .onOpenURL { url in
