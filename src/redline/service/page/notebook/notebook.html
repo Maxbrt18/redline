@@ -6,11 +6,14 @@
     <p>Pour te connecter, envoie <strong>/carnet</strong> dans Messenger et ouvre le bouton reçu sur cet appareil.</p>
   </section>
   <section id="handoff" hidden>
-    <h1>Ouvre ton carnet dans Safari</h1>
-    <p>Le navigateur de Messenger ne garde pas la connexion. Ce lien n’a pas encore servi : ouvre-le dans ton navigateur habituel pour y connecter ton carnet.</p>
-    <a id="handoff-safari" class="n-action" href="#">Ouvrir dans Safari</a>
-    <p><button id="handoff-copy" type="button" class="n-quiet">Copier le lien</button></p>
-    <p class="n-meta">Sinon : menu ⋯ en haut à droite, puis « Ouvrir dans le navigateur ». Le lien ne vaut que pour un appareil.</p>
+    <h1 id="handoff-title">Ouvre ton carnet</h1>
+    <p id="handoff-why">Le navigateur de Messenger ne garde pas la connexion. Ce lien n’a pas encore servi : ouvre-le dans l’app Redline, ou dans ton navigateur habituel pour y connecter ton carnet.</p>
+    <a id="handoff-app" class="n-action" href="#">Ouvrir dans l’app</a>
+    <div id="handoff-browser">
+      <a id="handoff-safari" class="n-action" href="#">Ouvrir dans Safari</a>
+      <p><button id="handoff-copy" type="button" class="n-quiet">Copier le lien</button></p>
+      <p class="n-meta">Sinon : menu ⋯ en haut à droite, puis « Ouvrir dans le navigateur ». Le lien ne vaut que pour un appareil.</p>
+    </div>
     <p><button id="handoff-here" type="button" class="n-quiet">Me connecter ici quand même</button></p>
   </section>
   <div id="connected" hidden>

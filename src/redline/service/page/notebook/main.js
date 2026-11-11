@@ -1,7 +1,7 @@
 import {$} from '../shared/dom.js';
 import {applyTheme} from '../shared/theme.js';
 import {app} from './state.js';
-import {connect, embedded, handoff} from './session.js';
+import {connect, embedded, handoff, sessionHandoff} from './session.js';
 import {isoDate} from './format.js';
 import {render} from './nav.js';
 import {refresh} from './data.js';
@@ -28,6 +28,7 @@ document.addEventListener('visibilitychange', () => {
 document.addEventListener('gesturestart', event => event.preventDefault());
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/carnet-sw.js', {scope: '/carnet'}).catch(() => {});
 const capability = new URLSearchParams(location.hash.slice(1)).get('t');
-// A session link (/s#t=…) opens the session alone; otherwise, the notebook.
-if (location.pathname === '/s') openLink();
+// A session link (/s#t=…) opens the session alone; otherwise, the notebook. In Messenger,
+// both first offer the app.
+if (location.pathname === '/s') { if (embedded) sessionHandoff(openLink); else openLink(); }
 else if (capability && embedded) handoff(capability); else connect(capability);

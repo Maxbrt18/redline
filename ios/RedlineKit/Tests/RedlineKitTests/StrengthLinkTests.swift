@@ -15,7 +15,14 @@ struct StrengthLinkTests {
         #expect(StrengthToken(link: url)?.value == String(repeating: "b_-9", count: 8))
     }
 
+    @Test func thePageHandsTheSameTokenToTheApp() throws {
+        let url = try #require(URL(string: "redline://s#t=" + String(repeating: "A", count: 32)))
+        #expect(StrengthToken(link: url) == token)
+    }
+
     @Test(arguments: ["https://coach.example.org/carnet#t=" + String(repeating: "A", count: 32),
+                      "redline://connect#t=" + String(repeating: "A", count: 32),
+                      "http://coach.example.org/s#t=" + String(repeating: "A", count: 32),
                       "https://coach.example.org/s#t=short",
                       "https://coach.example.org/s#t=" + String(repeating: "A", count: 31) + "=",
                       "https://coach.example.org/s"])

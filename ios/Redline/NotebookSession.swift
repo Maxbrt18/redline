@@ -1,3 +1,4 @@
+import Foundation
 import Observation
 import RedlineKit
 
@@ -43,6 +44,15 @@ final class NotebookSession {
     /// keeps its token, as an old notification stays openable on the page. A link to a
     /// card opens that card either way.
     func connect(with text: String) async {
+        // A session link opens the session; it needs a connected device, as Today does.
+        if let url = URL(string: text.trimmingCharacters(in: .whitespacesAndNewlines)), let token = StrengthToken(link: url) {
+            guard case .signedIn = state else {
+                failure = "Connecte d’abord l’app : envoie /carnet dans Messenger, puis rouvre la séance."
+                return
+            }
+            strength = StrengthLaunch(token: token, sid: nil)
+            return
+        }
         if case .signedIn = state {
             pendingEntry = (try? NotebookLink(text, server: server))?.entry ?? pendingEntry
             return

@@ -12,9 +12,12 @@ public struct StrengthToken: Hashable, Sendable, Codable {
         self.value = value
     }
 
-    /// The token of a session link (`…/s#t=<token>`); nil for any other link.
+    /// The token of a session link: `https://<host>/s#t=<token>` as the coach sends it, or
+    /// `redline://s#t=<token>` as the page hands it to the app; nil for any other link.
     public init?(link: URL) {
-        guard link.path() == "/s", let fragment = link.fragment(percentEncoded: false), fragment.hasPrefix("t=")
+        let fromServer = link.scheme == "https" && link.path() == "/s"
+        let fromPage = link.scheme == NotebookLink.scheme && link.host() == "s" && link.path().isEmpty
+        guard fromServer || fromPage, let fragment = link.fragment(percentEncoded: false), fragment.hasPrefix("t=")
         else { return nil }
         self.init(String(fragment.dropFirst(2)))
     }

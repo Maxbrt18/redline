@@ -253,15 +253,20 @@ def test_an_expired_link_says_so_and_nothing_else_leaves(browser):
     tab.close()
 
 
-def test_messenger_browser_keeps_link_for_safari(browser):
-    context = browser.new_context(user_agent='Mozilla/5.0 (iPhone) Mobile/15E148 [FBAN/MessengerForiOS;FBAV/480.0]')
+MESSENGER = 'Mozilla/5.0 (iPhone) Mobile/15E148 [FBAN/MessengerForiOS;FBAV/480.0]'
+
+
+def test_messenger_browser_keeps_link_for_the_app_or_safari(browser):
+    context = browser.new_context(user_agent=MESSENGER)
     tab = context.new_page()
     calls = []
     tab.on('request', lambda request: calls.append(request.url) if '/notebook-api/' in request.url else None)
     serve(tab)
     tab.goto(BASE + '/carnet#t=' + 'x' * 43)
-    tab.get_by_role('heading', name='Ouvre ton carnet dans Safari').wait_for()
+    tab.get_by_role('heading', name='Ouvre ton carnet').wait_for()
     assert '#t=' + 'x' * 43 in tab.url
+    assert tab.get_by_role('link', name='Ouvrir dans l’app').get_attribute('href') == \
+        'redline://connect#t=' + 'x' * 43
     assert tab.get_by_role('link', name='Ouvrir dans Safari').get_attribute('href') == \
         'x-safari-https://redline.test/carnet#t=' + 'x' * 43
     assert not calls
@@ -270,6 +275,22 @@ def test_messenger_browser_keeps_link_for_safari(browser):
     assert 't=' not in tab.url
     context.close()
 
+
+
+def test_a_session_link_in_messenger_offers_the_app_before_running_here(browser):
+    context = browser.new_context(user_agent=MESSENGER)
+    tab = context.new_page()
+    serve(tab)
+    tab.route(BASE + '/s', lambda route: route.fulfill(content_type='text/html', body=session_document(render.CARDS_DIR)))
+    tab.route('**/strength-session', lambda route: route.fulfill(
+        content_type='application/json', body=json.dumps({'status': 'ok', 'session': SESSION})))
+    tab.goto(BASE + '/s#t=' + 'A' * 32)
+    tab.get_by_role('heading', name='Ouvre ta séance').wait_for()
+    assert tab.get_by_role('link', name='Ouvrir dans l’app').get_attribute('href') == 'redline://s#t=' + 'A' * 32
+    assert not tab.get_by_role('link', name='Ouvrir dans Safari').is_visible()
+    tab.get_by_role('button', name='Continuer ici').click()
+    tab.get_by_text('Step-up').first.wait_for()
+    context.close()
 
 def pull(tab, distance=260):
     """Pull the page down from the top, by finger."""
