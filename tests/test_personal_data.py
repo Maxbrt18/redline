@@ -52,9 +52,9 @@ def test_no_private_word_is_published():
     assert not found, sorted(found)
 
 
-#: Test data, dated like the fictional athlete's: the suite, and the iOS app's tests, whose
-#: fixtures tests/ios_contract.py exports from tests/notebook_payloads.py.
-TEST_ROOTS = ("tests/", "ios/RedlineKit/Tests/")
+#: Test data, dated like the fictional athlete's: the suite, and the iOS app's tests and
+#: debug demo, whose fixtures tests/ios_contract.py exports from tests/notebook_payloads.py.
+TEST_ROOTS = ("tests/", "ios/RedlineKit/Tests/", "ios/Redline/Preview Content/")
 
 
 def test_no_real_date_outside_the_tests():

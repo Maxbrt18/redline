@@ -15,11 +15,18 @@ final class NotebookSession {
     /// Why the last connection failed, in the athlete's words; nil once it succeeds.
     private(set) var failure: String?
     private let store: any DeviceTokenStore
+    private let cache: (any ResponseCache)?
+    private let transport: any HTTPTransport
 
-    init(server: Server, store: any DeviceTokenStore) {
+    init(server: Server, store: any DeviceTokenStore, cache: (any ResponseCache)? = nil,
+         transport: any HTTPTransport = URLSessionTransport()) {
         self.server = server
         self.store = store
-        state = store.read().map { .signedIn(NotebookClient(server: server, device: $0)) } ?? .signedOut
+        self.cache = cache
+        self.transport = transport
+        state = store.read().map {
+            .signedIn(NotebookClient(server: server, device: $0, transport: transport, cache: cache))
+        } ?? .signedOut
     }
 
     /// Connects with a link pasted or opened by the system; a device already connected
@@ -40,10 +47,10 @@ final class NotebookSession {
         connecting = true
         defer { connecting = false }
         do {
-            let device = try await NotebookClient.connect(link, server: server)
+            let device = try await NotebookClient.connect(link, server: server, transport: transport)
             try store.save(device)
             failure = nil
-            state = .signedIn(NotebookClient(server: server, device: device))
+            state = .signedIn(NotebookClient(server: server, device: device, transport: transport, cache: cache))
         } catch let error as NotebookError {
             failure = Self.words(for: error)
         } catch {
@@ -62,6 +69,7 @@ final class NotebookSession {
     /// The server no longer knows this device: back to the connection screen.
     func forget(saying message: String? = nil) {
         store.delete()
+        cache?.clear()
         failure = message
         state = .signedOut
     }

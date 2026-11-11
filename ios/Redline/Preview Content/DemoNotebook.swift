@@ -1,0 +1,34 @@
+#if DEBUG
+import Foundation
+import RedlineKit
+
+/// The notebook of the tests' fictional athlete, served from the bundled contract fixtures:
+/// `-RedlineDemo YES` at launch opens every screen without a server. Debug builds only.
+enum DemoNotebook {
+    static func session() -> NotebookSession {
+        let server = try! Server(host: "demo.invalid")
+        return NotebookSession(server: server, store: DemoTokenStore(), transport: DemoTransport())
+    }
+}
+
+/// Answers each route with the fixture of the same name; `week/<label>` and
+/// `session/<id>` share one fixture each.
+struct DemoTransport: HTTPTransport {
+    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        let parts = request.url!.pathComponents.dropFirst(2)
+        let name = parts.first ?? ""
+        let fixture = Bundle.main.url(forResource: name, withExtension: "json")
+        try await Task.sleep(for: .milliseconds(300))
+        let body = fixture.flatMap { try? Data(contentsOf: $0) } ?? Data(#"{"error": "Pas de démo pour cette page."}"#.utf8)
+        let response = HTTPURLResponse(url: request.url!, statusCode: fixture == nil ? 404 : 200,
+                                       httpVersion: nil, headerFields: nil)!
+        return (body, response)
+    }
+}
+
+private struct DemoTokenStore: DeviceTokenStore {
+    func read() -> String? { "demo" }
+    func save(_ token: String) throws {}
+    func delete() {}
+}
+#endif

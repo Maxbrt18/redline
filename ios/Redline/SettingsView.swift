@@ -5,10 +5,20 @@ struct SettingsView: View {
     let session: NotebookSession
     @Environment(\.dismiss) private var dismiss
     @State private var confirmingSignOut = false
+    @AppStorage(Theme.storageKey) private var theme = Theme.auto
 
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    Picker("Thème", selection: $theme) {
+                        ForEach(Theme.allCases, id: \.self) { Text($0.label).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                } header: {
+                    Text("Thème")
+                }
+
                 Section {
                     Button("Déconnecter cet appareil", role: .destructive) {
                         confirmingSignOut = true

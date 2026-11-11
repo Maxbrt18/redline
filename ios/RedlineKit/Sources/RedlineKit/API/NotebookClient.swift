@@ -33,6 +33,9 @@ public enum NotebookError: Error, Equatable {
 /// A read route of the notebook API and the view it serves.
 public struct Endpoint<Value: Decodable & Sendable>: Sendable {
     let path: [String]
+
+    /// Where the cache keeps this route's last answer.
+    var cacheKey: String { path.joined(separator: "/") }
 }
 
 public extension Endpoint where Value == Notebook.TodayView {
@@ -72,11 +75,14 @@ public struct NotebookClient: Sendable {
     public let server: Server
     private let device: String
     private let transport: any HTTPTransport
+    private let cache: (any ResponseCache)?
 
-    public init(server: Server, device: String, transport: any HTTPTransport = URLSessionTransport()) {
+    public init(server: Server, device: String, transport: any HTTPTransport = URLSessionTransport(),
+                cache: (any ResponseCache)? = nil) {
         self.server = server
         self.device = device
         self.transport = transport
+        self.cache = cache
     }
 
     /// Trades a link for a device token, which the caller keeps in the keychain.
@@ -88,11 +94,29 @@ public struct NotebookClient: Sendable {
         return grant.device
     }
 
+    /// The route's view from the server; the answer replaces the cached one.
     public func get<Value>(_ endpoint: Endpoint<Value>) async throws(NotebookError) -> Value {
         var request = URLRequest(url: Self.url(endpoint.path, server: server))
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("Bearer \(device)", forHTTPHeaderField: "Authorization")
-        return try await Self.send(request, as: Value.self, transport: transport)
+        let data = try await Self.exchange(request, transport: transport)
+        let value = try Self.decode(Value.self, from: data)
+        cache?.write(data, for: endpoint.cacheKey)
+        return value
+    }
+
+    /// The route's last answer kept on the device, and when it came; nil if there is none
+    /// or if this build no longer reads it.
+    public func cached<Value>(_ endpoint: Endpoint<Value>) -> (value: Value, savedAt: Date)? {
+        guard let kept = cache?.read(endpoint.cacheKey),
+              let value = try? JSONDecoder().decode(Value.self, from: kept.data)
+        else { return nil }
+        return (value, kept.savedAt)
+    }
+
+    /// Forgets every cached answer.
+    public func clearCache() {
+        cache?.clear()
     }
 
     /// Revokes this device's token on the server.
@@ -127,6 +151,10 @@ public struct NotebookClient: Sendable {
     private static func send<Value: Decodable>(
         _ request: URLRequest, as type: Value.Type, transport: any HTTPTransport
     ) async throws(NotebookError) -> Value {
+        try decode(type, from: try await exchange(request, transport: transport))
+    }
+
+    private static func exchange(_ request: URLRequest, transport: any HTTPTransport) async throws(NotebookError) -> Data {
         let data: Data
         let response: URLResponse
         do {
@@ -139,6 +167,10 @@ public struct NotebookClient: Sendable {
             let message = (try? JSONDecoder().decode(ServerMessage.self, from: data))?.error ?? ""
             throw status == 401 ? .signedOut(message) : .refused(status: status, message: message)
         }
+        return data
+    }
+
+    private static func decode<Value: Decodable>(_ type: Value.Type, from data: Data) throws(NotebookError) -> Value {
         do {
             return try JSONDecoder().decode(type, from: data)
         } catch {

@@ -27,8 +27,13 @@ struct RootView: View {
     let session: NotebookSession?
     @State private var selection: NotebookTab = .today
     @State private var showingSettings = false
+    @AppStorage(Theme.storageKey) private var theme = Theme.auto
 
     var body: some View {
+        content.preferredColorScheme(theme.colorScheme)
+    }
+
+    @ViewBuilder private var content: some View {
         #if DEBUG
         // `-RedlineCatalogue all` (or `track`) at launch opens the components, connected or not.
         switch UserDefaults.standard.string(forKey: "RedlineCatalogue") {
@@ -48,7 +53,7 @@ struct RootView: View {
                 case .signedOut:
                     ConnectView(session: session)
                 case .signedIn:
-                    tabs
+                    tabs(session)
                         .sheet(isPresented: $showingSettings) { SettingsView(session: session) }
                 }
             }
@@ -64,18 +69,23 @@ struct RootView: View {
         }
     }
 
-    private var tabs: some View {
+    private func tabs(_ session: NotebookSession) -> some View {
         TabView(selection: $selection) {
             ForEach(NotebookTab.allCases, id: \.self) { tab in
                 Tab(tab.title, systemImage: tab.symbol, value: tab) {
                     NavigationStack {
-                        ScrollView {}
-                            .navigationTitle(tab.title)
-                            .toolbar {
-                                ToolbarItem(placement: .topBarTrailing) {
-                                    Button("Réglages", systemImage: "gearshape") { showingSettings = true }
-                                }
+                        Group {
+                            switch tab {
+                            case .today: TodayScreen(session: session)
+                            case .week: WeekScreen(session: session)
+                            case .race: RaceScreen(session: session)
                             }
+                        }
+                        .toolbar {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                Button("Réglages", systemImage: "gearshape") { showingSettings = true }
+                            }
+                        }
                     }
                 }
             }
