@@ -144,13 +144,22 @@ private struct WeekContent: View {
             }
             if week.review != nil || week.open || !week.cards.isEmpty {
                 SectionTitle(text: "Cartes de la semaine")
+                // The review takes its place among the cards: a grey line until it is
+                // written, the same line made touchable once it arrives.
                 if let review = week.review {
-                    CardLine(title: "Bilan W\(week.week.suffix(2))", date: review.occurredOn)
+                    let title = "Bilan W\(week.week.suffix(2))"
+                    NavigationLink(value: EntryLink(id: review.id, title: title)) {
+                        EntryRow(title: title, date: review.occurredOn)
+                    }
+                    .buttonStyle(.plain)
                 } else if week.open {
-                    CardLine(title: "Bilan de la semaine", date: nil, pending: true)
+                    EntryRow(title: "Bilan de la semaine", date: nil, pending: true)
                 }
                 ForEach(week.cards, id: \.id) { card in
-                    CardLine(title: card.title, date: card.occurredOn)
+                    NavigationLink(value: EntryLink(id: card.id, title: card.title)) {
+                        EntryRow(title: card.title, date: card.occurredOn)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             if root { PastWeeks(session: session) }
@@ -186,11 +195,30 @@ private struct WeekDayRow: View {
             ForEach(row.beside + (open ? row.detail : []), id: \.self) { line in
                 Text(line).font(.footnote).foregroundStyle(Palette.muted).padding(.leading, 52)
             }
+            ForEach(reports, id: \.id) { report in
+                NavigationLink(value: report) {
+                    HStack(spacing: 4) {
+                        Text("Compte rendu du renfo")
+                        Image(systemName: "chevron.right").font(.caption2.weight(.semibold))
+                    }
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Palette.ink)
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, 52)
+            }
         }
         .padding(.vertical, 10)
         .overlay(alignment: .bottom) { Rectangle().fill(Palette.grid).frame(height: 0.5) }
     }
 
+
+    /// The strength sessions of the day with a report card.
+    private var reports: [EntryLink] {
+        items.filter { $0.isStrength && $0.isDone }.compactMap { item in
+            item.entryId.map { EntryLink(id: $0, title: "Compte rendu du renfo") }
+        }
+    }
 
     private func line(_ row: Row) -> some View {
         HStack(alignment: .center, spacing: 12) {
@@ -343,20 +371,3 @@ struct WeekLine: View {
     }
 }
 
-/// A card of the week: its title and day. It opens with the archives (step 1.7).
-private struct CardLine: View {
-    let title: String
-    let date: String?
-    var pending = false
-
-    var body: some View {
-        HStack {
-            Text(title).font(.subheadline).foregroundStyle(pending ? Palette.faint : Palette.ink)
-            Spacer()
-            Text(pending ? "dimanche" : date.flatMap(Day.init).map { String(format: "%02d/%02d", $0.day, $0.month) } ?? "")
-                .font(.caption).foregroundStyle(Palette.muted)
-        }
-        .padding(.vertical, 12)
-        .overlay(alignment: .bottom) { Rectangle().fill(Palette.grid).frame(height: 0.5) }
-    }
-}

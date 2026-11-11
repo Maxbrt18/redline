@@ -198,9 +198,11 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
         except ValueError:
             return jsonify(error=notebook_text.ERRORS["bad_page"]), 400
         rows = notebook.store.list_entries(psid, offset=offset, limit=41)
-        return jsonify(entries=rows[:40], next_offset=offset + 40 if len(rows) > 40 else None,
-                       latest=[item for kind in ("weekly", "monthly")
-                               for item in notebook.store.list_entries(psid, kind=kind, limit=1)])
+        page: views.EntriesView = {
+            "entries": rows[:40], "next_offset": offset + 40 if len(rows) > 40 else None,
+            "latest": [item for kind in ("weekly", "monthly")
+                       for item in notebook.store.list_entries(psid, kind=kind, limit=1)]}
+        return jsonify(page)
 
     @app.get("/notebook-api/current")
     def notebook_current():
@@ -412,13 +414,19 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
         entry = notebook.store.get(psid, entry_id)
         if entry is None:
             return jsonify(error=notebook_text.ERRORS["no_card"]), 404
-        entry["related"] = (notebook.store.list_entries(psid, kind="weekly", month=entry["period"], limit=100)
-                            if entry["kind"] == "monthly" and entry["period"] else [])
-        entry["report"] = None
-        snapshot = entry.get("snapshot")
-        if snapshot and snapshot.get("sid"):
-            entry["report"] = notebook.store.strength_report(snapshot["sid"])
-        return jsonify(entry)
+        snapshot = entry["snapshot"]
+        view: views.EntryView = {
+            "id": entry["id"], "kind": entry["kind"], "title": entry["title"],
+            "period": entry["period"], "occurred_on": entry["occurred_on"],
+            "created_at": entry["created_at"], "origin": entry["origin"], "body": entry["body"],
+            "image_hash": entry["image_hash"], "snapshot": snapshot,
+            "report": (notebook.store.strength_report(snapshot["sid"])
+                       if snapshot and snapshot.get("sid") else None),
+            "related": (notebook.store.list_entries(psid, kind="weekly", month=entry["period"],
+                                                    limit=100)
+                        if entry["kind"] == "monthly" and entry["period"] else []),
+        }
+        return jsonify(view)
 
     @app.get("/notebook-api/entries/<entry_id>/image")
     def notebook_image(entry_id):

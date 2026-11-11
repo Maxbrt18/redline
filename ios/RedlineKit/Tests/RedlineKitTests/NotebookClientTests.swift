@@ -71,6 +71,30 @@ struct NotebookClientTests {
         #expect(cache.read(endpoint.cacheKey) == nil)
     }
 
+    @Test func aCardsImageIsAskedOnceThenKept() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fixture = try #require(Bundle.module.url(forResource: "entry", withExtension: "json", subdirectory: "Fixtures"))
+        let entry = try JSONDecoder().decode(Notebook.EntryView.self, from: Data(contentsOf: fixture))
+        let transport = StubTransport(body: Data([0x89, 0x50, 0x4e, 0x47]))
+        let client = NotebookClient(server: server, device: "d3v1ce", transport: transport,
+                                    cache: FileResponseCache(directory: directory))
+        let first = try await client.cardImage(entry)
+        let second = try await client.cardImage(entry)
+        #expect(first == second && first.count == 4)
+        let requests = await transport.requests
+        #expect(requests.count == 1)
+        #expect(requests.first?.url?.path() == "/notebook-api/entries/\(entry.id)/image")
+    }
+
+    @Test func aPageOfArchivesCarriesItsOffset() async throws {
+        let transport = StubTransport(status: 404, body: Data())
+        let client = NotebookClient(server: server, device: "d3v1ce", transport: transport)
+        _ = try? await client.get(.entries(offset: 40))
+        let request = try #require(await transport.requests.first)
+        #expect(request.url?.absoluteString == "https://coach.example.org/notebook-api/entries?offset=40")
+    }
+
     @Test func aRevokedDeviceIsSignedOutWithTheServersWords() async {
         let transport = StubTransport(status: 401, body: Data(#"{"error": "Ouvre un nouveau lien."}"#.utf8))
         let client = NotebookClient(server: server, device: "old", transport: transport)

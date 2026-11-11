@@ -14,6 +14,9 @@ final class NotebookSession {
     private(set) var connecting = false
     /// Why the last connection failed, in the athlete's words; nil once it succeeds.
     private(set) var failure: String?
+    /// A card the last link pointed at, for Today to open on top of itself; the screen
+    /// that opens it clears it.
+    var pendingEntry: String?
     private let store: any DeviceTokenStore
     private let cache: (any ResponseCache)?
     private let transport: any HTTPTransport
@@ -30,9 +33,13 @@ final class NotebookSession {
     }
 
     /// Connects with a link pasted or opened by the system; a device already connected
-    /// keeps its token, as an old notification stays openable on the page.
+    /// keeps its token, as an old notification stays openable on the page. A link to a
+    /// card opens that card either way.
     func connect(with text: String) async {
-        if case .signedIn = state { return }
+        if case .signedIn = state {
+            pendingEntry = (try? NotebookLink(text, server: server))?.entry ?? pendingEntry
+            return
+        }
         let link: NotebookLink
         do {
             link = try NotebookLink(text, server: server)
@@ -50,6 +57,7 @@ final class NotebookSession {
             let device = try await NotebookClient.connect(link, server: server, transport: transport)
             try store.save(device)
             failure = nil
+            pendingEntry = link.entry
             state = .signedIn(NotebookClient(server: server, device: device, transport: transport, cache: cache))
         } catch let error as NotebookError {
             failure = Self.words(for: error)

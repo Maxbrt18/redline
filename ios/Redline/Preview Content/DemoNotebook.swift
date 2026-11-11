@@ -12,12 +12,13 @@ enum DemoNotebook {
 }
 
 /// Answers each route with the fixture of the same name; `week/<label>` and
-/// `session/<id>` share one fixture each.
+/// `session/<id>` share one fixture each, every card is `entry`, and every card's image
+/// is `card.png`, a sample card of the engine.
 struct DemoTransport: HTTPTransport {
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
-        let parts = request.url!.pathComponents.dropFirst(2)
-        let name = parts.first ?? ""
-        let fixture = Bundle.main.url(forResource: name, withExtension: "json")
+        let parts = Array(request.url!.pathComponents.dropFirst(2))
+        let name = parts.first == "entries" && parts.count > 1 ? (parts.count > 2 ? "card" : "entry") : parts.first ?? ""
+        let fixture = Bundle.main.url(forResource: name, withExtension: name == "card" ? "png" : "json")
         try await Task.sleep(for: .milliseconds(300))
         let body = fixture.flatMap { try? Data(contentsOf: $0) } ?? Data(#"{"error": "Pas de démo pour cette page."}"#.utf8)
         let response = HTTPURLResponse(url: request.url!, statusCode: fixture == nil ? 404 : 200,

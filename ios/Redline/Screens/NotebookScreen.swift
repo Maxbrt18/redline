@@ -9,10 +9,13 @@ struct NotebookScreen<Value: Decodable & Sendable, Hero: View, Content: View>: V
     let session: NotebookSession
     @State var model: ScreenModel<Value>
     var onTrack = true
+    /// The title the view itself gives once loaded, for a screen opened by its id alone.
+    var heading: ((Value) -> String)?
     @ViewBuilder var hero: (Value) -> Hero
     @ViewBuilder var content: (Value) -> Content
 
     var body: some View {
+        let title = model.value.flatMap { value in heading.map { LocalizedStringKey($0(value)) } } ?? title
         if onTrack {
             TrackScreen(title: title) { head } content: { page }
                 .refreshable { await model.load(with: session) }

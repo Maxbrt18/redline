@@ -69,6 +69,7 @@ private struct RaceContent: View {
             }
             if !view.milestones.isEmpty { Milestones(items: view.milestones) }
             if !view.capabilities.isEmpty { Capabilities(items: view.capabilities) }
+            RaceArchives(items: view.archives)
         }
         .padding(.bottom, 24)
     }
@@ -258,5 +259,39 @@ extension Family {
         case "long": Family.longRun.symbol
         default: nil
         }
+    }
+}
+
+/// The latest reviews, then the way to every card.
+private struct RaceArchives: View {
+    let items: [Notebook.Entry]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SectionTitle(text: "Archives", meta: "bilans, monthly")
+            ForEach(items, id: \.id) { entry in
+                let label = Self.label(entry)
+                NavigationLink(value: EntryLink(id: entry.id, title: label)) {
+                    EntryRow(title: label, date: nil)
+                }
+                .buttonStyle(.plain)
+            }
+            NavigationLink(value: ArchivesLink()) {
+                ChevronRow(text: "Toutes les archives")
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    /// « Monthly · <month> <year> », « Weekly · W<nn> », else the card’s own title.
+    static func label(_ entry: Notebook.Entry) -> String {
+        if entry.kind == "monthly", let month = Day(entry.period + "-01") {
+            return "Monthly · " + month.date.formatted(
+                Date.FormatStyle(timeZone: .gmt).locale(Locale(identifier: "fr_FR")).month(.wide).year())
+        }
+        if entry.kind == "weekly", !entry.period.isEmpty {
+            return "Weekly · W" + entry.period.suffix(2)
+        }
+        return entry.title
     }
 }

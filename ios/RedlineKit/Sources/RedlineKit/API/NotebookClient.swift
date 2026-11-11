@@ -79,6 +79,17 @@ public extension Endpoint where Value == Notebook.HabitsView {
     static var habits: Self { Self(path: ["habits"]) }
 }
 
+public extension Endpoint where Value == Notebook.EntriesView {
+    /// A page of the archived cards, latest first; `offset` comes from the previous page.
+    static func entries(offset: Int = 0) -> Self {
+        Self(path: ["entries"], query: offset > 0 ? [URLQueryItem(name: "offset", value: "\(offset)")] : [])
+    }
+}
+
+public extension Endpoint where Value == Notebook.EntryView {
+    static func entry(_ id: String) -> Self { Self(path: ["entries", id]) }
+}
+
 public extension Endpoint where Value == Notebook.Forecast? {
     /// The forecast of a session to come: at its place, else the notebook's; around its
     /// start, else the moments of the day. Nil when there is none to give.
@@ -134,6 +145,19 @@ public struct NotebookClient: Sendable {
               let value = try? JSONDecoder().decode(Value.self, from: kept.data)
         else { return nil }
         return (value, kept.savedAt)
+    }
+
+    /// A card's image. An image never changes under its hash, so a kept one is shown
+    /// without a request, offline included.
+    public func cardImage(_ entry: Notebook.EntryView) async throws(NotebookError) -> Data {
+        let key = "entries/\(entry.id)/image@\(entry.imageHash)"
+        if let kept = cache?.read(key) { return kept.data }
+        var request = URLRequest(url: Self.url(["entries", entry.id, "image"], server: server))
+        request.setValue("image/*", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(device)", forHTTPHeaderField: "Authorization")
+        let data = try await Self.exchange(request, transport: transport)
+        cache?.write(data, for: key)
+        return data
     }
 
     /// Forgets every cached answer.

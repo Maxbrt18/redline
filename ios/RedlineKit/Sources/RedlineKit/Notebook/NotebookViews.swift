@@ -1449,6 +1449,271 @@ public extension Notebook {
         }
     }
 
+    struct EntriesView: Codable, Hashable, Sendable {
+        public let entries: [Entry]
+        public let nextOffset: Int?
+        public let latest: [Entry]
+
+        public init(entries: [Entry], nextOffset: Int? = nil, latest: [Entry]) {
+            self.entries = entries
+            self.nextOffset = nextOffset
+            self.latest = latest
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case entries = "entries"
+            case nextOffset = "next_offset"
+            case latest = "latest"
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            entries = try container.decode([Entry].self, forKey: .entries)
+            nextOffset = try container.decode(Int?.self, forKey: .nextOffset)
+            latest = try container.decode([Entry].self, forKey: .latest)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(entries, forKey: .entries)
+            try container.encode(nextOffset, forKey: .nextOffset)
+            try container.encode(latest, forKey: .latest)
+        }
+    }
+
+    struct StrengthSet: Codable, Hashable, Sendable {
+        public let side: Side
+        public let setIndex: Int
+        public let repetitions: Int
+
+        public enum Side: Codable, Hashable, Sendable {
+            case both
+            case right
+            case left
+            /// A value this build does not know yet: the server is newer than the app.
+            case unknown(String)
+    
+            public init(rawValue: String) {
+                switch rawValue {
+                case "both": self = .both
+                case "right": self = .right
+                case "left": self = .left
+                default: self = .unknown(rawValue)
+                }
+            }
+    
+            public var rawValue: String {
+                switch self {
+                case .both: "both"
+                case .right: "right"
+                case .left: "left"
+                case .unknown(let rawValue): rawValue
+                }
+            }
+    
+            public init(from decoder: any Decoder) throws {
+                self.init(rawValue: try decoder.singleValueContainer().decode(String.self))
+            }
+    
+            public func encode(to encoder: any Encoder) throws {
+                var container = encoder.singleValueContainer()
+                try container.encode(rawValue)
+            }
+        }
+
+        public init(side: Side, setIndex: Int, repetitions: Int) {
+            self.side = side
+            self.setIndex = setIndex
+            self.repetitions = repetitions
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case side = "side"
+            case setIndex = "set_index"
+            case repetitions = "repetitions"
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            side = try container.decode(Side.self, forKey: .side)
+            setIndex = try container.decode(Int.self, forKey: .setIndex)
+            repetitions = try container.decode(Int.self, forKey: .repetitions)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(side, forKey: .side)
+            try container.encode(setIndex, forKey: .setIndex)
+            try container.encode(repetitions, forKey: .repetitions)
+        }
+    }
+
+    struct StrengthResult: Codable, Hashable, Sendable {
+        public let slug: String
+        public let status: String?
+        public let note: String
+        public let difficulty: Int?
+        public let completedSlots: Int?
+        public let sets: [StrengthSet]
+
+        public init(slug: String, status: String? = nil, note: String, difficulty: Int? = nil, completedSlots: Int? = nil, sets: [StrengthSet]) {
+            self.slug = slug
+            self.status = status
+            self.note = note
+            self.difficulty = difficulty
+            self.completedSlots = completedSlots
+            self.sets = sets
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case slug = "slug"
+            case status = "status"
+            case note = "note"
+            case difficulty = "difficulty"
+            case completedSlots = "completed_slots"
+            case sets = "sets"
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            slug = try container.decode(String.self, forKey: .slug)
+            status = try container.decode(String?.self, forKey: .status)
+            note = try container.decode(String.self, forKey: .note)
+            difficulty = try container.decode(Int?.self, forKey: .difficulty)
+            completedSlots = try container.decode(Int?.self, forKey: .completedSlots)
+            sets = try container.decode([StrengthSet].self, forKey: .sets)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(slug, forKey: .slug)
+            try container.encode(status, forKey: .status)
+            try container.encode(note, forKey: .note)
+            try container.encode(difficulty, forKey: .difficulty)
+            try container.encode(completedSlots, forKey: .completedSlots)
+            try container.encode(sets, forKey: .sets)
+        }
+    }
+
+    struct StrengthReport: Codable, Hashable, Sendable {
+        public let performedOn: String
+        public let durationMinutes: Int?
+        public let note: String
+        public let pains: [String: [String: Double?]]
+        public let exercises: [StrengthResult]
+
+        public init(performedOn: String, durationMinutes: Int? = nil, note: String, pains: [String: [String: Double?]], exercises: [StrengthResult]) {
+            self.performedOn = performedOn
+            self.durationMinutes = durationMinutes
+            self.note = note
+            self.pains = pains
+            self.exercises = exercises
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case performedOn = "performed_on"
+            case durationMinutes = "duration_minutes"
+            case note = "note"
+            case pains = "pains"
+            case exercises = "exercises"
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            performedOn = try container.decode(String.self, forKey: .performedOn)
+            durationMinutes = try container.decode(Int?.self, forKey: .durationMinutes)
+            note = try container.decode(String.self, forKey: .note)
+            pains = try container.decode([String: [String: Double?]].self, forKey: .pains)
+            exercises = try container.decode([StrengthResult].self, forKey: .exercises)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(performedOn, forKey: .performedOn)
+            try container.encode(durationMinutes, forKey: .durationMinutes)
+            try container.encode(note, forKey: .note)
+            try container.encode(pains, forKey: .pains)
+            try container.encode(exercises, forKey: .exercises)
+        }
+    }
+
+    struct EntryView: Codable, Hashable, Sendable {
+        public let id: String
+        public let kind: String
+        public let title: String
+        public let period: String
+        public let occurredOn: String
+        public let createdAt: String
+        public let origin: String
+        public let body: String
+        public let imageHash: String
+        public let snapshot: [String: JSONValue]?
+        public let report: StrengthReport?
+        public let related: [Entry]
+
+        public init(id: String, kind: String, title: String, period: String, occurredOn: String, createdAt: String, origin: String, body: String, imageHash: String, snapshot: [String: JSONValue]? = nil, report: StrengthReport? = nil, related: [Entry]) {
+            self.id = id
+            self.kind = kind
+            self.title = title
+            self.period = period
+            self.occurredOn = occurredOn
+            self.createdAt = createdAt
+            self.origin = origin
+            self.body = body
+            self.imageHash = imageHash
+            self.snapshot = snapshot
+            self.report = report
+            self.related = related
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case id = "id"
+            case kind = "kind"
+            case title = "title"
+            case period = "period"
+            case occurredOn = "occurred_on"
+            case createdAt = "created_at"
+            case origin = "origin"
+            case body = "body"
+            case imageHash = "image_hash"
+            case snapshot = "snapshot"
+            case report = "report"
+            case related = "related"
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = try container.decode(String.self, forKey: .id)
+            kind = try container.decode(String.self, forKey: .kind)
+            title = try container.decode(String.self, forKey: .title)
+            period = try container.decode(String.self, forKey: .period)
+            occurredOn = try container.decode(String.self, forKey: .occurredOn)
+            createdAt = try container.decode(String.self, forKey: .createdAt)
+            origin = try container.decode(String.self, forKey: .origin)
+            body = try container.decode(String.self, forKey: .body)
+            imageHash = try container.decode(String.self, forKey: .imageHash)
+            snapshot = try container.decode([String: JSONValue]?.self, forKey: .snapshot)
+            report = try container.decode(StrengthReport?.self, forKey: .report)
+            related = try container.decode([Entry].self, forKey: .related)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(id, forKey: .id)
+            try container.encode(kind, forKey: .kind)
+            try container.encode(title, forKey: .title)
+            try container.encode(period, forKey: .period)
+            try container.encode(occurredOn, forKey: .occurredOn)
+            try container.encode(createdAt, forKey: .createdAt)
+            try container.encode(origin, forKey: .origin)
+            try container.encode(body, forKey: .body)
+            try container.encode(imageHash, forKey: .imageHash)
+            try container.encode(snapshot, forKey: .snapshot)
+            try container.encode(report, forKey: .report)
+            try container.encode(related, forKey: .related)
+        }
+    }
+
     struct WeekPlan: Codable, Hashable, Sendable {
         public let status: String
         public let message: String

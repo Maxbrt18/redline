@@ -262,6 +262,63 @@ class Entry(TypedDict):
     has_image: bool
 
 
+class EntriesView(TypedDict):
+    """A page of the archived cards, latest first."""
+
+    entries: list[Entry]
+    #: The offset of the next page; None on the last one.
+    next_offset: int | None
+    #: The latest weekly and the latest monthly.
+    latest: list[Entry]
+
+
+class StrengthSet(TypedDict):
+    side: Literal["both", "right", "left"]
+    set_index: int
+    repetitions: int
+
+
+class StrengthResult(TypedDict):
+    """One exercise of a strength report, as the athlete reported it."""
+
+    slug: str
+    status: str | None
+    note: str
+    difficulty: int | None
+    completed_slots: int | None
+    sets: list[StrengthSet]
+
+
+class StrengthReport(TypedDict):
+    performed_on: str
+    duration_minutes: int | None
+    note: str
+    #: Per zone, the pain before and after the session.
+    pains: dict[str, dict[str, float | None]]
+    exercises: list[StrengthResult]
+
+
+class EntryView(TypedDict):
+    """An archived card opened: its image is served apart, by `image_hash`."""
+
+    id: str
+    kind: str
+    title: str
+    period: str
+    occurred_on: str
+    created_at: str
+    origin: str
+    body: str
+    #: Empty without an image.
+    image_hash: str
+    #: A strength card's prescription, as sent.
+    snapshot: dict[str, Any] | None
+    #: What the athlete reported of that strength session.
+    report: StrengthReport | None
+    #: A monthly's weeklies.
+    related: list[Entry]
+
+
 class WeekPlan(PlanNote):
     revision: int | None
 

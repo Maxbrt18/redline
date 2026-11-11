@@ -150,6 +150,16 @@ struct ExerciseList: View {
         }
     }
 
+    /// The slug and name of each exercise of a prescription, to name a report's lines.
+    static func slugsAndNames(_ session: [String: JSONValue]) -> [(String, String)] {
+        guard case .array(let list)? = session["exercises"] else { return [] }
+        return list.compactMap { item in
+            guard case .object(let exercise) = item, case .string(let slug)? = exercise["slug"] else { return nil }
+            if case .string(let name)? = exercise["name"] { return (slug, name) }
+            return nil
+        }
+    }
+
     /// The exercises of a prescription: its name (or slug) and its dose in words.
     static func exercises(_ session: [String: JSONValue]) -> [(name: String, dose: String)] {
         guard case .array(let list)? = session["exercises"] else { return [] }

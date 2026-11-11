@@ -39,8 +39,10 @@ SAM = instance.load(TEST_VAULT)
 RACE_DAY = {"name": "TargetRace", "date": "2026-11-26", "days": 50}
 
 UUID_SAMPLE = "0b5a1c2e-3d4f-4a6b-8c9d-0e1f2a3b4c5d"
-#: Declared keys the page has no use for: the service sends them, nothing reads them.
-UNREAD = {"created_at", "has_image", "humidity", "strength_done"}
+#: Declared keys the page has no use for: the service sends them, the page does not read
+#: them (the iOS app may).
+UNREAD = {"completed_slots", "created_at", "difficulty", "has_image", "humidity", "set_index",
+          "strength_done"}
 
 
 # ------------------------------------------------------------ the checker
@@ -186,6 +188,10 @@ def test_the_screens_serve_their_declared_shapes(store, connect):
     assert contract.problems(views.WeeksView, served(client, "weeks")) == []
     assert contract.problems(views.InjuryView, served(client, "injury")) == []
     assert contract.problems(views.RaceView, served(client, "race")) == []
+    entries = served(client, "entries")
+    assert contract.problems(views.EntriesView, entries) == []
+    for entry in entries["entries"]:
+        assert contract.problems(views.EntryView, served(client, f"entries/{entry['id']}")) == []
 
 
 @needs_database

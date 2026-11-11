@@ -373,6 +373,50 @@ WEATHER = {
 }
 
 
+#: A page of archives, with the next page to ask for.
+ENTRIES = {
+    "entries": [ENTRY, {**ENTRY, "id": "two", "kind": "weekly", "title": "Weekly · W39",
+                        "period": "2026-W39", "occurred_on": "2026-09-27",
+                        "created_at": "2026-09-27 19:00:00+00:00"},
+                {**ENTRY, "id": "three", "kind": "strength", "title": "Renfo du 22 septembre",
+                 "period": "2026-09-22", "occurred_on": "2026-09-22",
+                 "created_at": "2026-09-22 18:00:00+00:00", "has_image": False}],
+    "next_offset": 40,
+    "latest": [ENTRY],
+}
+
+#: A strength card opened: its prescription and what was done of it.
+ENTRY_VIEW = {
+    "id": "three",
+    "kind": "strength",
+    "title": "Renfo du 22 septembre",
+    "period": "2026-09-22",
+    "occurred_on": "2026-09-22",
+    "created_at": "2026-09-22 18:00:00+00:00",
+    "origin": "delivery",
+    "body": "Bien tenu. On garde la charge la semaine prochaine.",
+    "image_hash": "5f0c1a9e",
+    "snapshot": {"sid": "w39-renfo", "exercises": [
+        {"slug": "squat", "name": "Squat", "dose": {"text": "3 × 10"}},
+        {"slug": "pont", "name": "Pont fessier", "dose": {"text": "3 × 12, 2 s en haut"}}]},
+    "report": {
+        "performed_on": "2026-09-22",
+        "duration_minutes": 30,
+        "note": "Genou calme.",
+        "pains": {"knee": {"before": 1.0, "after": 0.5}},
+        "exercises": [
+            {"slug": "squat", "status": "completed", "note": "", "difficulty": 6,
+             "completed_slots": 3,
+             "sets": [{"side": "both", "set_index": index, "repetitions": 10}
+                      for index in (1, 2, 3)]},
+            {"slug": "pont", "status": "partial", "note": "Crampe à la dernière série.",
+             "difficulty": None, "completed_slots": 2,
+             "sets": [{"side": "both", "set_index": index, "repetitions": 12}
+                      for index in (1, 2)]}]},
+    "related": [],
+}
+
+
 SCREENS = {
     "today": (views.TodayView, TODAY),
     "week": (views.WeekView, WEEK),
@@ -384,4 +428,6 @@ SCREENS = {
     "reorganize": (views.ReorganizeView, REORGANIZE),
     "habits": (views.HabitsView, HABITS),
     "weather": (views.Forecast, WEATHER),
+    "entries": (views.EntriesView, ENTRIES),
+    "entry": (views.EntryView, ENTRY_VIEW),
 }
