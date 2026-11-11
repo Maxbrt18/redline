@@ -187,6 +187,17 @@ def observation_of(store, activity_id):
 
 
 @pytestmark_db
+def test_the_streams_kept_at_capture_are_read_back_by_activity(store):
+    observation_id = seed_threshold(store)
+    activity_id = store.strava_detail(observation_id)["activity_id"]
+    assert store.strava_streams(activity_id) is None
+    flow = stream(seconds=300)
+    store.store_strava_detail(activity_id, streams=flow, actor="strava-ingestion")
+    assert store.strava_streams(activity_id) == flow
+    assert store.strava_streams(1) is None
+
+
+@pytestmark_db
 def test_a_threshold_detail_reads_its_reps_and_asks_for_the_reserve_once(store):
     observation_id = seed_threshold(store)
     when = dt.datetime(2026, 10, 26, 20, 0, tzinfo=PARIS)

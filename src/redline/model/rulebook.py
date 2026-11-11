@@ -119,6 +119,22 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
                    "differ by at most this share of the longer one, in %"),
         field("comparable_sessions", int, required=False, minimum=1, maximum=20,
               note="the most recent comparable sessions an accumulating one is read against"),
+        # Optional: absent, the debrief of an easy or long run carries no gap of that
+        # kind. Read on the kilometres of the run (`redline.model.debrief.split_gaps`).
+        field("split_hr_margin_bpm", int, required=False, minimum=0, maximum=30,
+              note="a kilometre whose mean HR exceeds the session's HR cap by more than "
+                   "this, in bpm, is named"),
+        field("split_fast_start_pct", float, required=False, minimum=1, maximum=30,
+              note="a first kilometre faster than the median of the others by at least "
+                   "this, in %, is a fast start"),
+        field("split_fade_pct", float, required=False, minimum=1, maximum=30,
+              note="a last third slower than the kilometres before by at least this, "
+                   "in %, is a fade"),
+        field("split_decoupling_pct", float, required=False, minimum=1, maximum=30,
+              note="a speed-to-HR ratio that drops by at least this between the halves, "
+                   "in %, is a decoupling"),
+        field("split_min_km", int, required=False, minimum=3, maximum=20,
+              note="kilometres a run needs before its start, fade or decoupling is read"),
     ])),
     field("scales", dict, schema=SCALES_SCHEMA),
     # Optional: absent, no lineage is followed. Its schema is derived from the ladders of
@@ -181,6 +197,11 @@ class Parameters:
     alarm_no_quality_days: int | None = None
     comparable_duration_pct: int | None = None
     comparable_sessions: int | None = None
+    split_hr_margin_bpm: int | None = None
+    split_fast_start_pct: float | None = None
+    split_fade_pct: float | None = None
+    split_decoupling_pct: float | None = None
+    split_min_km: int | None = None
 
     def spoken(self) -> dict[str, str]:
         """Thresholds as a rule's text states them: decimal comma."""
@@ -282,7 +303,8 @@ def parse(text: str, source: Path) -> Rulebook:
         "missed_cutoff": dt.time.fromisoformat(raw["missed_cutoff"]),
         **{name: float(raw[name])
            for name in ("gate_effort_peak", "hard_min_hours", "stall_tolerance_km",
-                        "missed_after_hours")
+                        "missed_after_hours", "split_fast_start_pct", "split_fade_pct",
+                        "split_decoupling_pct")
            if name in raw}})
     scales = build_scales(payload["scales"])
     problems = []
