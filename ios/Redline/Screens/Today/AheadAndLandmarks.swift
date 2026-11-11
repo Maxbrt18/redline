@@ -1,0 +1,180 @@
+import RedlineKit
+import SwiftUI
+
+/// A section title on a rule, never a box.
+struct SectionTitle: View {
+    let text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(text).font(.title3.bold()).accessibilityAddTraits(.isHeader)
+            Rectangle().fill(Palette.grid).frame(height: 0.5)
+        }
+        .padding(.top, 30)
+    }
+}
+
+/// What is coming: one line per day for the next three days, as the Week tab lists them.
+struct AheadList: View {
+    let items: [Notebook.SessionItem]
+
+    var body: some View {
+        let dates = items.map(\.date).reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }.prefix(3)
+        if !dates.isEmpty {
+            VStack(alignment: .leading, spacing: 0) {
+                SectionTitle(text: "À venir")
+                ForEach(Array(dates), id: \.self) { date in
+                    row(date: date, sessions: items.filter { $0.date == date })
+                }
+            }
+        }
+    }
+
+    private func row(date: String, sessions: [Notebook.SessionItem]) -> some View {
+        let main = sessions.first { !$0.isStrength } ?? sessions[0]
+        let title = sessions.count > 1 && !main.isStrength
+            ? "\(main.title.split(separator: ",").first.map(String.init) ?? main.title), puis renfo" : main.title
+        let sub = [main.startTime.flatMap(Numbers.clock), main.location, main.targets.hrCapBpm.map { "≤\($0) bpm" }]
+            .compactMap { $0 }.joined(separator: " · ")
+        let day = Day(date)
+        return HStack(alignment: .center, spacing: 14) {
+            VStack(spacing: 0) {
+                Text(day.map { "\($0.day)" } ?? "").font(.figure(22))
+                Text(day?.date.formatted(Date.FormatStyle(timeZone: .gmt).locale(Locale(identifier: "fr_FR")).weekday(.abbreviated)) ?? "")
+                    .font(.caption2).foregroundStyle(Palette.muted)
+            }
+            .frame(width: 40)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.subheadline.weight(.semibold))
+                if !sub.isEmpty { Text(sub).font(.caption).foregroundStyle(Palette.muted) }
+            }
+            Spacer(minLength: 8)
+            Text(main.plannedValue).font(.figure(17, weight: .semibold)).foregroundStyle(Palette.muted)
+        }
+        .padding(.vertical, 11)
+        .overlay(alignment: .bottom) { Rectangle().fill(Palette.grid).frame(height: 0.5) }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// The landmarks, on paper: the week with its bars, each watched zone against its ceiling,
+/// the race. The week leads to its tab.
+struct Landmarks: View {
+    let today: Notebook.TodayView
+    let openWeek: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            SectionTitle(text: "Repères")
+            week
+            ForEach(today.pain.zones, id: \.zone) { zone in
+                pain(zone)
+            }
+            if let race = today.race { self.race(race) }
+        }
+    }
+
+    private var week: some View {
+        let totals = today.totals
+        let runs = "\(totals.runsDone) sortie\(totals.runsDone > 1 ? "s" : "")" + (totals.runsPlanned > 0 ? " sur \(totals.runsPlanned)" : "")
+        return VStack(alignment: .leading, spacing: 10) {
+            Button(action: openWeek) {
+                LandmarkLabel(text: "Semaine \(Int(today.week.suffix(2)) ?? 0)", family: .run)
+            }
+            .buttonStyle(.plain)
+            HStack(alignment: .lastTextBaseline, spacing: 6) {
+                Text(Numbers.text(totals.kmDone)).font(.figure(40))
+                if let target = totals.kmTarget {
+                    Text("sur").font(.subheadline).foregroundStyle(Palette.muted)
+                    OutlinedFigure(text: Numbers.text(target), size: 40, lineWidth: 1.6)
+                }
+                Text("km · \(runs)").font(.subheadline).foregroundStyle(Palette.muted)
+            }
+            WeekBars(days: today.strip)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func pain(_ zone: Notebook.PainTrendZone) -> some View {
+        let peak = zone.weeks.last?.peak
+        let top = max(3, ((peak ?? 0) + 0.5).rounded(.up))
+        return VStack(alignment: .leading, spacing: 10) {
+            LandmarkLabel(text: zone.label, family: .pain)
+            RedLineCursor(label: "Pic d’effort, cette semaine", value: peak ?? 0, unit: "sur 10", scale: 0...top,
+                          limit: today.pain.cap, limitLabel: "plafond \(Numbers.text(today.pain.cap))",
+                          format: { Numbers.text($0) }, planned: peak == nil)
+        }
+    }
+
+    private func race(_ race: Notebook.Race) -> some View {
+        let date = Day(race.date)?.date.formatted(Date.FormatStyle(timeZone: .gmt).locale(Locale(identifier: "fr_FR"))
+            .weekday(.abbreviated).day().month(.wide))
+        let facts = [date, race.startTime.flatMap(Numbers.clock).map { "départ \($0)" },
+                     race.distanceKm.map { "\(Numbers.text($0)) km" }, race.target.map { "cible \($0)" }]
+            .compactMap { $0 }.joined(separator: " · ")
+        return VStack(alignment: .leading, spacing: 8) {
+            LandmarkLabel(text: race.name, family: .race)
+            HStack(alignment: .lastTextBaseline, spacing: 6) {
+                Text("\(race.days)").font(.figure(40))
+                Text(race.days > 1 ? "jours" : "jour").font(.subheadline).foregroundStyle(Palette.muted)
+            }
+            Text(facts).font(.footnote).foregroundStyle(Palette.muted)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// A landmark's name, with its badge.
+private struct LandmarkLabel: View {
+    let text: String
+    let family: Family
+
+    var body: some View {
+        HStack(spacing: 8) {
+            FamilyBadge(family: family, small: true)
+            Text(text).font(.subheadline.weight(.semibold))
+        }
+    }
+}
+
+/// The week's seven days as bars: done in ink, planned in dots, today's letter in red.
+struct WeekBars: View {
+    let days: [Notebook.StripDay]
+    private let height: CGFloat = 52
+
+    var body: some View {
+        let peak = max(1, days.map { max($0.doneKm ?? 0, $0.plannedKm ?? 0) }.max() ?? 1)
+        HStack(alignment: .bottom, spacing: 6) {
+            ForEach(days, id: \.date) { day in
+                VStack(spacing: 4) {
+                    Text(label(day)).font(.caption2.weight(.semibold)).foregroundStyle(day.doneKm != nil ? Palette.ink : Palette.faint)
+                        .lineLimit(1).minimumScaleFactor(0.7)
+                    bar(day, peak: peak)
+                    Text(day.letter).font(.caption2.weight(day.today ? .bold : .regular))
+                        .foregroundStyle(day.today ? Palette.red : Palette.muted)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .frame(height: height + 40, alignment: .bottom)
+    }
+
+    private func label(_ day: Notebook.StripDay) -> String {
+        if let done = day.doneKm, done > 0 { return Numbers.text(done) }
+        if let planned = day.plannedKm { return Numbers.text(planned) }
+        return day.plannedLabel ?? ""
+    }
+
+    @ViewBuilder private func bar(_ day: Notebook.StripDay, peak: Double) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 3)
+        if let done = day.doneKm, done > 0 {
+            shape.fill(Palette.data).frame(width: 18, height: max(4, height * done / peak))
+        } else if day.plannedKm != nil || day.plannedLabel != nil {
+            DotPattern.planned
+                .frame(width: 18, height: day.plannedKm.map { max(4, height * $0 / peak) } ?? height / 2)
+                .clipShape(shape)
+        } else {
+            shape.fill(Palette.ghost).frame(width: 18, height: 2)
+        }
+    }
+}

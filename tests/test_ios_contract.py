@@ -20,7 +20,7 @@ def test_a_json_key_becomes_a_swift_property(key, name):
 
 
 @pytest.mark.parametrize(("value", "name"), [
-    ("very-light", "veryLight"), ("as_planned", "asPlanned"), ("none", "noneValue"),
+    ("very-light", "veryLight"), ("as_planned", "asPlanned"), ("none", "noneValue"), ("ready", "ready"),
 ])
 def test_a_literal_becomes_a_swift_case(value, name):
     assert ios_contract.case_name(value) == name
@@ -30,3 +30,12 @@ def test_a_tagged_union_names_each_member_by_its_tag():
     tagged = [ios_contract.discriminator(members) for members in ios_contract.unions()]
     assert ("type", {"WakeAsk", "CellsAsk", "DailyAsk", "HrAsk"}) in [
         (key, {member.__name__ for member in values}) for key, values in filter(None, tagged)]
+
+
+def test_a_union_member_is_named_without_what_all_members_share():
+    from redline.model import notebook_views as views
+    named = {ios_contract.member_case(member, members, union)
+             for members, union in ios_contract.unions().items() for member in members}
+    assert {"fact", "strengthFact", "ready", "closed", "wake", "hr"} <= named
+    assert all(name == name.strip("`") and name[:1].islower() for name in named), named
+    assert views.SessionFact

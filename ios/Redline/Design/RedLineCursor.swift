@@ -16,6 +16,9 @@ struct RedLineCursor: View {
     var target: Double?
     var targetLabel: String?
     var format: (Double) -> String = { $0.formatted(.number.precision(.fractionLength(0...1))) }
+    /// Nothing is done yet: the rail stays empty and the figure is the planned one, in
+    /// outline.
+    var planned = false
 
     private var crossed: Bool { limit.map { value > $0 } ?? false }
 
@@ -27,10 +30,14 @@ struct RedLineCursor: View {
                     .foregroundStyle(Palette.muted)
                 Spacer()
                 HStack(alignment: .firstTextBaseline, spacing: 3) {
-                    Text(format(value))
-                        .font(.figure(22))
-                        .monospacedDigit()
-                        .foregroundStyle(crossed ? Palette.over : Palette.ink)
+                    if planned {
+                        OutlinedFigure(text: format(value), size: 22)
+                    } else {
+                        Text(format(value))
+                            .font(.figure(22))
+                            .monospacedDigit()
+                            .foregroundStyle(crossed ? Palette.over : Palette.ink)
+                    }
                     if !unit.isEmpty {
                         Text(unit).font(.caption.weight(.semibold)).foregroundStyle(Palette.muted)
                     }
@@ -58,7 +65,7 @@ struct RedLineCursor: View {
             let width = geometry.size.width
             let x = { (value: Double) in width * (min(max(value, scale.lowerBound), scale.upperBound) - scale.lowerBound)
                 / (scale.upperBound - scale.lowerBound) }
-            let done = x(min(value, limit ?? value))
+            let done = planned ? 0 : x(min(value, limit ?? value))
             ZStack(alignment: .leading) {
                 Capsule().fill(Palette.ghost).frame(width: width, height: 8)
                 if let band {
@@ -69,7 +76,7 @@ struct RedLineCursor: View {
                 UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 4)
                     .fill(Palette.data)
                     .frame(width: done, height: 8)
-                if crossed, let limit {
+                if crossed, !planned, let limit {
                     DotPattern.over
                         .frame(width: max(x(value) - x(limit), 0), height: 8)
                         .overlay(UnevenRoundedRectangle(bottomTrailingRadius: 4, topTrailingRadius: 4)

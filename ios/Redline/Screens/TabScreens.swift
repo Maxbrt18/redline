@@ -1,19 +1,6 @@
 import RedlineKit
 import SwiftUI
 
-/// Today: the day's session, what is asked, what comes next.
-struct TodayScreen: View {
-    let session: NotebookSession
-
-    var body: some View {
-        NotebookScreen(title: NotebookTab.today.title, session: session, model: ScreenModel(.today)) { today in
-            Kicker(text: Day(today.date)?.spelled().capitalizedFirst ?? today.date)
-        } content: { _ in
-            EmptyView()
-        }
-    }
-}
-
 /// Week: the week judged so far, and the rest prescribed.
 struct WeekScreen: View {
     let session: NotebookSession

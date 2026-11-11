@@ -15,6 +15,16 @@ public extension Notebook {
         public let hrCapBpm: Int?
         public let carbsTargetGH: Int?
 
+        public init(distanceTargetKm: Double? = nil, distanceCapKm: Double? = nil, durationCapMin: Int? = nil, rpeMin: Int? = nil, rpeMax: Int? = nil, hrCapBpm: Int? = nil, carbsTargetGH: Int? = nil) {
+            self.distanceTargetKm = distanceTargetKm
+            self.distanceCapKm = distanceCapKm
+            self.durationCapMin = durationCapMin
+            self.rpeMin = rpeMin
+            self.rpeMax = rpeMax
+            self.hrCapBpm = hrCapBpm
+            self.carbsTargetGH = carbsTargetGH
+        }
+
         enum CodingKeys: String, CodingKey {
             case distanceTargetKm = "distance_target_km"
             case distanceCapKm = "distance_cap_km"
@@ -53,6 +63,12 @@ public extension Notebook {
         public let label: String
         public let value: Double
 
+        public init(zone: String, label: String, value: Double) {
+            self.zone = zone
+            self.label = label
+            self.value = value
+        }
+
         enum CodingKeys: String, CodingKey {
             case zone = "zone"
             case label = "label"
@@ -87,6 +103,21 @@ public extension Notebook {
         public let dplus: Double?
         public let startedAt: String?
         public let over: [String]
+
+        public init(observationId: String, kind: String, date: String, km: Double? = nil, durationMin: Int? = nil, hrAvg: Double? = nil, rpe: Double? = nil, pains: [PainReading], enjoyment: Double? = nil, dplus: Double? = nil, startedAt: String? = nil, over: [String]) {
+            self.observationId = observationId
+            self.kind = kind
+            self.date = date
+            self.km = km
+            self.durationMin = durationMin
+            self.hrAvg = hrAvg
+            self.rpe = rpe
+            self.pains = pains
+            self.enjoyment = enjoyment
+            self.dplus = dplus
+            self.startedAt = startedAt
+            self.over = over
+        }
 
         enum CodingKeys: String, CodingKey {
             case observationId = "observation_id"
@@ -141,6 +172,12 @@ public extension Notebook {
         public let pains: [PainReading]
         public let over: [String]
 
+        public init(durationMin: Int? = nil, pains: [PainReading], over: [String]) {
+            self.durationMin = durationMin
+            self.pains = pains
+            self.over = over
+        }
+
         enum CodingKeys: String, CodingKey {
             case durationMin = "duration_min"
             case pains = "pains"
@@ -176,6 +213,22 @@ public extension Notebook {
         public let startedAt: String?
         public let over: [String]
         public let title: String
+
+        public init(observationId: String, kind: String, date: String, km: Double? = nil, durationMin: Int? = nil, hrAvg: Double? = nil, rpe: Double? = nil, pains: [PainReading], enjoyment: Double? = nil, dplus: Double? = nil, startedAt: String? = nil, over: [String], title: String) {
+            self.observationId = observationId
+            self.kind = kind
+            self.date = date
+            self.km = km
+            self.durationMin = durationMin
+            self.hrAvg = hrAvg
+            self.rpe = rpe
+            self.pains = pains
+            self.enjoyment = enjoyment
+            self.dplus = dplus
+            self.startedAt = startedAt
+            self.over = over
+            self.title = title
+        }
 
         enum CodingKeys: String, CodingKey {
             case observationId = "observation_id"
@@ -245,6 +298,24 @@ public extension Notebook {
         public let targets: Targets
         public let change: String?
 
+        public init(id: String, date: String, title: String, kind: String, workout: String, status: String, startTime: String? = nil, location: String? = nil, note: String? = nil, planned: [String], fact: SessionFact? = nil, entryId: String? = nil, transition: String? = nil, targets: Targets, change: String? = nil) {
+            self.id = id
+            self.date = date
+            self.title = title
+            self.kind = kind
+            self.workout = workout
+            self.status = status
+            self.startTime = startTime
+            self.location = location
+            self.note = note
+            self.planned = planned
+            self.fact = fact
+            self.entryId = entryId
+            self.transition = transition
+            self.targets = targets
+            self.change = change
+        }
+
         enum CodingKeys: String, CodingKey {
             case id = "id"
             case date = "date"
@@ -313,6 +384,18 @@ public extension Notebook {
         public let long: Bool
         public let rest: Bool
 
+        public init(date: String, letter: String, abbr: String, today: Bool, doneKm: Double? = nil, plannedKm: Double? = nil, plannedLabel: String? = nil, long: Bool, rest: Bool) {
+            self.date = date
+            self.letter = letter
+            self.abbr = abbr
+            self.today = today
+            self.doneKm = doneKm
+            self.plannedKm = plannedKm
+            self.plannedLabel = plannedLabel
+            self.long = long
+            self.rest = rest
+        }
+
         enum CodingKeys: String, CodingKey {
             case date = "date"
             case letter = "letter"
@@ -357,6 +440,12 @@ public extension Notebook {
         public let label: String
         public let peak: Double?
 
+        public init(zone: String, label: String, peak: Double? = nil) {
+            self.zone = zone
+            self.label = label
+            self.peak = peak
+        }
+
         enum CodingKeys: String, CodingKey {
             case zone = "zone"
             case label = "label"
@@ -388,6 +477,18 @@ public extension Notebook {
         public let strengthPlanned: Int
         public let load: Int
         public let painPeaks: [PainPeak]
+
+        public init(kmDone: Double, kmTarget: Double? = nil, runsDone: Int, runsPlanned: Int, dplus: Double, strengthDone: Int, strengthPlanned: Int, load: Int, painPeaks: [PainPeak]) {
+            self.kmDone = kmDone
+            self.kmTarget = kmTarget
+            self.runsDone = runsDone
+            self.runsPlanned = runsPlanned
+            self.dplus = dplus
+            self.strengthDone = strengthDone
+            self.strengthPlanned = strengthPlanned
+            self.load = load
+            self.painPeaks = painPeaks
+        }
 
         enum CodingKeys: String, CodingKey {
             case kmDone = "km_done"
@@ -432,6 +533,11 @@ public extension Notebook {
         public let week: String
         public let peak: Double?
 
+        public init(week: String, peak: Double? = nil) {
+            self.week = week
+            self.peak = peak
+        }
+
         enum CodingKeys: String, CodingKey {
             case week = "week"
             case peak = "peak"
@@ -454,6 +560,12 @@ public extension Notebook {
         public let zone: String
         public let label: String
         public let weeks: [PainWeek]
+
+        public init(zone: String, label: String, weeks: [PainWeek]) {
+            self.zone = zone
+            self.label = label
+            self.weeks = weeks
+        }
 
         enum CodingKeys: String, CodingKey {
             case zone = "zone"
@@ -479,6 +591,11 @@ public extension Notebook {
     struct PainTrend: Codable, Hashable, Sendable {
         public let cap: Double
         public let zones: [PainTrendZone]
+
+        public init(cap: Double, zones: [PainTrendZone]) {
+            self.cap = cap
+            self.zones = zones
+        }
 
         enum CodingKeys: String, CodingKey {
             case cap = "cap"
@@ -508,6 +625,18 @@ public extension Notebook {
         public let elevationLossM: Double?
         public let elevationApproximate: Bool?
         public let target: String?
+
+        public init(name: String, date: String, days: Int, startTime: String? = nil, distanceKm: Double? = nil, elevationGainM: Double? = nil, elevationLossM: Double? = nil, elevationApproximate: Bool? = nil, target: String? = nil) {
+            self.name = name
+            self.date = date
+            self.days = days
+            self.startTime = startTime
+            self.distanceKm = distanceKm
+            self.elevationGainM = elevationGainM
+            self.elevationLossM = elevationLossM
+            self.elevationApproximate = elevationApproximate
+            self.target = target
+        }
 
         enum CodingKeys: String, CodingKey {
             case name = "name"
@@ -551,6 +680,11 @@ public extension Notebook {
     struct TraceLevel: Codable, Hashable, Sendable {
         public let slug: String
         public let label: String
+
+        public init(slug: String, label: String) {
+            self.slug = slug
+            self.label = label
+        }
 
         enum CodingKeys: String, CodingKey {
             case slug = "slug"
@@ -606,6 +740,16 @@ public extension Notebook {
                 var container = encoder.singleValueContainer()
                 try container.encode(rawValue)
             }
+        }
+
+        public init(id: String, type: TypeValue, zone: String, label: String, date: String, afterEffort: Bool, levels: [TraceLevel]) {
+            self.id = id
+            self.type = type
+            self.zone = zone
+            self.label = label
+            self.date = date
+            self.afterEffort = afterEffort
+            self.levels = levels
         }
 
         enum CodingKeys: String, CodingKey {
@@ -680,6 +824,19 @@ public extension Notebook {
                 var container = encoder.singleValueContainer()
                 try container.encode(rawValue)
             }
+        }
+
+        public init(id: String, type: TypeValue, date: String, kind: String, km: Double? = nil, fields: [String], labels: [String: String], total: Int, durationMin: Int? = nil, painValues: [Double]) {
+            self.id = id
+            self.type = type
+            self.date = date
+            self.kind = kind
+            self.km = km
+            self.fields = fields
+            self.labels = labels
+            self.total = total
+            self.durationMin = durationMin
+            self.painValues = painValues
         }
 
         enum CodingKeys: String, CodingKey {
@@ -759,6 +916,13 @@ public extension Notebook {
             }
         }
 
+        public init(id: String, type: TypeValue, date: String, fields: [String]) {
+            self.id = id
+            self.type = type
+            self.date = date
+            self.fields = fields
+        }
+
         enum CodingKeys: String, CodingKey {
             case id = "id"
             case type = "type"
@@ -819,6 +983,16 @@ public extension Notebook {
                 var container = encoder.singleValueContainer()
                 try container.encode(rawValue)
             }
+        }
+
+        public init(id: String, type: TypeValue, date: String, hr: Int, reference: Int, n: Int, paceS: Int) {
+            self.id = id
+            self.type = type
+            self.date = date
+            self.hr = hr
+            self.reference = reference
+            self.n = n
+            self.paceS = paceS
         }
 
         enum CodingKeys: String, CodingKey {
@@ -897,6 +1071,12 @@ public extension Notebook {
             }
         }
 
+        public init(status: Status, date: String, message: String) {
+            self.status = status
+            self.date = date
+            self.message = message
+        }
+
         enum CodingKeys: String, CodingKey {
             case status = "status"
             case date = "date"
@@ -954,6 +1134,14 @@ public extension Notebook {
             }
         }
 
+        public init(status: Status, date: String, session: [String: JSONValue], revision: Int, signature: String) {
+            self.status = status
+            self.date = date
+            self.session = session
+            self.revision = revision
+            self.signature = signature
+        }
+
         enum CodingKeys: String, CodingKey {
             case status = "status"
             case date = "date"
@@ -985,6 +1173,11 @@ public extension Notebook {
         public let status: String
         public let message: String
 
+        public init(status: String, message: String) {
+            self.status = status
+            self.message = message
+        }
+
         enum CodingKeys: String, CodingKey {
             case status = "status"
             case message = "message"
@@ -1008,6 +1201,13 @@ public extension Notebook {
         public let plan: String
         public let sessions: [SessionItem]
         public let next: [SessionItem]
+
+        public init(date: String, plan: String, sessions: [SessionItem], next: [SessionItem]) {
+            self.date = date
+            self.plan = plan
+            self.sessions = sessions
+            self.next = next
+        }
 
         enum CodingKeys: String, CodingKey {
             case date = "date"
@@ -1046,6 +1246,21 @@ public extension Notebook {
         public let ahead: [SessionItem]
         public let pain: PainTrend
         public let race: Race?
+
+        public init(date: String, week: String, plan: PlanNote, sessions: [SessionItem], extra: [UnplannedFact], tomorrow: Tomorrow, strip: [StripDay], totals: Totals, asks: [Ask], ahead: [SessionItem], pain: PainTrend, race: Race? = nil) {
+            self.date = date
+            self.week = week
+            self.plan = plan
+            self.sessions = sessions
+            self.extra = extra
+            self.tomorrow = tomorrow
+            self.strip = strip
+            self.totals = totals
+            self.asks = asks
+            self.ahead = ahead
+            self.pain = pain
+            self.race = race
+        }
 
         enum CodingKeys: String, CodingKey {
             case date = "date"
@@ -1110,6 +1325,22 @@ public extension Notebook {
         public let race: Race?
         public let strength: StrengthOffer
 
+        public init(date: String, week: String, plan: PlanNote, sessions: [SessionItem], extra: [UnplannedFact], tomorrow: Tomorrow, strip: [StripDay], totals: Totals, asks: [Ask], ahead: [SessionItem], pain: PainTrend, race: Race? = nil, strength: StrengthOffer) {
+            self.date = date
+            self.week = week
+            self.plan = plan
+            self.sessions = sessions
+            self.extra = extra
+            self.tomorrow = tomorrow
+            self.strip = strip
+            self.totals = totals
+            self.asks = asks
+            self.ahead = ahead
+            self.pain = pain
+            self.race = race
+            self.strength = strength
+        }
+
         enum CodingKeys: String, CodingKey {
             case date = "date"
             case week = "week"
@@ -1171,6 +1402,17 @@ public extension Notebook {
         public let origin: String
         public let hasImage: Bool
 
+        public init(id: String, kind: String, title: String, period: String, occurredOn: String, createdAt: String, origin: String, hasImage: Bool) {
+            self.id = id
+            self.kind = kind
+            self.title = title
+            self.period = period
+            self.occurredOn = occurredOn
+            self.createdAt = createdAt
+            self.origin = origin
+            self.hasImage = hasImage
+        }
+
         enum CodingKeys: String, CodingKey {
             case id = "id"
             case kind = "kind"
@@ -1212,6 +1454,12 @@ public extension Notebook {
         public let message: String
         public let revision: Int?
 
+        public init(status: String, message: String, revision: Int? = nil) {
+            self.status = status
+            self.message = message
+            self.revision = revision
+        }
+
         enum CodingKeys: String, CodingKey {
             case status = "status"
             case message = "message"
@@ -1238,6 +1486,13 @@ public extension Notebook {
         public let monday: String
         public let kmTarget: Double?
         public let runsPlanned: Int
+
+        public init(week: String, monday: String, kmTarget: Double? = nil, runsPlanned: Int) {
+            self.week = week
+            self.monday = monday
+            self.kmTarget = kmTarget
+            self.runsPlanned = runsPlanned
+        }
 
         enum CodingKeys: String, CodingKey {
             case week = "week"
@@ -1275,6 +1530,20 @@ public extension Notebook {
         public let review: Entry?
         public let cards: [Entry]
         public let next: NextWeek?
+
+        public init(week: String, monday: String, current: String, plan: WeekPlan, sessions: [SessionItem], extra: [UnplannedFact], totals: Totals, strip: [StripDay], review: Entry? = nil, cards: [Entry], next: NextWeek? = nil) {
+            self.week = week
+            self.monday = monday
+            self.current = current
+            self.plan = plan
+            self.sessions = sessions
+            self.extra = extra
+            self.totals = totals
+            self.strip = strip
+            self.review = review
+            self.cards = cards
+            self.next = next
+        }
 
         enum CodingKeys: String, CodingKey {
             case week = "week"
@@ -1328,6 +1597,14 @@ public extension Notebook {
         public let kmTarget: Double?
         public let review: String?
 
+        public init(week: String, monday: String, kmDone: Double, kmTarget: Double? = nil, review: String? = nil) {
+            self.week = week
+            self.monday = monday
+            self.kmDone = kmDone
+            self.kmTarget = kmTarget
+            self.review = review
+        }
+
         enum CodingKeys: String, CodingKey {
             case week = "week"
             case monday = "monday"
@@ -1358,6 +1635,10 @@ public extension Notebook {
     struct DeviceGrant: Codable, Hashable, Sendable {
         public let device: String
 
+        public init(device: String) {
+            self.device = device
+        }
+
         enum CodingKeys: String, CodingKey {
             case device = "device"
         }
@@ -1375,6 +1656,10 @@ public extension Notebook {
 
     struct WeeksView: Codable, Hashable, Sendable {
         public let weeks: [PastWeek]
+
+        public init(weeks: [PastWeek]) {
+            self.weeks = weeks
+        }
 
         enum CodingKeys: String, CodingKey {
             case weeks = "weeks"
@@ -1394,6 +1679,11 @@ public extension Notebook {
     struct ZoneName: Codable, Hashable, Sendable {
         public let zone: String
         public let label: String
+
+        public init(zone: String, label: String) {
+            self.zone = zone
+            self.label = label
+        }
 
         enum CodingKeys: String, CodingKey {
             case zone = "zone"
@@ -1418,6 +1708,13 @@ public extension Notebook {
         public let pain: Double
         public let kind: String
         public let long: Bool
+
+        public init(date: String, pain: Double, kind: String, long: Bool) {
+            self.date = date
+            self.pain = pain
+            self.kind = kind
+            self.long = long
+        }
 
         enum CodingKeys: String, CodingKey {
             case date = "date"
@@ -1447,6 +1744,11 @@ public extension Notebook {
         public let date: String
         public let pain: Double
 
+        public init(date: String, pain: Double) {
+            self.date = date
+            self.pain = pain
+        }
+
         enum CodingKeys: String, CodingKey {
             case date = "date"
             case pain = "pain"
@@ -1470,6 +1772,13 @@ public extension Notebook {
         public let peak: Double?
         public let n: Int
         public let wake: Double?
+
+        public init(week: String, peak: Double? = nil, n: Int, wake: Double? = nil) {
+            self.week = week
+            self.peak = peak
+            self.n = n
+            self.wake = wake
+        }
 
         enum CodingKeys: String, CodingKey {
             case week = "week"
@@ -1498,6 +1807,11 @@ public extension Notebook {
     struct ScaleStep: Codable, Hashable, Sendable {
         public let value: Double
         public let text: String
+
+        public init(value: Double, text: String) {
+            self.value = value
+            self.text = text
+        }
 
         enum CodingKeys: String, CodingKey {
             case value = "value"
@@ -1530,6 +1844,21 @@ public extension Notebook {
         public let weeks: [InjuryWeek]
         public let missing: [String]
         public let scale: [ScaleStep]
+
+        public init(zone: String, label: String, zones: [ZoneName], cap: Double, start: String, today: String, week: String, points: [InjuryPoint], wakes: [WakePoint], weeks: [InjuryWeek], missing: [String], scale: [ScaleStep]) {
+            self.zone = zone
+            self.label = label
+            self.zones = zones
+            self.cap = cap
+            self.start = start
+            self.today = today
+            self.week = week
+            self.points = points
+            self.wakes = wakes
+            self.weeks = weeks
+            self.missing = missing
+            self.scale = scale
+        }
 
         enum CodingKeys: String, CodingKey {
             case zone = "zone"
@@ -1614,6 +1943,13 @@ public extension Notebook {
             }
         }
 
+        public init(date: String, label: String, kind: Kind, km: Double) {
+            self.date = date
+            self.label = label
+            self.kind = kind
+            self.km = km
+        }
+
         enum CodingKeys: String, CodingKey {
             case date = "date"
             case label = "label"
@@ -1671,6 +2007,13 @@ public extension Notebook {
                 var container = encoder.singleValueContainer()
                 try container.encode(rawValue)
             }
+        }
+
+        public init(date: String, label: String, kind: Kind, overdue: Bool) {
+            self.date = date
+            self.label = label
+            self.kind = kind
+            self.overdue = overdue
         }
 
         enum CodingKeys: String, CodingKey {
@@ -1732,6 +2075,13 @@ public extension Notebook {
             }
         }
 
+        public init(date: String, label: String, kind: Kind, startTime: String? = nil) {
+            self.date = date
+            self.label = label
+            self.kind = kind
+            self.startTime = startTime
+        }
+
         enum CodingKeys: String, CodingKey {
             case date = "date"
             case label = "label"
@@ -1763,6 +2113,15 @@ public extension Notebook {
         public let scale: Int
         public let number: Int
         public let evaluatedOn: String
+
+        public init(label: String, icon: String, score: Int, scale: Int, number: Int, evaluatedOn: String) {
+            self.label = label
+            self.icon = icon
+            self.score = score
+            self.scale = scale
+            self.number = number
+            self.evaluatedOn = evaluatedOn
+        }
 
         enum CodingKeys: String, CodingKey {
             case label = "label"
@@ -1799,6 +2158,12 @@ public extension Notebook {
         public let dplusM: Double
         public let dminusM: Double
 
+        public init(toKm: Double, dplusM: Double, dminusM: Double) {
+            self.toKm = toKm
+            self.dplusM = dplusM
+            self.dminusM = dminusM
+        }
+
         enum CodingKeys: String, CodingKey {
             case toKm = "to_km"
             case dplusM = "dplus_m"
@@ -1830,6 +2195,18 @@ public extension Notebook {
         public let main: Bool
         public let hours: Double
         public let runningHours: Double
+
+        public init(startKm: Double, endKm: Double, gainM: Double, gradePct: Double, steepestPct: Double, steepestM: Double, main: Bool, hours: Double, runningHours: Double) {
+            self.startKm = startKm
+            self.endKm = endKm
+            self.gainM = gainM
+            self.gradePct = gradePct
+            self.steepestPct = steepestPct
+            self.steepestM = steepestM
+            self.main = main
+            self.hours = hours
+            self.runningHours = runningHours
+        }
 
         enum CodingKeys: String, CodingKey {
             case startKm = "start_km"
@@ -1875,6 +2252,13 @@ public extension Notebook {
         public let name: String
         public let hours: Double
         public let runningHours: Double
+
+        public init(km: Double, name: String, hours: Double, runningHours: Double) {
+            self.km = km
+            self.name = name
+            self.hours = hours
+            self.runningHours = runningHours
+        }
 
         enum CodingKeys: String, CodingKey {
             case km = "km"
@@ -1950,6 +2334,25 @@ public extension Notebook {
             }
         }
 
+        public init(source: Source, lengthKm: Double, dplusM: Double, dminusM: Double, dplusBandM: [Double]? = nil, profile: [[Double]], highest: [Double], stretches: [RouteStretch], passages: [RacePassage], climbs: [RouteClimb], referencePaceS: Double, paceSPerKm: Double? = nil, stopMinutes: Double, carbsGH: Int? = nil, modelError: [Double], start: String? = nil) {
+            self.source = source
+            self.lengthKm = lengthKm
+            self.dplusM = dplusM
+            self.dminusM = dminusM
+            self.dplusBandM = dplusBandM
+            self.profile = profile
+            self.highest = highest
+            self.stretches = stretches
+            self.passages = passages
+            self.climbs = climbs
+            self.referencePaceS = referencePaceS
+            self.paceSPerKm = paceSPerKm
+            self.stopMinutes = stopMinutes
+            self.carbsGH = carbsGH
+            self.modelError = modelError
+            self.start = start
+        }
+
         enum CodingKeys: String, CodingKey {
             case source = "source"
             case lengthKm = "length_km"
@@ -2019,6 +2422,16 @@ public extension Notebook {
         public let code: Int?
         public let day: Bool
 
+        public init(time: String, temp: Int, feels: Int, rain: Int? = nil, wind: Int, code: Int? = nil, day: Bool) {
+            self.time = time
+            self.temp = temp
+            self.feels = feels
+            self.rain = rain
+            self.wind = wind
+            self.code = code
+            self.day = day
+        }
+
         enum CodingKeys: String, CodingKey {
             case time = "time"
             case temp = "temp"
@@ -2056,6 +2469,11 @@ public extension Notebook {
         public let plan: RacePlan
         public let weather: [[PassageHour]]?
 
+        public init(plan: RacePlan, weather: [[PassageHour]]? = nil) {
+            self.plan = plan
+            self.weather = weather
+        }
+
         enum CodingKeys: String, CodingKey {
             case plan = "plan"
             case weather = "weather"
@@ -2080,6 +2498,14 @@ public extension Notebook {
         public let milestones: [Milestone]
         public let capabilities: [Capability]
         public let archives: [Entry]
+
+        public init(race: Race? = nil, plan: RacePlan? = nil, milestones: [Milestone], capabilities: [Capability], archives: [Entry]) {
+            self.race = race
+            self.plan = plan
+            self.milestones = milestones
+            self.capabilities = capabilities
+            self.archives = archives
+        }
 
         enum CodingKeys: String, CodingKey {
             case race = "race"
@@ -2125,6 +2551,25 @@ public extension Notebook {
         public let hrMax: Double?
         public let cadence: Double?
         public let reserve: Double?
+
+        public init(observationId: String, kind: String, date: String, km: Double? = nil, durationMin: Int? = nil, hrAvg: Double? = nil, rpe: Double? = nil, pains: [PainReading], enjoyment: Double? = nil, dplus: Double? = nil, startedAt: String? = nil, over: [String], movingS: Double? = nil, hrMax: Double? = nil, cadence: Double? = nil, reserve: Double? = nil) {
+            self.observationId = observationId
+            self.kind = kind
+            self.date = date
+            self.km = km
+            self.durationMin = durationMin
+            self.hrAvg = hrAvg
+            self.rpe = rpe
+            self.pains = pains
+            self.enjoyment = enjoyment
+            self.dplus = dplus
+            self.startedAt = startedAt
+            self.over = over
+            self.movingS = movingS
+            self.hrMax = hrMax
+            self.cadence = cadence
+            self.reserve = reserve
+        }
 
         enum CodingKeys: String, CodingKey {
             case observationId = "observation_id"
@@ -2190,6 +2635,11 @@ public extension Notebook {
         public let targets: Targets
         public let note: String?
 
+        public init(targets: Targets, note: String? = nil) {
+            self.targets = targets
+            self.note = note
+        }
+
         enum CodingKeys: String, CodingKey {
             case targets = "targets"
             case note = "note"
@@ -2215,6 +2665,15 @@ public extension Notebook {
         public let total: Int
         public let durationMin: Int?
         public let painValues: [Double]
+
+        public init(id: String, fields: [String], labels: [String: String], total: Int, durationMin: Int? = nil, painValues: [Double]) {
+            self.id = id
+            self.fields = fields
+            self.labels = labels
+            self.total = total
+            self.durationMin = durationMin
+            self.painValues = painValues
+        }
 
         enum CodingKeys: String, CodingKey {
             case id = "id"
@@ -2252,6 +2711,13 @@ public extension Notebook {
         public let before: Double?
         public let after: Double?
 
+        public init(zone: String, label: String, before: Double? = nil, after: Double? = nil) {
+            self.zone = zone
+            self.label = label
+            self.before = before
+            self.after = after
+        }
+
         enum CodingKeys: String, CodingKey {
             case zone = "zone"
             case label = "label"
@@ -2280,6 +2746,11 @@ public extension Notebook {
         public let zones: [WakeZone]
         public let afterDue: Bool
 
+        public init(zones: [WakeZone], afterDue: Bool) {
+            self.zones = zones
+            self.afterDue = afterDue
+        }
+
         enum CodingKeys: String, CodingKey {
             case zones = "zones"
             case afterDue = "after_due"
@@ -2305,6 +2776,15 @@ public extension Notebook {
         public let hr: Int?
         public let cadence: Int?
         public let dplus: Int
+
+        public init(timeS: Double, distM: Int, paceS: Int? = nil, hr: Int? = nil, cadence: Int? = nil, dplus: Int) {
+            self.timeS = timeS
+            self.distM = distM
+            self.paceS = paceS
+            self.hr = hr
+            self.cadence = cadence
+            self.dplus = dplus
+        }
 
         enum CodingKeys: String, CodingKey {
             case timeS = "time_s"
@@ -2383,6 +2863,18 @@ public extension Notebook {
                 var container = encoder.singleValueContainer()
                 try container.encode(rawValue)
             }
+        }
+
+        public init(timeS: Double, distM: Int, paceS: Int? = nil, hr: Int? = nil, cadence: Int? = nil, dplus: Int, kind: Kind, start: Double, end: Double) {
+            self.timeS = timeS
+            self.distM = distM
+            self.paceS = paceS
+            self.hr = hr
+            self.cadence = cadence
+            self.dplus = dplus
+            self.kind = kind
+            self.start = start
+            self.end = end
         }
 
         enum CodingKeys: String, CodingKey {
@@ -2475,6 +2967,20 @@ public extension Notebook {
             }
         }
 
+        public init(timeS: Double, distM: Int, paceS: Int? = nil, hr: Int? = nil, cadence: Int? = nil, dplus: Int, kind: Kind, start: Double, end: Double, n: Int, hrDrop: Int? = nil) {
+            self.timeS = timeS
+            self.distM = distM
+            self.paceS = paceS
+            self.hr = hr
+            self.cadence = cadence
+            self.dplus = dplus
+            self.kind = kind
+            self.start = start
+            self.end = end
+            self.n = n
+            self.hrDrop = hrDrop
+        }
+
         enum CodingKeys: String, CodingKey {
             case timeS = "time_s"
             case distM = "dist_m"
@@ -2526,6 +3032,13 @@ public extension Notebook {
         public let slowestBefore: Int
         public let finalAcceleration: Bool
 
+        public init(last: Int, fastestBefore: Int, slowestBefore: Int, finalAcceleration: Bool) {
+            self.last = last
+            self.fastestBefore = fastestBefore
+            self.slowestBefore = slowestBefore
+            self.finalAcceleration = finalAcceleration
+        }
+
         enum CodingKeys: String, CodingKey {
             case last = "last"
             case fastestBefore = "fastest_before"
@@ -2554,6 +3067,12 @@ public extension Notebook {
         public let phases: [Phase]
         public let reps: [Rep]
         public let reading: RepReading?
+
+        public init(phases: [Phase], reps: [Rep], reading: RepReading? = nil) {
+            self.phases = phases
+            self.reps = reps
+            self.reading = reading
+        }
 
         enum CodingKeys: String, CodingKey {
             case phases = "phases"
@@ -2584,6 +3103,16 @@ public extension Notebook {
         public let hr: Int?
         public let cadence: Int?
         public let dplus: Int
+
+        public init(n: Int, distM: Int, movingS: Int, paceS: Int, hr: Int? = nil, cadence: Int? = nil, dplus: Int) {
+            self.n = n
+            self.distM = distM
+            self.movingS = movingS
+            self.paceS = paceS
+            self.hr = hr
+            self.cadence = cadence
+            self.dplus = dplus
+        }
 
         enum CodingKeys: String, CodingKey {
             case n = "n"
@@ -2624,6 +3153,13 @@ public extension Notebook {
         public let longestS: Int
         public let longestKm: Int?
 
+        public init(count: Int, totalS: Int, longestS: Int, longestKm: Int? = nil) {
+            self.count = count
+            self.totalS = totalS
+            self.longestS = longestS
+            self.longestKm = longestKm
+        }
+
         enum CodingKeys: String, CodingKey {
             case count = "count"
             case totalS = "total_s"
@@ -2652,6 +3188,11 @@ public extension Notebook {
         public let first: Int
         public let second: Int
 
+        public init(first: Int, second: Int) {
+            self.first = first
+            self.second = second
+        }
+
         enum CodingKeys: String, CodingKey {
             case first = "first"
             case second = "second"
@@ -2675,6 +3216,13 @@ public extension Notebook {
         public let duration: Int
         public let hr: [Int?]?
         public let alt: [Double?]?
+
+        public init(t: [Int], duration: Int, hr: [Int?]? = nil, alt: [Double?]? = nil) {
+            self.t = t
+            self.duration = duration
+            self.hr = hr
+            self.alt = alt
+        }
 
         enum CodingKeys: String, CodingKey {
             case t = "t"
@@ -2707,6 +3255,15 @@ public extension Notebook {
         public let alt: [Double?]?
         public let bands: [[Double]]
         public let stops: [[Int]]
+
+        public init(t: [Int], duration: Int, hr: [Int?]? = nil, alt: [Double?]? = nil, bands: [[Double]], stops: [[Int]]) {
+            self.t = t
+            self.duration = duration
+            self.hr = hr
+            self.alt = alt
+            self.bands = bands
+            self.stops = stops
+        }
 
         enum CodingKeys: String, CodingKey {
             case t = "t"
@@ -2742,6 +3299,11 @@ public extension Notebook {
         public let max: Int?
         public let seconds: [Int]
 
+        public init(max: Int? = nil, seconds: [Int]) {
+            self.max = max
+            self.seconds = seconds
+        }
+
         enum CodingKeys: String, CodingKey {
             case max = "max"
             case seconds = "seconds"
@@ -2769,6 +3331,17 @@ public extension Notebook {
         public let enjoyment: Double?
         public let repDplus: Int?
         public let repHr: Int?
+
+        public init(date: String, km: Double? = nil, hrAvg: Double? = nil, rpe: Double? = nil, pains: [PainReading], enjoyment: Double? = nil, repDplus: Int? = nil, repHr: Int? = nil) {
+            self.date = date
+            self.km = km
+            self.hrAvg = hrAvg
+            self.rpe = rpe
+            self.pains = pains
+            self.enjoyment = enjoyment
+            self.repDplus = repDplus
+            self.repHr = repHr
+        }
 
         enum CodingKeys: String, CodingKey {
             case date = "date"
@@ -2814,6 +3387,15 @@ public extension Notebook {
         public let wbgt: Double?
         public let conditions: String?
 
+        public init(temp: Double? = nil, feelsLike: Double? = nil, humidity: Double? = nil, wind: Double? = nil, wbgt: Double? = nil, conditions: String? = nil) {
+            self.temp = temp
+            self.feelsLike = feelsLike
+            self.humidity = humidity
+            self.wind = wind
+            self.wbgt = wbgt
+            self.conditions = conditions
+        }
+
         enum CodingKeys: String, CodingKey {
             case temp = "temp"
             case feelsLike = "feels_like"
@@ -2850,6 +3432,13 @@ public extension Notebook {
         public let retireAtKm: Double?
         public let status: String?
 
+        public init(name: String, km: Int, retireAtKm: Double? = nil, status: String? = nil) {
+            self.name = name
+            self.km = km
+            self.retireAtKm = retireAtKm
+            self.status = status
+        }
+
         enum CodingKeys: String, CodingKey {
             case name = "name"
             case km = "km"
@@ -2879,6 +3468,13 @@ public extension Notebook {
         public let titles: [String]
         public let families: [[String]]
         public let planned: [String]
+
+        public init(date: String, titles: [String], families: [[String]], planned: [String]) {
+            self.date = date
+            self.titles = titles
+            self.families = families
+            self.planned = planned
+        }
 
         enum CodingKeys: String, CodingKey {
             case date = "date"
@@ -2912,6 +3508,16 @@ public extension Notebook {
         public let runsDone: Int
         public let runsPlanned: Int
         public let next: NextDay?
+
+        public init(week: String, current: Bool, kmDone: Double, kmTarget: Double? = nil, runsDone: Int, runsPlanned: Int, next: NextDay? = nil) {
+            self.week = week
+            self.current = current
+            self.kmDone = kmDone
+            self.kmTarget = kmTarget
+            self.runsDone = runsDone
+            self.runsPlanned = runsPlanned
+            self.next = next
+        }
 
         enum CodingKeys: String, CodingKey {
             case week = "week"
@@ -2971,6 +3577,33 @@ public extension Notebook {
         public let weather: Conditions?
         public let gear: Gear?
         public let week: WeekContext
+
+        public init(id: String, date: String, kind: String, title: String? = nil, workout: String? = nil, quality: Bool, stravaId: Int? = nil, fact: DetailFact, plan: DetailPlan? = nil, ask: DetailAsk? = nil, wake: WakeTrace, phases: [Phase]? = nil, reps: [Rep]? = nil, reading: RepReading? = nil, km: [KmSplit]? = nil, stops: StopSummary? = nil, drift: Drift? = nil, series: Series? = nil, hrBounds: [Int]? = nil, zones: ZoneSeconds? = nil, previous: Previous? = nil, weather: Conditions? = nil, gear: Gear? = nil, week: WeekContext) {
+            self.id = id
+            self.date = date
+            self.kind = kind
+            self.title = title
+            self.workout = workout
+            self.quality = quality
+            self.stravaId = stravaId
+            self.fact = fact
+            self.plan = plan
+            self.ask = ask
+            self.wake = wake
+            self.phases = phases
+            self.reps = reps
+            self.reading = reading
+            self.km = km
+            self.stops = stops
+            self.drift = drift
+            self.series = series
+            self.hrBounds = hrBounds
+            self.zones = zones
+            self.previous = previous
+            self.weather = weather
+            self.gear = gear
+            self.week = week
+        }
 
         enum CodingKeys: String, CodingKey {
             case id = "id"
@@ -3062,6 +3695,14 @@ public extension Notebook {
         public let kind: String
         public let workout: String
         public let figure: String
+
+        public init(id: String, title: String, kind: String, workout: String, figure: String) {
+            self.id = id
+            self.title = title
+            self.kind = kind
+            self.workout = workout
+            self.figure = figure
+        }
 
         enum CodingKeys: String, CodingKey {
             case id = "id"
@@ -3182,6 +3823,17 @@ public extension Notebook {
             }
         }
 
+        public init(kind: Kind, minutes: Int? = nil, pace: Pace? = nil, required: Bool? = nil, sport: String? = nil, demanding: Bool? = nil, runToo: Bool? = nil, habit: Bool) {
+            self.kind = kind
+            self.minutes = minutes
+            self.pace = pace
+            self.required = required
+            self.sport = sport
+            self.demanding = demanding
+            self.runToo = runToo
+            self.habit = habit
+        }
+
         enum CodingKeys: String, CodingKey {
             case kind = "kind"
             case minutes = "minutes"
@@ -3226,6 +3878,15 @@ public extension Notebook {
         public let rest: Bool
         public let past: Bool
 
+        public init(date: String, sessions: [ReorganizeSession], stated: DayState? = nil, habitId: String? = nil, rest: Bool, past: Bool) {
+            self.date = date
+            self.sessions = sessions
+            self.stated = stated
+            self.habitId = habitId
+            self.rest = rest
+            self.past = past
+        }
+
         enum CodingKeys: String, CodingKey {
             case date = "date"
             case sessions = "sessions"
@@ -3262,6 +3923,13 @@ public extension Notebook {
         public let before: String
         public let after: String
 
+        public init(session: String, title: String, before: String, after: String) {
+            self.session = session
+            self.title = title
+            self.before = before
+            self.after = after
+        }
+
         enum CodingKeys: String, CodingKey {
             case session = "session"
             case title = "title"
@@ -3290,6 +3958,12 @@ public extension Notebook {
         public let session: String
         public let title: String
         public let km: Double?
+
+        public init(session: String, title: String, km: Double? = nil) {
+            self.session = session
+            self.title = title
+            self.km = km
+        }
 
         enum CodingKeys: String, CodingKey {
             case session = "session"
@@ -3359,6 +4033,13 @@ public extension Notebook {
             }
         }
 
+        public init(remark: Remark, title: String? = nil, date: String? = nil, value: Int? = nil) {
+            self.remark = remark
+            self.title = title
+            self.date = date
+            self.value = value
+        }
+
         enum CodingKeys: String, CodingKey {
             case remark = "remark"
             case title = "title"
@@ -3389,6 +4070,14 @@ public extension Notebook {
         public let load: Double
         public let moved: Bool
         public let carried: Bool
+
+        public init(date: String, labels: [String], load: Double, moved: Bool, carried: Bool) {
+            self.date = date
+            self.labels = labels
+            self.load = load
+            self.moved = moved
+            self.carried = carried
+        }
 
         enum CodingKeys: String, CodingKey {
             case date = "date"
@@ -3424,6 +4113,14 @@ public extension Notebook {
         public let days: [VariantDay]
         public let aroundMin: Int?
 
+        public init(moves: [VariantMove], dropped: [VariantDrop], notes: [VariantNote], days: [VariantDay], aroundMin: Int? = nil) {
+            self.moves = moves
+            self.dropped = dropped
+            self.notes = notes
+            self.days = days
+            self.aroundMin = aroundMin
+        }
+
         enum CodingKeys: String, CodingKey {
             case moves = "moves"
             case dropped = "dropped"
@@ -3456,6 +4153,13 @@ public extension Notebook {
         public let title: String
         public let body: String
         public let lines: [String]
+
+        public init(id: String, title: String, body: String, lines: [String]) {
+            self.id = id
+            self.title = title
+            self.body = body
+            self.lines = lines
+        }
 
         enum CodingKeys: String, CodingKey {
             case id = "id"
@@ -3525,6 +4229,18 @@ public extension Notebook {
                 var container = encoder.singleValueContainer()
                 try container.encode(rawValue)
             }
+        }
+
+        public init(week: String, revision: Int, written: Bool, blocked: Blocked? = nil, days: [ReorganizeDay], variants: [Variant], others: Int, heldBack: [String], proposals: [Proposal]) {
+            self.week = week
+            self.revision = revision
+            self.written = written
+            self.blocked = blocked
+            self.days = days
+            self.variants = variants
+            self.others = others
+            self.heldBack = heldBack
+            self.proposals = proposals
         }
 
         enum CodingKeys: String, CodingKey {
@@ -3662,6 +4378,21 @@ public extension Notebook {
             }
         }
 
+        public init(kind: Kind, minutes: Int? = nil, pace: Pace? = nil, required: Bool? = nil, sport: String? = nil, demanding: Bool? = nil, runToo: Bool? = nil, habit: Bool, id: String, weekday: Int, startsOn: String, endsOn: String? = nil) {
+            self.kind = kind
+            self.minutes = minutes
+            self.pace = pace
+            self.required = required
+            self.sport = sport
+            self.demanding = demanding
+            self.runToo = runToo
+            self.habit = habit
+            self.id = id
+            self.weekday = weekday
+            self.startsOn = startsOn
+            self.endsOn = endsOn
+        }
+
         enum CodingKeys: String, CodingKey {
             case kind = "kind"
             case minutes = "minutes"
@@ -3713,6 +4444,10 @@ public extension Notebook {
     struct HabitsView: Codable, Hashable, Sendable {
         public let habits: [Habit]
 
+        public init(habits: [Habit]) {
+            self.habits = habits
+        }
+
         enum CodingKeys: String, CodingKey {
             case habits = "habits"
         }
@@ -3730,20 +4465,20 @@ public extension Notebook {
 
     enum SessionFact: Codable, Hashable, Sendable {
         case fact(Fact)
-        case strengthfact(StrengthFact)
+        case strengthFact(StrengthFact)
 
         public init(from decoder: any Decoder) throws {
             if let value = try? Fact(from: decoder) {
                 self = .fact(value)
                 return
             }
-            self = .strengthfact(try StrengthFact(from: decoder))
+            self = .strengthFact(try StrengthFact(from: decoder))
         }
 
         public func encode(to encoder: any Encoder) throws {
             switch self {
             case .fact(let value): try value.encode(to: encoder)
-            case .strengthfact(let value): try value.encode(to: encoder)
+            case .strengthFact(let value): try value.encode(to: encoder)
             }
         }
     }

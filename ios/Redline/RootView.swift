@@ -30,7 +30,7 @@ struct RootView: View {
     @AppStorage(Theme.storageKey) private var theme = Theme.auto
 
     var body: some View {
-        content.preferredColorScheme(theme.colorScheme)
+        content.onChange(of: theme, initial: true) { _, theme in theme.apply() }
     }
 
     @ViewBuilder private var content: some View {
@@ -76,16 +76,12 @@ struct RootView: View {
                     NavigationStack {
                         Group {
                             switch tab {
-                            case .today: TodayScreen(session: session)
+                            case .today: TodayScreen(session: session) { selection = .week }
                             case .week: WeekScreen(session: session)
                             case .race: RaceScreen(session: session)
                             }
                         }
-                        .toolbar {
-                            ToolbarItem(placement: .topBarTrailing) {
-                                Button("Réglages", systemImage: "gearshape") { showingSettings = true }
-                            }
-                        }
+                        .environment(\.openSettings) { showingSettings = true }
                     }
                 }
             }

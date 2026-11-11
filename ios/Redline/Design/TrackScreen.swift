@@ -9,6 +9,8 @@ struct TrackScreen<Hero: View, Content: View>: View {
     @ViewBuilder var hero: Hero
     @ViewBuilder var content: Content
     @State private var onTrack = true
+    @Environment(\.openSettings) private var openSettings
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         ScrollView {
@@ -46,18 +48,28 @@ struct TrackScreen<Hero: View, Content: View>: View {
             ToolbarItem(placement: .principal) {
                 Text(title).font(.headline).opacity(onTrack ? 0 : 1)
             }
+            if let openSettings {
+                ToolbarItem(placement: .topBarTrailing) {
+                    // A bar button draws its glyph in the tint.
+                    Button("Réglages", systemImage: "gearshape", action: openSettings)
+                        .tint(onTrack ? Palette.onTrack : Palette.ink)
+                }
+            }
         }
-        // A visible but clear background while on the track: the red shows through and the
-        // bar takes the dark scheme, so its controls and the status bar turn white.
-        .toolbarBackground(Color.clear, for: .navigationBar)
-        .toolbarBackgroundVisibility(onTrack ? .visible : .automatic, for: .navigationBar)
-        .toolbarColorScheme(onTrack ? .dark : nil, for: .navigationBar)
+        // Always a visible background, so that the bar honours the scheme it is given:
+        // clear over the track (the red shows through, and the bar is dark, so its title,
+        // controls and status bar are white), then the paper once the track has gone.
+        .toolbarBackground(onTrack ? Color.clear : Palette.bg, for: .navigationBar)
+        .toolbarBackgroundVisibility(.visible, for: .navigationBar)
+        .toolbarColorScheme(onTrack ? .dark : scheme, for: .navigationBar)
     }
 }
 
 extension EnvironmentValues {
     /// True inside the track's hero: components take their white-on-red form.
     @Entry var onTrack = false
+    /// Opens the settings sheet; the tabs' bars carry its button.
+    @Entry var openSettings: (() -> Void)?
 }
 
 /// The red surface: the track's mean colour under the bar, deepening to the tartan, a
