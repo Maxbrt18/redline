@@ -91,8 +91,8 @@ def test_today_week_and_course_fit_a_phone_and_keep_text_inert(browser, width):
     assert tab.get_by_role('heading', name='Renfo, séance unique').is_visible()
     assert tab.get_by_text('Alerte FC de la montre sur 157').is_visible()
     assert tab.locator('.n-nav').bounding_box()['y'] > 700
-    tab.get_by_role('button', name='1 exercice', exact=True).click()
-    assert tab.get_by_text('3 × 12', exact=True).is_visible()
+    tab.get_by_role('button', name='4 exercices', exact=True).click()
+    assert tab.get_by_text('2 × 10-12 par jambe', exact=True).is_visible()
     tab.get_by_role('button', name='Séance guidée').click()
     tab.get_by_text('La séance a changé.', exact=True).wait_for()
     assert tab.evaluate('document.documentElement.scrollWidth <= innerWidth')
@@ -582,8 +582,9 @@ def test_a_card_from_messenger_opens_over_today_and_goes_back_to_it(browser):
 
 
 SESSION = {'sid': 'w41-ven-renfo-2026-10-09', 'session': 'a', 'title': 'Renfo A', 'date': '2026-10-09',
-           'duration_min': 25, 'rule': 'Une règle.', 'expires_at': int(time.time()) + 3600,
-           'exercises': [{'name': name, 'target': '', 'dose': Dose.read({'measure': 'reps', 'sets': 1, 'reps': 8}).payload()}
+           'duration_min': 25, 'rule': 'Une règle.', 'note': '', 'expires_at': int(time.time()) + 3600,
+           'exercises': [{'slug': name.lower(), 'name': name, 'target': '', 'cue': '', 'equipment': [], 'load': None,
+                          'dose': Dose.read({'measure': 'reps', 'sets': 1, 'reps': 8}).payload()}
                          for name in ('Step-up', 'Mollet', 'Pont')]}
 
 

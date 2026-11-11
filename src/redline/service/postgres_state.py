@@ -9,7 +9,8 @@ import re
 import time
 import uuid
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy import RowMapping
@@ -441,7 +442,7 @@ class PostgresStateStore(StateStore):
                 references.append(wording.REPLY_LOST)
         return wording.REPLY_HEADER + "\n\n".join(references) + wording.REPLY_RULE
 
-    def issue_strength_link(self, psid: str, session: dict) -> str:
+    def issue_strength_link(self, psid: str, session: Mapping[str, Any]) -> str:
         """Persist the immutable prescription and return its short-lived raw capability."""
         now = dt.datetime.now(dt.UTC)
         snapshot = strength.expiring_snapshot(session, now=int(now.timestamp()))

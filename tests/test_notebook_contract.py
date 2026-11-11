@@ -84,7 +84,7 @@ def test_a_browser_payload_is_what_the_service_serves(shape, payload):
 def test_the_page_reads_every_declared_key():
     declared = {key for shape in vars(views).values() if typing.is_typeddict(shape)
                 for key in shape.__annotations__}
-    scripts = [name for name in page.NOTEBOOK_SCRIPT if name.startswith("notebook/")]
+    scripts = [name for name in page.NOTEBOOK_SCRIPT if name.startswith(("notebook/", "strength/"))]
     read = {value.strip("'\"") for _, tokens, _, _ in modules(scripts).values()
             for kind, value, _ in tokens if kind in {"id", "str"}}
     assert declared - read == UNREAD

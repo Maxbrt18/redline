@@ -64,4 +64,8 @@ struct NotebookContractTests {
     @Test func revised() throws {
         try expectRoundTrip(Notebook.Revised.self, fixture: "revised")
     }
+
+    @Test func strengthSession() throws {
+        try expectRoundTrip(Notebook.StrengthSessionView.self, fixture: "strength-session")
+    }
 }

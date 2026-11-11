@@ -194,10 +194,13 @@ extension ThreadStep where Body == EmptyView {
 
 /// The day's strength exercises, folded under their count.
 struct ExerciseList: View {
-    let session: [String: JSONValue]
+    let exercises: [(name: String, dose: String)]
+
+    init(session: Notebook.StrengthSession) {
+        exercises = session.exercises.map { ($0.name, $0.dose.text) }
+    }
 
     var body: some View {
-        let exercises = Self.exercises(session)
         if !exercises.isEmpty {
             DisclosureGroup("\(exercises.count) exercice\(exercises.count > 1 ? "s" : "")") {
                 VStack(alignment: .leading, spacing: 0) {

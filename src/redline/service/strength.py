@@ -16,12 +16,14 @@ import os
 import re
 import secrets
 import time
+from collections.abc import Mapping
 from datetime import date
 from pathlib import Path
 from typing import Any
 
 from redline.coach.fr import strength_report as wording
 from redline.model import formats, strength_log
+from redline.model import notebook_views as views
 from redline.model.errors import InputError
 
 PAGE_PATH = "/s"
@@ -66,7 +68,7 @@ def token_url(base_url: str, token: str) -> str:
     return f"{base_url.rstrip('/')}{PAGE_PATH}#t={token}"
 
 
-def expiring_snapshot(session: dict, *, now: int | None = None) -> dict:
+def expiring_snapshot(session: Mapping[str, Any], *, now: int | None = None) -> dict:
     """Freeze a JSON-safe prescription and add the server-owned expiration."""
     try:
         snapshot = json.loads(json.dumps(session, ensure_ascii=False))
@@ -90,7 +92,7 @@ def sidecar_for(image: Path) -> Path:
     return image.with_name(image.name + SIDECAR_SUFFIX)
 
 
-def write_sidecar(image: Path, text: str, session: dict) -> Path:
+def write_sidecar(image: Path, text: str, session: Mapping[str, Any]) -> Path:
     """The bubble text and exact prescription awaiting server-side token issuance.
 
     The bot turns it into a button only after the image has been delivered, so Claude
@@ -180,8 +182,7 @@ def parse_report(report: dict, exercises: list, zones: dict[str, str] | None = N
     exercise_count = len(exercises)
     if not isinstance(report, dict):
         raise ReportError("report: JSON object expected")
-    allowed = {"performed_on", "pains", "minutes", "note", "exercises"}
-    unknown = sorted(set(report) - allowed)
+    unknown = sorted(set(report) - set(views.StrengthReportPosted.__annotations__))
     if unknown:
         raise ReportError("champs inconnus : " + ", ".join(unknown))
     performed_on = report.get("performed_on")
@@ -202,7 +203,7 @@ def parse_report(report: dict, exercises: list, zones: dict[str, str] | None = N
     for entry_position, entry in enumerate(raw_exercises):
         if not isinstance(entry, dict):
             raise ReportError(f"exercises[{entry_position}]: object expected")
-        entry_unknown = sorted(set(entry) - {"i", "score", "skipped", "gated", "reps", "status", "note"})
+        entry_unknown = sorted(set(entry) - set(views.StrengthReportExercise.__annotations__))
         if entry_unknown:
             raise ReportError(f"exercises[{entry_position}] : champs inconnus : "
                               + ", ".join(entry_unknown))

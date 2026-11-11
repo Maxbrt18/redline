@@ -216,6 +216,119 @@ class Answered(TypedDict):
     alert: bool
 
 
+class StrengthSlot(TypedDict):
+    """One validation a dose asks for, walked out by `Dose.slots`.
+
+    `n` and `of` count sets (or blocks), never slots; `s` is the side of a per-leg dose;
+    `t` is what the slot aims at (seconds, repetitions, contacts in the block).
+    """
+
+    n: int
+    of: int
+    s: NotRequired[Literal["d", "g"]]
+    t: NotRequired[int]
+
+
+class StrengthDose(TypedDict):
+    """A dose as the session runs it: `measure` picks the control, `slots` the walk."""
+
+    measure: Literal["reps", "time", "amrap", "contacts"]
+    text: str
+    current_text: str
+    slots: list[StrengthSlot]
+    #: A reps dose's answers, the prescribed range in full.
+    counts: NotRequired[list[int]]
+    #: Between sets (or blocks), only when the session says so.
+    rest_s: NotRequired[int]
+
+
+class StrengthLoad(TypedDict):
+    kg: float
+    count: int
+
+
+class StrengthExercise(TypedDict):
+    #: Empty for an exercise added outside the program.
+    slug: str
+    name: str
+    target: str
+    cue: str
+    equipment: list[str]
+    load: StrengthLoad | None
+    dose: StrengthDose
+    #: What was done the last time, already written for the athlete.
+    last: NotRequired[str]
+
+
+class StrengthGate(TypedDict):
+    """The day's pain guardrail, written by the coach: above `pain_max` on a watched zone
+    (`zone`, or any of them), the exercises of `drop` are taken out and `say` is shown."""
+
+    zone: NotRequired[str]
+    pain_max: int
+    drop: NotRequired[list[str]]
+    say: str
+
+
+class StrengthSession(TypedDict):
+    """The strength session of the day, as frozen in its link."""
+
+    sid: str
+    session: str
+    title: str
+    rule: str
+    date: str
+    duration_min: int
+    note: str
+    exercises: list[StrengthExercise]
+    gate: NotRequired[StrengthGate]
+    #: Unix seconds; set when a link is issued.
+    expires_at: NotRequired[int]
+
+
+class WatchedZone(TypedDict):
+    zone: str
+    label: str
+
+
+class StrengthSessionView(TypedDict):
+    """A strength link resolved: its session, and the zones to ask about today."""
+
+    status: Literal["ok"]
+    session: StrengthSession
+    #: The last reported prescription of the same routine, as it was stored then.
+    previous_session: dict[str, Any] | None
+    zones: list[WatchedZone]
+
+
+class StrengthReportExercise(TypedDict):
+    """One exercise of a posted report. `reps` is positional, one entry per slot walked,
+    blanks included: the position tells which side a count belongs to."""
+
+    i: int
+    score: int | None
+    skipped: bool
+    gated: bool
+    status: Literal["completed", "partial", "skipped", "gated"]
+    note: str
+    reps: list[int | None]
+
+
+class StrengthPainPosted(TypedDict):
+    before: int | None
+    after: int | None
+
+
+class StrengthReportPosted(TypedDict):
+    """What the session posts back once done; the server parses it in `strength.parse_report`."""
+
+    performed_on: str
+    pains: dict[str, StrengthPainPosted]
+    minutes: int | None
+    note: str
+    exercises: list[StrengthReportExercise]
+
+
 class StrengthClosed(TypedDict):
     """Why no guided session is offered today."""
 
@@ -229,7 +342,7 @@ class StrengthReady(TypedDict):
 
     status: Literal["ready"]
     date: str
-    session: dict[str, Any]
+    session: StrengthSession
     revision: int
     signature: str
 

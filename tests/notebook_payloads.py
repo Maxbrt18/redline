@@ -157,6 +157,54 @@ TOTALS = {
 STRIP = [strip_day(day, letter)
          for day, letter in zip(range(5, 12), "LMMJVSD", strict=True)]
 
+#: A strength session of the day: one exercise of each measure, a per-leg dose, a rest, the
+#: pain guardrail on the knee.
+STRENGTH_SESSION_OF_DAY = {
+    "sid": "w41-renfo-a",
+    "session": "renfo-a",
+    "title": "Renfo A",
+    "rule": "Arrêter une série si la douleur dépasse 3.",
+    "date": "vendredi 9 octobre",
+    "duration_min": 30,
+    "note": "Charge stable cette semaine.",
+    "gate": {"zone": "knee", "pain_max": 3, "drop": ["sauts"],
+             "say": "Genou au-dessus de 3 : les sauts sautent aujourd'hui."},
+    "exercises": [
+        {"slug": "mollets", "name": "Mollets sur une jambe", "target": "Mollets",
+         "cue": "Monter haut, descendre lentement.", "equipment": ["Marche"],
+         "load": {"kg": 8.0, "count": 1}, "last": "D 12, 12 · G 11, 12",
+         "dose": {"measure": "reps", "text": "2 × 10-12 par jambe",
+                  "current_text": "10-12 répétitions", "counts": [10, 11, 12], "rest_s": 60,
+                  "slots": [{"n": 1, "of": 2, "s": "d", "t": 12}, {"n": 1, "of": 2, "s": "g", "t": 12},
+                            {"n": 2, "of": 2, "s": "d", "t": 12}, {"n": 2, "of": 2, "s": "g", "t": 12}]}},
+        {"slug": "gainage", "name": "Gainage ventral", "target": "Tronc", "cue": "",
+         "equipment": [], "load": None,
+         "dose": {"measure": "time", "text": "2 × 45 s", "current_text": "45 s", "rest_s": 30,
+                  "slots": [{"n": 1, "of": 2, "t": 45}, {"n": 2, "of": 2, "t": 45}]}},
+        {"slug": "sauts", "name": "Sauts sur place", "target": "Pieds", "cue": "",
+         "equipment": [], "load": None,
+         "dose": {"measure": "contacts", "text": "20 contacts, par blocs de 10",
+                  "current_text": "10 contacts", "rest_s": 30,
+                  "slots": [{"n": 1, "of": 2, "t": 10}, {"n": 2, "of": 2, "t": 10}]}},
+        {"slug": "pompes", "name": "Pompes", "target": "Haut du corps", "cue": "",
+         "equipment": [], "load": {"kg": 0.0, "count": 1},
+         "dose": {"measure": "amrap", "text": "1 × jusqu'à fatigue",
+                  "current_text": "Jusqu'à échec technique",
+                  "slots": [{"n": 1, "of": 1}]}},
+    ],
+}
+
+#: The same session resolved from its link, with the previous one of its routine.
+STRENGTH_SESSION = {
+    "status": "ok",
+    "session": {**STRENGTH_SESSION_OF_DAY, "expires_at": 1_760_400_000},
+    "previous_session": {**STRENGTH_SESSION_OF_DAY, "sid": "w40-renfo-a", "exercises": [
+        {**exercise, "dose": {**exercise["dose"], "text": "2 × 10 par jambe"}}
+        if exercise["slug"] == "mollets" else exercise
+        for exercise in STRENGTH_SESSION_OF_DAY["exercises"] if exercise["slug"] != "pompes"]},
+    "zones": [KNEE],
+}
+
 TODAY = {
     "date": "2026-10-09",
     "week": CURRENT_WEEK,
@@ -195,10 +243,7 @@ TODAY = {
         "signature": "old",
         "revision": 3,
         "date": "2026-10-09",
-        "session": {
-            "title": "Renfo A",
-            "exercises": [{"name": "Mollets", "dose": {"text": "3 × 12"}}],
-        },
+        "session": STRENGTH_SESSION_OF_DAY,
     },
 }
 
@@ -441,4 +486,5 @@ SCREENS = {
     "answer": (views.Answered, ANSWERED),
     "done": (views.Done, DONE),
     "revised": (views.Revised, REVISED),
+    "strength-session": (views.StrengthSessionView, STRENGTH_SESSION),
 }
