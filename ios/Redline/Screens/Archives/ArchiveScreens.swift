@@ -41,10 +41,11 @@ private struct ArchivesList: View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(months, id: \.self) { month in
                 Text(Self.monthName(month))
-                    .font(.footnote.weight(.semibold))
+                    .font(TextRole.caption.font.weight(.semibold))
                     .foregroundStyle(Palette.muted)
-                    .padding(.top, 22)
-                    .padding(.bottom, 2)
+                    .accessibilityAddTraits(.isHeader)
+                    .padding(.top, Space.l)
+                    .padding(.bottom, Space.xxs)
                 ForEach(entries.filter { $0.occurredOn.hasPrefix(month) }, id: \.id) { entry in
                     NavigationLink(value: EntryLink(id: entry.id, title: entry.title)) {
                         EntryRow(title: entry.title, date: entry.occurredOn)
@@ -61,13 +62,14 @@ private struct ArchivesList: View {
                 .buttonStyle(.glass)
                 .controlSize(.large)
                 .disabled(loading)
-                .padding(.top, 20)
+                .padding(.top, Space.l)
             }
             if let failure {
-                Text(failure).font(.footnote).foregroundStyle(Palette.over).padding(.top, 8)
+                Label(failure, systemImage: "exclamationmark.triangle")
+                    .textRole(.caption).foregroundStyle(Palette.accent).padding(.top, Space.xs)
             }
         }
-        .padding(.bottom, 24)
+        .padding(.bottom, Space.l)
     }
 
     private func load(_ offset: Int) async {
@@ -107,7 +109,7 @@ struct EntryRow: View {
                 Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(Palette.faint)
             }
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, Space.s)
         .contentShape(.rect)
     }
 }
@@ -130,43 +132,48 @@ struct EntryScreen: View {
 
 private struct EntryContent: View {
     let entry: Notebook.EntryView
+    @ScaledMetric(relativeTo: .body) private var numberWidth: CGFloat = 18
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if !entry.imageHash.isEmpty { CardImage(entry: entry) }
             if !entry.body.isEmpty {
                 SectionTitle(text: "Le mot du coach")
-                Text(entry.body).font(.body).padding(.top, 12).textSelection(.enabled)
+                Text(entry.body).textRole(.body).padding(.top, Space.s).textSelection(.enabled)
             }
             if let snapshot = entry.snapshot {
                 let exercises = ExerciseList.exercises(snapshot)
                 if !exercises.isEmpty {
-                    DisclosureGroup("Consignes de cette séance") {
+                    DisclosureGroup {
                         VStack(alignment: .leading, spacing: 0) {
                             ForEach(Array(exercises.enumerated()), id: \.offset) { index, exercise in
-                                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                                    Text("\(index + 1)").font(.figure(16)).foregroundStyle(Palette.muted).frame(width: 18)
+                                HStack(alignment: .firstTextBaseline, spacing: Space.s) {
+                                    Text("\(index + 1)").figure(.inline).foregroundStyle(Palette.muted)
+                                        .frame(minWidth: numberWidth, alignment: .leading)
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text(exercise.name)
+                                        Text(exercise.name).textRole(.body)
                                         if !exercise.dose.isEmpty {
-                                            Text(exercise.dose).font(.subheadline).foregroundStyle(Palette.muted)
+                                            Text(exercise.dose).textRole(.secondary).foregroundStyle(Palette.muted)
                                         }
                                     }
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.vertical, 8)
+                                .padding(.vertical, Space.xs)
                             }
                         }
+                    } label: {
+                        Text("Consignes de cette séance").textRole(.body)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .tint(Palette.ink)
-                    .padding(.top, 24)
+                    .padding(.top, Space.l)
                 }
             }
             if let report = entry.report {
                 StrengthReportView(report: report, names: Dictionary(
                     ExerciseList.slugsAndNames(entry.snapshot ?? [:]), uniquingKeysWith: { first, _ in first }))
             } else if entry.kind == "strength" {
-                Text("Aucun compte rendu rattaché à cette carte.").font(.footnote).foregroundStyle(Palette.muted).padding(.top, 20)
+                Text("Aucun compte rendu rattaché à cette carte.").textRole(.caption).foregroundStyle(Palette.muted).padding(.top, Space.l)
             }
             if entry.kind == "monthly", !entry.related.isEmpty {
                 SectionTitle(text: "Les weekly de ce mois")
@@ -178,7 +185,7 @@ private struct EntryContent: View {
                 }
             }
         }
-        .padding(.bottom, 24)
+        .padding(.bottom, Space.l)
     }
 }
 
@@ -192,14 +199,13 @@ private struct CardImage: View {
     @State private var previewed: URL?
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Space.s) {
             if let image, let file {
                 Button { previewed = file } label: {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFit()
-                        .clipShape(.rect(cornerRadius: 14))
-                        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Palette.grid, lineWidth: 0.5))
+                        .clipShape(.rect(cornerRadius: Radius.surface))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Agrandir la carte \(entry.title)")
@@ -212,7 +218,7 @@ private struct CardImage: View {
                 ContentUnavailableView("Image indisponible", systemImage: "photo",
                                        description: Text("Tire la page pour réessayer."))
             } else {
-                RoundedRectangle(cornerRadius: 14).fill(Palette.panel).aspectRatio(1.13, contentMode: .fit)
+                RoundedRectangle(cornerRadius: Radius.surface).fill(Palette.panel).aspectRatio(1.13, contentMode: .fit)
                     .overlay { ProgressView() }
             }
         }
@@ -248,24 +254,24 @@ private struct StrengthReportView: View {
             SectionTitle(text: "Ce que tu as réalisé")
             Text([Day(report.performedOn)?.spelled(weekday: false), report.durationMinutes.map { "\($0) min" }]
                 .compactMap { $0 }.joined(separator: " · "))
-                .font(.subheadline).foregroundStyle(Palette.muted).padding(.top, 12)
+                .textRole(.secondary).foregroundStyle(Palette.muted).padding(.top, Space.s)
             if !report.note.isEmpty {
-                Text(report.note).padding(.top, 8)
+                Text(report.note).textRole(.body).padding(.top, Space.xs)
             }
             ForEach(report.exercises, id: \.slug) { exercise in
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(names[exercise.slug] ?? exercise.slug).font(.subheadline.weight(.semibold))
-                        Spacer()
-                        Text(Self.state(exercise.status)).font(.caption.weight(.semibold))
+                VStack(alignment: .leading, spacing: Space.xxs) {
+                    HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
+                        Text(names[exercise.slug] ?? exercise.slug).textRole(.secondary).fontWeight(.semibold)
+                        Spacer(minLength: Space.xs)
+                        Text(Self.state(exercise.status)).font(TextRole.caption.font.weight(.semibold))
                             .foregroundStyle(exercise.status == "completed" ? Palette.ink : Palette.muted)
                     }
                     let details = [Self.repetitions(exercise.sets), exercise.difficulty.map { "effort \($0)/10" }]
                         .compactMap { $0 }.joined(separator: " · ")
-                    if !details.isEmpty { Text(details).font(.caption).foregroundStyle(Palette.muted) }
-                    if !exercise.note.isEmpty { Text(exercise.note).font(.footnote) }
+                    if !details.isEmpty { Text(details).textRole(.caption).foregroundStyle(Palette.muted) }
+                    if !exercise.note.isEmpty { Text(exercise.note).textRole(.caption) }
                 }
-                .padding(.vertical, 12)
+                .padding(.vertical, Space.s)
                 .accessibilityElement(children: .combine)
             }
         }
