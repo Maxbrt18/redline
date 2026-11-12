@@ -32,7 +32,7 @@ struct StrengthLauncher: View {
             .foregroundStyle(Palette.bg)
             .disabled(launching)
             if let failure {
-                Text(failure).font(.footnote).foregroundStyle(Palette.over)
+                Label(failure, systemImage: "exclamationmark.circle").textRole(.caption).foregroundStyle(Palette.accent)
             }
             ExerciseList(session: ready.session)
         }

@@ -1,9 +1,11 @@
 import RedlineKit
 import SwiftUI
 
-/// The guided strength session, full screen over the notebook: its head, the opening pain
-/// reading when the coach set a guardrail, the exercises with the live one open, then the
-/// review. Close is the only way out, and leaving a started session asks first, saying that
+/// The guided strength session, full screen over the notebook. Before the first set, the
+/// head, what to get ready and the opening pain reading; then one exercise at a time, one
+/// figure per screen (`StrengthFocus`), the rest drawn in inverted colours; then the
+/// review. The list of exercises, the cues and the rarer actions are in the bar's menu.
+/// Close is the only way out, and leaving a started session asks first, saying that
 /// nothing is lost.
 struct StrengthScreen: View {
     let session: NotebookSession
@@ -11,50 +13,68 @@ struct StrengthScreen: View {
     @State private var leaving = false
     @State private var sound = StrengthSound()
     @State private var soundSettings = false
+    @State private var overview = false
+    @State private var gesture = false
+    @State private var rating = false
+    @State private var asking = false
+    @State private var typed = ""
     @AppStorage(StrengthSound.enabledKey) private var soundOn = true
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.colorScheme) private var scheme
 
     init(session: NotebookSession, launch: StrengthLaunch) {
         self.session = session
         _model = State(initialValue: StrengthModel(launch: launch, session: session))
     }
 
+    /// The exercise screen is showing, not the opening or the review.
+    private var focusing: Bool {
+        guard case .running = model.phase, let run = model.run else { return false }
+        return !run.needsOpening && !run.progress.review
+    }
+
+    /// A rest turns the page over: ink background, paper text.
+    private var resting: Bool {
+        guard focusing, let run = model.run else { return false }
+        return StrengthState(run: run).resting
+    }
+
+    private var shownScheme: ColorScheme { resting ? (scheme == .dark ? .light : .dark) : scheme }
+
     var body: some View {
         NavigationStack {
             content
                 .background(Palette.bg)
-                .navigationTitle(model.run?.session.title ?? "Renfo")
-                .navigationBarTitleDisplayMode(.large)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Fermer", systemImage: "xmark") {
-                            if model.run?.isUnfinished == true { leaving = true } else { close() }
-                        }
-                        // Attached to the button itself so the popover points at it, not at the page.
-                        .confirmationDialog("Quitter la séance ?", isPresented: $leaving, titleVisibility: .visible) {
-                            Button("Quitter la séance") { close() }
-                            Button("Rester", role: .cancel) {}
-                        } message: {
-                            Text("Rien n’est perdu : tu reprendras où tu en es.")
-                        }
-                    }
-                    ToolbarItem(placement: .primaryAction) {
-                        Button(soundOn ? "Son" : "Son coupé", systemImage: soundOn ? "speaker.wave.2" : "speaker.slash") {
-                            soundSettings = true
-                        }
-                    }
-                    // The number pad has no key to close it, and it covers the button forward.
-                    ToolbarItemGroup(placement: .keyboard) {
-                        Spacer()
-                        Button("OK") {
-                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                        }
-                        .fontWeight(.semibold)
-                    }
-                }
-                .sheet(isPresented: $soundSettings) { StrengthSoundSettings(sound: sound) }
+                .navigationTitle(focusing ? "" : model.run?.session.title ?? "Renfo")
+                .navigationBarTitleDisplayMode(focusing ? .inline : .large)
+                .toolbar { toolbar }
+                .toolbarColorScheme(resting ? shownScheme : nil, for: .navigationBar)
         }
+        .environment(\.colorScheme, shownScheme)
+        .animation(.easeInOut(duration: 0.3), value: resting)
+        // Sheets and the alert hang outside the inverted page, so a rest does not turn them over.
+        .sheet(isPresented: $soundSettings) { StrengthSoundSettings(sound: sound) }
+        .sheet(isPresented: $overview) {
+            if let run = model.run { StrengthOverview(model: model, run: run) }
+        }
+        .sheet(isPresented: $gesture) {
+            if let run = model.run { StrengthGesture(model: model, run: run) }
+        }
+        .sheet(isPresented: $rating) {
+            if let run = model.run, let index = run.progress.feedback, run.exercises.indices.contains(index) {
+                StrengthRating(model: model, run: run, index: index)
+            }
+        }
+        .alert("Combien de répétitions ?", isPresented: $asking) {
+            TextField("répétitions", text: $typed).keyboardType(.numberPad)
+            Button("Valider") {
+                if let count = Int(typed.filter(\.isNumber).prefix(3)) { model.change { $0.validate(count, at: .now) } }
+                typed = ""
+            }
+            Button("Annuler", role: .cancel) { typed = "" }
+        }
+        .onChange(of: asking) { _, open in model.editing = open }
         .interactiveDismissDisabled()
         .task {
             await model.open()
@@ -90,11 +110,85 @@ struct StrengthScreen: View {
             switch model.signals?.list.last {
             case .workStart?, .restEnd?: .impact(weight: .heavy)
             case .workEnd?: .success
-            case .changeSide?: .warning
+            case .changeSide?: .impact(weight: .medium)
             case .countdown?: .impact(weight: .light)
             case nil: nil
             }
         }
+        // A set banked by a tap answers under the finger.
+        .sensoryFeedback(trigger: banked) { old, new in new > old ? .success : nil }
+    }
+
+    /// Every set validated so far, across the session.
+    private var banked: Int {
+        model.run.map { run in run.exercises.indices.reduce(0) { $0 + run.step($1).slots.count } } ?? 0
+    }
+
+    @ToolbarContentBuilder private var toolbar: some ToolbarContent {
+        ToolbarItem(placement: .cancellationAction) {
+            Button("Fermer", systemImage: "xmark") {
+                if model.run?.isUnfinished == true { leaving = true } else { close() }
+            }
+            // Attached to the button itself so the popover points at it, not at the page.
+            .confirmationDialog("Quitter la séance ?", isPresented: $leaving, titleVisibility: .visible) {
+                Button("Quitter la séance") { close() }
+                Button("Rester", role: .cancel) {}
+            } message: {
+                Text("Rien n’est perdu : tu reprendras où tu en es.")
+            }
+        }
+        ToolbarItem(placement: .primaryAction) {
+            Button(soundOn ? "Son" : "Son coupé", systemImage: soundOn ? "speaker.wave.2" : "speaker.slash") {
+                soundSettings = true
+            }
+        }
+        if focusing, let run = model.run {
+            ToolbarItem(placement: .primaryAction) { menu(run) }
+        }
+        // The number pad has no key to close it, and it covers the button forward.
+        ToolbarItemGroup(placement: .keyboard) {
+            Spacer()
+            Button("OK") {
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+            }
+            .fontWeight(.semibold)
+        }
+    }
+
+    private func menu(_ run: StrengthRun) -> some View {
+        let index = run.progress.current
+        let exercise = run.exercises[index]
+        let step = run.step(index)
+        let state = StrengthState(run: run)
+        return Menu {
+            Button("La séance", systemImage: "list.bullet") { overview = true }
+            Button("Le geste", systemImage: "info.circle") { gesture = true }
+            if let finished = run.progress.feedback, run.exercises.indices.contains(finished) {
+                Button("Noter : \(run.exercises[finished].name)", systemImage: "star") { rating = true }
+            }
+            if exercise.dose.measure == .time {
+                Toggle("Enchaîner les séries", isOn: Binding(
+                    get: { run.progress.chainsSets }, set: { value in model.update { $0.setChainsSets(value) } }))
+                switch state {
+                case .ready, .work:
+                    // The countdown validates on its own at zero; this is for a set done without it.
+                    Button("Série faite sans chrono", systemImage: "checkmark") {
+                        model.change { $0.validate(nil, at: .now) }
+                    }
+                default: EmptyView()
+                }
+            }
+            if run.currentSlot != nil, !step.gated {
+                Button(step.slots.isEmpty ? "Passer l’exercice" : "Arrêter ici, garder les séries faites",
+                       systemImage: "forward") { model.update { $0.skip(at: .now) } }
+            }
+            if run.canUndo {
+                Button("Annuler la dernière validation", systemImage: "arrow.uturn.backward") { model.update { $0.undo() } }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+        }
+        .accessibilityLabel("Plus d’options")
     }
 
     @ViewBuilder private var content: some View {
@@ -105,16 +199,25 @@ struct StrengthScreen: View {
             ContentUnavailableView(title, systemImage: "exclamationmark.triangle", description: Text(text))
         case .running:
             if let run = model.run {
-                ScrollViewReader { proxy in
+                if run.needsOpening {
                     ScrollView {
-                        StrengthPage(model: model, run: run)
+                        VStack(alignment: .leading, spacing: Space.l) {
+                            SessionHead(session: run.session)
+                            Preparation(preparation: StrengthPreparation(run: run, previous: model.previous))
+                            Opening(model: model, run: run)
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, Space.xl)
+                    }
+                } else if run.progress.review {
+                    ScrollView {
+                        StrengthReview(model: model, run: run)
                             .padding(.horizontal, 20)
-                            .padding(.bottom, 32)
+                            .padding(.bottom, Space.xl)
                     }
                     .scrollDismissesKeyboard(.interactively)
-                    .onChange(of: run.progress.review ? -1 : run.progress.current) { _, index in
-                        withAnimation { proxy.scrollTo(index < 0 ? "review" : "step-\(index)", anchor: .center) }
-                    }
+                } else {
+                    StrengthFocus(model: model, run: run, asking: $asking)
                 }
             }
         }
@@ -137,39 +240,104 @@ struct StrengthScreen: View {
     }
 }
 
-/// Everything under the title, in reading order.
-private struct StrengthPage: View {
+/// The whole session, opened from the menu: its head, what to get ready, the guardrail's
+/// word when it fired, and every exercise; touching one goes to it.
+private struct StrengthOverview: View {
     let model: StrengthModel
     let run: StrengthRun
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        let session = run.session
-        VStack(alignment: .leading, spacing: 18) {
-            SessionHead(session: session)
-            if model.unsaved {
-                Label("La sauvegarde sur ce téléphone est indisponible. Garde la séance ouverte jusqu’à l’envoi.",
-                      systemImage: "exclamationmark.triangle")
-                    .font(.footnote).foregroundStyle(Palette.over)
-            }
-            Preparation(preparation: StrengthPreparation(run: run, previous: model.previous))
-            if run.needsOpening {
-                Opening(model: model, run: run)
-            } else {
-                if run.gateFired, let say = session.gate?.say {
-                    Label(say, systemImage: "exclamationmark.shield")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Palette.over)
-                }
-                VStack(spacing: 0) {
-                    ForEach(Array(run.exercises.enumerated()), id: \.offset) { index, exercise in
-                        StepRow(model: model, run: run, index: index, exercise: exercise).id("step-\(index)")
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Space.l) {
+                    SessionHead(session: run.session)
+                    if run.gateFired, let say = run.session.gate?.say {
+                        Label(say, systemImage: "exclamationmark.shield")
+                            .font(TextRole.secondary.font.weight(.semibold)).foregroundStyle(Palette.accent)
+                    }
+                    Preparation(preparation: StrengthPreparation(run: run, previous: model.previous))
+                    VStack(spacing: 0) {
+                        ForEach(Array(run.exercises.enumerated()), id: \.offset) { index, exercise in
+                            Button {
+                                model.update { $0.focus(index) }
+                                dismiss()
+                            } label: {
+                                StepRow(run: run, index: index, exercise: exercise)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(run.isLocked)
+                        }
                     }
                 }
-                if run.progress.review {
-                    StrengthReview(model: model, run: run).id("review")
-                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, Space.xl)
             }
+            .background(Palette.bg)
+            .navigationTitle(run.session.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(role: .close) { dismiss() } } }
         }
+        .presentationDetents([.medium, .large])
+    }
+}
+
+/// How to do the live exercise, and what was done last time: what to read before deciding.
+private struct StrengthGesture: View {
+    let model: StrengthModel
+    let run: StrengthRun
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        let exercise = run.exercises[run.progress.current]
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Space.l) {
+                    section("Prescription", lines: [exercise.dose.text]
+                            + [exercise.load.map { "Charge prévue : " + StrengthWords.load($0) }].compactMap { $0 }
+                            + (exercise.equipment.isEmpty ? [] : ["À préparer : " + exercise.equipment.joined(separator: " · ")]))
+                    if !exercise.cue.isEmpty || !(model.cues[exercise.slug] ?? []).isEmpty {
+                        section("Le geste", lines: [exercise.cue].filter { !$0.isEmpty } + (model.cues[exercise.slug] ?? []))
+                    }
+                    if let last = exercise.last { section("Réalisé la dernière fois", lines: [last]) }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(Space.l)
+            }
+            .background(Palette.bg)
+            .navigationTitle(exercise.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(role: .close) { dismiss() } } }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func section(_ title: String, lines: [String]) -> some View {
+        VStack(alignment: .leading, spacing: Space.xs) {
+            Text(title).textRole(.heading)
+            ForEach(lines, id: \.self) { Text($0).textRole(.body) }
+        }
+    }
+}
+
+/// The exercise just finished, to rate while the next one waits.
+private struct StrengthRating: View {
+    let model: StrengthModel
+    let run: StrengthRun
+    let index: Int
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ExerciseFeedback(model: model, run: run, index: index)
+                .padding(Space.l)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .background(Palette.bg)
+                .navigationTitle(run.exercises[index].name)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(role: .close) { dismiss() } } }
+        }
+        .presentationDetents([.medium])
     }
 }
 
@@ -178,12 +346,12 @@ private struct SessionHead: View {
     let session: Notebook.StrengthSession
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Space.xs) {
             let meta = [Day(session.date)?.spelled().capitalizedFirst ?? session.date,
                         session.durationMin > 0 ? "~\(session.durationMin) min" : ""].filter { !$0.isEmpty }
-            Text(meta.joined(separator: " · ")).font(.footnote.weight(.semibold)).foregroundStyle(Palette.muted)
-            if !session.note.isEmpty { Text(session.note).font(.subheadline) }
-            if !session.rule.isEmpty { Text(session.rule).font(.footnote).foregroundStyle(Palette.muted) }
+            Text(meta.joined(separator: " · ")).font(TextRole.caption.font.weight(.semibold)).foregroundStyle(Palette.muted)
+            if !session.note.isEmpty { Text(session.note).textRole(.secondary) }
+            if !session.rule.isEmpty { Text(session.rule).textRole(.caption).foregroundStyle(Palette.muted) }
         }
     }
 }
@@ -262,15 +430,14 @@ private struct Opening: View {
                 .buttonStyle(.bordered)
                 .tint(Palette.ink)
         }
-        .padding(14)
-        .background(Palette.panel, in: .rect(cornerRadius: 16))
+        .padding(Space.m)
+        .background(Palette.panel, in: .rect(cornerRadius: Radius.surface))
     }
 }
 
-/// One exercise of the list: its number, name and what it asks for (or what was done);
-/// the live one carries its control.
+/// One exercise of the session's list: its number, name and what it asks for, or what
+/// was done; the live one's number is in the red line.
 private struct StepRow: View {
-    let model: StrengthModel
     let run: StrengthRun
     let index: Int
     let exercise: Notebook.StrengthExercise
@@ -278,46 +445,24 @@ private struct StepRow: View {
     var body: some View {
         let live = !run.progress.review && index == run.progress.current
         let done = run.isDone(index)
-        VStack(alignment: .leading, spacing: 12) {
-            if live {
-                head(live: true, done: done)
-            } else {
-                Button {
-                    model.update { $0.focus(index) }
-                } label: {
-                    head(live: false, done: done)
-                }
-                .buttonStyle(.plain)
-                .disabled(run.isLocked)
-            }
-            if live {
-                StrengthControl(model: model, run: run, index: index)
-            }
-        }
-        .padding(.vertical, 12)
-    }
-
-    private func head(live: Bool, done: Bool) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
+        HStack(alignment: .firstTextBaseline, spacing: Space.s) {
             Text(String(format: "%02d", index + 1))
-                .font(.figure(20, relativeTo: .headline))
-                .foregroundStyle(live ? Palette.red : Palette.faint)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(exercise.name).font(.body.weight(.semibold)).foregroundStyle(done && !live ? Palette.muted : Palette.ink)
-                if live, !exercise.target.isEmpty {
-                    Text(exercise.target).font(.footnote).foregroundStyle(Palette.muted)
-                }
-                if !live {
-                    Text(StrengthWords.dose(of: exercise, step: run.step(index), done: done))
-                        .font(.subheadline).monospacedDigit().foregroundStyle(Palette.muted)
-                }
+                .figure(.medium)
+                .foregroundStyle(live ? Palette.accent : Palette.muted)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(exercise.name).textRole(.body).fontWeight(.semibold)
+                    .foregroundStyle(done && !live ? Palette.muted : Palette.ink)
+                Text(StrengthWords.dose(of: exercise, step: run.step(index), done: done))
+                    .textRole(.secondary).monospacedDigit().foregroundStyle(Palette.muted)
             }
             Spacer(minLength: 0)
             if done && !live {
                 Image(systemName: run.step(index).gated || run.step(index).skipped ? "minus.circle" : "checkmark.circle.fill")
-                    .foregroundStyle(Palette.faint)
+                    .foregroundStyle(Palette.muted)
+                    .accessibilityLabel(run.step(index).gated || run.step(index).skipped ? "pas fait" : "fait")
             }
         }
+        .padding(.vertical, Space.s)
         .contentShape(.rect)
     }
 }

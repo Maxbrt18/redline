@@ -168,7 +168,7 @@ struct StrengthSoundSettings: View {
                 ToolbarItem(placement: .confirmationAction) { Button("OK") { dismiss() } }
             }
         }
-        .tint(Palette.red)
+        .tint(Palette.accent)
         .presentationDetents([.medium, .large])
     }
 }

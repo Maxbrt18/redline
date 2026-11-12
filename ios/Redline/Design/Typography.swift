@@ -25,10 +25,12 @@ enum TextRole {
     }
 }
 
-/// The four sizes of a figure. Each grows with a text style and stops at a cap, so that a
+/// The five sizes of a figure. Each grows with a text style and stops at a cap, so that a
 /// figure never breaks over several lines at the accessibility sizes; its unit and its
 /// words keep growing.
 enum FigureRole {
+    /// The one figure of a screen read at arm's length: the guided strength session.
+    case display
     /// The figure of a screen's head.
     case hero
     /// The figure of a section or a card.
@@ -40,6 +42,7 @@ enum FigureRole {
 
     var size: CGFloat {
         switch self {
+        case .display: 120
         case .hero: 80
         case .large: 40
         case .medium: 22
@@ -49,7 +52,7 @@ enum FigureRole {
 
     var style: Font.TextStyle {
         switch self {
-        case .hero: .largeTitle
+        case .display, .hero: .largeTitle
         case .large: .title
         case .medium: .title3
         case .inline: .body
@@ -59,7 +62,7 @@ enum FigureRole {
     /// The largest text size the figure follows.
     var cap: DynamicTypeSize {
         switch self {
-        case .hero: .xxLarge
+        case .display, .hero: .xxLarge
         case .large: .xxxLarge
         case .medium: .accessibility1
         case .inline: .accessibility3
