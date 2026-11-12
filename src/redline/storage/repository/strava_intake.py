@@ -244,6 +244,14 @@ class StravaIntake(SessionCycles):
             )).mappings().one_or_none()
         return None if row is None else {key: _plain(value) for key, value in dict(row).items()}
 
+    def strava_streams(self, activity_id: int) -> dict | None:
+        """The lightened streams kept with a capture, `None` until they are fetched."""
+        with self.database.engine.connect() as connection:
+            return connection.execute(sa.select(strava_activity_intakes.c.streams).where(
+                strava_activity_intakes.c.activity_id == int(activity_id),
+                strava_activity_intakes.c.athlete_id == self.athlete_id,
+            )).scalar_one_or_none()
+
     def store_strava_detail(self, activity_id: int, *, streams: dict | None = None,
                             weather: dict | None = None,
                             actor: str = "notebook") -> None:

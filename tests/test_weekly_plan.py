@@ -24,6 +24,9 @@ def session(identifier="w32-lun-ef", date="2026-08-03", workout="easy", **overri
     if payload["kind"] != "run":
         for key in ("distance_target_km", "distance_cap_km", "rpe_min", "rpe_max"):
             payload.pop(key)
+    elif workout in session_kinds.ACCUMULATING:
+        payload.pop("rpe_min")
+        payload.pop("rpe_max")
     if workout == session_kinds.STRENGTH:
         payload["strength"] = {}
         payload["routine"] = "a"

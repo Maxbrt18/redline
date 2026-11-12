@@ -1,8 +1,9 @@
 """The detail of a completed session, for the notebook.
 
-Two halves. The readings: the run's streams and its laps with their bounds, then the
-hourly weather at the start, requested from the providers on first display and kept with
-the Strava capture (`store_strava_detail`). The computations: pure functions over those
+Two halves. The readings: the run's streams and its laps with their bounds, fetched at
+capture for the debrief (`ActivityPipeline`), then the hourly weather at the start; what
+is still missing is requested from the providers on first display. Both are kept with the
+Strava capture (`store_strava_detail`). The computations: pure functions over those
 streams that return facts (time per zone, kilometres, repetitions, stops, drift). The
 page formats; no figure is computed there.
 
@@ -18,6 +19,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
+from redline.coach.fr import debrief as text
 from redline.integrations import strava, weather
 from redline.model import debrief, hr_zones
 from redline.model import notebook_views as views
@@ -39,6 +41,8 @@ CHART_POINTS = 240
 #: A shorter stop is not marked on the chart.
 STOP_MARK_S = 60
 HR_DROP_S = 60
+#: The debrief's kilometre table stays bounded: past this many rows, kilometres merge.
+KM_ROWS_MAX = 50
 
 
 def compact(raw: dict, laps: list) -> dict:
@@ -95,6 +99,11 @@ def fetch_streams(activity_id: int) -> dict:
     return compact(raw, laps if isinstance(laps, list) else [])
 
 
+def is_current(streams: dict | None) -> bool:
+    """Streams kept before the timestamped bounds (`lap_times`) are fetched again once."""
+    return streams is not None and "lap_times" in streams
+
+
 def weather_at(query: dict) -> dict:
     """Hourly weather at the start point and time (WBGT included when it converges)."""
     return weather.weather_of_run(query["polyline"], query["time"])
@@ -109,8 +118,7 @@ def ensure(store: Any, intake: dict) -> dict:
     activity_id = intake["activity_id"]
     streams, conditions = intake.get("streams"), intake.get("weather")
     fresh: dict[str, dict] = {}
-    # Streams kept before the timestamped bounds (`lap_times`) are fetched again once.
-    if streams is None or "lap_times" not in streams:
+    if not is_current(streams):
         try:
             streams = fresh["streams"] = fetch_streams(activity_id)
         except Exception as exc:
@@ -205,6 +213,35 @@ def km_splits(s: dict) -> list[views.KmSplit] | None:
                         "dplus": round(gain)})
         start, k0 = edge, k
     return out
+
+
+def _weighted(pairs: list[tuple[int | None, int]]) -> int | None:
+    """Mean of values weighted by their moving time; `None` if one is unknown."""
+    seconds = sum(weight for _, weight in pairs)
+    if not seconds or any(value is None for value, _ in pairs):
+        return None
+    return round(sum((value or 0) * weight for value, weight in pairs) / seconds)
+
+
+def km_table(splits: list[views.KmSplit], limit: int = KM_ROWS_MAX) -> dict:
+    """The kilometres as a compact table for the debrief: one row per km, at most `limit`.
+
+    A longer run merges consecutive kilometres into one row, labelled by its first and
+    last kilometre (`"3-4"`); paces stay per kilometre.
+    """
+    size = -(-len(splits) // limit) if splits else 1
+    rows = []
+    for start in range(0, len(splits), size):
+        chunk = splits[start:start + size]
+        metres = sum(row["dist_m"] for row in chunk)
+        seconds = sum(row["moving_s"] for row in chunk)
+        hr = _weighted([(row["hr"], row["moving_s"]) for row in chunk])
+        cadence = _weighted([(row["cadence"], row["moving_s"]) for row in chunk])
+        dplus = sum(row["dplus"] for row in chunk)
+        label: int | str = chunk[0]["n"] if len(chunk) == 1 else f"{chunk[0]['n']}-{chunk[-1]['n']}"
+        rows.append([label, text.pace(seconds * 1000 / metres) if metres else None,
+                     hr, dplus, cadence])
+    return {"columns": ["km", "pace", "hr", "dplus", "cadence"], "rows": rows}
 
 
 def drift(s: dict) -> views.Drift | None:

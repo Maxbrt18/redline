@@ -369,17 +369,29 @@ def typed_target_errors(revision: dict, where: str = "revision") -> list[str]:
         for session in revision.get("sessions") or []
         if session.get("status") != SessionStatus.CANCELLED and session.get("hr_zone")
         and session.get("hr_cap_bpm") is None)
-    # A session whose effort accumulates with its duration has no fixed RPE band: its
-    # intensity is prescribed by HR or pace, its RPE is read against comparable sessions.
-    # Refused on write only, so the revisions already stored stay readable.
-    problems.extend(
+    return problems
+
+
+def accumulating_band_errors(previous: dict | None, current: dict,
+                             where: str = "revision") -> list[str]:
+    """Refuse an RPE band given to a session whose effort accumulates with its duration.
+
+    Its intensity is prescribed by HR or pace, its RPE is read against comparable
+    sessions. A band the previous revision already held on the same session is carried,
+    not given: refusing it would block every revision of a week planned before the rule,
+    and `rpe_band` ignores it anyway.
+    """
+    def band(session: dict) -> tuple:
+        return session.get("rpe_min"), session.get("rpe_max")
+
+    before = {session["id"]: band(session) for session in (previous or {}).get("sessions") or []}
+    return [
         f"{where}.{session.get('id', '?')}: no rpe_min/rpe_max for a {session['workout']} "
         "session -- its RPE grows with its duration; prescribe its intensity with "
         "hr_zone/hr_cap_bpm"
-        for session in revision.get("sessions") or []
+        for session in current.get("sessions") or []
         if session.get("workout") in session_kinds.ACCUMULATING
-        and (session.get("rpe_min") is not None or session.get("rpe_max") is not None))
-    return problems
+        and band(session) != (None, None) and before.get(session.get("id")) != band(session)]
 
 
 def _session_errors(session: dict, where: str) -> list[str]:

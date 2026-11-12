@@ -45,14 +45,21 @@ def test_a_long_run_has_no_rpe_band_even_when_one_is_stored():
     assert weekly_plan.rpe_band({"workout": "easy"}) is None
 
 
-def test_a_new_revision_refuses_an_rpe_band_on_a_long_run():
+def test_a_new_revision_refuses_an_rpe_band_given_to_a_long_run_but_carries_a_stored_one():
     def revision(**band) -> dict:
-        return {"volume_target_km": 30.0, "sessions": [
+        return {"sessions": [
             {"id": "sun-long", "kind": "run", "workout": "long", "status": "planned", **band}]}
 
-    assert any("sun-long" in problem and "rpe" in problem
-               for problem in weekly_plan.typed_target_errors(revision(rpe_max=4)))
-    assert weekly_plan.typed_target_errors(revision()) == []
+    def refused(previous, current) -> bool:
+        return any("sun-long" in problem and "rpe" in problem
+                   for problem in weekly_plan.accumulating_band_errors(previous, current))
+
+    assert refused(None, revision(rpe_max=4))
+    assert refused(revision(), revision(rpe_max=4))
+    assert refused(revision(rpe_min=3, rpe_max=4), revision(rpe_max=5))
+    assert not refused(revision(rpe_min=3, rpe_max=4), revision(rpe_min=3, rpe_max=4)), \
+        "a week planned before the rule must stay revisable"
+    assert not refused(None, revision())
 
 
 def test_the_debrief_compares_no_rpe_on_a_long_run():

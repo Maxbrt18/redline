@@ -116,7 +116,8 @@ def test_the_reprimand_stays_inside_the_perimeter_the_vault_gave_it():
     assert "n'est PAS une séance ratée" in style
     assert "mandat de réprimande limité" in style
     debrief = " ".join(PROACTIVE_TRIGGERS["strava_debrief"].split())
-    assert "Une EF un peu rapide n'entre pas dans ce mandat" in debrief
+    assert "Footing ou sortie longue trop rapide : pas de réprimande" in debrief
+    assert "nomme tel quel l'écart de `gaps` qui le montre" in debrief
 
 
 def test_emotional_turn_follows_the_request_without_a_mandatory_preamble():
@@ -811,9 +812,13 @@ def test_an_observation_does_not_hijack_a_social_message():
 def test_the_debrief_opens_on_a_computed_gap_not_on_the_watch():
     """A debrief must not open on three raw watch figures in a row."""
     debrief = _flat(PROACTIVE_TRIGGERS["strava_debrief"])
-    assert "Ta première phrase porte l'écart de `ecarts` qui compte" in debrief
+    assert "Ta première phrase porte l'écart de `gaps` qui compte" in debrief
     assert "jamais trois chiffres de la montre à la suite" in debrief
-    assert "`ecarts`, s'il est présent" in prompts.strava_snapshot_note({})
+    # The snapshot carries no raw streams: the debrief reads their kilometres.
+    assert "`streams`" not in debrief and "`km_splits`" in debrief
+    note = prompts.strava_snapshot_note({})
+    assert "`gaps`, s'il est présent" in note
+    assert "`km_splits`, s'il est présent" in note
 
 
 def test_a_skipped_session_is_cancelled_in_the_same_turn():
