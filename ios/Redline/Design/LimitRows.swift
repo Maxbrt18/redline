@@ -2,7 +2,8 @@ import SwiftUI
 
 /// Planned and done, one line per measure. Every limit sits at the same place on its rail,
 /// so the limits read as one red stroke down the block; what passes it spills in red dots
-/// and its figure turns `over`. A target that is not a limit is an ink tick.
+/// and its figure turns to the red line. A target that is not a limit is an ink tick. At the
+/// accessibility sizes the label and the figure go above the rail, which takes the full width.
 struct LimitRows: View {
     struct Row: Identifiable {
         let label: String
@@ -23,40 +24,58 @@ struct LimitRows: View {
 
     let rows: [Row]
     private static let markAt = 0.75
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @ScaledMetric(relativeTo: .subheadline) private var labelWidth: CGFloat = 70
+    @ScaledMetric(relativeTo: .title3) private var valueWidth: CGFloat = 78
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        let stacked = typeSize.isAccessibilitySize
+        VStack(alignment: .leading, spacing: stacked ? Space.s : 0) {
             if rows.contains(where: { $0.cap != nil }) {
                 GeometryReader { geometry in
                     Text("limite")
                         .font(.caption2.weight(.semibold))
-                        .foregroundStyle(Palette.red)
+                        .foregroundStyle(Palette.accent)
                         .fixedSize()
                         .offset(x: geometry.size.width * Self.markAt - 16)
                 }
                 .frame(height: 14)
-                .padding(.leading, 82)
-                .padding(.trailing, 90)
+                .padding(.leading, stacked ? 0 : labelWidth + Space.s)
+                .padding(.trailing, stacked ? 0 : valueWidth + Space.s)
             }
             ForEach(rows) { row in
-                HStack(spacing: 12) {
-                    Text(row.label)
-                        .font(.subheadline)
-                        .foregroundStyle(Palette.muted)
-                        .frame(width: 70, alignment: .leading)
-                    rail(row).frame(height: 8)
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text(row.value)
-                            .font(.figure(22))
-                            .monospacedDigit()
-                            .foregroundStyle(row.crossed ? Palette.over : Palette.ink)
-                        Text(row.sub).font(.caption2).foregroundStyle(Palette.muted).lineLimit(1)
+                Group {
+                    if stacked {
+                        VStack(alignment: .leading, spacing: Space.xs) {
+                            HStack(alignment: .firstTextBaseline) {
+                                label(row)
+                                Spacer(minLength: Space.xs)
+                                figure(row, alignment: .trailing)
+                            }
+                            rail(row).frame(height: 8).padding(.vertical, Space.s)
+                        }
+                    } else {
+                        HStack(spacing: Space.s) {
+                            label(row).frame(width: labelWidth, alignment: .leading)
+                            rail(row).frame(height: 8)
+                            figure(row, alignment: .trailing).frame(width: valueWidth, alignment: .trailing)
+                        }
+                        .frame(minHeight: 46)
                     }
-                    .frame(width: 78, alignment: .trailing)
                 }
-                .frame(minHeight: 46)
                 .accessibilityElement(children: .combine)
             }
+        }
+    }
+
+    private func label(_ row: Row) -> some View {
+        Text(row.label).textRole(.secondary).foregroundStyle(Palette.muted)
+    }
+
+    private func figure(_ row: Row, alignment: HorizontalAlignment) -> some View {
+        VStack(alignment: alignment, spacing: 2) {
+            Text(row.value).figure(.medium).foregroundStyle(row.crossed ? Palette.accent : Palette.ink)
+            Text(row.sub).font(.caption2).foregroundStyle(Palette.muted).lineLimit(1)
         }
     }
 
@@ -83,8 +102,8 @@ struct LimitRows: View {
                     }
                 }
                 Rectangle()
-                    .fill(row.cap != nil ? Palette.red : Palette.ink)
-                    .frame(width: 2, height: row.cap != nil ? 46 : 20)
+                    .fill(row.cap != nil ? Palette.accent : Palette.ink)
+                    .frame(width: 2, height: row.cap != nil && !typeSize.isAccessibilitySize ? 46 : 20)
                     .offset(x: width * Self.markAt - 1)
             }
             .frame(width: width, height: 8)

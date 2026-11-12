@@ -27,7 +27,7 @@ struct DotPattern: View {
 
 extension DotPattern {
     /// Dense red dots: the part of a value past its limit.
-    static var over: DotPattern { DotPattern(color: Palette.red, spacing: 3.5, radius: 1.25) }
+    static var over: DotPattern { DotPattern(color: Palette.accent, spacing: 3.5, radius: 1.25) }
     /// What is planned or allowed, on the data's colour.
     static var planned: DotPattern { DotPattern(color: Palette.data.opacity(0.75), spacing: 4, radius: 1.05) }
 }

@@ -26,14 +26,13 @@ struct RedLineCursor: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
                 Text(label)
-                    .font(.subheadline)
+                    .textRole(.secondary)
                     .foregroundStyle(Palette.muted)
                 Spacer()
                 HStack(alignment: .firstTextBaseline, spacing: 3) {
                     Text(format(value))
-                        .font(.figure(22, weight: planned ? .semibold : .bold))
-                        .monospacedDigit()
-                        .foregroundStyle(planned ? Palette.muted : crossed ? Palette.over : Palette.ink)
+                        .figure(.medium, planned ? .planned : .done)
+                        .foregroundStyle(planned ? Palette.muted : crossed ? Palette.accent : Palette.ink)
                     if !unit.isEmpty {
                         Text(unit).font(.caption.weight(.semibold)).foregroundStyle(Palette.muted)
                     }
@@ -50,7 +49,7 @@ struct RedLineCursor: View {
             }
             .font(.caption2)
             .monospacedDigit()
-            .foregroundStyle(Palette.faint)
+            .foregroundStyle(Palette.muted)
             .padding(.top, 6)
         }
         .accessibilityElement(children: .combine)
@@ -76,12 +75,12 @@ struct RedLineCursor: View {
                     DotPattern.over
                         .frame(width: max(x(value) - x(limit), 0), height: 8)
                         .overlay(UnevenRoundedRectangle(bottomTrailingRadius: 4, topTrailingRadius: 4)
-                            .strokeBorder(Palette.red.opacity(0.55), lineWidth: 1))
+                            .strokeBorder(Palette.accent.opacity(0.55), lineWidth: 1))
                         .clipShape(UnevenRoundedRectangle(bottomTrailingRadius: 4, topTrailingRadius: 4))
                         .offset(x: x(limit))
                 }
                 if let limit {
-                    mark(at: x(limit), color: Palette.red, label: limitLabel, below: false)
+                    mark(at: x(limit), color: Palette.accent, label: limitLabel, below: false)
                 }
                 if let target {
                     mark(at: x(target), color: Palette.ink, label: targetLabel, below: limit != nil)
