@@ -1,0 +1,360 @@
+{
+  "date": "2026-10-09",
+  "week": "2026-W41",
+  "plan": {
+    "status": "valid",
+    "message": ""
+  },
+  "sessions": [
+    {
+      "id": "w41-ven-ef",
+      "date": "2026-10-09",
+      "title": "EF, permis accompagné",
+      "kind": "run",
+      "workout": "easy",
+      "status": "planned",
+      "start_time": null,
+      "location": null,
+      "note": "Tu choisis la durée.",
+      "planned": [
+        "≤55 min",
+        "RPE 2-3",
+        "Z1-Z2, 130-157 bpm"
+      ],
+      "fact": null,
+      "entry_id": null,
+      "transition": null,
+      "change": null,
+      "targets": {
+        "duration_cap_min": 55,
+        "rpe_min": 2,
+        "rpe_max": 3,
+        "hr_cap_bpm": 157
+      }
+    },
+    {
+      "id": "w41-ven-renfo",
+      "date": "2026-10-09",
+      "title": "Renfo, séance unique",
+      "kind": "strength",
+      "workout": "strength",
+      "status": "planned",
+      "start_time": null,
+      "location": null,
+      "note": null,
+      "planned": [],
+      "fact": null,
+      "entry_id": null,
+      "transition": null,
+      "change": null,
+      "targets": {}
+    }
+  ],
+  "extra": [],
+  "tomorrow": {
+    "date": "2026-10-10",
+    "plan": "valid",
+    "sessions": [],
+    "next": []
+  },
+  "ahead": [],
+  "strip": [
+    {
+      "date": "2026-10-05",
+      "letter": "L",
+      "abbr": "easy",
+      "today": false,
+      "done_km": null,
+      "planned_km": null,
+      "planned_label": null,
+      "long": false,
+      "rest": true
+    },
+    {
+      "date": "2026-10-06",
+      "letter": "M",
+      "abbr": "easy",
+      "today": false,
+      "done_km": 8.35,
+      "planned_km": null,
+      "planned_label": null,
+      "long": false,
+      "rest": false
+    },
+    {
+      "date": "2026-10-07",
+      "letter": "M",
+      "abbr": "easy",
+      "today": false,
+      "done_km": null,
+      "planned_km": null,
+      "planned_label": null,
+      "long": false,
+      "rest": false
+    },
+    {
+      "date": "2026-10-08",
+      "letter": "J",
+      "abbr": "easy",
+      "today": false,
+      "done_km": null,
+      "planned_km": null,
+      "planned_label": null,
+      "long": false,
+      "rest": false
+    },
+    {
+      "date": "2026-10-09",
+      "letter": "V",
+      "abbr": "easy",
+      "today": true,
+      "done_km": null,
+      "planned_km": null,
+      "planned_label": "≤55′",
+      "long": false,
+      "rest": false
+    },
+    {
+      "date": "2026-10-10",
+      "letter": "S",
+      "abbr": "easy",
+      "today": false,
+      "done_km": null,
+      "planned_km": null,
+      "planned_label": null,
+      "long": false,
+      "rest": false
+    },
+    {
+      "date": "2026-10-11",
+      "letter": "D",
+      "abbr": "easy",
+      "today": false,
+      "done_km": null,
+      "planned_km": 16,
+      "planned_label": null,
+      "long": true,
+      "rest": false
+    }
+  ],
+  "totals": {
+    "km_done": 14.06,
+    "km_target": 41,
+    "runs_done": 2,
+    "runs_planned": 5,
+    "dplus": 27,
+    "strength_done": 1,
+    "strength_planned": 2,
+    "load": 25,
+    "pain_peaks": [
+      {
+        "zone": "knee",
+        "label": "Genou",
+        "peak": 1.0
+      }
+    ]
+  },
+  "asks": [
+    {
+      "id": "cell:6b0f3c1e-1d1a-4a39-9e0d-5c1b0b5d2f10",
+      "type": "cells",
+      "date": "2026-10-07",
+      "kind": "easy",
+      "km": 5.71,
+      "fields": [
+        "pain:knee",
+        "rpe"
+      ],
+      "labels": {
+        "pain:knee": "Genou"
+      },
+      "total": 3,
+      "duration_min": null,
+      "pain_values": [
+        0,
+        0.5,
+        1,
+        1.5,
+        2,
+        2.5,
+        3
+      ]
+    }
+  ],
+  "pain": {
+    "cap": 2.0,
+    "zones": [
+      {
+        "zone": "knee",
+        "label": "Genou",
+        "weeks": [
+          {
+            "week": "2026-W40",
+            "peak": 1.5
+          },
+          {
+            "week": "2026-W41",
+            "peak": 1.0
+          }
+        ]
+      }
+    ]
+  },
+  "race": {
+    "name": "TargetRace",
+    "date": "2026-11-26",
+    "days": 50,
+    "start_time": "09:00",
+    "distance_km": 45
+  },
+  "strength": {
+    "status": "ready",
+    "signature": "old",
+    "revision": 3,
+    "date": "2026-10-09",
+    "session": {
+      "sid": "w41-renfo-a",
+      "session": "renfo-a",
+      "title": "Renfo A",
+      "rule": "Arrêter une série si la douleur dépasse 3.",
+      "date": "vendredi 9 octobre",
+      "duration_min": 30,
+      "note": "Charge stable cette semaine.",
+      "gate": {
+        "zone": "knee",
+        "pain_max": 3,
+        "drop": [
+          "sauts"
+        ],
+        "say": "Genou au-dessus de 3 : les sauts sautent aujourd'hui."
+      },
+      "exercises": [
+        {
+          "slug": "mollets",
+          "name": "Mollets sur une jambe",
+          "target": "Mollets",
+          "cue": "Monter haut, descendre lentement.",
+          "equipment": [
+            "Marche"
+          ],
+          "load": {
+            "kg": 8.0,
+            "count": 1
+          },
+          "last": "D 12, 12 · G 11, 12",
+          "dose": {
+            "measure": "reps",
+            "text": "2 × 10-12 par jambe",
+            "current_text": "10-12 répétitions",
+            "counts": [
+              10,
+              11,
+              12
+            ],
+            "rest_s": 60,
+            "slots": [
+              {
+                "n": 1,
+                "of": 2,
+                "s": "d",
+                "t": 12
+              },
+              {
+                "n": 1,
+                "of": 2,
+                "s": "g",
+                "t": 12
+              },
+              {
+                "n": 2,
+                "of": 2,
+                "s": "d",
+                "t": 12
+              },
+              {
+                "n": 2,
+                "of": 2,
+                "s": "g",
+                "t": 12
+              }
+            ]
+          }
+        },
+        {
+          "slug": "gainage",
+          "name": "Gainage ventral",
+          "target": "Tronc",
+          "cue": "",
+          "equipment": [],
+          "load": null,
+          "dose": {
+            "measure": "time",
+            "text": "2 × 45 s",
+            "current_text": "45 s",
+            "rest_s": 30,
+            "slots": [
+              {
+                "n": 1,
+                "of": 2,
+                "t": 45
+              },
+              {
+                "n": 2,
+                "of": 2,
+                "t": 45
+              }
+            ]
+          }
+        },
+        {
+          "slug": "sauts",
+          "name": "Sauts sur place",
+          "target": "Pieds",
+          "cue": "",
+          "equipment": [],
+          "load": null,
+          "dose": {
+            "measure": "contacts",
+            "text": "20 contacts, par blocs de 10",
+            "current_text": "10 contacts",
+            "rest_s": 30,
+            "slots": [
+              {
+                "n": 1,
+                "of": 2,
+                "t": 10
+              },
+              {
+                "n": 2,
+                "of": 2,
+                "t": 10
+              }
+            ]
+          }
+        },
+        {
+          "slug": "pompes",
+          "name": "Pompes",
+          "target": "Haut du corps",
+          "cue": "",
+          "equipment": [],
+          "load": {
+            "kg": 0.0,
+            "count": 1
+          },
+          "dose": {
+            "measure": "amrap",
+            "text": "1 × jusqu'à fatigue",
+            "current_text": "Jusqu'à échec technique",
+            "slots": [
+              {
+                "n": 1,
+                "of": 1
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

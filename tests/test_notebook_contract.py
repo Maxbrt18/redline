@@ -16,17 +16,7 @@ from unittest.mock import MagicMock
 import contract
 import pytest
 from conftest import TEST_VAULT, reset_database
-from notebook_payloads import (
-    DETAIL,
-    HABITS,
-    INJURY,
-    RACE,
-    RACE_PLAN_VIEW,
-    REORGANIZE,
-    TODAY,
-    WEEK,
-    WEEKS,
-)
+from notebook_payloads import SCREENS
 from test_notebook_board import PARIS, Repo, ef, seed_week
 from test_notebook_board import WEEK as SEEDED_WEEK
 from test_page_modules import modules
@@ -49,8 +39,10 @@ SAM = instance.load(TEST_VAULT)
 RACE_DAY = {"name": "TargetRace", "date": "2026-11-26", "days": 50}
 
 UUID_SAMPLE = "0b5a1c2e-3d4f-4a6b-8c9d-0e1f2a3b4c5d"
-#: Declared keys the page has no use for: the service sends them, nothing reads them.
-UNREAD = {"created_at", "has_image", "humidity", "strength_done"}
+#: Declared keys the page has no use for: the service sends them, the page does not read
+#: them (the iOS app may).
+UNREAD = {"completed_slots", "created_at", "difficulty", "has_image", "humidity", "set_index",
+          "strength_done"}
 
 
 # ------------------------------------------------------------ the checker
@@ -83,13 +75,7 @@ def test_a_tagged_union_reports_its_closest_shape():
 
 
 # ------------------------------------------------------------ the browser fixtures
-@pytest.mark.parametrize(("shape", "payload"), [
-    (views.TodayView, TODAY), (views.WeekView, WEEK), (list[views.PastWeek], WEEKS["weeks"]),
-    (views.InjuryView, INJURY), (views.RaceView, RACE), (views.SessionView, DETAIL),
-    (views.RacePlanView, RACE_PLAN_VIEW), (views.ReorganizeView, REORGANIZE),
-    (views.HabitsView, HABITS),
-], ids=["today", "week", "weeks", "injury", "race", "detail", "race-plan", "reorganize",
-        "habits"])
+@pytest.mark.parametrize(("shape", "payload"), SCREENS.values(), ids=SCREENS.keys())
 def test_a_browser_payload_is_what_the_service_serves(shape, payload):
     assert contract.problems(shape, payload) == []
 
@@ -98,7 +84,7 @@ def test_a_browser_payload_is_what_the_service_serves(shape, payload):
 def test_the_page_reads_every_declared_key():
     declared = {key for shape in vars(views).values() if typing.is_typeddict(shape)
                 for key in shape.__annotations__}
-    scripts = [name for name in page.NOTEBOOK_SCRIPT if name.startswith("notebook/")]
+    scripts = [name for name in page.NOTEBOOK_SCRIPT if name.startswith(("notebook/", "strength/"))]
     read = {value.strip("'\"") for _, tokens, _, _ in modules(scripts).values()
             for kind, value, _ in tokens if kind in {"id", "str"}}
     assert declared - read == UNREAD
@@ -199,9 +185,13 @@ def test_the_screens_serve_their_declared_shapes(store, connect):
     seed_archives(archive, psid)
     assert contract.problems(views.TodayView, served(client, "today")) == []
     assert contract.problems(views.WeekView, served(client, f"week/{SEEDED_WEEK}")) == []
-    assert contract.problems(list[views.PastWeek], served(client, "weeks")["weeks"]) == []
+    assert contract.problems(views.WeeksView, served(client, "weeks")) == []
     assert contract.problems(views.InjuryView, served(client, "injury")) == []
     assert contract.problems(views.RaceView, served(client, "race")) == []
+    entries = served(client, "entries")
+    assert contract.problems(views.EntriesView, entries) == []
+    for entry in entries["entries"]:
+        assert contract.problems(views.EntryView, served(client, f"entries/{entry['id']}")) == []
 
 
 @needs_database

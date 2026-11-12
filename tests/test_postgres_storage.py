@@ -2373,6 +2373,36 @@ def test_notebook_routes_protect_both_metadata_and_images(make_config, store):
     assert client.get('/notebook-api/entries').status_code == 401
 
 
+
+def test_the_ios_app_holds_its_device_token_in_a_header(make_config, store):
+    from unittest.mock import MagicMock
+
+    from conftest import RecordingBot
+
+    from redline.service.notebook import NotebookService
+    from redline.service.web import create_app
+    from redline.storage.notebook import NotebookStore
+    archive = NotebookStore(store.database)
+    identity = archive.save_many('4242', 'http', [{'slot':'one', 'kind':'other',
+        'title':'Privé', 'body':'Jamais public', 'occurred_on':dt.date(2026,10,2),
+        'origin':'recovered'}])[0]
+    service = NotebookService(archive, MagicMock(), MagicMock(), VAULT_ROOT, 'https://coach.test')
+    client = create_app(make_config(), RecordingBot(), MagicMock(), notebook=service).test_client()
+    assert client.post('/notebook-api/devices', json={'token':'not-a-link'}).status_code == 401
+    assert client.post('/notebook-api/devices', json={'link':'x'}).status_code == 400
+    link = archive.issue('4242')
+    granted = client.post('/notebook-api/devices', json={'token':link})
+    assert granted.status_code == 200 and 'Set-Cookie' not in granted.headers
+    device = granted.json['device']
+    assert client.post('/notebook-api/devices', json={'token':link}).status_code == 401
+    bearer = {'Authorization': f'Bearer {device}'}
+    assert client.get(f'/notebook-api/entries/{identity}', headers=bearer).json['body'] == 'Jamais public'
+    forged = device[:-1] + ('A' if device[-1] != 'A' else 'B')
+    for header in ('Bearer ', f'Bearer {forged}', f'Token {device}', device):
+        assert client.get('/notebook-api/entries', headers={'Authorization': header}).status_code == 401
+    assert client.post('/notebook-api/logout', json={}, headers=bearer).status_code == 200
+    assert client.get('/notebook-api/entries', headers=bearer).status_code == 401
+
 def test_notebook_replay_preserves_the_card_after_a_text_failure(store, tmp_path):
     from unittest.mock import MagicMock
 

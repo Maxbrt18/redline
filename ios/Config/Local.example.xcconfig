@@ -1,0 +1,11 @@
+// Copy to Local.xcconfig, which Git ignores, and fill in your own values.
+
+// Your Apple team identifier: Xcode, Settings, Accounts. A free Personal Team works.
+DEVELOPMENT_TEAM =
+
+// A reverse-DNS prefix that you own; the app's identifier is <prefix>.redline.
+REDLINE_BUNDLE_PREFIX = org.example
+
+// Your coach server's host, with an optional port but no scheme or path: the app
+// always speaks HTTPS.
+REDLINE_SERVER_HOST = coach.example.com

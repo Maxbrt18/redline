@@ -1,0 +1,18 @@
+{
+  "habits": [
+    {
+      "id": "5d1c0c5e-8a4b-4f1e-9a43-2f0b8f3c1a77",
+      "weekday": 3,
+      "starts_on": "2026-09-01",
+      "ends_on": null,
+      "kind": "other_sport",
+      "minutes": null,
+      "pace": null,
+      "required": null,
+      "sport": "Volley",
+      "demanding": false,
+      "run_too": false,
+      "habit": true
+    }
+  ]
+}

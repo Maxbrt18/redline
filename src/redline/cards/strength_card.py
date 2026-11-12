@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 from redline.cards import html, render
+from redline.model import notebook_views as views
 from redline.model import paths, strength_log, vault_layout
 from redline.model.program import load
 
@@ -28,18 +29,19 @@ def exercise_row(index: int, prescription) -> str:
     )
 
 
-def page_session(built: dict, history: dict) -> dict:
-    def exercise(prescription) -> dict:
-        data = {"slug": prescription.slug, "name": prescription.name,
-                "target": prescription.target, "dose": prescription.dose.payload()}
-        data.update(cue=prescription.cue, equipment=list(prescription.equipment),
-                    load=prescription.load)
+def page_session(built: dict, history: dict) -> views.StrengthSession:
+    def exercise(prescription) -> views.StrengthExercise:
+        data: views.StrengthExercise = {
+            "slug": prescription.slug, "name": prescription.name,
+            "target": prescription.target, "dose": prescription.dose.payload(),
+            "cue": prescription.cue, "equipment": list(prescription.equipment),
+            "load": prescription.load}
         last = strength_log.human(history.get(prescription.slug) or {})
         if last:
             data["last"] = last
         return data
 
-    session = {
+    session: views.StrengthSession = {
         "sid": built["sid"], "session": built["session"],
         "title": built["title"], "rule": built["rule"], "date": built["date"],
         "duration_min": built["duration_min"], "note": built["note"],
@@ -50,7 +52,7 @@ def page_session(built: dict, history: dict) -> dict:
     return session
 
 
-def snapshot(built: dict, *, root: Path | None = None) -> dict:
+def snapshot(built: dict, *, root: Path | None = None) -> views.StrengthSession:
     root = root or paths.vault_root()
     history = strength_log.last_by_slug(root / vault_layout.STRENGTH_LOG_CSV)
     return page_session(built, history)
@@ -61,8 +63,7 @@ def subtitle(built: dict) -> str:
 
 
 def default_session_id(out: Path, built: dict) -> str:
-    identity = page_session(built, {})
-    identity.pop("sid", None)
+    identity = {key: value for key, value in page_session(built, {}).items() if key != "sid"}
     canonical = json.dumps(
         identity, sort_keys=True, separators=(",", ":"),
         ensure_ascii=False).encode("utf-8")

@@ -17,6 +17,7 @@ from redline.coach.fr import notebook as notebook_text
 from redline.coach.fr import session_labels
 from redline.model import formats, iso_week
 from redline.model import ledger as ledger_model
+from redline.model import notebook_views as views
 from redline.model.schema import SchemaError
 from redline.storage.database import StorageError
 from redline.storage.notebook import DEVICE_SECONDS
@@ -38,6 +39,7 @@ ASK = re.compile(rf"(?:cell:[0-9a-f-]{{36}}:(?:pain:{formats.SLUG}|{CELL_FIELDS}
                  rf"|daily:{formats.DATE}:(?:sleep|life_load)|hr:{formats.DATE})")
 
 COOKIE = "__Host-redline-notebook"
+BEARER = "Bearer "
 CSP = ("default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; "
        "font-src data:; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; "
        "worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
@@ -47,6 +49,15 @@ CSP = ("default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline
 PLACE = re.compile(r"[\w' -]{1,80}")
 DAY = re.compile(formats.DATE)
 CLOCK = re.compile(formats.TIME)
+
+
+def device_token() -> str:
+    """The device's token: the iOS app sends it in `Authorization`, the page in its cookie.
+    An `Authorization` header that is not a bearer token counts as no token at all."""
+    header = request.headers.get("Authorization", "")
+    if header:
+        return header.removeprefix(BEARER) if header.startswith(BEARER) else ""
+    return request.cookies.get(COOKIE, "")
 
 
 def register(app: Flask, notebook: NotebookService, psid: str, *,
@@ -85,10 +96,10 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
                 return jsonify(error=notebook_text.ERRORS["forbidden"]), 403
             if request.headers.get("Sec-Fetch-Site") == "cross-site":
                 return jsonify(error=notebook_text.ERRORS["forbidden"]), 403
-        if request.path == "/notebook-api/connect":
+        if request.path in ("/notebook-api/connect", "/notebook-api/devices"):
             return None
         try:
-            authenticated = notebook.store.authenticate(psid, request.cookies.get(COOKIE, ""))
+            authenticated = notebook.store.authenticate(psid, device_token())
         except (StorageError, SQLAlchemyError):
             return jsonify(error=notebook_text.ERRORS["unavailable"]), 503
         if not authenticated:
@@ -150,7 +161,7 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
             return jsonify(error=notebook_text.ERRORS["bad_link"]), 400
         # An old notification stays openable on an already connected device.
         if notebook.store.authenticate(psid, request.cookies.get(COOKIE, "")):
-            return jsonify(status="ok")
+            return jsonify(views.Done(status="ok"))
         device = notebook.store.exchange(psid, body["token"])
         if not device:
             return jsonify(error=notebook_text.ERRORS["link_used"]), 401
@@ -159,9 +170,21 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
                             max_age=DEVICE_SECONDS, path="/")
         return response
 
+    @app.post("/notebook-api/devices")
+    def notebook_device():
+        """The app's connection: the link buys a device token, returned in the body for the
+        app's keychain instead of a cookie."""
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict) or set(body) != {"token"} or not isinstance(body["token"], str):
+            return jsonify(error=notebook_text.ERRORS["bad_link"]), 400
+        device = notebook.store.exchange(psid, body["token"])
+        if not device:
+            return jsonify(error=notebook_text.ERRORS["link_used"]), 401
+        return jsonify(views.DeviceGrant(device=device))
+
     @app.post("/notebook-api/logout")
     def notebook_logout():
-        notebook.store.revoke(psid, request.cookies.get(COOKIE, ""))
+        notebook.store.revoke(psid, device_token())
         response = jsonify(status="ok")
         response.delete_cookie(COOKIE, path="/", secure=True, httponly=True, samesite="Strict")
         return response
@@ -175,9 +198,11 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
         except ValueError:
             return jsonify(error=notebook_text.ERRORS["bad_page"]), 400
         rows = notebook.store.list_entries(psid, offset=offset, limit=41)
-        return jsonify(entries=rows[:40], next_offset=offset + 40 if len(rows) > 40 else None,
-                       latest=[item for kind in ("weekly", "monthly")
-                               for item in notebook.store.list_entries(psid, kind=kind, limit=1)])
+        page: views.EntriesView = {
+            "entries": rows[:40], "next_offset": offset + 40 if len(rows) > 40 else None,
+            "latest": [item for kind in ("weekly", "monthly")
+                       for item in notebook.store.list_entries(psid, kind=kind, limit=1)]}
+        return jsonify(page)
 
     @app.get("/notebook-api/current")
     def notebook_current():
@@ -195,7 +220,7 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
 
     @app.get("/notebook-api/weeks")
     def notebook_weeks():
-        return jsonify(weeks=notebook.weeks(psid))
+        return jsonify(views.WeeksView(weeks=notebook.weeks(psid)))
 
     @app.get("/notebook-api/injury")
     def notebook_injury():
@@ -241,7 +266,9 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
             when = dt.date.fromisoformat(day)
         except ValueError:
             return jsonify(error=notebook_text.ERRORS["bad_date"]), 400
-        return jsonify(weather.forecast(where, when, start, clock.now()) or {})
+        # No forecast is `null`: the session is too far off, the place unknown, the
+        # network down.
+        return jsonify(weather.forecast(where, when, start, clock.now()))
 
     @app.post("/notebook-api/reorganize")
     def notebook_reorganize():
@@ -268,7 +295,7 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
             return jsonify(error=notebook_text.ERRORS["week_moved"]), 409
         except SchemaError:
             return jsonify(error=notebook_text.ERRORS["bad_days"]), 400
-        return jsonify(status="ok", revision=number)
+        return jsonify(views.Revised(status="ok", revision=number))
 
     @app.post("/notebook-api/days")
     def notebook_state_days():
@@ -282,7 +309,7 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
             return jsonify(error=notebook_text.ERRORS["bad_days"]), 400
         except reorganize.ReorganizeError:
             return jsonify(error=notebook_text.ERRORS["week_over"]), 409
-        return jsonify(status="ok")
+        return jsonify(views.Done(status="ok"))
 
     @app.get("/notebook-api/habits")
     def notebook_habits():
@@ -295,7 +322,7 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
             notebook.add_habit(body)
         except SchemaError:
             return jsonify(error=notebook_text.ERRORS["bad_habit"]), 400
-        return jsonify(status="ok")
+        return jsonify(views.Done(status="ok"))
 
     @app.post("/notebook-api/habits/end")
     def notebook_end_habit():
@@ -307,7 +334,7 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
             notebook.end_habit(body["id"])
         except reorganize.ReorganizeError:
             return jsonify(error=notebook_text.ERRORS["no_habit"]), 404
-        return jsonify(status="ok")
+        return jsonify(views.Done(status="ok"))
 
     @app.post("/notebook-api/reorganize/ask")
     def notebook_ask_coach():
@@ -327,7 +354,7 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
         except Exception:
             app.logger.exception("Reorganisation request not passed to the coach")
             return jsonify(error=notebook_text.ERRORS["coach_unreachable"]), 503
-        return jsonify(status="ok")
+        return jsonify(views.Done(status="ok"))
 
     @app.post("/notebook-api/proposals/take")
     def notebook_take_proposal():
@@ -339,7 +366,7 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
             number = notebook.take_proposal(body["id"])
         except (reorganize.ReorganizeError, SchemaError, StorageError):
             return jsonify(error=notebook_text.ERRORS["proposal_gone"]), 409
-        return jsonify(status="ok", revision=number)
+        return jsonify(views.Revised(status="ok", revision=number))
 
     @app.post("/notebook-api/proposals/dismiss")
     def notebook_dismiss_proposals():
@@ -348,7 +375,7 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
                 or not isinstance(body["week"], str) or not iso_week.is_label(body["week"])):
             return jsonify(error=notebook_text.ERRORS["bad_request"]), 400
         notebook.dismiss_proposals(body["week"])
-        return jsonify(status="ok")
+        return jsonify(views.Done(status="ok"))
 
     @app.post("/notebook-api/answer")
     def notebook_answer():
@@ -370,7 +397,8 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
                 settled(int(result["activity"]))
             except Exception:
                 app.logger.exception("The run's debrief was not brought forward")
-        return jsonify(status="ok", alert=bool(result["alert"]))
+        answered: views.Answered = {"status": "ok", "alert": bool(result["alert"])}
+        return jsonify(answered)
 
     @app.post("/notebook-api/launch")
     def notebook_launch():
@@ -380,20 +408,27 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
         url = notebook.launch(psid, body["signature"])
         if not url:
             return jsonify(error=notebook_text.ERRORS["session_changed"]), 409
-        return jsonify(url=url)
+        launched: views.Launched = {"url": url}
+        return jsonify(launched)
 
     @app.get("/notebook-api/entries/<entry_id>")
     def notebook_entry(entry_id):
         entry = notebook.store.get(psid, entry_id)
         if entry is None:
             return jsonify(error=notebook_text.ERRORS["no_card"]), 404
-        entry["related"] = (notebook.store.list_entries(psid, kind="weekly", month=entry["period"], limit=100)
-                            if entry["kind"] == "monthly" and entry["period"] else [])
-        entry["report"] = None
-        snapshot = entry.get("snapshot")
-        if snapshot and snapshot.get("sid"):
-            entry["report"] = notebook.store.strength_report(snapshot["sid"])
-        return jsonify(entry)
+        snapshot = entry["snapshot"]
+        view: views.EntryView = {
+            "id": entry["id"], "kind": entry["kind"], "title": entry["title"],
+            "period": entry["period"], "occurred_on": entry["occurred_on"],
+            "created_at": entry["created_at"], "origin": entry["origin"], "body": entry["body"],
+            "image_hash": entry["image_hash"], "snapshot": snapshot,
+            "report": (notebook.store.strength_report(snapshot["sid"])
+                       if snapshot and snapshot.get("sid") else None),
+            "related": (notebook.store.list_entries(psid, kind="weekly", month=entry["period"],
+                                                    limit=100)
+                        if entry["kind"] == "monthly" and entry["period"] else []),
+        }
+        return jsonify(view)
 
     @app.get("/notebook-api/entries/<entry_id>/image")
     def notebook_image(entry_id):

@@ -1,0 +1,35 @@
+{
+  "place": "Paris",
+  "date": "2026-10-09",
+  "hours": [
+    {
+      "hour": 17,
+      "temp": 4,
+      "feels": 2,
+      "rain": 10,
+      "wind": 12,
+      "code": 2,
+      "day": true
+    },
+    {
+      "hour": 18,
+      "temp": 3,
+      "feels": 1,
+      "rain": 20,
+      "wind": 12,
+      "code": 2,
+      "day": true
+    },
+    {
+      "hour": 19,
+      "temp": 2,
+      "feels": 0,
+      "rain": 30,
+      "wind": 12,
+      "code": 2,
+      "day": true
+    }
+  ],
+  "sunrise": "07:55",
+  "sunset": "19:05"
+}

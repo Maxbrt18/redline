@@ -1,0 +1,66 @@
+import SwiftUI
+
+/// The notebook's settings, in a sheet from any tab.
+struct SettingsView: View {
+    let session: NotebookSession
+    @Environment(\.dismiss) private var dismiss
+    @State private var confirmingSignOut = false
+    @AppStorage(Theme.storageKey) private var theme = Theme.auto
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    // A menu keeps the choice's words whole at every text size.
+                    Picker("Thème", selection: $theme) {
+                        ForEach(Theme.allCases, id: \.self) { Text($0.label).tag($0) }
+                    }
+                    .pickerStyle(.menu)
+                }
+
+                Section {
+                    // The question opens on the button that asked it.
+                    Button("Déconnecter cet appareil", role: .destructive) {
+                        confirmingSignOut = true
+                    }
+                    .confirmationDialog("Déconnecter cet appareil ?", isPresented: $confirmingSignOut,
+                                        titleVisibility: .visible) {
+                        Button("Déconnecter", role: .destructive) {
+                            Task {
+                                await session.signOut()
+                                dismiss()
+                            }
+                        }
+                    }
+                } footer: {
+                    Text("Pour revenir, envoie /carnet dans Messenger et colle le nouveau lien.")
+                }
+
+                Section {
+                    LabeledContent("Serveur", value: session.server.baseURL.host() ?? "")
+                    LabeledContent("Version", value: Self.version)
+                }
+
+                #if DEBUG
+                Section {
+                    NavigationLink("Catalogue des composants") { DesignCatalogue() }
+                }
+                #endif
+            }
+            .navigationTitle("Réglages")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Fermer", systemImage: "xmark") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private static var version: String {
+        let info = Bundle.main.infoDictionary ?? [:]
+        let marketing = info["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info["CFBundleVersion"] as? String ?? "?"
+        return "\(marketing) (\(build))"
+    }
+}

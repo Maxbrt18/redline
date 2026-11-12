@@ -83,7 +83,8 @@ def hours_for(day: dt.date, start: str | None, now: dt.datetime) -> list[int]:
     return list(DEFAULT_HOURS)
 
 
-def forecast(name: str, day: dt.date, start: str | None, now: dt.datetime) -> dict | None:
+def forecast(name: str, day: dt.date, start: str | None,
+             now: dt.datetime) -> views.Forecast | None:
     """The readable forecast of a session, or None if nothing is available."""
     hours = hours_for(day, start, now)
     if not hours or not 0 <= (day - now.date()).days <= 6:
@@ -98,7 +99,7 @@ def forecast(name: str, day: dt.date, start: str | None, now: dt.datetime) -> di
         return None
     hourly = data.get("hourly") or {}
     times = hourly.get("time") or []
-    out = []
+    out: list[views.ForecastHour] = []
     for hour in hours:
         stamp = f"{day.isoformat()}T{hour:02d}:00"
         if stamp not in times:

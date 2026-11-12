@@ -1,0 +1,47 @@
+{
+  "entries": [
+    {
+      "id": "one",
+      "kind": "monthly",
+      "title": "Monthly · 2026-09",
+      "period": "2026-09",
+      "occurred_on": "2026-09-01",
+      "created_at": "2026-09-01 08:00:00+00:00",
+      "origin": "delivery",
+      "has_image": true
+    },
+    {
+      "id": "two",
+      "kind": "weekly",
+      "title": "Weekly · W39",
+      "period": "2026-W39",
+      "occurred_on": "2026-09-27",
+      "created_at": "2026-09-27 19:00:00+00:00",
+      "origin": "delivery",
+      "has_image": true
+    },
+    {
+      "id": "three",
+      "kind": "strength",
+      "title": "Renfo du 22 septembre",
+      "period": "2026-09-22",
+      "occurred_on": "2026-09-22",
+      "created_at": "2026-09-22 18:00:00+00:00",
+      "origin": "delivery",
+      "has_image": false
+    }
+  ],
+  "next_offset": 40,
+  "latest": [
+    {
+      "id": "one",
+      "kind": "monthly",
+      "title": "Monthly · 2026-09",
+      "period": "2026-09",
+      "occurred_on": "2026-09-01",
+      "created_at": "2026-09-01 08:00:00+00:00",
+      "origin": "delivery",
+      "has_image": true
+    }
+  ]
+}

@@ -63,6 +63,11 @@ class UnplannedFact(Fact):
     title: str
 
 
+#: What a session's line shows once it happened: a run's measures, or a strength report.
+#: Nothing tags them; a strength report carries no `observation_id`.
+SessionFact = Fact | StrengthFact
+
+
 class SessionItem(TypedDict):
     id: str
     date: str
@@ -74,7 +79,7 @@ class SessionItem(TypedDict):
     location: str | None
     note: str | None
     planned: list[str]
-    fact: Fact | StrengthFact | None
+    fact: SessionFact | None
     entry_id: str | None
     transition: str | None
     targets: Targets
@@ -192,6 +197,146 @@ class HrAsk(TypedDict):
 Ask = WakeAsk | CellsAsk | DailyAsk | HrAsk
 
 
+class Done(TypedDict):
+    """A write the service accepted."""
+
+    status: Literal["ok"]
+
+
+class Revised(Done):
+    """A write that made the week's next revision."""
+
+    revision: int
+
+
+class Answered(TypedDict):
+    """One answer written; `alert` says it went on to the coach."""
+
+    status: Literal["ok"]
+    alert: bool
+
+
+class StrengthSlot(TypedDict):
+    """One validation a dose asks for, walked out by `Dose.slots`.
+
+    `n` and `of` count sets (or blocks), never slots; `s` is the side of a per-leg dose;
+    `t` is what the slot aims at (seconds, repetitions, contacts in the block).
+    """
+
+    n: int
+    of: int
+    s: NotRequired[Literal["d", "g"]]
+    t: NotRequired[int]
+
+
+class StrengthDose(TypedDict):
+    """A dose as the session runs it: `measure` picks the control, `slots` the walk."""
+
+    measure: Literal["reps", "time", "amrap", "contacts"]
+    text: str
+    current_text: str
+    slots: list[StrengthSlot]
+    #: A reps dose's answers, the prescribed range in full.
+    counts: NotRequired[list[int]]
+    #: Between sets (or blocks), only when the session says so.
+    rest_s: NotRequired[int]
+
+
+class StrengthLoad(TypedDict):
+    kg: float
+    count: int
+
+
+class StrengthExercise(TypedDict):
+    #: Empty for an exercise added outside the program.
+    slug: str
+    name: str
+    target: str
+    cue: str
+    equipment: list[str]
+    load: StrengthLoad | None
+    dose: StrengthDose
+    #: What was done the last time, already written for the athlete.
+    last: NotRequired[str]
+
+
+class StrengthGate(TypedDict):
+    """The day's pain guardrail, written by the coach: above `pain_max` on a watched zone
+    (`zone`, or any of them), the exercises of `drop` are taken out and `say` is shown."""
+
+    zone: NotRequired[str]
+    pain_max: int
+    drop: NotRequired[list[str]]
+    say: str
+
+
+class StrengthSession(TypedDict):
+    """The strength session of the day, as frozen in its link."""
+
+    sid: str
+    session: str
+    title: str
+    rule: str
+    date: str
+    duration_min: int
+    note: str
+    exercises: list[StrengthExercise]
+    gate: NotRequired[StrengthGate]
+    #: Unix seconds; set when a link is issued.
+    expires_at: NotRequired[int]
+
+
+class WatchedZone(TypedDict):
+    zone: str
+    label: str
+
+
+class StrengthSessionView(TypedDict):
+    """A strength link resolved: its session, and the zones to ask about today."""
+
+    status: Literal["ok"]
+    session: StrengthSession
+    #: The last reported prescription of the same routine, as it was stored then.
+    previous_session: dict[str, Any] | None
+    zones: list[WatchedZone]
+    #: The movement cues of the session's exercises, by slug; an exercise without any is absent.
+    cues: dict[str, list[str]]
+
+
+class StrengthReportExercise(TypedDict):
+    """One exercise of a posted report. `reps` is positional, one entry per slot walked,
+    blanks included: the position tells which side a count belongs to."""
+
+    i: int
+    score: int | None
+    skipped: bool
+    gated: bool
+    status: Literal["completed", "partial", "skipped", "gated"]
+    note: str
+    reps: list[int | None]
+
+
+class StrengthPainPosted(TypedDict):
+    before: int | None
+    after: int | None
+
+
+class StrengthReportPosted(TypedDict):
+    """What the session posts back once done; the server parses it in `strength.parse_report`."""
+
+    performed_on: str
+    pains: dict[str, StrengthPainPosted]
+    minutes: int | None
+    note: str
+    exercises: list[StrengthReportExercise]
+
+
+class Launched(TypedDict):
+    """Today's strength session handed out as a link, `/s#t=<token>`."""
+
+    url: str
+
+
 class StrengthClosed(TypedDict):
     """Why no guided session is offered today."""
 
@@ -205,7 +350,7 @@ class StrengthReady(TypedDict):
 
     status: Literal["ready"]
     date: str
-    session: dict[str, Any]
+    session: StrengthSession
     revision: int
     signature: str
 
@@ -257,6 +402,63 @@ class Entry(TypedDict):
     has_image: bool
 
 
+class EntriesView(TypedDict):
+    """A page of the archived cards, latest first."""
+
+    entries: list[Entry]
+    #: The offset of the next page; None on the last one.
+    next_offset: int | None
+    #: The latest weekly and the latest monthly.
+    latest: list[Entry]
+
+
+class StrengthSet(TypedDict):
+    side: Literal["both", "right", "left"]
+    set_index: int
+    repetitions: int
+
+
+class StrengthResult(TypedDict):
+    """One exercise of a strength report, as the athlete reported it."""
+
+    slug: str
+    status: str | None
+    note: str
+    difficulty: int | None
+    completed_slots: int | None
+    sets: list[StrengthSet]
+
+
+class StrengthReport(TypedDict):
+    performed_on: str
+    duration_minutes: int | None
+    note: str
+    #: Per zone, the pain before and after the session.
+    pains: dict[str, dict[str, float | None]]
+    exercises: list[StrengthResult]
+
+
+class EntryView(TypedDict):
+    """An archived card opened: its image is served apart, by `image_hash`."""
+
+    id: str
+    kind: str
+    title: str
+    period: str
+    occurred_on: str
+    created_at: str
+    origin: str
+    body: str
+    #: Empty without an image.
+    image_hash: str
+    #: A strength card's prescription, as sent.
+    snapshot: dict[str, Any] | None
+    #: What the athlete reported of that strength session.
+    report: StrengthReport | None
+    #: A monthly's weeklies.
+    related: list[Entry]
+
+
 class WeekPlan(PlanNote):
     revision: int | None
 
@@ -288,6 +490,17 @@ class PastWeek(TypedDict):
     km_done: float
     km_target: float | None
     review: str | None
+
+
+class DeviceGrant(TypedDict):
+    """What `/notebook-api/devices` gives the iOS app: its device token, sent back in
+    `Authorization: Bearer` on every later request."""
+
+    device: str
+
+
+class WeeksView(TypedDict):
+    weeks: list[PastWeek]
 
 
 class ZoneName(TypedDict):
@@ -439,6 +652,29 @@ class PassageHour(TypedDict):
     wind: int
     code: int | None
     day: bool
+
+
+class ForecastHour(TypedDict):
+    """One hour of a session's forecast; `code` is the WMO sky code."""
+
+    hour: int
+    temp: int
+    feels: int
+    rain: int | None
+    wind: int
+    code: int | None
+    day: bool
+
+
+class Forecast(TypedDict):
+    """The forecast of an upcoming session: the hours around its start, and the night;
+    `sunrise` and `sunset` are local, HH:MM."""
+
+    place: str
+    date: str
+    hours: list[ForecastHour]
+    sunrise: str | None
+    sunset: str | None
 
 
 class RacePlanView(TypedDict):

@@ -6,6 +6,8 @@ so a key the service renames breaks a fixture too.
 
 from __future__ import annotations
 
+from redline.model import notebook_views as views
+
 CURRENT_WEEK = "2026-W41"
 PREVIOUS_WEEK = "2026-W40"
 KNEE = {"zone": "knee", "label": "Genou"}
@@ -155,6 +157,55 @@ TOTALS = {
 STRIP = [strip_day(day, letter)
          for day, letter in zip(range(5, 12), "LMMJVSD", strict=True)]
 
+#: A strength session of the day: one exercise of each measure, a per-leg dose, a rest, the
+#: pain guardrail on the knee.
+STRENGTH_SESSION_OF_DAY = {
+    "sid": "w41-renfo-a",
+    "session": "renfo-a",
+    "title": "Renfo A",
+    "rule": "Arrêter une série si la douleur dépasse 3.",
+    "date": "vendredi 9 octobre",
+    "duration_min": 30,
+    "note": "Charge stable cette semaine.",
+    "gate": {"zone": "knee", "pain_max": 3, "drop": ["sauts"],
+             "say": "Genou au-dessus de 3 : les sauts sautent aujourd'hui."},
+    "exercises": [
+        {"slug": "mollets", "name": "Mollets sur une jambe", "target": "Mollets",
+         "cue": "Monter haut, descendre lentement.", "equipment": ["Marche"],
+         "load": {"kg": 8.0, "count": 1}, "last": "D 12, 12 · G 11, 12",
+         "dose": {"measure": "reps", "text": "2 × 10-12 par jambe",
+                  "current_text": "10-12 répétitions", "counts": [10, 11, 12], "rest_s": 60,
+                  "slots": [{"n": 1, "of": 2, "s": "d", "t": 12}, {"n": 1, "of": 2, "s": "g", "t": 12},
+                            {"n": 2, "of": 2, "s": "d", "t": 12}, {"n": 2, "of": 2, "s": "g", "t": 12}]}},
+        {"slug": "gainage", "name": "Gainage ventral", "target": "Tronc", "cue": "",
+         "equipment": [], "load": None,
+         "dose": {"measure": "time", "text": "2 × 45 s", "current_text": "45 s", "rest_s": 30,
+                  "slots": [{"n": 1, "of": 2, "t": 45}, {"n": 2, "of": 2, "t": 45}]}},
+        {"slug": "sauts", "name": "Sauts sur place", "target": "Pieds", "cue": "",
+         "equipment": [], "load": None,
+         "dose": {"measure": "contacts", "text": "20 contacts, par blocs de 10",
+                  "current_text": "10 contacts", "rest_s": 30,
+                  "slots": [{"n": 1, "of": 2, "t": 10}, {"n": 2, "of": 2, "t": 10}]}},
+        {"slug": "pompes", "name": "Pompes", "target": "Haut du corps", "cue": "",
+         "equipment": [], "load": {"kg": 0.0, "count": 1},
+         "dose": {"measure": "amrap", "text": "1 × jusqu'à fatigue",
+                  "current_text": "Jusqu'à échec technique",
+                  "slots": [{"n": 1, "of": 1}]}},
+    ],
+}
+
+#: The same session resolved from its link, with the previous one of its routine.
+STRENGTH_SESSION = {
+    "status": "ok",
+    "session": {**STRENGTH_SESSION_OF_DAY, "expires_at": 4_102_444_800},
+    "previous_session": {**STRENGTH_SESSION_OF_DAY, "sid": "w40-renfo-a", "exercises": [
+        {**exercise, "dose": {**exercise["dose"], "text": "2 × 10 par jambe"}}
+        if exercise["slug"] == "mollets" else exercise
+        for exercise in STRENGTH_SESSION_OF_DAY["exercises"] if exercise["slug"] != "pompes"]},
+    "zones": [KNEE],
+    "cues": {"mollets": ["Genou tendu, monter sur la pointe.", "Trois secondes pour redescendre."]},
+}
+
 TODAY = {
     "date": "2026-10-09",
     "week": CURRENT_WEEK,
@@ -193,10 +244,7 @@ TODAY = {
         "signature": "old",
         "revision": 3,
         "date": "2026-10-09",
-        "session": {
-            "title": "Renfo A",
-            "exercises": [{"name": "Mollets", "dose": {"text": "3 × 12"}}],
-        },
+        "session": STRENGTH_SESSION_OF_DAY,
     },
 }
 
@@ -356,3 +404,89 @@ HABITS = {"habits": [{
     "id": "5d1c0c5e-8a4b-4f1e-9a43-2f0b8f3c1a77", "weekday": 3, "starts_on": "2026-09-01",
     "ends_on": None, "kind": "other_sport", "minutes": None, "pace": None, "required": None,
     "sport": "Volley", "demanding": False, "run_too": False, "habit": True}]}
+
+
+#: Each screen's payload and the shape its route declares, by the name of the route. The
+#: iOS app decodes the same payloads (tests/ios_contract.py exports them).
+#: The forecast of a session to come: the hours from its start, and the night.
+WEATHER = {
+    "place": "Paris",
+    "date": "2026-10-09",
+    "hours": [{"hour": hour, "temp": 21 - hour, "feels": 19 - hour, "rain": 10 * (hour - 16),
+               "wind": 12, "code": 2, "day": True} for hour in (17, 18, 19)],
+    "sunrise": "07:55",
+    "sunset": "19:05",
+}
+
+
+#: A page of archives, with the next page to ask for.
+ENTRIES = {
+    "entries": [ENTRY, {**ENTRY, "id": "two", "kind": "weekly", "title": "Weekly · W39",
+                        "period": "2026-W39", "occurred_on": "2026-09-27",
+                        "created_at": "2026-09-27 19:00:00+00:00"},
+                {**ENTRY, "id": "three", "kind": "strength", "title": "Renfo du 22 septembre",
+                 "period": "2026-09-22", "occurred_on": "2026-09-22",
+                 "created_at": "2026-09-22 18:00:00+00:00", "has_image": False}],
+    "next_offset": 40,
+    "latest": [ENTRY],
+}
+
+#: A strength card opened: its prescription and what was done of it.
+ENTRY_VIEW = {
+    "id": "three",
+    "kind": "strength",
+    "title": "Renfo du 22 septembre",
+    "period": "2026-09-22",
+    "occurred_on": "2026-09-22",
+    "created_at": "2026-09-22 18:00:00+00:00",
+    "origin": "delivery",
+    "body": "Bien tenu. On garde la charge la semaine prochaine.",
+    "image_hash": "5f0c1a9e",
+    "snapshot": {"sid": "w39-renfo", "exercises": [
+        {"slug": "squat", "name": "Squat", "dose": {"text": "3 × 10"}},
+        {"slug": "pont", "name": "Pont fessier", "dose": {"text": "3 × 12, 2 s en haut"}}]},
+    "report": {
+        "performed_on": "2026-09-22",
+        "duration_minutes": 30,
+        "note": "Genou calme.",
+        "pains": {"knee": {"before": 1.0, "after": 0.5}},
+        "exercises": [
+            {"slug": "squat", "status": "completed", "note": "", "difficulty": 6,
+             "completed_slots": 3,
+             "sets": [{"side": "both", "set_index": index, "repetitions": 10}
+                      for index in (1, 2, 3)]},
+            {"slug": "pont", "status": "partial", "note": "Crampe à la dernière série.",
+             "difficulty": None, "completed_slots": 2,
+             "sets": [{"side": "both", "set_index": index, "repetitions": 12}
+                      for index in (1, 2)]}]},
+    "related": [],
+}
+
+
+#: A write accepted, and one that made the week's next revision.
+DONE = {"status": "ok"}
+REVISED = {"status": "ok", "revision": 3}
+
+#: An answer written that went on to the coach.
+ANSWERED = {"status": "ok", "alert": True}
+
+
+SCREENS = {
+    "today": (views.TodayView, TODAY),
+    "week": (views.WeekView, WEEK),
+    "weeks": (views.WeeksView, WEEKS),
+    "injury": (views.InjuryView, INJURY),
+    "race": (views.RaceView, RACE),
+    "session": (views.SessionView, DETAIL),
+    "race-plan": (views.RacePlanView, RACE_PLAN_VIEW),
+    "reorganize": (views.ReorganizeView, REORGANIZE),
+    "habits": (views.HabitsView, HABITS),
+    "weather": (views.Forecast, WEATHER),
+    "entries": (views.EntriesView, ENTRIES),
+    "entry": (views.EntryView, ENTRY_VIEW),
+    "answer": (views.Answered, ANSWERED),
+    "done": (views.Done, DONE),
+    "revised": (views.Revised, REVISED),
+    "strength-session": (views.StrengthSessionView, STRENGTH_SESSION),
+    "launch": (views.Launched, {"url": "https://coach.example.org/s#t=" + "A" * 32}),
+}

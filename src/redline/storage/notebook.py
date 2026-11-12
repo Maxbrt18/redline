@@ -7,12 +7,12 @@ import hashlib
 import re
 import secrets
 import uuid
-from typing import Any, cast
+from typing import cast
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from redline.model.notebook_views import Entry
+from redline.model.notebook_views import Entry, StrengthReport
 
 from .database import Database
 from .schema import notebook_credentials as credentials
@@ -160,21 +160,17 @@ class NotebookStore:
             )).mappings().one_or_none()
         return self._public(dict(row)) if row else None
 
-    def strength_report(self, session_key: str) -> dict | None:
+    def strength_report(self, session_key: str) -> StrengthReport | None:
         with self.database.engine.connect() as connection:
             row = connection.execute(sa.select(strength_sessions).where(
                 strength_sessions.c.session_key == session_key)).mappings().one_or_none()
             if row is None:
                 return None
-            result: dict[str, Any] = {
-                key: str(row[key]) if row[key] is not None else None
-                for key in ("performed_on", "duration_minutes", "note")}
-            pains: dict[str, dict[str, str | None]] = {}
+            pains: dict[str, dict[str, float | None]] = {}
             for reading in connection.execute(sa.select(strength_pain_readings).where(
                     strength_pain_readings.c.strength_session_id == row["id"])).mappings():
                 pains.setdefault(reading["zone"], {"before": None, "after": None})[
-                    reading["moment"]] = str(reading["value"])
-            result["pains"] = pains
+                    reading["moment"]] = float(reading["value"])
             exercises = []
             for exercise in connection.execute(sa.select(strength_results).where(
                 strength_results.c.session_id == row["id"]).order_by(strength_results.c.position)).mappings():
@@ -185,4 +181,6 @@ class NotebookStore:
                 exercises.append({"slug": exercise["exercise_slug"], "status": exercise["status"],
                                   "note": exercise["note"], "difficulty": exercise["difficulty"],
                                   "completed_slots": exercise["completed_slots"], "sets": sets})
-            return {**result, "exercises": exercises}
+            return cast("StrengthReport", {
+                "performed_on": str(row["performed_on"]), "duration_minutes": row["duration_minutes"],
+                "note": row["note"], "pains": pains, "exercises": exercises})

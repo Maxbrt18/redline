@@ -25,6 +25,7 @@ from flask import Flask, jsonify, request
 
 from redline.cards import render
 from redline.coach.fr import session_labels
+from redline.model import notebook_views as views
 from redline.model import paths, strength_log
 from redline.storage.database import expected_schema_revision
 from redline.storage.repository import OperationalStore
@@ -366,8 +367,11 @@ def create_app(config: Config, bot: TurnWorker, state: Any,
                 # the delivered session's snapshot.
                 zones = [{"zone": zone["slug"], "label": zone["label"]}
                          for zone in operational_store.pain_zones() if zone["active"]]
-            response = jsonify({"status": "ok", "session": resolved["session"],
-                                "previous_session": previous, "zones": zones})
+            slugs = {exercise.get("slug") for exercise in resolved["session"]["exercises"]}
+            view: views.StrengthSessionView = {
+                "status": "ok", "session": resolved["session"], "previous_session": previous,
+                "zones": zones, "cues": {slug: how for slug, how in cues.items() if slug in slugs}}
+            response = jsonify(view)
         response.headers["Cache-Control"] = "no-store"
         return response
 

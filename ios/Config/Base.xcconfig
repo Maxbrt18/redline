@@ -1,0 +1,47 @@
+// Build settings shared by every configuration, kept here rather than in the project
+// file so that a change reads as a diff. Instance values (team, bundle prefix, server
+// host) come from Local.xcconfig, which Git ignores; without it the app still builds
+// unsigned, as in CI.
+
+SDKROOT = iphoneos
+SUPPORTED_PLATFORMS = iphoneos iphonesimulator
+TARGETED_DEVICE_FAMILY = 1
+IPHONEOS_DEPLOYMENT_TARGET = 26.0
+
+SWIFT_VERSION = 6.0
+SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor
+SWIFT_APPROACHABLE_CONCURRENCY = YES
+SWIFT_EMIT_LOC_STRINGS = YES
+LOCALIZATION_PREFERS_STRING_CATALOGS = YES
+ENABLE_PREVIEWS = YES
+// The demo fixtures ship in debug builds only.
+DEVELOPMENT_ASSET_PATHS = "Redline/Preview Content"
+ENABLE_USER_SCRIPT_SANDBOXING = YES
+CLANG_ENABLE_MODULES = YES
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks
+
+PRODUCT_NAME = Redline
+PRODUCT_BUNDLE_IDENTIFIER = $(REDLINE_BUNDLE_PREFIX).redline
+MARKETING_VERSION = 0.1.0
+CURRENT_PROJECT_VERSION = 1
+CODE_SIGN_STYLE = Automatic
+
+// The palette is named in Design/Palette.swift, generated from tokens.css; Xcode's own
+// symbols would collide with SwiftUI's (`Color.red`).
+ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor
+ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS = NO
+ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO
+
+GENERATE_INFOPLIST_FILE = YES
+INFOPLIST_FILE = Config/Info.plist
+INFOPLIST_KEY_CFBundleDisplayName = Redline
+INFOPLIST_KEY_LSApplicationCategoryType = public.app-category.healthcare-fitness
+INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES
+INFOPLIST_KEY_UILaunchScreen_Generation = YES
+INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait
+
+DEVELOPMENT_TEAM =
+REDLINE_BUNDLE_PREFIX = org.example
+REDLINE_SERVER_HOST =
+
+#include? "Local.xcconfig"

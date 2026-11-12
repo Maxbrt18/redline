@@ -1,0 +1,282 @@
+{
+  "status": "ok",
+  "session": {
+    "sid": "w41-renfo-a",
+    "session": "renfo-a",
+    "title": "Renfo A",
+    "rule": "Arrêter une série si la douleur dépasse 3.",
+    "date": "vendredi 9 octobre",
+    "duration_min": 30,
+    "note": "Charge stable cette semaine.",
+    "gate": {
+      "zone": "knee",
+      "pain_max": 3,
+      "drop": [
+        "sauts"
+      ],
+      "say": "Genou au-dessus de 3 : les sauts sautent aujourd'hui."
+    },
+    "exercises": [
+      {
+        "slug": "mollets",
+        "name": "Mollets sur une jambe",
+        "target": "Mollets",
+        "cue": "Monter haut, descendre lentement.",
+        "equipment": [
+          "Marche"
+        ],
+        "load": {
+          "kg": 8.0,
+          "count": 1
+        },
+        "last": "D 12, 12 · G 11, 12",
+        "dose": {
+          "measure": "reps",
+          "text": "2 × 10-12 par jambe",
+          "current_text": "10-12 répétitions",
+          "counts": [
+            10,
+            11,
+            12
+          ],
+          "rest_s": 60,
+          "slots": [
+            {
+              "n": 1,
+              "of": 2,
+              "s": "d",
+              "t": 12
+            },
+            {
+              "n": 1,
+              "of": 2,
+              "s": "g",
+              "t": 12
+            },
+            {
+              "n": 2,
+              "of": 2,
+              "s": "d",
+              "t": 12
+            },
+            {
+              "n": 2,
+              "of": 2,
+              "s": "g",
+              "t": 12
+            }
+          ]
+        }
+      },
+      {
+        "slug": "gainage",
+        "name": "Gainage ventral",
+        "target": "Tronc",
+        "cue": "",
+        "equipment": [],
+        "load": null,
+        "dose": {
+          "measure": "time",
+          "text": "2 × 45 s",
+          "current_text": "45 s",
+          "rest_s": 30,
+          "slots": [
+            {
+              "n": 1,
+              "of": 2,
+              "t": 45
+            },
+            {
+              "n": 2,
+              "of": 2,
+              "t": 45
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sauts",
+        "name": "Sauts sur place",
+        "target": "Pieds",
+        "cue": "",
+        "equipment": [],
+        "load": null,
+        "dose": {
+          "measure": "contacts",
+          "text": "20 contacts, par blocs de 10",
+          "current_text": "10 contacts",
+          "rest_s": 30,
+          "slots": [
+            {
+              "n": 1,
+              "of": 2,
+              "t": 10
+            },
+            {
+              "n": 2,
+              "of": 2,
+              "t": 10
+            }
+          ]
+        }
+      },
+      {
+        "slug": "pompes",
+        "name": "Pompes",
+        "target": "Haut du corps",
+        "cue": "",
+        "equipment": [],
+        "load": {
+          "kg": 0.0,
+          "count": 1
+        },
+        "dose": {
+          "measure": "amrap",
+          "text": "1 × jusqu'à fatigue",
+          "current_text": "Jusqu'à échec technique",
+          "slots": [
+            {
+              "n": 1,
+              "of": 1
+            }
+          ]
+        }
+      }
+    ],
+    "expires_at": 4102444800
+  },
+  "previous_session": {
+    "sid": "w40-renfo-a",
+    "session": "renfo-a",
+    "title": "Renfo A",
+    "rule": "Arrêter une série si la douleur dépasse 3.",
+    "date": "vendredi 9 octobre",
+    "duration_min": 30,
+    "note": "Charge stable cette semaine.",
+    "gate": {
+      "zone": "knee",
+      "pain_max": 3,
+      "drop": [
+        "sauts"
+      ],
+      "say": "Genou au-dessus de 3 : les sauts sautent aujourd'hui."
+    },
+    "exercises": [
+      {
+        "slug": "mollets",
+        "name": "Mollets sur une jambe",
+        "target": "Mollets",
+        "cue": "Monter haut, descendre lentement.",
+        "equipment": [
+          "Marche"
+        ],
+        "load": {
+          "kg": 8.0,
+          "count": 1
+        },
+        "last": "D 12, 12 · G 11, 12",
+        "dose": {
+          "measure": "reps",
+          "text": "2 × 10 par jambe",
+          "current_text": "10-12 répétitions",
+          "counts": [
+            10,
+            11,
+            12
+          ],
+          "rest_s": 60,
+          "slots": [
+            {
+              "n": 1,
+              "of": 2,
+              "s": "d",
+              "t": 12
+            },
+            {
+              "n": 1,
+              "of": 2,
+              "s": "g",
+              "t": 12
+            },
+            {
+              "n": 2,
+              "of": 2,
+              "s": "d",
+              "t": 12
+            },
+            {
+              "n": 2,
+              "of": 2,
+              "s": "g",
+              "t": 12
+            }
+          ]
+        }
+      },
+      {
+        "slug": "gainage",
+        "name": "Gainage ventral",
+        "target": "Tronc",
+        "cue": "",
+        "equipment": [],
+        "load": null,
+        "dose": {
+          "measure": "time",
+          "text": "2 × 45 s",
+          "current_text": "45 s",
+          "rest_s": 30,
+          "slots": [
+            {
+              "n": 1,
+              "of": 2,
+              "t": 45
+            },
+            {
+              "n": 2,
+              "of": 2,
+              "t": 45
+            }
+          ]
+        }
+      },
+      {
+        "slug": "sauts",
+        "name": "Sauts sur place",
+        "target": "Pieds",
+        "cue": "",
+        "equipment": [],
+        "load": null,
+        "dose": {
+          "measure": "contacts",
+          "text": "20 contacts, par blocs de 10",
+          "current_text": "10 contacts",
+          "rest_s": 30,
+          "slots": [
+            {
+              "n": 1,
+              "of": 2,
+              "t": 10
+            },
+            {
+              "n": 2,
+              "of": 2,
+              "t": 10
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "zones": [
+    {
+      "zone": "knee",
+      "label": "Genou"
+    }
+  ],
+  "cues": {
+    "mollets": [
+      "Genou tendu, monter sur la pointe.",
+      "Trois secondes pour redescendre."
+    ]
+  }
+}

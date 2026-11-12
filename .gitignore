@@ -1,5 +1,13 @@
 .DS_Store
 
+# The iOS app: each instance's team, bundle prefix and server host, and what Xcode and
+# SwiftPM build or keep per user.
+/ios/Config/Local.xcconfig
+/ios/.build/
+/ios/RedlineKit/.build/
+/ios/RedlineKit/.swiftpm/
+xcuserdata/
+
 # Editor swap files: a swapped .env holds its secrets in clear text.
 *.sw[a-p]
 .*.sw[a-p]

@@ -1,0 +1,179 @@
+{
+  "week": "2026-W41",
+  "revision": 3,
+  "written": true,
+  "blocked": null,
+  "days": [
+    {
+      "date": "2026-10-05",
+      "sessions": [],
+      "rest": true,
+      "past": true,
+      "stated": null,
+      "habit_id": null
+    },
+    {
+      "date": "2026-10-06",
+      "past": true,
+      "rest": false,
+      "stated": null,
+      "habit_id": null,
+      "sessions": [
+        {
+          "id": "w41-mar-ef",
+          "title": "EF, permis accompagné",
+          "kind": "run",
+          "workout": "easy",
+          "figure": "≤55 min"
+        }
+      ]
+    },
+    {
+      "date": "2026-10-07",
+      "sessions": [],
+      "rest": false,
+      "past": true,
+      "stated": {
+        "kind": "other_sport",
+        "minutes": null,
+        "pace": null,
+        "required": null,
+        "sport": "Volley",
+        "demanding": false,
+        "run_too": false,
+        "habit": true
+      },
+      "habit_id": "5d1c0c5e-8a4b-4f1e-9a43-2f0b8f3c1a77"
+    },
+    {
+      "date": "2026-10-08",
+      "sessions": [],
+      "rest": false,
+      "past": true,
+      "stated": null,
+      "habit_id": null
+    },
+    {
+      "date": "2026-10-09",
+      "past": false,
+      "rest": false,
+      "stated": null,
+      "habit_id": null,
+      "sessions": [
+        {
+          "id": "w41-ven-ef",
+          "title": "EF, permis accompagné",
+          "kind": "run",
+          "workout": "easy",
+          "figure": "≤55 min"
+        }
+      ]
+    },
+    {
+      "date": "2026-10-10",
+      "sessions": [],
+      "rest": false,
+      "past": false,
+      "stated": null,
+      "habit_id": null
+    },
+    {
+      "date": "2026-10-11",
+      "past": false,
+      "rest": false,
+      "stated": null,
+      "habit_id": null,
+      "sessions": [
+        {
+          "id": "w41-dim-sl",
+          "title": "Sortie longue",
+          "kind": "run",
+          "workout": "long",
+          "figure": "16 km"
+        }
+      ]
+    }
+  ],
+  "variants": [
+    {
+      "moves": [
+        {
+          "session": "w41-ven-ef",
+          "title": "EF, permis accompagné",
+          "before": "2026-10-09",
+          "after": "2026-10-10"
+        }
+      ],
+      "dropped": [],
+      "notes": [
+        {
+          "remark": "load_above_plan",
+          "title": null,
+          "date": null,
+          "value": 30
+        }
+      ],
+      "days": [
+        {
+          "date": "2026-10-05",
+          "labels": [],
+          "load": 0,
+          "moved": false,
+          "carried": false
+        },
+        {
+          "date": "2026-10-06",
+          "labels": [
+            "EF"
+          ],
+          "load": 137,
+          "moved": false,
+          "carried": false
+        },
+        {
+          "date": "2026-10-07",
+          "labels": [],
+          "load": 0,
+          "moved": false,
+          "carried": false
+        },
+        {
+          "date": "2026-10-08",
+          "labels": [],
+          "load": 0,
+          "moved": false,
+          "carried": false
+        },
+        {
+          "date": "2026-10-09",
+          "labels": [],
+          "load": 0,
+          "moved": false,
+          "carried": false
+        },
+        {
+          "date": "2026-10-10",
+          "labels": [
+            "EF"
+          ],
+          "load": 137,
+          "moved": true,
+          "carried": true
+        },
+        {
+          "date": "2026-10-11",
+          "labels": [
+            "SL"
+          ],
+          "load": 540,
+          "moved": false,
+          "carried": false
+        }
+      ],
+      "around_min": null
+    }
+  ],
+  "others": 4,
+  "held_back": [],
+  "proposals": []
+}

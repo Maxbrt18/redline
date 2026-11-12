@@ -1,0 +1,77 @@
+{
+  "id": "6b0f3c1e-1d1a-4a39-9e0d-5c1b0b5d2f11",
+  "date": "2026-10-06",
+  "kind": "easy",
+  "title": "EF, permis accompagné",
+  "workout": "easy",
+  "quality": false,
+  "strava_id": null,
+  "fact": {
+    "observation_id": "6b0f3c1e-1d1a-4a39-9e0d-5c1b0b5d2f11",
+    "kind": "easy",
+    "date": "2026-10-06",
+    "km": 8.35,
+    "duration_min": 48,
+    "hr_avg": 162,
+    "rpe": 3,
+    "pains": [
+      {
+        "zone": "knee",
+        "label": "Genou",
+        "value": 0.5
+      }
+    ],
+    "enjoyment": 8,
+    "dplus": 20,
+    "started_at": "2026-10-06T07:10:00+02:00",
+    "over": [
+      "hr_avg"
+    ],
+    "moving_s": 2880,
+    "hr_max": null,
+    "cadence": null,
+    "reserve": null
+  },
+  "plan": {
+    "targets": {
+      "duration_cap_min": 55,
+      "rpe_min": 2,
+      "rpe_max": 3,
+      "hr_cap_bpm": 157
+    },
+    "note": null
+  },
+  "ask": null,
+  "wake": {
+    "zones": [
+      {
+        "zone": "knee",
+        "label": "Genou",
+        "before": null,
+        "after": null
+      }
+    ],
+    "after_due": false
+  },
+  "phases": null,
+  "reps": null,
+  "reading": null,
+  "km": null,
+  "stops": null,
+  "drift": null,
+  "series": null,
+  "hr_bounds": null,
+  "zones": null,
+  "previous": null,
+  "weather": null,
+  "gear": null,
+  "week": {
+    "week": "2026-W41",
+    "current": true,
+    "km_done": 14.06,
+    "km_target": 41,
+    "runs_done": 2,
+    "runs_planned": 5,
+    "next": null
+  }
+}

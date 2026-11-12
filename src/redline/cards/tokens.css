@@ -43,6 +43,30 @@
   --red:    #d40000;
   --over:   color-mix(in oklab, var(--red) 58%, var(--ink));
   --brand:  #d40000;
+  /* The app's red line and its one accent colour (iOS app only; the cards and the page
+   * keep --red). Lighter in the dark palette to hold 4.5:1 against the background. */
+  --accent: #c8102e;
+
+  /* Families of a session (run, long run, strength, rest, pain, race): desaturated
+   * tints at equal lightness, which name and never judge; none comes near red. */
+  --h-run:  #4c677b;
+  --h-pain: #705a75;
+  --h-race: #436b6f;
+  --h-str:  #7a5867;
+  --h-rest: #69625a;
+  /* Heart-rate zones climb toward red, which stays intensity: Z5 is --red. */
+  --z1:     #c7bbb7;
+  --z2:     #bc9392;
+  --z3:     #bb6c6f;
+  --z4:     #b54245;
+  --z5:     var(--red);
+  /* The track: the one red surface (the notebook's header and its main action).
+   * --track-flat is the track's mean colour once grained, for what cannot carry the
+   * grain: a bar, the status bar. */
+  --tartan:      #c8102e;
+  --tartan-deep: #a50d24;
+  --track-flat:  #cd183b;
+  --on-track:    #fff6f0;
 
   --radius: 12px;
 
@@ -62,6 +86,19 @@
   --ghost:  #3a3330;
   --red:    #f0362b;   /* the logo red is too dark to be READ on black */
   --brand:  #d40000;
+  --accent: #ff4d5e;
+  --h-run:  #a6c2d7;
+  --h-pain: #ccb4d1;
+  --h-race: #9ec6cb;
+  --h-str:  #d7b2c2;
+  --h-rest: #c4bcb4;
+  --z1:     #7a6f6b;
+  --z2:     #a87877;
+  --z3:     #d37b7e;
+  --z4:     #f47a79;
+  --tartan:      #b30f28;
+  --tartan-deep: #8c0b1f;
+  --track-flat:  #ba1635;
   color-scheme: dark;
 }
 
@@ -76,7 +113,20 @@
     --data:   #d8cdc1;
     --ghost:  #3a3330;
     --red:    #f0362b;
-    --brand:  #d40000;
+      --brand:  #d40000;
+    --accent: #ff4d5e;
+    --h-run:  #a6c2d7;
+    --h-pain: #ccb4d1;
+    --h-race: #9ec6cb;
+    --h-str:  #d7b2c2;
+    --h-rest: #c4bcb4;
+    --z1:     #7a6f6b;
+    --z2:     #a87877;
+    --z3:     #d37b7e;
+    --z4:     #f47a79;
+    --tartan:      #b30f28;
+    --tartan-deep: #8c0b1f;
+    --track-flat:  #ba1635;
     color-scheme: dark;
   }
 }

@@ -1,0 +1,39 @@
+{
+  "weeks": [
+    {
+      "week": "2026-W40",
+      "monday": "2026-09-28",
+      "km_done": 38.2,
+      "km_target": 40.0,
+      "review": null
+    },
+    {
+      "week": "2026-W39",
+      "monday": "2026-09-21",
+      "km_done": 35.0,
+      "km_target": 36.0,
+      "review": null
+    },
+    {
+      "week": "2026-W38",
+      "monday": "2026-09-14",
+      "km_done": 31.5,
+      "km_target": 34.0,
+      "review": null
+    },
+    {
+      "week": "2026-W37",
+      "monday": "2026-09-07",
+      "km_done": 29.0,
+      "km_target": 30.0,
+      "review": null
+    },
+    {
+      "week": "2026-W36",
+      "monday": "2026-08-31",
+      "km_done": 27.4,
+      "km_target": null,
+      "review": null
+    }
+  ]
+}
