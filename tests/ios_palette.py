@@ -34,17 +34,13 @@ class Token:
     css: str = ""
     #: The same colour in both modes: the light value of `css`.
     light_in_both: bool = False
-    #: Set on a token being retired: what replaces it, as the compiler says it.
-    deprecated: str = ""
 
     @property
     def source(self) -> str:
         return self.css or self.name
 
 
-_FAMILY = "Palette.muted (bare family symbols carry no tint)"
-#: The tokens the app uses, with what each one means there. Deprecated ones stay until no
-#: screen reads them; the compiler's warnings list the screens left to migrate.
+#: The tokens the app uses, with what each one means there.
 TOKENS = (
     Token("bg", "The paper: every screen's background."),
     Token("panel", "The only surfaces left: what a finger can press."),
@@ -58,19 +54,6 @@ TOKENS = (
     Token("track", "The track: the one red surface, the same in both modes.",
           css="tartan", light_in_both=True),
     Token("on-track", "Text and lines on the track."),
-    Token("red", "The logo red.", deprecated="Palette.accent"),
-    Token("over", "A limit crossed.",
-          deprecated="Palette.accent, plus a word or symbol that says the limit is crossed"),
-    Token("tartan", "The track.", deprecated="Palette.track"),
-    Token("tartan-deep", "The track, in shadow.", deprecated="Palette.track"),
-    Token("track-flat", "The track's mean colour once grained.", deprecated="Palette.track"),
-    Token("h-run", "Family tint: a run.", deprecated=_FAMILY),
-    Token("h-pain", "Family tint: pain.", deprecated=_FAMILY),
-    Token("h-race", "Family tint: a race.", deprecated=_FAMILY),
-    Token("h-str", "Family tint: strength.", deprecated=_FAMILY),
-    Token("h-rest", "Family tint: rest and other sports.", deprecated=_FAMILY),
-    *(Token(f"z{zone}", f"Heart-rate zone {zone}.", deprecated="ZoneShade.color(_:)")
-      for zone in range(1, 6)),
 )
 #: The accent colour of the app (`--accent`).
 ACCENT = "accent"
@@ -181,8 +164,6 @@ def palette_swift() -> str:
              "enum Palette {"]
     for token in TOKENS:
         lines.append(f"    /// {token.meaning}")
-        if token.deprecated:
-            lines.append(f'    @available(*, deprecated, message: "Use {token.deprecated}")')
         lines.append(f'    static let {camel(token.name)} = Color("Palette/{token.name}")')
     lines.append("}")
     return "\n".join(lines) + "\n"

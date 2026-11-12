@@ -65,13 +65,3 @@ def test_the_accent_is_readable_on_the_paper_in_both_modes():
 def test_the_track_is_the_same_colour_in_both_modes():
     light, dark = ios_palette.resolved()["track"]
     assert light == dark
-
-
-def test_a_retired_token_says_what_replaces_it():
-    swift = ios_palette.palette_swift()
-    retired = [token for token in ios_palette.TOKENS if token.deprecated]
-    assert retired
-    for token in retired:
-        declaration = f"static let {ios_palette.camel(token.name)} "
-        assert f'message: "Use {token.deprecated}")\n    {declaration}' in swift
-    assert swift.count("@available(*, deprecated") == len(retired)

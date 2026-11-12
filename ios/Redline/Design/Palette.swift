@@ -26,49 +26,4 @@ enum Palette {
     static let track = Color("Palette/track")
     /// Text and lines on the track.
     static let onTrack = Color("Palette/on-track")
-    /// The logo red.
-    @available(*, deprecated, message: "Use Palette.accent")
-    static let red = Color("Palette/red")
-    /// A limit crossed.
-    @available(*, deprecated, message: "Use Palette.accent, plus a word or symbol that says the limit is crossed")
-    static let over = Color("Palette/over")
-    /// The track.
-    @available(*, deprecated, message: "Use Palette.track")
-    static let tartan = Color("Palette/tartan")
-    /// The track, in shadow.
-    @available(*, deprecated, message: "Use Palette.track")
-    static let tartanDeep = Color("Palette/tartan-deep")
-    /// The track's mean colour once grained.
-    @available(*, deprecated, message: "Use Palette.track")
-    static let trackFlat = Color("Palette/track-flat")
-    /// Family tint: a run.
-    @available(*, deprecated, message: "Use Palette.muted (bare family symbols carry no tint)")
-    static let hRun = Color("Palette/h-run")
-    /// Family tint: pain.
-    @available(*, deprecated, message: "Use Palette.muted (bare family symbols carry no tint)")
-    static let hPain = Color("Palette/h-pain")
-    /// Family tint: a race.
-    @available(*, deprecated, message: "Use Palette.muted (bare family symbols carry no tint)")
-    static let hRace = Color("Palette/h-race")
-    /// Family tint: strength.
-    @available(*, deprecated, message: "Use Palette.muted (bare family symbols carry no tint)")
-    static let hStr = Color("Palette/h-str")
-    /// Family tint: rest and other sports.
-    @available(*, deprecated, message: "Use Palette.muted (bare family symbols carry no tint)")
-    static let hRest = Color("Palette/h-rest")
-    /// Heart-rate zone 1.
-    @available(*, deprecated, message: "Use ZoneShade.color(_:)")
-    static let z1 = Color("Palette/z1")
-    /// Heart-rate zone 2.
-    @available(*, deprecated, message: "Use ZoneShade.color(_:)")
-    static let z2 = Color("Palette/z2")
-    /// Heart-rate zone 3.
-    @available(*, deprecated, message: "Use ZoneShade.color(_:)")
-    static let z3 = Color("Palette/z3")
-    /// Heart-rate zone 4.
-    @available(*, deprecated, message: "Use ZoneShade.color(_:)")
-    static let z4 = Color("Palette/z4")
-    /// Heart-rate zone 5.
-    @available(*, deprecated, message: "Use ZoneShade.color(_:)")
-    static let z5 = Color("Palette/z5")
 }
