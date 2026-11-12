@@ -31,7 +31,12 @@ struct LimitRows: View {
     var body: some View {
         let stacked = typeSize.isAccessibilitySize
         VStack(alignment: .leading, spacing: stacked ? Space.s : 0) {
-            if rows.contains(where: { $0.cap != nil }) {
+            if rows.contains(where: { $0.cap != nil }), stacked {
+                // Stacked rows put words between the rails: the legend goes above them all.
+                Text("le trait rouge marque la limite")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(Palette.accent)
+            } else if rows.contains(where: { $0.cap != nil }) {
                 GeometryReader { geometry in
                     Text("limite")
                         .font(.caption2.weight(.semibold))
@@ -40,8 +45,8 @@ struct LimitRows: View {
                         .offset(x: geometry.size.width * Self.markAt - 16)
                 }
                 .frame(height: 14)
-                .padding(.leading, stacked ? 0 : labelWidth + Space.s)
-                .padding(.trailing, stacked ? 0 : valueWidth + Space.s)
+                .padding(.leading, labelWidth + Space.s)
+                .padding(.trailing, valueWidth + Space.s)
             }
             ForEach(rows) { row in
                 Group {
@@ -74,7 +79,15 @@ struct LimitRows: View {
 
     private func figure(_ row: Row, alignment: HorizontalAlignment) -> some View {
         VStack(alignment: alignment, spacing: 2) {
-            Text(row.value).figure(.medium).foregroundStyle(row.crossed ? Palette.accent : Palette.ink)
+            // A crossed limit shows as a symbol before the figure, not by the red alone.
+            HStack(alignment: .firstTextBaseline, spacing: Space.xxs) {
+                if row.crossed {
+                    Image(systemName: "arrow.up.right").font(.caption.weight(.bold))
+                        .accessibilityLabel("au-delà de la limite")
+                }
+                Text(row.value).figure(.medium)
+            }
+            .foregroundStyle(row.crossed ? Palette.accent : Palette.ink)
             Text(row.sub).font(.caption2).foregroundStyle(Palette.muted).lineLimit(1)
         }
     }
