@@ -31,6 +31,13 @@ struct StrengthScreen: View {
                         Button("Fermer", systemImage: "xmark") {
                             if model.run?.isUnfinished == true { leaving = true } else { close() }
                         }
+                        // Attached to the button itself so the popover points at it, not at the page.
+                        .confirmationDialog("Quitter la séance ?", isPresented: $leaving, titleVisibility: .visible) {
+                            Button("Quitter la séance") { close() }
+                            Button("Rester", role: .cancel) {}
+                        } message: {
+                            Text("Rien n’est perdu : tu reprendras où tu en es.")
+                        }
                     }
                     ToolbarItem(placement: .primaryAction) {
                         Button(soundOn ? "Son" : "Son coupé", systemImage: soundOn ? "speaker.wave.2" : "speaker.slash") {
@@ -47,12 +54,6 @@ struct StrengthScreen: View {
                     }
                 }
                 .sheet(isPresented: $soundSettings) { StrengthSoundSettings(sound: sound) }
-                .confirmationDialog("Quitter la séance ?", isPresented: $leaving, titleVisibility: .visible) {
-                    Button("Quitter", role: .destructive) { close() }
-                    Button("Rester", role: .cancel) {}
-                } message: {
-                    Text("Rien n’est perdu : tu reprendras où tu en es.")
-                }
         }
         .interactiveDismissDisabled()
         .task {
