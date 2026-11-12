@@ -17,7 +17,7 @@ struct RedLineCursor: View {
     var targetLabel: String?
     var format: (Double) -> String = { $0.formatted(.number.precision(.fractionLength(0...1))) }
     /// Nothing is done yet: the rail stays empty and the figure is the planned one, in
-    /// outline.
+    /// the muted colour and a lighter weight.
     var planned = false
 
     private var crossed: Bool { limit.map { value > $0 } ?? false }
@@ -30,14 +30,10 @@ struct RedLineCursor: View {
                     .foregroundStyle(Palette.muted)
                 Spacer()
                 HStack(alignment: .firstTextBaseline, spacing: 3) {
-                    if planned {
-                        OutlinedFigure(text: format(value), size: 22)
-                    } else {
-                        Text(format(value))
-                            .font(.figure(22))
-                            .monospacedDigit()
-                            .foregroundStyle(crossed ? Palette.over : Palette.ink)
-                    }
+                    Text(format(value))
+                        .font(.figure(22, weight: planned ? .semibold : .bold))
+                        .monospacedDigit()
+                        .foregroundStyle(planned ? Palette.muted : crossed ? Palette.over : Palette.ink)
                     if !unit.isEmpty {
                         Text(unit).font(.caption.weight(.semibold)).foregroundStyle(Palette.muted)
                     }

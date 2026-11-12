@@ -103,7 +103,7 @@ struct Landmarks: View {
                 Text(Numbers.text(totals.kmDone)).font(.figure(40))
                 if let target = totals.kmTarget {
                     Text("sur").font(.subheadline).foregroundStyle(Palette.muted)
-                    OutlinedFigure(text: Numbers.text(target), size: 40, lineWidth: 1.6)
+                    Text(Numbers.text(target)).font(.figure(40, weight: .semibold)).monospacedDigit().foregroundStyle(Palette.muted)
                 }
                 Text("km · \(runs)").font(.subheadline).foregroundStyle(Palette.muted)
             }

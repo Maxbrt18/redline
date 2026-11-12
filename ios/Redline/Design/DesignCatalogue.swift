@@ -36,8 +36,8 @@ struct DesignCatalogue: View {
                     .foregroundStyle(Palette.muted)
                 }
                 HStack(spacing: 16) {
-                    Text("5:12").font(.figure(22, weight: .semibold)).monospacedDigit()
-                    OutlinedFigure(text: "5:00", size: 22)
+                    Text("5:12").font(.figure(22)).monospacedDigit().foregroundStyle(Palette.ink)
+                    Text("5:00").font(.figure(22, weight: .semibold)).monospacedDigit().foregroundStyle(Palette.muted)
                     Text("Texte en police du système").font(.body)
                 }
             }
