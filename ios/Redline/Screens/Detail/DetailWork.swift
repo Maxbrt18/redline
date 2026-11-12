@@ -3,28 +3,28 @@ import RedlineKit
 import SwiftUI
 
 /// The work itself: for a quality session, the heart rate over its zones with the
-/// repetitions in red, their table and what to read from them; for a steady run, the same
-/// curve and the kilometres.
+/// repetitions in the red line, their table and what to read from them; for a steady run,
+/// the same curve and the kilometres.
 struct DetailWork: View {
     let detail: Notebook.SessionView
 
     var body: some View {
         if let reps = detail.reps, !reps.isEmpty {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: Space.s) {
                 DetailHead(title: "Les répétitions",
                            aside: "\(reps.count) × \(Numbers.minutes(reps.reduce(0) { $0 + $1.timeS } / Double(reps.count)))")
                 HeartChart(series: detail.series, bounds: detail.hrBounds ?? [], dplus: detail.fact.dplus)
                 RepsTable(reps: reps, bounds: detail.hrBounds ?? [])
-                if let note = repsNote(reps) { Text(note).font(.footnote).foregroundStyle(Palette.muted) }
+                if let note = repsNote(reps) { Text(note).textRole(.caption).foregroundStyle(Palette.muted) }
                 ReadRows(rows: qualityRead())
             }
         } else if detail.series?.hr?.contains(where: { $0 != nil }) == true || !(detail.km ?? []).isEmpty {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: Space.s) {
                 DetailHead(title: "Au kilomètre", aside: "temps en mouvement")
                 HeartChart(series: detail.series, bounds: detail.hrBounds ?? [], dplus: detail.fact.dplus)
                 if let splits = detail.km, !splits.isEmpty { KmTable(splits: splits, bounds: detail.hrBounds ?? []) }
                 if let stops = detail.stops {
-                    Text(stopsLine(stops)).font(.footnote).foregroundStyle(Palette.muted)
+                    Text(stopsLine(stops)).textRole(.caption).foregroundStyle(Palette.muted)
                 }
                 ReadRows(rows: steadyRead())
             }
@@ -98,39 +98,48 @@ private struct ReadRows: View {
     let rows: [(String, String, String?)]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Space.xs) {
             ForEach(rows, id: \.1) { symbol, title, detail in
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Image(systemName: symbol).foregroundStyle(Palette.muted).frame(width: 20)
-                    (Text(title).bold() + Text(detail.map { " · \($0)" } ?? "")).font(.subheadline)
+                Label {
+                    Text("\(Text(title).bold())\(detail.map { " · \($0)" } ?? "")").textRole(.secondary)
+                } icon: {
+                    Image(systemName: symbol).foregroundStyle(Palette.muted)
                 }
             }
         }
     }
 }
 
-/// The heart rate over the five zones of the instance, the repetitions as red bands, the
-/// stops named; under it, the altitude when the course is not flat.
+/// The heart rate over the five zones of the instance, each named `Z1`–`Z5` at its right,
+/// the repetitions as numbered bands in the red line, the stops named; under it, the
+/// altitude when the course is not flat. A graphic: its labels stop growing at the first
+/// accessibility size.
 struct HeartChart: View {
     let series: Notebook.Series?
     let bounds: [Int]
     var dplus: Double?
 
     /// Both charts reserve the same width for their labels, so that their minutes align.
-    static let labelWidth: CGFloat = 38
+    @ScaledMetric(relativeTo: .caption2) private var labelWidth: CGFloat = 38
 
     var body: some View {
         if let series, let hr = series.hr, hr.contains(where: { $0 != nil }) {
             let edges = [100] + bounds + [200]
             let points = Self.segments(times: series.t, values: hr.map { $0.map(Double.init) })
             let beats = points.map(\.value)
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    (Text("Fréquence cardiaque").bold() + Text(" sur ses zones")).font(.caption)
-                    Spacer()
-                    if series.alt == nil { Text("parcours plat, profil masqué").font(.caption2).foregroundStyle(Palette.muted) }
+            VStack(alignment: .leading, spacing: Space.xs) {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
+                        chartTitle
+                        Spacer(minLength: Space.xs)
+                        flat(series)
+                    }
+                    VStack(alignment: .leading, spacing: Space.xxs) {
+                        chartTitle
+                        flat(series)
+                    }
                 }
-                .padding(.bottom, 14)
+                .padding(.bottom, Space.s)
                 Chart {
                     ForEach(1..<min(edges.count, 6), id: \.self) { zone in
                         RectangleMark(yStart: .value("bas", edges[zone - 1]), yEnd: .value("haut", edges[zone]))
@@ -139,9 +148,9 @@ struct HeartChart: View {
                     ForEach(Array(series.bands.enumerated()), id: \.offset) { index, band in
                         if band.count == 2 {
                             RectangleMark(xStart: .value("début", band[0] / 60), xEnd: .value("fin", band[1] / 60))
-                                .foregroundStyle(Palette.red.opacity(0.14))
+                                .foregroundStyle(Palette.accent.opacity(0.14))
                                 .annotation(position: .overlay, alignment: .top, spacing: 2) {
-                                    Text("\(index + 1)").font(.caption2.weight(.bold)).foregroundStyle(Palette.red)
+                                    Text("\(index + 1)").font(.caption2.weight(.bold)).foregroundStyle(Palette.accent)
                                 }
                         }
                     }
@@ -169,8 +178,8 @@ struct HeartChart: View {
                     AxisMarks(position: .trailing, values: Self.zoneMiddles(edges)) { value in
                         AxisValueLabel {
                             if let middle = value.as(Double.self), let zone = Self.zoneMiddles(edges).firstIndex(of: middle) {
-                                Text("Z\(zone + 1)").font(.caption2.weight(.semibold)).foregroundStyle(ZoneShade.color(zone + 1))
-                                    .frame(width: Self.labelWidth, alignment: .leading)
+                                Text("Z\(zone + 1)").font(.caption2.weight(.semibold)).foregroundStyle(Palette.muted)
+                                    .frame(width: labelWidth, alignment: .leading)
                             }
                         }
                     }
@@ -181,12 +190,22 @@ struct HeartChart: View {
                     }
                 }
                 .frame(height: 150)
+                .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                 .accessibilityLabel("Fréquence cardiaque de \(Int(beats.min() ?? 0)) à \(Int(beats.max() ?? 0)) bpm, sur le fond des cinq zones")
                 if let alt = series.alt {
-                    AltitudeChart(times: series.t, altitudes: alt, duration: series.duration, dplus: dplus)
+                    AltitudeChart(times: series.t, altitudes: alt, duration: series.duration, dplus: dplus,
+                                  labelWidth: labelWidth)
                 }
             }
         }
+    }
+
+    private var chartTitle: some View {
+        Text("\(Text("Fréquence cardiaque").bold()) sur ses zones").textRole(.caption)
+    }
+
+    @ViewBuilder private func flat(_ series: Notebook.Series) -> some View {
+        if series.alt == nil { Text("parcours plat, profil masqué").textRole(.caption).foregroundStyle(Palette.muted) }
     }
 
     /// The middle of each zone, where its name is written.
@@ -215,12 +234,13 @@ private struct AltitudeChart: View {
     let altitudes: [Double?]
     let duration: Int
     let dplus: Double?
+    let labelWidth: CGFloat
 
     var body: some View {
         let points = zip(times, altitudes).compactMap { time, altitude in altitude.map { (Double(time) / 60, $0) } }
         let low = points.map(\.1).min() ?? 0, high = points.map(\.1).max() ?? 1
-        VStack(alignment: .leading, spacing: 4) {
-            (Text("Altitude").bold() + Text(dplus.map { " · +\(Int($0.rounded())) m" } ?? "")).font(.caption)
+        VStack(alignment: .leading, spacing: Space.xxs) {
+            Text("\(Text("Altitude").bold())\(dplus.map { " · +\(Int($0.rounded())) m" } ?? "")").textRole(.caption)
             Chart(Array(points.enumerated()), id: \.offset) { _, point in
                 AreaMark(x: .value("minute", point.0), yStart: .value("bas", low), yEnd: .value("altitude", point.1))
                     .foregroundStyle(Palette.ghost)
@@ -233,24 +253,26 @@ private struct AltitudeChart: View {
                     AxisValueLabel {
                         if let metres = value.as(Double.self) {
                             Text("\(Int(metres.rounded())) m").font(.caption2)
-                                .frame(width: HeartChart.labelWidth, alignment: .leading)
+                                .frame(width: labelWidth, alignment: .leading)
                         }
                     }
                 }
             }
             .frame(height: 52)
+            .dynamicTypeSize(...DynamicTypeSize.accessibility1)
             .accessibilityLabel("Altitude de \(Int(low.rounded())) à \(Int(high.rounded())) m")
         }
     }
 }
 
-/// One line per repetition: its time, its climb, its pace, its heart rate on its zone.
+/// One line per repetition: its number, its time, its climb, its pace, its heart rate with
+/// its zone, its cadence. A table: it stops growing at the first accessibility size.
 private struct RepsTable: View {
     let reps: [Notebook.Rep]
     let bounds: [Int]
 
     var body: some View {
-        Grid(alignment: .trailing, horizontalSpacing: 10, verticalSpacing: 8) {
+        Grid(alignment: .trailing, horizontalSpacing: Space.xs, verticalSpacing: Space.xs) {
             GridRow {
                 Text("")
                 Text("Durée"); Text("D+"); Text("Allure"); Text("FC moy"); Text("Cad.")
@@ -258,39 +280,49 @@ private struct RepsTable: View {
             .font(.caption2).foregroundStyle(Palette.muted)
             ForEach(reps, id: \.n) { rep in
                 GridRow {
-                    Text("\(rep.n)").font(.caption.weight(.bold)).foregroundStyle(.white)
-                        .frame(width: 20, height: 20).background(Palette.red, in: .circle)
+                    Text("\(rep.n)").figure(.inline).foregroundStyle(Palette.accent)
+                        .gridColumnAlignment(.leading)
                     Text(Numbers.duration(rep.timeS))
                     Text("\(rep.dplus) m")
                     Text(rep.paceS.map { Numbers.pace(Double($0)) } ?? "—")
-                    heart(rep.hr)
+                    ZonedBeat(beat: rep.hr, bounds: bounds)
                     Text(rep.cadence.map { "\($0)" } ?? "—")
                 }
-                .font(.figure(16, weight: .semibold))
-                .monospacedDigit()
+                .figure(.inline)
+                .foregroundStyle(Palette.ink)
+                .accessibilityElement(children: .combine)
             }
         }
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
     }
+}
 
-    @ViewBuilder private func heart(_ beat: Int?) -> some View {
+/// A heart rate followed by its zone's label on the zone's shade.
+private struct ZonedBeat: View {
+    let beat: Int?
+    let bounds: [Int]
+
+    var body: some View {
         if let beat {
-            Text("\(beat)").padding(.horizontal, 4).background(ZoneShade.color(heartZone(Double(beat), bounds: bounds)).opacity(0.35),
-                                                                in: .rect(cornerRadius: 3))
+            HStack(spacing: Space.xxs) {
+                Text("\(beat)")
+                ZoneChip(zone: heartZone(Double(beat), bounds: bounds))
+            }
         } else {
             Text("—")
         }
     }
 }
 
-/// One line per kilometre: its pace and a bar (longer is faster), its heart rate on its
-/// zone, its cadence.
+/// One line per kilometre: its pace and a bar (longer is faster), its heart rate with its
+/// zone, its cadence. A table: it stops growing at the first accessibility size.
 private struct KmTable: View {
     let splits: [Notebook.KmSplit]
     let bounds: [Int]
 
     var body: some View {
         let paces = splits.map(\.paceS), fast = paces.min() ?? 0, slow = paces.max() ?? 0
-        Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 6) {
+        Grid(alignment: .leading, horizontalSpacing: Space.xs, verticalSpacing: Space.xs) {
             GridRow {
                 Text("Km"); Text("Allure"); Text("plus long = plus vite"); Text("FC"); Text("Cad.")
             }
@@ -307,21 +339,14 @@ private struct KmTable: View {
                             .frame(maxHeight: .infinity)
                     }
                     .frame(height: 14)
-                    heart(split.hr)
+                    ZonedBeat(beat: split.hr, bounds: bounds)
                     Text(split.cadence.map { "\($0)" } ?? "—").foregroundStyle(Palette.muted)
                 }
-                .font(.figure(16, weight: .semibold))
-                .monospacedDigit()
+                .figure(.inline)
+                .foregroundStyle(Palette.ink)
+                .accessibilityElement(children: .combine)
             }
         }
-    }
-
-    @ViewBuilder private func heart(_ beat: Int?) -> some View {
-        if let beat {
-            Text("\(beat)").padding(.horizontal, 4).background(ZoneShade.color(heartZone(Double(beat), bounds: bounds)).opacity(0.35),
-                                                                in: .rect(cornerRadius: 3))
-        } else {
-            Text("—")
-        }
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
     }
 }

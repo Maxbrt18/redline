@@ -33,10 +33,10 @@ struct SessionDetailScreen: View {
                         Label("Ouvrir dans Strava", systemImage: "arrow.up.right.square")
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .padding(.vertical, 16)
+                    .padding(.vertical, Space.m)
                 }
             }
-            .padding(.bottom, 24)
+            .padding(.bottom, Space.l)
         }
     }
 }
@@ -54,31 +54,56 @@ struct ZoneChip: View {
         Text("Z\(zone)")
             .font(.caption2.weight(.bold))
             .foregroundStyle(ZoneShade.isDark(zone) ? Palette.bg : Palette.ink)
-            .padding(.horizontal, 5)
+            .padding(.horizontal, Space.xxs)
             .padding(.vertical, 1)
-            .background(ZoneShade.color(zone), in: .rect(cornerRadius: 4))
+            .background(ZoneShade.color(zone), in: .rect(cornerRadius: Radius.mark))
     }
 }
 
-/// A section's head: its title on a rule, a few words at its right.
+/// A section's head: its title, a few words at its right while they fit, under it otherwise.
 struct DetailHead: View {
     let title: String
     var aside: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(title).font(.title3.bold()).accessibilityAddTraits(.isHeader)
-                Spacer()
-                if let aside { Text(aside).font(.caption).foregroundStyle(Palette.muted) }
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
+                heading
+                Spacer(minLength: Space.xs)
+                words
+            }
+            VStack(alignment: .leading, spacing: Space.xxs) {
+                heading
+                words
             }
         }
-        .padding(.top, 30)
-        .padding(.bottom, 10)
+        .padding(.top, Space.xl)
+        .padding(.bottom, Space.xs)
+    }
+
+    private var heading: some View {
+        Text(title).textRole(.heading).accessibilityAddTraits(.isHeader)
+    }
+
+    @ViewBuilder private var words: some View {
+        if let aside { Text(aside).textRole(.caption).foregroundStyle(Palette.muted) }
     }
 }
 
-/// A figure with its label above and a line under it.
+/// Tiles side by side, one under the other at the accessibility sizes.
+struct DetailTiles<Content: View>: View {
+    @ViewBuilder var content: Content
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        let layout = typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: Space.s))
+        layout { content }
+    }
+}
+
+/// A figure with its label above and a line under it; a figure still to come is planned.
 struct DetailTile<Sub: View>: View {
     let label: String
     var symbol: String?
@@ -88,21 +113,21 @@ struct DetailTile<Sub: View>: View {
     @ViewBuilder var sub: Sub
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 4) {
-                if let symbol { Image(systemName: symbol).font(.caption2) }
+        VStack(alignment: .leading, spacing: Space.xxs) {
+            HStack(spacing: Space.xxs) {
+                if let symbol { Image(systemName: symbol) }
                 Text(label)
             }
-            .font(.caption)
+            .textRole(.caption)
             .foregroundStyle(Palette.muted)
-            HStack(alignment: .firstTextBaseline, spacing: 3) {
-                Text(value).font(.figure(26)).foregroundStyle(pending ? Palette.faint : Palette.ink)
-                if let suffix { Text(suffix).font(.caption).foregroundStyle(Palette.muted) }
+            HStack(alignment: .firstTextBaseline, spacing: Space.xxs) {
+                Text(value).figure(.medium, pending ? .planned : .done).foregroundStyle(pending ? Palette.muted : Palette.ink)
+                if let suffix { Text(suffix).textRole(.caption).foregroundStyle(Palette.muted) }
             }
-            sub.font(.caption).foregroundStyle(Palette.muted)
+            sub.textRole(.caption).foregroundStyle(Palette.muted)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 12)
+        .padding(.vertical, Space.s)
     }
 }
 
@@ -112,33 +137,40 @@ extension DetailTile where Sub == EmptyView {
     }
 }
 
-/// The head: the session's family, its distance as large as it gets, its time and pace,
-/// then its course as a strip (phases, or one block per kilometre in its zone).
+/// The head: the session's family, its distance as large as it gets, its time and pace
+/// side by side while they fit, then its course as a strip (phases, or one block per
+/// kilometre in its zone).
 private struct DetailHero: View {
     let detail: Notebook.SessionView
 
     var body: some View {
         let fact = detail.fact
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: Space.xs) {
+            HStack(spacing: Space.xs) {
                 FamilyBadge(family: Family(kind: detail.kind, workout: detail.workout), small: true)
-                Text(family).font(.footnote.weight(.semibold)).foregroundStyle(Palette.muted)
+                Text(family).font(TextRole.caption.font.weight(.semibold)).foregroundStyle(Palette.muted)
             }
             if let km = fact.km {
-                HStack(alignment: .lastTextBaseline, spacing: 6) {
-                    Text(Numbers.text(km, digits: 2)).font(.figure(80))
-                    Text("km").font(.title3).foregroundStyle(Palette.muted)
+                HStack(alignment: .lastTextBaseline, spacing: Space.xs) {
+                    Text(Numbers.text(km, digits: 2)).figure(.hero).foregroundStyle(Palette.ink)
+                    Text("km").textRole(.heading).foregroundStyle(Palette.muted)
                 }
             }
-            HStack(spacing: 28) {
-                if let moving = fact.movingS {
-                    pair(Numbers.duration(moving), "temps")
-                }
-                if let km = fact.km, km > 0, let moving = fact.movingS {
-                    pair(Numbers.pace(moving / km), "allure moyenne", suffix: "/km")
-                }
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: Space.xl) { pairs }
+                VStack(alignment: .leading, spacing: Space.s) { pairs }
             }
             CourseStrip(detail: detail)
+        }
+    }
+
+    @ViewBuilder private var pairs: some View {
+        let fact = detail.fact
+        if let moving = fact.movingS {
+            pair(Numbers.duration(moving), "temps")
+        }
+        if let km = fact.km, km > 0, let moving = fact.movingS {
+            pair(Numbers.pace(moving / km), "allure moyenne", suffix: "/km")
         }
     }
 
@@ -152,16 +184,17 @@ private struct DetailHero: View {
     private func pair(_ value: String, _ label: String, suffix: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text(value).font(.figure(28)).monospacedDigit()
-                if let suffix { Text(suffix).font(.caption).foregroundStyle(Palette.muted) }
+                Text(value).figure(.large).foregroundStyle(Palette.ink)
+                if let suffix { Text(suffix).textRole(.caption).foregroundStyle(Palette.muted) }
             }
-            Text(label).font(.caption).foregroundStyle(Palette.muted)
+            Text(label).textRole(.caption).foregroundStyle(Palette.muted)
         }
     }
 }
 
-/// The course in one strip: warm-up, repetitions in red, recoveries, cool-down; or, for a
-/// steady run, one block per kilometre in the colour of its zone.
+/// The course in one strip: warm-up, repetitions in the red line, recoveries, cool-down; or,
+/// for a steady run, one block per kilometre in the shade of its zone. The words under the
+/// strip sit on one line while they fit, one under the other otherwise.
 private struct CourseStrip: View {
     let detail: Notebook.SessionView
 
@@ -169,62 +202,94 @@ private struct CourseStrip: View {
         if let phases = detail.phases, !phases.isEmpty {
             let total = max(phases.reduce(0) { $0 + $1.timeS }, 1)
             let reps = detail.reps ?? []
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: Space.xs) {
                 GeometryReader { geometry in
                     HStack(spacing: 1) {
                         ForEach(Array(phases.enumerated()), id: \.offset) { _, phase in
                             Rectangle()
-                                .fill(phase.kind == .rep ? Palette.red : phase.kind == .recovery ? Palette.ghost : Palette.data.opacity(0.35))
+                                .fill(phase.kind == .rep ? Palette.accent : phase.kind == .recovery ? Palette.ghost : Palette.data.opacity(0.35))
                                 .frame(width: max(geometry.size.width * phase.timeS / total - 1, 1))
                         }
                     }
                 }
                 .frame(height: 14)
-                .clipShape(.rect(cornerRadius: 3))
-                HStack {
-                    if let warm = phases.first(where: { $0.kind == .warmup }) {
-                        Text("échauffement \(Numbers.minutes(warm.timeS))")
+                .clipShape(.rect(cornerRadius: Radius.mark))
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: Space.xs) {
+                        warm(phases)
+                        Spacer(minLength: Space.xs)
+                        repsLine(reps)
+                        Spacer(minLength: Space.xs)
+                        cool(phases)
                     }
-                    Spacer()
-                    if !reps.isEmpty {
-                        Text("\(reps.count) × \(Numbers.minutes(reps.reduce(0) { $0 + $1.timeS } / Double(reps.count)))")
-                            .foregroundStyle(Palette.red)
-                    }
-                    Spacer()
-                    if let cool = phases.first(where: { $0.kind == .cooldown }) {
-                        Text("calme \(Numbers.minutes(cool.timeS))")
+                    VStack(alignment: .leading, spacing: Space.xxs) {
+                        warm(phases)
+                        repsLine(reps)
+                        cool(phases)
                     }
                 }
-                .font(.caption2)
+                .textRole(.caption)
                 .foregroundStyle(Palette.muted)
             }
-            .padding(.top, 6)
+            .padding(.top, Space.xs)
             .accessibilityElement(children: .combine)
         } else if let splits = detail.km, splits.contains(where: { $0.hr != nil }) {
             let bounds = detail.hrBounds ?? []
             let zones = splits.map { split in split.hr.map { heartZone(Double($0), bounds: bounds) } }
             let counts = Dictionary(grouping: zones.compactMap { $0 }, by: { $0 }).mapValues(\.count)
             let main = counts.max { $0.value < $1.value }
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: Space.xs) {
                 HStack(spacing: 2) {
                     ForEach(Array(zones.enumerated()), id: \.offset) { _, zone in
-                        RoundedRectangle(cornerRadius: 2).fill(zone.map(ZoneShade.color) ?? Palette.ghost).frame(height: 14)
+                        RoundedRectangle(cornerRadius: Radius.mark / 2).fill(zone.map(ZoneShade.color) ?? Palette.ghost).frame(height: 14)
                     }
                 }
-                HStack {
-                    Text("1 bloc = 1 km, à la couleur de sa zone")
-                    Spacer()
-                    if let main {
-                        ZoneChip(zone: main.key)
-                        Text("\(main.value) sur \(splits.count)")
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: Space.xs) {
+                        Text("1 bloc = 1 km, à la teinte de sa zone")
+                        Spacer(minLength: Space.xs)
+                        mainZone(main, of: splits.count)
+                    }
+                    VStack(alignment: .leading, spacing: Space.xxs) {
+                        Text("1 bloc = 1 km, à la teinte de sa zone")
+                        mainZone(main, of: splits.count)
                     }
                 }
-                .font(.caption2)
+                .textRole(.caption)
                 .foregroundStyle(Palette.muted)
             }
-            .padding(.top, 6)
+            .padding(.top, Space.xs)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("\(splits.count) kilomètres" + (main.map { ", \($0.value) en Z\($0.key)" } ?? ""))
+        }
+    }
+    @ViewBuilder private func warm(_ phases: [Notebook.Phase]) -> some View {
+        if let warm = phases.first(where: { $0.kind == .warmup }) {
+            Text("échauffement \(Numbers.minutes(warm.timeS))")
+        }
+    }
+
+    @ViewBuilder private func repsLine(_ reps: [Notebook.Rep]) -> some View {
+        if !reps.isEmpty {
+            Text("\(reps.count) × \(Numbers.minutes(reps.reduce(0) { $0 + $1.timeS } / Double(reps.count)))")
+                .fontWeight(.semibold)
+                .foregroundStyle(Palette.ink)
+        }
+    }
+
+    @ViewBuilder private func cool(_ phases: [Notebook.Phase]) -> some View {
+        if let cool = phases.first(where: { $0.kind == .cooldown }) {
+            Text("calme \(Numbers.minutes(cool.timeS))")
+        }
+    }
+
+    /// The zone most kilometres ran in, by its label.
+    @ViewBuilder private func mainZone(_ main: (key: Int, value: Int)?, of count: Int) -> some View {
+        if let main {
+            HStack(spacing: Space.xxs) {
+                ZoneChip(zone: main.key)
+                Text("\(main.value) sur \(count)")
+            }
         }
     }
 }
