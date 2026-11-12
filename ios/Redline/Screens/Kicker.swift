@@ -7,7 +7,7 @@ struct Kicker: View {
 
     var body: some View {
         Text(text)
-            .font(.footnote.weight(.semibold))
+            .font(TextRole.caption.font.weight(.semibold))
             .opacity(0.82)
     }
 }

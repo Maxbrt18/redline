@@ -255,13 +255,13 @@ struct EntryLine: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.subheadline.weight(.semibold))
-                Text(detail).font(.caption).foregroundStyle(Palette.muted)
+                Text(title).textRole(.secondary).fontWeight(.semibold)
+                Text(detail).textRole(.caption).foregroundStyle(Palette.muted)
             }
             Spacer()
             Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(Palette.faint)
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, Space.s)
         .contentShape(.rect)
     }
 }

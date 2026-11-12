@@ -18,7 +18,7 @@ struct PastWeeks: View {
             if !weeks.isEmpty {
                 VStack(alignment: .leading, spacing: 0) {
                     SectionTitle(text: "Semaines passées")
-                    PastWeeksChart(weeks: Array(weeks.prefix(5).reversed())).padding(.vertical, 12)
+                    PastWeeksChart(weeks: Array(weeks.prefix(5).reversed())).padding(.vertical, Space.s)
                     ForEach(weeks.prefix(4), id: \.week) { week in
                         NavigationLink(value: WeekLink(label: week.week)) { PastWeekLine(week: week) }
                             .buttonStyle(.plain)
@@ -57,14 +57,14 @@ private struct PastWeeksChart: View {
                 BarMark(x: .value("Semaine", "W\(week.week.suffix(2))"), y: .value("Visé", target), width: 32,
                         stacking: .unstacked)
                     .foregroundStyle(Palette.ghost)
-                    .cornerRadius(3)
+                    .cornerRadius(Radius.mark)
             }
             BarMark(x: .value("Semaine", "W\(week.week.suffix(2))"), y: .value("Fait", week.kmDone), width: 14,
                     stacking: .unstacked)
                 .foregroundStyle(Palette.data)
-                .cornerRadius(2)
+                .cornerRadius(Radius.mark / 2)
                 .annotation(position: .top, spacing: 4) {
-                    Text(Numbers.text(week.kmDone)).font(.figure(13, weight: .semibold)).foregroundStyle(Palette.ink)
+                    Text(Numbers.text(week.kmDone)).figure(.inline).foregroundStyle(Palette.ink)
                 }
         }
         .chartYAxis(.hidden)
@@ -74,7 +74,7 @@ private struct PastWeeksChart: View {
                     if let name = value.as(String.self) {
                         let target = weeks.first { "W\($0.week.suffix(2))" == name }?.kmTarget
                         VStack(spacing: 2) {
-                            Text(target.map { "~\(Numbers.text($0))" } ?? " ").font(.caption2).foregroundStyle(Palette.faint)
+                            Text(target.map { "~\(Numbers.text($0))" } ?? " ").font(.caption2).foregroundStyle(Palette.muted)
                             Text(name).font(.caption2.weight(.semibold)).foregroundStyle(Palette.muted)
                         }
                     }
@@ -82,6 +82,7 @@ private struct PastWeeksChart: View {
             }
         }
         .frame(height: 150)
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         .accessibilityLabel("Kilomètres faits devant les kilomètres visés, semaine par semaine")
     }
 }
@@ -95,7 +96,7 @@ struct AllWeeksScreen: View {
             EmptyView()
         } content: { weeks in
             if weeks.weeks.isEmpty {
-                Text("Aucune semaine close au registre.").font(.subheadline).foregroundStyle(Palette.muted)
+                Text("Aucune semaine close au registre.").textRole(.secondary).foregroundStyle(Palette.muted)
             } else {
                 VStack(spacing: 0) {
                     ForEach(weeks.weeks, id: \.week) { week in

@@ -7,17 +7,23 @@ struct SectionTitle: View {
     var meta: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        ViewThatFits(in: .horizontal) {
             HStack(alignment: .firstTextBaseline) {
-                Text(text).font(.title3.bold()).accessibilityAddTraits(.isHeader)
-                Spacer(minLength: 8)
-                if let meta {
-                    Text(meta).font(.footnote).foregroundStyle(Palette.muted).multilineTextAlignment(.trailing)
-                }
+                title
+                Spacer(minLength: Space.xs)
+                if let meta { Text(meta).textRole(.caption).foregroundStyle(Palette.muted).multilineTextAlignment(.trailing) }
+            }
+            VStack(alignment: .leading, spacing: Space.xxs) {
+                title
+                if let meta { Text(meta).textRole(.caption).foregroundStyle(Palette.muted) }
             }
         }
-        .padding(.top, 30)
-        .padding(.bottom, 8)
+        .padding(.top, Space.xl)
+        .padding(.bottom, Space.xs)
+    }
+
+    private var title: some View {
+        Text(text).textRole(.heading).accessibilityAddTraits(.isHeader)
     }
 }
 
@@ -167,8 +173,9 @@ private struct LandmarkLabel: View {
     }
 }
 
-/// The week's seven days as bars: done solid, planned in dots, today's letter in red. On
-/// the track the bars turn white.
+/// The week's seven days as bars: done solid, planned in dots, today's letter in the red
+/// line. On the track the bars turn white. Seven columns cannot grow far: the words stop at
+/// the first accessibility size, and the bars keep their height whatever the text size.
 struct WeekBars: View {
     let days: [Notebook.StripDay]
     var height: CGFloat = 52
@@ -180,29 +187,29 @@ struct WeekBars: View {
         let peak = max(1, days.map { max($0.doneKm ?? 0, $0.plannedKm ?? 0) }.max() ?? 1)
         HStack(alignment: .bottom, spacing: 6) {
             ForEach(days, id: \.date) { day in
-                VStack(spacing: 4) {
+                VStack(spacing: Space.xxs) {
                     Text(label(day)).font(.caption2.weight(.semibold))
-                        .foregroundStyle(day.doneKm != nil ? ink : faint)
+                        .foregroundStyle(day.doneKm != nil ? ink : quiet)
                         .lineLimit(1).minimumScaleFactor(0.7)
-                    bar(day, peak: peak)
+                    bar(day, peak: peak).frame(height: height, alignment: .bottom)
                     Text(day.letter).font(.caption2.weight(day.today ? .bold : .regular))
-                        .foregroundStyle(day.today ? (onTrack ? Palette.onTrack : Palette.red) : muted)
+                        .foregroundStyle(day.today ? (onTrack ? Palette.onTrack : Palette.accent) : muted)
                         .underline(day.today && onTrack)
                     if abbreviations {
                         Text(day.abbr.isEmpty ? (day.rest ? "repos" : "—") : day.abbr)
-                            .font(.system(size: 9)).foregroundStyle(faint).lineLimit(1).minimumScaleFactor(0.6)
+                            .font(.caption2).foregroundStyle(quiet).lineLimit(1).minimumScaleFactor(0.6)
                     }
                 }
                 .frame(maxWidth: .infinity)
             }
         }
-        .frame(height: height + (abbreviations ? 54 : 40), alignment: .bottom)
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         .accessibilityHidden(true)
     }
 
     private var ink: Color { onTrack ? Palette.onTrack : Palette.ink }
     private var muted: Color { onTrack ? Palette.onTrack.opacity(0.8) : Palette.muted }
-    private var faint: Color { onTrack ? Palette.onTrack.opacity(0.7) : Palette.faint }
+    private var quiet: Color { onTrack ? Palette.onTrack.opacity(0.75) : Palette.muted }
 
     private func label(_ day: Notebook.StripDay) -> String {
         if let done = day.doneKm, done > 0 { return Numbers.text(done) }
@@ -211,7 +218,7 @@ struct WeekBars: View {
     }
 
     @ViewBuilder private func bar(_ day: Notebook.StripDay, peak: Double) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 3)
+        let shape = RoundedRectangle(cornerRadius: Radius.mark)
         if let done = day.doneKm, done > 0 {
             shape.fill(onTrack ? Palette.onTrack : Palette.data).frame(width: 18, height: max(4, height * done / peak))
         } else if day.plannedKm != nil || day.plannedLabel != nil {

@@ -47,33 +47,33 @@ func weekSpan(monday text: String) -> String {
     return "\(monday.date.formatted(french.day().month(.abbreviated))) – \(sunday.date.formatted(french.day().month(.wide)))"
 }
 
-/// The head: done solid against planned in outline, what remains, then the seven days.
+/// The head: done in full against planned in a lighter weight, what remains, then the
+/// seven days. The figures sit on one line while they fit, one under the other otherwise.
 private struct WeekHero: View {
     let week: Notebook.WeekView
-    @Environment(\.onTrack) private var onTrack
 
     var body: some View {
-        let totals = week.totals
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Space.xs) {
             Kicker(text: "Semaine \(Int(week.week.suffix(2)) ?? 0) · \(weekSpan(monday: week.monday))")
-            HStack(alignment: .lastTextBaseline, spacing: 10) {
-                if week.upcoming {
-                    OutlinedFigure(text: totals.kmTarget.map { Numbers.text($0) } ?? "—", size: 80, lineWidth: 2.2,
-                                   color: onTrack ? Palette.onTrack : Palette.ink)
-                    Text("km prévus").font(.subheadline).opacity(0.82)
-                } else {
-                    Text(Numbers.text(totals.kmDone)).font(.figure(80))
-                    if let target = totals.kmTarget {
-                        Text("sur").font(.subheadline).opacity(0.82)
-                        OutlinedFigure(text: Numbers.text(target), size: 80, lineWidth: 2.2,
-                                       color: onTrack ? Palette.onTrack : Palette.ink)
-                    }
-                    Text("km").font(.subheadline).opacity(0.82)
-                }
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .lastTextBaseline, spacing: 10) { figures }
+                VStack(alignment: .leading, spacing: 0) { figures }
             }
-            Text(summary).font(.subheadline).opacity(0.9)
+            Text(summary).textRole(.secondary).opacity(0.9)
             if !week.strip.isEmpty {
-                WeekBars(days: week.strip, height: 100, abbreviations: true).padding(.top, 10)
+                WeekBars(days: week.strip, height: 100, abbreviations: true).padding(.top, Space.s)
+            }
+        }
+    }
+
+    @ViewBuilder private var figures: some View {
+        let totals = week.totals
+        if week.upcoming {
+            HeroFigure(value: totals.kmTarget.map { Numbers.text($0) } ?? "—", unit: "km prévus", state: .planned)
+        } else {
+            HeroFigure(value: Numbers.text(totals.kmDone), unit: totals.kmTarget == nil ? "km" : nil, state: .done)
+            if let target = totals.kmTarget {
+                HeroFigure(value: Numbers.text(target), lead: "sur", unit: "km", state: .planned)
             }
         }
     }
@@ -116,15 +116,15 @@ private struct WeekContent: View {
         VStack(alignment: .leading, spacing: 0) {
             if !week.plan.message.isEmpty {
                 Label(week.plan.message, systemImage: "hourglass")
-                    .font(.subheadline)
-                    .padding(14)
+                    .textRole(.secondary)
+                    .padding(Space.m)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Palette.panel, in: .rect(cornerRadius: 12))
-                    .padding(.bottom, 16)
+                    .background(Palette.panel, in: .rect(cornerRadius: Radius.surface))
+                    .padding(.bottom, Space.m)
             }
             if week.sessions.isEmpty && week.plan.status == "invalid" {
                 Text("Aucun programme enregistré pour cette semaine. Le registre reste ci-dessous.")
-                    .font(.subheadline).foregroundStyle(Palette.muted).padding(.bottom, 12)
+                    .textRole(.secondary).foregroundStyle(Palette.muted).padding(.bottom, Space.s)
             }
             if let monday = Day(week.monday) {
                 ForEach(0..<7, id: \.self) { offset in
@@ -165,7 +165,7 @@ private struct WeekContent: View {
             }
             if root { PastWeeks(session: session) }
         }
-        .padding(.bottom, 24)
+        .padding(.bottom, Space.l)
     }
 }
 
@@ -180,7 +180,7 @@ extension WeekContent {
                 EntryLine(title: "Réorganiser la semaine", detail: "déplacer des séances selon tes jours")
             }
             .buttonStyle(.plain)
-            .padding(.top, 12)
+            .padding(.top, Space.s)
         }
         if root, week.next == nil, week.week == week.current, let monday = Day(week.monday) {
             let coming = monday.adding(7).isoWeek
@@ -188,7 +188,23 @@ extension WeekContent {
                 EntryLine(title: "Préparer la semaine \(Int(coming.suffix(2)) ?? 0)", detail: "dire au coach comment se présentent tes jours")
             }
             .buttonStyle(.plain)
-            .padding(.top, 12)
+            .padding(.top, Space.s)
+        }
+    }
+}
+
+/// A hero figure on the track, with the words around it.
+private struct HeroFigure: View {
+    let value: String
+    var lead: String?
+    var unit: String?
+    let state: FigureState
+
+    var body: some View {
+        HStack(alignment: .lastTextBaseline, spacing: 10) {
+            if let lead { Text(lead).textRole(.secondary).opacity(0.82) }
+            Text(value).figure(.hero, state).opacity(state == .planned ? 0.72 : 1)
+            if let unit { Text(unit).textRole(.secondary).opacity(0.82) }
         }
     }
 }
@@ -202,10 +218,14 @@ private struct WeekDayRow: View {
     let extra: [Notebook.UnplannedFact]
     let today: String
     @State private var open = false
+    @Environment(\.dynamicTypeSize) private var typeSize
+    /// Under the line, what is said lines up with the session's title, past the day's column.
+    @ScaledMetric(relativeTo: .title3) private var indent: CGFloat = 52
 
     var body: some View {
         let row = describe()
-        VStack(alignment: .leading, spacing: 6) {
+        let inset = typeSize.isAccessibilitySize ? 0 : indent
+        VStack(alignment: .leading, spacing: Space.xs) {
             // A done run opens its detail; a row with nothing to unfold is no button (a
             // disabled one would grey it).
             if let link = row.link {
@@ -218,7 +238,7 @@ private struct WeekDayRow: View {
                     .accessibilityHint(open ? "Replier" : "Déplier")
             }
             ForEach(row.beside + (open ? row.detail : []), id: \.self) { line in
-                Text(line).font(.footnote).foregroundStyle(Palette.muted).padding(.leading, 52)
+                Text(line).textRole(.caption).foregroundStyle(Palette.muted).padding(.leading, inset)
             }
             ForEach(reports, id: \.id) { report in
                 NavigationLink(value: report) {
@@ -226,16 +246,15 @@ private struct WeekDayRow: View {
                         Text("Compte rendu du renfo")
                         Image(systemName: "chevron.right").font(.caption2.weight(.semibold))
                     }
-                    .font(.footnote.weight(.semibold))
+                    .font(TextRole.caption.font.weight(.semibold))
                     .foregroundStyle(Palette.ink)
                 }
                 .buttonStyle(.plain)
-                .padding(.leading, 52)
+                .padding(.leading, inset)
             }
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, Space.s)
     }
-
 
     /// The strength sessions of the day with a report card.
     private var reports: [EntryLink] {
@@ -244,31 +263,64 @@ private struct WeekDayRow: View {
         }
     }
 
-    private func line(_ row: Row) -> some View {
-        HStack(alignment: .center, spacing: 12) {
-            DayNumber(date: date, today: date == today)
-            FamilyBadges(families: row.families, small: true)
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(row.title).font(.subheadline.weight(.semibold))
-                        .foregroundStyle(row.style == .rest ? Palette.muted : Palette.ink)
-                    ForEach(row.tags, id: \.self) { tag in
-                        Text(tag).font(.caption.weight(.semibold)).foregroundStyle(Palette.over)
+    /// The day, the session and its figure on one line; at the accessibility sizes the day
+    /// goes above, on a line of its own, and the figure under the title.
+    @ViewBuilder private func line(_ row: Row) -> some View {
+        Group {
+            if typeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: Space.xxs) {
+                    DayNumber(date: date, today: date == today, inline: true)
+                    HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
+                        VStack(alignment: .leading, spacing: Space.xxs) {
+                            heading(row)
+                            value(row)
+                        }
+                        Spacer(minLength: 0)
+                        chevron(row)
                     }
                 }
-                if let alert = row.alert { Text(alert).font(.caption).foregroundStyle(Palette.muted) }
-            }
-            Spacer(minLength: 6)
-            Text(row.value)
-                .font(row.style == .done ? .figure(17, weight: .semibold) : .subheadline)
-                .foregroundStyle(row.style == .done ? Palette.ink : Palette.faint)
-                .strikethrough(row.style == .skipped)
-            if !row.detail.isEmpty || row.link != nil {
-                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(Palette.faint)
-                    .rotationEffect(.degrees(open ? 90 : 0))
+            } else {
+                HStack(alignment: .center, spacing: Space.s) {
+                    DayNumber(date: date, today: date == today)
+                    FamilyBadges(families: row.families, small: true)
+                    heading(row)
+                    Spacer(minLength: Space.xs)
+                    value(row)
+                    chevron(row)
+                }
             }
         }
         .contentShape(.rect)
+    }
+
+    private func heading(_ row: Row) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(row.title).textRole(.secondary).fontWeight(.semibold)
+                .foregroundStyle(row.style == .rest ? Palette.muted : Palette.ink)
+            if !row.tags.isEmpty {
+                // A limit crossed: the gap to it, in the red line, after a symbol that says so.
+                Label(row.tags.joined(separator: " · "), systemImage: "arrow.up.right")
+                    .font(TextRole.caption.font.weight(.semibold))
+                    .foregroundStyle(Palette.accent)
+            }
+            if let alert = row.alert { Text(alert).textRole(.caption).foregroundStyle(Palette.muted) }
+        }
+    }
+
+    @ViewBuilder private func value(_ row: Row) -> some View {
+        if row.style == .done {
+            Text(row.value).figure(.inline, .done).foregroundStyle(Palette.ink)
+        } else {
+            Text(row.value).textRole(.secondary).foregroundStyle(Palette.muted)
+                .strikethrough(row.style == .skipped)
+        }
+    }
+
+    @ViewBuilder private func chevron(_ row: Row) -> some View {
+        if !row.detail.isEmpty || row.link != nil {
+            Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(Palette.faint)
+                .rotationEffect(.degrees(open ? 90 : 0))
+        }
     }
 
     private enum Style { case done, plan, rest, skipped }
@@ -348,19 +400,28 @@ private struct WeekDayRow: View {
     }
 }
 
-/// A day's number and its weekday, as a column.
+/// A day's number and its weekday: a column whose width follows the text size, or one
+/// line (« lun. 5 ») where the day heads its row.
 struct DayNumber: View {
     let date: String
     var today = false
+    var inline = false
+    @ScaledMetric(relativeTo: .title3) private var width: CGFloat = 36
 
     var body: some View {
         let day = Day(date)
-        VStack(spacing: 0) {
-            Text(day.map { "\($0.day)" } ?? "").font(.figure(20)).foregroundStyle(today ? Palette.red : Palette.ink)
-            Text(day?.date.formatted(Date.FormatStyle(timeZone: .gmt).locale(Locale(identifier: "fr_FR")).weekday(.abbreviated)) ?? "")
-                .font(.caption2).foregroundStyle(today ? Palette.red : Palette.muted)
+        let number = Text(day.map { "\($0.day)" } ?? "").figure(.medium).foregroundStyle(today ? Palette.accent : Palette.ink)
+        let weekday = Text(day?.date.formatted(Date.FormatStyle(timeZone: .gmt).locale(Locale(identifier: "fr_FR"))
+            .weekday(.abbreviated)) ?? "")
+            .font(.caption2).foregroundStyle(today ? Palette.accent : Palette.muted)
+        if inline {
+            HStack(alignment: .firstTextBaseline, spacing: Space.xxs) { weekday; number }
+                .accessibilityElement(children: .combine)
+        } else {
+            VStack(spacing: 0) { number; weekday.lineLimit(1).minimumScaleFactor(0.8) }
+                .frame(width: width)
+                .accessibilityElement(children: .combine)
         }
-        .frame(width: 36)
     }
 }
 
@@ -372,25 +433,41 @@ struct WeekLine: View {
     var progress: Double?
 
     var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.subheadline.weight(.semibold))
-                Text(detail).font(.caption).foregroundStyle(Palette.muted)
-            }
-            Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 4) {
-                if let progress {
-                    Capsule().fill(Palette.ghost).frame(width: 64, height: 5)
-                        .overlay(alignment: .leading) {
-                            Capsule().fill(Palette.data).frame(width: 64 * min(progress, 1), height: 5)
-                        }
+        HStack(spacing: Space.s) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: Space.s) {
+                    words
+                    Spacer(minLength: Space.xs)
+                    measure(alignment: .trailing)
                 }
-                Text(figure).font(.caption).monospacedDigit().foregroundStyle(Palette.muted)
+                VStack(alignment: .leading, spacing: Space.xxs) {
+                    words
+                    measure(alignment: .leading)
+                }
             }
             Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(Palette.faint)
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, Space.s)
         .contentShape(.rect)
+    }
+
+    private var words: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).textRole(.secondary).fontWeight(.semibold)
+            Text(detail).textRole(.caption).foregroundStyle(Palette.muted)
+        }
+    }
+
+    private func measure(alignment: HorizontalAlignment) -> some View {
+        VStack(alignment: alignment, spacing: Space.xxs) {
+            if let progress {
+                Capsule().fill(Palette.ghost).frame(width: 64, height: 5)
+                    .overlay(alignment: .leading) {
+                        Capsule().fill(Palette.data).frame(width: 64 * min(progress, 1), height: 5)
+                    }
+            }
+            Text(figure).textRole(.caption).monospacedDigit().foregroundStyle(Palette.muted)
+        }
     }
 }
 

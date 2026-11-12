@@ -99,10 +99,10 @@ struct EntryRow: View {
     var pending = false
 
     var body: some View {
-        HStack(spacing: 8) {
-            Text(title).font(.subheadline).foregroundStyle(pending ? Palette.faint : Palette.ink)
+        HStack(spacing: Space.xs) {
+            Text(title).textRole(.secondary).foregroundStyle(pending ? Palette.muted : Palette.ink)
             Spacer()
-            Text(pending ? "dimanche" : date.map(shortDate) ?? "").font(.caption).foregroundStyle(Palette.muted)
+            Text(pending ? "dimanche" : date.map(shortDate) ?? "").textRole(.caption).foregroundStyle(Palette.muted)
             if !pending {
                 Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(Palette.faint)
             }

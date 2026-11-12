@@ -74,12 +74,11 @@ extension EnvironmentValues {
     @Entry var notebook: NotebookSession?
 }
 
-/// The red surface: the track's mean colour under the bar, deepening to the tartan, a
-/// rubber grain that fades in below the bar, and the three lanes at its foot.
+/// The red surface: the track's red, the same in both modes, a rubber grain that fades in
+/// below the bar, and the three lanes at its foot.
 struct TrackSurface: View {
     var body: some View {
-        LinearGradient(stops: [.init(color: Palette.trackFlat, location: 0.7), .init(color: Palette.tartan, location: 1)],
-                       startPoint: .top, endPoint: .bottom)
+        Palette.track
             .overlay {
                 Grain()
                     .blendMode(.softLight)
@@ -92,7 +91,8 @@ struct TrackSurface: View {
     }
 }
 
-/// Three lane lines, numbered on the right.
+/// Three lane lines, numbered on the right. They are decoration: their numbers stop
+/// growing with the text size so the lanes never overlap.
 private struct Lanes: View {
     var body: some View {
         VStack(spacing: 13) {
@@ -110,6 +110,7 @@ private struct Lanes: View {
             }
         }
         .padding(.bottom, 14)
+        .dynamicTypeSize(...DynamicTypeSize.large)
     }
 }
 
