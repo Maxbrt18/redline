@@ -29,6 +29,7 @@ struct StrengthLauncher: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(Palette.ink)
+            .foregroundStyle(Palette.bg)
             .disabled(launching)
             if let failure {
                 Text(failure).font(.footnote).foregroundStyle(Palette.over)

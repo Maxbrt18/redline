@@ -231,6 +231,7 @@ struct DebriefCard<Ask: DebriefAsk>: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(Palette.ink)
+            .foregroundStyle(Palette.bg)
             .disabled(several.isEmpty)
         }
     }

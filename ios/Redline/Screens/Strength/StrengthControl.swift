@@ -332,6 +332,7 @@ struct StrengthControl: View {
         }
         .buttonStyle(.borderedProminent)
         .tint(Palette.ink)
+        .foregroundStyle(Palette.bg)
     }
 
     private func quiet(_ title: String, action: @escaping () -> Void) -> some View {

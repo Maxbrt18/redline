@@ -92,6 +92,7 @@ struct StrengthReview: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(Palette.ink)
+            .foregroundStyle(Palette.bg)
             .disabled(model.sending || run.isLocked)
             if run.canUndo {
                 Button("Annuler la dernière validation") { model.update { $0.undo() } }
