@@ -26,16 +26,24 @@ struct ConnectView: View {
                     if session.connecting {
                         ProgressView("Connexion…")
                     } else if let failure = session.failure {
-                        Text(failure)
-                            .textRole(.body)
-                            .foregroundStyle(Palette.muted)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, Space.xl)
+                        // In ink after a symbol in the red line: a refusal must not read as a hint.
+                        Label {
+                            // A word joiner keeps « /carnet » whole: the slash is a line-break opportunity.
+                            Text(failure.replacingOccurrences(of: "/carnet", with: "/\u{2060}carnet"))
+                                .foregroundStyle(Palette.ink)
+                        } icon: {
+                            Image(systemName: "exclamationmark.circle").foregroundStyle(Palette.accent)
+                        }
+                        .textRole(.body)
+                        .padding(Space.m)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Palette.panel, in: .rect(cornerRadius: Radius.surface))
                     }
                 }
                 .padding(.vertical, Space.xl)
                 .padding(.horizontal, Space.m)
             }
+            .background(Palette.bg)
         }
         .onReceive(NotificationCenter.default.publisher(for: UIPasteboard.changedNotification)) { _ in
             canPaste = Self.pasteboardHasLink
@@ -74,8 +82,8 @@ struct ConnectView: View {
         if canPaste {
             PasteButton(supportedContentTypes: [.url, .plainText]) { providers in
                 Task {
-                    guard let text = await Self.link(in: providers) else { return }
-                    await session.connect(with: text)
+                    // Nothing readable is still an answer: an empty text is refused as no link.
+                    await session.connect(with: await Self.link(in: providers) ?? "")
                 }
             }
             .buttonBorderShape(.capsule)
