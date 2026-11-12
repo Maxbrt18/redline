@@ -17,7 +17,7 @@ struct ReorganizeScreen: View {
     let week: String
     @State private var model: ReorganizeModel
     @State private var opened: DayLink?
-    @State private var notice: String?
+    @State private var notice: Notice?
     @State private var saving = false
     @Environment(\.dismiss) private var dismiss
 
@@ -32,15 +32,20 @@ struct ReorganizeScreen: View {
         var id: String { date }
     }
 
+    /// What a request answered, shown where it was made, so that it lands in view.
+    private struct Notice {
+        enum Place { case save, variants, ask }
+        let words: String
+        let done: Bool
+        let place: Place
+    }
+
     var body: some View {
         PaperScreen(title: "Réorganiser") {
             Kicker(text: "Semaine \(Int(week.suffix(2)) ?? 0)" + (Day(isoMonday: week).map { " · " + weekSpan(monday: $0.text) } ?? ""))
                 .foregroundStyle(Palette.muted)
         } content: {
             VStack(alignment: .leading, spacing: 0) {
-                if let notice {
-                    Label(notice, systemImage: "checkmark.circle.fill").textRole(.caption).fontWeight(.semibold).padding(.bottom, Space.s)
-                }
                 if let view = model.view {
                     content(view)
                 } else if let failure = model.failure {
@@ -82,21 +87,26 @@ struct ReorganizeScreen: View {
             .controlSize(.large)
             .disabled(saving)
             .padding(.top, Space.l)
+            noticeLine(.save)
             habitsRow
         } else {
             Intro(text: "Touche un jour pour dire comment il se présente. Seules les dates changent ; pour changer une séance, c’est le coach.")
             if let blocked = view.blocked {
                 Banner(text: Self.blocked(blocked))
+                // A variant refused because the week moved on says why here.
+                noticeLine(.variants)
             } else {
                 days(view)
                 if !view.proposals.isEmpty {
                     ProposalsSection(view: view, session: session, model: model) { words in leave(saying: words) }
                         .padding(.top, Space.l)
                 }
+                noticeLine(.variants)
                 variants(view)
                 if !view.heldBack.isEmpty {
                     Banner(text: view.heldBack.joined(separator: ", ") + " ne peut pas être avancé : un signal de douleur est actif. Le reculer reste possible ; l’avancer demande l’avis du coach.")
                 }
+                noticeLine(.ask)
                 ask(view)
                 habitsRow
             }
@@ -151,7 +161,7 @@ struct ReorganizeScreen: View {
         if wanted || model.asking {
             // Sending is the prominent action only when nothing else on the screen is one.
             AskCoachSection(model: model, session: session, prominent: view.variants.isEmpty && view.proposals.isEmpty) { words in
-                notice = words
+                tell(words, done: true, at: .ask)
                 Task { await model.load(session) }
             }
         } else {
@@ -179,7 +189,7 @@ struct ReorganizeScreen: View {
             notice = nil
             model.asking = false
             await model.load(session)
-            notice = NotebookSession.words(for: error)
+            tell(NotebookSession.words(for: error), done: false, at: .variants)
         }
     }
 
@@ -194,10 +204,29 @@ struct ReorganizeScreen: View {
         }
         do {
             try await client.stateDays(view.week, days: days)
-            notice = "Enregistré : le coach en tiendra compte en écrivant ta semaine."
+            tell("Enregistré : le coach en tiendra compte en écrivant ta semaine.", done: true, at: .save)
             await model.load(session)
         } catch {
-            notice = NotebookSession.words(for: error)
+            tell(NotebookSession.words(for: error), done: false, at: .save)
+        }
+    }
+
+    private func tell(_ words: String, done: Bool, at place: Notice.Place) {
+        notice = Notice(words: words, done: done, place: place)
+        AccessibilityNotification.Announcement(words).post()
+    }
+
+    @ViewBuilder private func noticeLine(_ place: Notice.Place) -> some View {
+        if let notice, notice.place == place {
+            Group {
+                if notice.done {
+                    Label(notice.words, systemImage: "checkmark.circle.fill")
+                        .textRole(.secondary).fontWeight(.semibold)
+                } else {
+                    RequestFailure(text: notice.words)
+                }
+            }
+            .padding(.top, Space.m)
         }
     }
 
