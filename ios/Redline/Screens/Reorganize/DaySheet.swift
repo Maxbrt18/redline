@@ -19,11 +19,17 @@ struct DaySheet: View {
                 if !day.sessions.isEmpty {
                     Section("Prévu") {
                         ForEach(day.sessions, id: \.id) { planned in
-                            HStack(spacing: 10) {
-                                FamilyBadge(family: Family(kind: planned.kind, workout: planned.workout), small: true)
-                                Text(planned.title)
-                                Spacer()
-                                Text(planned.figure).font(.subheadline).foregroundStyle(Palette.muted)
+                            ViewThatFits(in: .horizontal) {
+                                HStack(spacing: Space.s) {
+                                    FamilyBadge(family: Family(kind: planned.kind, workout: planned.workout), small: true)
+                                    Text(planned.title).textRole(.body)
+                                    Spacer()
+                                    Text(planned.figure).textRole(.secondary).foregroundStyle(Palette.muted)
+                                }
+                                VStack(alignment: .leading, spacing: Space.xxs) {
+                                    Text(planned.title).textRole(.body)
+                                    Text(planned.figure).textRole(.secondary).foregroundStyle(Palette.muted)
+                                }
                             }
                         }
                     }
@@ -43,7 +49,7 @@ struct DaySheet: View {
                     Text(day.habitId != nil
                          ? "Une habitude : elle revient chaque semaine. Tu la retrouves dans Mes habitudes."
                          : "En faire une habitude : elle reviendra chaque semaine, et le coach en tiendra compte en écrivant ta semaine.")
-                    if let failure { Text(failure).foregroundStyle(Palette.over) }
+                    if let failure { RequestFailure(text: failure) }
                 }
             }
             .navigationTitle(Day(day.date)?.weekdayAndNumber.capitalizedFirst ?? day.date)
@@ -129,15 +135,15 @@ struct DaySheet: View {
 
     private func segments<Value: Hashable>(_ label: String, _ options: [(Value, String)], value: Value,
                                            set: @escaping (Value) -> Void) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(label).font(.subheadline)
+        VStack(alignment: .leading, spacing: Space.xs) {
+            Text(label).textRole(.secondary)
             Picker(label, selection: Binding(get: { value }, set: set)) {
                 ForEach(options, id: \.0) { Text($0.1).tag($0.0) }
             }
-            .pickerStyle(.segmented)
+            .segmentsOrMenu()
             .labelsHidden()
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, Space.xxs)
     }
 
     private func change(_ next: StatedDay) {

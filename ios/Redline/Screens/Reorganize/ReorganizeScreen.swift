@@ -39,7 +39,7 @@ struct ReorganizeScreen: View {
         } content: {
             VStack(alignment: .leading, spacing: 0) {
                 if let notice {
-                    Label(notice, systemImage: "checkmark.circle.fill").font(.footnote.weight(.semibold)).padding(.bottom, 12)
+                    Label(notice, systemImage: "checkmark.circle.fill").textRole(.caption).fontWeight(.semibold).padding(.bottom, Space.s)
                 }
                 if let view = model.view {
                     content(view)
@@ -52,14 +52,14 @@ struct ReorganizeScreen: View {
                         Button("Réessayer") { Task { await model.load(session) } }.buttonStyle(.glass)
                     }
                 } else {
-                    HStack(spacing: 8) {
+                    HStack(spacing: Space.xs) {
                         ProgressView()
-                        Text("Calcul des variantes…").font(.subheadline).foregroundStyle(Palette.muted)
+                        Text("Calcul des variantes…").textRole(.secondary).foregroundStyle(Palette.muted)
                     }
-                    .padding(.top, 20)
+                    .padding(.top, Space.l)
                 }
             }
-            .padding(.bottom, 24)
+            .padding(.bottom, Space.l)
         }
         .task { await model.load(session) }
         .sheet(item: $opened) { link in
@@ -78,10 +78,10 @@ struct ReorganizeScreen: View {
                 Text("Enregistrer pour le bilan").frame(maxWidth: .infinity)
             }
             .buttonStyle(.glassProminent)
-            .tint(Palette.tartan)
+            .tint(Palette.accent)
             .controlSize(.large)
             .disabled(saving)
-            .padding(.top, 20)
+            .padding(.top, Space.l)
             habitsRow
         } else {
             Intro(text: "Touche un jour pour dire comment il se présente. Seules les dates changent ; pour changer une séance, c’est le coach.")
@@ -91,6 +91,7 @@ struct ReorganizeScreen: View {
                 days(view)
                 if !view.proposals.isEmpty {
                     ProposalsSection(view: view, session: session, model: model) { words in leave(saying: words) }
+                        .padding(.top, Space.l)
                 }
                 variants(view)
                 if !view.heldBack.isEmpty {
@@ -113,7 +114,7 @@ struct ReorganizeScreen: View {
                 }
             }
         }
-        .padding(.top, 8)
+        .padding(.top, Space.xs)
     }
 
     @ViewBuilder private func variants(_ view: Notebook.ReorganizeView) -> some View {
@@ -123,14 +124,18 @@ struct ReorganizeScreen: View {
                 Banner(text: "Ta semaine tient déjà avec ces jours : rien à déplacer.")
             } else {
                 SectionTitle(text: view.variants.count == 1 ? "1 variante" : "\(view.variants.count) variantes")
+                // The engine's first placement is the screen's one prominent action, unless the
+                // coach's proposals come first.
                 ForEach(Array(view.variants.enumerated()), id: \.offset) { index, variant in
-                    VariantCard(view: view, variant: variant, index: index) { await take(view, index) }
-                        .padding(.top, 14)
+                    VariantCard(view: view, variant: variant, index: index, prominent: index == 0 && view.proposals.isEmpty) {
+                        await take(view, index)
+                    }
+                    .padding(.top, Space.s)
                 }
                 if view.others > 0 {
                     Text("\(view.others) " + (view.others == 1 ? "autre placement respecte" : "autres placements respectent")
                          + " les règles ; ils changent plus de dates ou plient plus de préférences.")
-                        .font(.footnote).foregroundStyle(Palette.muted).padding(.top, 12)
+                        .textRole(.caption).foregroundStyle(Palette.muted).padding(.top, Space.s)
                 }
             }
         } else if !differing.isEmpty {
@@ -144,7 +149,8 @@ struct ReorganizeScreen: View {
         let differing = model.differing
         let wanted = differing.contains { $0.kind == .more } || (!differing.isEmpty && view.variants.isEmpty)
         if wanted || model.asking {
-            AskCoachSection(model: model, session: session) { words in
+            // Sending is the prominent action only when nothing else on the screen is one.
+            AskCoachSection(model: model, session: session, prominent: view.variants.isEmpty && view.proposals.isEmpty) { words in
                 notice = words
                 Task { await model.load(session) }
             }
@@ -153,7 +159,7 @@ struct ReorganizeScreen: View {
                 EntryLine(title: "Demander au coach", detail: "changer une séance, en ajouter une")
             }
             .buttonStyle(.plain)
-            .padding(.top, 20)
+            .padding(.top, Space.l)
         }
     }
 
@@ -210,40 +216,71 @@ struct ReorganizeScreen: View {
     }
 }
 
-/// A day of the week: its sessions, how it presents itself, and the state's tag.
+/// A day of the week: its sessions, how it presents itself, and the state's tag. At the
+/// accessibility sizes the day goes above, on a line of its own, as in Week.
 private struct DayRow: View {
     let day: Notebook.ReorganizeDay
     let stated: StatedDay?
     let habit: Bool
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
-        let sessions = day.sessions
-        let title = sessions.isEmpty ? (day.rest ? "Repos" : "Rien de prévu") : sessions.map(\.title.shortTitle).joined(separator: " + ")
-        let set = stated.map { $0.kind != .asPlanned } ?? false
-        let line = [sessions.first?.figure, stated.map { DayWords.line($0, habit: habit) }].compactMap { $0 }.filter { !$0.isEmpty }
-            .joined(separator: " · ")
-        HStack(spacing: 12) {
-            DayNumber(date: day.date, today: day.date == Day(.now).text)
-            FamilyBadge(family: sessions.first.map { Family(kind: $0.kind, workout: $0.workout) } ?? .rest, small: true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(sessions.isEmpty ? Palette.muted : Palette.ink)
-                if !line.isEmpty { Text(line).font(.caption).foregroundStyle(Palette.muted) }
-            }
-            Spacer(minLength: 6)
-            if set, let stated {
-                Text(DayWords.label(stated.kind))
-                    .font(.caption.weight(.semibold))
-                    .padding(.horizontal, 8).padding(.vertical, 4)
-                    .background(Palette.panel, in: .capsule)
-            }
-            if !day.past {
-                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(Palette.faint)
+        let today = day.date == Day(.now).text
+        Group {
+            if typeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: Space.xxs) {
+                    DayNumber(date: day.date, today: today, inline: true)
+                    HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
+                        VStack(alignment: .leading, spacing: Space.xxs) {
+                            words
+                            tag
+                        }
+                        Spacer(minLength: 0)
+                        chevron
+                    }
+                }
+            } else {
+                HStack(spacing: Space.s) {
+                    DayNumber(date: day.date, today: today)
+                    FamilyBadge(family: day.sessions.first.map { Family(kind: $0.kind, workout: $0.workout) } ?? .rest, small: true)
+                    words
+                    Spacer(minLength: Space.xs)
+                    tag
+                    chevron
+                }
             }
         }
-        .padding(.vertical, 12)
-        .opacity(day.past ? 0.55 : 1)
+        .padding(.vertical, Space.s)
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
+    }
+
+    /// A past day reads in the quieter colour; it stays legible.
+    private var words: some View {
+        let sessions = day.sessions
+        let title = sessions.isEmpty ? (day.rest ? "Repos" : "Rien de prévu") : sessions.map(\.title.shortTitle).joined(separator: " + ")
+        let line = [sessions.first?.figure, stated.map { DayWords.line($0, habit: habit) }].compactMap { $0 }.filter { !$0.isEmpty }
+            .joined(separator: " · ")
+        return VStack(alignment: .leading, spacing: 2) {
+            Text(title).textRole(.secondary).fontWeight(.semibold)
+                .foregroundStyle(sessions.isEmpty || day.past ? Palette.muted : Palette.ink)
+            if !line.isEmpty { Text(line).textRole(.caption).foregroundStyle(Palette.muted) }
+        }
+    }
+
+    @ViewBuilder private var tag: some View {
+        if let stated, stated.kind != .asPlanned {
+            Text(DayWords.label(stated.kind))
+                .font(TextRole.caption.font.weight(.semibold))
+                .padding(.horizontal, Space.xs).padding(.vertical, Space.xxs)
+                .background(Palette.panel, in: .capsule)
+        }
+    }
+
+    @ViewBuilder private var chevron: some View {
+        if !day.past {
+            Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(Palette.faint)
+        }
     }
 }
 
@@ -270,7 +307,7 @@ struct Intro: View {
     let text: String
 
     var body: some View {
-        Text(text).font(.subheadline).foregroundStyle(Palette.muted)
+        Text(text).textRole(.secondary).foregroundStyle(Palette.muted)
     }
 }
 
@@ -280,11 +317,11 @@ struct Banner: View {
 
     var body: some View {
         Text(text)
-            .font(.subheadline)
-            .padding(14)
+            .textRole(.secondary)
+            .padding(Space.m)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Palette.panel, in: .rect(cornerRadius: 12))
-            .padding(.top, 16)
+            .background(Palette.panel, in: .rect(cornerRadius: Radius.surface))
+            .padding(.top, Space.m)
     }
 }
 
@@ -294,5 +331,25 @@ extension Day {
         guard let match = label.wholeMatch(of: /(\d{4})-W(\d{2})/), let week = Int(match.2),
               let fourth = Day("\(match.1)-01-04") else { return nil }
         self = fourth.adding(1 - DayWords.isoWeekday(fourth.text) + 7 * (week - 1))
+    }
+}
+
+extension View {
+    /// A short choice: segments side by side, or a menu at the accessibility sizes, where
+    /// segments would cut their words.
+    func segmentsOrMenu() -> some View {
+        modifier(SegmentsOrMenu())
+    }
+}
+
+private struct SegmentsOrMenu: ViewModifier {
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    func body(content: Content) -> some View {
+        if typeSize.isAccessibilitySize {
+            content.pickerStyle(.menu)
+        } else {
+            content.pickerStyle(.segmented)
+        }
     }
 }
