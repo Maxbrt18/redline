@@ -30,10 +30,13 @@ extension LimitRows {
     }
 }
 
-/// A run's measures without limits to read them against: up to four figures.
+/// A run's measures without limits to read them against: up to four figures, four
+/// across, two across at the accessibility sizes. A figure past its limit is in the red
+/// line, after a symbol that says so.
 struct FactTiles: View {
     let fact: Notebook.Fact
     let targets: Notebook.Targets
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         let over = Set(fact.over)
@@ -46,16 +49,25 @@ struct FactTiles: View {
             cells.append((Numbers.text(heart, digits: 0), "FC" + (targets.hrCapBpm.map { " · ≤\($0)" } ?? " moy"), over.contains("hr_avg")))
         }
         if let pace = fact.pace { cells.append((pace, "/km", false)) }
-        return HStack(alignment: .top, spacing: 0) {
+        let columns = typeSize.isAccessibilitySize ? 2 : 4
+        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Space.s, alignment: .topLeading), count: columns),
+                         alignment: .leading, spacing: Space.s) {
             ForEach(Array(cells.prefix(4).enumerated()), id: \.offset) { _, cell in
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(cell.0).font(.figure(26)).monospacedDigit().foregroundStyle(cell.2 ? Palette.over : Palette.ink)
-                    Text(cell.1).font(.caption).foregroundStyle(Palette.muted)
+                    HStack(alignment: .firstTextBaseline, spacing: 2) {
+                        if cell.2 {
+                            Image(systemName: "arrow.up.right").font(TextRole.caption.font.weight(.semibold))
+                                .accessibilityLabel("au-delà du plafond")
+                        }
+                        Text(cell.0).figure(.medium, .done)
+                    }
+                    .foregroundStyle(cell.2 ? Palette.accent : Palette.ink)
+                    Text(cell.1).textRole(.caption).foregroundStyle(Palette.muted)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 12)
             }
         }
+        .padding(.vertical, Space.s)
     }
 }
 
@@ -79,9 +91,9 @@ struct OverLine: View {
         }
         return Group {
             if !parts.isEmpty {
-                Text(parts.joined(separator: " · ").capitalizedFirst + ".")
-                    .font(.subheadline)
-                    .foregroundStyle(Palette.over)
+                Label(parts.joined(separator: " · ").capitalizedFirst + ".", systemImage: "arrow.up.right")
+                    .textRole(.secondary)
+                    .foregroundStyle(Palette.accent)
             }
         }
     }
@@ -93,7 +105,7 @@ struct TargetCursors: View {
     let targets: Notebook.Targets
 
     var body: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: Space.m) {
             if let reference = targets.distanceCapKm ?? targets.distanceTargetKm {
                 let cap = targets.distanceCapKm, aim = targets.distanceTargetKm
                 let top = (reference * 1.25).rounded(.up)

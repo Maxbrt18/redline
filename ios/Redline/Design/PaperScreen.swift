@@ -13,7 +13,7 @@ struct PaperScreen<Hero: View, Content: View>: View {
                 hero
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 20)
-                    .padding(.bottom, 24)
+                    .padding(.bottom, Space.l)
                 content
                     .padding(.horizontal, 20)
             }

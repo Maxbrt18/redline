@@ -47,11 +47,11 @@ private struct TodayContent: View {
         VStack(alignment: .leading, spacing: 0) {
             if ["awaiting", "stale"].contains(today.plan.status) {
                 Label(today.plan.message, systemImage: "hourglass")
-                    .font(.subheadline)
-                    .padding(14)
+                    .textRole(.secondary)
+                    .padding(Space.m)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Palette.panel, in: .rect(cornerRadius: 12))
-                    .padding(.bottom, 20)
+                    .background(Palette.panel, in: .rect(cornerRadius: Radius.surface))
+                    .padding(.bottom, Space.m)
             }
             if !items.isEmpty || !today.extra.isEmpty {
                 DayThread(items: items, extra: today.extra, hero: hero, strength: today.strength,
@@ -62,7 +62,7 @@ private struct TodayContent: View {
             }
             Landmarks(today: today, openTab: openTab)
         }
-        .padding(.bottom, 24)
+        .padding(.bottom, Space.l)
     }
 }
 
@@ -75,22 +75,22 @@ private struct RestDay: View {
         let next = today.tomorrow
         let real = next.sessions.filter { $0.kind != "rest" }
         let shown = !real.isEmpty ? next.date : next.next.first?.date
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: Space.m) {
             // The day's questions come before the rest.
             DayThread(items: [], extra: [], asks: today.asks, date: today.date)
             if today.plan.status == "invalid" {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Programme en préparation").font(.title3.weight(.semibold))
-                    Text(today.plan.message).font(.subheadline).foregroundStyle(Palette.muted)
+                VStack(alignment: .leading, spacing: Space.xxs) {
+                    Text("Programme en préparation").textRole(.heading)
+                    Text(today.plan.message).textRole(.secondary).foregroundStyle(Palette.muted)
                 }
             } else {
-                (Text("Repos aujourd’hui.").bold() + Text(" Rien à faire.")).font(.body)
+                Text("\(Text("Repos aujourd’hui.").bold()) Rien à faire.").textRole(.body)
             }
             if !real.isEmpty {
                 DayHeading(date: next.date, prefix: "Demain")
                 DayThread(items: real, extra: [], hero: hero, today: false)
             } else if next.plan == "invalid" {
-                Text("Le programme de la semaine arrive avec le bilan.").font(.subheadline).foregroundStyle(Palette.muted)
+                Text("Le programme de la semaine arrive avec le bilan.").textRole(.secondary).foregroundStyle(Palette.muted)
             } else if let first = next.next.first {
                 DayHeading(date: first.date, prefix: nil)
                 DayThread(items: next.next, extra: [], hero: hero, today: false)
@@ -108,8 +108,8 @@ private struct DayHeading: View {
     var body: some View {
         let day = Day(date)?.weekdayAndNumber ?? date
         Text(prefix.map { "\($0) · \(day)" } ?? day.capitalizedFirst)
-            .font(.footnote.weight(.semibold))
+            .font(TextRole.caption.font.weight(.semibold))
             .foregroundStyle(Palette.muted)
-            .padding(.top, 8)
+            .padding(.top, Space.xs)
     }
 }

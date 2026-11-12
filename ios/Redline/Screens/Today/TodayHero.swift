@@ -1,39 +1,43 @@
 import RedlineKit
 import SwiftUI
 
-/// The head of Today always carries one session and its figure: the run still to do, in
-/// outline; else the run done today, solid; else the next run.
+/// The head of Today always carries one session and its figure: the run still to do, solid
+/// and lighter; else the run done today, solid and full; else the next run. The figure and
+/// its words sit side by side while they fit, one under the other otherwise.
 struct TodayHero: View {
     let kicker: String
     let item: Notebook.SessionItem
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Space.xs) {
             Kicker(text: [kicker, item.startTime.flatMap(Numbers.clock)].compactMap { $0 }.joined(separator: " · "))
-            HStack(spacing: 10) {
+            HStack(spacing: Space.xs) {
                 FamilyBadge(family: item.family)
-                Text(item.title).font(.title3.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
+                Text(item.title).textRole(.heading).fixedSize(horizontal: false, vertical: true)
             }
             if let figure {
-                HStack(alignment: .lastTextBaseline, spacing: 12) {
-                    if done {
-                        Text(figure.value).font(.figure(96)).minimumScaleFactor(0.5)
-                    } else {
-                        OutlinedFigure(text: figure.value, size: 96, lineWidth: 2.2, color: Palette.onTrack)
-                    }
-                    VStack(alignment: .leading, spacing: 2) {
-                        ForEach(figure.side, id: \.self) { Text($0) }
-                    }
-                    .font(.subheadline)
-                    .opacity(0.82)
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .lastTextBaseline, spacing: Space.s) { figureAndWords(figure) }
+                    VStack(alignment: .leading, spacing: Space.xxs) { figureAndWords(figure) }
                 }
-                .padding(.top, 4)
+                .padding(.top, Space.xxs)
             }
         }
         .accessibilityElement(children: .combine)
     }
 
     private var done: Bool { item.isDone && item.runFact != nil }
+
+    @ViewBuilder private func figureAndWords(_ figure: (value: String, side: [String])) -> some View {
+        Text(figure.value)
+            .figure(.hero, done ? .done : .planned)
+            .opacity(done ? 1 : 0.72)
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(figure.side, id: \.self) { Text($0) }
+        }
+        .textRole(.secondary)
+        .opacity(0.82)
+    }
 
     /// The figure and the lines beside it.
     private var figure: (value: String, side: [String])? {

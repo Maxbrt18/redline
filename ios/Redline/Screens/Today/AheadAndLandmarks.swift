@@ -28,10 +28,13 @@ struct SectionTitle: View {
 }
 
 /// What is coming: one line per day for the next three days, as the Week tab lists them.
+/// At the accessibility sizes the day goes above, on a line of its own, and the figure
+/// under the title.
 struct AheadList: View {
     let items: [Notebook.SessionItem]
     /// The day whose line carries the weather: tomorrow.
     var tomorrow: String?
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         let dates = items.map(\.date).reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }.prefix(3)
@@ -45,36 +48,37 @@ struct AheadList: View {
         }
     }
 
-    private func row(date: String, sessions: [Notebook.SessionItem]) -> some View {
+    @ViewBuilder private func row(date: String, sessions: [Notebook.SessionItem]) -> some View {
         let main = sessions.first { !$0.isStrength } ?? sessions[0]
         let title = sessions.count > 1 && !main.isStrength
             ? "\(main.title.split(separator: ",").first.map(String.init) ?? main.title), puis renfo" : main.title
         let sub = [main.startTime.flatMap(Numbers.clock), main.location, main.targets.hrCapBpm.map { "≤\($0) bpm" }]
             .compactMap { $0 }.joined(separator: " · ")
-        let day = Day(date)
-        return HStack(alignment: .center, spacing: 14) {
-            VStack(spacing: 0) {
-                Text(day.map { "\($0.day)" } ?? "").font(.figure(22))
-                Text(day?.date.formatted(Date.FormatStyle(timeZone: .gmt).locale(Locale(identifier: "fr_FR")).weekday(.abbreviated)) ?? "")
-                    .font(.caption2).foregroundStyle(Palette.muted)
+        let words = VStack(alignment: .leading, spacing: 2) {
+            Text(title).textRole(.secondary).fontWeight(.semibold)
+            if !sub.isEmpty { Text(sub).textRole(.caption).foregroundStyle(Palette.muted) }
+            if date == tomorrow, !main.isStrength {
+                InlineWeather(item: main).textRole(.caption).foregroundStyle(Palette.muted)
             }
-            .frame(width: 40)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.subheadline.weight(.semibold))
-                HStack(spacing: 0) {
-                    if !sub.isEmpty { Text(sub) }
-                    if date == tomorrow, !main.isStrength {
-                        if !sub.isEmpty { Text(" · ") }
-                        InlineWeather(item: main)
-                    }
-                }
-                .font(.caption)
-                .foregroundStyle(Palette.muted)
-            }
-            Spacer(minLength: 8)
-            Text(main.plannedValue).font(.figure(17, weight: .semibold)).foregroundStyle(Palette.muted)
         }
-        .padding(.vertical, 12)
+        let value = Text(main.plannedValue).textRole(.secondary).foregroundStyle(Palette.muted)
+        Group {
+            if typeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: Space.xxs) {
+                    DayNumber(date: date, inline: true)
+                    words
+                    value
+                }
+            } else {
+                HStack(alignment: .center, spacing: Space.s) {
+                    DayNumber(date: date)
+                    words
+                    Spacer(minLength: Space.xs)
+                    value
+                }
+            }
+        }
+        .padding(.vertical, Space.s)
         .accessibilityElement(children: .combine)
     }
 }
@@ -87,33 +91,43 @@ struct Landmarks: View {
     let openTab: (NotebookTab) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
+        VStack(alignment: .leading, spacing: 0) {
             SectionTitle(text: "Repères")
-            week
-            ForEach(today.pain.zones, id: \.zone) { zone in
-                pain(zone)
+            VStack(alignment: .leading, spacing: Space.l) {
+                week
+                ForEach(today.pain.zones, id: \.zone) { zone in
+                    pain(zone)
+                }
+                if let race = today.race { self.race(race) }
             }
-            if let race = today.race { self.race(race) }
         }
     }
 
+    /// Done in full against planned in a lighter weight; the figures sit on one line while
+    /// they fit, one under the other otherwise.
     private var week: some View {
         let totals = today.totals
         let runs = "\(totals.runsDone) sortie\(totals.runsDone > 1 ? "s" : "")" + (totals.runsPlanned > 0 ? " sur \(totals.runsPlanned)" : "")
-        return VStack(alignment: .leading, spacing: 10) {
+        let figures = Group {
+            Text(Numbers.text(totals.kmDone)).figure(.large, .done).foregroundStyle(Palette.ink)
+            if let target = totals.kmTarget {
+                HStack(alignment: .lastTextBaseline, spacing: Space.xxs) {
+                    Text("sur").textRole(.secondary).foregroundStyle(Palette.muted)
+                    Text(Numbers.text(target)).figure(.large, .planned).foregroundStyle(Palette.muted)
+                }
+            }
+        }
+        return VStack(alignment: .leading, spacing: Space.xs) {
             Button { openTab(.week) } label: {
                 LandmarkLabel(text: "Semaine \(Int(today.week.suffix(2)) ?? 0)", family: .run, opens: true)
             }
             .buttonStyle(.plain)
-            HStack(alignment: .lastTextBaseline, spacing: 6) {
-                Text(Numbers.text(totals.kmDone)).font(.figure(40))
-                if let target = totals.kmTarget {
-                    Text("sur").font(.subheadline).foregroundStyle(Palette.muted)
-                    Text(Numbers.text(target)).font(.figure(40, weight: .semibold)).monospacedDigit().foregroundStyle(Palette.muted)
-                }
-                Text("km · \(runs)").font(.subheadline).foregroundStyle(Palette.muted)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .lastTextBaseline, spacing: Space.xs) { figures }
+                VStack(alignment: .leading, spacing: 0) { figures }
             }
-            WeekBars(days: today.strip)
+            Text("km · \(runs)").textRole(.secondary).foregroundStyle(Palette.muted)
+            WeekBars(days: today.strip).padding(.top, Space.xs)
         }
         .accessibilityElement(children: .combine)
     }
@@ -121,7 +135,7 @@ struct Landmarks: View {
     private func pain(_ zone: Notebook.PainTrendZone) -> some View {
         let peak = zone.weeks.last?.peak
         let top = max(3, ((peak ?? 0) + 0.5).rounded(.up))
-        return VStack(alignment: .leading, spacing: 10) {
+        return VStack(alignment: .leading, spacing: Space.xs) {
             NavigationLink(value: PainLink(zone: zone.zone, label: zone.label)) {
                 LandmarkLabel(text: zone.label, family: .pain, opens: true)
             }
@@ -138,22 +152,22 @@ struct Landmarks: View {
         let facts = [date, race.startTime.flatMap(Numbers.clock).map { "départ \($0)" },
                      race.distanceKm.map { "\(Numbers.text($0)) km" }, race.target.map { "cible \($0)" }]
             .compactMap { $0 }.joined(separator: " · ")
-        return VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: Space.xs) {
             Button { openTab(.race) } label: {
                 LandmarkLabel(text: race.name, family: .race, opens: true)
             }
             .buttonStyle(.plain)
-            HStack(alignment: .lastTextBaseline, spacing: 6) {
-                Text("\(race.days)").font(.figure(40))
-                Text(race.days > 1 ? "jours" : "jour").font(.subheadline).foregroundStyle(Palette.muted)
+            HStack(alignment: .lastTextBaseline, spacing: Space.xs) {
+                Text("\(race.days)").figure(.large, .done)
+                Text(race.days > 1 ? "jours" : "jour").textRole(.secondary).foregroundStyle(Palette.muted)
             }
-            Text(facts).font(.footnote).foregroundStyle(Palette.muted)
+            Text(facts).textRole(.caption).foregroundStyle(Palette.muted)
         }
         .accessibilityElement(children: .combine)
     }
 }
 
-/// A landmark's name, with its badge.
+/// A landmark's name, with its symbol, on a line a finger can press.
 private struct LandmarkLabel: View {
     let text: String
     let family: Family
@@ -161,14 +175,15 @@ private struct LandmarkLabel: View {
     var opens = false
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Space.xs) {
             FamilyBadge(family: family, small: true)
-            Text(text).font(.subheadline.weight(.semibold))
+            Text(text).textRole(.secondary).fontWeight(.semibold)
             if opens {
-                Spacer()
+                Spacer(minLength: Space.xs)
                 Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(Palette.faint)
             }
         }
+        .frame(minHeight: 44)
         .contentShape(.rect)
     }
 }

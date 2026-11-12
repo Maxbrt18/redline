@@ -3,7 +3,7 @@ import SwiftUI
 
 /// A day's thread: what is done, in order, then what remains. Detail decreases with
 /// distance: the step to do now has everything, the next ones less. The first step to do
-/// reads « À faire » in red; nothing else marks it.
+/// reads « À faire » in the red line; nothing else marks it.
 struct DayThread: View {
     let items: [Notebook.SessionItem]
     let extra: [Notebook.UnplannedFact]
@@ -19,7 +19,7 @@ struct DayThread: View {
     @Environment(\.notebook) private var session
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
+        VStack(alignment: .leading, spacing: Space.l) {
             if !wakes.isEmpty || daily != nil {
                 ThreadStep(kicker: "Ce matin", now: true, title: "Comment tu te réveilles ?", family: nil, small: true) {
                     MorningCard(wakes: wakes, daily: daily)
@@ -150,13 +150,13 @@ struct DayThread: View {
         ThreadStep(kicker: kicker, now: now, title: item.id == hero?.id ? nil : item.title, family: item.family,
                    small: item.isStrength || !today) {
             if item.status == "held" {
-                Text("Une question t’attend dans Messenger avant cette séance.").font(.subheadline).foregroundStyle(Palette.muted)
+                Text("Une question t’attend dans Messenger avant cette séance.").textRole(.secondary).foregroundStyle(Palette.muted)
             } else if item.isStrength {
-                if let note = item.note { Text(note).font(.subheadline).foregroundStyle(Palette.muted) }
+                if let note = item.note { Text(note).textRole(.secondary).foregroundStyle(Palette.muted) }
                 if today, case .ready(let ready)? = strength { StrengthLauncher(ready: ready) }
             } else {
                 if today { TargetCursors(targets: item.targets) }
-                if let note = item.note, today { Text(note).font(.subheadline).foregroundStyle(Palette.muted) }
+                if let note = item.note, today { Text(note).textRole(.secondary).foregroundStyle(Palette.muted) }
                 SessionWeather(item: item, size: today ? .full : .line)
             }
         }
@@ -174,16 +174,16 @@ struct ThreadStep<Body: View>: View {
     @ViewBuilder var content: Body
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Space.s) {
             if !kicker.isEmpty {
                 Text(kicker)
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(now ? Palette.red : Palette.muted)
+                    .font(TextRole.caption.font.weight(.semibold))
+                    .foregroundStyle(now ? Palette.accent : Palette.muted)
             }
             if let title {
-                HStack(spacing: 10) {
+                HStack(spacing: Space.xs) {
                     if let family { FamilyBadge(family: family, small: small) }
-                    Text(title).font(small ? .body.weight(.semibold) : .title3.weight(.semibold))
+                    Text(title).font(small ? TextRole.body.font.weight(.semibold) : TextRole.heading.font)
                 }
             }
             content
@@ -211,14 +211,14 @@ struct ExerciseList: View {
             DisclosureGroup("\(exercises.count) exercice\(exercises.count > 1 ? "s" : "")") {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(exercises.enumerated()), id: \.offset) { _, exercise in
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(exercise.name)
+                        VStack(alignment: .leading, spacing: Space.xxs) {
+                            Text(exercise.name).textRole(.body)
                             if !exercise.dose.isEmpty {
-                                Text(exercise.dose).font(.subheadline).foregroundStyle(Palette.muted)
+                                Text(exercise.dose).textRole(.secondary).foregroundStyle(Palette.muted)
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 12)
+                        .padding(.vertical, Space.s)
                     }
                 }
             }
@@ -270,11 +270,11 @@ struct DetailLink: View {
     var body: some View {
         NavigationLink(value: link) {
             HStack {
-                Text("Détail de la séance").font(.subheadline.weight(.semibold))
-                Spacer()
+                Text("Détail de la séance").textRole(.secondary).fontWeight(.semibold)
+                Spacer(minLength: Space.xs)
                 Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(Palette.faint)
             }
-            .padding(.vertical, 10)
+            .frame(minHeight: 44)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
