@@ -121,14 +121,26 @@ struct AskPanel<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) { content }
-            .padding(14)
+        VStack(alignment: .leading, spacing: Space.s) { content }
+            .padding(Space.m)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Palette.panel, in: .rect(cornerRadius: 16))
+            .background(Palette.panel, in: .rect(cornerRadius: Radius.surface))
     }
 }
 
-/// One answer button: a full-width cell, filled while its answer is on its way.
+/// Why the server refused an answer, under the card's answers.
+private struct AnswerFailure: View {
+    let text: String
+
+    var body: some View {
+        Label(text, systemImage: "exclamationmark.circle")
+            .textRole(.caption)
+            .foregroundStyle(Palette.accent)
+    }
+}
+
+/// One answer button: a full-width cell, filled while its answer is on its way. Its words
+/// wrap rather than shrink, so every answer of a card reads at the same size.
 private struct AnswerButton: View {
     let text: String
     var picked = false
@@ -138,14 +150,16 @@ private struct AnswerButton: View {
     var body: some View {
         Button(action: action) {
             Text(text)
-                .font(.subheadline.weight(.semibold))
+                .textRole(.secondary)
+                .fontWeight(.semibold)
                 .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .frame(maxWidth: .infinity, minHeight: 38)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, Space.xxs)
+                .padding(.vertical, Space.xs)
+                .frame(maxWidth: .infinity, minHeight: 44)
                 .foregroundStyle(picked || on ? Palette.bg : Palette.ink)
-                .background(picked || on ? Palette.ink : Palette.bg, in: .rect(cornerRadius: 10))
-                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Palette.grid, lineWidth: picked || on ? 0 : 1))
+                .background(picked || on ? Palette.ink : Palette.bg, in: .rect(cornerRadius: Radius.surface))
+                .overlay(RoundedRectangle(cornerRadius: Radius.surface).strokeBorder(Palette.grid, lineWidth: picked || on ? 0 : 1))
                 .contentShape(.rect)
         }
         .buttonStyle(.plain)
@@ -154,21 +168,33 @@ private struct AnswerButton: View {
 }
 
 /// Answers laid out at a glance, with no hidden scrolling: up to seven on one row, more
-/// on two.
+/// on two. At the accessibility sizes figures take as many columns as fit, and words one
+/// line each.
 private struct AnswerGrid: View {
     let answers: [(tag: String, text: String)]
     var columns: Int?
+    /// The answers are words, not figures.
+    var words = false
     var picked: String?
     var on: Set<String> = []
     let choose: (String) -> Void
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @ScaledMetric(relativeTo: .subheadline) private var figureWidth: CGFloat = 40
 
     var body: some View {
-        let count = columns ?? (answers.count <= 7 ? answers.count : (answers.count + 1) / 2)
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: max(count, 1)), spacing: 6) {
+        LazyVGrid(columns: gridColumns, spacing: Space.xs) {
             ForEach(answers, id: \.tag) { answer in
                 AnswerButton(text: answer.text, picked: picked == answer.tag, on: on.contains(answer.tag)) { choose(answer.tag) }
             }
         }
+    }
+
+    private var gridColumns: [GridItem] {
+        if typeSize.isAccessibilitySize {
+            return words ? [GridItem(.flexible())] : [GridItem(.adaptive(minimum: figureWidth), spacing: Space.xs)]
+        }
+        let count = columns ?? (answers.count <= 7 ? answers.count : (answers.count + 1) / 2)
+        return Array(repeating: GridItem(.flexible(), spacing: Space.xs), count: max(count, 1))
     }
 }
 
@@ -187,25 +213,34 @@ struct DebriefCard<Ask: DebriefAsk>: View {
             let spec = AskSpec(field: field, ask: ask)
             let key = "\(ask.id):\(field)"
             AskPanel {
-                HStack(alignment: .firstTextBaseline) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(spec.label).font(.subheadline.weight(.semibold))
-                        if let aside = aside(field, spec) { Text(aside).font(.caption).foregroundStyle(Palette.muted) }
+                let rank = Text("\(ask.total - ask.fields.count + 1) sur \(ask.total)").textRole(.caption).foregroundStyle(Palette.muted)
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .firstTextBaseline) {
+                        question(field, spec)
+                        Spacer(minLength: Space.xs)
+                        rank
                     }
-                    Spacer()
-                    Text("\(ask.total - ask.fields.count + 1) sur \(ask.total)").font(.caption).foregroundStyle(Palette.muted)
+                    VStack(alignment: .leading, spacing: Space.xxs) {
+                        rank
+                        question(field, spec)
+                    }
                 }
                 answers(spec, key: key)
-                if let failure = sender.failure {
-                    Text(failure).font(.footnote).foregroundStyle(Palette.over)
-                }
+                if let failure = sender.failure { AnswerFailure(text: failure) }
                 if let note = note(field, spec) {
-                    Text(note).font(.footnote).foregroundStyle(Palette.muted)
+                    Text(note).textRole(.caption).foregroundStyle(Palette.muted)
                 }
             }
             .disabled(sender.busy)
             .sensoryFeedback(.success, trigger: ask.fields.count)
             .onChange(of: field) { several = [] }
+        }
+    }
+
+    private func question(_ field: String, _ spec: AskSpec) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(spec.label).textRole(.secondary).fontWeight(.semibold)
+            if let aside = aside(field, spec) { Text(aside).textRole(.caption).foregroundStyle(Palette.muted) }
         }
     }
 
@@ -217,21 +252,20 @@ struct DebriefCard<Ask: DebriefAsk>: View {
             }
         case .options(let options):
             AnswerGrid(answers: options.map { (Self.tag($0.0), $0.1) }, columns: options.count == 3 ? 1 : 2,
-                       picked: sender.picked) { tag in
+                       words: true, picked: sender.picked) { tag in
                 if let option = options.first(where: { Self.tag($0.0) == tag }) { send(key, option.0, tag: tag) }
             }
         case .several(let options):
-            AnswerGrid(answers: options.map { ($0.0, $0.1) }, columns: 2, on: several) { tag in
+            AnswerGrid(answers: options.map { ($0.0, $0.1) }, columns: 2, words: true, on: several) { tag in
                 if several.contains(tag) { several.remove(tag) } else { several.insert(tag) }
             }
             Button {
                 send(key, .array(options.map(\.0).filter(several.contains).map(JSONValue.string)), tag: "confirm")
             } label: {
-                Text("Valider").frame(maxWidth: .infinity)
+                Text("Valider").fontWeight(.semibold).frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
-            .tint(Palette.ink)
-            .foregroundStyle(Palette.bg)
+            .controlSize(.large)
             .disabled(several.isEmpty)
         }
     }
@@ -291,24 +325,23 @@ struct MorningCard: View {
                     }
                 }
             }
-            if let failure = sender.failure {
-                Text(failure).font(.footnote).foregroundStyle(Palette.over)
-            }
+            if let failure = sender.failure { AnswerFailure(text: failure) }
             Text("Un geste par ligne. Le coach ne t’écrit que si ça sort de l’ordinaire.")
-                .font(.footnote).foregroundStyle(Palette.muted)
+                .textRole(.caption).foregroundStyle(Palette.muted)
         }
         .disabled(sender.busy)
         .sensoryFeedback(.success, trigger: wakes.count + (daily?.fields.count ?? 0))
     }
 
     private func row(_ label: String, hint: String?, options: [(String, String)], key: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(label).font(.subheadline.weight(.semibold))
-                if let hint { Text(hint).font(.caption).foregroundStyle(Palette.muted) }
-            }
+        // The hint follows the label in the same paragraph, so both wrap rather than truncate.
+        let head = hint.map { hint in
+            Text("\(Text(label).fontWeight(.semibold))  \(Text(hint).font(TextRole.caption.font).foregroundStyle(Palette.muted))")
+        } ?? Text(label).fontWeight(.semibold)
+        return VStack(alignment: .leading, spacing: Space.xs) {
+            head.textRole(.secondary)
             AnswerGrid(answers: options.map { (key + "=" + $0.0, $0.1) }, columns: options.count == 4 ? 2 : options.count,
-                       picked: sender.picked) { tag in
+                       words: true, picked: sender.picked) { tag in
                 let slug = String(tag.dropFirst(key.count + 1))
                 Task { await sender.send(key, value: .string(slug), tag: tag, session: session, then: answered) }
             }
@@ -330,18 +363,16 @@ struct HeartCard: View {
 
     var body: some View {
         AskPanel {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Ton cœur était plus haut que d’habitude").font(.subheadline.weight(.semibold))
+            VStack(alignment: .leading, spacing: Space.xxs) {
+                Text("Ton cœur était plus haut que d’habitude").textRole(.secondary).fontWeight(.semibold)
                 Text("\(ask.hr) bpm à \(Numbers.pace(Double(ask.paceS)))/km, contre \(ask.reference) sur tes \(ask.n) EF à allure voisine (+\(ask.hr - ask.reference)).")
-                    .font(.caption).foregroundStyle(Palette.muted)
+                    .textRole(.caption).foregroundStyle(Palette.muted)
             }
-            Text("Une explication ?").font(.subheadline.weight(.semibold))
-            AnswerGrid(answers: Self.reasons, columns: 2, picked: sender.picked) { slug in
+            Text("Une explication ?").textRole(.secondary).fontWeight(.semibold)
+            AnswerGrid(answers: Self.reasons, columns: 2, words: true, picked: sender.picked) { slug in
                 Task { await sender.send(ask.id, value: .string(slug), tag: slug, session: session, then: answered) }
             }
-            if let failure = sender.failure {
-                Text(failure).font(.footnote).foregroundStyle(Palette.over)
-            }
+            if let failure = sender.failure { AnswerFailure(text: failure) }
         }
         .disabled(sender.busy)
     }
