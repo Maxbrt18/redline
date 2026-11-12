@@ -1,7 +1,9 @@
 import RedlineKit
 import SwiftUI
 
-/// A section title on a rule, never a box; a few words may follow it on the right.
+/// A section title on a rule, never a box; a few words may follow it on the right. The
+/// space above it is the page's: sections are stacked `Space.section` apart, so a section
+/// that opens a page sits right under its head.
 struct SectionTitle: View {
     let text: String
     var meta: String?
@@ -18,7 +20,6 @@ struct SectionTitle: View {
                 if let meta { Text(meta).textRole(.caption).foregroundStyle(Palette.muted) }
             }
         }
-        .padding(.top, Space.xl)
         .padding(.bottom, Space.xs)
     }
 

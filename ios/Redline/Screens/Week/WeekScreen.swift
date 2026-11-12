@@ -113,54 +113,60 @@ private struct WeekContent: View {
     let root: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if !week.plan.message.isEmpty {
-                Label(week.plan.message, systemImage: "hourglass")
-                    .textRole(.secondary)
-                    .padding(Space.m)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Palette.panel, in: .rect(cornerRadius: Radius.surface))
-                    .padding(.bottom, Space.m)
-            }
-            if week.sessions.isEmpty && week.plan.status == "invalid" {
-                Text("Aucun programme enregistré pour cette semaine. Le registre reste ci-dessous.")
-                    .textRole(.secondary).foregroundStyle(Palette.muted).padding(.bottom, Space.s)
-            }
-            if let monday = Day(week.monday) {
-                ForEach(0..<7, id: \.self) { offset in
-                    let date = monday.adding(offset).text
-                    WeekDayRow(date: date, items: week.sessions.filter { $0.date == date },
-                               extra: week.extra.filter { $0.date == date }, today: Day(.now).text)
+        VStack(alignment: .leading, spacing: Space.section) {
+            VStack(alignment: .leading, spacing: 0) {
+                if !week.plan.message.isEmpty {
+                    Label(week.plan.message, systemImage: "hourglass")
+                        .textRole(.secondary)
+                        .padding(Space.m)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Palette.panel, in: .rect(cornerRadius: Radius.surface))
+                        .padding(.bottom, Space.m)
                 }
+                if week.sessions.isEmpty && week.plan.status == "invalid" {
+                    Text("Aucun programme enregistré pour cette semaine. Le registre reste ci-dessous.")
+                        .textRole(.secondary).foregroundStyle(Palette.muted).padding(.bottom, Space.s)
+                }
+                if let monday = Day(week.monday) {
+                    ForEach(0..<7, id: \.self) { offset in
+                        let date = monday.adding(offset).text
+                        WeekDayRow(date: date, items: week.sessions.filter { $0.date == date },
+                                   extra: week.extra.filter { $0.date == date }, today: Day(.now).text)
+                    }
+                }
+                reorganize
             }
-            reorganize
             if root, let next = week.next {
-                SectionTitle(text: "Semaine prochaine")
-                NavigationLink(value: WeekLink(label: next.week)) {
-                    WeekLine(title: "Semaine \(Int(next.week.suffix(2)) ?? 0)",
-                             detail: "\(weekSpan(monday: next.monday)) · \(next.runsPlanned) sorties",
-                             figure: next.kmTarget.map { "~\(Numbers.text($0)) km" } ?? "")
+                VStack(alignment: .leading, spacing: 0) {
+                    SectionTitle(text: "Semaine prochaine")
+                    NavigationLink(value: WeekLink(label: next.week)) {
+                        WeekLine(title: "Semaine \(Int(next.week.suffix(2)) ?? 0)",
+                                 detail: "\(weekSpan(monday: next.monday)) · \(next.runsPlanned) sorties",
+                                 figure: next.kmTarget.map { "~\(Numbers.text($0)) km" } ?? "")
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
             if week.review != nil || week.open || !week.cards.isEmpty {
-                SectionTitle(text: "Cartes de la semaine")
-                // The review takes its place among the cards: a grey line until it is
-                // written, the same line made touchable once it arrives.
-                if let review = week.review {
-                    let title = "Bilan W\(week.week.suffix(2))"
-                    NavigationLink(value: EntryLink(id: review.id, title: title)) {
-                        EntryRow(title: title, date: review.occurredOn)
+                VStack(alignment: .leading, spacing: 0) {
+                    SectionTitle(text: "Cartes de la semaine")
+                    // The review takes its place among the cards: a grey line until it is
+                    // written, the same line made touchable once it arrives.
+                    if let review = week.review {
+                        let title = "Bilan W\(week.week.suffix(2))"
+                        NavigationLink(value: EntryLink(id: review.id, title: title)) {
+                            EntryRow(title: title, date: review.occurredOn)
+                        }
+                        .buttonStyle(.plain)
+                    } else if week.open {
+                        EntryRow(title: "Bilan de la semaine", date: nil, pending: true)
                     }
-                    .buttonStyle(.plain)
-                } else if week.open {
-                    EntryRow(title: "Bilan de la semaine", date: nil, pending: true)
-                }
-                ForEach(week.cards, id: \.id) { card in
-                    NavigationLink(value: EntryLink(id: card.id, title: card.title)) {
-                        EntryRow(title: card.title, date: card.occurredOn)
+                    ForEach(week.cards, id: \.id) { card in
+                        NavigationLink(value: EntryLink(id: card.id, title: card.title)) {
+                            EntryRow(title: card.title, date: card.occurredOn)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
             if root { PastWeeks(session: session) }

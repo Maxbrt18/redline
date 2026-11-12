@@ -14,11 +14,14 @@ enum NotebookTab: Hashable, CaseIterable {
         }
     }
 
-    var symbol: String {
+    /// The tab's drawing in the asset catalogue: the notebook page for Today, the load rising
+    /// to its target for Week, the chequered flag for Race. Only Today has a filled form; the
+    /// two others keep one drawing and take the tint alone when selected.
+    func image(selected: Bool) -> String {
         switch self {
-        case .today: "sun.horizon"
-        case .week: "chart.bar"
-        case .race: "flag"
+        case .today: selected ? "Tabs/today.fill" : "Tabs/today"
+        case .week: "Tabs/week"
+        case .race: "Tabs/race"
         }
     }
 }
@@ -117,7 +120,7 @@ struct RootView: View {
 
     @TabContentBuilder<NotebookTab> private func tabContent(_ session: NotebookSession) -> some TabContent<NotebookTab> {
         ForEach(NotebookTab.allCases, id: \.self) { tab in
-            Tab(tab.title, systemImage: tab.symbol, value: tab) {
+            Tab(tab.title, image: tab.image(selected: selection == tab), value: tab) {
                 NavigationStack(path: Binding(get: { paths[tab] ?? NavigationPath() }, set: { paths[tab] = $0 })) {
                     Group {
                         switch tab {

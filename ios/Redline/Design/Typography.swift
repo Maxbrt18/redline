@@ -101,6 +101,12 @@ enum Space {
     static let m: CGFloat = 16
     static let l: CGFloat = 24
     static let xl: CGFloat = 32
+    /// The page's side margin: a screen's title, hero and content all start on it.
+    static let gutter: CGFloat = 20
+    /// Between two sections of a page, and from the head of a page to its first section.
+    static let section: CGFloat = xl
+    /// From the track, or a paper screen's head, to the page.
+    static let pageTop: CGFloat = l
 }
 
 /// The two corner radii: a surface a finger presses, and a mark in a chart.
