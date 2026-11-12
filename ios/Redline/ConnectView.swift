@@ -1,12 +1,14 @@
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 /// The notebook before this device is connected: how to get a link, and where to paste it.
 struct ConnectView: View {
     let session: NotebookSession
-    /// Whether the pasteboard holds text. Reading this does not ask the reader's permission;
-    /// reading the text itself does, so only the system paste button reads it.
-    @State private var canPaste = UIPasteboard.general.hasStrings
+    /// Whether the pasteboard holds text or a link: Messenger copies a button's link as a URL,
+    /// not as text. Reading this does not ask the reader's permission; reading the content
+    /// itself does, so only the system paste button reads it.
+    @State private var canPaste = Self.pasteboardHasLink
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -36,20 +38,45 @@ struct ConnectView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIPasteboard.changedNotification)) { _ in
-            canPaste = UIPasteboard.general.hasStrings
+            canPaste = Self.pasteboardHasLink
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { canPaste = UIPasteboard.general.hasStrings }
+            if phase == .active { canPaste = Self.pasteboardHasLink }
         }
+    }
+
+    private static var pasteboardHasLink: Bool {
+        UIPasteboard.general.hasStrings || UIPasteboard.general.hasURLs
+    }
+
+    /// The pasted link, whether it came as a URL or as text.
+    private static func link(in providers: [NSItemProvider]) async -> String? {
+        for provider in providers {
+            if provider.canLoadObject(ofClass: URL.self) {
+                let url: String? = await withCheckedContinuation { continuation in
+                    _ = provider.loadObject(ofClass: URL.self) { url, _ in continuation.resume(returning: url?.absoluteString) }
+                }
+                if let url { return url }
+            }
+            if provider.canLoadObject(ofClass: String.self) {
+                let text: String? = await withCheckedContinuation { continuation in
+                    _ = provider.loadObject(ofClass: String.self) { text, _ in continuation.resume(returning: text) }
+                }
+                if let text { return text }
+            }
+        }
+        return nil
     }
 
     /// The system paste button while there is text to paste; otherwise a button in the
     /// system's disabled state, with what to copy first.
     @ViewBuilder private var paste: some View {
         if canPaste {
-            PasteButton(payloadType: String.self) { strings in
-                guard let text = strings.first else { return }
-                Task { await session.connect(with: text) }
+            PasteButton(supportedContentTypes: [.url, .plainText]) { providers in
+                Task {
+                    guard let text = await Self.link(in: providers) else { return }
+                    await session.connect(with: text)
+                }
             }
             .buttonBorderShape(.capsule)
             .controlSize(.large)
