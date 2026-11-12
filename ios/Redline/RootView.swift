@@ -16,7 +16,7 @@ enum NotebookTab: Hashable, CaseIterable {
 
     var symbol: String {
         switch self {
-        case .today: "calendar"
+        case .today: "sun.horizon"
         case .week: "chart.bar"
         case .race: "flag"
         }
@@ -61,8 +61,14 @@ struct RootView: View {
                             StrengthScreen(session: session, launch: launch)
                         }
                         #if DEBUG
-                        // `-RedlineStrength YES` with the demo opens its strength session at launch.
+                        // `-RedlineStrength YES` with the demo opens its strength session at launch;
+                        // `-RedlineTab week|race` opens that tab.
                         .task {
+                            switch UserDefaults.standard.string(forKey: "RedlineTab") {
+                            case "week": selection = .week
+                            case "race": selection = .race
+                            default: break
+                            }
                             if UserDefaults.standard.bool(forKey: "RedlineStrength"), let token = StrengthToken(String(repeating: "A", count: 32)) {
                                 session.strength = StrengthLaunch(token: token, sid: nil)
                             }
@@ -83,7 +89,7 @@ struct RootView: View {
     }
 
     private func tabs(_ session: NotebookSession) -> some View {
-        TabView(selection: $selection) {
+        TabView(selection: reselecting) {
             tabContent(session)
         }
         // A card received in Messenger opens on top of Today: back leads there.
@@ -95,6 +101,18 @@ struct RootView: View {
             today.append(EntryLink(id: entry))
             paths[.today] = today
         }
+    }
+
+    /// The selection. `TabView` calls the setter on a tap of the tab already selected, which
+    /// pops that tab's stack to its root; the scroll back to the top is the system's own.
+    private var reselecting: Binding<NotebookTab> {
+        Binding(
+            get: { selection },
+            set: { tab in
+                if tab == selection { paths[tab] = NavigationPath() }
+                selection = tab
+            }
+        )
     }
 
     @TabContentBuilder<NotebookTab> private func tabContent(_ session: NotebookSession) -> some TabContent<NotebookTab> {
