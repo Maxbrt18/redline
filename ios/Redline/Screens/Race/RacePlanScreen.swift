@@ -28,19 +28,19 @@ private struct RacePlanContent: View {
         VStack(alignment: .leading, spacing: 0) {
             if let pace {
                 PaceStepper(pace: pace) { explored = $0 }
-                Text(paceNote(pace)).font(.footnote).foregroundStyle(Palette.muted).padding(.top, 8)
+                Text(paceNote(pace)).textRole(.caption).foregroundStyle(Palette.muted).padding(.top, Space.xs)
             } else {
                 Text("Allure à choisir avec le coach : les passages s’afficheront ensuite.")
-                    .font(.footnote).foregroundStyle(Palette.muted)
+                    .textRole(.caption).foregroundStyle(Palette.muted)
             }
             SectionTitle(text: "Profil", meta: plan.source == .ign ? "altitude IGN" : "altitude du GPX")
-            RaceProfile(plan: plan, full: true).padding(.top, 14)
+            RaceProfile(plan: plan, full: true).padding(.top, Space.s)
             if let pace { passages(pace) }
             if !plan.climbs.isEmpty { ClimbList(plan: plan, pace: pace) }
             SectionTitle(text: "Parcours")
-            Text(courseFacts).font(.footnote).foregroundStyle(Palette.muted).padding(.top, 10)
+            Text(courseFacts).textRole(.caption).foregroundStyle(Palette.muted).padding(.top, Space.xs)
         }
-        .padding(.bottom, 24)
+        .padding(.bottom, Space.l)
     }
 
     private func paceNote(_ pace: Double) -> String {
@@ -60,12 +60,12 @@ private struct RacePlanContent: View {
         }
         if let finish = timed.last {
             Text("Arrivée 9 fois sur 10 entre \(Numbers.hours(finish.nineInTen.lowerBound)) et \(Numbers.hours(finish.nineInTen.upperBound)) de course. Nuit, fatigue et terrain technique ne sont pas modélisés.")
-                .font(.footnote).foregroundStyle(Palette.muted).padding(.top, 10)
+                .textRole(.caption).foregroundStyle(Palette.muted).padding(.top, Space.xs)
         }
         if let start = plan.start, view.weather == nil, let opens = Day(String(start.prefix(10)))?.adding(-15) {
             SectionTitle(text: "Météo aux passages")
             Text("Prévision disponible vers le \(opens.spelled(weekday: false)) : ressenti, ciel et vent à chaque ravito, à l’heure du passage.")
-                .font(.footnote).foregroundStyle(Palette.muted).padding(.top, 10)
+                .textRole(.caption).foregroundStyle(Palette.muted).padding(.top, Space.xs)
         }
     }
 
@@ -83,25 +83,39 @@ private struct RacePlanContent: View {
     }
 }
 
-/// The pace explored, five seconds at a time, between two glass buttons.
+/// The pace explored, five seconds at a time, between two glass buttons; at the
+/// accessibility sizes the figure stands above the two buttons.
 private struct PaceStepper: View {
     let pace: Double
     let change: (Double) -> Void
     private let step = 5.0
+    @Environment(\.dynamicTypeSize) private var typeSize
+    /// A button's side: never under the 44 pt of a tap target, growing a little with the
+    /// text size.
+    @ScaledMetric(relativeTo: .title3) private var side: CGFloat = 44
 
     var body: some View {
-        HStack(spacing: 10) {
-            button("Plus lent", symbol: "minus") { change(pace + step) }
-            VStack(spacing: 2) {
-                Text(Numbers.pace(pace)).font(.figure(40)).monospacedDigit().contentTransition(.numericText())
-                Text("/km à plat équivalent").font(.caption).foregroundStyle(Palette.muted)
+        Group {
+            if typeSize.isAccessibilitySize {
+                VStack(spacing: Space.s) {
+                    figure
+                    HStack {
+                        slower
+                        Spacer(minLength: Space.m)
+                        faster
+                    }
+                }
+            } else {
+                HStack(spacing: Space.s) {
+                    slower
+                    figure.frame(maxWidth: .infinity)
+                    faster
+                }
             }
-            .frame(maxWidth: .infinity)
-            button("Plus vite", symbol: "plus") { change(max(150, pace - step)) }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(Palette.panel, in: .rect(cornerRadius: 18))
+        .padding(.horizontal, Space.m)
+        .padding(.vertical, Space.s)
+        .background(Palette.panel, in: .rect(cornerRadius: Radius.surface))
         .animation(.snappy, value: pace)
         .sensoryFeedback(.selection, trigger: pace)
         .accessibilityElement(children: .ignore)
@@ -116,15 +130,52 @@ private struct PaceStepper: View {
         }
     }
 
+    private var figure: some View {
+        VStack(spacing: 2) {
+            Text(Numbers.pace(pace)).figure(.large).contentTransition(.numericText())
+            Text("/km à plat équivalent").textRole(.caption).foregroundStyle(Palette.muted)
+                .multilineTextAlignment(.center)
+        }
+    }
+
+    private var slower: some View { button("Plus lent", symbol: "minus") { change(pace + step) } }
+    private var faster: some View { button("Plus vite", symbol: "plus") { change(max(150, pace - step)) } }
+
     /// Both glyphs in the same square, so that the two circles are the same size.
     private func button(_ label: String, symbol: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: symbol).font(.title3.weight(.semibold)).frame(width: 30, height: 30)
+            Image(systemName: symbol).font(.title3.weight(.semibold)).dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+                .frame(width: min(side, 60), height: min(side, 60))
         }
         .buttonStyle(.glass)
         .buttonBorderShape(.circle)
         .tint(Palette.ink)
         .accessibilityLabel(label)
+    }
+}
+
+/// Two columns while the text is small: what a row names on the left, its figure on the
+/// right, flush with the edge. At the accessibility sizes the figure goes under the words,
+/// aligned with them.
+private struct PlanColumns<Leading: View, Trailing: View>: View {
+    @ViewBuilder let leading: Leading
+    @ViewBuilder let trailing: Trailing
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        if typeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: Space.xxs) {
+                leading
+                trailing
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            HStack(alignment: .firstTextBaseline) {
+                leading
+                Spacer(minLength: Space.xs)
+                trailing.multilineTextAlignment(.trailing)
+            }
+        }
     }
 }
 
@@ -139,29 +190,30 @@ private struct PassageRow: View {
         let clock = plan.wallClock(after: passage.hours).flatMap(Numbers.clock)
         let carbs = passage.carbs.map { "≈ \(Int(($0 / 5).rounded()) * 5) g de glucides \(passage.finish ? "au dernier tronçon" : "au tronçon")" }
         let facts = [clock.map { "vers \($0)" }, carbs].compactMap { $0 }.joined(separator: " · ")
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline) {
-                (Text(passage.name).font(.subheadline.weight(.semibold))
-                    + Text("  km \(Numbers.text(passage.km, digits: 0))").font(.footnote).foregroundStyle(Palette.muted))
-                Spacer(minLength: 8)
-                Text(Numbers.hours(passage.hours)).font(.figure(passage.finish ? 26 : 22)).monospacedDigit()
+        let name = Text(passage.name).font(TextRole.secondary.font.weight(.semibold))
+        let km = Text("km \(Numbers.text(passage.km, digits: 0))").font(TextRole.caption.font).foregroundStyle(Palette.muted)
+        VStack(alignment: .leading, spacing: Space.xxs) {
+            PlanColumns {
+                Text("\(name)  \(km)")
+            } trailing: {
+                Text(Numbers.hours(passage.hours)).figure(.medium)
             }
-            HStack(alignment: .firstTextBaseline) {
-                Text(facts).font(.caption).foregroundStyle(Palette.muted)
-                Spacer(minLength: 8)
+            PlanColumns {
+                Text(facts).textRole(.caption).foregroundStyle(Palette.muted)
+            } trailing: {
                 Text("\(Numbers.hours(passage.likely.lowerBound)) – \(Numbers.hours(passage.likely.upperBound))")
-                    .font(.caption).foregroundStyle(Palette.muted).lineLimit(1).fixedSize()
+                    .textRole(.caption).monospacedDigit().foregroundStyle(Palette.muted)
             }
             if let hour {
                 let sky = Sky(hour)
-                HStack(spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
                     SkySymbol(sky: sky).font(.body)
-                    Text("\(hour.temp)°, ressenti \(hour.feels)° · \(sky.word) · vent \(hour.wind) km/h").font(.footnote)
+                    Text("\(hour.temp)°, ressenti \(hour.feels)° · \(sky.word) · vent \(hour.wind) km/h").textRole(.caption)
                 }
-                .padding(.top, 2)
+                .padding(.top, Space.xxs)
             }
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, Space.s)
         .accessibilityElement(children: .combine)
     }
 }
@@ -182,11 +234,12 @@ private struct ClimbList: View {
             if !bumps.isEmpty {
                 let gain = bumps.reduce(0) { $0 + $1.gainM }
                 Text("Et \(bumps.count) bosse\(bumps.count > 1 ? "s" : "") plus courte\(bumps.count > 1 ? "s" : "") : +\(Int(gain)) m en tout.")
-                    .font(.footnote).foregroundStyle(Palette.muted).padding(.top, 10)
+                    .textRole(.caption).foregroundStyle(Palette.muted).padding(.top, Space.xs)
             }
         }
     }
 
+    /// The climb's number is bare, as on the profile, set apart from where it starts.
     private func row(_ climb: Notebook.RouteClimb, number: Int) -> some View {
         let length = climb.endKm - climb.startKm
         let steep = climb.steepestPct >= climb.gradePct + 2
@@ -195,28 +248,24 @@ private struct ClimbList: View {
         let footText = foot.map { hours in
             "pied à \(Numbers.hours(hours))" + (plan.wallClock(after: hours).flatMap(Numbers.clock).map { ", vers \($0)" } ?? "")
         }
-        return VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text("\(number)")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(Palette.hRace)
-                        .frame(width: 20, height: 20)
-                        .background(Palette.hRace.opacity(0.18), in: .circle)
-                        .alignmentGuide(.firstTextBaseline) { $0[.firstTextBaseline] }
-                    (Text("km \(Numbers.text(climb.startKm))").font(.subheadline.weight(.semibold))
-                        + Text("  → \(Numbers.text(climb.endKm))").font(.footnote).foregroundStyle(Palette.muted))
+        let start = Text("km \(Numbers.text(climb.startKm))").font(TextRole.secondary.font.weight(.semibold))
+        let end = Text("  → \(Numbers.text(climb.endKm))").font(TextRole.caption.font).foregroundStyle(Palette.muted)
+        return VStack(alignment: .leading, spacing: Space.xxs) {
+            PlanColumns {
+                HStack(alignment: .firstTextBaseline, spacing: Space.xs) {
+                    Text("\(number) ·").figure(.inline).foregroundStyle(Palette.muted)
+                    Text("\(start)\(end)")
                 }
-                Spacer(minLength: 8)
-                Text("+\(Int(climb.gainM)) m").font(.figure(22))
+            } trailing: {
+                Text("+\(Int(climb.gainM)) m").figure(.medium)
             }
-            HStack(alignment: .firstTextBaseline) {
-                Text("\(Numbers.text(length)) km à \(Int(climb.gradePct.rounded())) %\(steep)").font(.caption).foregroundStyle(Palette.muted)
-                Spacer(minLength: 8)
-                if let footText { Text(footText).font(.caption).foregroundStyle(Palette.muted).multilineTextAlignment(.trailing) }
+            PlanColumns {
+                Text("\(Numbers.text(length)) km à \(Int(climb.gradePct.rounded())) %\(steep)").textRole(.caption).foregroundStyle(Palette.muted)
+            } trailing: {
+                if let footText { Text(footText).textRole(.caption).foregroundStyle(Palette.muted) }
             }
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, Space.s)
         .accessibilityElement(children: .combine)
     }
 }
