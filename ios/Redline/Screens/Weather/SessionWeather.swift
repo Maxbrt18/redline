@@ -1,9 +1,8 @@
 import RedlineKit
 import SwiftUI
 
-/// The sky as a two-tone symbol: a grey cloud, a yellow sun, blue rain, an indigo moon.
-/// The system's multicolour clouds are white and vanish on paper. Colour stays within the
-/// weather; elsewhere it keeps its meaning.
+/// The sky as a symbol in one ink, its layers told apart by the system's hierarchical
+/// rendering: the weather keeps to the page's palette, and its words say what it is.
 struct SkySymbol: View {
     let name: String
 
@@ -16,23 +15,10 @@ struct SkySymbol: View {
     }
 
     var body: some View {
-        let (primary, secondary) = colours
         Image(systemName: name)
-            .symbolRenderingMode(.palette)
-            .foregroundStyle(primary, secondary)
+            .symbolRenderingMode(.hierarchical)
+            .foregroundStyle(Palette.muted)
             .accessibilityHidden(true)
-    }
-
-    private var colours: (Color, Color) {
-        switch name {
-        case "sun.max.fill", "sunrise.fill": (.orange, .orange)
-        case "moon.stars.fill": (.indigo, .indigo)
-        case "cloud.sun.fill": (Palette.faint, .orange)
-        case "cloud.moon.fill": (Palette.faint, .indigo)
-        case "cloud.rain.fill", "cloud.bolt.rain.fill": (Palette.faint, .blue)
-        case "cloud.snow.fill": (Palette.faint, .cyan)
-        default: (Palette.faint, Palette.faint)
-        }
     }
 
     static func name(_ sky: Sky) -> String {
@@ -85,9 +71,10 @@ struct SessionWeather: View {
     @Environment(\.notebook) private var session
     @State private var forecast: Notebook.Forecast?
     @State private var settled = false
+    @ScaledMetric(relativeTo: .subheadline) private var placeholder: CGFloat = 40
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Space.s) {
             if let forecast, let first = forecast.hours.first {
                 switch size {
                 case .full: full(forecast, first: first)
@@ -95,11 +82,11 @@ struct SessionWeather: View {
                 }
             } else if !settled, size == .full {
                 // The block's room is kept while it loads, so nothing below is pushed.
-                Color.clear.frame(height: 40)
+                Color.clear.frame(height: placeholder)
             }
             if size == .full, let cap = item.targets.hrCapBpm {
                 PrepRow(symbol: "applewatch") {
-                    Text("Alerte FC de la montre sur ") + Text("\(cap)").bold()
+                    Text("Alerte FC de la montre sur \(Text("\(cap)").bold())")
                 }
             }
         }
@@ -115,12 +102,19 @@ struct SessionWeather: View {
         let words = sky.wet ? sky.word : sky.word + ((first.rain ?? 0) >= 20 ? ", \(Sky.rainWord(first.rain))" : ", sec")
         let later = [first.wind >= 25 ? "Vent fort \(first.wind) km/h" : "Vent \(first.wind) km/h",
                      last.hour != first.hour ? "\(last.temp)° à \(last.hour) h" : nil].compactMap { $0 }
+        let description = VStack(alignment: .leading, spacing: 2) {
+            Text("Ressenti \(first.feels)° · \(words)").textRole(.secondary)
+            Text(later.joined(separator: " · ")).textRole(.caption).foregroundStyle(Palette.muted)
+        }
         PrepRow(sky: sky) {
-            HStack(alignment: .center, spacing: 10) {
-                Text("\(first.temp)°").font(.figure(30))
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Ressenti \(first.feels)° · \(words)").font(.subheadline)
-                    Text(later.joined(separator: " · ")).font(.caption).foregroundStyle(Palette.muted)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: Space.s) {
+                    Text("\(first.temp)°").figure(.large, .done)
+                    description
+                }
+                VStack(alignment: .leading, spacing: Space.xxs) {
+                    Text("\(first.temp)°").figure(.large, .done)
+                    description
                 }
             }
         }
@@ -132,22 +126,24 @@ struct SessionWeather: View {
     private func line(_ forecast: Notebook.Forecast, first: Notebook.ForecastHour) -> some View {
         let sky = Sky(first)
         return PrepRow(sky: sky) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text("\(first.temp)°, ressenti \(first.feels)° · \(sky.word)").font(.subheadline)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(first.temp)°, ressenti \(first.feels)° · \(sky.word)").textRole(.secondary)
                 if let sunset = forecast.sunset.flatMap(Numbers.clock) {
-                    Text("Nuit à \(sunset)").font(.caption).foregroundStyle(Palette.muted)
+                    Text("Nuit à \(sunset)").textRole(.caption).foregroundStyle(Palette.muted)
                 }
             }
         }
     }
 }
 
-/// One line of the departure sheet: a symbol on a pill, then its words.
+/// One line of the departure sheet: a bare symbol in a column that follows the text size,
+/// then its words.
 private struct PrepRow<Words: View>: View {
     let symbol: String
-    /// A sky's symbol, in its colours; otherwise the glyph is ink.
+    /// A sky's symbol, in the hierarchical rendering; otherwise the glyph is plain.
     var sky = false
     @ViewBuilder var words: Words
+    @ScaledMetric(relativeTo: .body) private var side: CGFloat = 28
 
     init(symbol: String, @ViewBuilder words: () -> Words) {
         self.symbol = symbol
@@ -165,18 +161,18 @@ private struct PrepRow<Words: View>: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Space.s) {
             Group {
                 if sky {
                     SkySymbol(name: symbol)
                 } else {
-                    Image(systemName: symbol).foregroundStyle(Palette.ink)
+                    Image(systemName: symbol).foregroundStyle(Palette.muted)
                 }
             }
-            .font(.system(size: 15))
-            .frame(width: 34, height: 34)
+            .font(.body)
+            .frame(width: side)
             .accessibilityHidden(true)
-            words.font(.subheadline)
+            words.textRole(.secondary)
         }
         .accessibilityElement(children: .combine)
     }
@@ -192,7 +188,7 @@ struct InlineWeather: View {
         Group {
             if let first = forecast?.hours.first {
                 let sky = Sky(first)
-                HStack(spacing: 3) {
+                HStack(spacing: Space.xxs) {
                     SkySymbol(sky: sky)
                     Text("\(first.temp)°, \(sky.word)" + (item.startTime == nil && first.hour < 12 ? " le matin" : ""))
                 }
