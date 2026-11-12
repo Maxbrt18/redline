@@ -15,9 +15,9 @@ struct SectionTitle: View {
                     Text(meta).font(.footnote).foregroundStyle(Palette.muted).multilineTextAlignment(.trailing)
                 }
             }
-            Rectangle().fill(Palette.grid).frame(height: 0.5)
         }
         .padding(.top, 30)
+        .padding(.bottom, 8)
     }
 }
 
@@ -68,8 +68,7 @@ struct AheadList: View {
             Spacer(minLength: 8)
             Text(main.plannedValue).font(.figure(17, weight: .semibold)).foregroundStyle(Palette.muted)
         }
-        .padding(.vertical, 11)
-        .overlay(alignment: .bottom) { Rectangle().fill(Palette.grid).frame(height: 0.5) }
+        .padding(.vertical, 12)
         .accessibilityElement(children: .combine)
     }
 }

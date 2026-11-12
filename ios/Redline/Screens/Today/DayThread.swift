@@ -218,8 +218,7 @@ struct ExerciseList: View {
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 10)
-                        .overlay(alignment: .bottom) { Rectangle().fill(Palette.grid).frame(height: 0.5) }
+                        .padding(.vertical, 12)
                     }
                 }
             }

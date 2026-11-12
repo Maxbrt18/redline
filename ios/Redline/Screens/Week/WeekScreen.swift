@@ -233,8 +233,7 @@ private struct WeekDayRow: View {
                 .padding(.leading, 52)
             }
         }
-        .padding(.vertical, 10)
-        .overlay(alignment: .bottom) { Rectangle().fill(Palette.grid).frame(height: 0.5) }
+        .padding(.vertical, 12)
     }
 
 
@@ -392,7 +391,6 @@ struct WeekLine: View {
         }
         .padding(.vertical, 12)
         .contentShape(.rect)
-        .overlay(alignment: .bottom) { Rectangle().fill(Palette.grid).frame(height: 0.5) }
     }
 }
 

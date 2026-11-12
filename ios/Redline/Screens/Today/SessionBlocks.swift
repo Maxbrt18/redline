@@ -53,8 +53,7 @@ struct FactTiles: View {
                     Text(cell.1).font(.caption).foregroundStyle(Palette.muted)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 8)
-                .overlay(alignment: .top) { Rectangle().fill(Palette.grid).frame(height: 0.5) }
+                .padding(.vertical, 12)
             }
         }
     }

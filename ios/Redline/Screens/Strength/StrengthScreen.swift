@@ -294,8 +294,7 @@ private struct StepRow: View {
                 StrengthControl(model: model, run: run, index: index)
             }
         }
-        .padding(.vertical, 14)
-        .overlay(alignment: .bottom) { Rectangle().fill(Palette.grid).frame(height: 0.5) }
+        .padding(.vertical, 12)
     }
 
     private func head(live: Bool, done: Bool) -> some View {

@@ -60,7 +60,6 @@ private struct HabitsList: View {
                 .disabled(stopping != nil)
         }
         .padding(.vertical, 12)
-        .overlay(alignment: .bottom) { Rectangle().fill(Palette.grid).frame(height: 0.5) }
     }
 
     private func stop(_ habit: Notebook.Habit) async {

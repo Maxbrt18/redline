@@ -109,7 +109,6 @@ struct EntryRow: View {
         }
         .padding(.vertical, 12)
         .contentShape(.rect)
-        .overlay(alignment: .bottom) { Rectangle().fill(Palette.grid).frame(height: 0.5) }
     }
 }
 
@@ -266,8 +265,7 @@ private struct StrengthReportView: View {
                     if !details.isEmpty { Text(details).font(.caption).foregroundStyle(Palette.muted) }
                     if !exercise.note.isEmpty { Text(exercise.note).font(.footnote) }
                 }
-                .padding(.vertical, 10)
-                .overlay(alignment: .bottom) { Rectangle().fill(Palette.grid).frame(height: 0.5) }
+                .padding(.vertical, 12)
                 .accessibilityElement(children: .combine)
             }
         }

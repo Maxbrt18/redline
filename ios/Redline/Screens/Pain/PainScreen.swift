@@ -82,7 +82,6 @@ private struct PainContent: View {
                     }
                     .font(.subheadline)
                     .padding(.vertical, 12)
-                    .overlay(alignment: .bottom) { Rectangle().fill(Palette.grid).frame(height: 0.5) }
                 }
             }
         }
@@ -244,7 +243,6 @@ private struct PainWeeks: View {
             .foregroundStyle(Palette.faint)
             .padding(.bottom, 6)
             ForEach(view.weeks.reversed(), id: \.week) { week in
-                Divider().overlay(Palette.grid)
                 GridRow(alignment: .firstTextBaseline) {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text("\(Int(week.week.suffix(2)) ?? 0)").font(.figure(18))
@@ -257,7 +255,7 @@ private struct PainWeeks: View {
                     Text(week.wake.map { Numbers.text($0) } ?? "—")
                 }
                 .font(.subheadline)
-                .padding(.vertical, 10)
+                .padding(.vertical, 12)
                 .accessibilityElement(children: .combine)
             }
         }

@@ -169,7 +169,6 @@ struct TrackPreview: View {
                     .frame(maxWidth: .infinity)
                 ForEach(0..<12) { index in
                     Text("Ligne \(index + 1)").frame(maxWidth: .infinity, alignment: .leading)
-                    Divider()
                 }
             }
         }

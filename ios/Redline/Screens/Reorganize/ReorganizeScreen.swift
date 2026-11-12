@@ -240,10 +240,9 @@ private struct DayRow: View {
                 Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(Palette.faint)
             }
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, 12)
         .opacity(day.past ? 0.55 : 1)
         .contentShape(.rect)
-        .overlay(alignment: .bottom) { Rectangle().fill(Palette.grid).frame(height: 0.5) }
         .accessibilityElement(children: .combine)
     }
 }
@@ -264,7 +263,6 @@ struct EntryLine: View {
         }
         .padding(.vertical, 12)
         .contentShape(.rect)
-        .overlay(alignment: .bottom) { Rectangle().fill(Palette.grid).frame(height: 0.5) }
     }
 }
 

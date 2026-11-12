@@ -76,7 +76,6 @@ struct DetailHead: View {
                 Spacer()
                 if let aside { Text(aside).font(.caption).foregroundStyle(Palette.muted) }
             }
-            Rectangle().fill(Palette.grid).frame(height: 0.5)
         }
         .padding(.top, 30)
         .padding(.bottom, 10)
@@ -107,8 +106,7 @@ struct DetailTile<Sub: View>: View {
             sub.font(.caption).foregroundStyle(Palette.muted)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 10)
-        .overlay(alignment: .top) { Rectangle().fill(Palette.grid).frame(height: 0.5) }
+        .padding(.vertical, 12)
     }
 }
 

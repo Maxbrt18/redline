@@ -162,7 +162,6 @@ private struct PassageRow: View {
             }
         }
         .padding(.vertical, 12)
-        .overlay(alignment: .bottom) { Rectangle().fill(Palette.grid).frame(height: 0.5) }
         .accessibilityElement(children: .combine)
     }
 }
@@ -218,7 +217,6 @@ private struct ClimbList: View {
             }
         }
         .padding(.vertical, 12)
-        .overlay(alignment: .bottom) { Rectangle().fill(Palette.grid).frame(height: 0.5) }
         .accessibilityElement(children: .combine)
     }
 }
