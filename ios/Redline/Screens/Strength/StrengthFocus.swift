@@ -106,7 +106,7 @@ struct StrengthFocus: View {
             center.frame(maxHeight: .infinity)
             bottom
         }
-        .padding(.horizontal, Space.l)
+        .padding(.horizontal, Space.gutter)
         .padding(.bottom, Space.m)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Palette.bg)

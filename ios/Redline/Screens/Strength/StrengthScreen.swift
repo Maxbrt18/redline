@@ -18,6 +18,7 @@ struct StrengthScreen: View {
     @State private var rating = false
     @State private var asking = false
     @State private var typed = ""
+    @State private var titleInView = true
     @AppStorage(StrengthSound.enabledKey) private var soundOn = true
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -46,8 +47,7 @@ struct StrengthScreen: View {
         NavigationStack {
             content
                 .background(Palette.bg)
-                .navigationTitle(focusing ? "" : model.run?.session.title ?? "Renfo")
-                .navigationBarTitleDisplayMode(focusing ? .inline : .large)
+                .navigationBarTitleDisplayMode(.inline)
                 .toolbar { toolbar }
                 .toolbarColorScheme(resting ? shownScheme : nil, for: .navigationBar)
         }
@@ -199,23 +199,32 @@ struct StrengthScreen: View {
             ContentUnavailableView(title, systemImage: "exclamationmark.triangle", description: Text(text))
         case .running:
             if let run = model.run {
+                let title = LocalizedStringKey(run.session.title)
                 if run.needsOpening {
                     ScrollView {
                         VStack(alignment: .leading, spacing: Space.l) {
-                            SessionHead(session: run.session)
+                            VStack(alignment: .leading, spacing: Space.xxs) {
+                                PageTitle(title: title)
+                                SessionHead(session: run.session)
+                            }
                             Preparation(preparation: StrengthPreparation(run: run, previous: model.previous))
                             Opening(model: model, run: run)
                         }
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, Space.gutter)
                         .padding(.bottom, Space.xl)
                     }
+                    .compactTitle(title, inView: $titleInView)
                 } else if run.progress.review {
                     ScrollView {
-                        StrengthReview(model: model, run: run)
-                            .padding(.horizontal, 20)
-                            .padding(.bottom, Space.xl)
+                        VStack(alignment: .leading, spacing: Space.xxs) {
+                            PageTitle(title: title)
+                            StrengthReview(model: model, run: run)
+                        }
+                        .padding(.horizontal, Space.gutter)
+                        .padding(.bottom, Space.xl)
                     }
                     .scrollDismissesKeyboard(.interactively)
+                    .compactTitle(title, inView: $titleInView)
                 } else {
                     StrengthFocus(model: model, run: run, asking: $asking)
                 }
@@ -270,7 +279,7 @@ private struct StrengthOverview: View {
                         }
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, Space.gutter)
                 .padding(.bottom, Space.xl)
             }
             .background(Palette.bg)

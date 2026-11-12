@@ -25,20 +25,27 @@ private struct RacePlanContent: View {
     private var pace: Double? { explored ?? plan.paceSPerKm }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if let pace {
-                PaceStepper(pace: pace) { explored = $0 }
-                Text(paceNote(pace)).textRole(.caption).foregroundStyle(Palette.muted).padding(.top, Space.xs)
-            } else {
-                Text("Allure à choisir avec le coach : les passages s’afficheront ensuite.")
-                    .textRole(.caption).foregroundStyle(Palette.muted)
+        VStack(alignment: .leading, spacing: Space.section) {
+            VStack(alignment: .leading, spacing: 0) {
+                if let pace {
+                    PaceStepper(pace: pace) { explored = $0 }
+                    Text(paceNote(pace)).textRole(.caption).foregroundStyle(Palette.muted).padding(.top, Space.xs)
+                } else {
+                    Text("Allure à choisir avec le coach : les passages s’afficheront ensuite.")
+                        .textRole(.caption).foregroundStyle(Palette.muted)
+                }
             }
-            SectionTitle(text: "Profil", meta: plan.source == .ign ? "altitude IGN" : "altitude du GPX")
-            RaceProfile(plan: plan, full: true).padding(.top, Space.s)
+            VStack(alignment: .leading, spacing: 0) {
+                SectionTitle(text: "Profil", meta: plan.source == .ign ? "altitude IGN" : "altitude du GPX")
+                RaceProfile(plan: plan, full: true).padding(.top, Space.s)
+            }
             if let pace { passages(pace) }
+            forecastNote
             if !plan.climbs.isEmpty { ClimbList(plan: plan, pace: pace) }
-            SectionTitle(text: "Parcours")
-            Text(courseFacts).textRole(.caption).foregroundStyle(Palette.muted).padding(.top, Space.xs)
+            VStack(alignment: .leading, spacing: 0) {
+                SectionTitle(text: "Parcours")
+                Text(courseFacts).textRole(.caption).foregroundStyle(Palette.muted).padding(.top, Space.xs)
+            }
         }
         .padding(.bottom, Space.l)
     }
@@ -52,20 +59,28 @@ private struct RacePlanContent: View {
 
     /// In large, the time on the watch since the start; the time of day comes after
     /// « vers », so a passage never reads as two clocks.
-    @ViewBuilder private func passages(_ pace: Double) -> some View {
+    private func passages(_ pace: Double) -> some View {
         let timed = plan.passages(pace: pace)
-        SectionTitle(text: "Passages", meta: plan.start.flatMap(Numbers.clock).map { "temps de course · départ \($0)" } ?? "temps de course")
-        ForEach(Array(timed.enumerated()), id: \.offset) { index, passage in
-            PassageRow(plan: plan, passage: passage, hour: hour(of: passage, at: index))
+        return VStack(alignment: .leading, spacing: 0) {
+            SectionTitle(text: "Passages", meta: plan.start.flatMap(Numbers.clock).map { "temps de course · départ \($0)" } ?? "temps de course")
+            ForEach(Array(timed.enumerated()), id: \.offset) { index, passage in
+                PassageRow(plan: plan, passage: passage, hour: hour(of: passage, at: index))
+            }
+            if let finish = timed.last {
+                Text("Arrivée 9 fois sur 10 entre \(Numbers.hours(finish.nineInTen.lowerBound)) et \(Numbers.hours(finish.nineInTen.upperBound)) de course. Nuit, fatigue et terrain technique ne sont pas modélisés.")
+                    .textRole(.caption).foregroundStyle(Palette.muted).padding(.top, Space.xs)
+            }
         }
-        if let finish = timed.last {
-            Text("Arrivée 9 fois sur 10 entre \(Numbers.hours(finish.nineInTen.lowerBound)) et \(Numbers.hours(finish.nineInTen.upperBound)) de course. Nuit, fatigue et terrain technique ne sont pas modélisés.")
-                .textRole(.caption).foregroundStyle(Palette.muted).padding(.top, Space.xs)
-        }
-        if let start = plan.start, view.weather == nil, let opens = Day(String(start.prefix(10)))?.adding(-15) {
-            SectionTitle(text: "Météo aux passages")
-            Text("Prévision disponible vers le \(opens.spelled(weekday: false)) : ressenti, ciel et vent à chaque ravito, à l’heure du passage.")
-                .textRole(.caption).foregroundStyle(Palette.muted).padding(.top, Space.xs)
+    }
+
+    /// Before the forecast reaches the race day, when it will.
+    @ViewBuilder private var forecastNote: some View {
+        if pace != nil, let start = plan.start, view.weather == nil, let opens = Day(String(start.prefix(10)))?.adding(-15) {
+            VStack(alignment: .leading, spacing: 0) {
+                SectionTitle(text: "Météo aux passages")
+                Text("Prévision disponible vers le \(opens.spelled(weekday: false)) : ressenti, ciel et vent à chaque ravito, à l’heure du passage.")
+                    .textRole(.caption).foregroundStyle(Palette.muted).padding(.top, Space.xs)
+            }
         }
     }
 

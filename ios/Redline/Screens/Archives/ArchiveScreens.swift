@@ -39,18 +39,21 @@ private struct ArchivesList: View {
         }.sorted { $0.occurredOn > $1.occurredOn }
         let months = entries.map { String($0.occurredOn.prefix(7)) }.reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(months, id: \.self) { month in
-                Text(Self.monthName(month))
-                    .font(TextRole.caption.font.weight(.semibold))
-                    .foregroundStyle(Palette.muted)
-                    .accessibilityAddTraits(.isHeader)
-                    .padding(.top, Space.l)
-                    .padding(.bottom, Space.xxs)
-                ForEach(entries.filter { $0.occurredOn.hasPrefix(month) }, id: \.id) { entry in
-                    NavigationLink(value: EntryLink(id: entry.id, title: entry.title)) {
-                        EntryRow(title: entry.title, date: entry.occurredOn)
+            VStack(alignment: .leading, spacing: Space.l) {
+                ForEach(months, id: \.self) { month in
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(Self.monthName(month))
+                            .font(TextRole.caption.font.weight(.semibold))
+                            .foregroundStyle(Palette.muted)
+                            .accessibilityAddTraits(.isHeader)
+                            .padding(.bottom, Space.xxs)
+                        ForEach(entries.filter { $0.occurredOn.hasPrefix(month) }, id: \.id) { entry in
+                            NavigationLink(value: EntryLink(id: entry.id, title: entry.title)) {
+                                EntryRow(title: entry.title, date: entry.occurredOn)
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
-                    .buttonStyle(.plain)
                 }
             }
             if let offset = next ?? first.nextOffset {
@@ -135,11 +138,13 @@ private struct EntryContent: View {
     @ScaledMetric(relativeTo: .body) private var numberWidth: CGFloat = 18
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Space.section) {
             if !entry.imageHash.isEmpty { CardImage(entry: entry) }
             if !entry.body.isEmpty {
-                SectionTitle(text: "Le mot du coach")
-                Text(entry.body).textRole(.body).padding(.top, Space.s).textSelection(.enabled)
+                VStack(alignment: .leading, spacing: 0) {
+                    SectionTitle(text: "Le mot du coach")
+                    Text(entry.body).textRole(.body).padding(.top, Space.s).textSelection(.enabled)
+                }
             }
             if let snapshot = entry.snapshot {
                 let exercises = ExerciseList.exercises(snapshot)
@@ -166,22 +171,23 @@ private struct EntryContent: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .tint(Palette.ink)
-                    .padding(.top, Space.l)
                 }
             }
             if let report = entry.report {
                 StrengthReportView(report: report, names: Dictionary(
                     ExerciseList.slugsAndNames(entry.snapshot ?? [:]), uniquingKeysWith: { first, _ in first }))
             } else if entry.kind == "strength" {
-                Text("Aucun compte rendu rattaché à cette carte.").textRole(.caption).foregroundStyle(Palette.muted).padding(.top, Space.l)
+                Text("Aucun compte rendu rattaché à cette carte.").textRole(.caption).foregroundStyle(Palette.muted)
             }
             if entry.kind == "monthly", !entry.related.isEmpty {
-                SectionTitle(text: "Les weekly de ce mois")
-                ForEach(entry.related, id: \.id) { weekly in
-                    NavigationLink(value: EntryLink(id: weekly.id, title: weekly.title)) {
-                        EntryRow(title: weekly.title, date: weekly.occurredOn)
+                VStack(alignment: .leading, spacing: 0) {
+                    SectionTitle(text: "Les weekly de ce mois")
+                    ForEach(entry.related, id: \.id) { weekly in
+                        NavigationLink(value: EntryLink(id: weekly.id, title: weekly.title)) {
+                            EntryRow(title: weekly.title, date: weekly.occurredOn)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }

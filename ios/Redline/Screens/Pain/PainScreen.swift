@@ -91,24 +91,28 @@ private struct PainContent: View {
     let view: Notebook.InjuryView
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            PainChart(view: view)
-            if !view.wakes.isEmpty {
-                Text("Le réveil d’un jour est placé juste avant la séance de ce jour.")
-                    .textRole(.caption).foregroundStyle(Palette.muted).padding(.top, Space.xs)
+        VStack(alignment: .leading, spacing: Space.section) {
+            VStack(alignment: .leading, spacing: 0) {
+                PainChart(view: view)
+                if !view.wakes.isEmpty {
+                    Text("Le réveil d’un jour est placé juste avant la séance de ce jour.")
+                        .textRole(.caption).foregroundStyle(Palette.muted).padding(.top, Space.xs)
+                }
             }
             PainScale(steps: view.scale, cap: view.cap)
             PainWeeks(view: view)
             if !view.missing.isEmpty {
-                SectionTitle(text: "À renseigner")
-                ForEach(view.missing, id: \.self) { date in
-                    let day = Text("Réveil du \(Day(date)?.spelled(weekday: false) ?? date)").textRole(.secondary)
-                    let note = Text("sans note chiffrée").textRole(.caption).foregroundStyle(Palette.muted)
-                    ViewThatFits(in: .horizontal) {
-                        HStack(alignment: .firstTextBaseline) { day; Spacer(minLength: Space.xs); note }
-                        VStack(alignment: .leading, spacing: Space.xxs) { day; note }
+                VStack(alignment: .leading, spacing: 0) {
+                    SectionTitle(text: "À renseigner")
+                    ForEach(view.missing, id: \.self) { date in
+                        let day = Text("Réveil du \(Day(date)?.spelled(weekday: false) ?? date)").textRole(.secondary)
+                        let note = Text("sans note chiffrée").textRole(.caption).foregroundStyle(Palette.muted)
+                        ViewThatFits(in: .horizontal) {
+                            HStack(alignment: .firstTextBaseline) { day; Spacer(minLength: Space.xs); note }
+                            VStack(alignment: .leading, spacing: Space.xxs) { day; note }
+                        }
+                        .padding(.vertical, Space.s)
                     }
-                    .padding(.vertical, Space.s)
                 }
             }
         }

@@ -19,7 +19,7 @@ struct SessionDetailScreen: View {
                        onTrack: false) { detail in
             DetailHero(detail: detail)
         } content: { detail in
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: Space.section) {
                 DetailFacts(detail: detail)
                 DetailFeelings(detail: detail)
                 DetailPlanSection(detail: detail)
@@ -33,7 +33,6 @@ struct SessionDetailScreen: View {
                         Label("Ouvrir dans Strava", systemImage: "arrow.up.right.square")
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .padding(.vertical, Space.m)
                 }
             }
             .padding(.bottom, Space.l)
@@ -61,6 +60,7 @@ struct ZoneChip: View {
 }
 
 /// A section's head: its title, a few words at its right while they fit, under it otherwise.
+/// As for `SectionTitle`, the space above it is the page's.
 struct DetailHead: View {
     let title: String
     var aside: String?
@@ -77,7 +77,6 @@ struct DetailHead: View {
                 words
             }
         }
-        .padding(.top, Space.xl)
         .padding(.bottom, Space.xs)
     }
 

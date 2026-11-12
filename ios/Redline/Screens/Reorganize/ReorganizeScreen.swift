@@ -99,7 +99,7 @@ struct ReorganizeScreen: View {
                 days(view)
                 if !view.proposals.isEmpty {
                     ProposalsSection(view: view, session: session, model: model) { words in leave(saying: words) }
-                        .padding(.top, Space.l)
+                        .padding(.top, Space.section)
                 }
                 noticeLine(.variants)
                 variants(view)
@@ -134,6 +134,7 @@ struct ReorganizeScreen: View {
                 Banner(text: "Ta semaine tient déjà avec ces jours : rien à déplacer.")
             } else {
                 SectionTitle(text: view.variants.count == 1 ? "1 variante" : "\(view.variants.count) variantes")
+                    .padding(.top, Space.section)
                 // The engine's first placement is the screen's one prominent action, unless the
                 // coach's proposals come first.
                 ForEach(Array(view.variants.enumerated()), id: \.offset) { index, variant in
@@ -164,6 +165,7 @@ struct ReorganizeScreen: View {
                 tell(words, done: true, at: .ask)
                 Task { await model.load(session) }
             }
+            .padding(.top, Space.section)
         } else {
             Button { withAnimation { model.asking = true } } label: {
                 EntryLine(title: "Demander au coach", detail: "changer une séance, en ajouter une")

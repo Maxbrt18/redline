@@ -25,7 +25,6 @@ struct DetailFacts: View {
                 Text("pas/min")
             }
         }
-        .padding(.top, Space.l)
     }
 }
 

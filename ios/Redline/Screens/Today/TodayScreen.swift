@@ -44,22 +44,26 @@ private struct TodayContent: View {
     var body: some View {
         let items = today.sessions.filter { $0.kind != "rest" }
         let hero = TodayScreen.hero(today)?.1
-        VStack(alignment: .leading, spacing: 0) {
-            if ["awaiting", "stale"].contains(today.plan.status) {
-                Label(today.plan.message, systemImage: "hourglass")
-                    .textRole(.secondary)
-                    .padding(Space.m)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Palette.panel, in: .rect(cornerRadius: Radius.surface))
-                    .padding(.bottom, Space.m)
+        let working = !items.isEmpty || !today.extra.isEmpty
+        // A rest day already shows its next day in full: the list of what is coming skips it.
+        let shown = working ? nil : RestDay.shownDay(today)
+        VStack(alignment: .leading, spacing: Space.section) {
+            VStack(alignment: .leading, spacing: Space.m) {
+                if ["awaiting", "stale"].contains(today.plan.status) {
+                    Label(today.plan.message, systemImage: "hourglass")
+                        .textRole(.secondary)
+                        .padding(Space.m)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Palette.panel, in: .rect(cornerRadius: Radius.surface))
+                }
+                if working {
+                    DayThread(items: items, extra: today.extra, hero: hero, strength: today.strength,
+                              asks: today.asks, date: today.date)
+                } else {
+                    RestDay(today: today, hero: hero)
+                }
             }
-            if !items.isEmpty || !today.extra.isEmpty {
-                DayThread(items: items, extra: today.extra, hero: hero, strength: today.strength,
-                          asks: today.asks, date: today.date)
-                AheadList(items: today.ahead.filter { $0.date != today.date }, tomorrow: today.tomorrow.date)
-            } else {
-                RestDay(today: today, hero: hero)
-            }
+            AheadList(items: today.ahead.filter { $0.date != today.date && $0.date != shown }, tomorrow: today.tomorrow.date)
             Landmarks(today: today, openTab: openTab)
         }
         .padding(.bottom, Space.l)
@@ -71,10 +75,16 @@ private struct RestDay: View {
     let today: Notebook.TodayView
     let hero: Notebook.SessionItem?
 
+    /// The day shown in full under today's rest: tomorrow when it holds a session,
+    /// otherwise the next day that does.
+    static func shownDay(_ today: Notebook.TodayView) -> String? {
+        let next = today.tomorrow
+        return next.sessions.contains { $0.kind != "rest" } ? next.date : next.next.first?.date
+    }
+
     var body: some View {
         let next = today.tomorrow
         let real = next.sessions.filter { $0.kind != "rest" }
-        let shown = !real.isEmpty ? next.date : next.next.first?.date
         VStack(alignment: .leading, spacing: Space.m) {
             // The day's questions come before the rest.
             DayThread(items: [], extra: [], asks: today.asks, date: today.date)
@@ -95,7 +105,6 @@ private struct RestDay: View {
                 DayHeading(date: first.date, prefix: nil)
                 DayThread(items: next.next, extra: [], hero: hero, today: false)
             }
-            AheadList(items: today.ahead.filter { $0.date != today.date && $0.date != shown }, tomorrow: next.date)
         }
     }
 }

@@ -68,7 +68,7 @@ private struct RaceContent: View {
     let view: Notebook.RaceView
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: Space.section) {
             if view.race == nil {
                 Text("Aucune course datée.").textRole(.secondary).foregroundStyle(Palette.muted)
             } else if let plan = view.plan {
