@@ -10,6 +10,7 @@ struct DesignCatalogue: View {
     /// The demo notebook the screens opened from here read.
     @State private var demo = DemoNotebook.session()
     @ScaledMetric(relativeTo: .footnote) private var swatchWidth: CGFloat = 48
+    @ScaledMetric(relativeTo: .body) private var badgeWidth: CGFloat = 32
 
     var body: some View {
         List {
@@ -51,7 +52,8 @@ struct DesignCatalogue: View {
                 }
 
                 Section("Symboles de famille") {
-                    HStack(spacing: Space.s) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: badgeWidth), spacing: Space.s)], alignment: .leading,
+                              spacing: Space.s) {
                         ForEach(Family.allCases, id: \.self) { FamilyBadge(family: $0) }
                     }
                     HStack(spacing: Space.s) {

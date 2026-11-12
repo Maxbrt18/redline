@@ -339,7 +339,7 @@ struct MorningCard: View {
             Text("\(Text(label).fontWeight(.semibold))  \(Text(hint).font(TextRole.caption.font).foregroundStyle(Palette.muted))")
         } ?? Text(label).fontWeight(.semibold)
         return VStack(alignment: .leading, spacing: Space.xs) {
-            head.textRole(.secondary)
+            head.textRole(.secondary).fixedSize(horizontal: false, vertical: true)
             AnswerGrid(answers: options.map { (key + "=" + $0.0, $0.1) }, columns: options.count == 4 ? 2 : options.count,
                        words: true, picked: sender.picked) { tag in
                 let slug = String(tag.dropFirst(key.count + 1))
