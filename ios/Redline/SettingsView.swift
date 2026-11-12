@@ -11,17 +11,26 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 Section {
+                    // A menu keeps the choice's words whole at every text size.
                     Picker("Thème", selection: $theme) {
                         ForEach(Theme.allCases, id: \.self) { Text($0.label).tag($0) }
                     }
-                    .pickerStyle(.segmented)
-                } header: {
-                    Text("Thème")
+                    .pickerStyle(.menu)
                 }
 
                 Section {
+                    // The question opens on the button that asked it.
                     Button("Déconnecter cet appareil", role: .destructive) {
                         confirmingSignOut = true
+                    }
+                    .confirmationDialog("Déconnecter cet appareil ?", isPresented: $confirmingSignOut,
+                                        titleVisibility: .visible) {
+                        Button("Déconnecter", role: .destructive) {
+                            Task {
+                                await session.signOut()
+                                dismiss()
+                            }
+                        }
                     }
                 } footer: {
                     Text("Pour revenir, envoie /carnet dans Messenger et colle le nouveau lien.")
@@ -43,15 +52,6 @@ struct SettingsView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Fermer", systemImage: "xmark") { dismiss() }
-                }
-            }
-            .confirmationDialog("Déconnecter cet appareil ?", isPresented: $confirmingSignOut,
-                                titleVisibility: .visible) {
-                Button("Déconnecter", role: .destructive) {
-                    Task {
-                        await session.signOut()
-                        dismiss()
-                    }
                 }
             }
         }
