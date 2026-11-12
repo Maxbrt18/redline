@@ -43,7 +43,7 @@ struct DaySheet: View {
                 }
                 details
                 Section {
-                    Toggle("Tous les \(DayWords.weekdayName(day.date))s", isOn: Binding(get: { day.habitId != nil }, set: habit))
+                    Toggle("Tous les \(DayWords.weekdayName(day.date))s", isOn: Binding(get: { day.habitId != nil }, set: { habit($0) }))
                         .disabled(savingHabit || (day.habitId == nil && stated.kind == .asPlanned))
                 } footer: {
                     Text(day.habitId != nil
@@ -137,7 +137,9 @@ struct DaySheet: View {
                                            set: @escaping (Value) -> Void) -> some View {
         VStack(alignment: .leading, spacing: Space.xs) {
             Text(label).textRole(.secondary)
-            Picker(label, selection: Binding(get: { value }, set: set)) {
+            // The setter is wrapped in a closure: handing the function itself to `Binding` makes
+            // Swift 6.3's IR generation crash on its isolation thunk.
+            Picker(label, selection: Binding(get: { value }, set: { set($0) })) {
                 ForEach(options, id: \.0) { Text($0.1).tag($0.0) }
             }
             .segmentsOrMenu()
