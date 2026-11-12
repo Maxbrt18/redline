@@ -137,11 +137,8 @@ struct DesignCatalogue: View {
     private static let swatches: [(String, Color)] = [
         ("bg", Palette.bg), ("panel", Palette.panel), ("grid", Palette.grid), ("ink", Palette.ink),
         ("muted", Palette.muted), ("faint", Palette.faint), ("data", Palette.data), ("ghost", Palette.ghost),
-        ("red", Palette.red), ("over", Palette.over), ("tartan", Palette.tartan), ("track", Palette.trackFlat),
-        ("run", Palette.hRun), ("str", Palette.hStr), ("rest", Palette.hRest), ("pain", Palette.hPain),
-        ("race", Palette.hRace), ("z1", Palette.z1), ("z2", Palette.z2), ("z3", Palette.z3),
-        ("z4", Palette.z4), ("z5", Palette.z5),
-    ]
+        ("accent", Palette.accent), ("track", Palette.track), ("on-track", Palette.onTrack),
+    ] + (1...5).map { ("z\($0)", ZoneShade.color($0)) }
 }
 
 /// The track under a large title, as the three tabs will show it.

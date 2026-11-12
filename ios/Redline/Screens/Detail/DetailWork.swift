@@ -134,7 +134,7 @@ struct HeartChart: View {
                 Chart {
                     ForEach(1..<min(edges.count, 6), id: \.self) { zone in
                         RectangleMark(yStart: .value("bas", edges[zone - 1]), yEnd: .value("haut", edges[zone]))
-                            .foregroundStyle(zoneColor(zone).opacity(0.18))
+                            .foregroundStyle(ZoneShade.color(zone).opacity(0.18))
                     }
                     ForEach(Array(series.bands.enumerated()), id: \.offset) { index, band in
                         if band.count == 2 {
@@ -169,7 +169,7 @@ struct HeartChart: View {
                     AxisMarks(position: .trailing, values: Self.zoneMiddles(edges)) { value in
                         AxisValueLabel {
                             if let middle = value.as(Double.self), let zone = Self.zoneMiddles(edges).firstIndex(of: middle) {
-                                Text("Z\(zone + 1)").font(.caption2.weight(.semibold)).foregroundStyle(zoneColor(zone + 1))
+                                Text("Z\(zone + 1)").font(.caption2.weight(.semibold)).foregroundStyle(ZoneShade.color(zone + 1))
                                     .frame(width: Self.labelWidth, alignment: .leading)
                             }
                         }
@@ -274,7 +274,7 @@ private struct RepsTable: View {
 
     @ViewBuilder private func heart(_ beat: Int?) -> some View {
         if let beat {
-            Text("\(beat)").padding(.horizontal, 4).background(zoneColor(heartZone(Double(beat), bounds: bounds)).opacity(0.35),
+            Text("\(beat)").padding(.horizontal, 4).background(ZoneShade.color(heartZone(Double(beat), bounds: bounds)).opacity(0.35),
                                                                 in: .rect(cornerRadius: 3))
         } else {
             Text("—")
@@ -318,7 +318,7 @@ private struct KmTable: View {
 
     @ViewBuilder private func heart(_ beat: Int?) -> some View {
         if let beat {
-            Text("\(beat)").padding(.horizontal, 4).background(zoneColor(heartZone(Double(beat), bounds: bounds)).opacity(0.35),
+            Text("\(beat)").padding(.horizontal, 4).background(ZoneShade.color(heartZone(Double(beat), bounds: bounds)).opacity(0.35),
                                                                 in: .rect(cornerRadius: 3))
         } else {
             Text("—")

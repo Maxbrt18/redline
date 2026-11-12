@@ -46,10 +46,6 @@ func heartZone(_ heart: Double, bounds: [Int]) -> Int {
     1 + bounds.filter { heart >= Double($0) }.count
 }
 
-func zoneColor(_ zone: Int) -> Color {
-    [Palette.z1, Palette.z2, Palette.z3, Palette.z4, Palette.z5][min(max(zone, 1), 5) - 1]
-}
-
 /// `Z3` on its zone's colour.
 struct ZoneChip: View {
     let zone: Int
@@ -57,10 +53,10 @@ struct ZoneChip: View {
     var body: some View {
         Text("Z\(zone)")
             .font(.caption2.weight(.bold))
-            .foregroundStyle(zone >= 4 ? Color.white : Palette.ink)
+            .foregroundStyle(ZoneShade.isDark(zone) ? Palette.bg : Palette.ink)
             .padding(.horizontal, 5)
             .padding(.vertical, 1)
-            .background(zoneColor(zone), in: .rect(cornerRadius: 4))
+            .background(ZoneShade.color(zone), in: .rect(cornerRadius: 4))
     }
 }
 
@@ -212,7 +208,7 @@ private struct CourseStrip: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 2) {
                     ForEach(Array(zones.enumerated()), id: \.offset) { _, zone in
-                        RoundedRectangle(cornerRadius: 2).fill(zone.map(zoneColor) ?? Palette.ghost).frame(height: 14)
+                        RoundedRectangle(cornerRadius: 2).fill(zone.map(ZoneShade.color) ?? Palette.ghost).frame(height: 14)
                     }
                 }
                 HStack {

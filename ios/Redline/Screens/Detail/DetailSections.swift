@@ -192,7 +192,7 @@ struct DetailZones: View {
                         }
                         .frame(width: 56, alignment: .leading)
                         GeometryReader { geometry in
-                            RoundedRectangle(cornerRadius: 3).fill(zoneColor(zone))
+                            RoundedRectangle(cornerRadius: 3).fill(ZoneShade.color(zone))
                                 .frame(width: max(geometry.size.width * Double(value) / Double(top), value > 0 ? 2 : 0))
                         }
                         .frame(height: 12)
