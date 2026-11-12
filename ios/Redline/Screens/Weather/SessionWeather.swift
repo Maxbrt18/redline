@@ -175,7 +175,6 @@ private struct PrepRow<Words: View>: View {
             }
             .font(.system(size: 15))
             .frame(width: 34, height: 34)
-            .background(Palette.panel, in: .circle)
             .accessibilityHidden(true)
             words.font(.subheadline)
         }

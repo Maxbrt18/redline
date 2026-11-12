@@ -28,39 +28,36 @@ enum Family: CaseIterable {
     }
 }
 
-/// A family's tinted disc. Two sessions on one day overlap, outlined by the paper.
+/// A family's bare symbol in its tint. The frame is a stable size that follows the text size,
+/// so rows of badges stay aligned.
 struct FamilyBadge: View {
     let family: Family
     var small = false
     /// A finer glyph than the family's, keeping its tint.
     var symbol: String?
-    @Environment(\.colorScheme) private var scheme
     @Environment(\.onTrack) private var onTrack
+    @ScaledMetric(relativeTo: .body) private var regularSide: CGFloat = 30
+    @ScaledMetric(relativeTo: .footnote) private var smallSide: CGFloat = 24
 
     var body: some View {
-        let side: CGFloat = small ? 24 : 30
+        let side = small ? smallSide : regularSide
         Image(systemName: symbol ?? family.symbol)
-            .font(.system(size: small ? 12 : 15, weight: .medium))
+            .font((small ? Font.footnote : Font.body).weight(.medium))
             .foregroundStyle(onTrack ? Palette.onTrack : family.tint)
             .frame(width: side, height: side)
-            .background(onTrack ? Color.white.opacity(0.2) : family.tint.opacity(scheme == .dark ? 0.24 : 0.2), in: .circle)
-            .background(onTrack ? Color.clear : Palette.bg, in: .circle)
             .accessibilityHidden(true)
     }
 }
 
-/// The badges of one day's sessions, overlapping.
+/// The badges of one day's sessions, side by side.
 struct FamilyBadges: View {
     let families: [Family]
     var small = false
 
     var body: some View {
-        HStack(spacing: small ? -6 : -7) {
+        HStack(spacing: 4) {
             ForEach(Array(families.enumerated()), id: \.offset) { _, family in
                 FamilyBadge(family: family, small: small)
-                    .padding(2)
-                    .background(Palette.bg, in: .circle)
-                    .padding(-2)
             }
         }
     }
