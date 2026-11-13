@@ -55,12 +55,11 @@ private enum Skies {
     }
 }
 
-/// Before leaving: the sky and the felt temperature at the start, the night against the
-/// session, and the watch's heart-rate alert. Weather arrives after the screen and its
-/// absence breaks nothing.
+/// Before leaving: the temperature, the wind and nightfall at the start, then the sky in
+/// words. Weather arrives after the screen and its absence breaks nothing.
 struct SessionWeather: View {
     enum Size {
-        /// Today's session: the sky on two lines, then the night and the watch.
+        /// Today's session: three figures side by side, then a line of words.
         case full
         /// Another day's session: one line.
         case line
@@ -71,7 +70,7 @@ struct SessionWeather: View {
     @Environment(\.notebook) private var session
     @State private var forecast: Notebook.Forecast?
     @State private var settled = false
-    @ScaledMetric(relativeTo: .subheadline) private var placeholder: CGFloat = 40
+    @ScaledMetric(relativeTo: .subheadline) private var placeholder: CGFloat = 88
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s) {
@@ -84,11 +83,6 @@ struct SessionWeather: View {
                 // The block's room is kept while it loads, so nothing below is pushed.
                 Color.clear.frame(height: placeholder)
             }
-            if size == .full, let cap = item.targets.hrCapBpm {
-                PrepRow(symbol: "applewatch") {
-                    Text("Alerte FC de la montre sur \(Text("\(cap)").bold())")
-                }
-            }
         }
         .task(id: item.id) {
             forecast = Skies.cached(item)
@@ -100,27 +94,32 @@ struct SessionWeather: View {
     @ViewBuilder private func full(_ forecast: Notebook.Forecast, first: Notebook.ForecastHour) -> some View {
         let sky = Sky(first), last = forecast.hours.last ?? first
         let words = sky.wet ? sky.word : sky.word + ((first.rain ?? 0) >= 20 ? ", \(Sky.rainWord(first.rain))" : ", sec")
-        let later = [first.wind >= 25 ? "Vent fort \(first.wind) km/h" : "Vent \(first.wind) km/h",
-                     last.hour != first.hour ? "\(last.temp)° à \(last.hour) h" : nil].compactMap { $0 }
-        let description = VStack(alignment: .leading, spacing: 2) {
-            Text("Ressenti \(first.feels)° · \(words)").textRole(.secondary)
-            Text(later.joined(separator: " · ")).textRole(.caption).foregroundStyle(Palette.muted)
-        }
-        PrepRow(sky: sky) {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .center, spacing: Space.s) {
-                    Text("\(first.temp)°").figure(.large, .done)
-                    description
-                }
-                VStack(alignment: .leading, spacing: Space.xxs) {
-                    Text("\(first.temp)°").figure(.large, .done)
-                    description
-                }
+        let later = last.hour != first.hour ? "\(last.temp)° à \(last.hour) h" : nil
+        let night = forecast.night(start: item.startTime, minutes: item.targets.durationCapMin)
+        let dark = night?.sunrise == true ? forecast.sunrise : forecast.sunset
+        let figures = [
+            WeatherFigure(symbol: SkySymbol.name(sky), value: "\(first.temp)°", words: "ressenti \(first.feels)°"),
+            WeatherFigure(symbol: "wind", value: "\(first.wind)", words: first.wind >= 25 ? "km/h, vent fort" : "km/h de vent"),
+            dark.flatMap(Numbers.figureClock).map {
+                WeatherFigure(symbol: night?.sunrise == true ? "sunrise.fill" : "moon.stars.fill", value: $0,
+                              words: night?.sunrise == true ? "lever du jour" : "nuit")
+            },
+        ].compactMap { $0 }
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: Space.s) {
+                ForEach(Array(figures.enumerated()), id: \.offset) { _, figure in figure }
+            }
+            VStack(alignment: .leading, spacing: Space.s) {
+                ForEach(Array(figures.enumerated()), id: \.offset) { _, figure in figure }
             }
         }
-        if let night = forecast.night(start: item.startTime, minutes: item.targets.durationCapMin) {
-            PrepRow(sky: night.sunrise ? "sunrise.fill" : "moon.stars.fill") { Text(night.text) }
+        VStack(alignment: .leading, spacing: 2) {
+            Text([words.capitalizedFirst, later].compactMap { $0 }.joined(separator: " · "))
+            // With no start time, the night's sentence only repeats its figure.
+            if item.startTime != nil, let night { Text(night.text) }
         }
+        .textRole(.caption)
+        .foregroundStyle(Palette.muted)
     }
 
     private func line(_ forecast: Notebook.Forecast, first: Notebook.ForecastHour) -> some View {
@@ -136,39 +135,40 @@ struct SessionWeather: View {
     }
 }
 
-/// One line of the departure sheet: a bare symbol in a column that follows the text size,
-/// then its words.
+/// One figure of the departure sheet: its symbol and its value, its words under them.
+private struct WeatherFigure: View {
+    let symbol: String
+    let value: String
+    let words: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.xxs) {
+            HStack(spacing: Space.xxs) {
+                SkySymbol(name: symbol).font(.subheadline)
+                Text(value).figure(.large, .done)
+            }
+            Text(words).textRole(.caption).foregroundStyle(Palette.muted)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// One line of another day's weather: the sky's symbol in a column that follows the text
+/// size, then its words.
 private struct PrepRow<Words: View>: View {
     let symbol: String
-    /// A sky's symbol, in the hierarchical rendering; otherwise the glyph is plain.
-    var sky = false
     @ViewBuilder var words: Words
     @ScaledMetric(relativeTo: .body) private var side: CGFloat = 28
 
-    init(symbol: String, @ViewBuilder words: () -> Words) {
-        self.symbol = symbol
-        self.words = words()
-    }
-
-    init(sky symbol: String, @ViewBuilder words: () -> Words) {
-        self.symbol = symbol
-        self.sky = true
-        self.words = words()
-    }
-
     init(sky: Sky, @ViewBuilder words: () -> Words) {
-        self.init(sky: SkySymbol.name(sky), words: words)
+        self.symbol = SkySymbol.name(sky)
+        self.words = words()
     }
 
     var body: some View {
         HStack(spacing: Space.s) {
-            Group {
-                if sky {
-                    SkySymbol(name: symbol)
-                } else {
-                    Image(systemName: symbol).foregroundStyle(Palette.muted)
-                }
-            }
+            SkySymbol(name: symbol)
             .font(.body)
             .frame(width: side)
             .accessibilityHidden(true)

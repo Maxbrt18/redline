@@ -41,4 +41,11 @@ public enum Numbers {
         let minutes = String(match.2)
         return "\(hours)\u{00a0}h" + (minutes == "00" ? "" : "\u{00a0}\(minutes)")
     }
+
+    /// A wall-clock time read as a figure, from the same texts as `clock`: `19:05`, `7:00`.
+    /// Nil when the text holds no time.
+    public static func figureClock(_ text: String) -> String? {
+        guard let match = text.firstMatch(of: /(\d{2}):(\d{2})/), let hours = Int(match.1) else { return nil }
+        return "\(hours):\(match.2)"
+    }
 }

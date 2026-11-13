@@ -140,23 +140,25 @@ struct DayThread: View {
 
     @ViewBuilder private func pendingStep(_ item: Notebook.SessionItem, index: Int) -> some View {
         let now = today && index == 0 && wakes.isEmpty && daily == nil && loose.isEmpty
-        let started: StrengthResume? = if item.isStrength, today, case .ready(let ready)? = strength {
-            StrengthLauncher.resume(of: ready, in: session)
-        } else { nil }
+        // Today's strength session ready to open is a card that carries its own title.
+        let launcher: Notebook.StrengthReady? = if item.isStrength, today, item.status != "held",
+                                                   case .ready(let ready)? = strength { ready } else { nil }
+        let started = launcher.flatMap { StrengthLauncher.resume(of: $0, in: session) }
         let role = !today ? nil : started != nil ? "En cours" : now ? "À faire" : index > 0 ? "Puis" : "Ensuite"
-        let time = started.map { "commencée à " + $0.startedAt.formatted(date: .omitted, time: .shortened) }
-            ?? item.startTime.flatMap(Numbers.clock)
+        let time = started == nil ? item.startTime.flatMap(Numbers.clock) : nil
         let kicker = [role, time, item.location].compactMap { $0 }.joined(separator: " · ")
-        ThreadStep(kicker: kicker, now: now, title: item.id == hero?.id ? nil : item.title, family: item.family,
-                   small: item.isStrength || !today) {
+        ThreadStep(kicker: kicker, now: now, title: item.id == hero?.id || launcher != nil ? nil : item.title,
+                   family: item.family, small: item.isStrength || !today) {
             if item.status == "held" {
                 Text("Une question t’attend dans Messenger avant cette séance.").textRole(.secondary).foregroundStyle(Palette.muted)
+            } else if let launcher {
+                StrengthLauncher(ready: launcher, title: item.title, note: item.note)
             } else if item.isStrength {
                 if let note = item.note { Text(note).textRole(.secondary).foregroundStyle(Palette.muted) }
-                if today, case .ready(let ready)? = strength { StrengthLauncher(ready: ready) }
             } else {
-                if today { TargetCursors(targets: item.targets) }
-                if let note = item.note, today { Text(note).textRole(.secondary).foregroundStyle(Palette.muted) }
+                // The hero already shows the session's limits: its step keeps the rest.
+                if today, item.id != hero?.id { TargetCursors(targets: item.targets) }
+                if let note = item.note, today { Text(note).textRole(.body) }
                 SessionWeather(item: item, size: today ? .full : .line)
             }
         }

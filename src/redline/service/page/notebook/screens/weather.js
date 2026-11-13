@@ -35,9 +35,7 @@ const SKY_ICONS = {
   rain: CLOUD('M7 14h10.5a3.6 3.6 0 0 0 0-7.2 5 5 0 0 0-9.6 1.5A2.9 2.9 0 0 0 7 14z') + '<path class="s-drop" d="M9 17l-1 2.5M13 17l-1 2.5M17 17l-1 2.5"/>',
   snow: CLOUD('M7 14h10.5a3.6 3.6 0 0 0 0-7.2 5 5 0 0 0-9.6 1.5A2.9 2.9 0 0 0 7 14z') + '<path class="s-snow" d="M9 18h.01M13 19.5h.01M17 18h.01"/>',
   storm: CLOUD('M7 14h10.5a3.6 3.6 0 0 0 0-7.2 5 5 0 0 0-9.6 1.5A2.9 2.9 0 0 0 7 14z') + '<path class="s-bolt" d="M12.5 14.5l-2.2 3.8h3.2l-2.2 3.7"/>',
-  fog: '<path class="s-fog" d="M4 9h16M6 13h12M4 17h16"/>',
-  // Not a sky: the watch of the "before leaving" line, in ink.
-  watch: '<rect x="6.5" y="6.5" width="11" height="11" rx="3"/><path d="M9 6.5l.6-3h4.8l.6 3M9 17.5l.6 3h4.8l.6-3M12 9.5v2.7l1.6 1"/>'
+  fog: '<path class="s-fog" d="M4 9h16M6 13h12M4 17h16"/>'
 };
 export function skyIcon(name) {
   const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -45,7 +43,7 @@ export function skyIcon(name) {
   icon.innerHTML = SKY_ICONS[name] || SKY_ICONS.cloud;
   return icon;
 }
-// Before leaving: pill lines on one column: the sky, the night, the watch. The pill takes
+// Before leaving: pill lines on one column: the sky, the night. The pill takes
 // the sky's tint, the text stays in ink.
 function pill(icon, tint) {
   const node = el('span', null, 'n-pill');
@@ -124,8 +122,5 @@ export function weatherSlot(item, mode) {
   return slot;
 }
 export function prep(item, options) {
-  const box = add(el('div', null, 'n-prep'), weatherSlot(item, options.compact ? 'line' : 'full'));
-  const cap = (item.targets || {}).hr_cap_bpm;
-  if (options.today && !options.compact && cap) box.append(prepRow(pill('watch', 'watch'), 'Alerte FC de la montre sur ', el('b', String(cap))));
-  return box;
+  return add(el('div', null, 'n-prep'), weatherSlot(item, options.compact ? 'line' : 'full'));
 }

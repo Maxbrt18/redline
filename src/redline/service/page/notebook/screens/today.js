@@ -282,7 +282,7 @@ function dayFeed(data, items, extras, options) {
     } else {
       body.append(targetCursors(item));
       if (item.note && !compact) body.append(el('p', item.note, 'n-meta'));
-      body.append(prep(item, {today: options.today, compact}));
+      body.append(prep(item, {compact}));
     }
     feed.append(node);
   });
