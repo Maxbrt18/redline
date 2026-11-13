@@ -8,7 +8,33 @@
 
 /* Begin PBXBuildFile section */
 		4D520000000000000000100A /* RedlineKit in Frameworks */ = {isa = PBXBuildFile; productRef = 4D520000000000000000100B /* RedlineKit */; };
+		4D520000000000000000200E /* RedlineKit in Frameworks */ = {isa = PBXBuildFile; productRef = 4D520000000000000000200D /* RedlineKit */; };
+		4D520000000000000000200F /* RedlineLive.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 4D5200000000000000002001 /* RedlineLive.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		4D5200000000000000002011 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4D5200000000000000001000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4D5200000000000000002004;
+			remoteInfo = RedlineLive;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		4D5200000000000000002010 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				4D520000000000000000200F /* RedlineLive.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		4D5200000000000000001004 /* Redline.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Redline.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -17,12 +43,38 @@
 		4D5200000000000000001015 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		4D5200000000000000001016 /* Local.example.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Local.example.xcconfig; sourceTree = "<group>"; };
 		4D5200000000000000001017 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		4D5200000000000000002001 /* RedlineLive.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RedlineLive.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		4D520000000000000000200B /* Live.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Live.xcconfig; sourceTree = "<group>"; };
+		4D520000000000000000200C /* Live-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Live-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		4D5200000000000000002003 /* Exceptions for "Redline" folder in "RedlineLive" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Assets.xcassets,
+				Design/Fonts.swift,
+				Design/Palette.swift,
+				"Fonts/BarlowCondensed-Bold.woff2",
+				"Fonts/BarlowCondensed-SemiBold.woff2",
+				Live/StrengthLiveIntent.swift,
+			);
+			target = 4D5200000000000000002004 /* RedlineLive */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		4D5200000000000000001005 /* Redline */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				4D5200000000000000002003 /* Exceptions for "Redline" folder in "RedlineLive" target */,
+			);
 			path = Redline;
+			sourceTree = "<group>";
+		};
+		4D5200000000000000002002 /* RedlineLive */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = RedlineLive;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -36,6 +88,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		4D5200000000000000002006 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4D520000000000000000200E /* RedlineKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -44,6 +104,7 @@
 			children = (
 				4D5200000000000000001002 /* Config */,
 				4D5200000000000000001005 /* Redline */,
+				4D5200000000000000002002 /* RedlineLive */,
 				4D5200000000000000001003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -56,6 +117,8 @@
 				4D5200000000000000001015 /* Release.xcconfig */,
 				4D5200000000000000001016 /* Local.example.xcconfig */,
 				4D5200000000000000001017 /* Info.plist */,
+				4D520000000000000000200B /* Live.xcconfig */,
+				4D520000000000000000200C /* Live-Info.plist */,
 			);
 			path = Config;
 			sourceTree = "<group>";
@@ -64,6 +127,7 @@
 			isa = PBXGroup;
 			children = (
 				4D5200000000000000001004 /* Redline.app */,
+				4D5200000000000000002001 /* RedlineLive.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -78,10 +142,12 @@
 				4D5200000000000000001007 /* Sources */,
 				4D5200000000000000001008 /* Frameworks */,
 				4D5200000000000000001009 /* Resources */,
+				4D5200000000000000002010 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				4D5200000000000000002012 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				4D5200000000000000001005 /* Redline */,
@@ -94,6 +160,29 @@
 			productReference = 4D5200000000000000001004 /* Redline.app */;
 			productType = "com.apple.product-type.application";
 		};
+		4D5200000000000000002004 /* RedlineLive */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4D5200000000000000002008 /* Build configuration list for PBXNativeTarget "RedlineLive" */;
+			buildPhases = (
+				4D5200000000000000002005 /* Sources */,
+				4D5200000000000000002006 /* Frameworks */,
+				4D5200000000000000002007 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				4D5200000000000000002002 /* RedlineLive */,
+			);
+			name = RedlineLive;
+			packageProductDependencies = (
+				4D520000000000000000200D /* RedlineKit */,
+			);
+			productName = RedlineLive;
+			productReference = 4D5200000000000000002001 /* RedlineLive.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -105,6 +194,9 @@
 				LastUpgradeCheck = 2720;
 				TargetAttributes = {
 					4D5200000000000000001006 = {
+						CreatedOnToolsVersion = 27.2;
+					};
+					4D5200000000000000002004 = {
 						CreatedOnToolsVersion = 27.2;
 					};
 				};
@@ -127,12 +219,20 @@
 			projectRoot = "";
 			targets = (
 				4D5200000000000000001006 /* Redline */,
+				4D5200000000000000002004 /* RedlineLive */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		4D5200000000000000001009 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4D5200000000000000002007 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -149,7 +249,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		4D5200000000000000002005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		4D5200000000000000002012 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4D5200000000000000002004 /* RedlineLive */;
+			targetProxy = 4D5200000000000000002011 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		4D520000000000000000100F /* Debug */ = {
@@ -178,6 +293,20 @@
 			};
 			name = Release;
 		};
+		4D5200000000000000002009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 4D520000000000000000200B /* Live.xcconfig */;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		4D520000000000000000200A /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 4D520000000000000000200B /* Live.xcconfig */;
+			buildSettings = {
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -199,6 +328,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		4D5200000000000000002008 /* Build configuration list for PBXNativeTarget "RedlineLive" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4D5200000000000000002009 /* Debug */,
+				4D520000000000000000200A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -210,6 +348,10 @@
 
 /* Begin XCSwiftPackageProductDependency section */
 		4D520000000000000000100B /* RedlineKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = RedlineKit;
+		};
+		4D520000000000000000200D /* RedlineKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = RedlineKit;
 		};

@@ -1,0 +1,22 @@
+// The widget extension that draws the strength session's Live Activity. It takes the
+// project's settings (Debug.xcconfig, Release.xcconfig) and changes what makes it an
+// extension embedded in the app rather than the app itself.
+
+PRODUCT_NAME = RedlineLive
+// An extension's identifier extends its app's.
+PRODUCT_BUNDLE_IDENTIFIER = $(REDLINE_BUNDLE_PREFIX).redline.live
+INFOPLIST_FILE = Config/Live-Info.plist
+INFOPLIST_KEY_CFBundleDisplayName = Redline
+INFOPLIST_KEY_UIApplicationSceneManifest_Generation = NO
+INFOPLIST_KEY_UILaunchScreen_Generation = NO
+INFOPLIST_KEY_UISupportedInterfaceOrientations =
+INFOPLIST_KEY_LSApplicationCategoryType =
+
+// The app's catalogue is shared for its palette; the icon and the accent stay the app's.
+ASSETCATALOG_COMPILER_APPICON_NAME =
+ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME =
+DEVELOPMENT_ASSET_PATHS =
+
+APPLICATION_EXTENSION_API_ONLY = YES
+SKIP_INSTALL = YES
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks @executable_path/../../Frameworks

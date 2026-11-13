@@ -262,7 +262,7 @@ struct DebriefCard<Ask: DebriefAsk>: View {
             Button {
                 send(key, .array(options.map(\.0).filter(several.contains).map(JSONValue.string)), tag: "confirm")
             } label: {
-                Text("Valider").fontWeight(.semibold).frame(maxWidth: .infinity)
+                Text("Valider").fontWeight(.semibold).foregroundStyle(Palette.bg).frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)

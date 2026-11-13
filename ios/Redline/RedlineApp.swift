@@ -15,6 +15,7 @@ struct RedlineApp: App {
 
     init() {
         Fonts.register()
+        StrengthLive.install()
     }
 
     var body: some Scene {

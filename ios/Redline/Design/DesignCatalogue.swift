@@ -91,7 +91,7 @@ struct DesignCatalogue: View {
                         Text("Clair").tag(1)
                         Text("Sombre").tag(2)
                     }
-                    Button("Commencer la séance") {}
+                    Button {} label: { Text("Commencer la séance").foregroundStyle(Palette.bg) }
                         .buttonStyle(.glassProminent)
                         .controlSize(.large)
                         .frame(maxWidth: .infinity)
@@ -189,7 +189,7 @@ struct TrackPreview: View {
             VStack(alignment: .leading, spacing: Space.l) {
                 RedLineCursor(label: "Volume de la semaine", value: 38, unit: "km", scale: 0...60,
                               band: 35...45, target: 42, targetLabel: "cible 42")
-                Button("Commencer la séance") {}
+                Button {} label: { Text("Commencer la séance").foregroundStyle(Palette.bg) }
                     .buttonStyle(.glassProminent)
                     .controlSize(.large)
                     .frame(maxWidth: .infinity)

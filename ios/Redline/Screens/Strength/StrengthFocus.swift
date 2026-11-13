@@ -1,60 +1,6 @@
 import RedlineKit
 import SwiftUI
 
-/// How the session's figures read.
-enum StrengthWords {
-    static func side(_ side: Notebook.StrengthSlot.S?) -> String? {
-        switch side {
-        case .d?: "droite"
-        case .g?: "gauche"
-        case .unknown(let raw)?: raw
-        case nil: nil
-        }
-    }
-
-    /// Blocks say « Bloc », sets say « Série »: reading « Série 3/4 » during plyometrics
-    /// would send the athlete looking for a set that does not exist.
-    static func unit(_ measure: Notebook.StrengthDose.Measure) -> String {
-        measure == .contacts ? "Bloc" : "Série"
-    }
-
-    /// « Série 2 sur 3 », or nothing for a single set.
-    static func position(_ slot: Notebook.StrengthSlot, measure: Notebook.StrengthDose.Measure) -> String? {
-        slot.of > 1 ? "\(unit(measure)) \(slot.n) sur \(slot.of)" : nil
-    }
-
-    /// « Série 2 · droite »: what a rest leads to.
-    static func slot(_ slot: Notebook.StrengthSlot, measure: Notebook.StrengthDose.Measure) -> String {
-        let parts = [slot.of > 1 ? "\(unit(measure)) \(slot.n)" : nil, side(slot.s)].compactMap { $0 }
-        return parts.isEmpty ? "Une seule série" : parts.joined(separator: " · ").capitalizedFirst
-    }
-
-    static func load(_ load: Notebook.StrengthLoad) -> String {
-        load.kg == 0 ? "Poids du corps" : "\(load.count) × \(Numbers.text(load.kg)) kg"
-    }
-
-    /// Whole seconds under a minute, minutes and seconds above.
-    static func clock(_ seconds: Double) -> String {
-        let whole = max(0, Int(seconds.rounded(.up)))
-        return whole < 60 ? "\(whole)" : "\(whole / 60):" + String(format: "%02d", whole % 60)
-    }
-
-    /// What a finished exercise shows in the list: what was done rather than what was
-    /// prescribed. « Removed » is the coach's rule, « not done » the athlete's choice.
-    static func dose(of exercise: Notebook.StrengthExercise, step: StepProgress, done: Bool) -> String {
-        guard done else { return exercise.dose.text }
-        if step.gated { return "retiré — garde-fou" }
-        if step.skipped { return "pas fait" }
-        let banked = step.slots.compactMap { $0 }
-        var text = exercise.dose.text
-        if !banked.isEmpty {
-            text = exercise.dose.measure == .contacts ? "\(banked.reduce(0, +)) contacts"
-                : banked.map(String.init).joined(separator: " · ")
-        }
-        return step.stopped ? "partiel · \(text)" : text
-    }
-}
-
 /// What the live exercise is in: one state per screen.
 enum StrengthState {
     case ready(Notebook.StrengthSlot)
@@ -326,7 +272,7 @@ struct StrengthFocus: View {
                 HStack(spacing: Space.s) {
                     ForEach(exercise.dose.counts ?? [], id: \.self) { count in
                         Button { model.change { $0.validate(count, at: .now) } } label: {
-                            Text("\(count)").figure(.large).frame(maxWidth: .infinity, minHeight: 48)
+                            Text("\(count)").figure(.large).foregroundStyle(Palette.bg).frame(maxWidth: .infinity, minHeight: 48)
                         }
                         .buttonStyle(.glassProminent)
                         .accessibilityLabel("\(count) répétitions faites")
@@ -369,7 +315,7 @@ struct StrengthFocus: View {
     }
 
     private func prominent(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) { label(title) }.buttonStyle(.glassProminent)
+        Button(action: action) { label(title).foregroundStyle(Palette.bg) }.buttonStyle(.glassProminent)
     }
 
     /// The main action's place, kept empty while there is nothing to press.

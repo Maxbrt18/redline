@@ -83,6 +83,8 @@ final class StrengthModel {
         previous = opened.view.previousSession
         run = StrengthRun(session: sessionView, zones: opened.view.zones, saved: store.load(sid: sessionView.sid))
         phase = .running
+        StrengthLive.model = self
+        StrengthLive.sync(run)
         startTicking()
         if case .pending? = run?.progress.delivery {
             await send()
@@ -107,6 +109,7 @@ final class StrengthModel {
         let signals = body(&run)
         self.run = run
         save()
+        StrengthLive.sync(run)
         if !signals.isEmpty {
             signalCount += 1
             self.signals = (signals, signalCount)
@@ -164,6 +167,10 @@ final class StrengthModel {
         ticking?.cancel()
         retrying?.cancel()
         save()
+        StrengthLive.end(run)
+        if StrengthLive.model === self {
+            StrengthLive.model = nil
+        }
     }
 
     // MARK: - The report
