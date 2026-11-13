@@ -10,6 +10,7 @@ server's `/notebook-api/` routes; it holds no coaching logic of its own.
 | `RedlineKit/` | Swift package: everything a test can check without a simulator (API client, models, formatting, session logic). Builds for macOS too, so `swift test` runs on the host. |
 | `RedlineKit/Sources/RedlineKit/Notebook/NotebookViews.swift` | the API's types, generated from `src/redline/model/notebook_views.py` by `tests/ios_contract.py`, with the payload fixtures and round-trip tests: never edited by hand. |
 | `Redline/` | the SwiftUI app: screens and components. A synchronized folder: a file added here is in the target. |
+| `RedlineLive/` | the widget extension: the guided strength session's Live Activity, on the lock screen and in the Dynamic Island. It shares the palette, the figures' face and `Live/StrengthLiveIntent.swift` with the app (the project's membership exceptions); its state is built and tested in `RedlineKit` (`StrengthLive.swift`). |
 | `Config/` | build settings as `.xcconfig` files, the Info.plist keys the build fills, and the example of the instance's local values. |
 | `scripts/` | `install-on-device`: build, sign and install on a paired iPhone. |
 
