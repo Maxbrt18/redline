@@ -80,7 +80,7 @@ struct ReorganizeScreen: View {
             Intro(text: "Le coach n’a pas encore écrit cette semaine. Dis-lui comment se présentent tes jours : il placera les séances au bon endroit, et tu n’auras rien à réorganiser.")
             days(view)
             Button { Task { await saveDays(view) } } label: {
-                Text("Enregistrer pour le bilan").frame(maxWidth: .infinity)
+                Text("Enregistrer pour le bilan").foregroundStyle(Palette.bg).frame(maxWidth: .infinity)
             }
             .buttonStyle(.glassProminent)
             .tint(Palette.accent)

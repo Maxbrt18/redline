@@ -272,7 +272,7 @@ struct StrengthFocus: View {
                 HStack(spacing: Space.s) {
                     ForEach(exercise.dose.counts ?? [], id: \.self) { count in
                         Button { model.change { $0.validate(count, at: .now) } } label: {
-                            Text("\(count)").figure(.large).frame(maxWidth: .infinity, minHeight: 48)
+                            Text("\(count)").figure(.large).foregroundStyle(Palette.bg).frame(maxWidth: .infinity, minHeight: 48)
                         }
                         .buttonStyle(.glassProminent)
                         .accessibilityLabel("\(count) répétitions faites")
@@ -315,7 +315,7 @@ struct StrengthFocus: View {
     }
 
     private func prominent(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) { label(title) }.buttonStyle(.glassProminent)
+        Button(action: action) { label(title).foregroundStyle(Palette.bg) }.buttonStyle(.glassProminent)
     }
 
     /// The main action's place, kept empty while there is nothing to press.

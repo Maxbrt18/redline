@@ -259,7 +259,7 @@ private struct TakeButton: View {
 
     var body: some View {
         if prominent {
-            Button(action: action) { Text(text).frame(maxWidth: .infinity) }
+            Button(action: action) { Text(text).foregroundStyle(Palette.bg).frame(maxWidth: .infinity) }
                 .buttonStyle(.glassProminent)
                 .tint(Palette.accent)
                 .controlSize(.large)
