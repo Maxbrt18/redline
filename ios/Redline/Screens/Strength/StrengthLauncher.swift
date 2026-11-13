@@ -1,10 +1,13 @@
 import RedlineKit
 import SwiftUI
 
-/// Today's strength session: the button that opens it (or resumes it where this phone left
-/// it), and the exercises folded under their count.
+/// Today's strength session as a card a finger presses: its title, how far this phone went
+/// in it, the button that opens it (or resumes it where this phone left it), and the
+/// exercises folded under their count.
 struct StrengthLauncher: View {
     let ready: Notebook.StrengthReady
+    let title: String
+    var note: String?
     @Environment(\.notebook) private var session
     @Environment(\.reloadScreen) private var reload
     @State private var launching = false
@@ -12,17 +15,36 @@ struct StrengthLauncher: View {
 
     var body: some View {
         let resume = StrengthLauncher.resume(of: ready, in: session)
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Space.s) {
+            HStack(spacing: Space.xs) {
+                FamilyBadge(family: .strength, small: true)
+                Text(title).font(TextRole.body.font.weight(.semibold))
+                Spacer(minLength: Space.xs)
+                if let resume {
+                    Text("depuis \(resume.startedAt.formatted(date: .omitted, time: .shortened))")
+                        .textRole(.caption).foregroundStyle(Palette.muted)
+                }
+            }
+            if let note { Text(note).textRole(.secondary).foregroundStyle(Palette.muted) }
             if let resume {
-                Text("\(resume.done) exercice\(resume.done > 1 ? "s" : "") sur \(resume.total)")
-                    .font(.subheadline).foregroundStyle(Palette.muted)
+                VStack(alignment: .leading, spacing: Space.xxs) {
+                    HStack(spacing: Space.xxs) {
+                        ForEach(0..<resume.total, id: \.self) { index in
+                            Capsule().fill(index < resume.done ? Palette.ink : Palette.faint.opacity(0.4)).frame(height: 4)
+                        }
+                    }
+                    .accessibilityHidden(true)
+                    let plural = resume.done > 1 ? "s" : ""
+                    Text("\(resume.done) exercice\(plural) fait\(plural) sur \(resume.total)")
+                        .textRole(.caption).foregroundStyle(Palette.muted)
+                }
             }
             Button {
                 Task { await launch() }
             } label: {
                 Group {
                     if launching { ProgressView() } else {
-                        Text(resume == nil ? "Séance guidée" : "Reprendre la séance").font(.body.weight(.semibold))
+                        Text(resume == nil ? "Séance guidée" : "Reprendre").font(.body.weight(.semibold))
                     }
                 }
                 .frame(maxWidth: .infinity, minHeight: 34)
@@ -36,6 +58,8 @@ struct StrengthLauncher: View {
             }
             ExerciseList(session: ready.session)
         }
+        .padding(Space.m)
+        .background(Palette.panel, in: .rect(cornerRadius: Radius.surface))
         .task {
             // A report left waiting for the network goes out when Today shows again.
             if let session, case .signedIn(let client) = session.state {

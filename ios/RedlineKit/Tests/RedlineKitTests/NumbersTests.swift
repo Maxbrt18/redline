@@ -19,6 +19,12 @@ struct NumbersTests {
         #expect(Numbers.clock("bientôt") == nil)
     }
 
+    @Test func aFigureClockKeepsItsMinutes() {
+        #expect(Numbers.figureClock("19:05") == "19:05")
+        #expect(Numbers.figureClock("2026-10-06T07:00:00") == "7:00")
+        #expect(Numbers.figureClock("bientôt") == nil)
+    }
+
     @Test func aDurationShowsHoursOnlyWhenThereAreSome() {
         #expect(Numbers.duration(3127) == "52:07")
         #expect(Numbers.duration(3870) == "1:04:30")
