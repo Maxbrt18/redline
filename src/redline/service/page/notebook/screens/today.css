@@ -54,7 +54,7 @@
 .n-chips button { background: var(--bg); border: 0; border-radius: 12px; min-height: 44px; padding: 4px 0; font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; }
 .n-note { color: var(--muted); font-size: 12.5px; margin: 11px 0 0; text-wrap: pretty; }
 
-/* Before leaving: the sky, the night and the watch as pill lines on one column. No block
+/* Before leaving: the sky and the night as pill lines on one column. No block
  * for the weather: the colour comes from the pictogram and its sky-tinted pill; the text
  * stays in ink. */
 .n-prep { margin: 14px 0 0; }
@@ -73,9 +73,7 @@
 .n-pill[data-sky="storm"] { --tint: #545a66; }
 .n-pill[data-sky="snow"] { --tint: #8aa0b8; }
 .n-pill[data-sky="night"] { --tint: #5a5fc8; }
-.n-pill[data-sky="watch"] { background: color-mix(in oklab, var(--ink) 6%, var(--bg)); }
 .n-pill .n-sky { width: 22px; height: 22px; }
-.n-pill[data-sky="watch"] .n-sky { width: 21px; height: 21px; stroke-width: 1.6; }
 .n-pill .n-sky .s-cloud { fill: color-mix(in oklab, var(--tint) 18%, var(--bg)); }
 .n-wx { display: flex; align-items: center; gap: 10px; }
 .n-wx > b { font: 700 30px/1 var(--display); }

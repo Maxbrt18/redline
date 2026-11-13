@@ -89,7 +89,7 @@ def test_today_week_and_course_fit_a_phone_and_keep_text_inert(browser, width):
     assert 't=' not in tab.url
     assert tab.get_by_text('Vendredi 9 octobre · semaine 41').is_visible()
     assert tab.get_by_role('heading', name='Renfo, séance unique').is_visible()
-    assert tab.get_by_text('Alerte FC de la montre sur 157').is_visible()
+    assert tab.get_by_text('Alerte FC de la montre', exact=False).count() == 0
     assert tab.locator('.n-nav').bounding_box()['y'] > 700
     tab.get_by_role('button', name='4 exercices', exact=True).click()
     assert tab.get_by_text('2 × 10-12 par jambe', exact=True).is_visible()
