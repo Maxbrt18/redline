@@ -9,6 +9,8 @@ struct NotebookScreen<Value: Decodable & Sendable, Hero: View, Content: View>: V
     let session: NotebookSession
     @State var model: ScreenModel<Value>
     var onTrack = true
+    /// The head is the day's card, which draws its own surface (`CardScreen`).
+    var card = false
     /// The title the view itself gives once loaded, for a screen opened by its id alone.
     var heading: ((Value) -> String)?
     @ViewBuilder var hero: (Value) -> Hero
@@ -18,7 +20,11 @@ struct NotebookScreen<Value: Decodable & Sendable, Hero: View, Content: View>: V
 
     var body: some View {
         let title = model.value.flatMap { value in heading.map { LocalizedStringKey($0(value)) } } ?? title
-        if onTrack {
+        if card {
+            CardScreen(title: title) { head } content: { page }
+                .refreshable { await model.load(with: session) }
+                .task { await model.load(with: session) }
+        } else if onTrack {
             TrackScreen(title: title) { head } content: { page }
                 .refreshable { await model.load(with: session) }
                 .task { await model.load(with: session) }
@@ -33,7 +39,11 @@ struct NotebookScreen<Value: Decodable & Sendable, Hero: View, Content: View>: V
         if let value = model.value {
             hero(value)
         } else if model.failure == nil {
-            Text("Mercredi 11 novembre").font(.footnote.weight(.semibold)).redacted(reason: .placeholder)
+            if card {
+                DayCardSkeleton()
+            } else {
+                Text("Mercredi 11 novembre").font(.footnote.weight(.semibold)).redacted(reason: .placeholder)
+            }
         }
     }
 

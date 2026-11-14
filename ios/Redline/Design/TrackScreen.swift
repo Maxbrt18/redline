@@ -81,15 +81,18 @@ struct TrackSurface: View {
 /// Three lanes between four lines, as on a straight seen from the infield: lane 1 is the
 /// inner one, at the top. Each number is painted in its lane before a finish line on the
 /// gutter, turned to be read by a runner coming from the left. They are decoration: the
-/// numbers stop growing with the text size so that they always fit their lane.
-private struct Lanes: View {
+/// numbers stop growing with the text size so that they always fit their lane. The day's
+/// card paints them in the colour of the surface it sits on.
+struct Lanes: View {
+    var color = Palette.onTrack
+
     var body: some View {
         VStack(spacing: 0) {
             line
             ForEach(1...3, id: \.self) { lane in
                 Text("\(lane)")
                     .font(.figure(LaneMetrics.number))
-                    .foregroundStyle(Palette.onTrack)
+                    .foregroundStyle(color)
                     .fixedSize()
                     .rotationEffect(.degrees(90))
                     .frame(width: LaneMetrics.lane, height: LaneMetrics.lane)
@@ -100,16 +103,19 @@ private struct Lanes: View {
         }
         .overlay(alignment: .trailing) {
             Rectangle()
-                .fill(LaneMetrics.paint)
+                .fill(paint)
                 .frame(width: LaneMetrics.line)
                 .padding(.trailing, Space.gutter)
         }
         .padding(.bottom, LaneMetrics.rim)
         .dynamicTypeSize(...DynamicTypeSize.large)
+        .accessibilityHidden(true)
     }
 
+    private var paint: Color { color.opacity(LaneMetrics.paintOpacity) }
+
     private var line: some View {
-        Rectangle().fill(LaneMetrics.paint).frame(height: LaneMetrics.line)
+        Rectangle().fill(paint).frame(height: LaneMetrics.line)
     }
 }
 
@@ -121,7 +127,7 @@ private enum LaneMetrics {
     /// The tartan left below the outer line, before the paper.
     static let rim: CGFloat = 6
     static let number: CGFloat = 11
-    static let paint = Palette.onTrack.opacity(0.85)
+    static let paintOpacity = 0.85
 }
 
 /// A fixed rubber grain: fine granules, two darker than the red for one lighter, at a low

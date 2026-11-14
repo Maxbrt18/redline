@@ -67,6 +67,12 @@
   --tartan-deep: #a50d24;
   --track-flat:  #cd183b;
   --on-track:    #fff6f0;
+  /* The notebook's surfaces (iOS app only): a grouped section on the paper, and the day's
+   * card once its session is done, with its text and the limit it crossed. */
+  --card:          #ffffff;
+  --done:          #1a1514;
+  --on-done:       #fff6f0;
+  --on-done-alert: #ff7a87;
 
   --radius: 12px;
 
@@ -99,6 +105,9 @@
   --tartan:      #b30f28;
   --tartan-deep: #8c0b1f;
   --track-flat:  #ba1635;
+  --card:        #1d1917;
+  --done:        #2c2523;
+  --on-done:     #f5f0ea;
   color-scheme: dark;
 }
 
@@ -127,6 +136,9 @@
     --tartan:      #b30f28;
     --tartan-deep: #8c0b1f;
     --track-flat:  #ba1635;
+    --card:        #1d1917;
+    --done:        #2c2523;
+    --on-done:     #f5f0ea;
     color-scheme: dark;
   }
 }

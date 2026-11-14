@@ -109,8 +109,13 @@ enum Space {
     static let pageTop: CGFloat = l
 }
 
-/// The two corner radii: a surface a finger presses, and a mark in a chart.
+/// The corner radii: a surface a finger presses, a mark in a chart, a grouped section on the
+/// paper, and the day's card with the panel it holds, whose corners stay concentric.
 enum Radius {
     static let surface: CGFloat = 12
     static let mark: CGFloat = 4
+    static let card: CGFloat = 16
+    static let dayCard: CGFloat = 32
+    /// The panel sits `Space.xs` inside the day's card.
+    static let dayPanel: CGFloat = dayCard - Space.xs
 }

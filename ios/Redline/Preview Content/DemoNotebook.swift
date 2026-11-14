@@ -53,10 +53,64 @@ struct DemoTransport: HTTPTransport {
     private func answer(_ request: URLRequest, name: String) async throws -> (Data, URLResponse) {
         let fixture = Bundle.main.url(forResource: name, withExtension: name == "card" ? "png" : "json")
         try await Task.sleep(for: .milliseconds(300))
-        let body = fixture.flatMap { try? Data(contentsOf: $0) } ?? Data(#"{"error": "Pas de démo pour cette page."}"#.utf8)
+        var body = fixture.flatMap { try? Data(contentsOf: $0) } ?? Data(#"{"error": "Pas de démo pour cette page."}"#.utf8)
+        if name == "today" { body = DemoDay.variant(of: body) }
         let response = HTTPURLResponse(url: request.url!, statusCode: fixture == nil ? 404 : 200,
                                        httpVersion: nil, headerFields: nil)!
         return (body, response)
+    }
+}
+
+/// `-RedlineDay done` or `-RedlineDay rest` with the demo turns today's fixture into that
+/// moment of the day: every session done, the run's debrief left to answer; or nothing
+/// planned and nothing asked.
+nonisolated private enum DemoDay {
+    static let run = (observation: "demo-run", km: 8.35)
+
+    static func variant(of data: Data) -> Data {
+        guard let moment = UserDefaults.standard.string(forKey: "RedlineDay"),
+              var today = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let sessions = today["sessions"] as? [[String: Any]] else { return data }
+        let date = today["date"] as? String ?? ""
+        switch moment {
+        case "done":
+            today["sessions"] = sessions.map { session in
+                var session = session
+                session["status"] = "done"
+                session["fact"] = session["kind"] as? String == "strength" ? strengthFact : runFact(date: date)
+                return session
+            }
+            today["asks"] = [debrief(date: date)]
+            today["strip"] = (today["strip"] as? [[String: Any]])?.map { day in
+                var day = day
+                if day["date"] as? String == date { day["done_km"] = run.km }
+                return day
+            }
+            if var totals = today["totals"] as? [String: Any] {
+                totals["km_done"] = (totals["km_done"] as? Double ?? 0) + run.km
+                today["totals"] = totals
+            }
+        case "rest":
+            today["sessions"] = [[String: Any]]()
+            today["asks"] = [[String: Any]]()
+        default:
+            return data
+        }
+        return (try? JSONSerialization.data(withJSONObject: today)) ?? data
+    }
+
+    private static var strengthFact: [String: Any] { ["duration_min": 26, "pains": [Any](), "over": [Any]()] }
+
+    private static func runFact(date: String) -> [String: Any] {
+        ["observation_id": run.observation, "kind": "easy", "date": date, "km": run.km, "duration_min": 48,
+         "hr_avg": 162, "rpe": 3, "pains": [Any](), "enjoyment": NSNull(), "dplus": 20,
+         "started_at": "\(date)T17:34:00", "over": ["hr_avg"]]
+    }
+
+    private static func debrief(date: String) -> [String: Any] {
+        ["id": "cell:\(run.observation)", "type": "cells", "date": date, "kind": "easy", "km": run.km,
+         "fields": ["enjoyment"], "labels": [String: String](), "total": 3, "duration_min": 48,
+         "pain_values": [0, 0.5, 1, 1.5, 2, 2.5, 3]]
     }
 }
 
