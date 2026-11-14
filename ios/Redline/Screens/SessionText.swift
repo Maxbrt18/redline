@@ -76,3 +76,12 @@ extension Day {
         date.formatted(Date.FormatStyle(timeZone: .gmt).locale(Locale(identifier: "fr_FR")).weekday(.wide).day())
     }
 }
+
+extension Notebook.Fact {
+    /// An unplanned run read as a run's fact: the same measures, no session to carry it.
+    init(unplanned fact: Notebook.UnplannedFact) {
+        self.init(observationId: fact.observationId, kind: fact.kind, date: fact.date, km: fact.km,
+                  durationMin: fact.durationMin, hrAvg: fact.hrAvg, rpe: fact.rpe, pains: fact.pains,
+                  enjoyment: fact.enjoyment, dplus: fact.dplus, startedAt: fact.startedAt, over: fact.over)
+    }
+}

@@ -90,6 +90,8 @@ extension EnvironmentValues {
     @Entry var answered: ((_ alert: Bool) async -> Void)?
     /// Loads the screen again, after a change made from it.
     @Entry var reloadScreen: (() async -> Void)?
+    /// The question sits in a surface of its own, the day's card: it draws no box.
+    @Entry var askInCard = false
 }
 
 /// Sends answers for one card, keeps its buttons still while one is on its way, and says
@@ -119,12 +121,18 @@ final class AnswerSender {
 /// A question's box: a panel, its rows, then a note.
 struct AskPanel<Content: View>: View {
     @ViewBuilder var content: Content
+    @Environment(\.askInCard) private var inCard
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.s) { content }
-            .padding(Space.m)
+        let rows = VStack(alignment: .leading, spacing: Space.s) { content }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Palette.panel, in: .rect(cornerRadius: Radius.surface))
+        if inCard {
+            rows
+        } else {
+            rows
+                .padding(Space.m)
+                .background(Palette.panel, in: .rect(cornerRadius: Radius.surface))
+        }
     }
 }
 

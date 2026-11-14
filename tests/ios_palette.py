@@ -54,6 +54,10 @@ TOKENS = (
     Token("track", "The track: the one red surface, the same in both modes.",
           css="tartan", light_in_both=True),
     Token("on-track", "Text and lines on the track."),
+    Token("card", "A grouped section of a page, on the paper."),
+    Token("done", "The day's card once its session is done."),
+    Token("on-done", "Text and lines on the done card."),
+    Token("on-done-alert", "A limit crossed, on the done card.", light_in_both=True),
 )
 #: The accent colour of the app (`--accent`).
 ACCENT = "accent"

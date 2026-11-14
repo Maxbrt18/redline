@@ -26,4 +26,12 @@ enum Palette {
     static let track = Color("Palette/track")
     /// Text and lines on the track.
     static let onTrack = Color("Palette/on-track")
+    /// A grouped section of a page, on the paper.
+    static let card = Color("Palette/card")
+    /// The day's card once its session is done.
+    static let done = Color("Palette/done")
+    /// Text and lines on the done card.
+    static let onDone = Color("Palette/on-done")
+    /// A limit crossed, on the done card.
+    static let onDoneAlert = Color("Palette/on-done-alert")
 }
