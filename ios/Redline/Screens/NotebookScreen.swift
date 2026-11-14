@@ -19,20 +19,36 @@ struct NotebookScreen<Value: Decodable & Sendable, Hero: View, Content: View>: V
     @State private var notice: String?
 
     var body: some View {
+        // The actions wrap the whole screen, head included: the day's card asks its
+        // questions in the head, the other screens in the page.
+        surface
+            .refreshable { await load() }
+            .task { await load() }
+            .environment(\.reloadScreen, ReloadAction { await load() })
+            .environment(\.answered, AnswerAction { alert in await answered(alert: alert) })
+    }
+
+    @ViewBuilder private var surface: some View {
         let title = model.value.flatMap { value in heading.map { LocalizedStringKey($0(value)) } } ?? title
         if card {
             CardScreen(title: title) { head } content: { page }
-                .refreshable { await model.load(with: session) }
-                .task { await model.load(with: session) }
         } else if onTrack {
             TrackScreen(title: title) { head } content: { page }
-                .refreshable { await model.load(with: session) }
-                .task { await model.load(with: session) }
         } else {
             PaperScreen(title: title) { head } content: { page }
-                .refreshable { await model.load(with: session) }
-                .task { await model.load(with: session) }
         }
+    }
+
+    private func load() async {
+        await model.load(with: session)
+    }
+
+    /// Says the answer is kept, then loads the screen, which moves on to the next question.
+    private func answered(alert: Bool) async {
+        let words = alert ? "Noté. Le coach te répond dans Messenger." : "Noté."
+        withAnimation { notice = words }
+        AccessibilityNotification.Announcement(words).post()
+        await load()
     }
 
     @ViewBuilder private var head: some View {
@@ -78,18 +94,11 @@ struct NotebookScreen<Value: Decodable & Sendable, Hero: View, Content: View>: V
                     ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
                 }
             }
-            .environment(\.reloadScreen) { await model.load(with: session) }
             .onAppear {
                 if let words = session.notice {
                     session.notice = nil
                     withAnimation { notice = words }
                 }
-            }
-            .environment(\.answered) { alert in
-                let words = alert ? "Noté. Le coach te répond dans Messenger." : "Noté."
-                withAnimation { notice = words }
-                AccessibilityNotification.Announcement(words).post()
-                await model.load(with: session)
             }
     }
 }

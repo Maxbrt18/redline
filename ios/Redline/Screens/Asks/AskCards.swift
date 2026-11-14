@@ -85,11 +85,6 @@ struct AskSpec {
 }
 
 extension EnvironmentValues {
-    /// What a screen does once one of its questions is answered: say so, and load itself
-    /// again so that the next question takes its place.
-    @Entry var answered: ((_ alert: Bool) async -> Void)?
-    /// Loads the screen again, after a change made from it.
-    @Entry var reloadScreen: (() async -> Void)?
     /// The question sits in a surface of its own, the day's card: it draws no box.
     @Entry var askInCard = false
 }
@@ -103,7 +98,7 @@ final class AnswerSender {
     private(set) var failure: String?
 
     func send(_ ask: String, value: JSONValue, tag: String, session: NotebookSession?,
-              then answered: ((Bool) async -> Void)?) async {
+              then answered: AnswerAction) async {
         guard !busy, case .signedIn(let client)? = session?.state else { return }
         busy = true
         picked = tag
@@ -111,7 +106,7 @@ final class AnswerSender {
         defer { busy = false; picked = nil }
         do {
             let alert = try await client.answer(ask, value: value)
-            await answered?(alert)
+            await answered(alert: alert)
         } catch {
             failure = NotebookSession.words(for: error)
         }
