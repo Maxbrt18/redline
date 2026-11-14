@@ -56,6 +56,25 @@ public struct StrengthLiveState: Codable, Hashable, Sendable {
     /// When the countdown began, for the line that empties.
     public var countdownStart: Date? { endsAt.map { $0.addingTimeInterval(-Double(total ?? 0)) } }
 
+    /// A state given whole, with no run behind it: the design catalogue's demonstration.
+    public init(phase: Phase, endsAt: Date? = nil, total: Int? = nil, figure: String, label: String, detail: String,
+                lead: String? = nil, title: String, subtitle: String, side: String? = nil, sets: [[Double]],
+                exercise: Int? = nil, set: Int? = nil) {
+        self.phase = phase
+        self.endsAt = endsAt
+        self.total = total
+        self.figure = figure
+        self.label = label
+        self.detail = detail
+        self.lead = lead
+        self.title = title
+        self.subtitle = subtitle
+        self.side = side
+        self.sets = sets
+        self.exercise = exercise
+        self.set = set
+    }
+
     /// Nil before the first gesture, a set done or a timer started: a link often waits on
     /// the phone before the session.
     public init?(run: StrengthRun, at now: Date) {

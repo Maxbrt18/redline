@@ -103,6 +103,23 @@ struct DesignCatalogue: View {
                     .tint(Palette.ink)
                 }
 
+                Section("Live Activity") {
+                    Button("Lancer la démo", systemImage: "play.fill") { StrengthLiveDemo.play() }
+                    Menu {
+                        ForEach(Array(StrengthLiveDemo.steps.enumerated()), id: \.offset) { _, step in
+                            Button(step.name) { StrengthLiveDemo.hold(step) }
+                        }
+                    } label: {
+                        Label("Montrer une phase", systemImage: "rectangle.stack")
+                    }
+                    Button("Arrêter", systemImage: "stop.fill", role: .destructive) { StrengthLiveDemo.stop() }
+                    Text(StrengthLiveDemo.enabled
+                         ? "Verrouille l’écran ou regarde l’île dynamique. La démo passe par chaque phase en 45 secondes, puis reste sur la fin de séance."
+                         : "Les activités en direct sont coupées pour Redline dans les réglages de l’iPhone.")
+                        .textRole(.caption).foregroundStyle(Palette.muted)
+                }
+                .tint(Palette.ink)
+
                 Section("Questions") {
                     MorningCard(wakes: [Notebook.WakeAsk(id: "wake:sample:knee", type: .wake, zone: "knee", label: "Genou",
                                                          date: "2030-01-01", afterEffort: true, levels: [

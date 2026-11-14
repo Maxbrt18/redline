@@ -8,6 +8,16 @@ struct StrengthLiveTests {
 
     func at(_ seconds: Double) -> Date { runs.at(seconds) }
 
+    @Test func aStateGivenWholeCountsDownAsARunsDoes() {
+        let state = StrengthLiveState(phase: .rest, endsAt: at(90), total: 60, figure: "1:00", label: "Repos",
+                                      detail: "sur 1 min", lead: "Ensuite", title: "Fentes", subtitle: "Série 2 sur 3",
+                                      sets: [[1, 0, 0]], exercise: 0, set: 1)
+        #expect(state.counts)
+        #expect(state.staleDate == at(90))
+        #expect(state.countdownStart == at(30))
+        #expect(!state.interrupted && state.pausedLeft == nil)
+    }
+
     @Test func nothingShowsBeforeTheFirstGesture() {
         #expect(StrengthLiveState(run: runs.ungated(), at: at(0)) == nil)
     }
