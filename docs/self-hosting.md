@@ -72,25 +72,36 @@ container, hence `--user postgres` in the commands below.
 The `DATABASE_URL` of the service and of the migrator then uses the socket:
 `postgresql+psycopg://redline_app:…@/redline?host=/run/redline-postgres`.
 
-**The service and a release.** Back up, update the checkout, install, migrate, restart,
-then check that the commit actually started: `runtime_tree` in `/health` fingerprints
-the engine's code, so a vault commit does not move it but different code does. The
-checkout follows `stable`, which only moves forward to a tagged release.
+**The service and a release.** `deploy/release` moves the checkout to another commit
+and back, from the deploy account:
 
 ```bash
-cd /home/ubuntu/redline && git pull --ff-only
-sudo systemctl start redline-backup.service
-sudo install -o root -g root -m 0755 deploy/agent-cli/redline-agent-cli /usr/local/bin/redline-agent-cli
-sudo install -D -o root -g root -m 0644 deploy/agent-cli/agent-cli-tools.txt \
-  /usr/local/share/redline/agent-cli-tools.txt
-sudo install -o root -g root -m 0644 deploy/systemd/coach-messenger.service /etc/systemd/system/
-sudo systemctl daemon-reload
-VENV=/home/ubuntu/.venvs/redline-current
-$VENV/bin/python -m pip install -c requirements.txt -e '.[cards,route]'    # add codex if used
-DATABASE_URL="$MIGRATOR_DATABASE_URL" $VENV/bin/alembic upgrade head
-sudo systemctl restart coach-messenger
-curl -fsS http://127.0.0.1:8000/ready && curl -s http://127.0.0.1:8000/health
+cd /home/ubuntu/redline && deploy/release <tag or commit>    # e.g. a tag of `stable`
+deploy/release <tag or commit> --declarations <dir>         # with the rulebook it needs
+deploy/release --rollback                                    # back to the commit it replaced
 ```
+
+It does, in this order:
+
+1. **Preflight.** The target engine's `redline config-check` reads a copy of the vault's
+   `redline.toml` and `rulebook.toml`, or the ones in `--declarations <dir>`. The service
+   refuses to start on a key its engine requires or no longer knows; here that refusal
+   stops the release before anything moves. The running engine refuses a key it does
+   not know yet, so a declaration the new engine needs is never written to the vault
+   ahead of time: put it in `<dir>`.
+2. **Release.** Backup (`redline-backup.service`), checkout, the launcher, its allowlist
+   and the unit installed as root, `pip install -e`, `alembic upgrade head` when
+   `migrations/` changed (with `MIGRATOR_DATABASE_URL`), then, service stopped, the
+   declarations of `<dir>` written and committed in the vault, and start.
+3. **Check.** `/ready` answers and `runtime_tree` in `/health` is the target's: it
+   fingerprints the engine's code, so a vault commit does not move it but different
+   code does.
+
+A failure in 2 or 3 puts the previous commit and declarations back and restarts it. After a migration it
+does not: the schema belongs to the new code, and the script says which revision to
+downgrade to by hand. A rollback across a migration is refused for the same reason.
+Overrides (`REDLINE_CHECKOUT`, `REDLINE_VENV`, `REDLINE_VAULT`, `REDLINE_EXTRAS`…) are at
+the top of the script; it targets this systemd layout, not Compose.
 
 The unit (`deploy/systemd/coach-messenger.service`) makes the file system read-only
 outside `/var/lib/redline` and reads its environment from

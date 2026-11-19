@@ -106,7 +106,7 @@ The same commands run locally and in CI:
 ```bash
 ruff check . && mypy && vulture && pytest -q
 shellcheck .githooks/pre-commit templates/vault/.githooks/pre-commit \
-           deploy/agent-cli/redline-agent-cli deploy/postgres/*.sh ios/scripts/install-on-device
+           deploy/agent-cli/redline-agent-cli deploy/release deploy/postgres/*.sh ios/scripts/install-on-device
 ```
 
 On a Mac with Xcode, for a change under `ios/`:

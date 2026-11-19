@@ -1,0 +1,222 @@
+#!/usr/bin/env bash
+# Moves the reference systemd deployment to another engine commit, or back.
+#
+#   deploy/release <ref> [--declarations <dir>]          a commit, tag or branch of origin
+#   deploy/release --rollback [--declarations <dir>]     the commit the last release replaced
+#
+# <dir> holds the redline.toml and/or rulebook.toml the target engine needs. The running
+# engine refuses a key it does not know yet, so they cannot be written to the vault
+# before the release: the script checks them, writes and commits them in the vault while
+# the service is stopped, and puts the previous ones back if the release fails.
+#
+# Run it from the deploy account (sudo for systemctl and the root-owned files), never
+# from a message or by the agent. The order is what keeps the service up:
+#   1. preflight: the TARGET engine checks the declarations it will run on, so a key it
+#      requires or no longer knows stops here, before anything moves;
+#   2. backup, checkout, root-owned files, venv, migrations, declarations, restart;
+#   3. /ready answers and /health reports the target's code fingerprint.
+# A failure in 2 or 3 puts the previous commit back, unless a migration already ran:
+# the schema then belongs to the new code, and only an operator downgrades it.
+set -euo pipefail
+
+checkout="${REDLINE_CHECKOUT:-/home/ubuntu/redline}"
+venv="${REDLINE_VENV:-/home/ubuntu/.venvs/redline-current}"
+vault="${REDLINE_VAULT:-/var/lib/redline/vault}"
+service_user="${REDLINE_SERVICE_USER:-redline}"
+unit="${REDLINE_UNIT:-coach-messenger}"
+base_url="${REDLINE_LOCAL_URL:-http://127.0.0.1:8000}"
+extras="${REDLINE_EXTRAS:-cards,route}"
+state_dir="${REDLINE_RELEASE_STATE:-$HOME/.local/state/redline-release}"
+ready_attempts="${REDLINE_READY_ATTEMPTS:-30}"
+declaration_names=(redline.toml rulebook.toml)
+
+die() {
+  echo "release: $*" >&2
+  exit 1
+}
+
+usage() {
+  sed -n '4,5p' "$0" | sed 's/^# //' >&2
+  exit 2
+}
+
+[[ "$(id -u)" -ne 0 ]] || die "run as the deploy account, not root"
+ref="" rollback=false staged=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --rollback) rollback=true ;;
+    --declarations) [[ $# -ge 2 ]] || usage; staged=$(cd "$2" && pwd); shift ;;
+    -*) usage ;;
+    *) [[ -z "$ref" ]] || usage; ref="$1" ;;
+  esac
+  shift
+done
+$rollback && [[ -n "$ref" ]] && usage
+$rollback || [[ -n "$ref" ]] || usage
+
+cd "$checkout"
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  die "the checkout has local changes"
+fi
+
+previous=$(git rev-parse HEAD)
+if $rollback; then
+  [[ -r "$state_dir/previous" ]] || die "no previous release recorded in $state_dir"
+  target=$(<"$state_dir/previous")
+else
+  git fetch --quiet --tags origin
+  target=$(git rev-parse --verify --quiet "$ref^{commit}") \
+    || target=$(git rev-parse --verify --quiet "origin/$ref^{commit}") \
+    || die "unknown ref: $ref"
+fi
+if [[ "$target" == "$previous" ]]; then
+  echo "release: ${target:0:12} is already deployed"
+  exit 0
+fi
+
+# The worktree belongs to the deploy account: one created under sudo would leave
+# root-owned files that `git worktree remove` cannot delete.
+work=$(mktemp -d)
+trap 'git -C "$checkout" worktree remove --force "$work/engine" >/dev/null 2>&1 || true
+      rm -rf "$work"' EXIT
+mkdir "$work/before" "$work/declarations"
+
+as_service() {
+  sudo -u "$service_user" "$@"
+}
+
+# The code fingerprint `/health` reports (`VaultRepo.runtime_tree`).
+runtime_tree() {
+  local trees
+  trees=$(git rev-parse "$1:deploy" "$1:src" "$1:migrations" | paste -sd ' ' -)
+  printf '%s' "$trees" | sha256sum | cut -c1-12
+}
+
+preflight() {
+  local name
+  for name in "${declaration_names[@]}"; do
+    if as_service test -f "$vault/$name"; then
+      as_service cat "$vault/$name" | tee "$work/before/$name" "$work/declarations/$name" \
+        >/dev/null
+    fi
+    if [[ -n "$staged" && -f "$staged/$name" ]]; then
+      cp "$staged/$name" "$work/declarations/$name"
+    fi
+  done
+  git worktree add --quiet --detach "$work/engine" "$target"
+  if [[ ! -f "$work/engine/src/redline/cli/config_check.py" ]]; then
+    echo "release: ${target:0:12} predates config-check; its declarations are not checked" >&2
+    return 0
+  fi
+  PYTHONPATH="$work/engine/src" "$venv/bin/python" -P -m redline.cli.config_check \
+    --vault "$work/declarations" \
+    || die "the declarations do not suit ${target:0:12} (see above): pass the ones it" \
+           "needs with --declarations <dir>; nothing was changed"
+}
+
+migrations_differ() {
+  ! git diff --quiet "$previous" "$target" -- migrations
+}
+
+# Writes the declarations of <dir> that differ from the vault's and commits them in the
+# vault: a coach turn restores an uncommitted rulebook.toml or redline.toml to HEAD.
+write_declarations() {
+  local source="$1" why="$2" name changed=()
+  for name in "${declaration_names[@]}"; do
+    [[ -f "$source/$name" ]] || continue
+    if as_service test -f "$vault/$name" \
+        && as_service cat "$vault/$name" | cmp -s - "$source/$name"; then
+      continue
+    fi
+    as_service tee "$vault/$name" < "$source/$name" >/dev/null || return 1
+    changed+=("$name")
+  done
+  [[ ${#changed[@]} -gt 0 ]] || return 0
+  as_service git -C "$vault" add -- "${changed[@]}" || return 1
+  as_service git -C "$vault" commit --quiet -m "$why" -- "${changed[@]}" || return 1
+}
+
+# Each step returns on failure instead of exiting, so the caller can put the previous
+# commit back.
+install_commit() {
+  local commit="$1"
+  git checkout --quiet --detach "$commit" || return 1
+  sudo install -o root -g root -m 0755 deploy/agent-cli/redline-agent-cli \
+    /usr/local/bin/redline-agent-cli || return 1
+  sudo install -D -o root -g root -m 0644 deploy/agent-cli/agent-cli-tools.txt \
+    /usr/local/share/redline/agent-cli-tools.txt || return 1
+  sudo install -o root -g root -m 0644 "deploy/systemd/$unit.service" \
+    /etc/systemd/system/ || return 1
+  sudo systemctl daemon-reload || return 1
+  "$venv/bin/python" -m pip install --quiet -c requirements.txt -e ".[$extras]" || return 1
+}
+
+# The declarations change while the service is stopped: the running engine rereads
+# them on change and would refuse the new keys.
+restart_on() {
+  local commit="$1" declarations="$2" why="$3"
+  sudo systemctl stop "$unit" || return 1
+  write_declarations "$declarations" "$why" || return 1
+  sudo systemctl start "$unit" || return 1
+  verify "$commit"
+}
+
+verify() {
+  local commit="$1" expected attempt health
+  expected=$(runtime_tree "$commit")
+  for ((attempt = 1; attempt <= ready_attempts; attempt++)); do
+    if curl -fsS --max-time 5 "$base_url/ready" >/dev/null 2>&1; then
+      health=$(curl -fsS --max-time 5 "$base_url/health") || return 1
+      if [[ "$health" == *"\"runtime_tree\":\"$expected\""* \
+            || "$health" == *"\"runtime_tree\": \"$expected\""* ]]; then
+        return 0
+      fi
+      echo "release: /health does not report the code of ${commit:0:12}: $health" >&2
+      return 1
+    fi
+    sleep 2
+  done
+  echo "release: /ready did not answer after $ready_attempts attempts" >&2
+  return 1
+}
+
+preflight
+
+migrate=false
+if migrations_differ; then
+  ! $rollback \
+    || die "migrations differ from ${target:0:12}: downgrade the schema with the current" \
+           "code first (alembic downgrade <revision of ${target:0:12}>), then roll back"
+  [[ -n "${MIGRATOR_DATABASE_URL:-}" ]] \
+    || die "migrations change: set MIGRATOR_DATABASE_URL for the migrator role"
+  migrate=true
+fi
+
+if systemctl cat redline-backup.service >/dev/null 2>&1; then
+  sudo systemctl start redline-backup.service || die "the backup failed; nothing was changed"
+fi
+
+echo "release: ${previous:0:12} -> ${target:0:12}"
+migrated=false
+if install_commit "$target" \
+    && { ! $migrate || { migrated=true
+         DATABASE_URL="$MIGRATOR_DATABASE_URL" "$venv/bin/alembic" upgrade head; }; } \
+    && restart_on "$target" "$work/declarations" \
+         "Declare what engine ${target:0:12} reads, with its release"; then
+  install -d -m 0700 "$state_dir"
+  printf '%s\n' "$previous" > "$state_dir/previous"
+  echo "release: ${target:0:12} is live (rollback: deploy/release --rollback)"
+  exit 0
+fi
+
+if $migrated; then
+  die "${target:0:12} failed after its migration: the checkout stays on it; downgrade" \
+      "the schema by hand before going back to ${previous:0:12}"
+fi
+echo "release: ${target:0:12} failed; putting ${previous:0:12} back" >&2
+if install_commit "$previous" \
+    && restart_on "$previous" "$work/before" \
+         "Restore the declarations of engine ${previous:0:12}: ${target:0:12} failed"; then
+  die "${target:0:12} was not deployed; ${previous:0:12} is live again"
+fi
+die "${previous:0:12} did not come back either: the service needs an operator now"
