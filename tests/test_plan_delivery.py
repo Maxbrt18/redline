@@ -63,7 +63,7 @@ def repo():
 @pytest.fixture
 def client():
     client = MagicMock()
-    for method in ("send_text", "send_burst", "send_image", "send_button", "action"):
+    for method in ("send_text", "send_burst", "send_image", "action"):
         getattr(client, method).return_value = DeliveryResult.success()
     return client
 

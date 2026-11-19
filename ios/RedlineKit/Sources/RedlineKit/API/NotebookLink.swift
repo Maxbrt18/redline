@@ -1,8 +1,8 @@
 import Foundation
 
-/// A notebook link that `/carnet` sends in Messenger, pasted in the app or opened by it:
-/// `https://<host>/carnet#t=<token>` or `redline://connect#t=<token>`, either followed by
-/// `&entry=<card id>` when the link points at a card. The token stays in the fragment, which
+/// A notebook link that `/carnet` sends in Messenger, pasted in the app or opened by iOS as a
+/// universal link: `https://<host>/carnet#t=<token>`, followed by `&entry=<card id>` when the
+/// link points at a card. The token stays in the fragment, which
 /// no request ever carries to a server.
 public struct NotebookLink: Sendable, Equatable {
     /// The one-use link token that buys a device token.
@@ -10,16 +10,13 @@ public struct NotebookLink: Sendable, Equatable {
     /// The card the link points at, if any.
     public let entry: String?
 
-    public static let scheme = "redline"
-
     public init(_ text: String, server: Server) throws(NotebookLinkError) {
         guard let url = URLComponents(string: text.trimmingCharacters(in: .whitespacesAndNewlines)) else {
             throw .notALink
         }
         let fromServer = url.scheme == "https" && url.host == server.baseURL.host()
             && url.port == server.baseURL.port && url.path == "/carnet"
-        let fromApp = url.scheme == Self.scheme && url.host == "connect" && url.path.isEmpty
-        guard fromServer || fromApp else {
+        guard fromServer else {
             throw url.scheme == "https" && url.path == "/carnet" ? .otherServer : .notALink
         }
         var fragment = URLComponents()

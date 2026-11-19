@@ -246,7 +246,6 @@ def make_bot(make_config, store):
             client.send_text.return_value = DeliveryResult.success()
             client.send_burst.return_value = DeliveryResult.success()
             client.send_image.return_value = DeliveryResult.success()
-            client.send_button.return_value = DeliveryResult.success()
             client.action.return_value = DeliveryResult.success()
         from redline.service.worker import TurnWorker
         return TurnWorker(client=client,
@@ -273,6 +272,15 @@ def cli_command(name: str) -> list[str]:
 
 # The suite may run as the service role, which can neither truncate nor create a database.
 ADMIN_URL = os.environ.get("TEST_ADMIN_DATABASE_URL") or os.environ.get("TEST_DATABASE_URL", "")
+
+
+def connect_device(client, link: str) -> int:
+    """Connects a test client as the iOS app does: the link buys a device token, sent as a
+    bearer token with every later request. Returns the connection's status code."""
+    response = client.post("/notebook-api/devices", json={"token": link})
+    if response.status_code == 200:
+        client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {response.json['device']}"
+    return response.status_code
 
 
 def reset_database():

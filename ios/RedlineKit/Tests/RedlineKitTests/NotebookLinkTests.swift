@@ -16,11 +16,6 @@ struct NotebookLinkTests {
         #expect(link.entry == card)
     }
 
-    @Test func theAppsSchemeOpensTheSameLink() throws {
-        let link = try NotebookLink("redline://connect#t=\(token)", server: server)
-        #expect(link.token == token)
-    }
-
     @Test func anotherServersLinkIsNamedAsSuch() {
         #expect(throws: NotebookLinkError.otherServer) {
             try NotebookLink("https://coach.other.org/carnet#t=\(token)", server: server)
@@ -28,7 +23,7 @@ struct NotebookLinkTests {
     }
 
     @Test(arguments: ["http://coach.example.org/carnet#t=x", "https://coach.example.org/s#t=x",
-                      "bonjour", "redline://strength#t=x", ""])
+                      "bonjour", "redline://connect#t=x", ""])
     func whatIsNotANotebookLinkIsRefused(text: String) {
         #expect(throws: NotebookLinkError.notALink) { try NotebookLink(text, server: server) }
     }
@@ -45,7 +40,7 @@ struct NotebookLinkTests {
 extension NotebookLink {
     init(token: String, entry: String?) {
         self = try! NotebookLink(
-            "redline://connect#t=\(token)" + (entry.map { "&entry=\($0)" } ?? ""),
+            "https://coach.example.org/carnet#t=\(token)" + (entry.map { "&entry=\($0)" } ?? ""),
             server: try! Server(host: "coach.example.org"))
     }
 }

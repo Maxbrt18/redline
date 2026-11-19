@@ -477,18 +477,6 @@ class PostgresStateStore(StateStore):
             return {"status": "expired"}
         return {"status": "active", "session": dict(row["snapshot"])}
 
-    def revoke_strength_link(self, psid: str, token: str) -> bool:
-        digest = strength.token_digest(token)
-        if not digest:
-            return False
-        with self.database.transaction() as connection:
-            changed = connection.execute(strength_session_links.update().where(
-                strength_session_links.c.token_hash == digest,
-                strength_session_links.c.psid == psid,
-                strength_session_links.c.revoked_at.is_(None),
-            ).values(revoked_at=dt.datetime.now(dt.UTC))).rowcount
-        return bool(changed)
-
     def relationship_context(self, psid: str, *, threads: bool = True) -> str:
         """`threads=False` when the turn's business packet already carries the open threads."""
         with self.database.engine.connect() as connection:

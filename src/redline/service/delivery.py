@@ -16,10 +16,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
-from redline.coach.fr import replies
 from redline.model.vocabulary import RESENDABLE_DELIVERIES, DeliveryStatus
 
-from . import strength
 from .messenger import DeliveredMessage, DeliveryResult, MessengerClient
 from .notebook import NotebookService
 from .outbox import Outbox, OutboxSnapshot
@@ -38,17 +36,12 @@ class TextPart:
 @dataclass(frozen=True)
 class ImagePart:
     path: Path
+    #: The strength card's (bubble text, session snapshot): it files the card as a strength
+    #: session in the notebook; nothing is sent from it.
     link: tuple[str, dict] | None = None
 
 
-@dataclass(frozen=True)
-class NotebookButtonPart:
-    """A text and a button to the notebook. The link is minted at send time: a login
-    token is neither stored nor replayed."""
-    text: str
-
-
-OutboundPart = TextPart | ImagePart | NotebookButtonPart
+OutboundPart = TextPart | ImagePart
 
 
 @dataclass(frozen=True)
@@ -94,8 +87,6 @@ def envelope_payload(envelope: OutboundEnvelope) -> dict:
         if isinstance(part, TextPart):
             parts.append({"kind": "text", "text": part.text, "mode": part.mode,
                           "pause_before": part.pause_before})
-        elif isinstance(part, NotebookButtonPart):
-            parts.append({"kind": "notebook_button", "text": part.text})
     return {"messaging_type": envelope.messaging_type, "tag": envelope.tag,
             "parts": parts, "meta": dict(envelope.meta)}
 
@@ -108,7 +99,9 @@ def envelope_from_payload(stored: StoredDelivery) -> OutboundEnvelope:
             parts.append(TextPart(str(item["text"]), item.get("mode", "burst"),
                                   bool(item.get("pause_before"))))
         elif item.get("kind") == "notebook_button":
-            parts.append(NotebookButtonPart(str(item["text"])))
+            # A stored envelope may still carry the retired notebook button: its text goes
+            # out alone.
+            parts.append(TextPart(str(item["text"]), "text"))
     if not parts:
         raise ValueError(f"stored envelope without content: {stored.source_key}")
     return OutboundEnvelope(stored.psid, stored.source_key, tuple(parts),
@@ -150,10 +143,6 @@ class EnvelopeBuilder:
              pause_before: bool = False) -> EnvelopeBuilder:
         if value.strip():
             self.parts.append(TextPart(value, "burst" if burst else "text", pause_before))
-        return self
-
-    def notebook_button(self, text: str) -> EnvelopeBuilder:
-        self.parts.append(NotebookButtonPart(text))
         return self
 
     def images(self, outbox: Outbox, before: OutboxSnapshot) -> EnvelopeBuilder:
@@ -221,7 +210,8 @@ class DeliveryService:
         return self.redeliver(stored)
 
     def deliver(self, envelope: OutboundEnvelope) -> DeliveryReceipt:
-        entries = self.notebook.capture(envelope) if self.notebook else []
+        if self.notebook:
+            self.notebook.capture(envelope)
         disposition = self.state.begin_outbound_delivery(
             envelope.source_key, envelope.psid, self._digest(envelope),
             envelope_payload(envelope))
@@ -275,22 +265,10 @@ class DeliveryService:
             text_ok=text_ok, attachments_ok=attachments_ok, delivered=delivered,
             detail=detail, messages=tuple(messages))
         has_text = any(not isinstance(part, ImagePart) for part in envelope.parts)
-        # An envelope without text may still have sent its card before the session
-        # button failed. It then becomes non-replayable too: `failed` must mean that
-        # no fragment crossed the transport.
+        # `failed` must mean that no fragment crossed the transport.
         accepted = ((text_ok or text_delivered > 0) if has_text else delivered > 0)
         self.state.finish_outbound_delivery(
             envelope.source_key, delivered=accepted, error=detail)
-        if entries and text_ok and self.notebook:
-            try:
-                button = self.client.send_button(
-                    envelope.psid, replies.NOTEBOOK_ARCHIVE,
-                    self.notebook.link(envelope.psid, entries[0]), replies.NOTEBOOK_BUTTON,
-                    messaging_type=envelope.messaging_type, tag=envelope.tag)
-                if not button.ok:
-                    log.warning("Notebook button not delivered; archive kept")
-            except Exception:
-                log.exception("Notebook link unavailable; archive kept")
         return receipt
 
     def _deliver_part(self, envelope: OutboundEnvelope,
@@ -302,25 +280,7 @@ class DeliveryService:
             return sender(
                 envelope.psid, part.text, messaging_type=envelope.messaging_type,
                 tag=envelope.tag)
-        if isinstance(part, NotebookButtonPart):
-            return self._deliver_notebook_button(envelope, part)
         return self._deliver_image(envelope, part)
-
-    def _deliver_notebook_button(self, envelope: OutboundEnvelope,
-                                 part: NotebookButtonPart) -> DeliveryResult:
-        url = None
-        if self.notebook:
-            try:
-                url = self.notebook.link(envelope.psid)
-            except Exception:
-                log.exception("Notebook link unavailable; text only")
-        if url is None:
-            return self.client.send_text(
-                envelope.psid, part.text, messaging_type=envelope.messaging_type,
-                tag=envelope.tag)
-        return self.client.send_button(
-            envelope.psid, part.text, url, replies.NOTEBOOK_BUTTON,
-            messaging_type=envelope.messaging_type, tag=envelope.tag)
 
     def _deliver_image(self, envelope: OutboundEnvelope,
                        part: ImagePart) -> DeliveryResult:
@@ -332,34 +292,8 @@ class DeliveryService:
             self.outbox.fail(part.path)
             return result
         log.info("Image sent: %s", part.path.name)
-        if not part.link:
-            self.outbox.archive(part.path)
-            return result
-
-        text, session = part.link
-        token = ""
-        try:
-            token = self.state.issue_strength_link(envelope.psid, session)
-            url = strength.token_url(self.coach_base_url, token)
-        except Exception as exc:
-            log.exception("Session link not created: %s", part.path.name)
-            self.outbox.archive(part.path)
-            return DeliveryResult.failure(
-                f"session link not created: {exc}", delivered=result.delivered,
-                messages=result.messages)
-        button = self.client.send_button(
-            envelope.psid, text, url, strength.BUTTON_TITLE,
-            messaging_type=envelope.messaging_type, tag=envelope.tag)
         self.outbox.archive(part.path)
-        if not button.ok:
-            log.error("Session button not delivered: %s", part.path.name)
-            self.state.revoke_strength_link(envelope.psid, token)
-            return DeliveryResult.failure(
-                button.detail, delivered=result.delivered + button.delivered,
-                messages=result.messages + button.messages)
-        log.info("Session link sent: %s", part.path.name)
-        return DeliveryResult.success(
-            result.delivered + button.delivered, result.messages + button.messages)
+        return result
 
     def _discard_image(self, path: Path) -> None:
         log.info("Image discarded (no text output): %s", path.name)
@@ -371,8 +305,6 @@ class DeliveryService:
             if isinstance(part, TextPart):
                 return {"kind": "text", "text": part.text, "mode": part.mode,
                         "pause_before": part.pause_before}
-            if isinstance(part, NotebookButtonPart):
-                return {"kind": "notebook_button", "text": part.text}
             return {"kind": "image", "path": part.path.name, "link": part.link}
 
         canonical = json.dumps({

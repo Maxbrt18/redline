@@ -1,11 +1,11 @@
-"""The HTTP facade: Messenger and Strava webhooks, the session page, healthcheck.
+"""The HTTP facade: Messenger and Strava webhooks, the iOS app's API, healthcheck.
 
 Structural decision: immediate HTTP 200, async processing. Claude may take
 minutes; Meta replays any webhook left without a fast response.
 
-The human page is a shell with no personal data. A capability in the URL fragment
-resolves an immutable session (`/s`), so the secret reaches neither the logs nor the
-Referer.
+No route serves a document: the athlete's interface is the iOS app, connected with a
+link pasted from Messenger. A capability stays in a URL fragment or a JSON body, so it
+reaches neither the logs nor the Referer.
 """
 
 from __future__ import annotations
@@ -23,25 +23,18 @@ from typing import Any
 
 from flask import Flask, jsonify, request
 
-from redline.cards import render
-from redline.coach.fr import session_labels
 from redline.model import notebook_views as views
 from redline.model import paths, strength_log
 from redline.storage.database import expected_schema_revision
 from redline.storage.repository import OperationalStore
 
-from . import clock, page, persona, strength
+from . import clock, persona, strength
 from .attachments import encode_payload
 from .config import Config
 from .notebook import NotebookService
-from .notebook_web import CSP as NOTEBOOK_CSP
 from .notebook_web import register as register_notebook
 from .worker import TurnWorker
 
-# /s serves the notebook's own document, since the guided session is one of its
-# screens: same bytes, same policy. Nothing loads from anywhere else;
-# `connect-src 'self'` is what lets it resolve the link and post its report back.
-PAGE_CSP = NOTEBOOK_CSP
 STRENGTH_REPORT_MAX_BYTES = 32 * 1024
 STRENGTH_SESSION_MAX_BYTES = 1024
 # Default cap on every request body. Without it Waitress accepts 1 GiB and
@@ -126,7 +119,7 @@ def _iter_events(payload: dict):
 
 
 def _exercise_cues(vault: Path) -> dict:
-    """{slug: [cues]} for the page, read once at startup.
+    """{slug: [cues]} for the app, read once at startup.
 
     Never fatal: a broken exercise note must fail `redline vault-check` and the card
     rendering, not the service startup. Without cues the « Le geste » button simply
@@ -223,7 +216,7 @@ def create_app(config: Config, bot: TurnWorker, state: Any,
         # receives it as a message, exactly like a strength report.
         register_notebook(app, notebook, config.allowed_psid, alert=lambda text, key: (
             bot.submit_event(config.allowed_psid, "postback", text, message_id=key)),
-            place=config.instance.place, cues=cues,
+            place=config.instance.place,
             settled=lambda activity_id: hasten_debrief(activity_id, "notebook feelings"))
     try:
         schema_expected = expected_schema_revision(paths.ENGINE_ROOT / "alembic.ini")
@@ -324,20 +317,6 @@ def create_app(config: Config, bot: TurnWorker, state: Any,
             hasten_debrief(activity_id, "title renamed")
         return "ok", 200
 
-    session_html, session_etag = page.build(render.CARDS_DIR, cues,
-                                            session_labels.for_page())
-
-    @app.get(strength.PAGE_PATH)
-    def session_page():
-        """The page itself: the same bytes for everyone, assembled once."""
-        response = app.response_class(session_html, mimetype="text/html")
-        response.set_etag(session_etag)
-        response.headers["Cache-Control"] = "no-cache"
-        response.headers["Content-Security-Policy"] = PAGE_CSP
-        response.headers["Referrer-Policy"] = "no-referrer"
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        return response.make_conditional(request)
-
     @app.post("/strength-session")
     def strength_session():
         """Resolve an opaque fragment capability without putting it in access logs."""
@@ -377,7 +356,7 @@ def create_app(config: Config, bot: TurnWorker, state: Any,
 
     @app.post("/strength-report")
     def strength_report():
-        """The end of the session, posted back by the page.
+        """The end of the session, posted back by the app.
 
         Everything is refused by default: no PSID, no capability, no session -- no
         injection. What survives all that is parsed once into bounded

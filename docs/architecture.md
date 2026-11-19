@@ -22,7 +22,7 @@ in force and their thresholds. The engine applies the rulebook; it does not writ
 flowchart LR
     Meta[Messenger] --> Web[web.py]
     Strava[Strava] --> Web
-    Pages[notebook and strength page] --> Web
+    App[iOS app] --> Web
     Web --> Inbox[(inbound_messages)]
     Inbox --> Bot[TurnWorker, the one worker]
     Scheduler[ProactiveScheduler] --> Jobs[(proactive_jobs)]
@@ -46,8 +46,8 @@ flowchart LR
 
 Webhooks answer quickly and store what they receive. A single worker then serializes
 messages, commands and initiatives, so two turns never share an agent session, a
-working tree or a delivery. The same web app serves the athlete's two pages: the
-notebook and the strength page.
+working tree or a delivery. The same web app serves the API of the athlete's iOS app:
+the notebook and the guided strength session.
 
 Around this core, `src/redline/analysis/` computes over the ledger (load, signals,
 descent, feasibility, progression, reviews), `src/redline/integrations/` talks to Strava,
@@ -132,7 +132,7 @@ An agent turn is the work of one model, wrapped in a transaction:
 6. The vault notes are committed locally, without network. Then the weeks the reply
    depends on, and every week the turn revised, are reread and validated.
 7. `TurnWorker` decides whether the canonical plan goes with the prose.
-8. `DeliveryService` stores the full envelope (text, buttons) in
+8. `DeliveryService` stores the full envelope (texts, images) in
    `outbound_deliveries`, then sends it. A retry resends this envelope, never a new turn.
 9. The message moves to `done`. A crash before this point makes it recoverable at the
    next start.
@@ -292,23 +292,24 @@ context. `redline fact-read conversation --query` searches past exchanges.
 
 ## The notebook
 
-`/carnet` is a private web app (PWA) that shows today's steps, the coming days, the week
+The notebook is the iOS app (`ios/`): it shows today's steps, the coming days, the week
 and its sessions, the pain over time and the race countdown, and collects in one tap
 what the ledger still lacks: ratings, the waking trace, sleep and life load. It computes
 everything at read time from the plan and the ledger, and stores no figure of its own.
 It also carries the reorganization of the week, the coach's proposals to take or
 dismiss, habits, the answers to open questions, the race plan, the weather and the
 archive of cards. What it reads is declared in `src/redline/model/notebook_views.py`.
-Access is a device cookie obtained from a one-time link sent over Messenger, revocable
-from the notebook or with `/carnet-revoquer`. Its routes are under `/notebook-api/`,
-without HTTP cache or CORS.
+Access is a device token, kept in the app's keychain and sent as a bearer token, bought
+with a one-time link that `/carnet` sends over Messenger and the athlete pastes into the
+app; it is revocable from the app or with `/carnet-revoquer`. The server serves no page:
+the app's routes are under `/notebook-api/`, without HTTP cache or CORS.
 
-## The strength page
+## The strength session
 
 A strength session in the plan is validated against the vault's exercise and routine
 notes when the revision is written: an unknown exercise blocks the revision, not the
 morning. The card (`/renfo`, or the morning's `strength_card` job) is rendered from the
-typed plan, without the model. Under it, a link opens a page that guides the session
+typed plan, without the model. The iOS app opens it from Today and guides the session
 set by set, offline if need be: the link is an opaque token of 192 bits, of which
 PostgreSQL keeps only the hash, valid seven days and revocable. The report it sends
 back is written in one transaction (claim, daily quota, session, message to the coach)

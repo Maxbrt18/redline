@@ -130,7 +130,7 @@ docker compose exec redline redline strava-subscription renew
 Once the webhook is subscribed, send a message to the Page from the athlete's account:
 the coach answers. From there:
 
-- `/carnet` in Messenger gives a link to the notebook; add it to the home screen.
+- `/carnet` in Messenger gives a link that connects the iOS app (`ios/README.md`).
 - `/help` lists the commands; `/status` says what the coach is doing.
 - The first week has no plan: ask the coach for one. Until a valid plan exists, it
   prescribes nothing.

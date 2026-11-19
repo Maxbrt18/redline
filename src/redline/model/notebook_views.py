@@ -1,11 +1,11 @@
-"""The JSON the notebook page reads: one declared shape per screen.
+"""The JSON the iOS app reads: one declared shape per screen.
 
-`Board` and `NotebookService` build these objects and the page reads them, so this module
-is the one description of what crosses between Python and JavaScript. They are TypedDicts
+`Board` and `NotebookService` build these objects and the app reads them, so this module
+is the one description of what crosses between Python and Swift. They are TypedDicts
 rather than dataclasses because what travels is a JSON object, where an absent key
 (`NotRequired`) is not a null. mypy holds the builders to these shapes;
-tests/test_notebook_contract.py holds the served JSON, the browser fixtures and the page's
-modules to them.
+tests/test_notebook_contract.py holds the served JSON and the app's fixtures to them, and
+tests/ios_contract.py writes the app's Swift models from them.
 
 This module skips `from __future__ import annotations`: a TypedDict reads `NotRequired`
 when the class is created, and a string annotation would hide it from `__required_keys__`.
@@ -618,7 +618,7 @@ class RacePassage(TypedDict):
 
 class RacePlan(TypedDict):
     """The race plan of the typed race. Running time is proportional to the pace and the
-    stops are not, so the page retimes every passage at any pace from these figures."""
+    stops are not, so the app retimes every passage at any pace from these figures."""
 
     source: Literal["ign", "gpx"]
     length_km: float
@@ -929,7 +929,7 @@ class VariantDrop(TypedDict):
 
 
 class VariantNote(TypedDict):
-    """A preference the variant bends; the page words it from `remark`."""
+    """A preference the variant bends; the app words it from `remark`."""
 
     remark: Literal["impact_near_hard", "load_above_plan", "long_off_days",
                     "group_uncarried", "rest_day_used"]

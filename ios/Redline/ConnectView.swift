@@ -18,7 +18,7 @@ struct ConnectView: View {
                     ContentUnavailableView {
                         Label("Ton carnet privé", systemImage: "lock")
                     } description: {
-                        Text("Ta séance du jour, ta semaine et ta course, sans remonter la conversation.\n\nEnvoie **/carnet** dans Messenger, copie le lien du bouton reçu, puis colle-le ici.")
+                        Text("Ta séance du jour, ta semaine et ta course, sans remonter la conversation.\n\nEnvoie **/carnet** dans Messenger, copie le lien reçu, puis colle-le ici.")
                     }
 
                     paste

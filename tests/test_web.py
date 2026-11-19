@@ -95,8 +95,7 @@ def app_bot(make_config, store, tmp_path):
 
     The real one would be harmless while the report route only forwarded a message, but not
     once it writes `athlete/strength-log.csv`: the suite would append rows to the athlete's
-    own log on every run. The two page tests below still ask for the real vault, because the
-    page borrows its skin from `src/redline/cards/`.
+    own log on every run.
     """
     class RecordingOperationalStore:
         def __init__(self):
@@ -139,23 +138,10 @@ def token_body(store, report=None, session=None):
                               **(report or {})}}
 
 
-def test_session_page_carries_no_session_data(app_bot):
-    client, _, _ = app_bot(vault_path=str(VAULT))
-    response = client.get("/s")
-    assert response.status_code == 200
-    body = response.get_data(as_text=True)
-    # The page is a shell identical for everyone. A fragment capability is resolved
-    # separately and therefore never appears in this request or in an access log.
-    assert "Redline" in body
-    assert "Mollet unipodal" not in body and SESSION["sid"] not in body
-    assert response.headers["Content-Security-Policy"].startswith("default-src 'none'")
-    assert response.headers["Referrer-Policy"] == "no-referrer"
-
-
-def test_session_page_is_conditional(app_bot):
-    client, _, _ = app_bot(vault_path=str(VAULT))
-    etag = client.get("/s").headers["ETag"]
-    assert client.get("/s", headers={"If-None-Match": etag}).status_code == 304
+def test_no_route_serves_a_page_for_the_coach_s_links(app_bot):
+    client, _, _ = app_bot()
+    assert client.get("/s").status_code == 404
+    assert client.get("/carnet").status_code == 404
 
 
 def test_report_reaches_the_athletes_own_queue(app_bot, store):

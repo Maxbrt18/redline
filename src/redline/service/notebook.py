@@ -165,14 +165,14 @@ class NotebookService:
         return f"{self.base_url}/carnet#t={token}" + (f"&entry={entry}" if entry else "")
 
     def capture(self, envelope: OutboundEnvelope) -> list[str]:
-        from .delivery import ImagePart, NotebookButtonPart, TextPart
+        from .delivery import ImagePart, TextPart
 
         existing = self.store.source_entries(envelope.psid, envelope.source_key)
         if existing:
             return existing
         kind, period = review_period(envelope.source_key)
         body = "\n\n".join(part.text for part in envelope.parts
-                           if isinstance(part, TextPart | NotebookButtonPart))
+                           if isinstance(part, TextPart))
         records = []
         has_review = False
         for part in envelope.parts:

@@ -1816,12 +1816,7 @@ class TurnWorker:
             log.info("Closed follow-up %s ignored: question already asked", job.kind)
             self._complete_job(job)
             return
-        builder = self._proactive_builder(job)
-        if message.notebook:
-            builder.notebook_button(message.text)
-        else:
-            builder.text(message.text)
-        envelope = (builder
+        envelope = (self._proactive_builder(job).text(message.text)
                     .meta(kind=job.kind, memory=message.text,
                           markers=list(message.markers),
                           questions=[message.question] if message.question else []).build())
@@ -1949,8 +1944,8 @@ class TurnWorker:
                 notebook.store.revoke(psid)
                 result = self._client.send_text(psid, replies.NOTEBOOK_REVOKED)
             else:
-                result = self._client.send_button(
-                    psid, replies.NOTEBOOK_INVITE, notebook.link(psid), replies.NOTEBOOK_BUTTON)
+                result = self._client.send_text(
+                    psid, replies.NOTEBOOK_INVITE.format(link=notebook.link(psid)))
             return result.ok
         if command == "/renfo":
             return self._deliver_strength_card(psid, source_key)

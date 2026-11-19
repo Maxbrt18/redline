@@ -50,7 +50,7 @@ A test checks that every variable the service reads is in this table.
 | `WEBHOOK_PORT` | `8000` | its port, the one the proxy forwards to |
 | `GIT_REMOTE` | `origin` | the vault's remote |
 | `GIT_BRANCH` | `main` | the vault's branch |
-| `COACH_BASE_URL` | empty | the public origin, `https://<domain>`; empty disables the strength page and its link on the card |
+| `COACH_BASE_URL` | empty | the public origin, `https://<domain>`, host of the `/carnet` link that connects the iOS app; empty disables the guided strength session |
 | `HEALTHCHECK_PING_URL` | empty | a URL pinged every 5 minutes (healthchecks.io, for instance) |
 
 ### The agent

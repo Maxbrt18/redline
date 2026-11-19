@@ -26,9 +26,6 @@ class ClosedProactive:
     text: str
     markers: tuple[str, ...] = ()
     question: str = ""
-    #: The text goes out with a button to the notebook: the answer is given there in
-    #: one tap, with no conversation turn, so no reply is awaited here.
-    notebook: bool = False
 
 
 def _object(detail: str) -> dict:
@@ -95,7 +92,7 @@ def missing_cells_in_notebook(detail: str) -> ClosedProactive | None:
     return ClosedProactive(
         initiatives.missing_cells_in_notebook(
             label, day, [_requested(initiatives.NOTEBOOK_CELL_LABELS, name) for name in names]),
-        markers, notebook=True)
+        markers)
 
 
 def _wake_trace(detail: str) -> ClosedProactive:
@@ -103,7 +100,7 @@ def _wake_trace(detail: str) -> ClosedProactive:
     names the levels of the instance's morning-trace scale."""
     levels = [level.label for level in rulebook.current().scales.morning_trace.levels]
     question = initiatives.wake_question(levels)
-    return ClosedProactive(initiatives.wake_trace(question), question=question, notebook=True)
+    return ClosedProactive(initiatives.wake_trace(question), question=question)
 
 
 def _missed_session(detail: str) -> ClosedProactive:
@@ -119,8 +116,7 @@ def _gut_review(detail: str) -> ClosedProactive:
 def gut_review_in_notebook(detail: str) -> ClosedProactive:
     """With the notebook connected, the fuel registry is filled there, one tap a question:
     the message points to it and awaits no reply."""
-    return ClosedProactive(initiatives.gut_review_in_notebook(_session_title(_object(detail))),
-                           notebook=True)
+    return ClosedProactive(initiatives.gut_review_in_notebook(_session_title(_object(detail))))
 
 
 def _number(value) -> float | None:

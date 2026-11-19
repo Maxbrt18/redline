@@ -1,9 +1,8 @@
 """The engine writes English; only the coach's language speaks French.
 
-A French string literal belongs under `src/redline/coach/fr/` (what the coach and the
-athlete read) or in the notebook page, `src/redline/service/page/`, which is the
-athlete's interface and keeps its words inline. Everywhere else -- logs, errors, argparse
-help, operator output, test failure messages -- the text is English.
+A French string literal belongs under `src/redline/coach/fr/`: what the coach and the
+athlete read. Everywhere else -- logs, errors, argparse help, operator output, test failure
+messages -- the text is English.
 
 `test_conventions.py` holds the same line for comments and docstrings.
 """
@@ -16,12 +15,12 @@ from conftest import ENGINE_ROOT
 from test_conventions import is_french
 
 SOURCE = ENGINE_ROOT / "src" / "redline"
-COACH_LANGUAGE = (SOURCE / "coach" / "fr", SOURCE / "service" / "page")
+COACH_LANGUAGE = (SOURCE / "coach" / "fr",)
 ACCENT = re.compile(r"[àâçéèêëîïôûùüœ]", re.IGNORECASE)
 # French on purpose, outside the coach's language: what the athlete types, the notebook's
 # routes, the token the persona fills in, and patterns that must match French text.
 ALLOWED = {
-    "/carnet", "/carnet-revoquer", "/renfo", "carnet-theme",
+    "/carnet", "/carnet-revoquer", "/renfo",
     "⟨athlète⟩", "oui", "non", "’",
     r"^[AEIOUYÂÊÎÔÛÉÈÀHaeiouyâêîôûéèàh]", r"\b[\wÀ-ÿ]+(?:['’][\wÀ-ÿ]+)*\b",
 }

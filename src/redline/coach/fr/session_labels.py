@@ -36,7 +36,7 @@ def name(slug: str) -> str:
     return LABELS[slug][1]
 
 
-def for_page() -> dict[str, dict[str, str]]:
-    """What the notebook page needs to name and draw every kind."""
+def for_app() -> dict[str, dict[str, str]]:
+    """What the iOS app needs to name and draw every kind (`tests/ios_contract.py`)."""
     return {slug: {"short": label, "name": title, "family": session_kinds.family(slug)}
             for slug, (label, title) in LABELS.items()}

@@ -12,7 +12,7 @@ import json
 import os
 
 import pytest
-from conftest import ENGINE_ROOT, reset_database
+from conftest import ENGINE_ROOT, connect_device, reset_database
 from test_weekly_plan import revision, session
 from writes import write
 
@@ -239,7 +239,7 @@ def test_the_answer_route_takes_every_fuel_registry_answer(store, make_config, m
     service = NotebookService(archive, Repo(store), MagicMock(), ENGINE_ROOT,
                               "https://coach.test", operational=store)
     client = create_app(config, MagicMock(), MagicMock(), notebook=service).test_client()
-    client.post("/notebook-api/connect", json={"token": archive.issue(config.allowed_psid)})
+    connect_device(client, archive.issue(config.allowed_psid))
 
     fuelled = next(row["id"] for row in store.observation_rows()
                    if row["idempotency_key"] == "test:fuelled")
@@ -435,8 +435,7 @@ def test_routes_serve_the_three_screens_and_hand_a_crossing_to_the_coach(
     client = create_app(config, bot, MagicMock(), notebook=service).test_client()
     for path in ("today", f"week/{WEEK}", "race"):
         assert client.get("/notebook-api/" + path).status_code == 401
-    assert client.post("/notebook-api/connect", json={
-        "token": archive.issue(config.allowed_psid)}).status_code == 200
+    assert connect_device(client, archive.issue(config.allowed_psid)) == 200
     today = client.get("/notebook-api/today").json
     assert today["totals"]["km_target"] == 41.0 and today["strength"] == {"status": "none"}
     assert client.get(f"/notebook-api/week/{WEEK}").json["week"] == WEEK
@@ -480,7 +479,7 @@ def test_the_last_feeling_of_a_strava_run_brings_its_debrief_forward(
     state, nudge = MagicMock(), MagicMock()
     client = create_app(config, MagicMock(), state, notebook=service,
                         nudge=nudge).test_client()
-    client.post("/notebook-api/connect", json={"token": archive.issue(config.allowed_psid)})
+    connect_device(client, archive.issue(config.allowed_psid))
     [ask] = client.get("/notebook-api/today").json["asks"]
     for metric, value in (("pain:knee", 1), ("rpe", 3)):
         client.post("/notebook-api/answer", json={"ask": f"{ask['id']}:{metric}", "value": value})

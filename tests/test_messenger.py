@@ -26,41 +26,6 @@ def test_split_never_inside_a_word():
         assert all(chunk == "mot" for chunk in part.split())
 
 
-# ---- the session button (interactive strength session)
-
-def test_button_payload_is_a_one_button_template(make_config):
-    client = MessengerClient(make_config())
-    sent = []
-    client._post = lambda payload: sent.append(payload)
-
-    client.send_button("4242", "Renfo A · samedi 25 juillet",
-                       "https://coach.test/s#abc.def", "Ouvrir la séance")
-
-    message = sent[0]["message"]["attachment"]["payload"]
-    assert message["template_type"] == "button"
-    assert message["text"] == "Renfo A · samedi 25 juillet"
-    assert message["buttons"] == [{"type": "web_url",
-                                   "url": "https://coach.test/s#abc.def",
-                                   "title": "Ouvrir la séance"}]
-    assert sent[0]["recipient"] == {"id": "4242"}
-    assert "tag" not in sent[0]
-
-
-def test_button_truncates_to_what_meta_accepts(make_config):
-    client = MessengerClient(make_config())
-    sent = []
-    client._post = lambda payload: sent.append(payload)
-
-    client.send_button("4242", "t" * 900, "https://coach.test/s#a.b", "l" * 40,
-                       messaging_type="UPDATE", tag="ACCOUNT_UPDATE")
-
-    message = sent[0]["message"]["attachment"]["payload"]
-    assert len(message["text"]) == MessengerClient.BUTTON_TEXT_MAX
-    assert len(message["buttons"][0]["title"]) == MessengerClient.BUTTON_TITLE_MAX
-    assert sent[0]["tag"] == "ACCOUNT_UPDATE"
-    assert sent[0]["messaging_type"] == "UPDATE"
-
-
 def test_a_4xx_is_an_explicit_delivery_failure(make_config, monkeypatch):
     client = MessengerClient(make_config())
     monkeypatch.setattr("redline.service.messenger.requests.post", lambda *a, **k:
