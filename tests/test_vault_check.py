@@ -81,6 +81,12 @@ def test_the_id_pattern_follows_the_typed_ledger(report):
     assert report.failed == 1
 
 
+def test_a_64_bit_strava_id_is_seen(report):
+    check = vault_check.check_no_duplicate_facts
+    check(vault({"concepts/seuil.md": "cf. 9223372036854775807"}), report)
+    assert report.failed == 1
+
+
 # ------------------------------------------------------------ the graph
 
 def test_a_link_to_nowhere_fails(report):

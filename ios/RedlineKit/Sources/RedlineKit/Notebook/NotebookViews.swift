@@ -4702,7 +4702,7 @@ public extension Notebook {
         public let title: String?
         public let workout: String?
         public let quality: Bool
-        public let stravaId: Int?
+        public let stravaId: String?
         public let fact: DetailFact
         public let plan: DetailPlan?
         public let ask: DetailAsk?
@@ -4721,7 +4721,7 @@ public extension Notebook {
         public let gear: Gear?
         public let week: WeekContext
 
-        public init(id: String, date: String, kind: String, title: String? = nil, workout: String? = nil, quality: Bool, stravaId: Int? = nil, fact: DetailFact, plan: DetailPlan? = nil, ask: DetailAsk? = nil, wake: WakeTrace, phases: [Phase]? = nil, reps: [Rep]? = nil, reading: RepReading? = nil, km: [KmSplit]? = nil, stops: StopSummary? = nil, drift: Drift? = nil, series: Series? = nil, hrBounds: [Int]? = nil, zones: ZoneSeconds? = nil, previous: Previous? = nil, weather: Conditions? = nil, gear: Gear? = nil, week: WeekContext) {
+        public init(id: String, date: String, kind: String, title: String? = nil, workout: String? = nil, quality: Bool, stravaId: String? = nil, fact: DetailFact, plan: DetailPlan? = nil, ask: DetailAsk? = nil, wake: WakeTrace, phases: [Phase]? = nil, reps: [Rep]? = nil, reading: RepReading? = nil, km: [KmSplit]? = nil, stops: StopSummary? = nil, drift: Drift? = nil, series: Series? = nil, hrBounds: [Int]? = nil, zones: ZoneSeconds? = nil, previous: Previous? = nil, weather: Conditions? = nil, gear: Gear? = nil, week: WeekContext) {
             self.id = id
             self.date = date
             self.kind = kind
@@ -4783,7 +4783,7 @@ public extension Notebook {
             title = try container.decode(String?.self, forKey: .title)
             workout = try container.decode(String?.self, forKey: .workout)
             quality = try container.decode(Bool.self, forKey: .quality)
-            stravaId = try container.decode(Int?.self, forKey: .stravaId)
+            stravaId = try container.decode(String?.self, forKey: .stravaId)
             fact = try container.decode(DetailFact.self, forKey: .fact)
             plan = try container.decode(DetailPlan?.self, forKey: .plan)
             ask = try container.decode(DetailAsk?.self, forKey: .ask)

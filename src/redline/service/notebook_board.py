@@ -790,7 +790,7 @@ class Board:
             "id": str(observation["id"]), "date": day.isoformat(), "kind": observation["kind"],
             "title": session["title"] if session else None,
             "workout": session["workout"] if session else None, "quality": quality,
-            "strava_id": (intake or {}).get("activity_id"),
+            "strava_id": str(intake["activity_id"]) if intake else None,
             "fact": {**fact, "moving_s": _known(observation, "duration_s"),
                      "hr_max": _known(observation, "hr_max_bpm") if hr_valid else None,
                      "cadence": _known(observation, "cadence_spm"),
