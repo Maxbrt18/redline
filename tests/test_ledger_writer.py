@@ -82,6 +82,15 @@ def test_the_typed_writer_rounds_what_strava_returns(monkeypatch, capsys):
     assert "EF | du jour" in captured.out  # PostgreSQL keeps the text, pipe included.
 
 
+def test_the_typed_writer_accepts_a_64_bit_strava_id(monkeypatch, capsys):
+    add = _load_writer()
+    monkeypatch.setattr(sys, "argv", [
+        "ledger-add", "--dry-run", "--date", "2026-08-10", "--type", "easy",
+        "--strava", "9223372036854775807"])
+    assert add.main() == 0
+    assert "9223372036854775807" in capsys.readouterr().out
+
+
 def test_the_typed_writer_refuses_and_names_the_column(monkeypatch, capsys):
     """What no rounding can fix is refused BEFORE any write."""
     add = _load_writer()

@@ -39,7 +39,8 @@ class ObservationInput:
     note: str = ""
 
 
-STRAVA_ID_PATTERN = r"\d{9,12}"
+# Strava activity ids are positive 64-bit integers: up to 19 digits.
+STRAVA_ID_PATTERN = r"\d{9,19}"
 INPUTS = (
     ObservationInput("date", formats.DATE, required=True),
     ObservationInput("type", "|".join(SESSION_TYPES), required=True),

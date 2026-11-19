@@ -854,7 +854,9 @@ class SessionView(TypedDict):
     title: str | None
     workout: str | None
     quality: bool
-    strava_id: int | None
+    # A string: Strava ids are 64-bit, and a JavaScript number holds an integer exactly
+    # only up to 2**53.
+    strava_id: str | None
     fact: DetailFact
     plan: DetailPlan | None
     ask: DetailAsk | None

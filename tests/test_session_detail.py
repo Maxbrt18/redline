@@ -256,6 +256,7 @@ def test_the_route_serves_the_detail_and_refuses_what_is_not_an_identifier(
     assert client.get("/notebook-api/session/00000000-0000-0000-0000-000000000000").status_code == 404
     view = client.get(f"/notebook-api/session/{observation_id}").json
     assert view["series"]["hr"] and view["reps"]
+    assert view["strava_id"] == "90000000006"
     # The streams fetched on first display are kept: the second one does not ask for them again.
     monkeypatch.setattr(session_detail, "fetch_streams", lambda _: pytest.fail("fetched twice"))
     assert client.get(f"/notebook-api/session/{observation_id}").status_code == 200
