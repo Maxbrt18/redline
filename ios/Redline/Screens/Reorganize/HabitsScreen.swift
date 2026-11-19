@@ -97,7 +97,7 @@ private struct HabitsList: View {
         do {
             try await client.endHabit(habit.id)
             failure = nil
-            await reload?()
+            await reload()
         } catch {
             failure = NotebookSession.words(for: error)
         }

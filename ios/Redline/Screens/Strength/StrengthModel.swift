@@ -8,7 +8,7 @@ struct StrengthLaunch: Identifiable {
     let token: StrengthToken
     /// The session the link was asked for, to reopen it offline from what the device kept.
     let sid: String?
-    var onClose: (() async -> Void)?
+    var onClose: ReloadAction?
 
     var id: String { token.value }
 }

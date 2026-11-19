@@ -112,7 +112,7 @@ struct StrengthCard: View {
             return
         } catch {
             failure = NotebookSession.words(for: error)
-            await reload?()
+            await reload()
             return
         }
         session.strength = StrengthLaunch(token: token, sid: sid, onClose: reload)
