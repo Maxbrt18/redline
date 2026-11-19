@@ -3,6 +3,85 @@
 Each release groups what `main` gathered once it has proven itself on a real server; see
 [CONTRIBUTING.md](CONTRIBUTING.md#releases). Each tag carries its date.
 
+## 0.3.0
+
+### Added
+
+- **Native iOS notebook**: the notebook becomes a SwiftUI app under `ios/`, connected by a
+  device token bought with the `/carnet` link and kept in the keychain. Today opens on a day
+  card whose colour says where the day stands, the strength session is guided set by set,
+  with a Live Activity, and the app's API types are generated from
+  `notebook_views.py` ([#103](https://github.com/Maxbrt18/redline/pull/103),
+  [#104](https://github.com/Maxbrt18/redline/pull/104), [#105](https://github.com/Maxbrt18/redline/pull/105),
+  [#106](https://github.com/Maxbrt18/redline/pull/106), [#107](https://github.com/Maxbrt18/redline/pull/107),
+  [#108](https://github.com/Maxbrt18/redline/pull/108), [#109](https://github.com/Maxbrt18/redline/pull/109),
+  [#110](https://github.com/Maxbrt18/redline/pull/110), [#111](https://github.com/Maxbrt18/redline/pull/111),
+  [#112](https://github.com/Maxbrt18/redline/pull/112)).
+- **Voice notes**: a Messenger voice note is transcribed by a speech-to-text provider
+  (`TRANSCRIPTION_PROVIDER`: `groq` or `openai`) and answered like a text
+  ([#100](https://github.com/Maxbrt18/redline/pull/100)).
+- **Kilometre splits in the debrief**: every run is read kilometre by kilometre from its
+  Strava streams, so an easy or long run that started too fast or sat above its cap shows
+  even without laps ([#99](https://github.com/Maxbrt18/redline/pull/99)).
+- **Long runs read against the athlete's own**: a long run's RPE is compared with the
+  athlete's long runs of a comparable duration, not a fixed target
+  ([#98](https://github.com/Maxbrt18/redline/pull/98), [#101](https://github.com/Maxbrt18/redline/pull/101)).
+- **Unplanned sessions**: a Strava session outside the plan is recorded, so the notebook
+  asks its pain, enjoyment and RPE ([#115](https://github.com/Maxbrt18/redline/pull/115)).
+- **`deploy/release`**: a release in one command. The target engine's new
+  `redline config-check` checks the instance's declarations first, the declarations a new
+  engine needs go in with `--declarations`, and a failure puts the previous commit back;
+  `--rollback` returns to the previous release
+  ([#116](https://github.com/Maxbrt18/redline/pull/116)).
+- **Backups watched and rehearsed**: `backup.sh` reports to its own healthchecks.io check
+  (`REDLINE_BACKUP_PING_URL`), `deploy/postgres/restore-check.sh` restores an archive into a
+  throwaway container and holds it to its manifest, and `self-hosting.md` states RPO and
+  RTO ([#116](https://github.com/Maxbrt18/redline/pull/116)).
+
+### Changed
+
+- **A coach turn cannot change its own rules**: `rulebook.toml` and `redline.toml` edited
+  during a turn are restored before its commands are applied
+  ([#116](https://github.com/Maxbrt18/redline/pull/116)).
+- **The heartbeat is the worker's**: it stops when the worker thread is gone or a job
+  outlasts every timeout, and one failed job no longer stops the worker
+  ([#116](https://github.com/Maxbrt18/redline/pull/116)).
+- A new plan revision refuses `rpe_min`/`rpe_max` on a long run: its intensity is
+  prescribed with `hr_zone` or `hr_cap_bpm`; stored revisions stay readable
+  ([#98](https://github.com/Maxbrt18/redline/pull/98)).
+- Strava ids up to 64 bits are accepted, and the notebook carries them as strings
+  ([#113](https://github.com/Maxbrt18/redline/pull/113)).
+- The architecture document matches the code again, and a design note plans the move of
+  the training program from the vault to PostgreSQL
+  ([#96](https://github.com/Maxbrt18/redline/pull/96), [#97](https://github.com/Maxbrt18/redline/pull/97),
+  [#102](https://github.com/Maxbrt18/redline/pull/102)).
+
+### Removed
+
+- **The web notebook**: the page, its strength screen, `/s`, the cookie login
+  (`/notebook-api/connect`) and the Messenger buttons that opened them. Those routes answer
+  404; reminders go out as plain text, and `/carnet` sends the link the app connects with
+  ([#114](https://github.com/Maxbrt18/redline/pull/114)).
+
+### Upgrading
+
+No migration. `deploy/release` checks the vault's declarations against the new engine
+before anything moves; a 0.2.0 checkout does not have it yet, so take it from the tag:
+
+```bash
+git fetch --tags origin && git show v0.3.0:deploy/release > /tmp/release
+bash /tmp/release v0.3.0
+```
+
+- The athlete moves to the iOS app (`ios/README.md`): the web notebook and its cookie are
+  gone. Set `COACH_BASE_URL` to the public origin, the host of the `/carnet` link.
+- Optional: `TRANSCRIPTION_PROVIDER` and `TRANSCRIPTION_API_KEY` for voice notes, and
+  `[transcription] vocabulary` in the vault's `redline.toml`.
+- Optional: the `comparable_*` and `split_*` keys of `[parameters]` (see
+  `rulebook.default.toml`); without them, the long-run comparison and the split gaps stay
+  silent.
+- Optional: `REDLINE_BACKUP_PING_URL` in the PostgreSQL environment file.
+
 ## 0.2.0
 
 ### Added
