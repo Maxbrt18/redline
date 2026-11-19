@@ -118,7 +118,9 @@ class ProactiveScheduler:
         self._nudge = threading.Event()
         self._thread: threading.Thread | None = None
         self._captured_on_arrival: set[str] = set()
-        self._last_health_ping = 0.0
+        # None until the first ping: the monotonic clock starts near zero at boot, so a
+        # zero start would hold the first pulse for up to HEALTH_PING_SECONDS.
+        self._last_health_ping: float | None = None
         self._last_maintenance = 0.0
         self._last_block = ""  # last budget-block reason logged (log only on change)
         self._wake_checked_on = ""  # one board read per morning, not one per tick
@@ -164,7 +166,8 @@ class ProactiveScheduler:
         if not url:
             return
         now = time.monotonic()
-        if now - self._last_health_ping < self.HEALTH_PING_SECONDS:
+        if (self._last_health_ping is not None
+                and now - self._last_health_ping < self.HEALTH_PING_SECONDS):
             return
         self._last_health_ping = now
         stall = self._bot.stall()
