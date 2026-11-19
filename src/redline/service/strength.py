@@ -1,4 +1,4 @@
-"""The strength-session link: one immutable snapshot, a card and a page to follow.
+"""The strength-session link: one immutable snapshot, a card and the app to follow it.
 
 Links carry only an opaque capability (`/s#t=<token>`). The exact prescription lives
 in PostgreSQL and the raw token never does.
@@ -28,7 +28,6 @@ from redline.model.errors import InputError
 
 PAGE_PATH = "/s"
 SIDECAR_SUFFIX = ".link"
-BUTTON_TITLE = wording.BUTTON_TITLE
 
 NOTE_MAX = 300          # a free-text note the coach will read, not an essay
 REPS_MAX_SETS = 24
@@ -40,7 +39,7 @@ ROUTINE = re.compile(formats.SLUG)
 
 
 class ReportError(InputError):
-    """The report does not respect the page contract."""
+    """The report does not respect the app's contract."""
 
 
 class ExpiredLink(InputError):
@@ -158,10 +157,10 @@ def _clean_text(value) -> str:
 
 
 def _sides_of(exercise) -> list:
-    """The side of each slot, in the order the page walks them: ["d", "g", "d", ...].
+    """The side of each slot, in the order the app walks them: ["d", "g", "d", ...].
 
     Read off the session -- which the route already holds -- rather than trusted
-    from the report. The page posts its counts POSITIONALLY, blanks included, and
+    from the report. The app posts its counts POSITIONALLY, blanks included, and
     that position is the only thing that says which leg a number belongs to.
     """
     dose = exercise.get("dose") if isinstance(exercise, dict) else None
@@ -172,7 +171,7 @@ def _sides_of(exercise) -> list:
 
 
 def parse_report(report: dict, exercises: list, zones: dict[str, str] | None = None) -> dict:
-    """Validate then normalize the contract posted by the page.
+    """Validate then normalize the contract posted by the app.
 
     An out-of-range value is an invalid request, not a value to fix silently:
     turning 99 into pain 10 or ``"false"`` into true would fabricate a medical fact

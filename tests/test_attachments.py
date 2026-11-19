@@ -149,7 +149,6 @@ def test_bot_analysis_is_read_only_and_drops_any_staged_write(
         send_burst=lambda *_, **__: delivered,
         send_text=lambda *_, **__: delivered,
         send_image=lambda *_, **__: DeliveryResult.success(),
-        send_button=lambda *_, **__: DeliveryResult.success(),
         pause_before=lambda *_, **__: None,
     )
     bot = make_bot(agent=agent, client=client, attachments=attachments)

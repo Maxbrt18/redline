@@ -41,7 +41,7 @@ final class NotebookSession {
     }
 
     /// Connects with a link pasted or opened by the system; a device already connected
-    /// keeps its token, as an old notification stays openable on the page. A link to a
+    /// keeps its token, so an old notification stays openable. A link to a
     /// card opens that card either way.
     func connect(with text: String) async {
         // A session link opens the session; it needs a connected device, as Today does.
@@ -62,7 +62,7 @@ final class NotebookSession {
             link = try NotebookLink(text, server: server)
         } catch {
             failure = switch error {
-            case .notALink: "Ce n’est pas un lien de carnet. Envoie /carnet dans Messenger et copie le lien du bouton."
+            case .notALink: "Ce n’est pas un lien de carnet. Envoie /carnet dans Messenger et copie le lien reçu."
             case .otherServer: "Ce lien vient d’un autre coach que celui de cette app."
             case .noToken: "Ce lien est incomplet. Copie-le en entier depuis Messenger."
             }

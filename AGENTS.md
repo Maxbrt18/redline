@@ -12,7 +12,7 @@ instructions are not here: they live in each instance's vault (template:
 | `src/redline/storage/` | PostgreSQL: `schema.py`, one repository module per aggregate, projections |
 | `src/redline/analysis/` | computations over the ledger (load, signals, descent, feasibility) |
 | `src/redline/integrations/` | Strava and weather clients, speech-to-text providers (`speech/`) |
-| `src/redline/service/` | the Messenger service, agent runners, the notebook PWA (`page/`) |
+| `src/redline/service/` | the Messenger service, agent runners, the notebook API the iOS app calls |
 | `src/redline/coach/fr/` | every athlete-facing text: prompts, messages, labels, scales |
 | `src/redline/cards/` | PNG cards and charts |
 | `src/redline/cli/` | one thin module per command (`redline week-plan` → `redline.cli.week_plan`) |
@@ -43,12 +43,9 @@ host live in `ios/Config/Local.xcconfig`, which Git ignores.
 - The coach speaks French. What the coach or the athlete reads lives under
   `src/redline/coach/fr/`, and the code calls it by name (`wording.DONE.format(...)`).
   So do the rule texts of `rulebook.default.toml` and the vault templates in `templates/`.
-- The notebook page (`src/redline/service/page/`) and the iOS app (`ios/`) are the
-  athlete's interface: their words stay inline, in French, next to the code that shows
-  them. There is no string catalogue for the page; the day it gets a second language, it
-  moves to a standard i18n setup (one message file per locale, a library, a lint rule
-  against literal strings). The app's development region is `fr`, so its inline words are
-  already the source of an Xcode string catalogue.
+- The iOS app (`ios/`) is the athlete's interface: its words stay inline, in French, next
+  to the code that shows them. The app's development region is `fr`, so its inline words
+  are already the source of an Xcode string catalogue.
 - `tests/test_language.py` (string literals and test failure messages) and
   `tests/test_conventions.py` (comments and docstrings) enforce these rules.
 
@@ -78,10 +75,9 @@ Parse once at the boundary (Strava, LLM output, config, frontmatter) into frozen
 dataclasses and pass typed objects inward. Derived values (pace, zones, weekly load) are
 computed, never stored.
 
-What the notebook page and the iOS app read is declared in
-`src/redline/model/notebook_views.py`. `tests/test_notebook_contract.py` holds the real
-routes, the browser payloads of `tests/notebook_payloads.py` and the page's modules to it:
-change a key there, in its builder and in the page together, then run
+What the iOS app reads is declared in `src/redline/model/notebook_views.py`.
+`tests/test_notebook_contract.py` holds the real routes and the payloads of
+`tests/notebook_payloads.py` to it: change a key there and in its builder together, then run
 `python tests/ios_contract.py`, which rewrites the app's Swift models and fixtures from the
 same declarations (`tests/test_ios_contract.py` fails while they are stale).
 
@@ -121,7 +117,7 @@ xcodebuild -project ios/Redline.xcodeproj -scheme Redline \
     -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 ```
 
-PostgreSQL tests need `TEST_DATABASE_URL`; browser tests need `playwright install
+PostgreSQL tests need `TEST_DATABASE_URL`; the card tests need `playwright install
 chromium`. Run `git config core.hooksPath .githooks` once to enable the pre-commit hook.
 
 ## Changes

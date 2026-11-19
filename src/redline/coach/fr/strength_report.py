@@ -1,8 +1,6 @@
-"""The strength page as Messenger shows it, and the report the coach reads once it is sent."""
+"""The strength card's default caption, and the report the coach reads once it is sent."""
 
 from __future__ import annotations
-
-BUTTON_TITLE = "Ouvrir la séance"   # Messenger caps a button title at 20 characters
 
 DEFAULT_TEXT = "Ta séance de renfo"
 

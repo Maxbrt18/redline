@@ -28,7 +28,7 @@ ACTIVITY = "90000000001"
 @pytest.fixture
 def client():
     client = MagicMock()
-    for method in ("send_text", "send_burst", "send_image", "send_button", "action"):
+    for method in ("send_text", "send_burst", "send_image", "action"):
         getattr(client, method).return_value = MagicMock(ok=True)
     return client
 

@@ -1,4 +1,4 @@
-"""What the notebook API answers in the browser tests.
+"""What the notebook API answers, as the iOS app's fixtures.
 
 tests/test_notebook_contract.py reads each payload against `redline.model.notebook_views`,
 so a key the service renames breaks a fixture too.

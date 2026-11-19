@@ -57,7 +57,7 @@ Read by `model/program.py` (`_workout_notes`, `load`, `rpe_targets`), validated 
 | `type` | `workout` | schema only |
 | `kinds` | list of `session_kinds.RECORDED` | `rpe_targets` (kind → target) |
 | `routine` | slug, exclusive with `kinds` | `load` (routine key), plans, ledger, strength card |
-| `title`, `rule` | text printed on the card | `Program.build`, `strength_card`, notebook page |
+| `title`, `rule` | text printed on the card | `Program.build`, `strength_card`, iOS app |
 | `exercises` | ordered list: slug, or `{exercise, dose}` override | `Program.prescriptions` |
 | `target_rpe` | int 1–10 | `rpe_targets` → ledger flags, missed-quality cost, weekly dossier, hot cache, notebook board, reorganize |
 | `duration_min` | int 5–120 | `Program.build` (card default) |
@@ -76,7 +76,7 @@ Read by `model/program.py` (`EXERCISE_SCHEMA`, via `notes.read_all`).
 | Field | Shape | Read by |
 |---|---|---|
 | file name | the slug | everything that cites an exercise (`strength_results.exercise_slug`, lineages in `rulebook.toml`) |
-| `name`, `target`, `cue`, `how[]`, `equipment[]` | display text | strength card, notebook page, `strength.md` tables |
+| `name`, `target`, `cue`, `how[]`, `equipment[]` | display text | strength card, iOS app, `strength.md` tables |
 | `dose` | `model/dose.py`: `measure`, `sets`, `reps`/`seconds`/`contacts`+`block`, `side`, `rest_s`; ranges as `[low, high]` | `Program.prescriptions`, `progression_strength` (current dose), `strength_tables` |
 | `load` | `{kg, count}` | card |
 | `impact` | bool | `Program.impact`, reorganize |
@@ -193,7 +193,7 @@ override tables, so the two cannot drift.
   keep their meaning.
 - A version may be recorded for a future week (prepared progression); nothing reads it
   until that week.
-- `strength_sessions.prescription` (the JSONB snapshot of what the page served, after
+- `strength_sessions.prescription` (the JSONB snapshot of what the app served, after
   variant, half dose and drops) stays the truth of what a given session asked. The
   version tables answer what the program prescribed; the progression engine reads the
   snapshot when it exists and the version otherwise.
@@ -391,12 +391,12 @@ Only an empty diff (or a diff fully explained by the backfill) goes to productio
   mid-lineage and old exposures are read against their own week), `test_ledger.py`
   (a target changed later does not rewrite an old flag), `test_vault_check.py`,
   `test_correction_replay.py`, `test_fact_write_patch.py`, `test_strength_card.py`,
-  `test_notebook_board.py`, `test_page.py`, `test_reorganize.py`, `test_prompts.py`
+  `test_notebook_board.py`, `test_reorganize.py`, `test_prompts.py`
   (prompt references to `redline program`), `test_dress_rehearsal.py`,
   `test_vault_sync.py`, `test_charts.py`, `tests/conftest.py`.
 - A new `tests/test_cli_program.py` and a migration test running the importer on the
   fixture vault and comparing with `program.load`.
-- `tests/test_notebook_contract.py` only if the page payload changes (the aim is that it
+- `tests/test_notebook_contract.py` only if the app payload changes (the aim is that it
   does not).
 
 ## Risks
@@ -420,7 +420,7 @@ Only an empty diff (or a diff fully explained by the backfill) goes to productio
 2. **Week granularity.** Is a dose change ever meant to start mid-week (from a given
    session)? If so, `valid_from` becomes a date and plans resolve it per session.
 3. **Who may record a version?** Only the coach through `redline program`, or also the
-   athlete from the notebook page (a "change this dose" control)?
+   athlete from the iOS app (a "change this dose" control)?
 4. **Calibrations.** What exactly is the "reserve" of a calibration line (reps in reserve,
    a 0–10 feeling, minutes left)? Are the existing lines worth importing, or do they stay
    as prose history?

@@ -1,25 +1,23 @@
-"""The notebook contract, from its three sides.
+"""The notebook contract, from the service's side.
 
-`redline.model.notebook_views` declares what crosses between Python and JavaScript. The real
-routes answer with those shapes, the payloads the browser tests fake are those shapes, and
-the page's modules read every declared key. A key renamed on one side fails on the others,
-including a page left on the old name: the new key is then read by nothing.
+`redline.model.notebook_views` declares what crosses between Python and the iOS app. The real
+routes answer with those shapes, and the payloads `tests/ios_contract.py` exports as the app's
+fixtures are those shapes; `tests/test_ios_contract.py` holds the app's Swift models to the
+same declarations.
 """
 
 from __future__ import annotations
 
 import datetime as dt
 import os
-import typing
 from unittest.mock import MagicMock
 
 import contract
 import pytest
-from conftest import TEST_VAULT, reset_database
+from conftest import TEST_VAULT, connect_device, reset_database
 from notebook_payloads import SCREENS
 from test_notebook_board import PARIS, Repo, ef, seed_week
 from test_notebook_board import WEEK as SEEDED_WEEK
-from test_page_modules import modules
 from test_session_detail import observation_of, seed_threshold, stream
 from test_weekly_plan import revision
 from writes import write
@@ -27,7 +25,7 @@ from writes import write
 from redline.model import commands, instance, ledger
 from redline.model import notebook_views as views
 from redline.model.activity import Activity
-from redline.service import clock, notebook_web, page, race_plan, session_detail
+from redline.service import clock, notebook_web, race_plan, session_detail
 from redline.service.notebook import NotebookService
 from redline.service.web import create_app
 from redline.storage import Database, OperationalStore
@@ -39,10 +37,6 @@ SAM = instance.load(TEST_VAULT)
 RACE_DAY = {"name": "TargetRace", "date": "2026-11-26", "days": 50}
 
 UUID_SAMPLE = "0b5a1c2e-3d4f-4a6b-8c9d-0e1f2a3b4c5d"
-#: Declared keys the page has no use for: the service sends them, the page does not read
-#: them (the iOS app may).
-UNREAD = {"completed_slots", "created_at", "difficulty", "has_image", "humidity", "set_index",
-          "strength_done"}
 
 
 # ------------------------------------------------------------ the checker
@@ -74,20 +68,10 @@ def test_a_tagged_union_reports_its_closest_shape():
     assert contract.problems(views.Ask, ask) == ["$.fields: missing"]
 
 
-# ------------------------------------------------------------ the browser fixtures
+# ------------------------------------------------------------ the app's fixtures
 @pytest.mark.parametrize(("shape", "payload"), SCREENS.values(), ids=SCREENS.keys())
-def test_a_browser_payload_is_what_the_service_serves(shape, payload):
+def test_an_app_fixture_is_what_the_service_serves(shape, payload):
     assert contract.problems(shape, payload) == []
-
-
-# ------------------------------------------------------------ the page
-def test_the_page_reads_every_declared_key():
-    declared = {key for shape in vars(views).values() if typing.is_typeddict(shape)
-                for key in shape.__annotations__}
-    scripts = [name for name in page.NOTEBOOK_SCRIPT if name.startswith(("notebook/", "strength/"))]
-    read = {value.strip("'\"") for _, tokens, _, _ in modules(scripts).values()
-            for kind, value, _ in tokens if kind in {"id", "str"}}
-    assert declared - read == UNREAD
 
 
 # ------------------------------------------------------------ the routes
@@ -110,7 +94,7 @@ def connect(store, make_config, monkeypatch):
         service = NotebookService(archive, Repo(store), MagicMock(), TEST_VAULT,
                                   "https://coach.test", operational=store, instance=SAM)
         client = create_app(config, MagicMock(), MagicMock(), notebook=service).test_client()
-        client.post("/notebook-api/connect", json={"token": archive.issue(config.allowed_psid)})
+        connect_device(client, archive.issue(config.allowed_psid))
         return client, archive, config.allowed_psid
     return at
 

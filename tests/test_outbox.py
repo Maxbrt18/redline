@@ -116,9 +116,12 @@ def test_pruning_counts_cards_not_files(tmp_path):
     assert len(list(sent.glob("*.link"))) == KEEP_SENT
 
 
-def test_delivery_issues_the_capability_only_after_the_image_is_delivered(make_bot, store):
+def test_a_strength_card_goes_out_alone(make_bot):
+    """The app opens the session from Today: the card carries no link and mints no
+    capability."""
     from unittest.mock import MagicMock
 
+    from redline.service.delivery import EnvelopeBuilder
     from redline.service.messenger import DeliveryResult
 
     image = MagicMock()
@@ -128,48 +131,17 @@ def test_delivery_issues_the_capability_only_after_the_image_is_delivered(make_b
     outbox.link_for.return_value = ("Renfo A", SESSION)
     client = MagicMock()
     client.send_image.return_value = DeliveryResult.success()
-    client.send_button.return_value = DeliveryResult.success()
     bot = make_bot(client=client, outbox=outbox)
-
-    from redline.service.delivery import EnvelopeBuilder
+    bot._delivery.state = MagicMock(wraps=bot._delivery.state)
 
     envelope = EnvelopeBuilder("4242", "test:strength-card")
     envelope.images(outbox, {})
     assert bot._delivery.deliver(envelope.build()).attachments_ok
     client.send_image.assert_called_once()
-    button = client.send_button.call_args.args
-    assert button[0:2] == ("4242", "Renfo A")
-    assert button[2].startswith("https://coach.test/s#t=")
-    token = button[2].split("#t=", 1)[1]
-    resolved = store.resolve_strength_link("4242", token)
-    assert resolved["status"] == "active"
-    assert resolved["session"]["exercises"] == SESSION["exercises"]
+    assert client.method_calls == [call for call in client.method_calls
+                                   if call[0] == "send_image"]
+    bot._delivery.state.issue_strength_link.assert_not_called()
     outbox.archive.assert_called_once_with(image)
-
-
-def test_a_failed_button_revokes_its_exact_capability(make_bot, store):
-    from unittest.mock import MagicMock
-
-    from redline.service.messenger import DeliveryResult
-
-    image = MagicMock()
-    type(image).name = "strength.png"
-    outbox = MagicMock()
-    outbox.collect_new.return_value = [image]
-    outbox.link_for.return_value = ("Renfo A", SESSION)
-    client = MagicMock()
-    client.send_image.return_value = DeliveryResult.success()
-    client.send_button.return_value = DeliveryResult.failure("Meta indisponible")
-    bot = make_bot(client=client, outbox=outbox)
-
-    from redline.service.delivery import EnvelopeBuilder
-
-    envelope = EnvelopeBuilder("4242", "test:failed-strength-card")
-    envelope.images(outbox, {})
-    assert not bot._delivery.deliver(envelope.build()).attachments_ok
-    assert store._deliveries["test:failed-strength-card"]["status"] == "delivered"
-    token = client.send_button.call_args.args[2].split("#t=", 1)[1]
-    assert store.resolve_strength_link("4242", token)["status"] == "revoked"
 
 
 # ------------------------------------------------ residue of a dead turn

@@ -1,10 +1,8 @@
-"""Private notebook routes; only the shell and the resources are public."""
+"""The notebook API the iOS app calls; every route but the connection needs a device token."""
 
 from __future__ import annotations
 
 import datetime as dt
-import gzip
-import hashlib
 import re
 from collections.abc import Callable
 from urllib.parse import urlsplit
@@ -12,17 +10,14 @@ from urllib.parse import urlsplit
 from flask import Flask, jsonify, request
 from sqlalchemy.exc import SQLAlchemyError
 
-from redline.cards import render
 from redline.coach.fr import notebook as notebook_text
-from redline.coach.fr import session_labels
 from redline.model import formats, iso_week
 from redline.model import ledger as ledger_model
 from redline.model import notebook_views as views
 from redline.model.schema import SchemaError
 from redline.storage.database import StorageError
-from redline.storage.notebook import DEVICE_SECONDS
 
-from . import clock, page, race_plan, reorganize
+from . import clock, race_plan, reorganize
 from . import notebook_weather as weather
 from .notebook import NotebookService
 from .notebook_board import AnswerError
@@ -38,11 +33,9 @@ ASK = re.compile(rf"(?:cell:[0-9a-f-]{{36}}:(?:pain:{formats.SLUG}|{CELL_FIELDS}
                  rf"|wake:{formats.DATE}:{formats.SLUG}"
                  rf"|daily:{formats.DATE}:(?:sleep|life_load)|hr:{formats.DATE})")
 
-COOKIE = "__Host-redline-notebook"
 BEARER = "Bearer "
-CSP = ("default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; "
-       "font-src data:; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; "
-       "worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+# JSON only: nothing in a response is ever rendered as a document.
+CSP = "default-src 'none'; frame-ancestors 'none'"
 
 
 #: A place name to read the weather of; as long as the instance's own `place` may be.
@@ -52,35 +45,24 @@ CLOCK = re.compile(formats.TIME)
 
 
 def device_token() -> str:
-    """The device's token: the iOS app sends it in `Authorization`, the page in its cookie.
-    An `Authorization` header that is not a bearer token counts as no token at all."""
+    """The device's token, sent by the app as a bearer token; any other `Authorization`
+    header counts as no token at all."""
     header = request.headers.get("Authorization", "")
-    if header:
-        return header.removeprefix(BEARER) if header.startswith(BEARER) else ""
-    return request.cookies.get(COOKIE, "")
+    return header.removeprefix(BEARER) if header.startswith(BEARER) else ""
 
 
 def register(app: Flask, notebook: NotebookService, psid: str, *,
-             alert: Callable[[str, str], None], place: str, cues: dict,
+             alert: Callable[[str, str], None], place: str,
              settled: Callable[[int], None]) -> None:
     """`alert(text, key)` wakes the coach when an answer crosses a cap;
-    `cues` carries the exercises' execution cues, for the guided session;
     `settled(activity)` advances the debrief of a run whose feelings are complete."""
-    document = page.notebook_document(render.CARDS_DIR, cues,
-                                      session_labels.for_page()).encode("utf-8")
-    # The shell carries no data: it is revalidated (304) and travels compressed.
-    # `no-store` would re-download it in full on every open.
-    document_etag = hashlib.sha256(document).hexdigest()[:16]
-    document_gzip = gzip.compress(document, mtime=0)
     origin = urlsplit(notebook.base_url)
     expected_origin = f"{origin.scheme}://{origin.netloc}"
 
     @app.after_request
     def notebook_headers(response):
-        if request.path.startswith(("/carnet", "/notebook-api/")):
-            response.headers.update({"Cache-Control": "no-cache" if request.path == "/carnet"
-                                     else response.headers.get("Cache-Control", "no-store")
-                                     if request.path.startswith("/carnet-launch/") else "no-store",
+        if request.path.startswith("/notebook-api/"):
+            response.headers.update({"Cache-Control": "no-store",
                                      "Referrer-Policy": "no-referrer",
                                      "X-Content-Type-Options": "nosniff",
                                      "Content-Security-Policy": CSP})
@@ -96,7 +78,7 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
                 return jsonify(error=notebook_text.ERRORS["forbidden"]), 403
             if request.headers.get("Sec-Fetch-Site") == "cross-site":
                 return jsonify(error=notebook_text.ERRORS["forbidden"]), 403
-        if request.path in ("/notebook-api/connect", "/notebook-api/devices"):
+        if request.path == "/notebook-api/devices":
             return None
         try:
             authenticated = notebook.store.authenticate(psid, device_token())
@@ -112,68 +94,10 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
         app.logger.error("Storage unavailable: %s", type(error).__name__)
         return jsonify(error=notebook_text.ERRORS["storage"]), 503
 
-    @app.get("/carnet")
-    def notebook_page():
-        compressed = "gzip" in request.headers.get("Accept-Encoding", "")
-        response = app.response_class(document_gzip if compressed else document,
-                                      mimetype="text/html")
-        if compressed:
-            response.headers["Content-Encoding"] = "gzip"
-        response.headers["Vary"] = "Accept-Encoding"
-        response.set_etag(document_etag + ("-gz" if compressed else ""))
-        return response.make_conditional(request)
-
-    @app.get("/carnet-manifest.json")
-    def notebook_manifest():
-        return jsonify(name=notebook_text.APP_NAME, short_name="Redline", lang="fr",
-                       start_url="/carnet", scope="/", id="/carnet", display="standalone",
-                       background_color="#f7f5f2", theme_color="#f7f5f2",
-                       icons=[{"src": "/carnet-install-icon.png", "sizes": "512x512", "type": "image/png"}])
-
-    # The shell kept on the device: the service worker only keeps `/carnet`, which
-    # carries no data; it never touches the /notebook-api routes.
-    @app.get("/carnet-sw.js")
-    def notebook_worker():
-        return app.response_class((page.PAGE_DIR / "notebook" / "sw.js").read_bytes(),
-                                  mimetype="text/javascript")
-
-    @app.get("/carnet-launch/<name>.png")
-    def notebook_launch_image(name):
-        image = page.launch_image(name)
-        if image is None:
-            return "not found", 404
-        response = app.response_class(image, mimetype="image/png")
-        response.headers["Cache-Control"] = "public, max-age=604800"
-        return response
-
-    @app.get("/carnet-install-icon.png")
-    def notebook_install_icon():
-        return app.response_class((page.PAGE_DIR / "notebook-icon.png").read_bytes(), mimetype="image/png")
-
-    @app.get("/carnet-icon.png")
-    def notebook_icon():
-        return app.response_class((page.PAGE_DIR / "icon.png").read_bytes(), mimetype="image/png")
-
-    @app.post("/notebook-api/connect")
-    def notebook_connect():
-        body = request.get_json(silent=True)
-        if not isinstance(body, dict) or set(body) != {"token"} or not isinstance(body["token"], str):
-            return jsonify(error=notebook_text.ERRORS["bad_link"]), 400
-        # An old notification stays openable on an already connected device.
-        if notebook.store.authenticate(psid, request.cookies.get(COOKIE, "")):
-            return jsonify(views.Done(status="ok"))
-        device = notebook.store.exchange(psid, body["token"])
-        if not device:
-            return jsonify(error=notebook_text.ERRORS["link_used"]), 401
-        response = jsonify(status="ok")
-        response.set_cookie(COOKIE, device, secure=True, httponly=True, samesite="Strict",
-                            max_age=DEVICE_SECONDS, path="/")
-        return response
-
     @app.post("/notebook-api/devices")
     def notebook_device():
         """The app's connection: the link buys a device token, returned in the body for the
-        app's keychain instead of a cookie."""
+        app's keychain."""
         body = request.get_json(silent=True)
         if not isinstance(body, dict) or set(body) != {"token"} or not isinstance(body["token"], str):
             return jsonify(error=notebook_text.ERRORS["bad_link"]), 400
@@ -185,9 +109,7 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
     @app.post("/notebook-api/logout")
     def notebook_logout():
         notebook.store.revoke(psid, device_token())
-        response = jsonify(status="ok")
-        response.delete_cookie(COOKIE, path="/", secure=True, httponly=True, samesite="Strict")
-        return response
+        return jsonify(views.Done(status="ok"))
 
     @app.get("/notebook-api/entries")
     def notebook_entries():

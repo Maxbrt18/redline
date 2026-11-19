@@ -1,7 +1,7 @@
 /* Redline design tokens -- the palette and the faces, and nothing else.
  *
- * Shared by the cards and the interactive session page (src/redline/service/page/):
- * tokens are shared, geometry is not.
+ * Read by the cards (render.py) and mirrored into the iOS app's palette
+ * (tests/ios_contract.py).
  *
  * TWO PALETTES, ONE SET OF NAMES (« Ligne rouge » system). Both derive
  * from the logo: its red (#d40000) and its warm black. The light one is the
@@ -9,7 +9,6 @@
  * for it and nothing pinned the theme.
  *  - The cards pin theme in render.py (CARD_THEME). Switching every card to dark
  *    is that one constant.
- *  - The page pins nothing: it follows the phone.
  * The dark block is written twice (attribute, then media query) because CSS
  * cannot join an attribute selector and a media query in one rule. Edit both.
  *
@@ -43,7 +42,7 @@
   --red:    #d40000;
   --over:   color-mix(in oklab, var(--red) 58%, var(--ink));
   --brand:  #d40000;
-  /* The app's red line and its one accent colour (iOS app only; the cards and the page
+  /* The app's red line and its one accent colour (iOS app only; the cards
    * keep --red). Lighter in the dark palette to hold 4.5:1 against the background. */
   --accent: #c8102e;
 

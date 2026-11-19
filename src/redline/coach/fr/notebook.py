@@ -104,7 +104,3 @@ STRENGTH_BLOCKED = "Ta séance attend une réponse dans Messenger avant de déma
 STRENGTH_DONE = "Ton renfo du jour est enregistré."
 
 CARD_TITLE = "Carte"
-
-APP_NAME = "Carnet Redline"
-
-PAGE_TITLE = "Mon carnet — Redline"

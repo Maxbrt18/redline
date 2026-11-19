@@ -358,8 +358,10 @@ def test_strength_snapshot_is_database_immutable_and_revocation_irreversible(sto
             "SET snapshot = snapshot || '{\"title\":\"faux\"}'::jsonb "
             "WHERE token_hash = :digest"), {"digest": digest})
 
-    assert state.revoke_strength_link("4242", token)
-    assert not state.revoke_strength_link("4242", token)
+    with store.database.transaction() as connection:
+        connection.execute(sa.text(
+            "UPDATE redline.strength_session_links SET revoked_at = now() "
+            "WHERE token_hash = :digest"), {"digest": digest})
     assert state.resolve_strength_link("4242", token)["status"] == "revoked"
     with pytest.raises(StorageError), store.database.transaction() as connection:
         connection.execute(sa.text(
@@ -2343,7 +2345,6 @@ def test_notebook_routes_protect_both_metadata_and_images(make_config, store):
     from conftest import RecordingBot
 
     from redline.service.notebook import NotebookService
-    from redline.service.notebook_web import COOKIE
     from redline.service.web import create_app
     from redline.storage.notebook import NotebookStore
     archive = NotebookStore(store.database)
@@ -2353,24 +2354,14 @@ def test_notebook_routes_protect_both_metadata_and_images(make_config, store):
     service = NotebookService(archive, MagicMock(), MagicMock(), VAULT_ROOT, 'https://coach.test')
     app = create_app(make_config(), RecordingBot(), MagicMock(), notebook=service)
     client = app.test_client()
-    assert b'Jamais public' not in client.get('/carnet').data
-    shell = client.get('/carnet', headers={'Accept-Encoding': 'gzip'})
-    assert shell.headers['Content-Encoding'] == 'gzip' and shell.headers['Cache-Control'] == 'no-cache'
-    assert client.get('/carnet', headers={'Accept-Encoding': 'gzip',
-                                          'If-None-Match': shell.headers['ETag']}).status_code == 304
     for path in ('entries', f'entries/{identity}', f'entries/{identity}/image', 'current'):
         assert client.get('/notebook-api/' + path).status_code == 401
     link = archive.issue('4242')
-    assert client.post('/notebook-api/connect', json={'token':link}, headers={'Origin':'https://evil.test'}).status_code == 403
-    response = client.post('/notebook-api/connect', json={'token':link})
-    assert response.status_code == 200
-    cookie = response.headers['Set-Cookie']
-    assert COOKIE in cookie and 'Secure' in cookie and 'HttpOnly' in cookie and 'SameSite=Strict' in cookie
-    assert client.get(f'/notebook-api/entries/{identity}').json['body'] == 'Jamais public'
-    image = client.get(f'/notebook-api/entries/{identity}/image')
+    assert client.post('/notebook-api/devices', json={'token':link}, headers={'Origin':'https://evil.test'}).status_code == 403
+    bearer = {'Authorization': 'Bearer ' + client.post('/notebook-api/devices', json={'token':link}).json['device']}
+    assert client.get(f'/notebook-api/entries/{identity}', headers=bearer).json['body'] == 'Jamais public'
+    image = client.get(f'/notebook-api/entries/{identity}/image', headers=bearer)
     assert image.data == b'PNG' and image.headers['Cache-Control'] == 'no-store'
-    assert client.post('/notebook-api/logout', json={}).status_code == 200
-    assert client.get('/notebook-api/entries').status_code == 401
 
 
 
@@ -2427,13 +2418,12 @@ def test_notebook_replay_preserves_the_card_after_a_text_failure(store, tmp_path
     assert archive.list_entries('4242') == []
     assert not image.exists()
     client.send_burst.return_value = DeliveryResult.success()
-    client.send_button.return_value = DeliveryResult.success()
     assert service.redeliver(service.stored(envelope.source_key)).text_ok
     entries = archive.list_entries('4242')
     assert len(entries) == 1
     assert archive.get('4242', entries[0]['id'], image=True)['image'] == b'original-png'
     assert archive.get('4242', entries[0]['id'])['body'] == 'Texte exact'
-    assert client.send_button.call_args.args[3] == 'Ouvrir mon carnet'
+    client.send_button.assert_not_called()
 
 
 def test_notebook_current_resolves_the_same_typed_workout_and_rechecks_claims(store, monkeypatch):

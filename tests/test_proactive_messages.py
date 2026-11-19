@@ -197,12 +197,11 @@ def _connected_notebook(bot, connected=True):
     notebook = MagicMock()
     notebook.connected.return_value = connected
     notebook.capture.return_value = []
-    notebook.link.return_value = "https://coach.example/carnet#t=jeton"
     bot._delivery.notebook = notebook
     return notebook
 
 
-def test_with_a_connected_notebook_the_evening_claim_is_a_button_not_a_question(
+def test_with_a_connected_notebook_the_evening_claim_points_to_the_notebook(
         make_bot, store):
     """The reply in Messenger cost a coach turn for a figure the logbook takes in one
         tap. The reminder lists everything and points to the logbook."""
@@ -217,11 +216,9 @@ def test_with_a_connected_notebook_the_evening_claim_is_a_button_not_a_question(
             {"date": "2026-10-08", "type": "easy", "missing": ["rpe"]})))
 
     assert agent.calls == []
-    bot._client.send_burst.assert_not_called()
-    _, text, url, title = bot._client.send_button.call_args.args
+    text = bot._client.send_burst.call_args.args[1]
     assert text == ("Ta séance EF du 08/10 attend encore ton pic de douleur, ton RPE et "
                     "ton plaisir : un tap dans le carnet.")
-    assert url.endswith("#t=jeton") and title == "Ouvrir mon carnet"
     # One reminder per cell: the next day, the safety net does not ask for it again.
     assert store.proactive.marked("asked:2026-10-08:easy:rpe")
     assert store.proactive.marked("asked:2026-10-08:easy:enjoyment")
@@ -238,7 +235,6 @@ def test_without_a_connected_notebook_the_evening_claim_still_asks_in_messenger(
         psid="4242", kind="ledger_incomplete", prompt="", detail=json.dumps(
             {"date": "2026-10-08", "type": "easy", "missing": ["rpe"]})))
 
-    bot._client.send_button.assert_not_called()
     assert "RPE global sur 10" in bot._client.send_burst.call_args.args[1]
 
 
@@ -261,20 +257,12 @@ def test_the_notebook_note_reaches_the_turns_that_used_to_ask(make_bot):
     assert NOTEBOOK_NOTE not in prompt
 
 
-def test_a_stored_notebook_button_never_keeps_its_one_time_link():
-    from redline.service.delivery import (
-        NotebookButtonPart,
-        OutboundEnvelope,
-        StoredDelivery,
-        envelope_from_payload,
-        envelope_payload,
-    )
+def test_a_stored_notebook_button_replays_as_its_text_alone():
+    from redline.service.delivery import StoredDelivery, TextPart, envelope_from_payload
 
-    envelope = OutboundEnvelope("4242", "proactive:cells", (NotebookButtonPart("Il manque ton RPE."),))
-    payload = envelope_payload(envelope)
-    assert payload["parts"] == [{"kind": "notebook_button", "text": "Il manque ton RPE."}]
+    payload = {"parts": [{"kind": "notebook_button", "text": "Il manque ton RPE."}]}
     replayed = envelope_from_payload(StoredDelivery("proactive:cells", "4242", "failed", payload))
-    assert replayed.parts == envelope.parts
+    assert replayed.parts == (TextPart("Il manque ton RPE.", "text"),)
 
 
 def test_the_wake_reminder_points_to_the_notebook_and_accepts_a_chat_answer(
@@ -289,9 +277,8 @@ def test_the_wake_reminder_points_to_the_notebook_and_accepts_a_chat_answer(
         psid="4242", kind="wake_trace", prompt="", detail="", job_id="wake-trace:1"))
 
     assert agent.calls == []
-    _, text, url, title = bot._client.send_button.call_args.args
+    text = bot._client.send_burst.call_args.args[1]
     assert "aucune, très légère, légère ou nette ?" in text and "réponds-moi ici" in text
-    assert url.endswith("#t=jeton") and title == "Ouvrir mon carnet"
 
 
 def test_a_wake_trace_given_before_half_past_ten_cancels_the_reminder(make_bot, store):
@@ -303,7 +290,6 @@ def test_a_wake_trace_given_before_half_past_ten_cancels_the_reminder(make_bot, 
     bot._respond_proactive(ProactiveJob(
         psid="4242", kind="wake_trace", prompt="", detail="", job_id="wake-trace:1"))
 
-    bot._client.send_button.assert_not_called()
     bot._client.send_burst.assert_not_called()
     assert store.proactive.jobs()[0]["status"] == "done"
 
@@ -332,8 +318,16 @@ def test_with_a_connected_notebook_the_gut_review_points_to_the_fuel_registry(
     bot._respond_proactive(ProactiveJob(psid="4242", kind="gut_review", prompt="",
                                         detail=detail, job_id="gut:1"))
 
-    bot._client.send_burst.assert_not_called()
-    _, text, url, _ = bot._client.send_button.call_args.args
+    text = bot._client.send_burst.call_args.args[1]
     assert text.startswith("Ton retour carburant sur SL t’attend dans le carnet")
-    assert url.endswith("#t=jeton")
     assert not store.question_known("4242", text)
+
+
+def test_the_notebook_command_sends_the_link_to_paste_as_text(make_bot):
+    bot = make_bot()
+    notebook = _connected_notebook(bot)
+    notebook.link.return_value = "https://coach.example/carnet#t=jeton"
+    assert bot._run_command("4242", "/carnet")
+    psid, text = bot._client.send_text.call_args.args
+    assert psid == "4242" and text.endswith("\nhttps://coach.example/carnet#t=jeton")
+    bot._client.send_button.assert_not_called()

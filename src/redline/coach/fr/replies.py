@@ -81,9 +81,8 @@ NOTEBOOK_UNAVAILABLE = "Le carnet est momentanément indisponible."
 NOTEBOOK_REVOKED = ("Les accès au carnet sont révoqués. Tape /carnet pour reconnecter ton "
                     "appareil.")
 
-NOTEBOOK_INVITE = "Ton carnet : ta séance du jour, ta semaine et ta course."
-
-NOTEBOOK_BUTTON = "Ouvrir mon carnet"
+NOTEBOOK_INVITE = ("Copie ce lien et colle-le dans l’app Redline pour la connecter "
+                   "(il ne sert qu’une fois) :\n{link}")
 
 CLEARED = "Nouvelle conversation. Je repars du contexte frais du vault au prochain message."
 
@@ -119,9 +118,6 @@ STATUS_HOURS = "{hours} h {minutes:02d}"
 
 STATUS_MINUTES = "{minutes} min"
 
-NOTEBOOK_ARCHIVE = "Tes cartes et bilans restent dans ton carnet."
-
-SESSION_BUTTON_TEXT = "Ta séance"
 
 #: What a /deep turn leaves for the next ordinary turn to read.
 DEEP_HANDOFF = "QUESTION /deep : {question}\nRÉPONSE : {answer}"

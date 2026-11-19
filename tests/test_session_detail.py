@@ -12,7 +12,7 @@ import datetime as dt
 import os
 
 import pytest
-from conftest import ENGINE_ROOT, TEST_VAULT, reset_database
+from conftest import ENGINE_ROOT, TEST_VAULT, connect_device, reset_database
 from test_notebook_board import Repo
 from test_weekly_plan import revision, session
 from writes import write
@@ -251,7 +251,7 @@ def test_the_route_serves_the_detail_and_refuses_what_is_not_an_identifier(
                               "https://coach.test", operational=store)
     client = create_app(config, MagicMock(), MagicMock(), notebook=service).test_client()
     assert client.get(f"/notebook-api/session/{observation_id}").status_code == 401
-    client.post("/notebook-api/connect", json={"token": archive.issue(config.allowed_psid)})
+    connect_device(client, archive.issue(config.allowed_psid))
     assert client.get("/notebook-api/session/drop-table").status_code == 400
     assert client.get("/notebook-api/session/00000000-0000-0000-0000-000000000000").status_code == 404
     view = client.get(f"/notebook-api/session/{observation_id}").json

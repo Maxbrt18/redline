@@ -14,8 +14,6 @@ from typing import ClassVar
 
 import requests
 
-from redline.coach.fr import replies
-
 from . import persona
 from .config import Config
 from .prompts import DEEP_PATIENCE_LINES, PATIENCE_LINES
@@ -141,33 +139,6 @@ class MessengerClient:
                                      timeout=self.UPLOAD_TIMEOUT)
 
         return self._with_retry(upload, "Image upload", (OSError, requests.RequestException))
-
-    BUTTON_TEXT_MAX = 640    # Messenger caps a button template's text
-    BUTTON_TITLE_MAX = 20    # ...and its button label, hard
-
-    def send_button(self, psid: str, text: str, url: str, title: str,
-                    messaging_type: str = "RESPONSE", tag: str | None = None) -> DeliveryResult:
-        """A one-button template pointing at a web page.
-
-        Used for the interactive strength session, right after its card. Why a
-        template and not a URL in the prose: the STYLE_PROMPT forbids the coach
-        from writing links, strip_links() eats markdown ones, and no one should
-        have to retype 1000 characters of base64 without a typo. Here the link is
-        a control, and the coach's text stays a coach's text.
-        """
-        message = {
-            "recipient": {"id": psid},
-            "messaging_type": messaging_type,
-            "message": {"attachment": {"type": "template", "payload": {
-                "template_type": "button",
-                "text": (text or replies.SESSION_BUTTON_TEXT)[:self.BUTTON_TEXT_MAX],
-                "buttons": [{"type": "web_url", "url": url,
-                             "title": title[:self.BUTTON_TITLE_MAX]}],
-            }}},
-        }
-        if tag:
-            message["tag"] = tag
-        return self._post(message)
 
     ATTEMPTS = 3
     # (connect, read). Meta answers within a second: waiting a minute for a lost

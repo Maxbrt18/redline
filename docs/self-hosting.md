@@ -157,8 +157,8 @@ The Strava tokens rotate: they live in `$REDLINE_STATE_DIR/strava-token.json`, w
 |---|---|---|
 | `GET`, `POST` | `/webhook` | the Meta challenge, signed Messenger events |
 | `GET`, `POST` | `/strava-webhook/<secret>` | subscription and activity events |
-| `GET` | `/carnet`, `/notebook-api/*` | the private notebook and its API (device cookie) |
-| `GET`, `POST` | `/s`, `/strength-session`, `/strength-report` | the strength page, by opaque capability |
+| `GET`, `POST` | `/notebook-api/*` | the iOS app's API (device bearer token) |
+| `POST` | `/strength-session`, `/strength-report` | the guided strength session, by opaque capability |
 | `GET` | `/health` | liveness, deployed commit, `runtime_tree`, uptime |
 | `GET` | `/ready` | worker running, PostgreSQL reachable, schema at the Alembic head: **local only** |
 

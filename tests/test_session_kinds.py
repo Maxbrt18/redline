@@ -34,7 +34,7 @@ def test_a_strava_sport_matches_the_planned_kinds_of_its_family():
     assert session_kinds.planned_for_sport("WeightTraining") == ()
 
 
-def test_the_page_receives_every_kind_with_its_family():
-    page = session_labels.for_page()
-    assert page["long"] == {"short": "SL", "name": "Sortie longue", "family": "run"}
-    assert set(page) == set(session_kinds.BY_SLUG)
+def test_the_app_receives_every_kind_with_its_family():
+    kinds = session_labels.for_app()
+    assert kinds["long"] == {"short": "SL", "name": "Sortie longue", "family": "run"}
+    assert set(kinds) == set(session_kinds.BY_SLUG)

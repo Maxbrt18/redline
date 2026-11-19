@@ -74,27 +74,3 @@ def test_launch_checks_the_exact_version_shown_to_the_user(monkeypatch):
     monkeypatch.setattr(service, 'current', lambda: {'status':'ready', 'signature':'new', 'session':{'sid':'a'}})
     assert service.launch('4242', 'old') is None
     service.state.issue_strength_link.assert_not_called()
-
-
-def test_the_shell_keeps_itself_and_launches_on_the_theme_background(make_config):
-    """The service worker and the launch screens are public and carry no data: the
-    worker only keeps the shell, the launch screen is a plain background."""
-    from conftest import RecordingBot
-
-    from redline.service import page
-    from redline.service.web import create_app
-
-    service = NotebookService(MagicMock(), MagicMock(), MagicMock(), ENGINE_ROOT, 'https://coach.test')
-    client = create_app(make_config(), RecordingBot(), MagicMock(), notebook=service).test_client()
-    worker = client.get('/carnet-sw.js')
-    assert worker.status_code == 200 and worker.mimetype == 'text/javascript'
-    assert b"url.pathname !== '/carnet'" in worker.data
-    image = client.get('/carnet-launch/1179x2556-dark.png')
-    assert image.status_code == 200 and image.data.startswith(b'\x89PNG')
-    assert image.headers['Cache-Control'] == 'public, max-age=604800'
-    assert client.get('/carnet-launch/100x100-dark.png').status_code == 404
-    assert client.get('/carnet-launch/1179x2556-blue.png').status_code == 404
-    document = page.notebook_document(ENGINE_ROOT / 'scripts' / 'cards')
-    assert ('(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) '
-            'and (orientation: portrait) and (prefers-color-scheme: dark)" '
-            'href="/carnet-launch/1179x2556-dark.png"') in document

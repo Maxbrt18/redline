@@ -16,7 +16,7 @@ from redline.service.vault import PersistenceResult
 
 def _bot(make_bot, result=None):
     client = MagicMock()
-    for method in ("send_text", "send_burst", "send_image", "send_button", "action"):
+    for method in ("send_text", "send_burst", "send_image", "action"):
         getattr(client, method).return_value = MagicMock(ok=True)
     repo = MagicMock()
     repo.ledger_cells.return_value = ([], [])

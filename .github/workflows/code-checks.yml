@@ -1,6 +1,6 @@
 # The conventions of pyproject.toml only hold while something runs them. Four jobs: the
 # gate (lint, types, dead code, shell scripts, schema, tests), the same tests under the
-# service role, the pages (the PNG cards and the notebook, in Chromium), which need a
+# service role, the PNG cards (in Chromium), which need a
 # browser the gate does without, and the iOS app, which needs a macOS runner.
 name: Code checks
 
@@ -57,7 +57,7 @@ jobs:
         with:
           python-version-file: ".python-version"
 
-      # Without the `cards` extra: Playwright and its Chromium belong to the pages job.
+      # Without the `cards` extra: Playwright and its Chromium belong to the cards job.
       - name: Install
         run: |
           python -m pip install --quiet -c requirements.txt -c requirements-dev.txt \
@@ -146,7 +146,7 @@ jobs:
         run: python -m pytest -q -rs
 
   pages:
-    name: cards · notebook (Chromium)
+    name: cards (Chromium)
     # Pinned: Playwright installs Chromium's system libraries only on the Ubuntu
     # releases it supports, which `ubuntu-latest` can outrun.
     runs-on: ubuntu-24.04
@@ -164,7 +164,7 @@ jobs:
           python -m playwright install --with-deps chromium
 
       - name: Pages
-        run: python -m pytest -q -rs tests/test_charts.py tests/test_page.py tests/test_notebook_page.py
+        run: python -m pytest -q -rs tests/test_charts.py
 
   ios:
     name: iOS app (swift test · xcodebuild)
