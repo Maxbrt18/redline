@@ -129,6 +129,19 @@ class RoutingConfig:
         except RoutingError:
             return self.plan(Route.N1)
 
+    def job_ceiling_seconds(self, *, heavy: bool = False) -> int:
+        """The longest one job may keep the worker on the model.
+
+        The slowest route it may take with every attempt, the follow-up call an empty
+        continued reply gets, and the triage before it. Only an initiative takes the
+        heavy route.
+        """
+        triage = self.plan(Route.TRIAGE).primary.timeout
+        excluded = {Route.TRIAGE} | (set() if heavy else {Route.HEAVY})
+        return triage + max(
+            sum(spec.timeout for spec in plan.attempts) + plan.primary.timeout
+            for route, plan in self.plans.items() if route not in excluded)
+
     def describe(self, route: str | Route) -> str:
         plan = self.plan(route)
         primary = _describe_spec(plan.primary)

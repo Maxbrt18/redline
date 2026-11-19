@@ -11,6 +11,25 @@ env_file="${REDLINE_POSTGRES_ENV:-/etc/redline/postgres.env}"
 backup_dir="${REDLINE_BACKUP_DIR:-/var/lib/redline-backups}"
 recipient_file="${REDLINE_AGE_RECIPIENT_FILE:-/etc/redline/secrets/backup-age-recipient.txt}"
 retention_days="${REDLINE_BACKUP_RETENTION_DAYS:-3}"
+ping_url="${REDLINE_BACKUP_PING_URL:-}"
+
+# A healthchecks.io check of its own: the base URL on success, `/fail` on any failure,
+# and the check's own schedule alerts when no backup reports at all. A failed ping
+# never fails the backup.
+ping() {
+  [[ -n "$ping_url" ]] || return 0
+  curl -fsS --max-time 10 --retry 3 --output /dev/null "$ping_url$1" \
+    || echo "backup: ping $ping_url$1 failed" >&2
+}
+temporary=""
+manifest_temporary=""
+# One exit handler: a second trap would replace it.
+finish() {
+  local status=$?
+  rm -f "$temporary" "$manifest_temporary"
+  [[ $status -eq 0 ]] || ping /fail
+}
+trap finish EXIT
 
 command -v age >/dev/null || { echo "age absent" >&2; exit 1; }
 command -v sha256sum >/dev/null || { echo "sha256sum absent" >&2; exit 1; }
@@ -24,7 +43,6 @@ name="redline-${stamp}.dump.age"
 manifest="$name.manifest.json"
 temporary=$(mktemp "$backup_dir/.${name}.XXXXXX")
 manifest_temporary=$(mktemp "$backup_dir/.${manifest}.XXXXXX")
-trap 'rm -f "$temporary" "$manifest_temporary"' EXIT
 
 snapshot=$(docker compose --env-file "$env_file" -f "$compose_file" exec -T \
   --user postgres postgres psql --username postgres --dbname redline \
@@ -47,7 +65,8 @@ docker compose --env-file "$env_file" -f "$compose_file" exec -T --user postgres
 
 mv "$temporary" "$backup_dir/$name"
 mv "$manifest_temporary" "$backup_dir/$manifest"
-trap - EXIT
+temporary=""
+manifest_temporary=""
 (
   cd "$backup_dir"
   sha256sum "$name" "$manifest" > "$name.sha256"
@@ -57,3 +76,4 @@ find "$backup_dir" -type f \( -name 'redline-*.dump.age' -o -name 'redline-*.dum
   -o -name 'redline-*.dump.age.manifest.json' \) \
   -mtime "+$retention_days" -delete
 echo "$backup_dir/$name"
+ping ""

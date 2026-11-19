@@ -37,6 +37,10 @@ What the engine is built to guarantee:
     with `python -P`, so a `redline/` folder there never shadows the engine, and the
     views run without the service secrets. Code a turn writes anyway (Python, a script,
     the vault's Git hooks or CI) is removed before the notes are committed.
+  - A turn cannot change the rules it is held to. `rulebook.toml` and `redline.toml`
+    edited during a turn are restored before its commands are applied, so the commands
+    are checked against the operator's thresholds. The edited file is live for the rest
+    of that turn only, and the restore is logged.
   - The reference unit runs the service as a dedicated account without sudo, with a
     read-only file system outside its state directory.
 - **A local account is not a database account.** The PostgreSQL image of `deploy/postgres/`
@@ -46,10 +50,10 @@ What the engine is built to guarantee:
 - **Received content is data.** Messages and attachments are never treated as
   instructions to the service. Attachments are downloaded by the worker into a private,
   size-bounded, temporary file that is deleted after the turn.
-- **Private notebook.** The notebook PWA serves only its shell and static resources
-  publicly; every data route needs a device cookie (`Secure`, `HttpOnly`,
-  `SameSite=Strict`) obtained by exchanging a one-time token sent over Messenger, and
-  revocable.
+- **Private notebook.** The server serves no notebook page. Every data route of the
+  iOS app's API (`/notebook-api/`) needs a device token, sent as a bearer token and kept in
+  the app's keychain. It is obtained by exchanging a one-time link sent over Messenger;
+  PostgreSQL keeps only its hash, and it expires and is revocable.
 - **Secrets stay out of Git.** They live in the service environment file
   (`/etc/redline/runtime/coach-messenger.env` in the reference deployment) and in
   `REDLINE_STATE_DIR` (`var/`, ignored).

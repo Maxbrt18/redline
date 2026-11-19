@@ -17,7 +17,7 @@ from pathlib import Path
 from sqlalchemy import exc as sa_exc
 
 from redline import cli
-from redline.model import agent_input, iso_week, session_cycle, vault_layout
+from redline.model import agent_input, instance, iso_week, rulebook, session_cycle, vault_layout
 from redline.model import ledger as ledger_model
 from redline.model import paths as engine_paths
 from redline.model import weekly_plan as weekly_plan_model
@@ -109,10 +109,17 @@ def _transient(error: StorageError) -> bool:
 EXECUTABLE_SUFFIXES = frozenset({".py", ".pyc", ".pth"})
 EXECUTABLE_FOLDERS = (".githooks/", ".github/")
 
+# What the engine enforces rather than what the coach writes: the rules and thresholds
+# in force, and the instance's own declarations. Both are reread on change, so a turn
+# that edited them would loosen a guard the transaction is meant to hold; only the
+# operator changes them, outside a turn.
+INSTANCE_DECLARATIONS = frozenset({rulebook.FILENAME, instance.FILENAME})
+
 
 def forbidden_in_turn(path: str) -> bool:
     """What a coach turn may never modify in the vault, judged by its path alone."""
     return (path in CANONICAL_PROJECTIONS
+            or path in INSTANCE_DECLARATIONS
             or path.startswith((f"{vault_layout.CAPABILITIES}/", *EXECUTABLE_FOLDERS))
             or Path(path).suffix in EXECUTABLE_SUFFIXES)
 
@@ -274,8 +281,10 @@ class VaultRepo:
                      turn_id: str = "") -> PersistenceResult:
         """Record a turn BEFORE its delivery, with no network call.
 
-        1. A forbidden file (hand-edited PostgreSQL projection, code, capabilities) is
-           restored: that effect is the dangerous one, not the rest of the turn.
+        1. A forbidden file (hand-edited PostgreSQL projection, code, capabilities, the
+           rulebook or the instance declarations) is restored: that effect is the
+           dangerous one, not the rest of the turn. The commands are applied after it,
+           so they are checked against the rulebook the operator wrote.
         2. The prepared commands, already validated during the turn, are applied in
            PostgreSQL, with a short retry on a transient outage.
         3. The notes edited by the coach are committed locally, without a push.

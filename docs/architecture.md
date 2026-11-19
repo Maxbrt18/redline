@@ -125,7 +125,8 @@ An agent turn is the work of one model, wrapped in a transaction:
    the error while the turn is still running.
 5. After the call, a projection or capability note edited during the turn is restored
    file by file, without losing the other notes or the commands; so is code (Python, a
-   script, the vault's Git hooks or CI), which a turn never writes. Then all the staged
+   script, the vault's Git hooks or CI), which a turn never writes, and so are
+   `rulebook.toml` and `redline.toml`, which only the operator changes. Then all the staged
    commands are applied in **one PostgreSQL transaction**, which repeats the check. A
    transient failure (connection, lock) is retried three times, after 1, 3 and 8
    seconds; a business refusal never is. An invalid command cancels the batch.

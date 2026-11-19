@@ -51,7 +51,7 @@ A test checks that every variable the service reads is in this table.
 | `GIT_REMOTE` | `origin` | the vault's remote |
 | `GIT_BRANCH` | `main` | the vault's branch |
 | `COACH_BASE_URL` | empty | the public origin, `https://<domain>`, host of the `/carnet` link that connects the iOS app; empty disables the guided strength session |
-| `HEALTHCHECK_PING_URL` | empty | a URL pinged every 5 minutes (healthchecks.io, for instance) |
+| `HEALTHCHECK_PING_URL` | empty | a URL pinged every 5 minutes (healthchecks.io, for instance) while the worker answers: a stopped worker, or a job that outlasts every timeout, stops the pings |
 
 ### The agent
 

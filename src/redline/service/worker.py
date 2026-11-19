@@ -160,6 +160,8 @@ class TurnWorker:
     PROACTIVE_RETRY_DELAYS: ClassVar[tuple[float, ...]] = (300.0, 900.0, 2700.0)
     PROACTIVE_MAX_ATTEMPTS = 3
     WEEK_REPAIR_CHECK_SECONDS = 15 * 60
+    # What a turn does besides the model: persistence retries, Git, views, delivery.
+    STALL_MARGIN_SECONDS = 15 * 60
 
     def __init__(self, client: MessengerClient, repo: VaultRepo,
                  agent: AgentRunner, state: StateStore, config: Config,
@@ -184,6 +186,10 @@ class TurnWorker:
         # State of the single worker, read by the scheduler: a conversation is active during a
         # reactive turn and in the minutes after its reply.
         self._reactive_since: float | None = None
+        # When the job in hand started, whatever its kind: the heartbeat stops once it
+        # outlasts every timeout that should have ended it.
+        self._busy_since: float | None = None
+        self._busy_heavy = False
         self._last_reactive_reply = 0.0
         self._outage_notice_at = 0.0
         self._retry_not_before: float | None = None
@@ -215,6 +221,22 @@ class TurnWorker:
 
     def is_running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
+
+    def stall(self, now: float | None = None) -> str:
+        """Why the worker no longer answers, or "" while it does.
+
+        Every model call, Git command and query has its own timeout, so a job that
+        outlasts all of them together, with a margin for the rest of the turn, is stuck.
+        """
+        if not self.is_running():
+            return "worker thread stopped"
+        started, heavy = self._busy_since, self._busy_heavy
+        if started is None:
+            return ""
+        busy = (time.time() if now is None else now) - started
+        ceiling = (self._config.routing.job_ceiling_seconds(heavy=heavy)
+                   + self.STALL_MARGIN_SECONDS)
+        return f"one job running for {int(busy)} s" if busy > ceiling else ""
 
     def reconcile_outbox(self) -> int:
         """Archive crash leftovers and report them instead of sending stale cards."""
@@ -310,58 +332,70 @@ class TurnWorker:
             job = self._queue.next()
             if job is None:
                 return
-            if isinstance(job, MaintenanceRequest):
-                self._maintain()
-                continue
-            processed = True
-            if not isinstance(job, ProactiveJob):
-                self._reactive_since = time.time()
+            self._busy_heavy = isinstance(job, ProactiveJob)
+            self._busy_since = time.time()
             try:
-                if isinstance(job, ProactiveJob):
-                    self._respond_proactive(job)
-                elif isinstance(job, CommandRequest):
-                    processed = self._run_command(
-                        job.psid, job.command, message_ids=job.message_ids)
-                elif isinstance(job, DeepRequest):
-                    processed = self._respond(
-                        job.psid, job.text, deep_request=True,
-                        message_ids=job.message_ids)
-                elif isinstance(job, AttachmentRequest):
-                    processed = self._respond_attachment(job)
-                elif isinstance(job, VoiceRequest):
-                    processed = self._transcribe_voice(job)
-                else:
-                    processed = self._respond(
-                        job.psid, job.text, message_ids=job.message_ids)
+                self._handle(job)
             except Exception:
-                log.exception("Failed to handle a message")
-                if isinstance(job, ProactiveJob):
-                    try:
-                        self._buffer_proactive_retry(job, cause="service exception")
-                    except Exception:
-                        log.exception("Retry of proactive %s failed", job.job_id)
-                else:
-                    # A worker failure is never something to ask of the athlete. The inbound message
-                    # is durable and will be retried.
-                    self._log_incident("worker", "inbound message not handled")
-                    processed = False
+                # The thread is the service's only worker: a failure the handlers did not
+                # catch costs this job, never the next ones.
+                log.exception("Worker job failed outside its handler")
             finally:
-                self._reactive_since = None
-            try:
-                if not processed and not isinstance(job, ProactiveJob):
-                    self._retry_inbound(job)
-                elif isinstance(job, (InboundRequest, DeepRequest, CommandRequest)):
-                    self._state.complete_inbound(job.message_ids)
-                elif isinstance(job, AttachmentRequest):
-                    self._state.complete_inbound((job.message_id,))
-                # A processed VoiceRequest is acknowledged by `_transcribe_voice` when the
-                # service answered it, or by the turn that answers its transcript.
-            except Exception:
-                # The inbound stays `pending`: its reply is already persisted and is never
-                # recomputed on retry.
-                log.exception("Acknowledging the inbound message failed")
-            if self._publish_due:
-                self._after_turn()
+                self._busy_since = None
+
+    def _handle(self, job) -> None:
+        if isinstance(job, MaintenanceRequest):
+            self._maintain()
+            return
+        processed = True
+        if not isinstance(job, ProactiveJob):
+            self._reactive_since = time.time()
+        try:
+            if isinstance(job, ProactiveJob):
+                self._respond_proactive(job)
+            elif isinstance(job, CommandRequest):
+                processed = self._run_command(
+                    job.psid, job.command, message_ids=job.message_ids)
+            elif isinstance(job, DeepRequest):
+                processed = self._respond(
+                    job.psid, job.text, deep_request=True,
+                    message_ids=job.message_ids)
+            elif isinstance(job, AttachmentRequest):
+                processed = self._respond_attachment(job)
+            elif isinstance(job, VoiceRequest):
+                processed = self._transcribe_voice(job)
+            else:
+                processed = self._respond(
+                    job.psid, job.text, message_ids=job.message_ids)
+        except Exception:
+            log.exception("Failed to handle a message")
+            if isinstance(job, ProactiveJob):
+                try:
+                    self._buffer_proactive_retry(job, cause="service exception")
+                except Exception:
+                    log.exception("Retry of proactive %s failed", job.job_id)
+            else:
+                # A worker failure is never something to ask of the athlete. The inbound
+                # message is durable and will be retried.
+                self._log_incident("worker", "inbound message not handled")
+                processed = False
+        finally:
+            self._reactive_since = None
+        try:
+            if not processed and not isinstance(job, ProactiveJob):
+                self._retry_inbound(job)
+            elif isinstance(job, (InboundRequest, DeepRequest, CommandRequest)):
+                self._state.complete_inbound(job.message_ids)
+            elif isinstance(job, AttachmentRequest):
+                self._state.complete_inbound((job.message_id,))
+            # A processed VoiceRequest is acknowledged by `_transcribe_voice` when the
+            # service answered it, or by the turn that answers its transcript.
+        except Exception:
+            # The inbound stays `pending`: its reply is already persisted and is never
+            # recomputed on retry.
+            log.exception("Acknowledging the inbound message failed")
+        if self._publish_due:
+            self._after_turn()
 
     def _after_turn(self) -> None:
         """Git and views after delivery: they never delay a reply."""
