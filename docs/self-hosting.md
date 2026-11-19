@@ -145,8 +145,31 @@ docker exec --user postgres <container> psql --username postgres --dbname redlin
   -c 'SELECT version_num FROM alembic_version' -c 'SELECT count(*) FROM redline.observations'
 ```
 
-A backup never restored is a hypothesis: try it once, then after any change to the
-chain.
+`REDLINE_BACKUP_PING_URL`, in the same environment file, names a healthchecks.io check
+of its own, scheduled hourly: `backup.sh` pings it after each backup and pings its
+`/fail` endpoint when one fails, and the check alerts when none reports at all.
+
+A backup never restored is a hypothesis. `deploy/postgres/restore-check.sh` does the
+restore above in a throwaway PostgreSQL 17 container, where the private key lives, and
+holds the result to the manifest (revision, number of observations, latest day) and the
+checksum; it prints how long the restore took and removes the container:
+
+```bash
+deploy/postgres/restore-check.sh redline-<stamp>.dump.age backup-age-key.txt
+```
+
+Run it on the latest archive once a month, and after any change to the chain.
+
+### Recovery objectives
+
+| | Target | Rests on |
+|---|---|---|
+| RPO, PostgreSQL | 1 hour | the hourly backup, once copied off the host |
+| RPO, vault | 10 minutes | the push after each delivery and at maintenance |
+| RTO | 2 hours (target, measured only by a rehearsal) | a new host from this page, the latest archive restored, the vault cloned |
+
+The archives on the host cover a failed migration or a deleted row, not the loss of the
+host: the RPO holds only as long as the copy off the host runs at least hourly.
 
 ## Strava
 
