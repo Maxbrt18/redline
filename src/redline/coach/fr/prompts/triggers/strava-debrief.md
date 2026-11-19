@@ -6,8 +6,8 @@
    zone font une qualité ; première depuis 30 jours, la séance porte `transition: qualite`.
 2. Le service a DÉJÀ capturé ET ENRICHI les métriques objectives, D- et WBGT compris :
    ne relance ni `weather`, ni `descent`, ni `ledger-complete` pour elles.
-   Statut : `redline session-cycle pending`. `matched` = observation et cycle
-   existent ; `ambiguous` ou `unmatched` = distillat durable : demande l'appariement,
+   Statut : `redline session-cycle pending`. `matched` = observation enregistrée
+   (hors plan : EF) ; `ambiguous` ou `unmatched` = distillat durable : demande l'appariement,
    n'invente aucun type, ne relance pas `redline ledger-add` sur la même identité.
    `start_local` a déjà reconstruit le départ. Une seule séance du jour et du même
    type : rattachement automatique ; plusieurs : demande laquelle puis

@@ -862,6 +862,27 @@ def test_a_wbgt_already_logged_by_the_coach_does_not_sink_the_capture(store):
     assert store.strava_intake(90000000013)["status"] != "failed"
 
 
+def test_an_unplanned_strava_activity_takes_its_sports_declared_kind(store):
+    """No session that day: a run is recorded as an easy run, a walk as a hike, with
+    every feeling pending; a sport no family records stays an unmatched capture."""
+    captured = {sport: store.ingest_strava_activity(Activity(
+        id=activity_id, sport=sport, name="Sortie", start_local="2026-08-15T08:00:00",
+        distance_m=5000.0, moving_s=1800))
+        for activity_id, sport in ((90000000041, "Run"), (90000000042, "Walk"),
+                                   (90000000043, "Swim"))}
+    assert captured["Swim"]["status"] == "unmatched"
+    assert captured["Swim"]["observation_id"] is None
+    rows = {row["strava_activity_id"]: row for row in store.observation_rows()}
+    assert sorted(rows) == [90000000041, 90000000042]
+    assert (rows[90000000041]["kind"], rows[90000000042]["kind"]) == ("easy", "hike")
+    run = rows[90000000041]
+    assert captured["Run"]["status"] == "matched" and captured["Run"]["candidate_session_keys"] == []
+    assert run["measurements"]["rpe"]["state"] == "pending"
+    assert run["pains"]["knee"]["state"] == "pending"
+    assert [item["activity_id"] for item in store.strava_intakes(unresolved_only=True)] == [
+        90000000043]
+
+
 def test_deterministic_strava_capture_preserves_ambiguity_without_inventing_a_type(store):
     from test_weekly_plan import revision as build_revision
     from test_weekly_plan import session

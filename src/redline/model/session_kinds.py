@@ -37,10 +37,13 @@ class SessionKind:
     #: band or target applies. It is read against the athlete's own sessions of the same
     #: kind and a comparable duration (`analysis.comparable`).
     accumulating: bool = False
+    #: What an activity of its family is recorded as when the plan holds no session it
+    #: could fulfil that day: one kind per family at most.
+    unplanned: bool = False
 
 
 KINDS = (
-    SessionKind("easy", "run", planned=True, recorded=True, easy=True),
+    SessionKind("easy", "run", planned=True, recorded=True, easy=True, unplanned=True),
     SessionKind("long", "run", planned=True, recorded=True, easy=True, demanding=True,
                 fuelled=True, accumulating=True),
     SessionKind("threshold", "run", planned=True, recorded=True, quality=True,
@@ -50,8 +53,8 @@ KINDS = (
     SessionKind("strides", "run", planned=True, recorded=True, repetitions=True),
     SessionKind("cadence", "run", planned=True, recorded=True),
     SessionKind("race", "run", planned=True, recorded=True, demanding=True, fuelled=True),
-    SessionKind("hike", "hike", planned=True, recorded=True),
-    SessionKind("bike", "bike", planned=True, recorded=True),
+    SessionKind("hike", "hike", planned=True, recorded=True, unplanned=True),
+    SessionKind("bike", "bike", planned=True, recorded=True, unplanned=True),
     SessionKind("strength", "strength", planned=True, recorded=True),
     SessionKind("test", "test", planned=True, recorded=False),
     SessionKind("rest", "rest", planned=True, recorded=False),
@@ -87,6 +90,7 @@ REPETITIONS = frozenset(kind.slug for kind in KINDS if kind.repetitions)
 DEMANDING = frozenset(kind.slug for kind in KINDS if kind.demanding)
 FUELLED = frozenset(kind.slug for kind in KINDS if kind.fuelled)
 ACCUMULATING = frozenset(kind.slug for kind in KINDS if kind.accumulating)
+UNPLANNED_BY_FAMILY = {kind.family: kind.slug for kind in KINDS if kind.unplanned}
 
 #: Share of the descent that counts in the load gauge: a run descent in full, a
 #: walked one at half, none for anything that does not descend on foot.
@@ -114,3 +118,10 @@ def planned_for_sport(sport: str) -> tuple[str, ...]:
     """The planned kinds a Strava activity of this sport can fulfil."""
     families = {name for name, sports in STRAVA_SPORTS.items() if sport in sports}
     return tuple(kind.slug for kind in KINDS if kind.planned and kind.family in families)
+
+
+def unplanned_for_sport(sport: str) -> str | None:
+    """The kind a Strava activity of this sport is recorded as when no planned session
+    can carry it; None for a sport no family records."""
+    family = next((name for name, sports in STRAVA_SPORTS.items() if sport in sports), None)
+    return UNPLANNED_BY_FAMILY.get(family) if family else None
