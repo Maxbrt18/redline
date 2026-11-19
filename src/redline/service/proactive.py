@@ -155,7 +155,11 @@ class ProactiveScheduler:
 
     def _ping_healthcheck(self) -> None:
         """Outgoing heartbeat: healthchecks.io alerts the athlete if the pings stop
-        (service dead, VPS down). Silent and harmless otherwise."""
+        (service dead, VPS down, worker stopped or stuck). Silent and harmless otherwise.
+
+        The pulse is the worker's, not this thread's: a scheduler that ticks while
+        nothing answers the athlete must not report the service as up.
+        """
         url = self._config.healthcheck_ping_url
         if not url:
             return
@@ -163,6 +167,10 @@ class ProactiveScheduler:
         if now - self._last_health_ping < self.HEALTH_PING_SECONDS:
             return
         self._last_health_ping = now
+        stall = self._bot.stall()
+        if stall:
+            log.error("Heartbeat withheld: %s", stall)
+            return
         try:
             requests.get(url, timeout=10)
         except requests.RequestException as exc:
