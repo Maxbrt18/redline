@@ -162,6 +162,39 @@ class TestNothingFailsSilently:
         committed = _committed(git_repo)
         assert "notes.md" in committed and "redline/" not in committed
 
+    def test_the_rulebook_and_the_instance_come_back_and_the_facts_still_apply(self, git_repo):
+        """The engine enforces them: a turn that loosened a threshold would bypass it."""
+        (git_repo / "rulebook.toml").write_text("[parameters]\ntaper_weeks = 2\n",
+                                                encoding="utf-8")
+        (git_repo / "redline.toml").write_text("[athlete]\nname = \"Alex\"\n",
+                                               encoding="utf-8")
+        git(git_repo, "add", "-A")
+        git(git_repo, "commit", "-m", "instance")
+        base = _head(git_repo)
+        (git_repo / "rulebook.toml").write_text("[parameters]\ntaper_weeks = 6\n",
+                                                encoding="utf-8")
+        (git_repo / "redline.toml").unlink()
+        (git_repo / "notes.md").write_text("le débrief", encoding="utf-8")
+        store = MagicMock()
+        store.apply_turn_with_receipts.return_value = (1, ())
+        repo = VaultRepo(str(git_repo), "origin", "main", operational_store=store)
+
+        result = repo.persist_turn(base_head=base, turn_id="tour")
+
+        assert result.writes_applied and result.applied_commands == 1
+        assert result.restored == ("redline.toml", "rulebook.toml")
+        assert "taper_weeks = 2" in (git_repo / "rulebook.toml").read_text(encoding="utf-8")
+        assert (git_repo / "redline.toml").exists()
+        committed = _committed(git_repo)
+        assert "notes.md" in committed and "rulebook.toml" not in committed
+
+    def test_a_note_named_like_the_rulebook_elsewhere_is_only_a_note(self, git_repo):
+        (git_repo / "knowledge").mkdir()
+        (git_repo / "knowledge" / "rulebook.toml").write_text("x = 1\n", encoding="utf-8")
+        result = VaultRepo(str(git_repo), "origin", "main").persist_turn()
+        assert result.restored == ()
+        assert "knowledge/rulebook.toml" in _committed(git_repo)
+
 
 class TestTheHookAgreesWithTheCode:
     """The contradiction that took production down: the hook aborted the commit that
