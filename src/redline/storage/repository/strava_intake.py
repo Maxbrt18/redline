@@ -8,7 +8,7 @@ from typing import Any
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from redline.model import session_cycle
+from redline.model import session_cycle, session_kinds
 from redline.model.activity import Activity
 from redline.model.vocabulary import CycleState, EnrichmentState, IntakeStatus, MeasurementState
 
@@ -30,9 +30,10 @@ class StravaIntake(SessionCycles):
                                *, actor: str = "strava-ingestion") -> dict:
         """Capture the objective facts before any coaching reasoning.
 
-        An activity becomes a typed observation only if the plan offers a single
-        candidate that day. Otherwise the capture stays durable and the ambiguity is
-        exposed; no sport taxonomy is inferred from a title.
+        An activity becomes a typed observation when the plan offers a single candidate
+        that day, or none: an unplanned session takes its sport's declared default kind
+        (`session_kinds.unplanned_for_sport`). With several candidates the capture stays
+        durable and the ambiguity is exposed; no sport taxonomy is inferred from a title.
         """
         activity_id = int(activity.id or 0)
         if activity_id <= 0:
@@ -86,9 +87,11 @@ class StravaIntake(SessionCycles):
                     observation_for_link = {**existing_observation, "started_at": started_at}
                 self._link_cycle_observation_in(
                     connection, candidates[0], observation_for_link, actor=actor)
-            if observation_id is None and len(candidates) == 1 and started_at is not None:
-                candidate = candidates[0]
-                kind = self._observation_kind_for_workout(candidate["workout"])
+            if observation_id is None and len(candidates) < 2 and started_at is not None:
+                # One candidate types the observation; none means an unplanned session,
+                # recorded as its sport's declared default so its feelings are asked.
+                kind = (self._observation_kind_for_workout(candidates[0]["workout"])
+                        if candidates else session_kinds.unplanned_for_sport(sport))
                 if kind:
                     observation_id = self.add_observation_in(connection, {
                         "occurred_on": started_at.date(), "started_at": started_at,
@@ -98,7 +101,7 @@ class StravaIntake(SessionCycles):
                         "note": f"Strava : {(activity.name or sport).strip()}",
                         "source": actor,
                         "measurements": self._strava_measurements(activity),
-                        "session_key": candidate_keys[0],
+                        "session_key": candidate_keys[0] if candidates else None,
                     }, actor=actor)
                     status = IntakeStatus.MATCHED
 

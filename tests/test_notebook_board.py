@@ -508,3 +508,47 @@ def test_the_current_week_announces_the_next_one_once_planned(store):
     assert view.week_view(WEEK, [])["next"] == {
         "week": "2026-W42", "monday": "2026-10-12", "km_target": 32.0, "runs_planned": 2}
     assert view.week_view("2026-W42", [])["next"] is None
+
+
+def test_an_unplanned_strava_run_asks_its_feelings_like_a_planned_one(
+        store, make_config, monkeypatch):
+    """Thursday holds no session: the run captured that day is recorded as an easy run,
+    and the notebook asks its pain per zone, RPE and enjoyment through the answer route."""
+    from unittest.mock import MagicMock
+
+    from redline.service import clock
+    from redline.service.notebook import NotebookService
+    from redline.service.web import create_app
+    from redline.storage.notebook import NotebookStore
+
+    seed_week(store)
+    captured = store.ingest_strava_activity(Activity(
+        id=90000000020, sport="Run", name="Footing improvisé",
+        start_local="2026-10-08T07:00:00", distance_m=6200.0, moving_s=2200))
+    assert captured["candidate_session_keys"] == [] and captured["observation_id"]
+    evening = dt.datetime(2026, 10, 8, 20, 0, tzinfo=PARIS)
+    monkeypatch.setattr(clock, "now", lambda: evening)
+    monkeypatch.setattr(clock, "today", lambda: evening.date())
+    config = make_config()
+    archive = NotebookStore(store.database)
+    service = NotebookService(archive, Repo(store), MagicMock(), ENGINE_ROOT,
+                              "https://coach.test", operational=store)
+    client = create_app(config, MagicMock(), MagicMock(), notebook=service,
+                        nudge=MagicMock()).test_client()
+    connect_device(client, archive.issue(config.allowed_psid))
+    today = client.get("/notebook-api/today").json
+    [ask] = [item for item in today["asks"]
+             if item["id"] == f"cell:{captured['observation_id']}"]
+    assert (ask["kind"], ask["date"], ask["km"]) == ("easy", "2026-10-08", 6.2)
+    assert ask["fields"] == ["pain:knee", "rpe", "enjoyment"]
+    assert [item["date"] for item in today["extra"]] == ["2026-10-08"]
+    detail = client.get(f"/notebook-api/session/{captured['observation_id']}").json
+    assert detail["ask"]["id"] == ask["id"]
+    for metric, value in (("pain:knee", 1), ("rpe", 3), ("enjoyment", 7)):
+        response = client.post("/notebook-api/answer",
+                               json={"ask": f"{ask['id']}:{metric}", "value": value})
+        assert response.status_code == 200, response.json
+    assert store.observation_feelings(captured["observation_id"]) == {
+        "rpe": 3.0, "enjoyment": 7.0, "pains": {"knee": 1.0}}
+    assert not [item for item in client.get("/notebook-api/today").json["asks"]
+                if item["id"] == ask["id"]]
