@@ -75,3 +75,14 @@ def test_the_heartbeat_is_withheld_while_the_worker_is_stalled(make_config, make
     scheduler, pings = _scheduler(make_config, store, make_bot(), monkeypatch)
     scheduler._ping_healthcheck()
     assert pings == []
+
+
+def test_the_first_heartbeat_goes_out_right_after_boot(make_config, make_bot, store,
+                                                        monkeypatch):
+    """The monotonic clock starts near zero when the host boots."""
+    scheduler, pings = _scheduler(make_config, store, _running(make_bot()), monkeypatch)
+    monkeypatch.setattr(proactive.time, "monotonic", lambda: 12.0)
+    scheduler._ping_healthcheck()
+    assert pings == [PING_URL]
+    scheduler._ping_healthcheck()
+    assert pings == [PING_URL]
