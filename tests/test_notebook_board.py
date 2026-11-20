@@ -19,6 +19,7 @@ from writes import write
 from redline.model import commands, weekly_plan
 from redline.model.activity import Activity
 from redline.service.notebook_board import AnswerError, Board
+from redline.service.notebook_web import ASK
 from redline.service.plans import PlanStatus
 from redline.storage import Database, OperationalStore
 
@@ -409,6 +410,74 @@ def test_without_a_plan_nothing_is_prescribed_but_the_ledger_still_counts(store)
     week = board(store).week_view(WEEK, [])
     assert [item["km"] for item in week["extra"]] == [8.0]
     json.dumps(view)  # the notebook serves it as is
+
+
+def test_an_activity_off_the_program_names_its_day_even_beside_a_planned_session(store):
+    """A walk on the rest day and a ride on a planned easy day: both are listed with the
+    week, and the strip names them instead of « repos » or the planned run alone."""
+    seed_week(store)
+    for day, kind, key in ((dt.date(2026, 10, 5), "hike", "manual:walk"),
+                           (dt.date(2026, 10, 9), "bike", "manual:ride")):
+        store.add_observation({"occurred_on": day, "kind": kind, "idempotency_key": key,
+                               "measurements": {"duration_s": {"state": "known", "value": 2700}}})
+    week = board(store, dt.datetime(2026, 10, 10, 20, 0, tzinfo=PARIS)).week_view(WEEK, [])
+    assert [(item["date"], item["kind"]) for item in week["extra"]] == [
+        ("2026-10-05", "hike"), ("2026-10-09", "bike")]
+    strip = {item["date"]: item for item in week["strip"]}
+    assert strip["2026-10-05"]["abbr"] == "rando" and not strip["2026-10-05"]["rest"]
+    assert strip["2026-10-09"]["abbr"] == "EF+vélo"
+
+
+def test_an_activity_whose_session_left_the_plan_is_still_listed(store):
+    """The cycle outlives the revision that removed its session: the run it settled has no
+    session left to show it, so it is listed as done off the program."""
+    store.append_plan_revision(WEEK, revision(
+        sessions=[ef("w41-mar-ef", "2026-10-06"), ef("w41-jeu-ef", "2026-10-08")],
+        computed_at="2026-10-04T20:00:00+02:00"))
+    store.add_observation({
+        "occurred_on": dt.date(2026, 10, 6), "kind": "easy",
+        "idempotency_key": "strava:90000000030", "strava_activity_id": 90000000030,
+        "started_at": dt.datetime(2026, 10, 6, 7, 10, tzinfo=PARIS),
+        "measurements": {"distance_km": {"state": "known", "value": 7.0}}})
+    before = board(store).week_view(WEEK, [])
+    assert before["extra"] == [] and before["sessions"][0]["status"] == "done"
+    store.append_plan_revision(WEEK, revision(
+        2, sessions=[ef("w41-jeu-ef", "2026-10-08")], computed_at="2026-10-07T20:00:00+02:00"))
+    after = board(store).week_view(WEEK, [])
+    assert [item["id"] for item in after["sessions"]] == ["w41-jeu-ef"]
+    assert [item["km"] for item in after["extra"]] == [7.0]
+
+
+def test_an_activity_two_sessions_could_carry_waits_on_the_week_and_is_settled_in_one_tap(
+        store):
+    """Two runs planned on Thursday: the Strava run is recorded nowhere until someone says
+    which one it was. The week shows it as pending, Today asks, and the answer links it."""
+    store.append_plan_revision(WEEK, revision(
+        sessions=[ef("w41-jeu-matin", "2026-10-08"),
+                  session("w41-jeu-soir", date="2026-10-08", title="Footing du soir")],
+        computed_at="2026-10-04T20:00:00+02:00"))
+    captured = store.ingest_strava_activity(Activity(
+        id=90000000040, sport="Run", name="Course du midi",
+        start_local="2026-10-08T12:30:00", distance_m=7000.0, moving_s=2400))
+    assert captured["status"] == "ambiguous" and captured["observation_id"] is None
+    evening = board(store, dt.datetime(2026, 10, 8, 20, 0, tzinfo=PARIS))
+    [pending] = evening.week_view(WEEK, [])["pending"]
+    assert (pending["date"], pending["family"], pending["name"], pending["km"],
+            pending["duration_min"]) == ("2026-10-08", "run", "Course du midi", 7.0, 40)
+    assert [choice["title"] for choice in pending["choices"]] == [
+        "EF, permis accompagné", "Footing du soir"]
+    [ask] = [item for item in evening.today_view()["asks"] if item["type"] == "match"]
+    assert ask["id"] == "match:90000000040" and ask["choices"] == pending["choices"]
+    assert ASK.fullmatch(ask["id"])  # the answer route takes it
+    with pytest.raises(AnswerError):
+        evening.answer(ask["id"], f"{WEEK}:w41-ven-ef")
+    evening.answer(ask["id"], f"{WEEK}:w41-jeu-soir")
+    after = board(store, dt.datetime(2026, 10, 8, 20, 5, tzinfo=PARIS))
+    week = after.week_view(WEEK, [])
+    assert week["pending"] == [] and week["extra"] == []
+    done = {item["id"]: item for item in week["sessions"]}["w41-jeu-soir"]
+    assert done["status"] == "done" and done["fact"]["km"] == 7.0
+    assert not [item for item in after.today_view()["asks"] if item["type"] == "match"]
 
 
 def test_routes_serve_the_three_screens_and_hand_a_crossing_to_the_coach(

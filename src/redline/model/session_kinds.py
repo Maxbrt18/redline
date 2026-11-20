@@ -114,14 +114,19 @@ def descent_weight(slug: str) -> float:
     return DESCENT_WEIGHT_BY_FAMILY.get(BY_SLUG[slug].family, 0.0)
 
 
+def family_for_sport(sport: str) -> str | None:
+    """The family a Strava sport belongs to; None for a sport no family records."""
+    return next((name for name, sports in STRAVA_SPORTS.items() if sport in sports), None)
+
+
 def planned_for_sport(sport: str) -> tuple[str, ...]:
     """The planned kinds a Strava activity of this sport can fulfil."""
-    families = {name for name, sports in STRAVA_SPORTS.items() if sport in sports}
-    return tuple(kind.slug for kind in KINDS if kind.planned and kind.family in families)
+    family = family_for_sport(sport)
+    return tuple(kind.slug for kind in KINDS if kind.planned and kind.family == family)
 
 
 def unplanned_for_sport(sport: str) -> str | None:
     """The kind a Strava activity of this sport is recorded as when no planned session
     can carry it; None for a sport no family records."""
-    family = next((name for name, sports in STRAVA_SPORTS.items() if sport in sports), None)
+    family = family_for_sport(sport)
     return UNPLANNED_BY_FAMILY.get(family) if family else None

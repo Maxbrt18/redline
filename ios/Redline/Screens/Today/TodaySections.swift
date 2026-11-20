@@ -82,6 +82,7 @@ private struct LeftAsk: View {
             case .morning(let wakes, let daily): MorningCard(wakes: wakes, daily: daily)
             case .cells(let cells): DebriefCard(ask: cells)
             case .heart(let hr): HeartCard(ask: hr)
+            case .match(let match): MatchCard(ask: match)
             }
         }
         .environment(\.askInCard, true)
@@ -162,7 +163,8 @@ private struct AlsoToday: View {
                     if let strength { StrengthCard(item: strength, offer: today.strength) }
                     ForEach(runs, id: \.id) { run in RunRow(title: run.title, fact: run.runFact, planned: run.plannedValue) }
                     ForEach(today.extra, id: \.observationId) { fact in
-                        RunRow(title: "\(Notebook.kindName(fact.kind)) hors programme", fact: Notebook.Fact(unplanned: fact), planned: "")
+                        RunRow(title: "\(Notebook.kindName(fact.kind)) hors programme", fact: Notebook.Fact(unplanned: fact),
+                               planned: "", family: Family(kind: fact.kind))
                     }
                 }
             }
@@ -176,13 +178,14 @@ private struct RunRow: View {
     let title: String
     let fact: Notebook.Fact?
     let planned: String
+    var family = Family.run
 
     var body: some View {
         let row = HStack(spacing: Space.s) {
-            IconTile(symbol: Family.run.symbol, done: fact != nil)
+            IconTile(symbol: family.symbol, done: fact != nil)
             Text(title).textRole(.body).fontWeight(.semibold).lineLimit(2)
             Spacer(minLength: Space.xs)
-            Text(fact?.km.map { "\(Numbers.text($0)) km" } ?? planned).textRole(.secondary).foregroundStyle(Palette.muted)
+            Text(fact.flatMap { fact in fact.km.map { "\(Numbers.text($0)) km" } ?? fact.durationMin.map { "\($0) min" } } ?? planned).textRole(.secondary).foregroundStyle(Palette.muted)
             if fact != nil {
                 Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(Palette.faint)
             }

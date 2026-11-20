@@ -29,7 +29,7 @@ def test_a_literal_becomes_a_swift_case(value, name):
 
 def test_a_tagged_union_names_each_member_by_its_tag():
     tagged = [ios_contract.discriminator(members) for members in ios_contract.unions()]
-    assert ("type", {"WakeAsk", "CellsAsk", "DailyAsk", "HrAsk"}) in [
+    assert ("type", {"WakeAsk", "CellsAsk", "DailyAsk", "HrAsk", "MatchAsk"}) in [
         (key, {member.__name__ for member in values}) for key, values in filter(None, tagged)]
 
 

@@ -18,10 +18,12 @@ struct TodayLayout {
         case morning([Notebook.WakeAsk], Notebook.DailyAsk?)
         case cells(Notebook.CellsAsk)
         case heart(Notebook.HrAsk)
+        case match(Notebook.MatchAsk)
     }
 
     let moment: Moment
-    /// The morning first, then the debriefs (today's run before an older one), then the heart.
+    /// The morning first, then which session an activity was, the debriefs (today's run
+    /// before an older one), then the heart.
     let asks: [Ask]
     /// The run done today, whose debrief closes the card.
     let ownRun: String?
@@ -45,7 +47,9 @@ struct TodayLayout {
         let cells = today.asks.compactMap { if case .cells(let cells) = $0 { cells } else { nil } }
             .sorted { ($0.id == own ? 0 : 1) < ($1.id == own ? 0 : 1) }
         let hearts = today.asks.compactMap { if case .hr(let hr) = $0 { hr } else { nil } }
-        asks = (wakes.isEmpty && daily == nil ? [] : [.morning(wakes, daily)]) + cells.map(Ask.cells) + hearts.map(Ask.heart)
+        let matches = today.asks.compactMap { if case .match(let match) = $0 { match } else { nil } }
+        asks = (wakes.isEmpty && daily == nil ? [] : [.morning(wakes, daily)]) + matches.map(Ask.match)
+            + cells.map(Ask.cells) + hearts.map(Ask.heart)
     }
 
     /// The session the card is about, when there is one today.
@@ -269,6 +273,8 @@ struct DayCard: View {
             return "\(Notebook.kindName(cells.kind)) de \(day)"
         case .heart(let hr) where hr.date != today.date:
             return "EF de \(Day(hr.date)?.weekdayAndNumber ?? hr.date)"
+        case .match(let match) where match.date != today.date:
+            return "Activité de \(Day(match.date)?.weekdayAndNumber ?? match.date)"
         default:
             return nil
         }
@@ -349,6 +355,7 @@ private struct PanelAsk: View {
         case .morning(let wakes, let daily): MorningCard(wakes: wakes, daily: daily)
         case .cells(let cells): DebriefCard(ask: cells, targets: targets)
         case .heart(let hr): HeartCard(ask: hr)
+        case .match(let match): MatchCard(ask: match)
         }
     }
 }

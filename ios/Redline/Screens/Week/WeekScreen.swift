@@ -131,7 +131,8 @@ private struct WeekContent: View {
                     ForEach(0..<7, id: \.self) { offset in
                         let date = monday.adding(offset).text
                         WeekDayRow(date: date, items: week.sessions.filter { $0.date == date },
-                                   extra: week.extra.filter { $0.date == date }, today: Day(.now).text)
+                                   extra: week.extra.filter { $0.date == date },
+                                   pending: week.pending.filter { $0.date == date }, today: Day(.now).text)
                     }
                 }
                 reorganize
@@ -222,6 +223,8 @@ private struct WeekDayRow: View {
     let date: String
     let items: [Notebook.SessionItem]
     let extra: [Notebook.UnplannedFact]
+    /// What was done that day and waits to be told which session it was.
+    let pending: [Notebook.PendingActivity]
     let today: String
     @State private var open = false
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -245,6 +248,23 @@ private struct WeekDayRow: View {
             }
             ForEach(row.beside + (open ? row.detail : []), id: \.self) { line in
                 Text(line).textRole(.caption).foregroundStyle(Palette.muted).padding(.leading, inset)
+            }
+            // What was done off the program always shows, folded or not, and opens its detail.
+            ForEach(row.off, id: \.observationId) { fact in
+                NavigationLink(value: SessionLink(id: fact.observationId, title: Notebook.kindName(fact.kind))) {
+                    HStack(spacing: 4) {
+                        Text(Self.unplannedLine(fact))
+                        Image(systemName: "chevron.right").font(.caption2.weight(.semibold))
+                    }
+                    .font(TextRole.caption.font.weight(.semibold))
+                    .foregroundStyle(Palette.ink)
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, inset)
+            }
+            ForEach(pending, id: \.activityId) { activity in
+                Label(Self.pendingLine(activity), systemImage: "questionmark.circle")
+                    .textRole(.caption).foregroundStyle(Palette.muted).padding(.leading, inset)
             }
             ForEach(reports, id: \.id) { report in
                 NavigationLink(value: report) {
@@ -332,7 +352,8 @@ private struct WeekDayRow: View {
     private enum Style { case done, plan, rest, skipped }
 
     private typealias Row = (title: String, value: String, style: Style, families: [Family], tags: [String],
-                             alert: String?, beside: [String], detail: [String], link: SessionLink?)
+                             alert: String?, beside: [String], detail: [String], link: SessionLink?,
+                             off: [Notebook.UnplannedFact])
 
     private func describe() -> Row {
         let live = items.filter { $0.kind != "rest" }
@@ -341,12 +362,12 @@ private struct WeekDayRow: View {
         var beside: [String] = [], detail: [String] = []
         guard let main = runs.first ?? strengths.first else {
             guard let first = extra.first else {
-                return ("Repos", "", .rest, [.rest], [], nil, [], [], nil)
+                return ("Repos", "", .rest, [.rest], [], nil, [], [], nil, [])
             }
             let value = first.km.map { "\(Numbers.text($0)) km" } ?? first.durationMin.map { "\($0) min" } ?? ""
             return ("\(Notebook.kindName(first.kind)) · hors programme", value, .done, [Family(kind: first.kind)], [], nil,
-                    extra.dropFirst().map(Self.unplannedLine), [],
-                    SessionLink(id: first.observationId, title: Notebook.kindName(first.kind)))
+                    [], [], SessionLink(id: first.observationId, title: Notebook.kindName(first.kind)),
+                    Array(extra.dropFirst()))
         }
         let title = ([main.title.split(separator: ",").first.map(String.init) ?? main.title]
                      + (!main.isStrength && !strengths.isEmpty ? ["renfo"] : [])).joined(separator: " + ")
@@ -368,8 +389,12 @@ private struct WeekDayRow: View {
             value = "sauté"
             style = .skipped
             if let note = main.note { detail.append(note) }
+        } else if !pending.isEmpty {
+            // An activity of the day may be this session: nothing is said until it is told.
+            value = "à rattacher"
         } else if past {
-            value = "pas de trace"
+            // Something else was done that day: the plan was not followed, but there is a trace.
+            value = extra.isEmpty ? "pas de trace" : "pas fait"
         } else {
             value = main.plannedValue
             if main.status == "held" { alert = "en attente d’une réponse dans Messenger" }
@@ -380,14 +405,17 @@ private struct WeekDayRow: View {
             observed ? beside.append(line) : detail.append(line)
         }
         if style == .plan, !past, let note = main.note { detail.append(note) }
-        for fact in extra {
-            observed ? beside.append(Self.unplannedLine(fact)) : detail.append(Self.unplannedLine(fact))
-        }
-        return (title, value, style, families, tags, alert, beside, detail, link)
+        return (title, value, style, families, tags, alert, beside, detail, link, extra)
+    }
+
+    private static func pendingLine(_ activity: Notebook.PendingActivity) -> String {
+        "À rattacher · \(activity.name)"
+            + (activity.km.map { " · \(Numbers.text($0)) km" } ?? activity.durationMin.map { " · \($0) min" } ?? "")
     }
 
     private static func unplannedLine(_ fact: Notebook.UnplannedFact) -> String {
-        "Hors programme · \(Notebook.kindName(fact.kind))" + (fact.km.map { " · \(Numbers.text($0)) km" } ?? "")
+        "Hors programme · \(Notebook.kindName(fact.kind))"
+            + (fact.km.map { " · \(Numbers.text($0)) km" } ?? fact.durationMin.map { " · \($0) min" } ?? "")
     }
 
     /// What overshot, as the gap to the limit: labels, not a sentence.

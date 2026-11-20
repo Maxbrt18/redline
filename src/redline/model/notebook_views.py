@@ -194,7 +194,34 @@ class HrAsk(TypedDict):
     pace_s: int
 
 
-Ask = WakeAsk | CellsAsk | DailyAsk | HrAsk
+class MatchChoice(TypedDict):
+    """A planned session an activity may have fulfilled: `key` is `<week>:<session id>`."""
+
+    key: str
+    title: str
+
+
+class PendingActivity(TypedDict):
+    """A Strava activity two planned sessions of its day could carry: nothing is recorded
+    until someone says which one it was."""
+
+    activity_id: int
+    date: str
+    #: The session family its sport belongs to: run, hike or bike.
+    family: str
+    name: str
+    km: float | None
+    duration_min: int | None
+    started_at: str | None
+    choices: list[MatchChoice]
+
+
+class MatchAsk(PendingActivity):
+    id: str
+    type: Literal["match"]
+
+
+Ask = WakeAsk | CellsAsk | DailyAsk | HrAsk | MatchAsk
 
 
 class Done(TypedDict):
@@ -477,6 +504,7 @@ class WeekView(TypedDict):
     plan: WeekPlan
     sessions: list[SessionItem]
     extra: list[UnplannedFact]
+    pending: list[PendingActivity]
     totals: Totals
     strip: list[StripDay]
     review: Entry | None
