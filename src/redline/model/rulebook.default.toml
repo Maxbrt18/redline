@@ -198,7 +198,7 @@ title = "Douleur"
 text = "plafond {pain_cap}/10 à l'effort, zone par zone ; au-dessus ou foulée modifiée : arrêt. Persistante > 48 h : -30 %, puis paliers 50/70/85 % et 2 semaines sans qualité."
 grade = "règle de coaching"
 owner = "coaching/current-plan.md"
-enforced_by = "code : trace au réveil persistante → qualité refusée {pain_no_quality_days} j, semaine déjà prévue -{pain_cut_pct} % (redline week-plan revise). Coach : arrêt en séance, foulée modifiée, paliers 50/70/85 %"
+enforced_by = "code : trace au réveil persistante → qualité refusée {pain_no_quality_days} j, semaine déjà prévue -{pain_cut_pct} % (redline week-plan revise), sauf une révision qui ne fait que déplacer des séances. Coach : arrêt en séance, foulée modifiée, paliers 50/70/85 %"
 
 [[rules]]
 id = "n4"
