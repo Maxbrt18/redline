@@ -34,6 +34,9 @@ class StravaIntake(SessionCycles):
         that day, or none: an unplanned session takes its sport's declared default kind
         (`session_kinds.unplanned_for_sport`). With several candidates the capture stays
         durable and the ambiguity is exposed; no sport taxonomy is inferred from a title.
+
+        An observation already recorded under this activity (the coach's `ledger-add`, often
+        before the webhook) receives the measures it left empty.
         """
         activity_id = int(activity.id or 0)
         if activity_id <= 0:
@@ -78,6 +81,9 @@ class StravaIntake(SessionCycles):
                               if existing_observation is not None else None)
             status = IntakeStatus.MATCHED if observation_id else (
                 IntakeStatus.AMBIGUOUS if len(candidates) > 1 else IntakeStatus.UNMATCHED)
+            if existing_observation is not None:
+                self._fill_from_strava_in(connection, existing_observation["id"], activity,
+                                          actor=actor)
             if existing_observation is not None and len(candidates) == 1:
                 observation_for_link: Any = existing_observation
                 if existing_observation["started_at"] is None and started_at is not None:

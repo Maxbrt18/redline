@@ -10,7 +10,8 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Connection
 
 from redline.model import ledger
-from redline.model.vocabulary import IntakeStatus, MeasurementState
+from redline.model.activity import Activity
+from redline.model.vocabulary import EnrichmentState, IntakeStatus, MeasurementState
 
 from ..database import StorageError
 from ..schema import (
@@ -36,6 +37,56 @@ from .facts import Facts
 
 
 class Observations(Facts):
+    @staticmethod
+    def _strava_measurements(activity: Activity,
+                             intake: dict | None = None) -> dict[str, dict[str, Any]]:
+        measurements: dict[str, dict[str, Any]] = {
+            "rpe": {"state": MeasurementState.PENDING}, "enjoyment": {"state": MeasurementState.PENDING},
+            "elevation_loss_m": {"state": MeasurementState.PENDING},
+            "wbgt_c": ({"state": MeasurementState.PENDING} if activity.weather_query
+                       else {"state": MeasurementState.UNAVAILABLE}),
+        }
+        raw = {
+            "distance_km": ("km", activity.distance_km),
+            "duration_s": (None, activity.moving_s or None),
+            "pace_s_per_km": (None, activity.pace_s_per_km),
+            "hr_avg_bpm": ("hr_avg", activity.hr_avg_bpm),
+            "hr_max_bpm": ("hr_max", activity.hr_max_bpm),
+            "cadence_spm": ("cadence", activity.cadence_spm or activity.cadence_rpm),
+            "elevation_gain_m": ("dplus", activity.elevation_gain_m),
+        }
+        for metric, (field, value) in raw.items():
+            if value is None:
+                continue
+            if field:
+                canonical = ledger.canonical_value(field, str(value))
+                value = float(canonical)
+                if ledger.input_field(field).decimals == 0:
+                    value = int(value)
+            measurements[metric] = {"state": MeasurementState.KNOWN, "value": value}
+        if intake:
+            for prefix, metric in (("elevation_loss", "elevation_loss_m"),
+                                   ("wbgt", "wbgt_c")):
+                state = intake.get(f"{prefix}_state")
+                if state == EnrichmentState.KNOWN:
+                    measurements[metric] = {
+                        "state": MeasurementState.KNOWN, "value": intake[f"{prefix}_value"]}
+                elif state == EnrichmentState.UNAVAILABLE:
+                    measurements[metric] = {"state": MeasurementState.UNAVAILABLE}
+        return measurements
+
+    def _fill_from_strava_in(self, connection: Connection, observation_id: Any, activity: Activity,
+                             *, actor: str) -> None:
+        """Write the activity's measures where the observation holds none. What it states
+        stays: a known measurement is never overwritten, only an empty one is filled."""
+        stored = connection.execute(sa.select(observation_metrics).where(
+            observation_metrics.c.observation_id == observation_id)).mappings().one()
+        for metric, measure in self._strava_measurements(activity).items():
+            if (measure["state"] == MeasurementState.KNOWN
+                    and stored[f"{metric}_state"] != MeasurementState.KNOWN):
+                self.complete_measurement_in(connection, observation_id, metric,
+                                             measure["value"], actor=actor)
+
     def add_observation(self, payload: dict, *, actor: str = "application") -> uuid.UUID:
         with self.database.transaction() as connection:
             return self.add_observation_in(connection, payload, actor=actor)
@@ -109,6 +160,16 @@ class Observations(Facts):
                         connection, values["kind"], values["occurred_on"], zone,
                         float(reading["value"]) if reading["state"] == MeasurementState.KNOWN else None,
                         actor=actor)
+        if values["strava_activity_id"]:
+            # Captured before this write (the coach recording a run the webhook brought):
+            # the measures the payload leaves out come from the capture.
+            distilled = connection.execute(sa.select(strava_activity_intakes.c.distilled).where(
+                strava_activity_intakes.c.activity_id == values["strava_activity_id"],
+                strava_activity_intakes.c.athlete_id == values["athlete_id"],
+            )).scalar_one_or_none()
+            if distilled:
+                self._fill_from_strava_in(connection, observation_id,
+                                          Activity.from_json(distilled), actor=actor)
         if values["strava_activity_id"] and values["started_at"]:
             self._auto_match_observation_in(
                 connection, observation_id, payload.get("session_key"), actor=actor)
