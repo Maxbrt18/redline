@@ -10,7 +10,7 @@ from sqlalchemy.engine import Connection
 
 from redline.model import iso_week, ledger, local_time, session_kinds
 from redline.model.activity import Activity
-from redline.model.vocabulary import CycleState, EnrichmentState, MeasurementState
+from redline.model.vocabulary import CycleState, MeasurementState
 
 from ..database import StorageError
 from ..schema import (
@@ -26,44 +26,6 @@ from .observations import Observations
 
 
 class SessionCycles(Observations):
-    @staticmethod
-    def _strava_measurements(activity: Activity,
-                             intake: dict | None = None) -> dict[str, dict[str, Any]]:
-        measurements: dict[str, dict[str, Any]] = {
-            "rpe": {"state": MeasurementState.PENDING}, "enjoyment": {"state": MeasurementState.PENDING},
-            "elevation_loss_m": {"state": MeasurementState.PENDING},
-            "wbgt_c": ({"state": MeasurementState.PENDING} if activity.weather_query
-                       else {"state": MeasurementState.UNAVAILABLE}),
-        }
-        raw = {
-            "distance_km": ("km", activity.distance_km),
-            "duration_s": (None, activity.moving_s or None),
-            "pace_s_per_km": (None, activity.pace_s_per_km),
-            "hr_avg_bpm": ("hr_avg", activity.hr_avg_bpm),
-            "hr_max_bpm": ("hr_max", activity.hr_max_bpm),
-            "cadence_spm": ("cadence", activity.cadence_spm or activity.cadence_rpm),
-            "elevation_gain_m": ("dplus", activity.elevation_gain_m),
-        }
-        for metric, (field, value) in raw.items():
-            if value is None:
-                continue
-            if field:
-                canonical = ledger.canonical_value(field, str(value))
-                value = float(canonical)
-                if ledger.input_field(field).decimals == 0:
-                    value = int(value)
-            measurements[metric] = {"state": MeasurementState.KNOWN, "value": value}
-        if intake:
-            for prefix, metric in (("elevation_loss", "elevation_loss_m"),
-                                   ("wbgt", "wbgt_c")):
-                state = intake.get(f"{prefix}_state")
-                if state == EnrichmentState.KNOWN:
-                    measurements[metric] = {
-                        "state": MeasurementState.KNOWN, "value": intake[f"{prefix}_value"]}
-                elif state == EnrichmentState.UNAVAILABLE:
-                    measurements[metric] = {"state": MeasurementState.UNAVAILABLE}
-        return measurements
-
     @staticmethod
     def _observation_kind_for_workout(workout: str) -> str | None:
         kind = session_kinds.BY_SLUG.get(workout)

@@ -839,6 +839,61 @@ def test_historical_capture_links_an_existing_observation_to_its_cycle(store):
     assert stored["started_at"].astimezone(paris).strftime("%H:%M") == "08:03"
 
 
+def test_a_run_the_coach_recorded_first_receives_the_measures_it_left_empty(store):
+    """The coach logged an unplanned run with its feelings and no figures, before the
+    webhook: the capture fills the distance and duration, and keeps what the coach stated."""
+    store.add_observation({
+        "occurred_on": dt.date(2026, 9, 22), "kind": "easy",
+        "idempotency_key": "strava:90000000014", "strava_activity_id": 90000000014,
+        "measurements": {
+            "distance_km": {"state": "not_applicable"}, "duration_s": {"state": "not_applicable"},
+            "hr_avg_bpm": {"state": "known", "value": 150},
+            "rpe": {"state": "known", "value": 2}},
+    })
+    result = store.ingest_strava_activity(Activity(
+        id=90000000014, sport="Run", name="Afternoon Run",
+        start_local="2026-09-22T15:18:48", distance_m=5001.8, moving_s=1907,
+        hr_avg_bpm=149.7, cadence_spm=166.8))
+    assert result["status"] == "matched" and result["candidate_session_keys"] == []
+    [row] = [row for row in store.observation_rows()
+             if row["strava_activity_id"] == 90000000014]
+    known = {metric: measure["value"] for metric, measure in row["measurements"].items()
+             if measure["state"] == "known"}
+    assert known["distance_km"] == pytest.approx(5.0) and known["duration_s"] == 1907
+    assert known["hr_avg_bpm"] == 150 and known["rpe"] == 2
+
+
+def test_a_run_the_coach_records_after_its_capture_takes_the_captured_measures(store):
+    """The capture wrote no observation (two sessions could carry it) and the coach then
+    records the run with the athlete's feelings only: its figures come from the capture."""
+    from test_weekly_plan import revision as build_revision
+    from test_weekly_plan import session
+
+    store.append_plan_revision("2026-W39", build_revision(1, sessions=[
+        session("w39-mar-ef", date="2026-09-22"),
+        session("w39-mar-soir", date="2026-09-22", title="Footing du soir")],
+        computed_at="2026-09-20T19:10:00+02:00"))
+    captured = store.ingest_strava_activity(Activity(
+        id=90000000015, sport="Run", name="Afternoon Run",
+        start_local="2026-09-22T15:18:48", distance_m=5001.8, moving_s=1907, hr_avg_bpm=149.7))
+    assert captured["status"] == "ambiguous" and captured["observation_id"] is None
+    store.add_observation({
+        "occurred_on": dt.date(2026, 9, 22), "kind": "easy",
+        "started_at": dt.datetime(2026, 9, 22, 15, 18, 48,
+                                  tzinfo=dt.timezone(dt.timedelta(hours=2))),
+        "idempotency_key": "strava:90000000015", "strava_activity_id": 90000000015,
+        "session_key": "2026-W39:w39-mar-soir",
+        "measurements": {"distance_km": {"state": "not_applicable"},
+                         "rpe": {"state": "known", "value": 2}},
+    })
+    [row] = [row for row in store.observation_rows()
+             if row["strava_activity_id"] == 90000000015]
+    known = {metric: measure["value"] for metric, measure in row["measurements"].items()
+             if measure["state"] == "known"}
+    assert known["distance_km"] == pytest.approx(5.0) and known["duration_s"] == 1907
+    assert known["hr_avg_bpm"] == pytest.approx(149.7, abs=0.5) and known["rpe"] == 2
+
+
 def test_a_wbgt_already_logged_by_the_coach_does_not_sink_the_capture(store):
     """The coach logged the WBGT before the webhook: that value stays and the
     pipeline's differing one becomes a trace, instead of failing the capture."""
