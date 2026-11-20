@@ -340,18 +340,28 @@ class Board:
         return [self.session_item(week, session, entries or {}) for session in sessions]
 
     def unplanned(self, week: Week) -> list[views.UnplannedFact]:
-        """What was run or walked with no program session to carry it."""
-        linked = {link["observation_id"] for link in week.links.values()
-                  if link.get("observation_id")}
-        return [{**observation_fact(row, labels=self.zone_labels), "title": row["kind"]}
-                for row in week.observations
-                if row["kind"] in MOVING_TYPES and row["id"] not in linked]
+        """What was run or walked with no program session to carry it.
+
+        Only a live session of the active revision carries its observation: a cycle
+        outlives the revisions, so a session removed or cancelled since would otherwise
+        hide the activity it settled from both the sessions and this list."""
+        carriers = {session["id"] for session in (week.revision or {}).get("sessions") or []
+                    if session["status"] != SessionStatus.CANCELLED}
+        linked = {link["observation_id"] for key, link in week.links.items()
+                  if link.get("observation_id") and key in carriers}
+        facts: list[views.UnplannedFact] = [
+            {**observation_fact(row, labels=self.zone_labels), "title": row["kind"]}
+            for row in week.observations
+            if row["kind"] in MOVING_TYPES and row["id"] not in linked]
+        return sorted(facts, key=lambda fact: (fact["date"], fact["started_at"] or ""))
 
     def strip(self, week: Week, sessions: list[views.SessionItem]) -> list[views.StripDay]:
         days: list[views.StripDay] = []
+        extra = self.unplanned(week)
         for day in week.days:
             iso = day.isoformat()
             same = [s for s in sessions if s["date"] == iso and s["status"] != SessionStatus.CANCELLED]
+            off = [fact["kind"] for fact in extra if fact["date"] == iso]
             done = sum(row.km or 0 for row in week.rows
                        if row.date == day and row.type in ledger.RUN_TYPES)
             pending = [s for s in same if s["kind"] == "run" and s["status"] != SessionStatus.DONE]
@@ -362,14 +372,17 @@ class Board:
                 planned_km = _distance(pending[0])
                 if planned_km is None and targets.get("duration_cap_min"):
                     planned_label = f"≤{targets['duration_cap_min']}′"
+            # What was done off the program names the day too: a rest day walked is no rest.
             abbr = "+".join(dict.fromkeys(
-                session_labels.short(s["workout"]) for s in same)) or ""
+                [session_labels.short(s["workout"]) for s in same
+                 if not (off and s["kind"] == "rest")]
+                + [session_labels.short(kind) for kind in off])) or ""
             days.append({
                 "date": iso, "letter": dates.weekday(day, "narrow"), "abbr": abbr,
                 "today": day == self.today, "done_km": round(done, 2) or None,
                 "planned_km": planned_km, "planned_label": planned_label,
                 "long": any(s["workout"] == session_kinds.LONG for s in same),
-                "rest": not any(s["kind"] != "rest" for s in same),
+                "rest": not off and not any(s["kind"] != "rest" for s in same),
             })
         return days
 

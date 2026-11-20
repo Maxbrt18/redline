@@ -411,6 +411,42 @@ def test_without_a_plan_nothing_is_prescribed_but_the_ledger_still_counts(store)
     json.dumps(view)  # the notebook serves it as is
 
 
+def test_an_activity_off_the_program_names_its_day_even_beside_a_planned_session(store):
+    """A walk on the rest day and a ride on a planned easy day: both are listed with the
+    week, and the strip names them instead of « repos » or the planned run alone."""
+    seed_week(store)
+    for day, kind, key in ((dt.date(2026, 10, 5), "hike", "manual:walk"),
+                           (dt.date(2026, 10, 9), "bike", "manual:ride")):
+        store.add_observation({"occurred_on": day, "kind": kind, "idempotency_key": key,
+                               "measurements": {"duration_s": {"state": "known", "value": 2700}}})
+    week = board(store, dt.datetime(2026, 10, 10, 20, 0, tzinfo=PARIS)).week_view(WEEK, [])
+    assert [(item["date"], item["kind"]) for item in week["extra"]] == [
+        ("2026-10-05", "hike"), ("2026-10-09", "bike")]
+    strip = {item["date"]: item for item in week["strip"]}
+    assert strip["2026-10-05"]["abbr"] == "rando" and not strip["2026-10-05"]["rest"]
+    assert strip["2026-10-09"]["abbr"] == "EF+vélo"
+
+
+def test_an_activity_whose_session_left_the_plan_is_still_listed(store):
+    """The cycle outlives the revision that removed its session: the run it settled has no
+    session left to show it, so it is listed as done off the program."""
+    store.append_plan_revision(WEEK, revision(
+        sessions=[ef("w41-mar-ef", "2026-10-06"), ef("w41-jeu-ef", "2026-10-08")],
+        computed_at="2026-10-04T20:00:00+02:00"))
+    store.add_observation({
+        "occurred_on": dt.date(2026, 10, 6), "kind": "easy",
+        "idempotency_key": "strava:90000000030", "strava_activity_id": 90000000030,
+        "started_at": dt.datetime(2026, 10, 6, 7, 10, tzinfo=PARIS),
+        "measurements": {"distance_km": {"state": "known", "value": 7.0}}})
+    before = board(store).week_view(WEEK, [])
+    assert before["extra"] == [] and before["sessions"][0]["status"] == "done"
+    store.append_plan_revision(WEEK, revision(
+        2, sessions=[ef("w41-jeu-ef", "2026-10-08")], computed_at="2026-10-07T20:00:00+02:00"))
+    after = board(store).week_view(WEEK, [])
+    assert [item["id"] for item in after["sessions"]] == ["w41-jeu-ef"]
+    assert [item["km"] for item in after["extra"]] == [7.0]
+
+
 def test_routes_serve_the_three_screens_and_hand_a_crossing_to_the_coach(
         store, make_config, monkeypatch):
     from unittest.mock import MagicMock
