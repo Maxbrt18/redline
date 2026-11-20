@@ -193,6 +193,47 @@ def test_a_volume_above_the_ceiling_is_refused():
     assert weekly_plan.pain_rule_errors(written(easy, volume=28), [], [ceiling]) == []
 
 
+CEILING = weekly_plan.VolumeCeiling("n3", "2026-W41", 28.0, 40.0, HOLD.fact)
+SATURDAY_LONG = run("w41-sat-long", "2026-10-10", "long", note="Samedi.")
+SUNDAY_EASY = run("w41-sun-easy", "2026-10-11", "easy", note="Dimanche.")
+
+
+def test_swapping_two_days_is_not_held_to_the_volume_cut():
+    previous = written(SATURDAY_LONG, SUNDAY_EASY, volume=40)
+    swapped = written({**SATURDAY_LONG, "date": "2026-10-11", "note": "Passée à dimanche."},
+                      {**SUNDAY_EASY, "date": "2026-10-10", "note": "Passé à samedi."},
+                      volume=40)
+    assert weekly_plan.reschedules_only(previous, swapped)
+    assert weekly_plan.pain_rule_errors(swapped, [], [CEILING], previous=previous) == []
+
+
+def test_a_session_the_loaded_plan_shows_done_still_counts_as_unchanged():
+    previous = written({**SATURDAY_LONG, "status": "done"}, SUNDAY_EASY, volume=40)
+    moved = written(SATURDAY_LONG, {**SUNDAY_EASY, "date": "2026-10-12"}, volume=40)
+    assert weekly_plan.reschedules_only(previous, moved)
+
+
+@pytest.mark.parametrize("change", [
+    {"volume": 41},
+    {"sessions": (SATURDAY_LONG,)},
+    {"sessions": (SATURDAY_LONG, {**SUNDAY_EASY, "distance_target_km": 12.0})},
+    {"sessions": (SATURDAY_LONG, SUNDAY_EASY, run("w41-fri-easy", "2026-10-09", "easy"))},
+])
+def test_any_other_change_still_applies_the_cut(change):
+    previous = written(SATURDAY_LONG, SUNDAY_EASY, volume=40)
+    current = written(*change.get("sessions", (SATURDAY_LONG, SUNDAY_EASY)),
+                      volume=change.get("volume", 40))
+    assert not weekly_plan.reschedules_only(previous, current)
+    assert weekly_plan.pain_rule_errors(current, [], [CEILING], previous=previous)
+
+
+def test_a_quality_session_moved_into_a_hold_is_still_refused():
+    threshold = run("w41-thu-threshold", "2026-10-15", "threshold")
+    previous = written({**threshold, "date": "2026-10-20"})
+    assert weekly_plan.reschedules_only(previous, written(threshold))
+    assert weekly_plan.pain_rule_errors(written(threshold), [HOLD], [], previous=previous)
+
+
 class Store:
     def __init__(self, rows):
         self.rows = rows
@@ -211,6 +252,14 @@ def test_the_write_gate_reads_the_ledger_at_the_instant_of_writing(monkeypatch):
     problems = plan_revision.pain_errors(store, "2026-W41", written(threshold), None,
                                          lambda message: None)
     assert len(problems) == 1 and "rule n3" in problems[0]
+    planned = {**written(SATURDAY_LONG, SUNDAY_EASY, volume=40),
+               "revision": 1, "computed_at": "2026-10-04T18:00:00+02:00"}
+    swapped = written({**SATURDAY_LONG, "date": "2026-10-11"},
+                      {**SUNDAY_EASY, "date": "2026-10-10"}, volume=40)
+    assert plan_revision.pain_errors(store, "2026-W41", swapped, {"revisions": [planned]},
+                                     lambda message: None) == []
+    assert plan_revision.pain_errors(store, "2026-W41", {**swapped, "volume_target_km": 41},
+                                     {"revisions": [planned]}, lambda message: None)
     later = Store(wakes(1, 1, 1, start=day(4)))
     assert plan_revision.pain_errors(later, "2026-W41", written(threshold), None,
                                      lambda message: None) == []

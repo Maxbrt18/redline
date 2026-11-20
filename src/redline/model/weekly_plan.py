@@ -983,12 +983,48 @@ def _is_quality(session: dict) -> bool:
             or session.get("transition") in rulebook.current().quality_kinds)
 
 
+#: What a session may change while the week stays the same load: its day, and the note
+#: that tells the athlete about the move.
+RESCHEDULE_FIELDS = frozenset({"date", "note"})
+
+
+def reschedules_only(previous: dict | None, current: dict) -> bool:
+    """Whether `current` only moves sessions of `previous` to other days.
+
+    The same sessions, each identical outside `RESCHEDULE_FIELDS`, and a volume target
+    no higher: the load of the week is unchanged, only its order.
+    """
+    if previous is None:
+        return False
+    before, after = previous.get("volume_target_km"), current.get("volume_target_km")
+    if before is None or after is None or after > before:
+        return False
+    old = {session.get("id"): session for session in previous.get("sessions") or []}
+    new = current.get("sessions") or []
+    if sorted(old, key=str) != sorted((session.get("id") for session in new), key=str):
+        return False
+
+    def kept(session: dict) -> dict:
+        found = {key: value for key, value in session.items()
+                 if key not in RESCHEDULE_FIELDS and value is not None}
+        # A loaded plan shows `done` from the session cycle where the revision stores
+        # `planned`, which is what the next revision must write.
+        if found.get("status") == SessionStatus.DONE:
+            found["status"] = SessionStatus.PLANNED
+        return found
+
+    return all(kept(session) == kept(old[session.get("id")]) for session in new)
+
+
 def pain_rule_errors(revision: dict, holds: list[QualityHold],
-                     ceilings: list[VolumeCeiling], where: str = "revision") -> list[str]:
+                     ceilings: list[VolumeCeiling], where: str = "revision",
+                     previous: dict | None = None) -> list[str]:
     """Rules n3 and n4 on write: no quality inside a hold, no volume above a ceiling.
 
     Judged on the new revision only, from its own date on: a session already behind it
-    belongs to the week's story, and an older revision stays readable.
+    belongs to the week's story, and an older revision stays readable. A revision that
+    only reschedules `previous` (`reschedules_only`) adds no load, so the volume ceiling
+    does not bind it; a quality session moved into a hold is still refused.
     """
     written_on = str(revision.get("computed_at") or now_stamp())[:10]
     problems = []
@@ -1005,12 +1041,14 @@ def pain_rule_errors(revision: dict, holds: list[QualityHold],
                     f"fact={hold.fact!r}")
                 break
     target = revision.get("volume_target_km")
-    for ceiling in ceilings:
+    for ceiling in [] if reschedules_only(previous, revision) else ceilings:
         if target is not None and target > ceiling.ceiling_km:
             problems.append(
                 f"{where}.volume_target_km: {target:g} km is above {ceiling.ceiling_km:g} km, "
                 f"the cut of rule {ceiling.rule} on the {ceiling.reference_km:g} km planned "
-                f"before {ceiling.fact!r}")
+                f"before {ceiling.fact!r}. Only moving sessions (changing nothing but "
+                f"{' and '.join(sorted(RESCHEDULE_FIELDS))}, volume target unchanged) "
+                f"keeps the volume")
     return problems
 
 

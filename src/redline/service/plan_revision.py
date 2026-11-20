@@ -57,7 +57,9 @@ def pain_errors(store, week: str, revision: dict, existing: dict | None,
     except Exception as exc:
         warn(wording.PAIN_RULES_UNREADABLE.format(name=exc.__class__.__name__))
         return []
-    return pain_rule_errors(revision, holds, ceilings, f"{week} revision {revision['revision']}")
+    previous = existing["revisions"][-1] if existing else None
+    return pain_rule_errors(revision, holds, ceilings, f"{week} revision {revision['revision']}",
+                            previous)
 
 
 def checked(store, week: str, revision: dict, existing: dict | None, *, stamp: str,
