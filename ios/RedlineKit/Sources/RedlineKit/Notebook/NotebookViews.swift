@@ -1028,6 +1028,186 @@ public extension Notebook {
         }
     }
 
+    struct MatchChoice: Codable, Hashable, Sendable {
+        public let key: String
+        public let title: String
+
+        public init(key: String, title: String) {
+            self.key = key
+            self.title = title
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case key = "key"
+            case title = "title"
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            key = try container.decode(String.self, forKey: .key)
+            title = try container.decode(String.self, forKey: .title)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(key, forKey: .key)
+            try container.encode(title, forKey: .title)
+        }
+    }
+
+    struct PendingActivity: Codable, Hashable, Sendable {
+        public let activityId: Int
+        public let date: String
+        public let family: String
+        public let name: String
+        public let km: Double?
+        public let durationMin: Int?
+        public let startedAt: String?
+        public let choices: [MatchChoice]
+
+        public init(activityId: Int, date: String, family: String, name: String, km: Double? = nil, durationMin: Int? = nil, startedAt: String? = nil, choices: [MatchChoice]) {
+            self.activityId = activityId
+            self.date = date
+            self.family = family
+            self.name = name
+            self.km = km
+            self.durationMin = durationMin
+            self.startedAt = startedAt
+            self.choices = choices
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case activityId = "activity_id"
+            case date = "date"
+            case family = "family"
+            case name = "name"
+            case km = "km"
+            case durationMin = "duration_min"
+            case startedAt = "started_at"
+            case choices = "choices"
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            activityId = try container.decode(Int.self, forKey: .activityId)
+            date = try container.decode(String.self, forKey: .date)
+            family = try container.decode(String.self, forKey: .family)
+            name = try container.decode(String.self, forKey: .name)
+            km = try container.decode(Double?.self, forKey: .km)
+            durationMin = try container.decode(Int?.self, forKey: .durationMin)
+            startedAt = try container.decode(String?.self, forKey: .startedAt)
+            choices = try container.decode([MatchChoice].self, forKey: .choices)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(activityId, forKey: .activityId)
+            try container.encode(date, forKey: .date)
+            try container.encode(family, forKey: .family)
+            try container.encode(name, forKey: .name)
+            try container.encode(km, forKey: .km)
+            try container.encode(durationMin, forKey: .durationMin)
+            try container.encode(startedAt, forKey: .startedAt)
+            try container.encode(choices, forKey: .choices)
+        }
+    }
+
+    struct MatchAsk: Codable, Hashable, Sendable {
+        public let activityId: Int
+        public let date: String
+        public let family: String
+        public let name: String
+        public let km: Double?
+        public let durationMin: Int?
+        public let startedAt: String?
+        public let choices: [MatchChoice]
+        public let id: String
+        public let type: TypeValue
+
+        public enum TypeValue: Codable, Hashable, Sendable {
+            case match
+            /// A value this build does not know yet: the server is newer than the app.
+            case unknown(String)
+    
+            public init(rawValue: String) {
+                switch rawValue {
+                case "match": self = .match
+                default: self = .unknown(rawValue)
+                }
+            }
+    
+            public var rawValue: String {
+                switch self {
+                case .match: "match"
+                case .unknown(let rawValue): rawValue
+                }
+            }
+    
+            public init(from decoder: any Decoder) throws {
+                self.init(rawValue: try decoder.singleValueContainer().decode(String.self))
+            }
+    
+            public func encode(to encoder: any Encoder) throws {
+                var container = encoder.singleValueContainer()
+                try container.encode(rawValue)
+            }
+        }
+
+        public init(activityId: Int, date: String, family: String, name: String, km: Double? = nil, durationMin: Int? = nil, startedAt: String? = nil, choices: [MatchChoice], id: String, type: TypeValue) {
+            self.activityId = activityId
+            self.date = date
+            self.family = family
+            self.name = name
+            self.km = km
+            self.durationMin = durationMin
+            self.startedAt = startedAt
+            self.choices = choices
+            self.id = id
+            self.type = type
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case activityId = "activity_id"
+            case date = "date"
+            case family = "family"
+            case name = "name"
+            case km = "km"
+            case durationMin = "duration_min"
+            case startedAt = "started_at"
+            case choices = "choices"
+            case id = "id"
+            case type = "type"
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            activityId = try container.decode(Int.self, forKey: .activityId)
+            date = try container.decode(String.self, forKey: .date)
+            family = try container.decode(String.self, forKey: .family)
+            name = try container.decode(String.self, forKey: .name)
+            km = try container.decode(Double?.self, forKey: .km)
+            durationMin = try container.decode(Int?.self, forKey: .durationMin)
+            startedAt = try container.decode(String?.self, forKey: .startedAt)
+            choices = try container.decode([MatchChoice].self, forKey: .choices)
+            id = try container.decode(String.self, forKey: .id)
+            type = try container.decode(TypeValue.self, forKey: .type)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(activityId, forKey: .activityId)
+            try container.encode(date, forKey: .date)
+            try container.encode(family, forKey: .family)
+            try container.encode(name, forKey: .name)
+            try container.encode(km, forKey: .km)
+            try container.encode(durationMin, forKey: .durationMin)
+            try container.encode(startedAt, forKey: .startedAt)
+            try container.encode(choices, forKey: .choices)
+            try container.encode(id, forKey: .id)
+            try container.encode(type, forKey: .type)
+        }
+    }
+
     struct Done: Codable, Hashable, Sendable {
         public let status: Status
 
@@ -2574,19 +2754,21 @@ public extension Notebook {
         public let plan: WeekPlan
         public let sessions: [SessionItem]
         public let extra: [UnplannedFact]
+        public let pending: [PendingActivity]
         public let totals: Totals
         public let strip: [StripDay]
         public let review: Entry?
         public let cards: [Entry]
         public let next: NextWeek?
 
-        public init(week: String, monday: String, current: String, plan: WeekPlan, sessions: [SessionItem], extra: [UnplannedFact], totals: Totals, strip: [StripDay], review: Entry? = nil, cards: [Entry], next: NextWeek? = nil) {
+        public init(week: String, monday: String, current: String, plan: WeekPlan, sessions: [SessionItem], extra: [UnplannedFact], pending: [PendingActivity], totals: Totals, strip: [StripDay], review: Entry? = nil, cards: [Entry], next: NextWeek? = nil) {
             self.week = week
             self.monday = monday
             self.current = current
             self.plan = plan
             self.sessions = sessions
             self.extra = extra
+            self.pending = pending
             self.totals = totals
             self.strip = strip
             self.review = review
@@ -2601,6 +2783,7 @@ public extension Notebook {
             case plan = "plan"
             case sessions = "sessions"
             case extra = "extra"
+            case pending = "pending"
             case totals = "totals"
             case strip = "strip"
             case review = "review"
@@ -2616,6 +2799,7 @@ public extension Notebook {
             plan = try container.decode(WeekPlan.self, forKey: .plan)
             sessions = try container.decode([SessionItem].self, forKey: .sessions)
             extra = try container.decode([UnplannedFact].self, forKey: .extra)
+            pending = try container.decode([PendingActivity].self, forKey: .pending)
             totals = try container.decode(Totals.self, forKey: .totals)
             strip = try container.decode([StripDay].self, forKey: .strip)
             review = try container.decode(Entry?.self, forKey: .review)
@@ -2631,6 +2815,7 @@ public extension Notebook {
             try container.encode(plan, forKey: .plan)
             try container.encode(sessions, forKey: .sessions)
             try container.encode(extra, forKey: .extra)
+            try container.encode(pending, forKey: .pending)
             try container.encode(totals, forKey: .totals)
             try container.encode(strip, forKey: .strip)
             try container.encode(review, forKey: .review)
@@ -5631,6 +5816,7 @@ public extension Notebook {
         case cells(CellsAsk)
         case daily(DailyAsk)
         case hr(HrAsk)
+        case match(MatchAsk)
         /// A `type` this build does not know yet: the server is newer than the app.
         case unknown(String)
 
@@ -5645,6 +5831,7 @@ public extension Notebook {
             case "cells": self = .cells(try CellsAsk(from: decoder))
             case "daily": self = .daily(try DailyAsk(from: decoder))
             case "hr": self = .hr(try HrAsk(from: decoder))
+            case "match": self = .match(try MatchAsk(from: decoder))
             default: self = .unknown(tag)
             }
         }
@@ -5655,6 +5842,7 @@ public extension Notebook {
             case .cells(let value): try value.encode(to: encoder)
             case .daily(let value): try value.encode(to: encoder)
             case .hr(let value): try value.encode(to: encoder)
+            case .match(let value): try value.encode(to: encoder)
             case .unknown(let tag):
                 var container = encoder.container(keyedBy: Tag.self)
                 try container.encode(tag, forKey: .tag)

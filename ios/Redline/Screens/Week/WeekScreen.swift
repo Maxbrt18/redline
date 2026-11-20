@@ -131,7 +131,8 @@ private struct WeekContent: View {
                     ForEach(0..<7, id: \.self) { offset in
                         let date = monday.adding(offset).text
                         WeekDayRow(date: date, items: week.sessions.filter { $0.date == date },
-                                   extra: week.extra.filter { $0.date == date }, today: Day(.now).text)
+                                   extra: week.extra.filter { $0.date == date },
+                                   pending: week.pending.filter { $0.date == date }, today: Day(.now).text)
                     }
                 }
                 reorganize
@@ -222,6 +223,8 @@ private struct WeekDayRow: View {
     let date: String
     let items: [Notebook.SessionItem]
     let extra: [Notebook.UnplannedFact]
+    /// What was done that day and waits to be told which session it was.
+    let pending: [Notebook.PendingActivity]
     let today: String
     @State private var open = false
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -258,6 +261,10 @@ private struct WeekDayRow: View {
                 }
                 .buttonStyle(.plain)
                 .padding(.leading, inset)
+            }
+            ForEach(pending, id: \.activityId) { activity in
+                Label(Self.pendingLine(activity), systemImage: "questionmark.circle")
+                    .textRole(.caption).foregroundStyle(Palette.muted).padding(.leading, inset)
             }
             ForEach(reports, id: \.id) { report in
                 NavigationLink(value: report) {
@@ -382,6 +389,9 @@ private struct WeekDayRow: View {
             value = "sauté"
             style = .skipped
             if let note = main.note { detail.append(note) }
+        } else if !pending.isEmpty {
+            // An activity of the day may be this session: nothing is said until it is told.
+            value = "à rattacher"
         } else if past {
             // Something else was done that day: the plan was not followed, but there is a trace.
             value = extra.isEmpty ? "pas de trace" : "pas fait"
@@ -396,6 +406,11 @@ private struct WeekDayRow: View {
         }
         if style == .plan, !past, let note = main.note { detail.append(note) }
         return (title, value, style, families, tags, alert, beside, detail, link, extra)
+    }
+
+    private static func pendingLine(_ activity: Notebook.PendingActivity) -> String {
+        "À rattacher · \(activity.name)"
+            + (activity.km.map { " · \(Numbers.text($0)) km" } ?? activity.durationMin.map { " · \($0) min" } ?? "")
     }
 
     private static func unplannedLine(_ fact: Notebook.UnplannedFact) -> String {

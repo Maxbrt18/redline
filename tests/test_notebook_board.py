@@ -19,6 +19,7 @@ from writes import write
 from redline.model import commands, weekly_plan
 from redline.model.activity import Activity
 from redline.service.notebook_board import AnswerError, Board
+from redline.service.notebook_web import ASK
 from redline.service.plans import PlanStatus
 from redline.storage import Database, OperationalStore
 
@@ -445,6 +446,38 @@ def test_an_activity_whose_session_left_the_plan_is_still_listed(store):
     after = board(store).week_view(WEEK, [])
     assert [item["id"] for item in after["sessions"]] == ["w41-jeu-ef"]
     assert [item["km"] for item in after["extra"]] == [7.0]
+
+
+def test_an_activity_two_sessions_could_carry_waits_on_the_week_and_is_settled_in_one_tap(
+        store):
+    """Two runs planned on Thursday: the Strava run is recorded nowhere until someone says
+    which one it was. The week shows it as pending, Today asks, and the answer links it."""
+    store.append_plan_revision(WEEK, revision(
+        sessions=[ef("w41-jeu-matin", "2026-10-08"),
+                  session("w41-jeu-soir", date="2026-10-08", title="Footing du soir")],
+        computed_at="2026-10-04T20:00:00+02:00"))
+    captured = store.ingest_strava_activity(Activity(
+        id=90000000040, sport="Run", name="Course du midi",
+        start_local="2026-10-08T12:30:00", distance_m=7000.0, moving_s=2400))
+    assert captured["status"] == "ambiguous" and captured["observation_id"] is None
+    evening = board(store, dt.datetime(2026, 10, 8, 20, 0, tzinfo=PARIS))
+    [pending] = evening.week_view(WEEK, [])["pending"]
+    assert (pending["date"], pending["family"], pending["name"], pending["km"],
+            pending["duration_min"]) == ("2026-10-08", "run", "Course du midi", 7.0, 40)
+    assert [choice["title"] for choice in pending["choices"]] == [
+        "EF, permis accompagné", "Footing du soir"]
+    [ask] = [item for item in evening.today_view()["asks"] if item["type"] == "match"]
+    assert ask["id"] == "match:90000000040" and ask["choices"] == pending["choices"]
+    assert ASK.fullmatch(ask["id"])  # the answer route takes it
+    with pytest.raises(AnswerError):
+        evening.answer(ask["id"], f"{WEEK}:w41-ven-ef")
+    evening.answer(ask["id"], f"{WEEK}:w41-jeu-soir")
+    after = board(store, dt.datetime(2026, 10, 8, 20, 5, tzinfo=PARIS))
+    week = after.week_view(WEEK, [])
+    assert week["pending"] == [] and week["extra"] == []
+    done = {item["id"]: item for item in week["sessions"]}["w41-jeu-soir"]
+    assert done["status"] == "done" and done["fact"]["km"] == 7.0
+    assert not [item for item in after.today_view()["asks"] if item["type"] == "match"]
 
 
 def test_routes_serve_the_three_screens_and_hand_a_crossing_to_the_coach(

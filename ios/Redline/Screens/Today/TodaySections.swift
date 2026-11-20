@@ -82,6 +82,7 @@ private struct LeftAsk: View {
             case .morning(let wakes, let daily): MorningCard(wakes: wakes, daily: daily)
             case .cells(let cells): DebriefCard(ask: cells)
             case .heart(let hr): HeartCard(ask: hr)
+            case .match(let match): MatchCard(ask: match)
             }
         }
         .environment(\.askInCard, true)

@@ -31,6 +31,7 @@ from redline.coach.fr import session_labels
 from redline.coach.fr import weather as weather_labels
 from redline.coach.fr.notebook import HR_REASONS
 from redline.model import (
+    commands,
     debrief,
     iso_week,
     local_time,
@@ -50,6 +51,7 @@ from redline.model.vocabulary import (
     DeadlineStatus,
     HrDoubt,
     HrReason,
+    IntakeStatus,
     LifeLoad,
     MeasurementState,
     SessionStatus,
@@ -235,6 +237,7 @@ class Board:
         self._observations: list[dict] | None = None
         self._rows: list[ledger.Row] | None = None
         self._strength: list[dict] | None = None
+        self._ambiguous: list[dict] | None = None
 
     @property
     def zones(self) -> list[ledger.PainZone]:
@@ -272,6 +275,19 @@ class Board:
         if self._strength is None:
             self._strength = self.ops.strength_history()
         return self._strength
+
+    @property
+    def ambiguous(self) -> list[dict]:
+        """The Strava captures still waiting to be told which session of their day they
+        were, oldest first. A capture is settled once its observation exists."""
+        if self._ambiguous is None:
+            recorded = {row.get("strava_activity_id") for row in self.observations}
+            self._ambiguous = sorted(
+                (row for row in self.ops.strava_intakes(unresolved_only=True)
+                 if row["status"] == IntakeStatus.AMBIGUOUS and row["started_at"]
+                 and row["activity_id"] not in recorded),
+                key=lambda row: row["started_at"])
+        return self._ambiguous
 
     def week(self, label: str) -> Week:
         status = self.repo.validate_weekly_plan(label)
@@ -354,6 +370,43 @@ class Board:
             for row in week.observations
             if row["kind"] in MOVING_TYPES and row["id"] not in linked]
         return sorted(facts, key=lambda fact: (fact["date"], fact["started_at"] or ""))
+
+    def pending(self, week: Week) -> list[views.PendingActivity]:
+        """The activities of the week that several sessions could carry, each with the
+        sessions still open to it: neither cancelled nor already settled."""
+        open_sessions = {f"{week.label}:{session['id']}": session
+                         for session in (week.revision or {}).get("sessions") or []
+                         if session["status"] != SessionStatus.CANCELLED
+                         and not (week.links.get(session["id"]) or {}).get("observation_id")}
+        items: list[views.PendingActivity] = []
+        for row in self.ambiguous:
+            started = dt.datetime.fromisoformat(row["started_at"]).astimezone(local_time.zone())
+            if iso_week.of(started.date()) != week.label:
+                continue
+            activity = _activity(row)
+            items.append({
+                "activity_id": row["activity_id"], "date": started.date().isoformat(),
+                "family": session_kinds.family_for_sport(row["sport"]) or row["sport"],
+                "name": (activity.name if activity else None) or row["sport"],
+                "km": round(activity.distance_km, 2) if activity and activity.distance_m else None,
+                "duration_min": round(activity.moving_s / 60) if activity and activity.moving_s else None,
+                "started_at": started.isoformat(),
+                "choices": [{"key": key, "title": open_sessions[key]["title"]}
+                            for key in row["candidate_session_keys"] if key in open_sessions],
+            })
+        return items
+
+    def match_asks(self) -> list[views.MatchAsk]:
+        """Which session a recent activity was, when its day held several it could be."""
+        recent = dict.fromkeys(
+            iso_week.of(day) for row in self.ambiguous
+            if (day := dt.datetime.fromisoformat(row["started_at"]).astimezone(
+                local_time.zone()).date()) <= self.today
+            and self.today - day < ledger_model.COMPLETION_WINDOW)
+        return [{**item, "id": f"match:{item['activity_id']}", "type": "match"}
+                for label in recent for item in self.pending(self.week(label))
+                if item["choices"]
+                and self.today - dt.date.fromisoformat(item["date"]) < ledger_model.COMPLETION_WINDOW]
 
     def strip(self, week: Week, sessions: list[views.SessionItem]) -> list[views.StripDay]:
         days: list[views.StripDay] = []
@@ -522,6 +575,8 @@ class Board:
                              "total": len(labels) + 2 + quality + len(fuelled),
                              "duration_min": round(seconds / 60) if seconds else None,
                              "pain_values": _pain_values()})
+        # Which session an activity was comes before its debrief: the debrief needs it.
+        asks.extend(self.match_asks())
         daily = self.daily(self.today)
         missing = [field for field in DAILY_FIELDS if not daily.get(field)]
         if missing and self._morning:
@@ -583,6 +638,14 @@ class Board:
             if field not in ask["fields"] or value not in DAILY_FIELDS[field]:
                 raise AnswerError(notebook_text.UNEXPECTED_ANSWER)
             self._put_daily(self.today, **{field: value})
+            return {"alert": None}
+        if ask["type"] == "match":
+            if value not in {choice["key"] for choice in ask["choices"]}:
+                raise AnswerError(notebook_text.UNEXPECTED_ANSWER)
+            self.ops.submit(commands.SESSION_MATCH,
+                            {"session_key": value, "strava_activity_id": ask["activity_id"]},
+                            command_key=f"session-match:{ask['activity_id']}:{value}",
+                            turn_id="", actor=ACTOR)
             return {"alert": None}
         if ask["type"] == "hr":
             if value not in HR_REASONS:
@@ -893,6 +956,7 @@ class Board:
                      "message": PLAN_MESSAGES.get(week.status, "") if label >= iso_week.of(self.today) else "",
                      "revision": (week.revision or {}).get("revision")},
             "sessions": sessions, "extra": self.unplanned(week),
+            "pending": self.pending(week),
             "totals": self.totals(week, sessions),
             "strip": self.strip(week, sessions),
             "review": review,

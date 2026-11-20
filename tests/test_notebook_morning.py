@@ -59,6 +59,9 @@ class Ops:
     def week_session_links(self, week):
         return {}
 
+    def strava_intakes(self, *, unresolved_only):
+        return []
+
 
 def board(ops, hour=8):
     return Board(ops, None, None, TODAY, dt.datetime.combine(TODAY, dt.time(hour), PARIS))

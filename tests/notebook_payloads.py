@@ -255,6 +255,7 @@ WEEK = {
     "plan": {"status": "valid", "message": "", "revision": 3},
     "sessions": [DONE, ef("w41-ven-ef", "2026-10-09"), STRENGTH],
     "extra": [],
+    "pending": [],
     "totals": TOTALS,
     "strip": STRIP,
     "review": None,

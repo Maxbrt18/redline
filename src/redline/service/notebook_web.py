@@ -31,7 +31,7 @@ CELL_FIELDS = "|".join(re.escape(field)
 ASK = re.compile(rf"(?:cell:[0-9a-f-]{{36}}:(?:pain:{formats.SLUG}|{CELL_FIELDS})"
                  rf"|wake-cell:[0-9a-f-]{{36}}:{formats.SLUG}"
                  rf"|wake:{formats.DATE}:{formats.SLUG}"
-                 rf"|daily:{formats.DATE}:(?:sleep|life_load)|hr:{formats.DATE})")
+                 rf"|daily:{formats.DATE}:(?:sleep|life_load)|hr:{formats.DATE}|match:[0-9]{{1,20}})")
 
 BEARER = "Bearer "
 # JSON only: nothing in a response is ever rendered as a document.

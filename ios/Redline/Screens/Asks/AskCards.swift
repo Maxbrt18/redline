@@ -357,6 +357,38 @@ struct MorningCard: View {
     ]
 }
 
+/// An activity two planned sessions of its day could carry: which one it was. Nothing is
+/// recorded until the answer, which links it and opens its debrief.
+struct MatchCard: View {
+    let ask: Notebook.MatchAsk
+    @Environment(\.notebook) private var session
+    @Environment(\.answered) private var answered
+    @State private var sender = AnswerSender()
+
+    var body: some View {
+        AskPanel {
+            VStack(alignment: .leading, spacing: Space.xxs) {
+                Text("Quelle séance était-ce ?").textRole(.secondary).fontWeight(.semibold)
+                Text(ask.summary).textRole(.caption).foregroundStyle(Palette.muted)
+            }
+            AnswerGrid(answers: ask.choices.map { ($0.key, $0.title.shortTitle) }, columns: min(ask.choices.count, 2),
+                       words: true, picked: sender.picked) { key in
+                Task { await sender.send(ask.id, value: .string(key), tag: key, session: session, then: answered) }
+            }
+            if let failure = sender.failure { AnswerFailure(text: failure) }
+        }
+        .disabled(sender.busy)
+    }
+}
+
+extension Notebook.MatchAsk {
+    /// « Course du midi · 7 km », what Strava says of the activity.
+    var summary: String {
+        ([name] + [km.map { "\(Numbers.text($0)) km" } ?? durationMin.map { "\($0) min" }].compactMap { $0 })
+            .joined(separator: " · ")
+    }
+}
+
 /// A heart rate higher than usual at the same pace: what might explain it.
 struct HeartCard: View {
     let ask: Notebook.HrAsk
