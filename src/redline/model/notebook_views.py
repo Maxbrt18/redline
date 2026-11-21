@@ -796,6 +796,7 @@ class KmSplit(TypedDict):
     hr: int | None
     cadence: int | None
     dplus: int
+    dminus: int
 
 
 class StopSummary(TypedDict):

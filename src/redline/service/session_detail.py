@@ -178,7 +178,7 @@ def _mean(values: list) -> float | None:
 
 
 def km_splits(s: dict) -> list[views.KmSplit] | None:
-    """Each kilometre: distance, moving time, mean HR and cadence, elevation gain."""
+    """Each kilometre: distance, moving time, mean HR and cadence, elevation gain and loss."""
     distance = s.get("d")
     if not distance:
         return None
@@ -190,7 +190,7 @@ def km_splits(s: dict) -> list[views.KmSplit] | None:
     out: list[views.KmSplit] = []
     start, k0 = 0.0, 0
     for edge in edges:
-        moving_s, hrs, cads, gain, k = 0, [], [], 0.0, k0
+        moving_s, hrs, cads, gain, loss, k = 0, [], [], 0.0, 0.0, k0
         while k + 1 < len(distance) and (distance[k + 1] or 0) <= edge:
             k += 1
         for j in range(k0 + 1, k + 1):
@@ -201,8 +201,10 @@ def km_splits(s: dict) -> list[views.KmSplit] | None:
                     hrs.append(hr[j])
                 if cad:
                     cads.append(cad[j])
-            if alt and alt[j] is not None and alt[j - 1] is not None and alt[j] > alt[j - 1]:
-                gain += alt[j] - alt[j - 1]
+            if alt and alt[j] is not None and alt[j - 1] is not None:
+                step_m = alt[j] - alt[j - 1]
+                gain += max(step_m, 0)
+                loss += max(-step_m, 0)
         span = edge - start
         if span > 0 and moving_s > 0:
             beat, step = _mean(hrs), _mean(cads)
@@ -210,7 +212,7 @@ def km_splits(s: dict) -> list[views.KmSplit] | None:
                         "pace_s": round(moving_s * 1000 / span),
                         "hr": None if beat is None else round(beat),
                         "cadence": None if step is None else round(2 * step),
-                        "dplus": round(gain)})
+                        "dplus": round(gain), "dminus": round(loss)})
         start, k0 = edge, k
     return out
 
@@ -238,10 +240,11 @@ def km_table(splits: list[views.KmSplit], limit: int = KM_ROWS_MAX) -> dict:
         hr = _weighted([(row["hr"], row["moving_s"]) for row in chunk])
         cadence = _weighted([(row["cadence"], row["moving_s"]) for row in chunk])
         dplus = sum(row["dplus"] for row in chunk)
+        dminus = sum(row["dminus"] for row in chunk)
         label: int | str = chunk[0]["n"] if len(chunk) == 1 else f"{chunk[0]['n']}-{chunk[-1]['n']}"
         rows.append([label, text.pace(seconds * 1000 / metres) if metres else None,
-                     hr, dplus, cadence])
-    return {"columns": ["km", "pace", "hr", "dplus", "cadence"], "rows": rows}
+                     hr, dplus, dminus, cadence])
+    return {"columns": ["km", "pace", "hr", "dplus", "dminus", "cadence"], "rows": rows}
 
 
 def drift(s: dict) -> views.Drift | None:

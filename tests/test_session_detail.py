@@ -263,3 +263,11 @@ def test_the_route_serves_the_detail_and_refuses_what_is_not_an_identifier(
     answer = client.post("/notebook-api/answer",
                          json={"ask": f"{view['ask']['id']}:reserve", "value": 0})
     assert answer.json == {"status": "ok", "alert": False}
+
+
+def test_each_kilometre_carries_its_loss_as_well_as_its_gain():
+    """A descent is read on its own loss: a net grade would read up-then-down as flat."""
+    up, down = session_detail.km_splits(stream(climb=0.1)), session_detail.km_splits(
+        stream(climb=-0.1))
+    assert up[0]["dplus"] > 30 and up[0]["dminus"] == 0
+    assert down[0]["dminus"] > 30 and down[0]["dplus"] == 0

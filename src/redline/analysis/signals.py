@@ -29,6 +29,7 @@ from redline.coach.fr import signals as text
 from redline.model import (
     iso_week,
     session_kinds,
+    terrain,
 )
 
 # A cadence that RISES at equal pace deserves a look. It does not carry its cause:
@@ -56,7 +57,6 @@ HR_DRIFT_BPM = 6            # above the noise of a session-average HR
 HR_PACE_BAND_S = 20         # "same pace": ±20 s/km
 HR_BASELINE_DAYS = 42       # six reference weeks, before the run
 HR_BASELINE_MIN = 3         # below this, no reference, hence no verdict
-HR_FLAT_M_PER_KM = 15       # above this, the relief drives HR
 HR_MIN_KM = 4.0
 # Weather normalises HR, it does not excuse it: a hot day enters neither the reference nor
 # the comparison. Unknown WBGT: kept.
@@ -152,7 +152,7 @@ def _flat_easy_runs(rows: list) -> list:
     runs = [row for row in rows
             if row.type == session_kinds.EASY and row.km and row.km >= HR_MIN_KM and row.hours
             and row.hr_avg and not getattr(row, "hr_doubt", None)
-            and row.dplus / row.km <= HR_FLAT_M_PER_KM
+            and row.dplus / row.km <= terrain.FLAT_M_PER_KM
             and (row.wbgt is None or row.wbgt < HR_HOT_WBGT_C)]
     return sorted(runs, key=lambda row: row.date)
 

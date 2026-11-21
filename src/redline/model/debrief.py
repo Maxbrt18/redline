@@ -19,7 +19,7 @@ from typing import Any
 from redline.coach.fr import debrief as text
 from redline.model.vocabulary import HrDoubt
 
-from . import rulebook, session_kinds, weekly_plan
+from . import rulebook, session_kinds, terrain, weekly_plan
 from .activity import Lap
 from .notebook_views import KmSplit
 
@@ -65,6 +65,9 @@ def gaps(row: Any, session: dict | None, drift: Any | None,
     if workout in session_kinds.EASY_RUNS:
         trusted = getattr(row, "hr_doubt", None) != HrDoubt.NO_SENSOR
         cap = session.get("hr_cap_bpm") if session else None
+        line = relief(splits)
+        if line:
+            out.append(line)
         out.extend(render(gap) for gap in split_gaps(splits, cap if trusted else None,
                                                     hr_trusted=trusted))
     return out
@@ -111,16 +114,36 @@ def _percent(value: float, reference: float) -> float:
     return (value - reference) / reference * 100
 
 
+def _terrain(row: KmSplit) -> terrain.Terrain:
+    return terrain.of(row["dist_m"], row["dplus"], row["dminus"])
+
+
+def relief(splits: Sequence[KmSplit]) -> str | None:
+    """The kilometres the gaps leave out because the relief drives them, or None."""
+    by_kind: dict[terrain.Terrain, list[int]] = {}
+    for row in splits:
+        by_kind.setdefault(_terrain(row), []).append(row["n"])
+    flat = len(by_kind.pop(terrain.Terrain.FLAT, []))
+    if not by_kind:
+        return None
+    parts = ", ".join(text.RELIEF_KMS[kind].format(kms=text.kilometres(tuple(numbers)))
+                      for kind, numbers in sorted(by_kind.items(), key=lambda item: item[1][0]))
+    return (text.RELIEF.format(parts=parts, count=flat) if flat
+            else text.RELIEF_NO_FLAT.format(parts=parts))
+
+
 def split_gaps(splits: Sequence[KmSplit], hr_cap: int | None, *,
                hr_trusted: bool = True) -> list[SplitGap]:
     """The kilometres of an easy or long run read against the rulebook's thresholds.
 
-    A threshold absent from the rulebook reads no gap of its kind. HR gaps need a cap
-    (above cap) or a trusted HR (decoupling); start, fade and decoupling need
-    `split_min_km` kilometres.
+    Only the flat kilometres are read (`redline.model.terrain`): a climb raises the HR and
+    slows the pace whatever the effort, a descent speeds it up. A threshold absent from
+    the rulebook reads no gap of its kind. HR gaps need a cap (above cap) or a trusted HR
+    (decoupling); start, fade and decoupling need `split_min_km` flat kilometres, and a
+    fast start a flat first one.
     """
     book = rulebook.current().parameters
-    rows = list(splits)
+    rows = [row for row in splits if _terrain(row) is terrain.Terrain.FLAT]
     out: list[SplitGap] = []
     margin = book.split_hr_margin_bpm
     if hr_cap is not None and margin is not None:
@@ -131,7 +154,7 @@ def split_gaps(splits: Sequence[KmSplit], hr_cap: int | None, *,
                                 float(hr_cap), tuple(row["n"] for row in above)))
     if book.split_min_km is None or len(rows) < book.split_min_km:
         return out
-    if book.split_fast_start_pct is not None:
+    if book.split_fast_start_pct is not None and rows[0]["n"] == 1:
         first, median = rows[0]["pace_s"], statistics.median(row["pace_s"] for row in rows[1:])
         if median and -_percent(first, median) >= book.split_fast_start_pct:
             out.append(SplitGap(SplitGapKind.FAST_START, float(first), float(median), (1,)))

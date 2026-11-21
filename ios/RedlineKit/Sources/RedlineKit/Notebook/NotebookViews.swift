@@ -4431,8 +4431,9 @@ public extension Notebook {
         public let hr: Int?
         public let cadence: Int?
         public let dplus: Int
+        public let dminus: Int
 
-        public init(n: Int, distM: Int, movingS: Int, paceS: Int, hr: Int? = nil, cadence: Int? = nil, dplus: Int) {
+        public init(n: Int, distM: Int, movingS: Int, paceS: Int, hr: Int? = nil, cadence: Int? = nil, dplus: Int, dminus: Int) {
             self.n = n
             self.distM = distM
             self.movingS = movingS
@@ -4440,6 +4441,7 @@ public extension Notebook {
             self.hr = hr
             self.cadence = cadence
             self.dplus = dplus
+            self.dminus = dminus
         }
 
         enum CodingKeys: String, CodingKey {
@@ -4450,6 +4452,7 @@ public extension Notebook {
             case hr = "hr"
             case cadence = "cadence"
             case dplus = "dplus"
+            case dminus = "dminus"
         }
 
         public init(from decoder: any Decoder) throws {
@@ -4461,6 +4464,7 @@ public extension Notebook {
             hr = try container.decode(Int?.self, forKey: .hr)
             cadence = try container.decode(Int?.self, forKey: .cadence)
             dplus = try container.decode(Int.self, forKey: .dplus)
+            dminus = try container.decode(Int.self, forKey: .dminus)
         }
 
         public func encode(to encoder: any Encoder) throws {
@@ -4472,6 +4476,7 @@ public extension Notebook {
             try container.encode(hr, forKey: .hr)
             try container.encode(cadence, forKey: .cadence)
             try container.encode(dplus, forKey: .dplus)
+            try container.encode(dminus, forKey: .dminus)
         }
     }
 

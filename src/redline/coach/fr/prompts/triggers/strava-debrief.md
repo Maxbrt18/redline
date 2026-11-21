@@ -1,9 +1,9 @@
 ⟨athlète⟩ vient de terminer l'activité Strava {detail}.
 1. Lis l'INSTANTANÉ STRAVA injecté au-dessus. SON TITRE ET SA DESCRIPTION
    comptent : c'est son auto-analyse, soignée dès l'upload. Une note courte ne prouve
-   ni douleur ni dissimulation. La moyenne cache la forme : lis `km_splits` (FC et D+
-   des montées), `drift`, `stops` ; qualité : `quality_card`, à défaut `laps`. Des montées hors
-   zone font une qualité ; première depuis 30 jours, la séance porte `transition: qualite`.
+   ni douleur ni dissimulation. La moyenne cache la forme : lis `km_splits`, `drift`,
+   `stops` ; qualité : `quality_card`, à défaut `laps`. Une montée hors zone n'est ni
+   reproche ni qualité : `gaps` juge FC et allure sur le plat.
 2. Le service a DÉJÀ capturé ET ENRICHI les métriques objectives, D- et WBGT compris :
    ne relance ni `weather`, ni `descent`, ni `ledger-complete` pour elles.
    Statut : `redline session-cycle pending`. `matched` = observation enregistrée
