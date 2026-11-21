@@ -1,6 +1,7 @@
 """The rulebook: the instance's own, or the engine default; short, without history,
 and what the coach reads is what the code applies."""
 
+import datetime as dt
 import os
 import re
 import tomllib
@@ -9,7 +10,9 @@ from pathlib import Path
 import pytest
 from conftest import VAULT_ROOT
 
-from redline.model import rulebook, transitions, typography
+from redline.analysis import permit_report
+from redline.model import permit, rulebook, transitions, typography
+from redline.model.errors import ConfigError
 
 DEFAULT_TEXT = rulebook.DEFAULT.read_text(encoding="utf-8")
 
@@ -73,6 +76,7 @@ def test_the_wake_trace_cutoff_is_a_local_time():
     (('wake_trace_until = "14:00"', 'wake_trace_until = "14h"'), "HH:MM"),
     (("gear_alert_pct = 90\n", ""), "gear_alert_pct"),
     (('missed_cutoff = "22:00"', 'missed_cutoff = "22h"'), "HH:MM"),
+    (("permit_min_runs = 5\n", ""), "permit thresholds go together, missing permit_min_runs"),
 ])
 def test_a_malformed_rulebook_is_refused_with_its_reason(tmp_path, change, message):
     old, new = change
@@ -182,3 +186,23 @@ def test_the_fuelling_rule_cites_the_thresholds_it_applies():
     rule = next(rule for rule in book.rules if rule.id == "f1")
     assert f"au plus {book.parameters.carbs_cap_g_h} g/h" in rule.text
     assert f"au-delà de {book.parameters.carbs_mix_above_g_h} g/h" in rule.text
+
+
+def test_the_default_quality_rule_states_its_parameter_not_an_athletes_choice():
+    """How many qualities a week, and which kinds, belong to an instance: the default rule
+    cites the applied value and names no session kind it forbids."""
+    book = rulebook.parse(DEFAULT_TEXT, rulebook.DEFAULT)
+    rule = next(rule for rule in book.rules if rule.id == "n1")
+    assert rule.text.startswith(f"{book.parameters.quality_sessions_per_week} par semaine au plus")
+    assert "VMA" not in rule.text
+
+
+def test_a_rulebook_without_permit_thresholds_judges_no_permit(tmp_path, monkeypatch):
+    """An instance rulebook written before the thresholds stays valid; no permit is read."""
+    text = "\n".join(line for line in DEFAULT_TEXT.splitlines()
+                     if not line.startswith("permit_"))
+    monkeypatch.setenv("VAULT_PATH", str(_variant(tmp_path, text + "\n")))
+    assert permit.declared() is None
+    with pytest.raises(ConfigError, match="permit thresholds"):
+        permit.thresholds()
+    assert permit_report.report(store=None, today=dt.date(2030, 10, 1)) == []

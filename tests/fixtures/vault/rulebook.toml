@@ -94,6 +94,14 @@ split_min_km = 4
 # ------------------------------------------------------------------ pain scales
 
 # Sam rates pain on a table of their own, not on the generic default.
+# The fictional athlete holds one quality session a week (rule n1).
+quality_sessions_per_week = 1
+# Easy-run permit thresholds, declared together.
+permit_weeks = 3
+permit_min_runs = 5
+permit_agreement_min = 10
+permit_withdrawal_days = 14
+
 [scales.morning_trace]
 levels = [
   { slug = "none", value = 0, label = "aucune", role = "below_base" },
@@ -190,10 +198,10 @@ race_first = true
 [[rules]]
 id = "n1"
 title = "Qualité"
-text = "une par semaine au plus, introduite seulement porte ouverte. Zéro VMA."
+text = "{quality_sessions_per_week} par semaine au plus, introduite seulement porte ouverte. Zéro VMA."
 grade = "règle de coaching"
 owner = "coaching/current-plan.md"
-enforced_by = "le coach"
+enforced_by = "redline week-plan revise (nombre de qualités de la semaine) ; le coach (porte ouverte, zéro VMA)"
 
 [[rules]]
 id = "n2"

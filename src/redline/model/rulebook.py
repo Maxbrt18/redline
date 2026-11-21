@@ -52,6 +52,11 @@ DEFAULT = Path(__file__).with_name("rulebook.default.toml")
 #: reject from the program what the injected rulebook does not state.
 ENFORCED = ("n2", "n3", "n4", "n7", "n8", "po", "s9")
 
+#: The thresholds of the easy-run permit: declared together or not at all, since the
+#: permit cannot be judged on part of them.
+PERMIT_PARAMETERS = ("permit_weeks", "permit_min_runs", "permit_agreement_min",
+                     "permit_withdrawal_days")
+
 RULEBOOK_SCHEMA = Schema("rulebook.toml", [
     field("parameters", dict, schema=Schema("[parameters]", [
         field("transition_lookback_days", int, minimum=7, maximum=90),
@@ -135,6 +140,22 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
                    "in %, is a decoupling"),
         field("split_min_km", int, required=False, minimum=3, maximum=20,
               note="kilometres a run needs before its start, fade or decoupling is read"),
+        # Optional: absent, the coach alone holds the number of quality sessions. Present,
+        # `redline week-plan revise` refuses a week that prescribes more.
+        field("quality_sessions_per_week", int, required=False, minimum=0, maximum=7,
+              note="most quality sessions a week may prescribe"),
+        # Optional, all four or none (`PERMIT_PARAMETERS`): absent, no easy-run permit is
+        # judged (`redline.model.permit`).
+        field("permit_weeks", int, required=False, minimum=1, maximum=8,
+              note="ISO weeks the supervised period lasts, the week of the first sealed "
+                   "choice included"),
+        field("permit_min_runs", int, required=False, minimum=1, maximum=20,
+              note="easy runs run in the supervised period to obtain the permit"),
+        field("permit_agreement_min", int, required=False, minimum=0, maximum=60,
+              note="a run within this many minutes of the coach's sealed choice agrees "
+                   "with it"),
+        field("permit_withdrawal_days", int, required=False, minimum=1, maximum=42,
+              note="days of supervision after a run that triggers a withdrawal"),
     ])),
     field("scales", dict, schema=SCALES_SCHEMA),
     # Optional: absent, no lineage is followed. Its schema is derived from the ladders of
@@ -202,6 +223,11 @@ class Parameters:
     split_fade_pct: float | None = None
     split_decoupling_pct: float | None = None
     split_min_km: int | None = None
+    quality_sessions_per_week: int | None = None
+    permit_weeks: int | None = None
+    permit_min_runs: int | None = None
+    permit_agreement_min: int | None = None
+    permit_withdrawal_days: int | None = None
 
     def spoken(self) -> dict[str, str]:
         """Thresholds as a rule's text states them: decimal comma."""
@@ -313,6 +339,10 @@ def parse(text: str, source: Path) -> Rulebook:
         progression = parse_lineages(payload.get("progression"), scales.effort_pain.cap)
     except DeclarationError as exc:
         problems.append(str(exc))
+    declared = [name for name in PERMIT_PARAMETERS if name in raw]
+    if declared and len(declared) != len(PERMIT_PARAMETERS):
+        problems.append("parameters: the permit thresholds go together, missing "
+                        + ", ".join(name for name in PERMIT_PARAMETERS if name not in raw))
     if parameters.gate_effort_peak > scales.effort_pain.cap:
         problems.append(f"parameters.gate_effort_peak {parameters.gate_effort_peak:g} is above "
                         f"the effort-pain cap {scales.effort_pain.cap:g}")
