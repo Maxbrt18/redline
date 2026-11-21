@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import datetime as dt
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from redline.coach import dates
 from redline.coach.fr import permit as text
@@ -41,8 +41,21 @@ class Thresholds:
     min_runs: int
     #: A run within this many minutes of the coach's sealed choice agrees with it.
     agreement_min: int
-    #: Supervision after a run that triggers a withdrawal.
+    #: Supervision after a morning trace above the base, the day after a run.
     withdrawal_days: int
+    #: Graded verdicts (`permit_tolerance_*`, `permit_minor_*`). The defaults grade
+    #: nothing: any run past its envelope or over the HR cap is a failure.
+    tolerance_min: int = 0
+    tolerance_pct: float = 0
+    minor_pct: float = 0
+    minor_hr_bpm: int = 0
+    #: Supervision after a failure; without the graded thresholds, `withdrawal_days`.
+    failure_withdrawal_days: int | None = None
+
+    @property
+    def after_failure(self) -> int:
+        return self.withdrawal_days if self.failure_withdrawal_days is None \
+            else self.failure_withdrawal_days
 
 
 def declared() -> Thresholds | None:
@@ -52,9 +65,18 @@ def declared() -> Thresholds | None:
     if (book.permit_weeks is None or book.permit_min_runs is None
             or book.permit_agreement_min is None or book.permit_withdrawal_days is None):
         return None
-    return Thresholds(weeks=book.permit_weeks, min_runs=book.permit_min_runs,
+    base = Thresholds(weeks=book.permit_weeks, min_runs=book.permit_min_runs,
                       agreement_min=book.permit_agreement_min,
                       withdrawal_days=book.permit_withdrawal_days)
+    # The graded five also go together: one absent means none is declared.
+    if (book.permit_tolerance_min is None or book.permit_tolerance_pct is None
+            or book.permit_minor_pct is None or book.permit_minor_hr_bpm is None
+            or book.permit_failure_withdrawal_days is None):
+        return base
+    return replace(base, tolerance_min=book.permit_tolerance_min,
+                   tolerance_pct=book.permit_tolerance_pct, minor_pct=book.permit_minor_pct,
+                   minor_hr_bpm=book.permit_minor_hr_bpm,
+                   failure_withdrawal_days=book.permit_failure_withdrawal_days)
 
 
 def thresholds() -> Thresholds:
@@ -76,11 +98,24 @@ class Run:
     strava_id: int | None = None
 
 
-@dataclass
-class EfLine:
+@dataclass(frozen=True)
+class Envelope:
+    """A planned easy run with its duration cap: judged even without a sealed choice."""
+
     session_key: str
     date: dt.date
-    coach_minutes: int
+    cap_minutes: int
+
+
+@dataclass
+class EfLine:
+    """One easy run of the permit. `triggers` are its failures, `minors` its minor gaps;
+    `safety` marks a failure read on the body (the next morning's trace), not on a choice.
+    `coach_minutes` is None for an enveloped run the coach sealed no choice for."""
+
+    session_key: str
+    date: dt.date
+    coach_minutes: int | None
     cap_minutes: int | None
     actual_minutes: float | None = None
     hr_avg: int | None = None
@@ -88,10 +123,12 @@ class EfLine:
     group: bool | None = None
     status: str = "upcoming"
     triggers: list[str] = field(default_factory=list)
+    minors: list[str] = field(default_factory=list)
+    safety: bool = False
 
     @property
     def gap(self) -> float | None:
-        if self.actual_minutes is None:
+        if self.actual_minutes is None or self.coach_minutes is None:
             return None
         return self.actual_minutes - self.coach_minutes
 
@@ -126,42 +163,73 @@ def window(choices: Iterable[dict]) -> Window | None:
 
 def evaluate(choices: Iterable[dict], runs: Iterable[Run], traces: dict[dt.date, float],
              caps: dict[str, int | None], groups: dict[int, bool],
-             today: dt.date, *, hr_cap: int) -> list[EfLine]:
-    """One line per sealed easy run: the coach's choice against what the athlete ran.
+             today: dt.date, *, hr_cap: int, envelopes: Iterable[Envelope] = ()) -> list[EfLine]:
+    """One line per sealed easy run, and per enveloped one the coach sealed no choice for:
+    whatever the phase, a run with an envelope is judged against it.
 
-    `hr_cap`: the top of the athlete's Z2 (`Instance.hr_bounds[1]`). A run whose
-    average heart rate exceeds it is "too fast" (`trop rapide`).
+    `hr_cap`: the top of the athlete's Z2 (`Instance.hr_bounds[1]`). Past the tolerance,
+    a run is a minor gap up to `minor_pct` above its envelope and a failure beyond; a mean
+    HR is a minor gap up to `minor_hr_bpm` above the cap. A second minor gap within the
+    length of the supervised period is a failure.
     """
+    limits = thresholds()
     by_day: dict[dt.date, list[Run]] = {}
     for run in runs:
         if run.type == session_kinds.EASY:
             by_day.setdefault(run.date, []).append(run)
     trace = rulebook.current().scales.morning_trace
-    lines = []
-    for choice in sorted(choices, key=lambda row: row["scheduled_on"]):
-        day = _day(choice["scheduled_on"])
-        line = EfLine(choice["session_key"], day, int(choice["coach_minutes"]),
-                      caps.get(choice["session_key"]))
-        done = by_day.get(day, [])
+    sealed = {choice["session_key"]: choice for choice in choices}
+    lines = [EfLine(key, _day(choice["scheduled_on"]), int(choice["coach_minutes"]),
+                    caps.get(key)) for key, choice in sealed.items()]
+    lines += [EfLine(envelope.session_key, envelope.date, None, envelope.cap_minutes)
+              for envelope in envelopes if envelope.session_key not in sealed]
+    lines.sort(key=lambda line: (line.date, line.session_key))
+    for line in lines:
+        done = by_day.get(line.date, [])
         if done:
             run = done[0]
             line.status = "run"
             line.actual_minutes = run.minutes
             line.hr_avg = run.hr_avg
-            line.next_trace = traces.get(day + dt.timedelta(days=1))
+            line.next_trace = traces.get(line.date + dt.timedelta(days=1))
             if run.strava_id is not None:
                 line.group = groups.get(run.strava_id)
             if line.next_trace is not None and trace.above_base(line.next_trace):
                 line.triggers.append(text.TRACE_NEXT_DAY)
-            if (line.cap_minutes is not None and line.actual_minutes is not None
-                    and line.actual_minutes > line.cap_minutes):
-                line.triggers.append(text.OVER_ENVELOPE.format(cap=line.cap_minutes))
-            if line.hr_avg is not None and line.hr_avg > hr_cap:
-                line.triggers.append(text.TOO_FAST.format(hr_avg=line.hr_avg, hr_cap=hr_cap))
-        elif day < today:
+                line.safety = True
+            _judge(line, limits, hr_cap)
+        elif line.date < today:
             line.status = "skipped"
-        lines.append(line)
+    _second_minors(lines, limits)
     return lines
+
+
+def _judge(line: EfLine, limits: Thresholds, hr_cap: int) -> None:
+    """The envelope and the HR cap, each a minor gap or a failure past its tolerance."""
+    cap, actual = line.cap_minutes, line.actual_minutes
+    if cap is not None and actual is not None:
+        tolerance = max(limits.tolerance_min, cap * limits.tolerance_pct / 100)
+        if actual > cap + tolerance:
+            if actual <= cap * (1 + limits.minor_pct / 100):
+                line.minors.append(text.MINOR_ENVELOPE.format(cap=cap))
+            else:
+                line.triggers.append(text.OVER_ENVELOPE.format(cap=cap))
+    if line.hr_avg is not None and line.hr_avg > hr_cap:
+        if line.hr_avg <= hr_cap + limits.minor_hr_bpm:
+            line.minors.append(text.MINOR_HR.format(hr_avg=line.hr_avg, hr_cap=hr_cap))
+        else:
+            line.triggers.append(text.HR_ABOVE_CAP.format(hr_avg=line.hr_avg, hr_cap=hr_cap))
+
+
+def _second_minors(lines: list[EfLine], limits: Thresholds) -> None:
+    """A minor gap within the supervised period's length of the previous one fails."""
+    previous: dt.date | None = None
+    for line in lines:
+        if not line.minors or line.triggers:
+            continue
+        if previous is not None and (line.date - previous).days < limits.weeks * 7:
+            line.triggers.append(text.SECOND_MINOR)
+        previous = line.date
 
 
 @dataclass
@@ -180,7 +248,8 @@ def state(lines: list[EfLine], daily: Iterable[dict], today: dt.date,
     withdrawal_until = None
     for line in lines:
         if line.triggers:
-            until = line.date + dt.timedelta(days=limits.withdrawal_days)
+            days = limits.withdrawal_days if line.safety else limits.after_failure
+            until = line.date + dt.timedelta(days=days)
             if withdrawal_until is None or until > withdrawal_until:
                 withdrawal_until = until
 
@@ -243,11 +312,14 @@ def render(lines: list[EfLine], current: State, week: str | None = None) -> list
         trace = (text.TRACE_UNKNOWN if line.next_trace is None
                  else text.TRACE.format(trace=scale.said(line.next_trace)))
         group = text.IN_GROUP if line.group else ""
-        detail = (text.DETAIL_RUN.format(coach=line.coach_minutes,
+        chosen = (text.CHOSEN.format(coach=line.coach_minutes) if line.coach_minutes is not None
+                  else text.ENVELOPE_ONLY.format(cap=_fmt_minutes(line.cap_minutes)))
+        detail = (text.DETAIL_RUN.format(chosen=chosen,
                                          actual=_fmt_minutes(line.actual_minutes),
                                          agreement=agreement, trace=trace, group=group)
-                  if line.status == "run" else text.DETAIL.format(coach=line.coach_minutes))
-        flags = f" ⇒ {'; '.join(line.triggers)}" if line.triggers else ""
+                  if line.status == "run" else chosen)
+        flags = text.MINORS.format(minors="; ".join(line.minors)) if line.minors else ""
+        flags += f" ⇒ {'; '.join(line.triggers)}" if line.triggers else ""
         out.append(text.LINE.format(weekday=dates.weekday(line.date, "abbreviated"),
                                     date=line.date, session=line.session_key,
                                     status=text.STATUSES[line.status], detail=detail,

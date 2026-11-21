@@ -66,9 +66,22 @@ permit_weeks = 3
 permit_min_runs = 5
 # ... a run within this many minutes of the coach's sealed choice agrees with it ...
 permit_agreement_min = 10
-# ... and a run that triggers a withdrawal puts the athlete back under supervision for
-# this many days.
+# ... and a morning trace above the base after a run puts the athlete back under
+# supervision for this many days.
 permit_withdrawal_days = 14
+# Graded verdicts, five thresholds declared together (absent: any run past its envelope
+# or over the HR cap is a failure). A run up to this many minutes past its envelope ...
+permit_tolerance_min = 3
+# ... or this share of it (%), whichever is larger, shows no gap; ...
+permit_tolerance_pct = 5
+# ... up to this share above it (%), a minor gap; beyond, a failure. A mean HR at most
+# this many bpm above the cap is a minor gap, beyond a failure: the noise of a session
+# average.
+permit_minor_pct = 15
+permit_minor_hr_bpm = 6
+# A failure, or a second minor gap within the length of the supervised period, puts the
+# athlete back under supervision for this many days.
+permit_failure_withdrawal_days = 7
 # A reorganised week puts at most this many runs, and this many sessions (runs and
 # strength together), on one day.
 runs_per_day = 1

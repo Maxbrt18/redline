@@ -56,6 +56,11 @@ ENFORCED = ("n2", "n3", "n4", "n7", "n8", "po", "s9")
 #: permit cannot be judged on part of them.
 PERMIT_PARAMETERS = ("permit_weeks", "permit_min_runs", "permit_agreement_min",
                      "permit_withdrawal_days")
+#: The graded verdicts of the permit (tolerance, minor gaps, a shorter withdrawal after a
+#: failure): declared together, and only on top of `PERMIT_PARAMETERS`.
+PERMIT_GRADED_PARAMETERS = ("permit_tolerance_min", "permit_tolerance_pct",
+                            "permit_minor_pct", "permit_minor_hr_bpm",
+                            "permit_failure_withdrawal_days")
 
 RULEBOOK_SCHEMA = Schema("rulebook.toml", [
     field("parameters", dict, schema=Schema("[parameters]", [
@@ -155,7 +160,23 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
               note="a run within this many minutes of the coach's sealed choice agrees "
                    "with it"),
         field("permit_withdrawal_days", int, required=False, minimum=1, maximum=42,
-              note="days of supervision after a run that triggers a withdrawal"),
+              note="days of supervision after a run that triggers a withdrawal; with the "
+                   "graded thresholds, after a morning trace above the base only"),
+        # Optional, all five or none (`PERMIT_GRADED_PARAMETERS`), and only with the four
+        # above: absent, any run past its envelope or over the HR cap is a failure.
+        field("permit_tolerance_min", int, required=False, minimum=0, maximum=30,
+              note="minutes past its envelope a run may last without any gap ..."),
+        field("permit_tolerance_pct", float, required=False, minimum=0, maximum=50,
+              note="... or this share of the envelope, in %, whichever is larger"),
+        field("permit_minor_pct", float, required=False, minimum=0, maximum=100,
+              note="past the tolerance and up to this share above its envelope, in %, a "
+                   "run is a minor gap; beyond, a failure"),
+        field("permit_minor_hr_bpm", int, required=False, minimum=0, maximum=30,
+              note="a mean HR at most this many bpm above the cap is a minor gap; beyond, "
+                   "a failure"),
+        field("permit_failure_withdrawal_days", int, required=False, minimum=1, maximum=42,
+              note="days of supervision after a failure, or a second minor gap within the "
+                   "length of the supervised period"),
     ])),
     field("scales", dict, schema=SCALES_SCHEMA),
     # Optional: absent, no lineage is followed. Its schema is derived from the ladders of
@@ -228,6 +249,11 @@ class Parameters:
     permit_min_runs: int | None = None
     permit_agreement_min: int | None = None
     permit_withdrawal_days: int | None = None
+    permit_tolerance_min: int | None = None
+    permit_tolerance_pct: float | None = None
+    permit_minor_pct: float | None = None
+    permit_minor_hr_bpm: int | None = None
+    permit_failure_withdrawal_days: int | None = None
 
     def spoken(self) -> dict[str, str]:
         """Thresholds as a rule's text states them: decimal comma."""
@@ -330,7 +356,7 @@ def parse(text: str, source: Path) -> Rulebook:
         **{name: float(raw[name])
            for name in ("gate_effort_peak", "hard_min_hours", "stall_tolerance_km",
                         "missed_after_hours", "split_fast_start_pct", "split_fade_pct",
-                        "split_decoupling_pct")
+                        "split_decoupling_pct", "permit_tolerance_pct", "permit_minor_pct")
            if name in raw}})
     scales = build_scales(payload["scales"])
     problems = []
@@ -339,10 +365,15 @@ def parse(text: str, source: Path) -> Rulebook:
         progression = parse_lineages(payload.get("progression"), scales.effort_pain.cap)
     except DeclarationError as exc:
         problems.append(str(exc))
-    declared = [name for name in PERMIT_PARAMETERS if name in raw]
-    if declared and len(declared) != len(PERMIT_PARAMETERS):
-        problems.append("parameters: the permit thresholds go together, missing "
-                        + ", ".join(name for name in PERMIT_PARAMETERS if name not in raw))
+    for group, label in ((PERMIT_PARAMETERS, "permit thresholds"),
+                         (PERMIT_GRADED_PARAMETERS, "graded permit thresholds")):
+        declared = [name for name in group if name in raw]
+        if declared and len(declared) != len(group):
+            problems.append(f"parameters: the {label} go together, missing "
+                            + ", ".join(name for name in group if name not in raw))
+    if (any(name in raw for name in PERMIT_GRADED_PARAMETERS)
+            and not all(name in raw for name in PERMIT_PARAMETERS)):
+        problems.append("parameters: the graded permit thresholds need the permit thresholds")
     if parameters.gate_effort_peak > scales.effort_pain.cap:
         problems.append(f"parameters.gate_effort_peak {parameters.gate_effort_peak:g} is above "
                         f"the effort-pain cap {scales.effort_pain.cap:g}")

@@ -12,11 +12,13 @@ from typing import Any
 from redline.analysis import ledger
 from redline.model import (
     instance,
+    iso_week,
     paths,
     permit,
     session_kinds,
 )
 from redline.model.activity import Activity
+from redline.model.vocabulary import SessionStatus
 
 
 def _strava_id(key: str) -> int | None:
@@ -26,15 +28,31 @@ def _strava_id(key: str) -> int | None:
     return None
 
 
-def _caps(store: Any, weeks: set[str]) -> dict[str, int | None]:
+def _plans(store: Any, weeks: set[str]) -> tuple[dict[str, int | None], list[permit.Envelope]]:
+    """Each planned session's duration cap, and the easy runs that carry one."""
     caps: dict[str, int | None] = {}
-    for week in weeks:
+    envelopes: list[permit.Envelope] = []
+    for week in sorted(weeks):
         plan = store.load_plan(week)
         if not plan:
             continue
         for session in plan["revisions"][-1]["sessions"]:
-            caps[session["id"]] = session.get("duration_cap_min")
-    return caps
+            cap = session.get("duration_cap_min")
+            caps[session["id"]] = cap
+            if (cap is not None and session["workout"] == session_kinds.EASY
+                    and session["status"] != SessionStatus.CANCELLED):
+                envelopes.append(permit.Envelope(session["id"],
+                                                 dt.date.fromisoformat(session["date"]), cap))
+    return caps, envelopes
+
+
+def _weeks(start: dt.date, today: dt.date) -> set[str]:
+    """The ISO weeks from the permit's first one to the current one."""
+    out, day = set(), start
+    while day <= today:
+        out.add(iso_week.of(day))
+        day += dt.timedelta(weeks=1)
+    return out
 
 
 def _group(store: Any, activity_id: int) -> bool | None:
@@ -67,10 +85,11 @@ def report(store: Any, today: dt.date, week: str | None = None) -> list[str]:
     for row in rows:
         if row.type == session_kinds.WAKE_TRACE and row.pains and row.date >= period.start:
             traces[row.date] = max(traces.get(row.date, 0), *row.pains.values())
-    weeks = {choice["iso_week"] for choice in choices}
+    weeks = {choice["iso_week"] for choice in choices} | _weeks(period.start, today)
     groups = {run.strava_id: group for run in runs if run.type == session_kinds.EASY and run.strava_id
               for group in [_group(store, run.strava_id)] if group is not None}
-    lines = permit.evaluate(choices, runs, traces, _caps(store, weeks), groups, today,
-                            hr_cap=hr_cap)
+    caps, envelopes = _plans(store, weeks)
+    lines = permit.evaluate(choices, runs, traces, caps, groups, today, hr_cap=hr_cap,
+                            envelopes=envelopes)
     current = permit.state(lines, store.daily_rows(), today, period)
     return permit.render(lines, current, week)
