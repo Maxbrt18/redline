@@ -11,9 +11,9 @@ from redline.model.debrief import SplitGapKind
 from redline.model.vocabulary import HrDoubt
 
 
-def km(n, pace, hr=140, dist=1000, dplus=0):
+def km(n, pace, hr=140, dist=1000, dplus=0, dminus=0):
     return {"n": n, "dist_m": dist, "moving_s": round(pace * dist / 1000), "pace_s": pace,
-            "hr": hr, "cadence": 168, "dplus": dplus}
+            "hr": hr, "cadence": 168, "dplus": dplus, "dminus": dminus}
 
 
 def even(count, pace=330, hr=140):
@@ -104,3 +104,44 @@ def test_a_wrist_hr_without_the_armband_is_never_held_to_the_cap():
     out = debrief.gaps(row(hr_doubt=HrDoubt.NO_SENSOR), {"workout": "long", "hr_cap_bpm": 157},
                        None, rows)
     assert not any("FC" in text or "découplage" in text for text in out)
+
+
+def test_a_climb_above_the_cap_is_not_held_to_it_and_the_relief_says_so():
+    """Uphill the HR rises whatever the effort: only flat kilometres meet the cap."""
+    rows = [km(1, 330, 150), km(2, 420, 168, dplus=60), km(3, 330, 152),
+            km(4, 300, 150, dminus=55), km(5, 330, 151)]
+    assert debrief.split_gaps(rows, 157) == []
+    assert debrief.relief(rows) == ("relief : km 2 en montée, km 4 en descente ; "
+                                    "FC et allure jugées sur 3 km de plat")
+    rows[2] = km(3, 330, 161)
+    [gap] = debrief.split_gaps(rows, 157)
+    assert gap.kms == (3,) and gap.value == 161
+
+
+def test_a_slow_climbing_end_is_no_fade_and_a_downhill_start_no_fast_start():
+    rows = [km(1, 290, dminus=40), *[km(n, 330) for n in range(2, 6)],
+            km(6, 400, 150, dplus=50), km(7, 410, 152, dplus=55)]
+    assert debrief.split_gaps(rows, None) == []
+
+
+def test_a_kilometre_up_then_down_is_rolling_not_flat():
+    rolling = km(2, 360, 165, dplus=30, dminus=30)
+    assert debrief.relief([km(1, 330), rolling]) == (
+        "relief : km 2 vallonnés ; FC et allure jugées sur 1 km de plat")
+    assert debrief.split_gaps([km(1, 330), rolling], 157) == []
+
+
+def test_a_run_without_flat_kilometres_judges_none():
+    rows = [km(1, 420, 170, dplus=40), km(2, 300, 160, dminus=45)]
+    assert debrief.relief(rows) == ("relief : km 1 en montée, km 2 en descente ; "
+                                    "aucun km plat, FC et allure des kilomètres non jugées")
+    assert debrief.split_gaps(rows, 157) == []
+    assert debrief.relief(even(5)) is None
+
+
+def test_the_debrief_gaps_carry_the_relief_line_before_the_kilometres():
+    rows = [km(1, 330, 150), km(2, 420, 168, dplus=60), *[km(n, 330, 162) for n in range(3, 6)]]
+    out = debrief.gaps(row(), {"workout": "long", "hr_cap_bpm": 157}, None, rows)
+    relief_at = next(i for i, text in enumerate(out) if text.startswith("relief"))
+    cap_at = next(i for i, text in enumerate(out) if text.startswith("FC au-dessus"))
+    assert relief_at < cap_at and "km 3, 4 et 5" in out[cap_at]

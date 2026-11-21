@@ -308,8 +308,8 @@ def test_the_streams_fetched_at_capture_are_kept_and_read_km_by_km():
     ).run(42)["snapshot"]
     assert store.kept is streams
     table = snapshot["km_splits"]
-    assert table["columns"] == ["km", "pace", "hr", "dplus", "cadence"]
-    assert table["rows"][0] == [1, "5:33", 145, 3, 168]
+    assert table["columns"] == ["km", "pace", "hr", "dplus", "dminus", "cadence"]
+    assert table["rows"][0] == [1, "5:33", 145, 3, 0, 168]
     assert len(table["rows"]) == 6
     assert snapshot["drift"] == {"first": 145, "second": 145}
     assert "stops" not in snapshot
@@ -335,9 +335,9 @@ def test_unavailable_streams_leave_the_debrief_without_its_kilometres():
 def test_a_long_run_table_stays_bounded():
     table = session_detail.km_table([
         {"n": n, "dist_m": 1000, "moving_s": 360, "pace_s": 360, "hr": 140, "cadence": 168,
-         "dplus": 5} for n in range(1, 121)])
+         "dplus": 5, "dminus": 4} for n in range(1, 121)])
     assert len(table["rows"]) == 40
-    assert table["rows"][0] == ["1-3", "6:00", 140, 15, 168]
+    assert table["rows"][0] == ["1-3", "6:00", 140, 15, 12, 168]
 
 
 def test_an_easy_run_too_fast_shows_in_the_gaps(monkeypatch):

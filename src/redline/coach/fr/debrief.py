@@ -54,3 +54,11 @@ SPLIT_FAST_START = "départ rapide : 1er km en {first} pour {median} sur les aut
 SPLIT_FADE = "fin qui faiblit : {kms} en {last} contre {before} avant ({signed} %)"
 
 SPLIT_DECOUPLING = "découplage allure/FC de {value} % entre les deux moitiés"
+
+#: The kilometres a gap leaves out, by terrain slug (`redline.model.terrain.Terrain`).
+RELIEF_KMS = {"climb": "{kms} en montée", "descent": "{kms} en descente",
+              "rolling": "{kms} vallonnés"}
+
+RELIEF = "relief : {parts} ; FC et allure jugées sur {count} km de plat"
+
+RELIEF_NO_FLAT = "relief : {parts} ; aucun km plat, FC et allure des kilomètres non jugées"
