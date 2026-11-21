@@ -46,6 +46,9 @@ def _group(store: Any, activity_id: int) -> bool | None:
 
 
 def report(store: Any, today: dt.date, week: str | None = None) -> list[str]:
+    """The permit block; empty when nothing is sealed or the rulebook declares no permit."""
+    if permit.declared() is None:
+        return []
     choices = list(store.permit_choice_rows())
     period = permit.window(choices)
     if period is None:

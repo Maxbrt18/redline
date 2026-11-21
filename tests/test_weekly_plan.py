@@ -718,3 +718,18 @@ def test_a_threshold_the_rulebook_does_not_declare_does_not_apply(monkeypatch):
                                             carbs_mix_above_g_h=None))
     monkeypatch.setattr(weekly_plan.rulebook, "current", lambda: bare)
     assert weekly_plan.fuelling_errors(_fuelled(120)) == []
+
+
+def test_a_week_with_more_quality_than_rule_n1_allows_is_refused():
+    """The fixture athlete holds one quality session a week (`quality_sessions_per_week`);
+    a cancelled one no longer counts, and a closed week is not judged again."""
+    sessions = [session("w32-mar-seuil", date="2026-08-04", workout="threshold"),
+                session("w32-jeu-cotes", date="2026-08-06", workout="hills")]
+    before = dt.date(2026, 8, 3)
+    assert any("2 quality sessions" in problem and "rule n1 allows 1 per week" in problem
+               for problem in weekly_plan.semantic_errors(plan(sessions), today=before))
+    assert not any("rule n1" in problem for problem in
+                   weekly_plan.semantic_errors(plan(sessions), today=dt.date(2026, 8, 10)))
+    sessions[1]["status"] = "cancelled"
+    assert not any("rule n1" in problem
+                   for problem in weekly_plan.semantic_errors(plan(sessions), today=before))

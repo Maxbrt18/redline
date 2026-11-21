@@ -7,7 +7,8 @@ withdrawal, restriction) derives from them, like any state derived from the vaul
 
 What is NOT detected here, and the report says so: a new route (it would need track
 comparison), and a big form signal while its threshold is unset.
-Method: `coaching/protocols.md`, permit section.
+Method: `coaching/protocols.md`, permit section. Thresholds: the `permit_*` parameters of
+the rulebook; an instance that declares none judges no permit.
 """
 
 from __future__ import annotations
@@ -21,19 +22,47 @@ from redline.coach.fr import permit as text
 from redline.model.vocabulary import LifeLoad, Sleep
 
 from . import iso_week, rulebook, session_kinds
+from .errors import ConfigError
 
-#: The supervised period lasts this many ISO weeks, including the week of the first
-#: sealed choice; the permit is judged at the end of the last one.
-PERMIT_WEEKS = 3
-#: Criteria for obtaining the permit.
-MIN_EF = 5
-TOLERANCE_MIN = 10
-#: Length of the supervised period after a withdrawal trigger.
-WITHDRAWAL_DAYS = 14
 #: Big form: pace progression at equal heart rate. Without history there is no honest
 #: threshold; it is set when the permit is judged. Until then the signal is displayed
 #: and triggers nothing.
 BIG_FORM_THRESHOLD: float | None = None
+
+
+@dataclass(frozen=True)
+class Thresholds:
+    """The permit's thresholds, as the rulebook in force declares them."""
+
+    #: The supervised period lasts this many ISO weeks, the week of the first sealed
+    #: choice included; the permit is judged at the end of the last one.
+    weeks: int
+    #: Easy runs run in the period to obtain it.
+    min_runs: int
+    #: A run within this many minutes of the coach's sealed choice agrees with it.
+    agreement_min: int
+    #: Supervision after a run that triggers a withdrawal.
+    withdrawal_days: int
+
+
+def declared() -> Thresholds | None:
+    """The thresholds of the rulebook in force, or None when it declares no permit."""
+    book = rulebook.current().parameters
+    # The rulebook accepts the four together or none: one absent means all are.
+    if (book.permit_weeks is None or book.permit_min_runs is None
+            or book.permit_agreement_min is None or book.permit_withdrawal_days is None):
+        return None
+    return Thresholds(weeks=book.permit_weeks, min_runs=book.permit_min_runs,
+                      agreement_min=book.permit_agreement_min,
+                      withdrawal_days=book.permit_withdrawal_days)
+
+
+def thresholds() -> Thresholds:
+    """The thresholds in force; a permit read under a rulebook without them is a fault."""
+    found = declared()
+    if found is None:
+        raise ConfigError("the rulebook declares no permit thresholds (permit_* parameters)")
+    return found
 
 
 @dataclass(frozen=True)
@@ -69,7 +98,7 @@ class EfLine:
     @property
     def agrees(self) -> bool | None:
         gap = self.gap
-        return None if gap is None else abs(gap) <= TOLERANCE_MIN
+        return None if gap is None else abs(gap) <= thresholds().agreement_min
 
 
 def _day(value: dt.date | str) -> dt.date:
@@ -92,7 +121,7 @@ def window(choices: Iterable[dict]) -> Window | None:
         return None
     first = min(days)
     start = first - dt.timedelta(days=first.weekday())
-    return Window(start, iso_week.of(start + dt.timedelta(weeks=PERMIT_WEEKS - 1)))
+    return Window(start, iso_week.of(start + dt.timedelta(weeks=thresholds().weeks - 1)))
 
 
 def evaluate(choices: Iterable[dict], runs: Iterable[Run], traces: dict[dt.date, float],
@@ -147,10 +176,11 @@ class State:
 def state(lines: list[EfLine], daily: Iterable[dict], today: dt.date,
           period: Window) -> State:
     """Supervised, permit or withdrawal, derived from the lines and the declarations."""
+    limits = thresholds()
     withdrawal_until = None
     for line in lines:
         if line.triggers:
-            until = line.date + dt.timedelta(days=WITHDRAWAL_DAYS)
+            until = line.date + dt.timedelta(days=limits.withdrawal_days)
             if withdrawal_until is None or until > withdrawal_until:
                 withdrawal_until = until
 
@@ -182,7 +212,7 @@ def state(lines: list[EfLine], daily: Iterable[dict], today: dt.date,
         failures = [text.FAILURE.format(session=line.session_key, triggers=", ".join(line.triggers))
                     for line in judged if line.triggers]
         grant = {"run": len(run), "agreements": agreements, "failures": failures,
-                 "granted": len(run) >= MIN_EF and not failures}
+                 "granted": len(run) >= limits.min_runs and not failures}
 
     if withdrawal_until is not None and today <= withdrawal_until:
         phase = "withdrawn"
@@ -225,16 +255,17 @@ def render(lines: list[EfLine], current: State, week: str | None = None) -> list
     for iso, reasons in sorted(current.restricted_weeks.items()):
         if week is None or iso == week:
             out.append(text.RESTRICTION.format(week=iso, reasons="; ".join(reasons)))
+    limits = thresholds()
     if current.grant is not None:
         verdict = current.grant
         out.append(text.GRANT.format(
-            week=current.window.granted_week, run=verdict["run"], needed=MIN_EF,
-            agreements=verdict["agreements"], tolerance=TOLERANCE_MIN,
+            week=current.window.granted_week, run=verdict["run"], needed=limits.min_runs,
+            agreements=verdict["agreements"], tolerance=limits.agreement_min,
             failures=len(verdict["failures"]),
             verdict=text.GRANTED if verdict["granted"] else text.NOT_GRANTED))
     else:
         run = sum(1 for line in lines if line.status == "run")
-        out.append(text.COUNTER.format(run=run, needed=MIN_EF,
+        out.append(text.COUNTER.format(run=run, needed=limits.min_runs,
                                        week=current.window.granted_week))
     out.append(text.NOT_DETECTED + (text.BIG_FORM_UNSET if BIG_FORM_THRESHOLD is None
                                     else text.BIG_FORM.format(threshold=BIG_FORM_THRESHOLD)))

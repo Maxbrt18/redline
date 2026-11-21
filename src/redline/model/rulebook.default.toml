@@ -56,6 +56,19 @@ carbs_mix_above_g_h = 60
 taper_cut_min_pct = 41
 # ... and by at most this much: the band where a meta-analysis finds the benefit.
 taper_cut_max_pct = 60
+# Rule n1: a week prescribes at most this many quality sessions, checked when the program
+# is written. Absent, the coach alone holds the number.
+quality_sessions_per_week = 2
+# The easy-run permit (`redline.model.permit`), four thresholds declared together or not
+# at all; absent, no permit is judged. The supervised period lasts this many ISO weeks ...
+permit_weeks = 3
+# ... the permit needs this many easy runs run in it ...
+permit_min_runs = 5
+# ... a run within this many minutes of the coach's sealed choice agrees with it ...
+permit_agreement_min = 10
+# ... and a run that triggers a withdrawal puts the athlete back under supervision for
+# this many days.
+permit_withdrawal_days = 14
 # A reorganised week puts at most this many runs, and this many sessions (runs and
 # strength together), on one day.
 runs_per_day = 1
@@ -179,10 +192,10 @@ race_first = true
 [[rules]]
 id = "n1"
 title = "Qualité"
-text = "une par semaine au plus, introduite seulement porte ouverte. Zéro VMA."
+text = "{quality_sessions_per_week} par semaine au plus, introduites seulement porte ouverte."
 grade = "règle de coaching"
 owner = "coaching/current-plan.md"
-enforced_by = "le coach"
+enforced_by = "redline week-plan revise (nombre de qualités de la semaine) ; le coach (porte ouverte)"
 
 [[rules]]
 id = "n2"

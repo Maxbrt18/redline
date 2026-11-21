@@ -536,6 +536,7 @@ def semantic_errors(plan: dict, where: str = "weekly_plan",
                         session[label], f"{prefix}.{session['id']}", label, gate_ids))
         if revision is revisions[-1] and prescribable:
             problems.extend(_spacing_errors(sessions, prefix))
+            problems.extend(_quality_count_errors(sessions, prefix))
 
         if len(gate_ids) != len(set(gate_ids)):
             problems.append(f"{prefix}: duplicate dated gate ids")
@@ -563,6 +564,19 @@ def semantic_errors(plan: dict, where: str = "weekly_plan",
                 problems.append(
                     f"{prefix}: consecutive demanding days {first} and {second}")
     return problems
+
+
+def _quality_count_errors(sessions: list[dict], prefix: str) -> list[str]:
+    """Rule n1: no more quality sessions in the week than the rulebook allows."""
+    most = rulebook.current().parameters.quality_sessions_per_week
+    if most is None:
+        return []
+    quality = [session["id"] for session in sessions
+               if session["status"] != SessionStatus.CANCELLED and _is_quality(session)]
+    if len(quality) <= most:
+        return []
+    return [f"{prefix}: {len(quality)} quality sessions ({', '.join(quality)}), rule n1 "
+            f"allows {most} per week"]
 
 
 def _spacing_errors(sessions: list[dict], prefix: str) -> list[str]:

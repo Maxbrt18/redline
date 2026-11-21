@@ -48,7 +48,7 @@ def test_net_trace_envelope_and_heart_rate_trigger_withdrawal():
     assert len(lines[1].triggers) == 2
     current = permit.state(lines, [], today=thu + dt.timedelta(days=1), period=PERIOD)
     assert current.phase == "withdrawn"
-    assert current.withdrawal_until == thu + dt.timedelta(days=permit.WITHDRAWAL_DAYS)
+    assert current.withdrawal_until == thu + dt.timedelta(days=permit.thresholds().withdrawal_days)
 
 
 def test_declared_life_load_and_group_restrict_the_week():
@@ -85,7 +85,7 @@ def test_before_w42_the_counter_is_shown_and_nothing_is_granted():
 
 def test_the_window_starts_with_the_first_sealed_choice():
     """No date in the code: the permit opens on the Monday of the first sealed choice and
-    is judged after `PERMIT_WEEKS` weeks, that one included."""
+    is judged after `permit_weeks` weeks, that one included."""
     choices = [_choice("w41-jeu-ef", MON + dt.timedelta(days=10), 40),
                _choice("w40-mer-ef", MON + dt.timedelta(days=2), 40)]
     assert permit.window(choices) == PERIOD
