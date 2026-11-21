@@ -77,6 +77,7 @@ def test_the_wake_trace_cutoff_is_a_local_time():
     (("gear_alert_pct = 90\n", ""), "gear_alert_pct"),
     (('missed_cutoff = "22:00"', 'missed_cutoff = "22h"'), "HH:MM"),
     (("permit_min_runs = 5\n", ""), "permit thresholds go together, missing permit_min_runs"),
+    (("permit_minor_pct = 15\n", ""), "graded permit thresholds go together"),
 ])
 def test_a_malformed_rulebook_is_refused_with_its_reason(tmp_path, change, message):
     old, new = change
@@ -200,9 +201,16 @@ def test_the_default_quality_rule_states_its_parameter_not_an_athletes_choice():
 def test_a_rulebook_without_permit_thresholds_judges_no_permit(tmp_path, monkeypatch):
     """An instance rulebook written before the thresholds stays valid; no permit is read."""
     text = "\n".join(line for line in DEFAULT_TEXT.splitlines()
-                     if not line.startswith("permit_"))
+                     if not line.startswith("permit_"))  # base and graded alike
     monkeypatch.setenv("VAULT_PATH", str(_variant(tmp_path, text + "\n")))
     assert permit.declared() is None
     with pytest.raises(ConfigError, match="permit thresholds"):
         permit.thresholds()
     assert permit_report.report(store=None, today=dt.date(2030, 10, 1)) == []
+
+
+def test_graded_permit_thresholds_need_the_permit_itself(tmp_path):
+    text = "\n".join(line for line in DEFAULT_TEXT.splitlines()
+                     if not line.startswith(rulebook.PERMIT_PARAMETERS))
+    with pytest.raises(rulebook.RulebookError, match="need the permit thresholds"):
+        rulebook.load(_variant(tmp_path, text + "\n"))
