@@ -192,3 +192,84 @@ def test_the_report_reads_the_envelope_of_every_easy_run_planned_since_the_start
     assert envelopes == [permit.Envelope("w40-mar-ef", dt.date(2026, 9, 29), 50)]
     assert permit_report._weeks(MON, MON + dt.timedelta(days=15)) == {
         "2026-W40", "2026-W41", "2026-W42"}
+
+
+@pytest.fixture
+def in_load(graded, monkeypatch):
+    """The graded thresholds with the raw-duration guard: the envelope counts in load."""
+    book = rulebook.current()
+    monkeypatch.setattr(rulebook, "current", lambda: dataclasses.replace(
+        book, parameters=dataclasses.replace(book.parameters, permit_raw_guard_pct=25.0)))
+
+
+def _loaded(minutes, load, cap=50):
+    tue = MON + dt.timedelta(days=1)
+    run = dataclasses.replace(_ef(tue, minutes),
+                              load=None if load is None else permit.Load(load, 374))
+    [line] = permit.evaluate([_choice("w40-mar-ef", tue, 40)], [run], {},
+                             {"w40-mar-ef": cap}, {}, today=tue + dt.timedelta(days=1),
+                             hr_cap=HR_CAP)
+    return line
+
+
+def test_the_envelope_counted_in_load_spares_a_slow_run(in_load):
+    slow = _loaded(60, 38)
+    assert slow.triggers == [] and slow.minors == []
+    assert round(slow.gap) == -2 and slow.agrees is True
+    assert _loaded(50, 57).minors == ["un peu au-delà de l'enveloppe (50 min)"]
+    assert _loaded(45, 58).triggers == ["au-delà de l'enveloppe (50 min)"]
+
+
+def test_past_the_raw_duration_guard_a_run_fails_whatever_its_load(in_load):
+    assert _loaded(62.5, 40).triggers == []
+    assert _loaded(63, 40).triggers == ["durée brute au-delà de l'enveloppe + 25 % (50 min)"]
+
+
+def test_a_run_without_its_load_is_judged_on_raw_minutes_and_says_so(in_load):
+    line = _loaded(57, None)
+    assert line.load is None and line.minors == ["un peu au-delà de l'enveloppe (50 min)"]
+    current = permit.state([line], [], today=line.date + dt.timedelta(days=1), period=PERIOD)
+    assert any("couru 57 min (charge inconnue : minutes brutes)" in row
+               for row in permit.render([line], current))
+
+
+def test_the_load_is_shown_with_the_reference_pace_of_the_day(in_load):
+    line = _loaded(60, 38)
+    current = permit.state([line], [], today=line.date + dt.timedelta(days=1), period=PERIOD)
+    assert any("couru 60 min (38 min à l'allure EF de 6:14/km)" in row
+               for row in permit.render([line], current))
+
+
+def test_without_the_guard_the_load_is_not_read(graded):
+    line = _loaded(60, 38)
+    assert line.load is None and line.triggers == ["au-delà de l'enveloppe (50 min)"]
+
+
+class _Streams:
+    def __init__(self, streams):
+        self.streams = streams
+
+    def strava_streams(self, activity_id):
+        return self.streams.get(activity_id)
+
+
+def _flat(minutes, pace_s):
+    seconds, speed = int(minutes * 60), 1000 / pace_s
+    return {"t": list(range(seconds + 1)), "d": [t * speed for t in range(seconds + 1)],
+            "v": [speed] * (seconds + 1), "alt": [100.0] * (seconds + 1)}
+
+
+def test_the_report_loads_each_run_at_the_reference_of_its_day():
+    """Three solo flat runs before the permit set the pace; a slow group run is loaded at
+    it, a run without streams is left unloaded."""
+    before = [MON - dt.timedelta(days=offset) for offset in (3, 10, 17)]
+    tue, thu = MON + dt.timedelta(days=1), MON + dt.timedelta(days=3)
+    runs = [_ef(day, 45, strava_id=index) for index, day in enumerate(before, start=1)]
+    runs += [_ef(tue, 60, strava_id=9), _ef(thu, 40, strava_id=10)]
+    streams = {1: _flat(45, 374), 2: _flat(45, 370), 3: _flat(45, 378), 9: _flat(60, 472)}
+    groups = {1: False, 2: False, 3: False, 9: True}
+    loaded = permit_report._loaded(_Streams(streams), runs, groups, MON)
+    assert [run.date for run in loaded] == [tue, thu]
+    assert loaded[0].load.reference_pace_s == 374
+    assert round(loaded[0].load.minutes) == 38
+    assert loaded[1].load is None

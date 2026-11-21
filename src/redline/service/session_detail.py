@@ -7,9 +7,8 @@ Strava capture (`store_strava_detail`). The computations: pure functions over th
 streams that return facts (time per zone, kilometres, repetitions, stops, drift). The
 page formats; no figure is computed there.
 
-A stream is read sample by sample: sample `k` covers the interval that precedes it. An
-interval longer than `GAP_S` seconds is a stop (the watch paused); a sample below
-`MOVING_MPS` does not count toward moving time.
+A stream is read sample by sample, with the stops and the moving threshold of
+`redline.model.streams`.
 """
 
 from __future__ import annotations
@@ -24,12 +23,11 @@ from redline.integrations import strava, weather
 from redline.model import debrief, hr_zones
 from redline.model import notebook_views as views
 from redline.model.activity import Activity, Lap
+from redline.model.streams import GAP_S, MOVING_MPS
 
 log = logging.getLogger("redline")
 
 STREAM_KEYS = "time,heartrate,altitude,distance,velocity_smooth,cadence"
-GAP_S = 10
-MOVING_MPS = 0.8
 #: A kilometre started with less than this is not a row: it merges into the previous one.
 SPLIT_MIN_M = 300
 #: Below this elevation gain the altitude profile tells nothing: it is not shown.
