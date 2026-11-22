@@ -702,6 +702,10 @@ class Board:
             number = _scale(metric, value)
             self.ops.complete_measurement(observation_id, metric, number, zone=zone or None,
                                           actor=ACTOR)
+            if metric == "rpe":
+                from .activity_pipeline import rejudge_declared_rpe
+
+                rejudge_declared_rpe(self.ops, observation_id)
         alert = None
         effort = rulebook.current().scales.effort_pain
         if metric == "pain" and effort.above_cap(number):

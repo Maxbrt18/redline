@@ -223,27 +223,50 @@ class ActivityPipeline:
             return [], None, None
         try:
             from redline.analysis import ledger, signals
-            from redline.model import debrief, weekly_plan
+            from redline.model import debrief
 
             rows = ledger.parse_ledger(self.store)
             row = next((row for row in rows
                         if row.idempotency_key == f"strava:{activity_id}"), None)
             if row is None:
                 return [], None, None
-            session = None
-            session_id = next((key for key, link in self.store.week_session_links(
-                row.week).items() if str(link.get("observation_id")) == str(observation_id)),
-                None)
-            plan = self.store.load_plan(row.week) if session_id else None
-            if plan:
-                session = next((item for item in weekly_plan.active(plan)["sessions"]
-                                if item["id"] == session_id), None)
+            session = self.linked_session(row.week, observation_id)
             drift = next((item for item in signals.hr_at_pace(rows)
                           if item.date == row.date and item.hr == row.hr_avg), None)
             return debrief.gaps(row, session, drift, splits), session, row.date
         except Exception as exc:
             log.warning("Gaps of activity %s not computed: %s", activity_id, exc)
             return [], None, None
+
+    def linked_session(self, week: str, observation_id: Any) -> dict | None:
+        """The planned session an observation fulfilled, in the revision in force."""
+        from redline.model import weekly_plan
+
+        session_id = next((key for key, link in self.store.week_session_links(week).items()
+                           if str(link.get("observation_id")) == str(observation_id)), None)
+        plan = self.store.load_plan(week) if session_id else None
+        if not plan:
+            return None
+        return next((item for item in weekly_plan.active(plan)["sessions"]
+                     if item["id"] == session_id), None)
+
+    def rejudge_rpe(self, activity_id: int, observation_id: Any) -> bool:
+        """Rule again the RPE of a run whose debrief verdict is already kept, once the RPE
+        is declared after it; the other findings stay. False when no verdict is kept yet:
+        the debrief to come rules it."""
+        from redline.analysis import execution, ledger
+
+        kept = self.store.debrief_verdict(activity_id)
+        if not kept:
+            return False
+        row = next((row for row in ledger.parse_ledger(self.store)
+                    if row.idempotency_key == f"strava:{activity_id}"), None)
+        session = self.linked_session(row.week, observation_id) if row else None
+        cost = self._cost(activity_id, session)
+        self.store.store_debrief_verdict(activity_id, kept["verdict"],
+                                         execution.rejudged(kept["findings"] or [], cost),
+                                         actor="rpe-rejudge")
+        return True
 
     def _verdict(self, activity_id: int, session: dict | None, splits: list,
                  streams: dict | None, cost: Cost | None = None,
@@ -394,3 +417,15 @@ class ActivityPipeline:
             return
         self.store.finish_strava_enrichment(
             activity_id, "wbgt", value=value, unavailable=value is None)
+
+
+def rejudge_declared_rpe(store: Any, observation_id: Any) -> bool:
+    """An RPE just declared on an observation, ruled on its run's kept verdict. A failure
+    is logged: the answer is already recorded, its reading waits for the next one."""
+    try:
+        activity = store.strava_activity_for_observation(observation_id)
+        return activity is not None and ActivityPipeline(store).rejudge_rpe(
+            int(activity), observation_id)
+    except Exception as exc:
+        log.warning("RPE of observation %s not ruled again: %s", observation_id, exc)
+        return False

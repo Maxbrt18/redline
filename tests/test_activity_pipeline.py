@@ -426,3 +426,42 @@ def test_the_debrief_reads_the_rpe_against_the_range_of_the_dose_run(monkeypatch
     assert findings == [{"kind": "rpe_above", "owner": "body", "value": 9.0,
                          "reference": float(snapshot["expected_rpe"]["run"]["high"]),
                          "kms": [], "signs": ["poor_night"]}]
+
+
+def test_an_rpe_declared_in_a_turn_is_ruled_on_its_runs_kept_verdict(monkeypatch):
+    from redline.service import activity_pipeline, vault
+
+    ruled = []
+    monkeypatch.setattr(activity_pipeline, "rejudge_declared_rpe",
+                        lambda store, observation_id: ruled.append(observation_id))
+
+    class Keys:
+        def observation_id(self, key):
+            return {"strava:42": "obs-42"}.get(key)
+
+    repo = vault.VaultRepo.__new__(vault.VaultRepo)
+    repo._store = Keys()
+    repo._rejudge_rpe((
+        {"kind": "measurement.complete", "payload": {"idempotency_key": "strava:42",
+                                                     "metric": "rpe"}},
+        {"kind": "measurement.complete", "payload": {"idempotency_key": "strava:42",
+                                                     "metric": "enjoyment"}},
+        {"kind": "measurement.complete", "payload": {"idempotency_key": "manual:1",
+                                                     "metric": "rpe"}},
+    ))
+    assert ruled == ["obs-42"]
+
+
+def test_an_rpe_without_a_kept_verdict_waits_for_the_debrief():
+    from redline.service import activity_pipeline
+
+    class Unruled(Store):
+        def strava_activity_for_observation(self, observation_id):
+            return 42
+
+        def debrief_verdict(self, activity_id):
+            return None
+
+    assert activity_pipeline.rejudge_declared_rpe(Unruled(), "obs") is False
+    assert activity_pipeline.rejudge_declared_rpe(object(), "obs") is False, \
+        "a failure is logged, never raised"
