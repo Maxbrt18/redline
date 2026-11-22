@@ -12,7 +12,6 @@ exercises:
   - single-leg-step-down
   - rdl-tempo
   - calf-drop
-target_rpe: 6
 duration_min: 30
 phase: [general, specifique-1, specifique-2]
 contraindications:

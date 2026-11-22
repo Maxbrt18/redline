@@ -51,20 +51,17 @@ A **session note** names the session kinds it describes, among the engine's kind
 type: workout
 kinds: [easy]
 capabilities: [endurance]
-target_rpe: 3        # the effort the coach compares the session with
 duration_min: 45
 phase: [base, general]
 status: active       # active | retired
 ---
 ```
 
-A kind whose effort accumulates with its duration (`long`, declared `accumulating` in
-`session_kinds.py`) takes no `target_rpe`, and a plan gives its sessions no
-`rpe_min`/`rpe_max`: its session RPE grows faster than its duration, so no single figure
-holds. Its intensity is prescribed by `hr_zone`/`hr_cap_bpm`, and its RPE is read against
-the athlete's previous sessions of the same kind and a comparable duration
-(`comparable_duration_pct` and `comparable_sessions` in `rulebook.toml`). A `target_rpe`
-left on such a note is ignored.
+No note carries an RPE target, and a plan gives its sessions no `rpe_min`/`rpe_max`: a
+session's RPE is computed from its dose (effort-kilometres and intensity for a run, minutes
+otherwise) and calibrated on the athlete's declared RPE, kind by kind
+(`redline.analysis.expected_rpe`, the `rpe_*` thresholds of `rulebook.toml`). It is read
+after the session against that range, never prescribed before it.
 
 A **strength routine** declares `routine:` instead of `kinds:`, and its exercises in
 order:
@@ -79,7 +76,6 @@ exercises:
   - warmup-a                 # an exercise note, with its own dose
   - exercise: calf-drop      # or a slug with the dose of this session
     dose: {measure: reps, sets: 3, reps: 8, side: each, rest_s: 90}
-target_rpe: 6
 min_gap_h: {strength: 48}    # minimum hours since another session of a kind
 variants:
   degraded:

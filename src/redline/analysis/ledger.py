@@ -18,15 +18,15 @@ from __future__ import annotations
 
 import datetime as dt
 import re
+from collections.abc import Container, Mapping
 from dataclasses import dataclass, field
 from itertools import pairwise
-from typing import Protocol
+from typing import Any, Protocol
 
 from redline.coach.fr import ledger as text
 from redline.model import (
     daily,
     iso_week,
-    program,
     rulebook,
     session_kinds,
 )
@@ -254,16 +254,22 @@ def load_instruments(store: LedgerStore) -> dict[str, Instruments]:
     return out
 
 
-def row_weight(row: Row, targets: dict) -> tuple[float, bool]:
+def row_key(row: Row) -> tuple:
+    """What identifies a session across two reads of the ledger."""
+    return row.date, row.type, row.routine, row.idempotency_key
+
+
+def row_weight(row: Row, above: Container[tuple]) -> tuple[float, bool]:
     """One row's raw contribution to the gauge, before the week multipliers, and
-    whether it was a MISSED quality session (RPE above target, which costs +0.5).
+    whether it was a quality session that cost more than its dose expects (its RPE above
+    the expected range, `analysis.expected_rpe.above_range`), which adds +0.5.
 
     Exposed rather than inlined because `analysis/hot_cache.py` needs the same number to
     work out the walking share; a second copy of the formula would drift (a walk share
     from different arithmetic over-states walking and can raise a "red made of hiking"
     the gauge denies).
 
-    `targets` is REQUIRED, with no default: an empty default would silently yield a gauge
+    `above` is REQUIRED, with no default: an empty default would silently yield a gauge
     stripped of its penalty. The computation states what it compares against.
     """
     if row.type in table.REST_TYPES or not row.hours:
@@ -271,45 +277,47 @@ def row_weight(row: Row, targets: dict) -> tuple[float, bool]:
     weighted = row.hours * (0.5 if row.type in HALF_TYPES else 1.0)
     # The gauge counts the descent, not the climb: the climb is already paid in time.
     weighted += (row.dminus / 600) * session_kinds.descent_weight(row.type)
-    missed = False
+    costlier = False
     if row.type in QUALITY_TYPES:
         weighted += 0.5
-        target = program.target_for(targets, row.type, row.routine)
-        missed = bool(row.rpe and target and row.rpe > target)
-        if missed:
+        costlier = row_key(row) in above
+        if costlier:
             weighted += 0.5
-    return weighted, missed
+    return weighted, costlier
 
 
 @dataclass
-class TargetFlag:
-    """A session run above its RPE target, whatever its type."""
+class RangeFlag:
+    """A session whose declared RPE is above the range its dose expects."""
 
     date: dt.date
     kind: str
     rpe: float
-    target: float
+    low: int
+    high: int
 
     def __str__(self) -> str:
-        return (text.OVER_TARGET.format(date=self.date, kind=self.kind, rpe=self.rpe, target=self.target))
+        return text.ABOVE_RANGE.format(date=self.date, kind=self.kind, rpe=self.rpe,
+                                       low=self.low, high=self.high)
 
 
-def over_target(rows: list[Row], targets: dict) -> list[TargetFlag]:
-    """All sessions above their target, not only the quality ones.
+def above_expected(rows: list[Row], above: Mapping[tuple, Any]) -> list[RangeFlag]:
+    """Every session above its expected range, not only the quality ones.
 
     The gauge penalty stays reserved to QUALITY_TYPES: it was calibrated that way and
     widening it would rescale an instrument. This is a SIGNAL, not a term of the formula.
+    `above` maps a row's key to its expectation (`low`, `high`).
     """
     flags = []
     for row in sorted(rows, key=lambda r: r.date):
-        target = program.target_for(targets, row.type, row.routine)
-        if row.rpe is not None and target is not None and row.rpe > target:
-            flags.append(TargetFlag(row.date, row.type, row.rpe, target))
+        expected = above.get(row_key(row))
+        if row.rpe is not None and expected is not None:
+            flags.append(RangeFlag(row.date, row.type, row.rpe, expected.low, expected.high))
     return flags
 
 
 def equivalent_hours(rows: list[Row], instr: Instruments,
-                     targets: dict) -> tuple[float, int, list[str]]:
+                     above: Container[tuple]) -> tuple[float, int, list[str]]:
     """coaching/protocols.md § Formule v1 -> (h_eq, level out of 100, trace).
 
     The trace is not a debug aid: it is what makes the gauge an arbiter rather than an
@@ -317,11 +325,11 @@ def equivalent_hours(rows: list[Row], instr: Instruments,
     """
     base, trace = 0.0, []
     for row in sorted(rows, key=lambda r: r.date):
-        weighted, missed = row_weight(row, targets)
+        weighted, costlier = row_weight(row, above)
         if not weighted:
             continue
-        if missed:
-            trace.append(text.TRACE_MISSED.format(date=row.date, type=row.type))
+        if costlier:
+            trace.append(text.TRACE_COSTLIER.format(date=row.date, type=row.type))
         base += weighted
         trace.append(text.TRACE_SESSION.format(date=row.date, type=row.type, weighted=weighted))
 
@@ -400,12 +408,12 @@ def acute_chronic_ratio(per_week: dict[str, float], label: str) -> float | None:
 
 
 def eq_hours_per_week(rows: list[Row], instruments: dict[str, Instruments],
-                      targets: dict) -> dict[str, float]:
+                      above: Container[tuple]) -> dict[str, float]:
     weeks: dict[str, list[Row]] = {}
     for row in rows:
         weeks.setdefault(row.week, []).append(row)
     return {label: round(equivalent_hours(rs, instruments.get(label, Instruments()),
-                                         targets)[0], 2)
+                                         above)[0], 2)
             for label, rs in weeks.items()}
 
 

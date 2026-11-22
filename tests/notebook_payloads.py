@@ -35,7 +35,7 @@ def ef(identifier, date, status="planned", fact=None):
         "entry_id": None,
         "transition": None,
         "change": None,
-        "targets": {"duration_cap_min": 55, "rpe_min": 2, "rpe_max": 3, "hr_cap_bpm": 157},
+        "targets": {"duration_cap_min": 55, "hr_cap_bpm": 157},
     }
 
 

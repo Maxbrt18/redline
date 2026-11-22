@@ -8,13 +8,15 @@ non-regression test of the whole gauge: if a change breaks it, the gauge stops m
 import datetime as dt
 
 import pytest
-from conftest import RPE_TARGETS, VAULT_ROOT, ZONE, zoned
+from conftest import ZONE, zoned
 
-from redline.analysis import ledger, week_review
+from redline.analysis import expected_rpe, ledger, week_review
 from redline.analysis.ledger import Instruments, Row
-from redline.model import iso_week, program, session_kinds
+from redline.model import iso_week, session_kinds
 from redline.model import ledger as table
-from redline.model.notes import NoteError
+
+#: No session above its expected RPE.
+NONE_ABOVE: frozenset = frozenset()
 
 
 def _etalon_rows():
@@ -32,7 +34,7 @@ def _etalon_rows():
 
 def test_calibration_week_is_100():
     h_eq, level, _ = ledger.equivalent_hours(
-        _etalon_rows(), Instruments(sleep="bad_nights"), RPE_TARGETS)
+        _etalon_rows(), Instruments(sleep="bad_nights"), NONE_ABOVE)
     assert abs(h_eq - 7.15) < 0.1, h_eq
     assert abs(level - 100) <= 2, level
 
@@ -40,18 +42,10 @@ def test_calibration_week_is_100():
 def test_gauge_prints_its_inputs():
     _, _, detail = ledger.equivalent_hours(_etalon_rows(),
                                            Instruments(sleep="bad_nights"),
-                                           RPE_TARGETS)
+                                           NONE_ABOVE)
     assert any("×1.15" in d for d in detail)     # three consecutive demanding days
     assert any("×1.10" in d for d in detail)     # poor sleep
     assert any("h-éq" in d for d in detail)
-
-
-def test_rated_session_adds_half_an_hour():
-    """Garde-fou n°6: a séance run above its RPE target costs +0.5 h-éq."""
-    on_target = [Row(dt.date(2026, 3, 2), "threshold", km=8, hours=0.75, rpe=6.0)]
-    over = [Row(dt.date(2026, 3, 2), "threshold", km=8, hours=0.75, rpe=8.0)]
-    assert ledger.equivalent_hours(over, Instruments(), RPE_TARGETS)[0] == \
-        ledger.equivalent_hours(on_target, Instruments(), RPE_TARGETS)[0] + 0.5
 
 
 # ------------------------------ the elevation term, and who owns it
@@ -67,7 +61,7 @@ def test_a_bike_carries_no_elevation_term():
     not what the formula bills ([[src-minetti-cout-pente]]).
     """
     bike = Row(dt.date(2026, 8, 13), "bike", hours=1.716, dplus=647.5, dminus=648)
-    assert ledger.row_weight(bike, RPE_TARGETS)[0] == pytest.approx(0.858, abs=0.01)
+    assert ledger.row_weight(bike, NONE_ABOVE)[0] == pytest.approx(0.858, abs=0.01)
 
 
 def test_a_hilly_run_keeps_its_full_elevation_term():
@@ -75,8 +69,8 @@ def test_a_hilly_run_keeps_its_full_elevation_term():
     On a loop (D- = D+), the change of reading moves nothing -- that is the point."""
     course = Row(dt.date(2026, 8, 16), "long", km=10.3, hours=1.152, dplus=600, dminus=600)
     hike = Row(dt.date(2026, 7, 21), "hike", hours=4.0, dplus=600, dminus=600)
-    assert ledger.row_weight(course, RPE_TARGETS)[0] == pytest.approx(2.152, abs=0.01)
-    assert ledger.row_weight(hike, RPE_TARGETS)[0] == pytest.approx(2.5, abs=0.01)
+    assert ledger.row_weight(course, NONE_ABOVE)[0] == pytest.approx(2.152, abs=0.01)
+    assert ledger.row_weight(hike, NONE_ABOVE)[0] == pytest.approx(2.5, abs=0.01)
 
 
 def test_only_running_and_walking_carry_a_descent_weight():
@@ -86,49 +80,40 @@ def test_only_running_and_walking_carry_a_descent_weight():
     assert weights["bike"] == weights["strength"] == 0.0
 
 
-# ------------------------------------------------- the RPE target, single source
+# ------------------------------------------------- the expected RPE, not a target
 
-def test_the_targets_come_from_the_workout_notes():
-    """`redline ledger` used to carry a hard-coded COPY of the `target_rpe`: dead
-    entries and missing notes meant a strength session above its target triggered
-    nothing. The numbers now exist once. This is the only test in the suite that really
-    reads the notes: it tells that the literal table in conftest has not fallen behind."""
-    assert program.rpe_targets(VAULT_ROOT) == RPE_TARGETS
-
-
-def test_a_workout_note_declaring_an_unknown_kind_is_refused(tmp_path):
-    """A note's `kinds:` must name registry kinds, or its RPE target would match nothing."""
-    workouts = tmp_path / "coaching" / "workouts"
-    workouts.mkdir(parents=True)
-    (workouts / "ef.md").write_text("---\ntype: workout\nkinds: [EF]\ntarget_rpe: 3\n---\n",
-                                    encoding="utf-8")
-    with pytest.raises(NoteError, match=r"ef\.md"):
-        program.rpe_targets(tmp_path)
+def test_a_quality_session_above_its_expected_rpe_weighs_half_an_hour_more():
+    """The +0.5 once given to a quality session above a fixed target now goes to one
+    whose RPE is above the range its dose expects (`expected_rpe.above_range`)."""
+    session = Row(dt.date(2026, 8, 6), "threshold", km=10, hours=1.0, rpe=8.0)
+    plain, plain_flag = ledger.row_weight(session, NONE_ABOVE)
+    costlier, flag = ledger.row_weight(session, {ledger.row_key(session)})
+    assert (plain, plain_flag) == (1.5, False)
+    assert (costlier, flag) == (2.0, True)
 
 
-def test_a_session_above_its_target_is_flagged_whatever_its_type():
-    """The case that triggered it: a strength session at RPE 7 for a target of 6."""
+def test_a_session_above_its_expected_rpe_is_flagged_whatever_its_type():
     rows = [Row(dt.date(2026, 8, 6), "strength", routine="b", hours=0.73, rpe=7.0),
             Row(dt.date(2026, 7, 31), "strength", routine="b", hours=0.42, rpe=3.0)]
-    flags = ledger.over_target(rows, RPE_TARGETS)
+    above = {ledger.row_key(rows[0]): expected_rpe.Expectation(5.0, 4, 6, 7, 0.3)}
+    flags = ledger.above_expected(rows, above)
     assert [f.date for f in flags] == [dt.date(2026, 8, 6)]
-    assert "RPE 7 déclaré pour une cible de 6" in str(flags[0])
+    assert "RPE 7 déclaré pour 4-6 attendus" in str(flags[0])
 
 
 def test_the_gauge_penalty_stays_restricted_to_quality_sessions():
-    """Flagging is not penalising. The +0.5 "failed session" was calibrated on quality
-    sessions only; extending it to strength would rescale the gauge, which is a coaching
-    decision and not a side effect of this fix."""
+    """Flagging is not penalising. The +0.5 was calibrated on quality sessions only;
+    extending it to strength would rescale the gauge, which is a coaching decision."""
     over = [Row(dt.date(2026, 8, 6), "strength", routine="b", hours=1.0, rpe=9.0)]
-    on_target = [Row(dt.date(2026, 8, 6), "strength", routine="b", hours=1.0, rpe=6.0)]
-    assert ledger.equivalent_hours(over, Instruments(), RPE_TARGETS)[0] == \
-        ledger.equivalent_hours(on_target, Instruments(), RPE_TARGETS)[0]
-    assert ledger.over_target(over, RPE_TARGETS)      # but the flag does go out
+    above = {ledger.row_key(over[0]): expected_rpe.Expectation(5.0, 4, 6, 7, 0.3)}
+    assert ledger.equivalent_hours(over, Instruments(), above)[0] == \
+        ledger.equivalent_hours(over, Instruments(), NONE_ABOVE)[0]
+    assert ledger.above_expected(over, above)      # but the flag does go out
 
 
 def test_a_hike_is_half_weighted():
     hike = [Row(dt.date(2026, 3, 2), "hike", km=20, hours=4.0, dplus=600, dminus=600)]
-    h_eq, _, _ = ledger.equivalent_hours(hike, Instruments(), RPE_TARGETS)
+    h_eq, _, _ = ledger.equivalent_hours(hike, Instruments(), NONE_ABOVE)
     assert h_eq == 4.0 * 0.5 + (600 / 600) * 0.5     # 2.0 + 0.5 = 2.5
 
 
@@ -149,7 +134,7 @@ def test_a_typed_strength_report_enters_the_gauge_without_a_second_observation()
     assert rows == [Row(
         dt.date(2026, 8, 26), "strength", routine="a", hours=1.0, pains=zoned(1.0),
         note="Planche unipodale trop dure.")]
-    assert ledger.row_weight(rows[0], RPE_TARGETS)[0] == 0.5
+    assert ledger.row_weight(rows[0], NONE_ABOVE)[0] == 0.5
 
 
 def test_an_old_strength_observation_wins_instead_of_being_counted_twice():
@@ -248,7 +233,7 @@ def test_a_peak_is_printed_with_its_count():
 def test_a_rest_reading_never_enters_the_gauge():
     for kind in ("rest-reading", "wake-trace"):
         row = Row(dt.date(2026, 7, 29), kind, hours=0.5, pains=zoned(1.0))
-        assert ledger.row_weight(row, RPE_TARGETS) == (0.0, False)
+        assert ledger.row_weight(row, NONE_ABOVE) == (0.0, False)
 
 
 def test_a_palpation_enters_neither_pain_series():
@@ -377,7 +362,7 @@ def test_the_descent_of_konigssee_no_longer_weighs_zero():
     """
     rows = [Row(dt.date(2026, 7, 21), "hike", hours=2.5, dplus=20, dminus=1096)]
     assert ledger.week_descent(rows) == 1096
-    assert ledger.equivalent_hours(rows, Instruments(), RPE_TARGETS)[0] == \
+    assert ledger.equivalent_hours(rows, Instruments(), NONE_ABOVE)[0] == \
         pytest.approx(1.25 + (1096 / 600) * 0.5, abs=0.01)
 
 
@@ -385,7 +370,7 @@ def test_a_pure_climb_is_no_longer_billed_as_a_descent():
     """The symmetric control: a climb (1108 m D+, 17 m D-) is paid by the time it takes,
     not by an elevation term that counts it twice."""
     rows = [Row(dt.date(2026, 7, 19), "hike", hours=4.0, dplus=1108, dminus=17)]
-    assert ledger.equivalent_hours(rows, Instruments(), RPE_TARGETS)[0] == \
+    assert ledger.equivalent_hours(rows, Instruments(), NONE_ABOVE)[0] == \
         pytest.approx(2.0 + (17 / 600) * 0.5, abs=0.01)
 
 
@@ -598,9 +583,9 @@ def test_an_undeclared_week_is_neither_ok_nor_multiplied():
     assert loaded["2026-W39"] == Instruments(sleep=None, life_load=None)
     assert loaded["2026-W41"] == Instruments(sleep="ok", life_load=None)
     rows = _etalon_rows()
-    assert ledger.equivalent_hours(rows, Instruments(), RPE_TARGETS)[0] == \
+    assert ledger.equivalent_hours(rows, Instruments(), NONE_ABOVE)[0] == \
         ledger.equivalent_hours(rows, Instruments(sleep="ok", life_load="normal"),
-                                RPE_TARGETS)[0]
+                                NONE_ABOVE)[0]
 
 
 ZONES = [ledger.PainZone(ZONE, "Genou")]

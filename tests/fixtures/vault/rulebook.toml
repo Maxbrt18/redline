@@ -241,10 +241,10 @@ enforced_by = "le coach"
 [[rules]]
 id = "n6"
 title = "Dernier intervalle"
-text = "une qualité finit dans sa bande RPE, une répétition en réserve ; un all-in final la rate. Allures comparées au sein de la séance seulement."
+text = "une qualité finit avec une répétition en réserve ; un all-in final la rate. Le RPE se lit contre la fourchette que la dose attend, jamais contre une bande : il ne se commente qu'avec un second indice, et un écart d'exécution reçoit la correction, jamais le chiffre. Allures comparées au sein de la séance seulement."
 grade = "règle de coaching"
 owner = "coaching/current-plan.md"
-enforced_by = "le coach"
+enforced_by = "code : RPE attendu, écart d'exécution et second indice (verdict du débrief). Coach : réserve, all-in final"
 
 [[rules]]
 id = "n7"

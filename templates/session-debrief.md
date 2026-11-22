@@ -7,11 +7,11 @@ aliases: [débrief séance, session-debrief]
      PostgreSQL via `redline ledger-add` / `redline ledger-complete`. Rien n'est demandé qui n'ait
      pas d'usage. Le pattern de douleur passe avant le chiffre : "empire au fil de la
      sortie" = stade avancé, "apparaît puis se dissipe" = charge encaissée
-     (coaching/protocols.md batterie E). Le RPE se lit en voyant la cible du jour :
-     au-dessus = séance RATÉE (mandat de réprimande, athlete/athlete.md). -->
+     (coaching/protocols.md batterie E). Le RPE est le coût de la séance entière : il se
+     donne sans cible, le service le lit contre ce que la dose attend. -->
 
 **Séance** : <EF | SL | seuil | côtes | cadence | course | rando | renfo>
-**Effort ressenti (RPE)** : ___ /10   ← cible du jour : ___ /10
+**Effort ressenti (RPE)** : ___ /10
 **Douleur** : pic ___ /10 — et elle a :
   ( ) disparu à l'échauffement   ( ) apparu puis s'est dissipé
   ( ) resté stable               ( ) empiré au fil de la sortie

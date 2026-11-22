@@ -15,12 +15,12 @@ from redline.coach.fr import plan as wording
 from redline.model import prescription
 from redline.model.schema import SchemaError
 from redline.model.weekly_plan import (
-    accumulating_band_errors,
     change_evidence_errors,
     decision_errors,
     fuelling_errors,
     intention_errors,
     pain_rule_errors,
+    rpe_band_errors,
     typed_target_errors,
     validate,
     written_text_errors,
@@ -94,7 +94,7 @@ def checked(store, week: str, revision: dict, existing: dict | None, *, stamp: s
         *written_text_errors(current, where),
         *change_evidence_errors(previous, current),
         *typed_target_errors(current, where),
-        *accumulating_band_errors(previous, current, where),
+        *rpe_band_errors(previous, current, where),
         *prescription.errors(previous, current, where),
         *decision_errors(current, where),
         *fuelling_errors(current, where),

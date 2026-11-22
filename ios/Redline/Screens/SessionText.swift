@@ -28,15 +28,6 @@ extension Notebook {
     static func kindName(_ kind: String) -> String { kinds[kind]?.name ?? kind }
 }
 
-extension Notebook.Targets {
-    /// `6-7` for a band, `≤7` for a ceiling.
-    var rpeRange: String? {
-        guard let rpeMax else { return nil }
-        if let rpeMin, rpeMin != rpeMax { return "\(rpeMin)-\(rpeMax)" }
-        return "≤\(rpeMax)"
-    }
-}
-
 extension Notebook.SessionItem {
     var family: Family { Family(kind: kind, workout: workout) }
     var isStrength: Bool { kind == "strength" }

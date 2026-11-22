@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from redline.analysis import (
+    expected_rpe,
     feasibility,
     ledger,
     permit_report,
@@ -25,7 +26,7 @@ from redline.analysis import (
 )
 from redline.coach.fr import progression as progression_text
 from redline.coach.fr import weekly_dossier as text
-from redline.model import iso_week, program
+from redline.model import iso_week
 from redline.model import predictions as prediction_model
 from redline.model.errors import RedlineError
 from redline.model.vocabulary import DeadlineStatus
@@ -49,9 +50,9 @@ def render(store: OperationalStore, root: Path, week: str, today: dt.date) -> st
     """The dossier for week `week` (the one that CLOSES), seen from `today`."""
     rows = ledger.parse_ledger(store)
     instruments = ledger.load_instruments(store)
-    targets = program.rpe_targets(root)
+    above = expected_rpe.above_range(store, rows)
     lines = [text.HEADER, ""]
-    lines.extend(week_review.week_report(store, rows, instruments, targets, week, today,
+    lines.extend(week_review.week_report(store, rows, instruments, above, week, today,
                                     closing=True))
 
     weeks = signals.recent_weeks(rows, 4)

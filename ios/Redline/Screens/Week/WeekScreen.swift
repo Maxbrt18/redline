@@ -425,7 +425,6 @@ private struct WeekDayRow: View {
         if over.contains("hr_avg"), let heart = fact.hrAvg, let cap = targets.hrCapBpm {
             tags.append("FC +\(Numbers.text(heart - Double(cap), digits: 0))")
         }
-        if over.contains("rpe"), let rpe = fact.rpe, let cap = targets.rpeMax { tags.append("RPE +\(Numbers.text(rpe - Double(cap)))") }
         if over.contains("km"), let km = fact.km, let cap = targets.distanceCapKm { tags.append("+\(Numbers.text(km - cap)) km") }
         if over.contains("duration_min"), let minutes = fact.durationMin, let cap = targets.durationCapMin {
             tags.append("+\(minutes - cap) min")

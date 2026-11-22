@@ -19,7 +19,7 @@ from typing import Any
 from redline.coach.fr import debrief as text
 from redline.model.vocabulary import HrDoubt
 
-from . import prescription, rulebook, session_kinds, terrain, weekly_plan
+from . import prescription, rulebook, session_kinds, terrain
 from .activity import Lap
 from .notebook_views import KmSplit
 
@@ -49,12 +49,6 @@ def planned_vs_done(row: Any, session: dict | None) -> list[str]:
     if (hr is not None and session.get("hr_cap_bpm") is not None
             and not prescription.has_efforts(session) and _flat_run(row)):
         out.append(text.HR_GAP.format(hr=hr, hr_cap_bpm=session["hr_cap_bpm"], signed=text.signed(hr - session["hr_cap_bpm"])))
-    band = weekly_plan.rpe_band(session)
-    if row.rpe is not None and band is not None:
-        low, high = band
-        span = f"{text.number(low)}-{text.number(high)}" if low is not None else \
-            text.AT_MOST.format(high=text.number(high))
-        out.append(text.RPE_GAP.format(rpe=text.number(row.rpe), span=span))
     return out
 
 

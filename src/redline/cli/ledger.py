@@ -9,9 +9,9 @@ import io
 import sys
 from pathlib import Path
 
-from redline.analysis import ledger, week_review
+from redline.analysis import expected_rpe, ledger, week_review
 from redline.coach.fr import ledger as text
-from redline.model import entrypoint, paths, program
+from redline.model import entrypoint
 from redline.model.errors import InputError
 from redline.storage import open_store
 
@@ -49,8 +49,8 @@ def main() -> int:
     store = open_store("ledger-gauge")
     rows = ledger.parse_ledger(store)
     instruments = ledger.load_instruments(store)
-    # Targets come from the session sheets, never from a hard-coded table.
-    targets = program.rpe_targets(args.root or paths.vault_root())
+    # The sessions above the RPE their dose expects, calibrated on the athlete.
+    above = expected_rpe.above_range(store, rows)
 
     if args.csv:
         sys.stdout.write(_export_csv(rows, ledger.pain_zones(store)))
@@ -79,7 +79,7 @@ def main() -> int:
             print()
         return 0
 
-    per_week = ledger.eq_hours_per_week(rows, instruments, targets)
+    per_week = ledger.eq_hours_per_week(rows, instruments, above)
     if not per_week:
         print(text.EMPTY_LEDGER)
         return 0
@@ -92,7 +92,7 @@ def main() -> int:
         label = max(per_week)
 
     print()
-    for line in week_review.week_report(store, rows, instruments, targets, label, dt.date.today(),
+    for line in week_review.week_report(store, rows, instruments, above, label, dt.date.today(),
                             target_km=args.target_km):
         print(f"  {line}" if line else "")
     print()

@@ -138,7 +138,8 @@ def gate(rows: list[ledger.Row], label: str, instr: ledger.Instruments,
 
 
 
-def week_report(store: ledger.LedgerStore, rows: list[ledger.Row], instruments: dict, targets: dict,
+def week_report(store: ledger.LedgerStore, rows: list[ledger.Row], instruments: dict,
+                above: dict,
                 label: str, today: dt.date, *, target_km: float | None = None,
                 closing: bool = False) -> list[str]:
     """A week's report: volume, gauge, pain, then the slope.
@@ -147,10 +148,10 @@ def week_report(store: ledger.LedgerStore, rows: list[ledger.Row], instruments: 
     computes before the Sunday review (`weekly_dossier.py`): two renderings of the same
     computation would diverge.
     """
-    per_week = ledger.eq_hours_per_week(rows, instruments, targets)
+    per_week = ledger.eq_hours_per_week(rows, instruments, above)
     week_rows = [row for row in rows if row.week == label]
     instr = instruments.get(label, ledger.Instruments())
-    h_eq, level, trace = ledger.equivalent_hours(week_rows, instr, targets)
+    h_eq, level, trace = ledger.equivalent_hours(week_rows, instr, above)
     ratio = ledger.acute_chronic_ratio(per_week, label)
     lines = [text.REPORT_WEEK.format(label=label), ""]
     # Volume before the gauge: it is the figure the athlete hears most often, and the only
@@ -177,8 +178,8 @@ def week_report(store: ledger.LedgerStore, rows: list[ledger.Row], instruments: 
                      for flag in ledger.esculier_check(week_rows, zone.slug, history=rows))
         lines.extend(wake_lines(rows, zone.slug, iso_week.as_of(label, today)))
     lines.extend(gate(rows, label, instr, zones, today))
-    lines.extend(text.REPORT_OVER_TARGET.format(overshoot=overshoot)
-                 for overshoot in ledger.over_target(week_rows, targets))
+    lines.extend(text.REPORT_ABOVE_RANGE.format(overshoot=overshoot)
+                 for overshoot in ledger.above_expected(week_rows, above))
     lines.extend(text.REPORT_INCOMPLETE.format(problem=problem)
                  for problem in ledger.week_completeness(store, label, today))
 

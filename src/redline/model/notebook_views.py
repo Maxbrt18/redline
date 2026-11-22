@@ -20,8 +20,6 @@ class Targets(TypedDict, total=False):
     distance_target_km: float
     distance_cap_km: float
     duration_cap_min: int
-    rpe_min: int
-    rpe_max: int
     hr_cap_bpm: int
     carbs_target_g_h: int
 

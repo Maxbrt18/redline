@@ -33,10 +33,6 @@ class SessionKind:
     demanding: bool = False
     #: Long enough to rehearse race fuelling.
     fuelled: bool = False
-    #: Its session RPE grows with its duration, faster than the duration: no fixed RPE
-    #: band or target applies. It is read against the athlete's own sessions of the same
-    #: kind and a comparable duration (`analysis.comparable`).
-    accumulating: bool = False
     #: What an activity of its family is recorded as when the plan holds no session it
     #: could fulfil that day: one kind per family at most.
     unplanned: bool = False
@@ -45,7 +41,7 @@ class SessionKind:
 KINDS = (
     SessionKind("easy", "run", planned=True, recorded=True, easy=True, unplanned=True),
     SessionKind("long", "run", planned=True, recorded=True, easy=True, demanding=True,
-                fuelled=True, accumulating=True),
+                fuelled=True),
     SessionKind("threshold", "run", planned=True, recorded=True, quality=True,
                 repetitions=True, demanding=True),
     SessionKind("hills", "run", planned=True, recorded=True, quality=True,
@@ -90,7 +86,6 @@ QUALITY = frozenset(kind.slug for kind in KINDS if kind.quality)
 REPETITIONS = frozenset(kind.slug for kind in KINDS if kind.repetitions)
 DEMANDING = frozenset(kind.slug for kind in KINDS if kind.demanding)
 FUELLED = frozenset(kind.slug for kind in KINDS if kind.fuelled)
-ACCUMULATING = frozenset(kind.slug for kind in KINDS if kind.accumulating)
 UNPLANNED_BY_FAMILY = {kind.family: kind.slug for kind in KINDS if kind.unplanned}
 
 #: Share of the descent that counts in the load gauge: a run descent in full, a

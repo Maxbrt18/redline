@@ -34,10 +34,6 @@ DURATION_GAP = "durée {minutes:.0f} min pour un plafond de {duration_cap_min} (
 
 HR_GAP = "FC moyenne {hr} pour un plafond de {hr_cap_bpm} ({signed})"
 
-AT_MOST = "au plus {high}"
-
-RPE_GAP = "RPE {rpe} pour une cible {span}"
-
 HR_AT_PACE = "FC à allure comparable : "
 
 SESSION = "Séance"

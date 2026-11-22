@@ -17,16 +17,13 @@ def session(identifier="w32-lun-ef", date="2026-08-03", workout="easy", **overri
         "id": identifier, "title": overrides.pop("title", workout), "date": date,
         "kind": session_kinds.family(workout),
         "workout": workout, "status": "planned", "distance_target_km": 7.0,
-        "distance_cap_km": 9.0, "rpe_min": 2, "rpe_max": 3,
+        "distance_cap_km": 9.0,
         "demanding": workout in {"long", "threshold", "hills"},
         "sources": ["[[current-plan]]"],
     }
     if payload["kind"] != "run":
-        for key in ("distance_target_km", "distance_cap_km", "rpe_min", "rpe_max"):
+        for key in ("distance_target_km", "distance_cap_km"):
             payload.pop(key)
-    elif workout in session_kinds.ACCUMULATING:
-        payload.pop("rpe_min")
-        payload.pop("rpe_max")
     if workout == session_kinds.STRENGTH:
         payload["strength"] = {}
         payload["routine"] = "a"

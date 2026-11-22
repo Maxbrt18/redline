@@ -39,7 +39,7 @@ from redline.model import rulebook, session_kinds, terrain
 from redline.model.vocabulary import RpeSide
 
 from . import easy_load
-from .ledger import Row
+from .ledger import Row, row_key
 
 #: Metres of gain worth one kilometre of flat: the equivalence trail races use.
 DPLUS_M_PER_KM = 100
@@ -302,28 +302,62 @@ class History:
 
 
 def history(store: Any, rows: Iterable[Row], config: Settings) -> History:
-    """The history of the ledger with the kept streams of its runs, from the store."""
+    """The history of the ledger with the kept streams of its runs, from the store.
+
+    Streams are read only when a dose or a reference needs them, each run once: the
+    reference of a day reads the easy runs of the weeks before it."""
     rows = list(rows)
-    profiles: dict[str, easy_load.Profile | None] = {}
+    profiles: dict[int, easy_load.Profile | None] = {}
+    groups: dict[int, bool | None] = {}
+    references: dict[dt.date, float | None] = {}
+    easy = sorted(((row.date, activity) for row in rows if row.type == session_kinds.EASY
+                   for activity in [easy_load.strava_id(row.idempotency_key)]
+                   if activity is not None), key=lambda item: item[0])
+
+    def profile(activity: int) -> easy_load.Profile | None:
+        if activity not in profiles:
+            try:
+                profiles[activity] = easy_load.stored_profile(store, activity)
+            except Exception:  # unreadable streams: the run reads its raw speed or none
+                profiles[activity] = None
+        return profiles[activity]
 
     def profile_of(row: Row) -> easy_load.Profile | None:
         activity = easy_load.strava_id(row.idempotency_key)
-        if activity is None:
-            return None
-        if row.idempotency_key not in profiles:
-            try:
-                profiles[row.idempotency_key] = easy_load.stored_profile(store, activity)
-            except Exception:  # unreadable streams: the run reads its raw speed or none
-                profiles[row.idempotency_key] = None
-        return profiles[row.idempotency_key]
+        return None if activity is None else profile(activity)
 
-    samples: list[easy_load.Sample] = []
-    for row in rows:
-        activity = easy_load.strava_id(row.idempotency_key)
-        if row.type != session_kinds.EASY or activity is None:
+    def reference_of(day: dt.date) -> float | None:
+        if day not in references:
+            since = day - dt.timedelta(weeks=easy_load.REFERENCE_WEEKS)
+            runs = []
+            for date, activity in easy:
+                shape = profile(activity) if since <= date < day else None
+                if shape is None:
+                    continue
+                if activity not in groups:
+                    groups[activity] = easy_load.group_of(store, activity)
+                runs.append((date, shape, groups[activity]))
+            references[day] = easy_load.reference_mps(easy_load.samples(runs), day)
+        return references[day]
+
+    return History(rows, profile_of, reference_of, config)
+
+
+def above_range(store: Any, rows: Sequence[Row],
+                only: Iterable[Row] | None = None) -> dict[tuple, Expectation]:
+    """The sessions (of `only`, else all) whose declared RPE is above the range their
+    dose expects, by `ledger.row_key`, calibrated on `rows`: what the load gauge weighs
+    more on a quality session, and what the weekly review lists. Empty when the rulebook
+    declares no method."""
+    config = settings()
+    if config is None:
+        return {}
+    found = history(store, rows, config)
+    out = {}
+    for row in rows if only is None else only:
+        if row.rpe is None:
             continue
-        shape = profile_of(row)
-        if shape is not None:
-            samples.extend(easy_load.samples([(row.date, shape,
-                                               easy_load.group_of(store, activity))]))
-    return History(rows, profile_of, lambda day: easy_load.reference_mps(samples, day), config)
+        expected = found.expectation(row)
+        if expected is not None and expected.side(row.rpe) is RpeSide.ABOVE:
+            out[row_key(row)] = expected
+    return out

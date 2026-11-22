@@ -161,3 +161,24 @@ def test_reorganize_weighs_a_session_by_its_expected_rpe_and_nothing_without():
     assert reorganize.items(sessions, [], None, lambda session: 5.5)[0].load == 150 * 5.5
     assert reorganize.items(sessions, [], None, lambda session: None)[0].load == 0
     assert reorganize.items(sessions, [], None)[0].load == 0
+
+
+def test_a_new_revision_gives_no_rpe_band_but_carries_a_stored_one():
+    from redline.model import weekly_plan
+
+    def revision(workout="threshold", **band) -> dict:
+        return {"sessions": [{"id": "thu", "kind": "run", "workout": workout,
+                              "status": "planned", **band}]}
+
+    def refused(previous, current) -> bool:
+        return any("thu" in problem and "rpe" in problem
+                   for problem in weekly_plan.rpe_band_errors(previous, current))
+
+    assert refused(None, revision(rpe_min=6, rpe_max=7))
+    assert refused(None, revision("easy", rpe_max=3))
+    assert refused(revision(rpe_min=6, rpe_max=7), revision(rpe_min=6, rpe_max=8))
+    assert not refused(revision(rpe_min=6, rpe_max=7), revision(rpe_min=6, rpe_max=7)), \
+        "a week planned before the rule must stay revisable"
+    assert not refused(None, revision())
+    assert "RPE" not in " ".join(weekly_plan.details_of(
+        {"workout": "threshold", "rpe_min": 6, "rpe_max": 7, "duration_cap_min": 60}))

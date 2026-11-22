@@ -185,7 +185,7 @@ struct DetailPlanSection: View {
             let low = times.min()!, high = times.max()!
             steps.append(Step(quality: true,
                               name: "\(reps.count) × \(Numbers.minutes(times.reduce(0, +) / Double(reps.count)))",
-                              sub: targets.rpeRange.map { "effort visé \($0.replacingOccurrences(of: "≤", with: ""))" },
+                              sub: nil,
                               value: Numbers.duration(low) + (high != low ? " – \(Numbers.duration(high))" : ""),
                               valueSub: beats.isEmpty ? nil
                                 : "FC \(beats.min()!)" + (beats.max() != beats.min() ? " – \(beats.max()!)" : "")))

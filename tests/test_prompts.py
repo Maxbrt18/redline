@@ -87,13 +87,16 @@ def test_the_coach_names_its_ai_identity_when_asked_and_never_signs():
     assert "c'est sous ce nom que tu signes" not in style
 
 
-def test_overshooting_a_target_is_scolded_not_nuanced():
-    """An explicit mandate the style must keep: overshooting a target is a reprimand."""
+def test_a_quality_run_above_its_prescription_is_scolded_not_nuanced():
+    """An explicit mandate the style must keep: a quality session run above its
+    prescription is a reprimand; the RPE figure never is."""
     assert "SÉANCE RATÉE" in STYLE_PROMPT
     assert "réprimande" in STYLE_PROMPT
     debrief = " ".join(PROACTIVE_TRIGGERS["strava_debrief"].split())
     assert "réserve dépensée ou all-in final = séance ratée" in debrief
     assert "réprimande franche" in debrief
+    assert "jamais au chiffre du RPE" in " ".join(STYLE_PROMPT.split())
+    assert "RPE hors bande" not in debrief
 
 
 def test_a_slightly_faster_last_rep_is_not_scolded():
@@ -112,7 +115,7 @@ def test_the_reprimand_stays_inside_the_perimeter_the_vault_gave_it():
     false positives ends up ignored. The prompt applies the vault, it does not rule
     against it."""
     style = " ".join(STYLE_PROMPT.split())
-    assert "SÉANCE DE QUALITÉ" in style
+    assert "QUALITÉ COURUE AU-DESSUS DE SA CONSIGNE" in style
     assert "n'est PAS une séance ratée" in style
     assert "mandat de réprimande limité" in style
     debrief = " ".join(PROACTIVE_TRIGGERS["strava_debrief"].split())

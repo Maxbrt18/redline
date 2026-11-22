@@ -4,7 +4,7 @@ from __future__ import annotations
 
 REST_BASELINE = "repos 8 sem : {series}"
 
-OVER_TARGET = "{date} {kind} — RPE {rpe:g} déclaré pour une cible de {target:g}"
+ABOVE_RANGE = "{date} {kind} — RPE {rpe:g} déclaré pour {low}-{high} attendus"
 
 PAIN_SERIES = "pic {peak} · médiane {median} (n={n})"
 
@@ -91,7 +91,7 @@ PROJECTION_REQUIRED_NOTE = (
 
 REPORT_DESCENT = "D− de la semaine : {dminus} m — c'est LUI que compte la jauge"
 
-REPORT_OVER_TARGET = "⚠ au-dessus de la cible — {overshoot}"
+REPORT_ABOVE_RANGE = "⚠ au-dessus du RPE attendu — {overshoot}"
 
 REPORT_INCOMPLETE = "⚠ ligne incomplète — {problem}"
 
@@ -105,7 +105,7 @@ TREND_SERIES = (
 
 EMPTY_LEDGER = "Registre vide."
 
-TRACE_MISSED = "{date} {type} séance RATÉE (+0.5)"
+TRACE_COSTLIER = "{date} {type} au-dessus du RPE attendu (+0.5)"
 
 TRACE_BAD_NIGHTS = "×1.10 2-3 mauvaises nuits"
 
