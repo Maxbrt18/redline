@@ -187,9 +187,10 @@ def test_the_report_reads_the_envelope_of_every_easy_run_planned_since_the_start
         {"id": "w40-sam-sl", "workout": "long", "status": "planned", "date": "2026-10-03",
          "duration_cap_min": 120},
         {"id": "w40-dim-ef", "workout": "easy", "status": "planned", "date": "2026-10-04"}]
-    caps, envelopes = permit_report._plans(_Plans(sessions), {"2026-W40", "2026-W41"})
+    caps, envelopes, efforts = permit_report._plans(_Plans(sessions), {"2026-W40", "2026-W41"})
     assert caps["w40-sam-sl"] == 120 and caps["w40-dim-ef"] is None
     assert envelopes == [permit.Envelope("w40-mar-ef", dt.date(2026, 9, 29), 50)]
+    assert efforts == set()
     assert permit_report._weeks(MON, MON + dt.timedelta(days=15)) == {
         "2026-W40", "2026-W41", "2026-W42"}
 
@@ -273,3 +274,33 @@ def test_the_report_loads_each_run_at_the_reference_of_its_day():
     assert loaded[0].load.reference_pace_s == 374
     assert round(loaded[0].load.minutes) == 38
     assert loaded[1].load is None
+
+
+def test_a_run_with_prescribed_efforts_is_judged_on_its_raw_duration_only(in_load):
+    """The pyramid the coach prescribed as an easy run: its fast efforts weigh in load and
+    lift the mean HR by design; neither is the athlete's choice."""
+    thu = MON + dt.timedelta(days=3)
+    run = dataclasses.replace(_ef(thu, 41, hr=161), load=permit.Load(46, 379))
+    [line] = permit.evaluate([_choice("w47-jeu-ef-pote", thu, 38)], [run], {},
+                             {"w47-jeu-ef-pote": 40}, {}, today=thu + dt.timedelta(days=1),
+                             hr_cap=HR_CAP, efforts={"w47-jeu-ef-pote"})
+    assert line.efforts and line.load is None
+    assert line.triggers == [] and line.minors == []
+    assert round(line.gap) == 3
+    current = permit.state([line], [], today=thu + dt.timedelta(days=1), period=PERIOD)
+    assert any("couru 41 min (efforts prescrits : durée brute, FC non jugée)" in row
+               for row in permit.render([line], current))
+    over = permit.evaluate([], [_ef(thu, 47)], {}, {}, {}, today=thu + dt.timedelta(days=1),
+                           hr_cap=HR_CAP, envelopes=[permit.Envelope("w47-jeu-ef", thu, 40)],
+                           efforts={"w47-jeu-ef"})
+    assert over[0].triggers == ["au-delà de l'enveloppe (40 min)"]
+
+
+def test_the_report_reads_the_efforts_the_plan_prescribed():
+    sessions = [
+        {"id": "w47-jeu-ef-pote", "workout": "easy", "status": "done", "date": "2026-09-29",
+         "duration_cap_min": 40, "structure": "efforts"},
+        {"id": "w47-mer-cotes", "workout": "hills", "status": "planned",
+         "date": "2026-09-30"}]
+    _, _, efforts = permit_report._plans(_Plans(sessions), {"2026-W40"})
+    assert efforts == {"w47-jeu-ef-pote", "w47-mer-cotes"}

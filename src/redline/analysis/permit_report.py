@@ -17,6 +17,7 @@ from redline.model import (
     iso_week,
     paths,
     permit,
+    prescription,
     session_kinds,
 )
 from redline.model.activity import Activity
@@ -30,10 +31,13 @@ def _strava_id(key: str) -> int | None:
     return None
 
 
-def _plans(store: Any, weeks: set[str]) -> tuple[dict[str, int | None], list[permit.Envelope]]:
-    """Each planned session's duration cap, and the easy runs that carry one."""
+def _plans(store: Any, weeks: set[str]
+           ) -> tuple[dict[str, int | None], list[permit.Envelope], set[str]]:
+    """Each planned session's duration cap, the easy runs that carry one, and the
+    sessions the plan prescribed efforts on."""
     caps: dict[str, int | None] = {}
     envelopes: list[permit.Envelope] = []
+    efforts: set[str] = set()
     for week in sorted(weeks):
         plan = store.load_plan(week)
         if not plan:
@@ -41,11 +45,13 @@ def _plans(store: Any, weeks: set[str]) -> tuple[dict[str, int | None], list[per
         for session in plan["revisions"][-1]["sessions"]:
             cap = session.get("duration_cap_min")
             caps[session["id"]] = cap
+            if prescription.has_efforts(session):
+                efforts.add(session["id"])
             if (cap is not None and session["workout"] == session_kinds.EASY
                     and session["status"] != SessionStatus.CANCELLED):
                 envelopes.append(permit.Envelope(session["id"],
                                                  dt.date.fromisoformat(session["date"]), cap))
-    return caps, envelopes
+    return caps, envelopes, efforts
 
 
 def _weeks(start: dt.date, today: dt.date) -> set[str]:
@@ -123,8 +129,8 @@ def report(store: Any, today: dt.date, week: str | None = None) -> list[str]:
               for group in [_group(store, run.strava_id)] if group is not None}
     if counts_load:
         runs = _loaded(store, runs, groups, period.start)
-    caps, envelopes = _plans(store, weeks)
+    caps, envelopes, efforts = _plans(store, weeks)
     lines = permit.evaluate(choices, runs, traces, caps, groups, today, hr_cap=hr_cap,
-                            envelopes=envelopes)
+                            envelopes=envelopes, efforts=efforts)
     current = permit.state(lines, store.daily_rows(), today, period)
     return permit.render(lines, current, week)

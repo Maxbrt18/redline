@@ -129,7 +129,9 @@ class EfLine:
     """One easy run of the permit. `triggers` are its failures, `minors` its minor gaps;
     `safety` marks a failure read on the body (the next morning's trace), not on a choice.
     `coach_minutes` is None for an enveloped run the coach sealed no choice for. `load` is
-    set when the rulebook counts the envelope in load and the run's load is known."""
+    set when the rulebook counts the envelope in load and the run's load is known.
+    `efforts`: the plan prescribed efforts (`prescription.has_efforts`), whose pace and HR
+    are the prescription's: the run is judged on its raw duration, its mean HR is not."""
 
     session_key: str
     date: dt.date
@@ -144,6 +146,7 @@ class EfLine:
     minors: list[str] = field(default_factory=list)
     safety: bool = False
     load: Load | None = None
+    efforts: bool = False
 
     @property
     def measured_minutes(self) -> float | None:
@@ -188,16 +191,19 @@ def window(choices: Iterable[dict]) -> Window | None:
 
 def evaluate(choices: Iterable[dict], runs: Iterable[Run], traces: dict[dt.date, float],
              caps: dict[str, int | None], groups: dict[int, bool],
-             today: dt.date, *, hr_cap: int, envelopes: Iterable[Envelope] = ()) -> list[EfLine]:
+             today: dt.date, *, hr_cap: int, envelopes: Iterable[Envelope] = (),
+             efforts: Iterable[str] = ()) -> list[EfLine]:
     """One line per sealed easy run, and per enveloped one the coach sealed no choice for:
     whatever the phase, a run with an envelope is judged against it.
 
     `hr_cap`: the top of the athlete's Z2 (`Instance.hr_bounds[1]`). Past the tolerance,
     a run is a minor gap up to `minor_pct` above its envelope and a failure beyond; a mean
     HR is a minor gap up to `minor_hr_bpm` above the cap. A second minor gap within the
-    length of the supervised period is a failure.
+    length of the supervised period is a failure. `efforts`: the keys of the sessions the
+    plan prescribed efforts on.
     """
     limits = thresholds()
+    prescribed = set(efforts)
     by_day: dict[dt.date, list[Run]] = {}
     for run in runs:
         if run.type == session_kinds.EASY:
@@ -210,13 +216,14 @@ def evaluate(choices: Iterable[dict], runs: Iterable[Run], traces: dict[dt.date,
               for envelope in envelopes if envelope.session_key not in sealed]
     lines.sort(key=lambda line: (line.date, line.session_key))
     for line in lines:
+        line.efforts = line.session_key in prescribed
         done = by_day.get(line.date, [])
         if done:
             run = done[0]
             line.status = "run"
             line.actual_minutes = run.minutes
             line.hr_avg = run.hr_avg
-            if limits.raw_guard_pct is not None:
+            if limits.raw_guard_pct is not None and not line.efforts:
                 line.load = run.load
             line.next_trace = traces.get(line.date + dt.timedelta(days=1))
             if run.strava_id is not None:
@@ -246,7 +253,7 @@ def _judge(line: EfLine, limits: Thresholds, hr_cap: int) -> None:
                 line.minors.append(text.MINOR_ENVELOPE.format(cap=cap))
             else:
                 line.triggers.append(text.OVER_ENVELOPE.format(cap=cap))
-    if line.hr_avg is not None and line.hr_avg > hr_cap:
+    if line.hr_avg is not None and line.hr_avg > hr_cap and not line.efforts:
         if line.hr_avg <= hr_cap + limits.minor_hr_bpm:
             line.minors.append(text.MINOR_HR.format(hr_avg=line.hr_avg, hr_cap=hr_cap))
         else:
@@ -333,6 +340,8 @@ def _fmt_minutes(value: float | None) -> str:
 def _fmt_actual(line: EfLine, limits: Thresholds) -> str:
     """The raw minutes, with the load they count for when the envelope is counted in load."""
     actual = _fmt_minutes(line.actual_minutes)
+    if line.efforts:
+        return actual + text.EFFORTS
     if limits.raw_guard_pct is None:
         return actual
     if line.load is None:
