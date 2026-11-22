@@ -232,6 +232,17 @@ class DebriefVerdict(StrEnum):
     UNDETERMINED = "undetermined"
 
 
+class RpeSide(StrEnum):
+    """Where a declared RPE falls against the range its dose expects
+    (`redline.analysis.expected_rpe`)."""
+
+    WITHIN = "within"
+    ABOVE = "above"
+    BELOW = "below"
+    #: No RPE declared, or no range to read it against.
+    UNKNOWN = "unknown"
+
+
 class FindingKind(StrEnum):
     """One reading of a run against its prescription (`debrief_findings`)."""
 

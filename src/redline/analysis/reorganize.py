@@ -33,7 +33,7 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from enum import StrEnum
 
-from redline.model import session_kinds, weekly_plan
+from redline.model import session_kinds
 from redline.model.program import Program
 from redline.model.vocabulary import DayKind, GroupPace, SessionPriority
 from redline.model.week_days import Request
@@ -138,42 +138,17 @@ def _minutes(session: dict, program: Program | None) -> int | None:
     return None
 
 
-#: The typical RPE of an accumulating kind for a duration in minutes, or None.
-Typical = Callable[[str, int], float | None]
-
-
-def _effort(session: dict, program: Program | None,
-            targets: dict[tuple[str, str | None], float], minutes: int | None,
-            typical: Typical | None) -> float:
-    """The session's planned effort on 10: its RPE band, else its routine's target.
-
-    A session whose effort accumulates has neither: it weighs what the athlete's
-    comparable sessions weighed (`typical`), else as much as the hardest declared target,
-    never less.
-    """
-    if session["workout"] in session_kinds.ACCUMULATING:
-        known = typical(session["workout"], minutes) if typical and minutes else None
-        return known if known is not None else max(targets.values(), default=0.0)
-    band = weekly_plan.rpe_band(session)
-    if band is not None:
-        low, high = band
-        return ((high if low is None else low) + high) / 2
-    if session.get("routine"):
-        target = targets.get((session_kinds.STRENGTH, session["routine"]))
-        if target is not None:
-            return target
-        if program and session["routine"] in program.sessions:
-            return float(program.sessions[session["routine"]].get("target_rpe") or 0)
-    return targets.get((session["workout"], None), 0.0)
+#: The RPE a planned session is expected to cost, from the athlete's history
+#: (`redline.analysis.expected_rpe`), or None without a reference.
+Effort = Callable[[dict], float | None]
 
 
 def items(sessions: list[dict], gates: list[dict], program: Program | None,
-          targets: dict[tuple[str, str | None], float],
-          typical: Typical | None = None) -> list[Item]:
+          effort: Effort | None = None) -> list[Item]:
     """The sessions a search works with; a rest day is a day, not a session.
 
-    `typical` gives the athlete's typical RPE for an accumulating kind and a duration
-    in minutes (`analysis.comparable.typical_rpe`), None without a reference.
+    A session's load is its minutes times its expected RPE (`effort`); a session without
+    one weighs nothing in the comparison of loads rather than an invented figure.
     """
     held: dict[str, dt.date] = {}
     for gate in gates:
@@ -195,7 +170,7 @@ def items(sessions: list[dict], gates: list[dict], program: Program | None,
             id=session["id"], title=session["title"], workout=session["workout"],
             home=dt.date.fromisoformat(session["date"]), demanding=session["demanding"],
             priority=SessionPriority(priority), minutes=minutes,
-            load=(minutes or 0) * _effort(session, program, targets, minutes, typical),
+            load=(minutes or 0) * ((effort(session) if effort else None) or 0.0),
             strength=session["kind"] == session_kinds.STRENGTH,
             impact=bool(note and program and routine and program.impact(routine, drop)),
             gaps=tuple(sorted((note.get("min_gap_h") or {}).items())) if note else (),

@@ -124,9 +124,9 @@ class ActivityPipeline:
         verdict = self._verdict(activity_id, session, splits, streams)
         if verdict:
             snapshot["verdict"] = verdict
-        comparables = self._comparables(activity_id)
-        if comparables:
-            snapshot["comparables"] = comparables
+        expected = self._expected_rpe(activity_id, session, day)
+        if expected:
+            snapshot["expected_rpe"] = expected
         from redline.model import debrief
 
         if debrief.is_quality(session):
@@ -266,25 +266,33 @@ class ActivityPipeline:
             log.warning("Verdict of activity %s not ruled: %s", activity_id, exc)
             return []
 
-    def _comparables(self, activity_id: int) -> list[dict]:
-        """The athlete's previous sessions this one compares with, if its effort accumulates.
-
-        Its RPE has no fixed target: the coach reads it against these. A failed read
-        deprives the debrief of the reference, never of its departure.
-        """
+    def _expected_rpe(self, activity_id: int, session: dict | None, day: Any) -> dict:
+        """The RPE the run's dose should cost, and the prescribed session's, from the
+        athlete's history (`redline.analysis.expected_rpe`). A failed read deprives the
+        debrief of the range, never of its departure."""
         try:
-            from redline.analysis import comparable, ledger
+            from redline.analysis import expected_rpe, ledger
 
+            config = expected_rpe.settings()
+            if config is None:
+                return {}
             rows = ledger.parse_ledger(self.store)
             row = next((row for row in rows
                         if row.idempotency_key == f"strava:{activity_id}"), None)
-            if row is None or not row.hours:
-                return []
-            return [item.as_json() for item in
-                    comparable.comparables(rows, row.type, row.hours * 60, row.date)]
+            if row is None:
+                return {}
+            history = expected_rpe.history(self.store, rows, config)
+            out: dict[str, Any] = {}
+            run = history.expectation(row)
+            if run is not None:
+                out["run"] = run.as_json()
+            prescribed = history.prescribed(session, row.date) if session else None
+            if prescribed is not None:
+                out["prescribed"] = prescribed.as_json()
+            return out
         except Exception as exc:
-            log.warning("Comparable sessions of activity %s not read: %s", activity_id, exc)
-            return []
+            log.warning("Expected RPE of activity %s not computed: %s", activity_id, exc)
+            return {}
 
     @staticmethod
     def _quality_card(activity_id: int, laps: tuple[Lap, ...], session: dict | None,

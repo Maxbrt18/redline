@@ -280,12 +280,16 @@ def test_items_read_priority_minutes_and_gates_from_the_plan():
     program = Program({"jumps": {"impact": True}, "calf": {}},
                       {"a": {"exercises": ["jumps", "calf"], "duration_min": 30,
                              "target_rpe": 6, "min_gap_h": {"strength": 48}}})
-    found = {i.id: i for i in reorganize.items(sessions, gates, program, {})}
+    expected = {"a": 3.0, "c": 6.0}
+    found = {i.id: i for i in reorganize.items(sessions, gates, program,
+                                                lambda session: expected.get(session["id"]))}
     assert set(found) == {"a", "b", "c"}
     assert found["a"].priority is SessionPriority.OPTIONAL
     assert found["b"].priority is SessionPriority.KEY
     assert found["b"].held_until == dt.date(2030, 3, 7)
     assert found["c"].minutes == 30 and found["c"].load == 180
+    assert found["a"].load == 45 * 3.0
+    assert found["b"].load == 0, "no expected RPE: no invented weight"
     assert found["c"].impact is False
     assert found["c"].gaps == (("strength", 48),)
 

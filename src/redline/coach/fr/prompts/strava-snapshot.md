@@ -18,10 +18,11 @@ consigne typée (relief, montées, descentes, efforts) : conforme, écart d'exé
 indéterminé, puis chaque constat avec son propriétaire. Un choix d'allure reçoit la
 correction ; un choix du parcours se nomme à part de la FC ; un signal d'état n'appelle
 au plus qu'une question ; un constat « sans reproche » se nomme tel quel.
-`comparables`, sur une sortie longue, porte ses dernières sorties longues de durée
-proche (date, km, minutes, RPE). Son RPE n'a pas de cible fixe : il croît avec la durée,
-plus vite qu'elle. Lis-le contre ces sorties, jamais contre un chiffre. Sans
-`comparables`, il n'y a pas de référence : n'en invente aucune.
+`expected_rpe` porte le RPE que la dose devait coûter, calculé sur l'historique de
+⟨athlète⟩ : `run` pour la séance courue, `prescribed` pour la séance prescrite (footing
+ou sortie longue), chacun avec sa valeur, sa fourchette (`low`-`high`), le nombre de
+séances qui le calibrent et l'écart-type. Aucune séance n'a de cible RPE fixe. Sans
+`expected_rpe`, il n'y a pas de référence : n'en invente aucune.
 `quality_card`, sur une séance de qualité, porte chaque répétition (durée, distance, FC)
 et sa récup, lues sur les tours ; le service en joint la carte.
 La polyline est volontairement retirée du paquet.

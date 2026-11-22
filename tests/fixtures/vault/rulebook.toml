@@ -71,12 +71,15 @@ pain_cut_pct = 30
 poor_nights_streak = 3
 # ... as an abnormally high easy-run HR does, for this many days.
 alarm_no_quality_days = 7
-# A long run's session RPE grows with its duration, faster than the duration: it has no
-# fixed target. It is read against the athlete's own long runs whose duration differs by
-# at most this share (%) ...
-comparable_duration_pct = 15
-# ... the most recent ones, at most this many.
-comparable_sessions = 5
+# The expected RPE: calibrated per kind on the declared RPE of these weeks, from these
+# many sessions, a range of plus or minus the width (wider while unsettled), a run's
+# intensity to this power in its dose.
+rpe_model_weeks = 26
+rpe_model_min_sessions = 3
+rpe_model_settled_sessions = 5
+rpe_range_width = 1.0
+rpe_range_width_unsettled = 1.5
+rpe_intensity_exponent = 2.0
 # The debrief of an easy or long run reads its kilometres. A kilometre whose mean HR
 # exceeds the session's HR cap by more than this (bpm) is named ...
 split_hr_margin_bpm = 0
