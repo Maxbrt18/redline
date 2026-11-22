@@ -438,6 +438,35 @@ class DeadlineStatus(StrEnum):
     DONE = "done"
 
 
+class RaceTerrain(StrEnum):
+    """Where a typed race is run (`context.terrain`): it picks the plan's template and the
+    default climb intent."""
+
+    ROAD = "road"
+    TRAIL = "trail"
+
+
+class GoalSource(StrEnum):
+    """Where a race's time goal comes from (`context.goal_source`)."""
+
+    #: The athlete's own figure.
+    ATHLETE = "athlete"
+    #: Set with the coach from recent races and sessions.
+    COACH = "coach"
+    #: A VDOT-style equivalence from a recent race.
+    EQUIVALENCE = "equivalence"
+
+
+class PlanPhase(StrEnum):
+    """The phases of a plan skeleton, in the order they run (`redline.model.plan_skeleton`)."""
+
+    RECOVERY = "recovery"
+    BASE = "base"
+    DEVELOPMENT = "development"
+    SPECIFIC = "specific"
+    TAPER = "taper"
+
+
 class DeadlineKind(StrEnum):
     """What a deadline is about (`deadlines.kind`)."""
 

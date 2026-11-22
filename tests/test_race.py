@@ -69,3 +69,43 @@ def test_an_unreadable_key_costs_its_value_never_the_race():
     typed = race.from_row({"kind": "race", "status": "scheduled", "due_on": "2030-11-30",
                            "context": {"taper_weeks": 1, "pace_s_per_km": "fast"}})
     assert typed.taper_weeks == 1 and typed.pace_s_per_km is None
+
+
+GOAL = {"distance_km": 21.1, "terrain": "road", "peak_volume_km": 50, "peak_long_run_km": 20,
+        "quality_per_week": 2, "families": ["threshold"], "goal_time_s": 6300,
+        "goal_source": "coach",
+        "skeleton": {"candidate": "balanced", "specific_weeks": 6, "deload_every": 4,
+                     "second_quality": "specific"}}
+
+
+def test_a_race_carries_the_goal_its_plan_is_built_from():
+    typed = race.from_row({"kind": "race", "status": "scheduled", "due_on": "2031-04-06",
+                           "context": GOAL})
+    goal = typed.goal
+    assert (goal.distance_km, goal.terrain, goal.peak_volume_km) == (21.1, "road", 50)
+    assert goal.families == ("threshold",) and goal.goal_time_s == 6300
+    assert goal.skeleton == race.Skeleton("balanced", 6, 4, "specific")
+    assert race.from_row({"kind": "race", "status": "scheduled",
+                          "due_on": "2031-04-06"}).goal is None
+
+
+def test_a_race_that_says_no_taper_takes_its_templates_by_distance():
+    def taper(context):
+        return race.from_row({"kind": "race", "status": "scheduled", "due_on": "2031-04-06",
+                              "context": context}).taper_weeks
+
+    assert taper({"distance_km": 21.1, "terrain": "road"}) == 2
+    assert taper({"distance_km": 42.2, "terrain": "road"}) == 3
+    assert taper({"distance_km": 21.1, "terrain": "road", "taper_weeks": 1}) == 1, \
+        "the race's own taper first"
+    assert taper({"distance_km": 21.1}) == 3, "without a terrain, the rulebook's"
+
+
+def test_the_goal_keys_are_typed():
+    race.CONTEXT_SCHEMA.validate(GOAL)
+    with pytest.raises(SchemaError, match="goal_time_s and goal_source go together"):
+        race.CONTEXT_SCHEMA.validate({"goal_time_s": 6300})
+    with pytest.raises(SchemaError, match="terrain"):
+        race.CONTEXT_SCHEMA.validate({"terrain": "track"})
+    with pytest.raises(SchemaError, match="second_quality"):
+        race.CONTEXT_SCHEMA.validate({"skeleton": {**GOAL["skeleton"], "second_quality": "base"}})
