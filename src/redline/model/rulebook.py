@@ -66,6 +66,8 @@ PERMIT_GRADED_PARAMETERS = ("permit_tolerance_min", "permit_tolerance_pct",
 PERMIT_LOAD_PARAMETER = "permit_raw_guard_pct"
 #: The expected-RPE method (`redline.analysis.expected_rpe`), declared together or not at
 #: all; in this order, the fields of its `Settings`.
+#: The climb of a plan skeleton (`redline.model.plan_skeleton`), declared together.
+SKELETON_PARAMETERS = ("skeleton_ramp_max_pct", "skeleton_long_step_max_pct")
 RPE_MODEL_PARAMETERS = ("rpe_model_weeks", "rpe_model_min_sessions",
                         "rpe_model_settled_sessions", "rpe_range_width",
                         "rpe_range_width_unsettled", "rpe_intensity_exponent")
@@ -132,6 +134,12 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
               note="consecutive poor nights that remove quality"),
         field("alarm_no_quality_days", int, required=False, minimum=1, maximum=14,
               note="days without quality after poor nights or a high easy-run HR"),
+        # Optional, both or none (`SKELETON_PARAMETERS`): absent, no plan skeleton is built.
+        field("skeleton_ramp_max_pct", float, required=False, minimum=1, maximum=50,
+              note="most a skeleton's weekly volume climbs from one build week to the next, "
+                   "in %"),
+        field("skeleton_long_step_max_pct", float, required=False, minimum=1, maximum=50,
+              note="most a skeleton's long run climbs from one build week to the next, in %"),
         # Optional, all six or none (`RPE_MODEL_PARAMETERS`): absent, no session has an
         # expected RPE and none is read against one.
         field("rpe_model_weeks", int, required=False, minimum=2, maximum=104,
@@ -258,6 +266,8 @@ class Parameters:
     pain_cut_pct: int | None = None
     poor_nights_streak: int | None = None
     alarm_no_quality_days: int | None = None
+    skeleton_ramp_max_pct: float | None = None
+    skeleton_long_step_max_pct: float | None = None
     rpe_model_weeks: int | None = None
     rpe_model_min_sessions: int | None = None
     rpe_model_settled_sessions: int | None = None
@@ -384,7 +394,8 @@ def parse(text: str, source: Path) -> Rulebook:
                         "missed_after_hours", "split_fast_start_pct", "split_fade_pct",
                         "split_decoupling_pct", "permit_tolerance_pct", "permit_minor_pct",
                         "rpe_range_width", "rpe_range_width_unsettled",
-                        "rpe_intensity_exponent")
+                        "rpe_intensity_exponent", "skeleton_ramp_max_pct",
+                        "skeleton_long_step_max_pct")
            if name in raw}})
     scales = build_scales(payload["scales"])
     problems = []
@@ -395,7 +406,8 @@ def parse(text: str, source: Path) -> Rulebook:
         problems.append(str(exc))
     for group, label in ((PERMIT_PARAMETERS, "permit thresholds"),
                          (PERMIT_GRADED_PARAMETERS, "graded permit thresholds"),
-                         (RPE_MODEL_PARAMETERS, "expected-RPE thresholds")):
+                         (RPE_MODEL_PARAMETERS, "expected-RPE thresholds"),
+                         (SKELETON_PARAMETERS, "skeleton thresholds")):
         declared = [name for name in group if name in raw]
         if declared and len(declared) != len(group):
             problems.append(f"parameters: the {label} go together, missing "
