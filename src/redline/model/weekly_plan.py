@@ -1034,11 +1034,13 @@ def _is_quality(session: dict) -> bool:
 RESCHEDULE_FIELDS = frozenset({"date", "note"})
 
 
-def reschedules_only(previous: dict | None, current: dict) -> bool:
+def reschedules_only(previous: dict | None, current: dict, *, settled_before: str = "") -> bool:
     """Whether `current` only moves sessions of `previous` to other days.
 
     The same sessions, each identical outside `RESCHEDULE_FIELDS`, and a volume target
-    no higher: the load of the week is unchanged, only its order.
+    no higher: the load of the week is unchanged, only its order. A session dated before
+    `settled_before` in both revisions may change in any field: it is already behind the
+    revision, part of the week's story, and declaring it differently adds no load.
     """
     if previous is None:
         return False
@@ -1059,7 +1061,13 @@ def reschedules_only(previous: dict | None, current: dict) -> bool:
             found["status"] = SessionStatus.PLANNED
         return found
 
-    return all(kept(session) == kept(old[session.get("id")]) for session in new)
+    def settled(session: dict) -> bool:
+        before = old[session.get("id")]
+        return (session.get("date", "") < settled_before
+                and before.get("date", "") < settled_before)
+
+    return all(settled(session) or kept(session) == kept(old[session.get("id")])
+               for session in new)
 
 
 def pain_rule_errors(revision: dict, holds: list[QualityHold],
@@ -1069,8 +1077,9 @@ def pain_rule_errors(revision: dict, holds: list[QualityHold],
 
     Judged on the new revision only, from its own date on: a session already behind it
     belongs to the week's story, and an older revision stays readable. A revision that
-    only reschedules `previous` (`reschedules_only`) adds no load, so the volume ceiling
-    does not bind it; a quality session moved into a hold is still refused.
+    only reschedules `previous`, or changes only sessions already behind it
+    (`reschedules_only`), adds no load, so the volume ceiling does not bind it; a quality
+    session moved into a hold is still refused.
     """
     written_on = str(revision.get("computed_at") or now_stamp())[:10]
     problems = []
@@ -1087,14 +1096,15 @@ def pain_rule_errors(revision: dict, holds: list[QualityHold],
                     f"fact={hold.fact!r}")
                 break
     target = revision.get("volume_target_km")
-    for ceiling in [] if reschedules_only(previous, revision) else ceilings:
+    unchanged_load = reschedules_only(previous, revision, settled_before=written_on)
+    for ceiling in [] if unchanged_load else ceilings:
         if target is not None and target > ceiling.ceiling_km:
             problems.append(
                 f"{where}.volume_target_km: {target:g} km is above {ceiling.ceiling_km:g} km, "
                 f"the cut of rule {ceiling.rule} on the {ceiling.reference_km:g} km planned "
                 f"before {ceiling.fact!r}. Only moving sessions (changing nothing but "
                 f"{' and '.join(sorted(RESCHEDULE_FIELDS))}, volume target unchanged) "
-                f"keeps the volume")
+                f"or changing only sessions already past keeps the volume")
     return problems
 
 
