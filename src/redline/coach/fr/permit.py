@@ -5,6 +5,7 @@ from __future__ import annotations
 TRACE_NEXT_DAY = "trace au-dessus de la base le lendemain"
 OVER_ENVELOPE = "au-delà de l'enveloppe ({cap} min)"
 MINOR_ENVELOPE = "un peu au-delà de l'enveloppe ({cap} min)"
+OVER_RAW_GUARD = "durée brute au-delà de l'enveloppe + {guard} % ({cap} min)"
 #: The HR is the body's answer, not the athlete's choice: never called "too fast".
 HR_ABOVE_CAP = "FC moyenne au-dessus du plafond ({hr_avg} > {hr_cap})"
 MINOR_HR = "FC moyenne un peu au-dessus du plafond ({hr_avg} > {hr_cap})"
@@ -37,6 +38,9 @@ DETAIL_RUN = "{chosen}, couru {actual}{agreement} · {trace}{group}"
 CHOSEN = "coach {coach} min"
 ENVELOPE_ONLY = "enveloppe {cap}"
 MINUTES = "{minutes} min"
+#: What a run counts for against an envelope counted in load.
+LOAD = " ({minutes} min à l'allure EF de {pace}/km)"
+LOAD_UNKNOWN = " (charge inconnue : minutes brutes)"
 LINE = "- {weekday} {date:%d/%m} {session} [{status}] : {detail}{flags}"
 RESTRICTION = "Restriction {week} : {reasons}."
 GRANT = ("Obtention ({week}) : {run} EF courues (≥{needed} requises), {agreements} accords à "

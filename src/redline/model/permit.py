@@ -19,6 +19,8 @@ from dataclasses import dataclass, field, replace
 
 from redline.coach import dates
 from redline.coach.fr import permit as text
+from redline.coach.fr.debrief import number as said_number
+from redline.coach.fr.debrief import pace as said_pace
 from redline.model.vocabulary import LifeLoad, Sleep
 
 from . import iso_week, rulebook, session_kinds
@@ -51,6 +53,10 @@ class Thresholds:
     minor_hr_bpm: int = 0
     #: Supervision after a failure; without the graded thresholds, `withdrawal_days`.
     failure_withdrawal_days: int | None = None
+    #: Declared (`permit_raw_guard_pct`), the envelope counts in load, equivalent minutes
+    #: at the reference easy pace, and a raw duration more than this share (%) above the
+    #: envelope still fails. Absent, the envelope counts raw minutes.
+    raw_guard_pct: float | None = None
 
     @property
     def after_failure(self) -> int:
@@ -76,7 +82,8 @@ def declared() -> Thresholds | None:
     return replace(base, tolerance_min=book.permit_tolerance_min,
                    tolerance_pct=book.permit_tolerance_pct, minor_pct=book.permit_minor_pct,
                    minor_hr_bpm=book.permit_minor_hr_bpm,
-                   failure_withdrawal_days=book.permit_failure_withdrawal_days)
+                   failure_withdrawal_days=book.permit_failure_withdrawal_days,
+                   raw_guard_pct=book.permit_raw_guard_pct)
 
 
 def thresholds() -> Thresholds:
@@ -88,14 +95,24 @@ def thresholds() -> Thresholds:
 
 
 @dataclass(frozen=True)
+class Load:
+    """A run counted in equivalent minutes at the reference easy pace of its day."""
+
+    minutes: float
+    reference_pace_s: int
+
+
+@dataclass(frozen=True)
 class Run:
-    """A ledger run, reduced to what the permit reads."""
+    """A ledger run, reduced to what the permit reads. `load` is None when its streams or
+    the reference pace of its day are missing."""
 
     date: dt.date
     type: str
     minutes: float | None
     hr_avg: int | None
     strava_id: int | None = None
+    load: Load | None = None
 
 
 @dataclass(frozen=True)
@@ -111,7 +128,8 @@ class Envelope:
 class EfLine:
     """One easy run of the permit. `triggers` are its failures, `minors` its minor gaps;
     `safety` marks a failure read on the body (the next morning's trace), not on a choice.
-    `coach_minutes` is None for an enveloped run the coach sealed no choice for."""
+    `coach_minutes` is None for an enveloped run the coach sealed no choice for. `load` is
+    set when the rulebook counts the envelope in load and the run's load is known."""
 
     session_key: str
     date: dt.date
@@ -125,12 +143,19 @@ class EfLine:
     triggers: list[str] = field(default_factory=list)
     minors: list[str] = field(default_factory=list)
     safety: bool = False
+    load: Load | None = None
+
+    @property
+    def measured_minutes(self) -> float | None:
+        """The minutes held against the envelope and the coach's choice."""
+        return self.actual_minutes if self.load is None else self.load.minutes
 
     @property
     def gap(self) -> float | None:
-        if self.actual_minutes is None or self.coach_minutes is None:
+        measured = self.measured_minutes
+        if measured is None or self.coach_minutes is None:
             return None
-        return self.actual_minutes - self.coach_minutes
+        return measured - self.coach_minutes
 
     @property
     def agrees(self) -> bool | None:
@@ -191,6 +216,8 @@ def evaluate(choices: Iterable[dict], runs: Iterable[Run], traces: dict[dt.date,
             line.status = "run"
             line.actual_minutes = run.minutes
             line.hr_avg = run.hr_avg
+            if limits.raw_guard_pct is not None:
+                line.load = run.load
             line.next_trace = traces.get(line.date + dt.timedelta(days=1))
             if run.strava_id is not None:
                 line.group = groups.get(run.strava_id)
@@ -205,12 +232,17 @@ def evaluate(choices: Iterable[dict], runs: Iterable[Run], traces: dict[dt.date,
 
 
 def _judge(line: EfLine, limits: Thresholds, hr_cap: int) -> None:
-    """The envelope and the HR cap, each a minor gap or a failure past its tolerance."""
-    cap, actual = line.cap_minutes, line.actual_minutes
-    if cap is not None and actual is not None:
+    """The envelope and the HR cap, each a minor gap or a failure past its tolerance;
+    past the raw-duration guard, a run fails whatever its load."""
+    cap, measured = line.cap_minutes, line.measured_minutes
+    if cap is not None and measured is not None:
         tolerance = max(limits.tolerance_min, cap * limits.tolerance_pct / 100)
-        if actual > cap + tolerance:
-            if actual <= cap * (1 + limits.minor_pct / 100):
+        guard = limits.raw_guard_pct
+        actual = line.actual_minutes
+        if guard is not None and actual is not None and actual > cap * (1 + guard / 100):
+            line.triggers.append(text.OVER_RAW_GUARD.format(cap=cap, guard=said_number(guard)))
+        elif measured > cap + tolerance:
+            if measured <= cap * (1 + limits.minor_pct / 100):
                 line.minors.append(text.MINOR_ENVELOPE.format(cap=cap))
             else:
                 line.triggers.append(text.OVER_ENVELOPE.format(cap=cap))
@@ -298,10 +330,22 @@ def _fmt_minutes(value: float | None) -> str:
     return "—" if value is None else text.MINUTES.format(minutes=round(value))
 
 
+def _fmt_actual(line: EfLine, limits: Thresholds) -> str:
+    """The raw minutes, with the load they count for when the envelope is counted in load."""
+    actual = _fmt_minutes(line.actual_minutes)
+    if limits.raw_guard_pct is None:
+        return actual
+    if line.load is None:
+        return actual + text.LOAD_UNKNOWN
+    return actual + text.LOAD.format(minutes=round(line.load.minutes),
+                                     pace=said_pace(line.load.reference_pace_s))
+
+
 def render(lines: list[EfLine], current: State, week: str | None = None) -> list[str]:
     """The block the coach reads, at the review or on request."""
     shown = [line for line in lines if week is None or iso_week.of(line.date) == week]
     scale = rulebook.current().scales.morning_trace
+    limits = thresholds()
     out = [text.TITLE.format(phase=text.PHASES[current.phase])]
     if current.withdrawal_until is not None:
         out.append(text.WITHDRAWAL.format(until=current.withdrawal_until))
@@ -315,7 +359,7 @@ def render(lines: list[EfLine], current: State, week: str | None = None) -> list
         chosen = (text.CHOSEN.format(coach=line.coach_minutes) if line.coach_minutes is not None
                   else text.ENVELOPE_ONLY.format(cap=_fmt_minutes(line.cap_minutes)))
         detail = (text.DETAIL_RUN.format(chosen=chosen,
-                                         actual=_fmt_minutes(line.actual_minutes),
+                                         actual=_fmt_actual(line, limits),
                                          agreement=agreement, trace=trace, group=group)
                   if line.status == "run" else chosen)
         flags = text.MINORS.format(minors="; ".join(line.minors)) if line.minors else ""
@@ -327,7 +371,6 @@ def render(lines: list[EfLine], current: State, week: str | None = None) -> list
     for iso, reasons in sorted(current.restricted_weeks.items()):
         if week is None or iso == week:
             out.append(text.RESTRICTION.format(week=iso, reasons="; ".join(reasons)))
-    limits = thresholds()
     if current.grant is not None:
         verdict = current.grant
         out.append(text.GRANT.format(

@@ -61,6 +61,9 @@ PERMIT_PARAMETERS = ("permit_weeks", "permit_min_runs", "permit_agreement_min",
 PERMIT_GRADED_PARAMETERS = ("permit_tolerance_min", "permit_tolerance_pct",
                             "permit_minor_pct", "permit_minor_hr_bpm",
                             "permit_failure_withdrawal_days")
+#: The raw-duration guard, which also counts the envelope in load: only on top of
+#: `PERMIT_GRADED_PARAMETERS`, whose tolerance and minor gap it then reads in load.
+PERMIT_LOAD_PARAMETER = "permit_raw_guard_pct"
 
 RULEBOOK_SCHEMA = Schema("rulebook.toml", [
     field("parameters", dict, schema=Schema("[parameters]", [
@@ -177,6 +180,10 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
         field("permit_failure_withdrawal_days", int, required=False, minimum=1, maximum=42,
               note="days of supervision after a failure, or a second minor gap within the "
                    "length of the supervised period"),
+        # Optional, and only with the five above: absent, the envelope counts raw minutes.
+        field("permit_raw_guard_pct", float, required=False, minimum=0, maximum=100,
+              note="declared, the envelope counts equivalent minutes at the reference easy "
+                   "pace, and a raw duration more than this share above it, in %, fails"),
     ])),
     field("scales", dict, schema=SCALES_SCHEMA),
     # Optional: absent, no lineage is followed. Its schema is derived from the ladders of
@@ -254,6 +261,7 @@ class Parameters:
     permit_minor_pct: float | None = None
     permit_minor_hr_bpm: int | None = None
     permit_failure_withdrawal_days: int | None = None
+    permit_raw_guard_pct: float | None = None
 
     def spoken(self) -> dict[str, str]:
         """Thresholds as a rule's text states them: decimal comma."""
@@ -374,6 +382,10 @@ def parse(text: str, source: Path) -> Rulebook:
     if (any(name in raw for name in PERMIT_GRADED_PARAMETERS)
             and not all(name in raw for name in PERMIT_PARAMETERS)):
         problems.append("parameters: the graded permit thresholds need the permit thresholds")
+    if (PERMIT_LOAD_PARAMETER in raw
+            and not all(name in raw for name in PERMIT_GRADED_PARAMETERS)):
+        problems.append(f"parameters: {PERMIT_LOAD_PARAMETER} needs the graded permit "
+                        "thresholds")
     if parameters.gate_effort_peak > scales.effort_pain.cap:
         problems.append(f"parameters.gate_effort_peak {parameters.gate_effort_peak:g} is above "
                         f"the effort-pain cap {scales.effort_pain.cap:g}")

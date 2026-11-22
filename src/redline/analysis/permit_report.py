@@ -1,15 +1,17 @@
 """The easy-run permit report, read from PostgreSQL: same code for the review and the CLI.
 
 The computation lives in `src/redline/model/permit.py`; this module only gathers the facts
-(sealed choices, ledger, daily state, plans, Strava captures).
+(sealed choices, ledger, daily state, plans, Strava captures and their streams), and the
+load of each easy run when the rulebook counts the envelope in load (`easy_load`).
 """
 
 from __future__ import annotations
 
+import dataclasses
 import datetime as dt
 from typing import Any
 
-from redline.analysis import ledger
+from redline.analysis import easy_load, ledger
 from redline.model import (
     instance,
     iso_week,
@@ -63,6 +65,33 @@ def _group(store: Any, activity_id: int) -> bool | None:
     return None if count is None else int(count) > 1
 
 
+def _profile(store: Any, activity_id: int) -> easy_load.Profile | None:
+    streams = store.strava_streams(activity_id)
+    return None if not streams else easy_load.profile(streams)
+
+
+def _loaded(store: Any, runs: list[permit.Run], groups: dict[int, bool],
+            since: dt.date) -> list[permit.Run]:
+    """The easy runs from `since` with their load at the reference pace of their day; the
+    runs before `since` only set the reference."""
+    profiles = {run.strava_id: found for run in runs
+                if run.type == session_kinds.EASY and run.strava_id is not None
+                for found in [_profile(store, run.strava_id)] if found is not None}
+    found = easy_load.samples((run.date, profiles[run.strava_id], groups.get(run.strava_id))
+                              for run in runs if run.strava_id in profiles)
+    out = []
+    for run in runs:
+        if run.date < since:
+            continue
+        shape = profiles.get(run.strava_id) if run.strava_id is not None else None
+        reference = easy_load.reference_mps(found, run.date)
+        if shape is not None and reference:
+            run = dataclasses.replace(run, load=permit.Load(
+                shape.equivalent_minutes(reference), round(1000 / reference)))
+        out.append(run)
+    return out
+
+
 def report(store: Any, today: dt.date, week: str | None = None) -> list[str]:
     """The permit block; empty when nothing is sealed or the rulebook declares no permit."""
     if permit.declared() is None:
@@ -74,10 +103,14 @@ def report(store: Any, today: dt.date, week: str | None = None) -> list[str]:
     # An easy run's cap is the top of the athlete's Z2: a single source, their HR bounds.
     hr_cap = instance.load(paths.vault_root()).hr_bounds[1]
     rows = ledger.parse_ledger(store)
+    counts_load = permit.thresholds().raw_guard_pct is not None
+    # The reference pace of the first runs reads the weeks before the permit's start.
+    since = (period.start - dt.timedelta(weeks=easy_load.REFERENCE_WEEKS) if counts_load
+             else period.start)
     runs = [permit.Run(row.date, row.type,
                        None if row.hours is None else row.hours * 60,
                        row.hr_valid, _strava_id(row.idempotency_key))
-            for row in rows if row.date >= period.start]
+            for row in rows if row.date >= since]
     # The permit is judged on the WORST morning trace across all zones: one complaining
     # zone is enough to refuse it. This is the only place zones are merged, and they are
     # merged by the maximum, never by an average.
@@ -88,6 +121,8 @@ def report(store: Any, today: dt.date, week: str | None = None) -> list[str]:
     weeks = {choice["iso_week"] for choice in choices} | _weeks(period.start, today)
     groups = {run.strava_id: group for run in runs if run.type == session_kinds.EASY and run.strava_id
               for group in [_group(store, run.strava_id)] if group is not None}
+    if counts_load:
+        runs = _loaded(store, runs, groups, period.start)
     caps, envelopes = _plans(store, weeks)
     lines = permit.evaluate(choices, runs, traces, caps, groups, today, hr_cap=hr_cap,
                             envelopes=envelopes)

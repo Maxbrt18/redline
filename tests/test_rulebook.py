@@ -209,6 +209,13 @@ def test_a_rulebook_without_permit_thresholds_judges_no_permit(tmp_path, monkeyp
     assert permit_report.report(store=None, today=dt.date(2030, 10, 1)) == []
 
 
+def test_the_raw_duration_guard_needs_the_graded_thresholds(tmp_path):
+    text = "\n".join(line for line in DEFAULT_TEXT.splitlines()
+                     if not line.startswith(rulebook.PERMIT_GRADED_PARAMETERS))
+    with pytest.raises(rulebook.RulebookError, match="permit_raw_guard_pct needs the graded"):
+        rulebook.load(_variant(tmp_path, text + "\n"))
+
+
 def test_graded_permit_thresholds_need_the_permit_itself(tmp_path):
     text = "\n".join(line for line in DEFAULT_TEXT.splitlines()
                      if not line.startswith(rulebook.PERMIT_PARAMETERS))

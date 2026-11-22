@@ -82,6 +82,11 @@ permit_minor_hr_bpm = 6
 # A failure, or a second minor gap within the length of the supervised period, puts the
 # athlete back under supervision for this many days.
 permit_failure_withdrawal_days = 7
+# Declared, on top of the graded five: the envelope counts in load, equivalent minutes at
+# the reference easy pace (`redline.analysis.easy_load`), so a slow run lasts longer and a
+# fast one shorter; a raw duration more than this share (%) above the envelope still fails,
+# whatever its load. Absent, the envelope counts raw minutes.
+permit_raw_guard_pct = 25
 # A reorganised week puts at most this many runs, and this many sessions (runs and
 # strength together), on one day.
 runs_per_day = 1
