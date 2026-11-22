@@ -21,10 +21,6 @@ extension LimitRows {
             rows.append(Row(label: "FC moy.", low: Double(heart - 30), cap: Double(heart), fill: fact?.hrAvg,
                             value: fact?.hrAvg.map { Numbers.text($0, digits: 0) } ?? "\(heart)", sub: "\(heart) max"))
         }
-        if let rpeMax = targets.rpeMax, let range = targets.rpeRange {
-            rows.append(Row(label: "Effort", cap: Double(rpeMax), band: targets.rpeMin.map(Double.init), fill: fact?.rpe,
-                            value: fact?.rpe.map { Numbers.text($0) } ?? range, sub: "visé \(range)"))
-        }
         guard !rows.isEmpty else { return nil }
         self.init(rows: rows)
     }

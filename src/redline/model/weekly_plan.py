@@ -35,6 +35,7 @@ from .vocabulary import (
     ClimbIntent,
     Decider,
     DescentIntent,
+    OverrideReason,
     SessionPriority,
     SessionStatus,
     SessionStructure,
@@ -76,6 +77,8 @@ SESSION_SCHEMA = Schema("planned session", [
     field("distance_target_km", float, required=False, minimum=0),
     field("distance_cap_km", float, required=False, minimum=0),
     field("duration_cap_min", int, required=False, minimum=1),
+    # Carried from revisions written before the expected RPE, never given anew
+    # (`rpe_band_errors`), never shown nor compared.
     field("rpe_min", int, required=False, minimum=0, maximum=10),
     field("rpe_max", int, required=False, minimum=0, maximum=10),
     field("hr_zone", str, required=False),
@@ -97,6 +100,19 @@ SESSION_SCHEMA = Schema("planned session", [
           note="the grade, in %, brisk walking starts at; with climb_intent=power_hike only"),
     field("descent_intent", str, required=False, choices=tuple(DescentIntent),
           note="what the descents ask; absent, relaxed"),
+    field("reps", int, required=False, minimum=1, maximum=60,
+          note="repetitions of a session made of them; with rep_seconds"),
+    field("rep_seconds", int, required=False, minimum=10, maximum=3600,
+          note="the duration of one repetition, in seconds"),
+    field("recovery_seconds", int, required=False, minimum=0, maximum=1800,
+          note="the recovery between two repetitions, in seconds"),
+    field("rep_pace_s", int, required=False, minimum=120, maximum=900,
+          note="the pace of a repetition, in s/km; not on a hill session"),
+    field("override_reason", str, required=False, choices=tuple(OverrideReason),
+          note="why the dose goes one step above its lineage's ceiling; with "
+               "override_prediction"),
+    field("override_prediction", str, required=False, pattern=formats.KEY,
+          note="the key of the open prediction sealed on that step"),
     field("structure", str, required=False, choices=tuple(SessionStructure),
           note="an easy or long run run steady, or with prescribed efforts (a pyramid, "
                "strides, a structure set by the group); absent, steady"),
@@ -402,26 +418,25 @@ def typed_target_errors(revision: dict, where: str = "revision") -> list[str]:
     return problems
 
 
-def accumulating_band_errors(previous: dict | None, current: dict,
-                             where: str = "revision") -> list[str]:
-    """Refuse an RPE band given to a session whose effort accumulates with its duration.
+def rpe_band_errors(previous: dict | None, current: dict,
+                    where: str = "revision") -> list[str]:
+    """Refuse an RPE band given to a session: its RPE is computed from its dose and read
+    after it (`redline.analysis.expected_rpe`), never prescribed.
 
-    Its intensity is prescribed by HR or pace, its RPE is read against comparable
-    sessions. A band the previous revision already held on the same session is carried,
-    not given: refusing it would block every revision of a week planned before the rule,
-    and `rpe_band` ignores it anyway.
+    A band the previous revision already held on the same session is carried, not given:
+    refusing it would block every revision of a week planned before the rule. A carried
+    band is neither shown nor compared.
     """
     def band(session: dict) -> tuple:
         return session.get("rpe_min"), session.get("rpe_max")
 
     before = {session["id"]: band(session) for session in (previous or {}).get("sessions") or []}
     return [
-        f"{where}.{session.get('id', '?')}: no rpe_min/rpe_max for a {session['workout']} "
-        "session -- its RPE grows with its duration; prescribe its intensity with "
-        "hr_zone/hr_cap_bpm"
+        f"{where}.{session.get('id', '?')}: no rpe_min/rpe_max -- a session's RPE is "
+        "computed from its dose and read after it; prescribe the intensity with "
+        "hr_zone/hr_cap_bpm, the relief and climb intents, or the session's note"
         for session in current.get("sessions") or []
-        if session.get("workout") in session_kinds.ACCUMULATING
-        and band(session) != (None, None) and before.get(session.get("id")) != band(session)]
+        if band(session) != (None, None) and before.get(session.get("id")) != band(session)]
 
 
 def _session_errors(session: dict, where: str) -> list[str]:
@@ -429,9 +444,6 @@ def _session_errors(session: dict, where: str) -> list[str]:
     target, cap = session.get("distance_target_km"), session.get("distance_cap_km")
     if target is not None and cap is not None and target > cap:
         problems.append(f"{where}: target {target:g} km above the cap {cap:g} km")
-    lo, hi = session.get("rpe_min"), session.get("rpe_max")
-    if lo is not None and hi is not None and lo > hi:
-        problems.append(f"{where}: minimum RPE {lo} above the maximum {hi}")
     workout = session.get("workout")
     duration = session.get("duration_cap_min", 0)
     if workout in session_kinds.BY_SLUG and session.get("kind") != session_kinds.family(workout):
@@ -753,33 +765,16 @@ def distance_of(session: dict) -> str:
     return ""
 
 
-def rpe_band(session: dict) -> tuple[int | None, int] | None:
-    """The (minimum, maximum) RPE a session commits to, or None.
-
-    The one reading of `rpe_min`/`rpe_max`: a band stored on a session whose effort
-    accumulates (`session_kinds.ACCUMULATING`) is neither shown nor compared.
-    """
-    if session.get("workout") in session_kinds.ACCUMULATING:
-        return None
-    low, high = session.get("rpe_min"), session.get("rpe_max")
-    if high is None:
-        return None if low is None else (low, low)
-    return low, high
-
-
 def details_of(session: dict, *, cadence_unit: str = "") -> list[str]:
     """Everything a session commits to, in order, without its title or status.
 
-    The order is part of the contract: distance, RPE, HR zone, cadence, the typed
+    The order is part of the contract: distance, HR zone, cadence, the typed
     prescription (relief, climbs, descents, efforts), fuelling, note. Each
     rendering only decides its separator and markup -- and `cadence_unit` is the one real
     difference, the journal naming the unit that the text message and the card leave
     implicit.
     """
     details = [distance_of(session)]
-    band = rpe_band(session)
-    if band is not None and band[0] is not None:
-        details.append(text.RPE.format(low=band[0], high=band[1]))
     if session.get("hr_zone"):
         details.append(session["hr_zone"])
     if session.get("cadence_target"):

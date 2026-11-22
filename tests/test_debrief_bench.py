@@ -24,6 +24,15 @@ def test_the_bench_counts_an_unjustified_reproach_and_a_missed_intervention(tmp_
     assert result.missed == ("descent_not_held",)
 
 
+def test_an_rpe_spoken_of_without_a_second_sign_is_an_unjustified_reproach():
+    silent = next(case for case in CASES if case["id"] == "rpe-above-without-a-second-sign")
+    spoken = next(case for case in CASES if case["id"] == "rpe-above-after-a-poor-night")
+    assert debrief_bench.outcome({**spoken, "expected": silent["expected"]}).unjustified == (
+        "rpe_above",)
+    assert debrief_bench.outcome({**silent, "expected": spoken["expected"]}).missed == (
+        "rpe_above",)
+
+
 def test_the_command_fails_when_a_case_fails(tmp_path, monkeypatch, capsys):
     from redline.cli import evaluate_debriefs
 

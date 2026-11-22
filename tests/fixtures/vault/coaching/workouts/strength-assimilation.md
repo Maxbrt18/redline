@@ -12,7 +12,6 @@ exercises:
     dose: {measure: time, sets: 3, seconds: 30, rest_s: 30}
   - pallof
   - hip-abduction-light
-target_rpe: 3
 duration_min: 18
 phase: [base, general, specifique-1, specifique-2]
 contraindications:

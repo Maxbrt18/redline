@@ -1,5 +1,5 @@
 """The typed prescription of a run: its relief, what its climbs and descents ask, its
-structure.
+structure, and the dose of its repetitions.
 
 A planned run declares what the athlete reads before leaving and what is judged after:
 the gain and loss allowed (`dplus_cap_m`, `dminus_cap_m`, an optional `dplus_target_m`),
@@ -7,6 +7,13 @@ the climb and descent intents and whether it carries prescribed efforts. Absent,
 takes its default: easy climbs (hard on a hill session, whose climbs are the repetitions),
 relaxed descents, a steady run. The write-time rules refuse a prescription that
 contradicts itself before the run, such as a cap on the session's mean HR over efforts.
+
+A session made of repetitions (`session_kinds.REPETITIONS`) may type its dose: how many
+(`reps`), how long each (`rep_seconds`), the recovery between two (`recovery_seconds`)
+and, off a hill, the pace of a repetition (`rep_pace_s`). The progression engine reads
+this dose, and the debrief holds the repetitions run to their pace. A dose one step above
+the ceiling of its lineage declares why (`override_reason`) and the prediction sealed on
+it (`override_prediction`); `redline.analysis.progression_runs` checks the rest.
 """
 
 from __future__ import annotations
@@ -14,13 +21,20 @@ from __future__ import annotations
 from redline.coach.fr import plan as text
 
 from . import session_kinds
-from .vocabulary import ClimbIntent, DescentIntent, SessionStatus, SessionStructure
+from .vocabulary import (
+    ClimbIntent,
+    DescentIntent,
+    SessionStatus,
+    SessionStructure,
+)
 
 #: The relief caps apply on foot; the intents to runs only.
 RELIEF_FAMILIES = frozenset({"run", "hike"})
 INTENT_FIELDS = ("climb_intent", "power_hike_from_pct", "descent_intent", "structure")
 RELIEF_FIELDS = ("dplus_cap_m", "dplus_target_m", "dminus_cap_m")
-FIELDS = (*RELIEF_FIELDS, *INTENT_FIELDS)
+DOSE_FIELDS = ("reps", "rep_seconds", "recovery_seconds", "rep_pace_s")
+OVERRIDE_FIELDS = ("override_reason", "override_prediction")
+FIELDS = (*RELIEF_FIELDS, *INTENT_FIELDS, *DOSE_FIELDS, *OVERRIDE_FIELDS)
 
 
 def climb_intent(session: dict) -> ClimbIntent:
@@ -65,10 +79,31 @@ def relief_of(session: dict) -> str:
     return ", ".join(parts)
 
 
+def _duration(seconds: int) -> str:
+    minutes, rest = divmod(seconds, 60)
+    if not minutes:
+        return text.SECONDS.format(seconds=rest)
+    return text.MINUTES.format(minutes=minutes) + (f" {rest:02d}" if rest else "")
+
+
+def dose_of(session: dict) -> str:
+    """The repetitions as the athlete reads them; empty when none is typed."""
+    reps, seconds = session.get("reps"), session.get("rep_seconds")
+    if reps is None or seconds is None:
+        return ""
+    line = text.REPS.format(reps=reps, duration=_duration(seconds))
+    if session.get("recovery_seconds") is not None:
+        line += text.RECOVERY.format(duration=_duration(session["recovery_seconds"]))
+    if session.get("rep_pace_s") is not None:
+        minutes, rest = divmod(session["rep_pace_s"], 60)
+        line += text.REP_PACE.format(pace=f"{minutes}:{rest:02d}")
+    return line
+
+
 def readout(session: dict) -> list[str]:
-    """What the declared prescription asks, in reading order: relief, climbs, descents,
-    efforts. A default the coach did not declare is not shown."""
-    parts = [relief_of(session)]
+    """What the declared prescription asks, in reading order: repetitions, relief,
+    climbs, descents, efforts. A default the coach did not declare is not shown."""
+    parts = [dose_of(session), relief_of(session)]
     if session.get("climb_intent") is not None:
         parts.append(text.CLIMB_INTENTS[climb_intent(session)].format(
             grade=session.get("power_hike_from_pct")))
@@ -111,6 +146,29 @@ def session_errors(session: dict, where: str) -> list[str]:
     if session.get("structure") is not None and workout not in session_kinds.EASY_RUNS:
         problems.append(f"{where}.structure: only an easy or long run declares a structure; "
                         "a quality session's structure is its workout")
+    return problems + _dose_errors(session, where)
+
+
+def _dose_errors(session: dict, where: str) -> list[str]:
+    declared = [name for name in (*DOSE_FIELDS, *OVERRIDE_FIELDS)
+                if session.get(name) is not None]
+    if not declared:
+        return []
+    workout = session.get("workout")
+    if workout not in session_kinds.REPETITIONS:
+        return [f"{where}.{name}: only a session of repetitions types its dose"
+                for name in declared]
+    problems = []
+    if (session.get("reps") is None) != (session.get("rep_seconds") is None):
+        problems.append(f"{where}: reps and rep_seconds go together")
+    if session.get("reps") is None:
+        problems += [f"{where}.{name}: needs reps and rep_seconds" for name in declared
+                     if name in ("recovery_seconds", "rep_pace_s", *OVERRIDE_FIELDS)]
+    if (session.get("override_reason") is None) != (session.get("override_prediction") is None):
+        problems.append(f"{where}: override_reason and override_prediction go together")
+    if session.get("rep_pace_s") is not None and workout == session_kinds.HILLS:
+        problems.append(f"{where}.rep_pace_s: a hill repetition is run by its effort; its "
+                        "pace is the grade's")
     return problems
 
 

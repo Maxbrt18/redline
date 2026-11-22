@@ -7,14 +7,15 @@ from redline.analysis.signals import HrDrift
 from redline.model import debrief
 
 
-def test_planned_versus_done_names_every_typed_target():
+def test_planned_versus_done_names_every_typed_target_and_never_an_rpe_band():
+    """A band carried from an old revision is no target: the RPE is read against the
+    range its dose expects, in the verdict."""
     row = Row(date=dt.date(2026, 10, 3), type="long", km=15.84, hours=1.72, hr_avg=164,
               rpe=5)
     session = {"distance_cap_km": 16.0, "hr_cap_bpm": 157, "rpe_min": 4, "rpe_max": 4.5}
     assert debrief.gaps(row, session, None) == [
         "distance 15,84 km pour un plafond de 16 (-0,16)",
         "FC moyenne 164 pour un plafond de 157 (+7)",
-        "RPE 5 pour une cible 4-4,5",
     ]
 
 

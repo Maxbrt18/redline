@@ -52,13 +52,6 @@ struct DetailWork: View {
 
     private func qualityRead() -> [(String, String, String?)] {
         var rows: [(String, String, String?)] = []
-        let targets = detail.plan?.targets, rpe = detail.fact.rpe
-        if let rpe, let high = targets?.rpeMax, let range = targets?.rpeRange {
-            let low = Double(targets?.rpeMin ?? 0)
-            let title = rpe >= low && rpe <= Double(high) ? "Effort dans la bande"
-                : rpe > Double(high) ? "Effort au-dessus de la bande" : "Effort sous la bande"
-            rows.append(("gauge.with.needle", title, "RPE \(Numbers.text(rpe)) pour \(range) visé"))
-        }
         if let reading = detail.reading {
             let range = "\(Numbers.pace(Double(reading.fastestBefore))) – \(Numbers.pace(Double(reading.slowestBefore)))"
             rows.append(reading.finalAcceleration
@@ -82,12 +75,6 @@ struct DetailWork: View {
             rows.append(("chart.line.uptrend.xyaxis",
                          abs(delta) < 3 ? "Pas de dérive cardiaque" : "FC \(delta > 0 ? "en hausse" : "en baisse") de \(abs(delta)) bpm",
                          "\(drift.first) sur la 1ʳᵉ moitié, \(drift.second) sur la 2ᵈᵉ"))
-        }
-        if let rpe = detail.fact.rpe, let targets = detail.plan?.targets, let high = targets.rpeMax, let range = targets.rpeRange {
-            let low = Double(targets.rpeMin ?? high)
-            rows.append(("gauge.with.needle",
-                         rpe > Double(high) ? "Effort au-dessus de la cible" : rpe < low ? "Effort sous la cible" : "Effort dans la cible",
-                         "RPE \(Numbers.text(rpe)) pour \(range) visé"))
         }
         return rows
     }

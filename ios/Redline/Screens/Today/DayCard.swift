@@ -199,7 +199,7 @@ struct DayCard: View {
             else if targets.distanceTargetKm != nil { "km" }
             else if targets.distanceCapKm != nil { "km au plus" }
             else { nil }
-        return [unit, targets.hrCapBpm.map { "FC ≤ \($0)" }, targets.rpeRange.map { "Effort \($0)" }].compactMap { $0 }
+        return [unit, targets.hrCapBpm.map { "FC ≤ \($0)" }].compactMap { $0 }
     }
 
     // MARK: The foot

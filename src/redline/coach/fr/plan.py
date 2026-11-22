@@ -12,7 +12,6 @@ DISTANCE_TARGET_AND_CAP = "cible {target} km, plafond {cap} km"
 DISTANCE_CAP = "plafond {cap} km"
 DISTANCE_TARGET = "cible {target} km"
 DURATION_CAP = "plafond {minutes} min"
-RPE = "RPE {low}-{high}"
 CADENCE = "cadence ~{cadence}{unit}"
 CADENCE_UNIT = " pas/min"
 CARBS = "glucides {grams} g/h"
@@ -39,6 +38,12 @@ DESCENT_INTENTS = {
     "worked": "descentes travaillées",
 }
 EFFORTS = "efforts prescrits : allure et FC suivent la consigne, pas un plafond"
+#: The typed dose of a session of repetitions: « 5 × 7 min, récup 2 min, à 4:35/km ».
+REPS = "{reps} × {duration}"
+RECOVERY = ", récup {duration}"
+REP_PACE = ", à {pace}/km"
+MINUTES = "{minutes} min"
+SECONDS = "{seconds} s"
 
 DONE = "fait"
 WITH_TRANSITION = ", transition {label}"
@@ -150,6 +155,9 @@ ACTIVE_MISSING = ("ABSENTE OU INVALIDE : ne prescris aucune séance. Une répara
 
 TAPER_UNREADABLE = ("Affûtage : lecture du registre impossible ({name}), la baisse du "
                     "volume n'est pas contrôlée pour cette révision.")
+
+PROGRESSION_UNREADABLE = ("Progression : lecture du registre impossible ({name}), les doses "
+                          "de qualité ne sont pas contrôlées contre leur plafond.")
 
 PAIN_RULES_UNREADABLE = ("Règles n3 et n4 : lecture du registre impossible ({name}), la "
                          "qualité et le volume ne sont pas contrôlés pour cette révision.")

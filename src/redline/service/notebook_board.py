@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
-from redline.analysis import ledger, signals
+from redline.analysis import expected_rpe, ledger, signals
 from redline.coach import dates
 from redline.coach.fr import notebook as notebook_text
 from redline.coach.fr import session_labels
@@ -36,11 +36,9 @@ from redline.model import (
     iso_week,
     local_time,
     prescription,
-    program,
     rulebook,
     session_kinds,
     transitions,
-    weekly_plan,
 )
 from redline.model import ledger as ledger_model
 from redline.model import notebook_views as views
@@ -117,10 +115,8 @@ def observation_fact(observation: dict, session: dict | None = None,
         "over": [],
     }
     if session:
-        band = weekly_plan.rpe_band(session)
         fact["over"] = [key for key, value, cap in (
             ("hr_avg", fact["hr_avg"], session.get("hr_cap_bpm")),
-            ("rpe", fact["rpe"], band[1] if band else None),
             ("duration_min", fact["duration_min"], session.get("duration_cap_min")),
             ("km", fact["km"], session.get("distance_cap_km")))
             if value is not None and cap is not None and value > float(cap)]
@@ -192,10 +188,6 @@ def _planned(session: dict) -> list[str]:
         parts.append(f"≤{_fr(cap)} km")
     elif session.get("duration_cap_min"):
         parts.append(f"≤{session['duration_cap_min']} min")
-    band = weekly_plan.rpe_band(session)
-    if band is not None:
-        low, high = band
-        parts.append(f"RPE {low}-{high}" if low is not None and low != high else f"RPE ≤{high}")
     if session.get("hr_zone"):
         parts.append(session["hr_zone"])
     if session.get("cadence_target"):
@@ -447,8 +439,9 @@ class Board:
         runs = [s for s in live if s["kind"] == "run"]
         strength = [s for s in live if s["kind"] == "strength"]
         instruments = ledger.load_instruments(self.ops).get(week.label, ledger.Instruments())
-        _, level, _ = ledger.equivalent_hours(week.rows, instruments,
-                                              program.rpe_targets(self.root))
+        quality = [row for row in week.rows if row.type in ledger.QUALITY_TYPES]
+        above = expected_rpe.above_range(self.ops, self.rows, quality) if quality else {}
+        _, level, _ = ledger.equivalent_hours(week.rows, instruments, above)
         return {
             "km_done": round(volume.km_run, 2),
             "km_target": (week.revision or {}).get("volume_target_km"),

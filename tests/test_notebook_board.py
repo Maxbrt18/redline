@@ -76,7 +76,7 @@ def seed_week(store):
     for item in sessions:
         if item["workout"] == "rest":
             item["kind"] = "rest"
-            for key in ("strength", "distance_target_km", "distance_cap_km", "rpe_min", "rpe_max"):
+            for key in ("strength", "distance_target_km", "distance_cap_km"):
                 item.pop(key, None)
     store.append_plan_revision(WEEK, revision(
         sessions=sessions, computed_at="2026-10-04T20:00:00+02:00", volume_target_km=41.0))
@@ -137,7 +137,8 @@ def test_a_crossed_typed_cap_is_named_never_inferred_from_prose(store):
     tuesday = next(item for item in week["sessions"] if item["id"] == "w41-mar-ef")
     assert tuesday["fact"]["hr_avg"] == 162
     assert tuesday["fact"]["over"] == ["hr_avg"]
-    assert tuesday["planned"][:2] == ["≤55 min", "RPE 2-3"]
+    assert tuesday["planned"][0] == "≤55 min"
+    assert not any("RPE" in part for part in tuesday["planned"]), "the RPE is never prescribed"
     assert week["review"] is None and week["plan"]["revision"] == 1
 
 

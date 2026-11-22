@@ -8,6 +8,7 @@ for these days and this revision, never by a placement it could have altered.
 from __future__ import annotations
 
 import datetime as dt
+import functools
 import uuid
 from dataclasses import dataclass
 from typing import Literal
@@ -61,31 +62,28 @@ def pain_signal(store, today: dt.date) -> bool:
                for value in row.pains.values())
 
 
-def _program() -> tuple[strength_program.Program | None, dict]:
-    vault = paths.vault_root()
+def _program() -> strength_program.Program | None:
     try:
-        return strength_program.load(vault), strength_program.rpe_targets(vault)
+        return strength_program.load(paths.vault_root())
     except NoteError:
-        return None, {}
+        return None
 
 
 def compute(store, plan: dict, week: str, request: week_days.Request, today: dt.date,
             signal: bool) -> Computation:
     """The variants of the active revision of `plan` for the days of `request`."""
     revision = active(plan)
-    program, targets = _program()
+    program = _program()
     parameters = rulebook.current().parameters
     sessions = revision["sessions"]
-    from redline.analysis import comparable, ledger
-    history: list[ledger.Row] = []
+    from redline.analysis import expected_rpe, ledger
+    config = expected_rpe.settings()
+    effort: reorganize.Effort | None = None
+    if config is not None:
+        history = expected_rpe.history(store, ledger.parse_ledger(store), config)
+        effort = functools.partial(history.planned, day=today)
 
-    def typical(kind: str, minutes: int) -> float | None:
-        # The ledger is read only for a week that holds an accumulating session.
-        if not history:
-            history.extend(ledger.parse_ledger(store))
-        return comparable.typical_rpe(history, kind, minutes, today)
-
-    items = reorganize.items(sessions, revision.get("gates") or [], program, targets, typical)
+    items = reorganize.items(sessions, revision.get("gates") or [], program, effort)
     outcome = reorganize.reorganise(
         items, iso_week.dates(week), today, request,
         reorganize.Rules(runs_per_day=parameters.runs_per_day,

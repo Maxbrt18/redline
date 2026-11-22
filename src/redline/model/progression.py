@@ -29,7 +29,7 @@ from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
 
-from . import formats
+from . import formats, session_kinds
 from .errors import ConfigError
 from .schema import Schema, SchemaError
 from .schema import field as spec
@@ -68,6 +68,14 @@ class StepMode(StrEnum):
     FREE = "free"
 
 
+class Direction(StrEnum):
+    """Which way a ladder variable moves to make the session harder."""
+
+    UP = "up"
+    #: A shorter recovery: the value falls as the dose rises.
+    DOWN = "down"
+
+
 class Unit(StrEnum):
     """What one exposure of the family is."""
 
@@ -87,6 +95,12 @@ class Signal(StrEnum):
     """The typed readings an exposure can carry, computed from the ledger."""
 
     SESSION_RPE = "session_rpe"
+    #: The declared RPE minus the top of the range the dose run expects
+    #: (`redline.analysis.expected_rpe`): above zero, the session cost more than its dose.
+    RPE_OVER_RANGE = "rpe_over_range"
+    #: The execution gaps the debrief verdict owes to the athlete (repetitions faster than
+    #: their pace, a run above its prescription).
+    EXECUTION_GAPS = "execution_gaps"
     #: Whole repetitions still possible at the same effort when the session stopped.
     RESERVE_REPS = "reserve_reps"
     #: The fewest repetitions of the working sets, every side counted apart.
@@ -164,9 +178,10 @@ class Variable:
 
     name: str
     mode: StepMode = StepMode.EXACT
-    #: On a carry, the variable goes back to its minimum (reps after a load rise);
-    #: otherwise it stays where it is (a ceiling of effort once raised).
+    #: On a carry, the variable goes back to its easiest value (reps to their minimum
+    #: after a load rise); otherwise it stays where it is (a ceiling of effort once raised).
     resets: bool = True
+    direction: Direction = Direction.UP
 
 
 @dataclass(frozen=True)
@@ -271,6 +286,9 @@ class Lineage:
     parameters: tuple[tuple[str, float], ...] = ()
     #: Lineages of one group share a rise budget (one exercise of a routine at a time).
     group: str = ""
+    #: The planned kind a run lineage follows (`session_kinds.REPETITIONS`); empty for an
+    #: exercise.
+    workout: str = ""
 
     def bound(self, name: str) -> Bound | None:
         return dict(self.bounds).get(name)
@@ -364,6 +382,7 @@ FAMILY_SCHEMA = Schema("[[families]]", [
             spec("name", str, pattern=r"[a-z][a-z0-9_]{0,39}"),
             spec("mode", str, required=False, choices=tuple(StepMode)),
             spec("resets", bool, required=False),
+            spec("direction", str, required=False, choices=tuple(Direction)),
         ]))),
     spec("criteria", list, minimum=1, maximum=12, item=spec("criterion", dict, schema=Schema(
         "[[families.criteria]]", [
@@ -412,7 +431,9 @@ def _family(data: dict) -> Family:
     return Family(
         slug=data["slug"], unit=Unit(data["unit"]),
         ladder=tuple(Variable(item["name"], StepMode(item.get("mode") or StepMode.EXACT),
-                              item.get("resets", True)) for item in data["ladder"]),
+                              item.get("resets", True),
+                              Direction(item.get("direction") or Direction.UP))
+                     for item in data["ladder"]),
         criteria=tuple(_criterion(item) for item in data["criteria"]),
         rule=tuple(Clause(id=item["id"], move=Move(item["move"]),
                           **{name: item[name] for name in CONDITIONS if name in item})
@@ -454,11 +475,16 @@ def default() -> dict[str, Family]:
 STRENGTH_FAMILIES = {"reps": "strength-reps", "time": "strength-time",
                      "contacts": "strength-contacts"}
 
-#: The lineage parameters the strength criteria cite (`at_most_ref`), from `[progression]`
-#: and the effort-pain scale of the rulebook.
+#: The families a run lineage may follow: its dose is typed on the planned session.
+RUN_FAMILIES = ("intervals",)
+
+#: The lineage parameters the criteria cite (`at_most_ref`), from `[progression]` and the
+#: effort-pain scale of the rulebook.
 PROGRESS_UP_TO = "difficulty_progress_up_to"
 REGRESS_ABOVE = "difficulty_regress_above"
 PAIN_CAP = "pain_cap"
+RESERVE_MIN = "reserve_min"
+FOLLOWING_PAIN_MAX = "following_pain_max"
 
 
 @dataclass(frozen=True)
@@ -482,10 +508,11 @@ def _bound_check(data: dict) -> list[str]:
     return problems
 
 
-def _strength_variables() -> tuple[str, ...]:
-    """Every ladder variable of the strength families, in their declared order."""
+def _lineage_variables() -> tuple[str, ...]:
+    """Every ladder variable a declared lineage may bound, in their declared order."""
     families = default()
-    return tuple(dict.fromkeys(variable.name for slug in STRENGTH_FAMILIES.values()
+    return tuple(dict.fromkeys(variable.name
+                               for slug in (*STRENGTH_FAMILIES.values(), *RUN_FAMILIES)
                                for variable in families[slug].ladder))
 
 
@@ -493,13 +520,16 @@ def _strength_variables() -> tuple[str, ...]:
 def _lineages_schema() -> Schema:
     bound = [spec(item.name, float) for item in fields(Bound)]
     entry = Schema("[[progression.lineages]]", [
-        spec("slug", str, pattern=formats.SLUG, note="the name of coaching/exercises/<slug>.md"),
-        spec("family", str, choices=tuple(STRENGTH_FAMILIES.values())),
+        spec("slug", str, pattern=formats.SLUG,
+             note="an exercise: the name of coaching/exercises/<slug>.md"),
+        spec("family", str, choices=(*STRENGTH_FAMILIES.values(), *RUN_FAMILIES)),
+        spec("workout", str, required=False, choices=tuple(sorted(session_kinds.REPETITIONS)),
+             note="the planned kind a run lineage follows; a run family only"),
         spec("group", str, required=False, pattern=formats.SLUG,
              note="lineages of one group share the weekly rise budget"),
         *(spec(name, dict, required=False,
                schema=Schema(f"[[progression.lineages]].{name}", bound, check=_bound_check))
-          for name in _strength_variables()),
+          for name in _lineage_variables()),
     ])
     return Schema("[progression]", [
         spec("rises_per_group_week", int, minimum=0, maximum=7),
@@ -507,6 +537,11 @@ def _lineages_schema() -> Schema:
              note="a difficulty at or below this lets a hold rise"),
         spec(REGRESS_ABOVE, int, minimum=0, maximum=10,
              note="a difficulty above this steps the exercise back"),
+        spec(RESERVE_MIN, int, required=False, minimum=0, maximum=5,
+             note="whole repetitions a quality session keeps in reserve; with a run lineage"),
+        spec(FOLLOWING_PAIN_MAX, float, required=False, minimum=0, maximum=10,
+             note="effort pain the runs after a quality session may reach; with a run "
+                  "lineage"),
         spec("lineages", list, maximum=60, item=spec("lineage", dict, schema=entry)),
     ])
 
@@ -516,7 +551,7 @@ def _lineage(entry: dict, families: dict[str, Family],
     family = families[entry["family"]]
     ladder = {variable.name for variable in family.ladder}
     bounds = tuple((name, Bound(**{key: float(value) for key, value in entry[name].items()}))
-                   for name in _strength_variables() if entry.get(name) is not None)
+                   for name in _lineage_variables() if entry.get(name) is not None)
     where = f"lineage {entry['slug']}"
     problems = [f"{where}: {name} is not a variable of {family.slug} "
                 f"({', '.join(sorted(ladder))})"
@@ -524,8 +559,11 @@ def _lineage(entry: dict, families: dict[str, Family],
     first = family.ladder[0]
     if first.mode != StepMode.FREE and first.name not in dict(bounds):
         problems.append(f"{where}: {family.slug} moves {first.name} first, which it bounds")
+    run = family.slug in RUN_FAMILIES
+    if run != bool(entry.get("workout")):
+        problems.append(f"{where}: a run lineage names the workout it follows, and only it")
     return Lineage(entry["slug"], family.slug, bounds, parameters,
-                   entry.get("group") or ""), problems
+                   entry.get("group") or "", entry.get("workout") or ""), problems
 
 
 def parse_lineages(raw: dict | None, pain_cap: float) -> Lineages:
@@ -541,7 +579,12 @@ def parse_lineages(raw: dict | None, pain_cap: float) -> Lineages:
         problems.append(f"{PROGRESS_UP_TO} {clean[PROGRESS_UP_TO]} is above "
                         f"{REGRESS_ABOVE} {clean[REGRESS_ABOVE]}")
     parameters = ((PROGRESS_UP_TO, float(clean[PROGRESS_UP_TO])),
-                  (REGRESS_ABOVE, float(clean[REGRESS_ABOVE])), (PAIN_CAP, pain_cap))
+                  (REGRESS_ABOVE, float(clean[REGRESS_ABOVE])), (PAIN_CAP, pain_cap),
+                  *((name, float(clean[name])) for name in (RESERVE_MIN, FOLLOWING_PAIN_MAX)
+                    if clean.get(name) is not None))
+    if any(entry["family"] in RUN_FAMILIES for entry in clean["lineages"]) and any(
+            clean.get(name) is None for name in (RESERVE_MIN, FOLLOWING_PAIN_MAX)):
+        problems.append(f"a run lineage needs {RESERVE_MIN} and {FOLLOWING_PAIN_MAX}")
     built = []
     for entry in clean["lineages"]:
         lineage, found = _lineage(entry, default(), parameters)

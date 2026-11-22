@@ -12,7 +12,7 @@ from writes import write
 
 from redline.analysis import reorganize
 from redline.analysis.reorganize import Item, Remark, Rules
-from redline.model import commands, iso_week, session_kinds, week_days
+from redline.model import commands, iso_week, week_days
 from redline.model.program import Program
 from redline.model.schema import SchemaError
 from redline.model.vocabulary import SessionPriority
@@ -279,13 +279,17 @@ def test_items_read_priority_minutes_and_gates_from_the_plan():
               "question": "pas de trace ce matin ?", "on_fail": "EF"}]
     program = Program({"jumps": {"impact": True}, "calf": {}},
                       {"a": {"exercises": ["jumps", "calf"], "duration_min": 30,
-                             "target_rpe": 6, "min_gap_h": {"strength": 48}}})
-    found = {i.id: i for i in reorganize.items(sessions, gates, program, {})}
+                             "min_gap_h": {"strength": 48}}})
+    expected = {"a": 3.0, "c": 6.0}
+    found = {i.id: i for i in reorganize.items(sessions, gates, program,
+                                                lambda session: expected.get(session["id"]))}
     assert set(found) == {"a", "b", "c"}
     assert found["a"].priority is SessionPriority.OPTIONAL
     assert found["b"].priority is SessionPriority.KEY
     assert found["b"].held_until == dt.date(2030, 3, 7)
     assert found["c"].minutes == 30 and found["c"].load == 180
+    assert found["a"].load == 45 * 3.0
+    assert found["b"].load == 0, "no expected RPE: no invented weight"
     assert found["c"].impact is False
     assert found["c"].gaps == (("strength", 48),)
 
@@ -334,11 +338,10 @@ def test_the_outcome_reads_as_json():
 
 def _plan() -> dict:
     def run(identifier, date, workout, minutes, **extra):
-        band = {} if workout in session_kinds.ACCUMULATING else {"rpe_min": 2, "rpe_max": 3}
         return {"id": identifier, "title": extra.pop("title", identifier), "date": date,
                 "kind": "run", "workout": workout, "status": "planned",
                 "demanding": workout in {"long", "threshold"}, "duration_cap_min": minutes,
-                **band, "sources": ["[[current-plan]]"], **extra}
+                "sources": ["[[current-plan]]"], **extra}
     sessions = [run("w10-tue-ef", "2030-03-05", "easy", 50, title="EF"),
                 run("w10-thu-seuil", "2030-03-07", "threshold", 60, title="Seuil"),
                 run("w10-sat-foot", "2030-03-09", "easy", 35, title="Footing",

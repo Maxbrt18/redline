@@ -6,4 +6,9 @@ défaut), `run_slow` (toutes courues lentement, la FC peut monter), `race_effort
 `power_hike_from_pct`. Descentes : `descent_intent` = `relaxed` (défaut), `held` ou
 `worked`. Une EF ou une SL à efforts prescrits (pyramide, lignes, structure d'un
 groupe) porte `structure` = `efforts`, sans `hr_zone` ni `hr_cap_bpm` : les efforts
-montent la FC par construction.]
+montent la FC par construction. Une séance de répétitions type sa dose : `reps` et
+`rep_seconds`, `recovery_seconds`, et hors côtes `rep_pace_s` (s/km) ; au-dessus du
+plafond de sa lignée (`redline progression`), un seul cran, sans veto, avec
+`override_reason` et `override_prediction` (une prédiction ouverte), jamais deux fois de
+suite. Jamais de
+`rpe_min`/`rpe_max` : le RPE se calcule sur la dose, après la séance.]

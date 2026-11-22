@@ -10,17 +10,13 @@ public extension Notebook {
         public let distanceTargetKm: Double?
         public let distanceCapKm: Double?
         public let durationCapMin: Int?
-        public let rpeMin: Int?
-        public let rpeMax: Int?
         public let hrCapBpm: Int?
         public let carbsTargetGH: Int?
 
-        public init(distanceTargetKm: Double? = nil, distanceCapKm: Double? = nil, durationCapMin: Int? = nil, rpeMin: Int? = nil, rpeMax: Int? = nil, hrCapBpm: Int? = nil, carbsTargetGH: Int? = nil) {
+        public init(distanceTargetKm: Double? = nil, distanceCapKm: Double? = nil, durationCapMin: Int? = nil, hrCapBpm: Int? = nil, carbsTargetGH: Int? = nil) {
             self.distanceTargetKm = distanceTargetKm
             self.distanceCapKm = distanceCapKm
             self.durationCapMin = durationCapMin
-            self.rpeMin = rpeMin
-            self.rpeMax = rpeMax
             self.hrCapBpm = hrCapBpm
             self.carbsTargetGH = carbsTargetGH
         }
@@ -29,8 +25,6 @@ public extension Notebook {
             case distanceTargetKm = "distance_target_km"
             case distanceCapKm = "distance_cap_km"
             case durationCapMin = "duration_cap_min"
-            case rpeMin = "rpe_min"
-            case rpeMax = "rpe_max"
             case hrCapBpm = "hr_cap_bpm"
             case carbsTargetGH = "carbs_target_g_h"
         }
@@ -40,8 +34,6 @@ public extension Notebook {
             distanceTargetKm = try container.decodeIfPresent(Double.self, forKey: .distanceTargetKm)
             distanceCapKm = try container.decodeIfPresent(Double.self, forKey: .distanceCapKm)
             durationCapMin = try container.decodeIfPresent(Int.self, forKey: .durationCapMin)
-            rpeMin = try container.decodeIfPresent(Int.self, forKey: .rpeMin)
-            rpeMax = try container.decodeIfPresent(Int.self, forKey: .rpeMax)
             hrCapBpm = try container.decodeIfPresent(Int.self, forKey: .hrCapBpm)
             carbsTargetGH = try container.decodeIfPresent(Int.self, forKey: .carbsTargetGH)
         }
@@ -51,8 +43,6 @@ public extension Notebook {
             try container.encodeIfPresent(distanceTargetKm, forKey: .distanceTargetKm)
             try container.encodeIfPresent(distanceCapKm, forKey: .distanceCapKm)
             try container.encodeIfPresent(durationCapMin, forKey: .durationCapMin)
-            try container.encodeIfPresent(rpeMin, forKey: .rpeMin)
-            try container.encodeIfPresent(rpeMax, forKey: .rpeMax)
             try container.encodeIfPresent(hrCapBpm, forKey: .hrCapBpm)
             try container.encodeIfPresent(carbsTargetGH, forKey: .carbsTargetGH)
         }

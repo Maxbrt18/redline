@@ -3,20 +3,21 @@
 import pytest
 from test_weekly_plan import session
 
-from redline.analysis import execution
+from redline.analysis import execution, expected_rpe
 from redline.evaluation.debrief_bench import synthetic_streams
-from redline.model.vocabulary import DebriefVerdict, FindingKind, FindingOwner
+from redline.model.vocabulary import DebriefVerdict, FindingKind, FindingOwner, RpeSide, RpeSign
 from redline.service import session_detail
 
 #: 6:14/km.
 REFERENCE = 374.0
 
 
-def _judge(prescribed, legs, *, dplus=None, dminus=None, reference=REFERENCE):
+def _judge(prescribed, legs, *, dplus=None, dminus=None, reference=REFERENCE, cost=None,
+           reps=()):
     streams = synthetic_streams([list(leg) for leg in legs])
     splits = session_detail.km_splits(streams) or []
     return execution.judge(prescribed, splits, streams, dplus=dplus, dminus=dminus,
-                           reference_pace_s=reference)
+                           reference_pace_s=reference, cost=cost, reps=reps)
 
 
 def _kinds(ruled):
@@ -88,3 +89,83 @@ def test_without_a_prescription_or_a_reading_nothing_is_ruled():
                            reference_pace_s=None).verdict is DebriefVerdict.UNDETERMINED
     assert execution.judge(session(), [], None, dplus=None, dminus=None,
                            reference_pace_s=None).verdict is DebriefVerdict.UNDETERMINED
+
+
+# ------------------------------------------------------------------ the cost
+
+
+def _expect(expected: float, low: int, high: int) -> expected_rpe.Expectation:
+    return expected_rpe.Expectation(expected, low, high, sessions=7, residual=0.3)
+
+
+def _cost(declared, run=(4.3, 3, 5), prescribed=None, **extra) -> execution.Cost:
+    return execution.Cost(declared, _expect(*run),
+                          None if prescribed is None else _expect(*prescribed), **extra)
+
+
+def test_an_rpe_within_its_range_says_nothing():
+    ruled = _judge(session(), [FLAT], cost=_cost(5))
+    assert ruled.findings == () and ruled.verdict is DebriefVerdict.CONFORMING
+    assert execution.render(ruled, _cost(5))[1] == (
+        "RPE attendu pour la séance courue : 3-5 (7 séances de calibration)")
+
+
+def test_an_rpe_out_of_range_without_a_second_sign_is_kept_not_said():
+    ruled = _judge(session(), [FLAT], cost=_cost(7))
+    assert _kinds(ruled) == [FindingKind.RPE_ABOVE]
+    assert ruled.findings[0].signs == () and ruled.verdict is DebriefVerdict.CONFORMING
+    assert ruled.findings[0].as_json()["signs"] == []
+    assert "sans second indice : n'en parle pas" in execution.render(ruled)[-1]
+
+
+def test_a_costlier_run_followed_as_prescribed_is_adjusted_without_reproach():
+    ruled = _judge(session(), [FLAT], cost=_cost(7, signs=(RpeSign.POOR_NIGHT,)))
+    assert ruled.findings[0].signs == (RpeSign.POOR_NIGHT,)
+    assert ruled.verdict is DebriefVerdict.CONFORMING
+    line = execution.render(ruled)[-1]
+    assert "coûté plus que prévu" in line and "mauvaise nuit" in line
+
+
+def test_a_run_run_above_its_prescription_gets_the_correction_never_the_rpe():
+    """A long run prescribed at the easy pace, run as a race: its RPE is normal for what
+    was run, the choice of running it so is the gap."""
+    ruled = _judge(session(), [FLAT], cost=_cost(6, run=(5.6, 5, 7), prescribed=(4.0, 3, 5)))
+    assert _kinds(ruled) == [FindingKind.RUN_ABOVE_PRESCRIPTION]
+    assert ruled.findings[0].owner is FindingOwner.ATHLETE
+    assert ruled.verdict is DebriefVerdict.EXECUTION_GAP
+    assert "jamais le chiffre" in execution.render(ruled)[-1]
+    above = _judge(session(), [FLAT], cost=_cost(8, run=(5.6, 5, 7), prescribed=(4.0, 3, 5)))
+    assert above.findings[-1].signs == (RpeSign.EXECUTION,)
+    assert "la correction porte sur le choix" in execution.render(above)[-1]
+    close = _judge(session(), [FLAT], cost=_cost(5, run=(4.6, 4, 6), prescribed=(4.0, 3, 5)))
+    assert close.findings == (), "a dose expected within the prescribed range is no gap"
+
+
+def test_two_sessions_out_of_range_on_the_same_side_make_a_pattern():
+    ruled = _judge(session(), [FLAT], cost=_cost(1, previous=RpeSide.BELOW))
+    assert _kinds(ruled) == [FindingKind.RPE_BELOW]
+    assert ruled.findings[0].signs == (RpeSign.PATTERN,)
+    assert "une seule question" in execution.render(ruled)[-1]
+    lower = _judge(session(), [FLAT], cost=_cost(1, signs=(RpeSign.HR_AT_PACE,)))
+    assert "jamais de hausse de dose" in execution.render(lower)[-1]
+
+
+def test_a_flat_hr_high_is_a_second_sign():
+    capped = session(hr_zone="Z2", hr_cap_bpm=157)
+    ruled = _judge(capped, [FLAT, (1000, 400, 0, 85, 163), (1000, 400, 0, 85, 163)],
+                   cost=_cost(7))
+    assert ruled.findings[-1].signs == (RpeSign.FLAT_HR_HIGH,)
+
+
+def test_repetitions_faster_than_their_pace_are_an_execution_gap():
+    threshold = session(workout="threshold", reps=3, rep_seconds=420, rep_pace_s=275)
+    held = [{"time_s": 420, "dist_m": 1530}, {"time_s": 420, "dist_m": 1525},
+            {"time_s": 420, "dist_m": 1540}]
+    assert _judge(threshold, [FLAT], reps=held).findings == ()
+    pushed = [*held[:2], {"time_s": 420, "dist_m": 1650}]
+    ruled = _judge(threshold, [FLAT], reps=pushed)
+    assert _kinds(ruled) == [FindingKind.REPS_FASTER]
+    assert ruled.findings[0].kms == (3,) and ruled.verdict is DebriefVerdict.EXECUTION_GAP
+    assert "R3 à 4:15/km pour 4:35/km" in execution.render(ruled)[-1]
+    assert _judge(session(workout="threshold"), [FLAT], reps=pushed).findings == (), \
+        "without a typed pace, the repetitions are compared within the session only"

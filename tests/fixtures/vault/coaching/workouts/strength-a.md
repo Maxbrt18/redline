@@ -18,7 +18,6 @@ exercises:
   - calf-raise-bent
   - hip-abduction-side-lying
   - plyometrics
-target_rpe: 6
 duration_min: 30
 phase: [base, general, specifique-1, specifique-2]
 contraindications:

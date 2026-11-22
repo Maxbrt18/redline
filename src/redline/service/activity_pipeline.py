@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, replace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from redline.analysis import descent
 from redline.integrations import strava
@@ -17,6 +17,9 @@ from redline.storage.repository import OperationalStore
 
 from . import session_detail
 from .session_detail import weather_at
+
+if TYPE_CHECKING:
+    from redline.analysis.execution import Cost
 
 ActivityFetch = Callable[[int], dict]
 StreamFetch = Callable[[int], list]
@@ -121,12 +124,14 @@ class ActivityPipeline:
         gaps, session, day = self._gaps(activity_id, captured.get("observation_id"), splits)
         if gaps:
             snapshot["gaps"] = gaps
-        verdict = self._verdict(activity_id, session, splits, streams)
+        cost = self._cost(activity_id, session)
+        if cost is not None and cost.run is not None:
+            snapshot["expected_rpe"] = {
+                "run": cost.run.as_json(),
+                **({} if cost.prescribed is None else {"prescribed": cost.prescribed.as_json()})}
+        verdict = self._verdict(activity_id, session, splits, streams, cost, activity.laps)
         if verdict:
             snapshot["verdict"] = verdict
-        comparables = self._comparables(activity_id)
-        if comparables:
-            snapshot["comparables"] = comparables
         from redline.model import debrief
 
         if debrief.is_quality(session):
@@ -241,7 +246,8 @@ class ActivityPipeline:
             return [], None, None
 
     def _verdict(self, activity_id: int, session: dict | None, splits: list,
-                 streams: dict | None) -> list[str]:
+                 streams: dict | None, cost: Cost | None = None,
+                 laps: tuple[Lap, ...] = ()) -> list[str]:
         """The service's verdict on the run's execution against its prescription, kept,
         then rendered for the coach, who writes it and does not decide it. A failed
         reading costs the debrief its verdict, never its departure."""
@@ -249,6 +255,7 @@ class ActivityPipeline:
             return []
         try:
             from redline.analysis import easy_load, execution, ledger
+            from redline.model import debrief
 
             rows = ledger.parse_ledger(self.store)
             row = next((row for row in rows
@@ -258,33 +265,51 @@ class ActivityPipeline:
             ruled = execution.judge(
                 session, splits, streams, dplus=row.dplus, dminus=row.dminus,
                 reference_pace_s=easy_load.reference_pace_s(self.store, rows, row.date),
-                hr_trusted=row.hr_doubt != HrDoubt.NO_SENSOR)
+                hr_trusted=row.hr_doubt != HrDoubt.NO_SENSOR, cost=cost,
+                reps=(debrief.workout_reps(laps) or []) if debrief.is_quality(session) else [])
             self.store.store_debrief_verdict(activity_id, str(ruled.verdict),
                                              [finding.as_json() for finding in ruled.findings])
-            return execution.render(ruled)
+            return execution.render(ruled, cost)
         except Exception as exc:
             log.warning("Verdict of activity %s not ruled: %s", activity_id, exc)
             return []
 
-    def _comparables(self, activity_id: int) -> list[dict]:
-        """The athlete's previous sessions this one compares with, if its effort accumulates.
-
-        Its RPE has no fixed target: the coach reads it against these. A failed read
-        deprives the debrief of the reference, never of its departure.
-        """
+    def _cost(self, activity_id: int, session: dict | None) -> Cost | None:
+        """What the run should have cost, as run and as prescribed, from the athlete's
+        history (`redline.analysis.expected_rpe`), with the signs read off the run. None
+        when the rulebook declares no method; a failed read costs the debrief its range,
+        never its departure."""
         try:
-            from redline.analysis import comparable, ledger
+            from redline.analysis import execution, expected_rpe, ledger, signals
+            from redline.model.vocabulary import RpeSide, RpeSign, Sleep
 
+            config = expected_rpe.settings()
+            if config is None:
+                return None
             rows = ledger.parse_ledger(self.store)
             row = next((row for row in rows
                         if row.idempotency_key == f"strava:{activity_id}"), None)
-            if row is None or not row.hours:
-                return []
-            return [item.as_json() for item in
-                    comparable.comparables(rows, row.type, row.hours * 60, row.date)]
+            if row is None:
+                return None
+            history = expected_rpe.history(self.store, rows, config)
+            previous = history.previous(row)
+            before = history.expectation(previous) if previous is not None else None
+            signs = []
+            if any(drift.date == row.date and drift.hr == row.hr_avg
+                   and drift.delta >= signals.HR_DRIFT_BPM for drift in signals.hr_at_pace(rows)):
+                signs.append(RpeSign.HR_AT_PACE)
+            if any(day.get("checked_on") == row.date and day.get("sleep") == Sleep.POOR
+                   for day in self.store.daily_rows()):
+                signs.append(RpeSign.POOR_NIGHT)
+            return execution.Cost(
+                declared=row.rpe, run=history.expectation(row),
+                prescribed=history.prescribed(session, row.date) if session else None,
+                previous=before.side(previous.rpe) if before and previous else
+                RpeSide.UNKNOWN,
+                signs=tuple(signs))
         except Exception as exc:
-            log.warning("Comparable sessions of activity %s not read: %s", activity_id, exc)
-            return []
+            log.warning("Expected RPE of activity %s not computed: %s", activity_id, exc)
+            return None
 
     @staticmethod
     def _quality_card(activity_id: int, laps: tuple[Lap, ...], session: dict | None,

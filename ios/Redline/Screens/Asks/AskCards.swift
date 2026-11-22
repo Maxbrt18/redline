@@ -287,7 +287,6 @@ struct DebriefCard<Ask: DebriefAsk>: View {
 
     /// What was aimed at, beside the question it bears on.
     private func aside(_ field: String, _ spec: AskSpec) -> String? {
-        if field == "rpe", let range = targets?.rpeRange { return "visé \(range)" }
         if field == "carbs_g_h", let target = targets?.carbsTargetGH { return "visé \(target) g/h" }
         return spec.hint
     }

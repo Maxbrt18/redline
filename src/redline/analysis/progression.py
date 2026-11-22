@@ -26,8 +26,10 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, replace
 
 from redline.model.progression import (
+    Bound,
     Clause,
     Criterion,
+    Direction,
     Dose,
     Exposure,
     Family,
@@ -40,6 +42,7 @@ from redline.model.progression import (
     Signal,
     StepMode,
     Unit,
+    Variable,
     Verdict,
     Veto,
     VetoKind,
@@ -56,8 +59,34 @@ TALLY_SHRINK_SHARE = 0.5
 
 
 def _key(family: Family, dose: Dose) -> tuple[float, ...]:
-    """The order of the ladder: the outermost variable weighs most."""
-    return tuple(dose.get(variable.name) or 0.0 for variable in reversed(family.ladder))
+    """The order of the ladder: the outermost variable weighs most, and a variable that
+    falls as the dose rises (a recovery) counts negated."""
+    return tuple((dose.get(variable.name) or 0.0)
+                 * (-1 if variable.direction == Direction.DOWN else 1)
+                 for variable in reversed(family.ladder))
+
+
+def _sign(variable: Variable) -> int:
+    return -1 if variable.direction == Direction.DOWN else 1
+
+
+def _harder(variable: Variable, bound: Bound, value: float) -> float | None:
+    """One step harder, or None past the bound."""
+    moved = round(value + _sign(variable) * bound.step, 6)
+    return moved if bound.minimum - EPSILON <= moved <= bound.maximum + EPSILON else None
+
+
+def _easier(variable: Variable, bound: Bound, value: float) -> float | None:
+    moved = round(value - _sign(variable) * bound.step, 6)
+    return moved if bound.minimum - EPSILON <= moved <= bound.maximum + EPSILON else None
+
+
+def _easiest(variable: Variable, bound: Bound) -> float:
+    return bound.maximum if variable.direction == Direction.DOWN else bound.minimum
+
+
+def _hardest(variable: Variable, bound: Bound) -> float:
+    return bound.minimum if variable.direction == Direction.DOWN else bound.maximum
 
 
 def above(family: Family, dose: Dose, other: Dose) -> bool:
@@ -67,8 +96,8 @@ def above(family: Family, dose: Dose, other: Dose) -> bool:
 def step_up(family: Family, lineage: Lineage, dose: Dose) -> Dose | None:
     """The next rung, or None at the top (or when a bound is not declared).
 
-    The innermost variable moves first. When it is at its maximum, the next one moves
-    and the inner ones that reset go back to their minimum: reps after a load rise.
+    The innermost variable moves first. When it is at its hardest, the next one moves
+    and the inner ones that reset go back to their easiest: reps after a load rise.
     """
     values = dict(dose.values)
     for index, variable in enumerate(family.ladder):
@@ -77,12 +106,13 @@ def step_up(family: Family, lineage: Lineage, dose: Dose) -> Dose | None:
             return dose
         if bound is None or value is None:
             return None
-        if value + bound.step <= bound.maximum + EPSILON:
-            values[variable.name] = round(value + bound.step, 6)
+        harder = _harder(variable, bound, value)
+        if harder is not None:
+            values[variable.name] = harder
             for inner in family.ladder[:index]:
                 inner_bound = lineage.bound(inner.name)
                 if inner.resets and inner_bound is not None:
-                    values[inner.name] = inner_bound.minimum
+                    values[inner.name] = _easiest(inner, inner_bound)
             return Dose(tuple((name, values[name]) for name, _ in dose.values))
     return None
 
@@ -91,8 +121,8 @@ def step_down(family: Family, lineage: Lineage, dose: Dose,
               seen: Sequence[Dose] = ()) -> Dose | None:
     """The rung below, or None at the bottom.
 
-    The innermost variable gives first; when it is at its minimum, the next one steps
-    down and the inner ones that reset go to their maximum, the rung that earned the
+    The innermost variable gives first; when it is at its easiest, the next one steps
+    down and the inner ones that reset go to their hardest, the rung that earned the
     rise. A free variable steps back to the highest value already run below it.
     """
     values = dict(dose.values)
@@ -106,12 +136,13 @@ def step_down(family: Family, lineage: Lineage, dose: Dose,
             return dose.with_value(variable.name, max(lower)) if lower else None
         if bound is None:
             return None
-        if value - bound.step >= bound.minimum - EPSILON:
-            values[variable.name] = round(value - bound.step, 6)
+        easier = _easier(variable, bound, value)
+        if easier is not None:
+            values[variable.name] = easier
             for inner in family.ladder[:index]:
                 inner_bound = lineage.bound(inner.name)
                 if inner.resets and inner_bound is not None:
-                    values[inner.name] = inner_bound.maximum
+                    values[inner.name] = _hardest(inner, inner_bound)
             return Dose(tuple((name, values[name]) for name, _ in dose.values))
     return None
 
@@ -122,7 +153,7 @@ def _rises_freely(family: Family, lineage: Lineage, dose: Dose) -> bool:
         if variable.mode == StepMode.FREE:
             return True
         bound, value = lineage.bound(variable.name), dose.get(variable.name)
-        if bound is not None and value is not None and value + bound.step <= bound.maximum + EPSILON:
+        if bound is not None and value is not None and _harder(variable, bound, value) is not None:
             return False
     return False
 

@@ -64,6 +64,11 @@ PERMIT_GRADED_PARAMETERS = ("permit_tolerance_min", "permit_tolerance_pct",
 #: The raw-duration guard, which also counts the envelope in load: only on top of
 #: `PERMIT_GRADED_PARAMETERS`, whose tolerance and minor gap it then reads in load.
 PERMIT_LOAD_PARAMETER = "permit_raw_guard_pct"
+#: The expected-RPE method (`redline.analysis.expected_rpe`), declared together or not at
+#: all; in this order, the fields of its `Settings`.
+RPE_MODEL_PARAMETERS = ("rpe_model_weeks", "rpe_model_min_sessions",
+                        "rpe_model_settled_sessions", "rpe_range_width",
+                        "rpe_range_width_unsettled", "rpe_intensity_exponent")
 
 RULEBOOK_SCHEMA = Schema("rulebook.toml", [
     field("parameters", dict, schema=Schema("[parameters]", [
@@ -127,11 +132,20 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
               note="consecutive poor nights that remove quality"),
         field("alarm_no_quality_days", int, required=False, minimum=1, maximum=14,
               note="days without quality after poor nights or a high easy-run HR"),
-        field("comparable_duration_pct", int, required=False, minimum=1, maximum=100,
-              note="two sessions of an accumulating kind compare when their durations "
-                   "differ by at most this share of the longer one, in %"),
-        field("comparable_sessions", int, required=False, minimum=1, maximum=20,
-              note="the most recent comparable sessions an accumulating one is read against"),
+        # Optional, all six or none (`RPE_MODEL_PARAMETERS`): absent, no session has an
+        # expected RPE and none is read against one.
+        field("rpe_model_weeks", int, required=False, minimum=2, maximum=104,
+              note="weeks of history a kind's expected RPE is calibrated on"),
+        field("rpe_model_min_sessions", int, required=False, minimum=2, maximum=20,
+              note="declared RPE a kind needs before it has an expected RPE"),
+        field("rpe_model_settled_sessions", int, required=False, minimum=2, maximum=50,
+              note="from this many declared RPE, the narrow range applies"),
+        field("rpe_range_width", float, required=False, minimum=0.5, maximum=3,
+              note="half-width of the expected range, before its bounds are rounded"),
+        field("rpe_range_width_unsettled", float, required=False, minimum=0.5, maximum=4,
+              note="half-width while the kind has fewer declared RPE than settled"),
+        field("rpe_intensity_exponent", float, required=False, minimum=0, maximum=4,
+              note="exponent of a run's intensity in its dose"),
         # Optional: absent, the debrief of an easy or long run carries no gap of that
         # kind. Read on the kilometres of the run (`redline.model.debrief.split_gaps`).
         field("split_hr_margin_bpm", int, required=False, minimum=0, maximum=30,
@@ -244,8 +258,12 @@ class Parameters:
     pain_cut_pct: int | None = None
     poor_nights_streak: int | None = None
     alarm_no_quality_days: int | None = None
-    comparable_duration_pct: int | None = None
-    comparable_sessions: int | None = None
+    rpe_model_weeks: int | None = None
+    rpe_model_min_sessions: int | None = None
+    rpe_model_settled_sessions: int | None = None
+    rpe_range_width: float | None = None
+    rpe_range_width_unsettled: float | None = None
+    rpe_intensity_exponent: float | None = None
     split_hr_margin_bpm: int | None = None
     split_fast_start_pct: float | None = None
     split_fade_pct: float | None = None
@@ -364,7 +382,9 @@ def parse(text: str, source: Path) -> Rulebook:
         **{name: float(raw[name])
            for name in ("gate_effort_peak", "hard_min_hours", "stall_tolerance_km",
                         "missed_after_hours", "split_fast_start_pct", "split_fade_pct",
-                        "split_decoupling_pct", "permit_tolerance_pct", "permit_minor_pct")
+                        "split_decoupling_pct", "permit_tolerance_pct", "permit_minor_pct",
+                        "rpe_range_width", "rpe_range_width_unsettled",
+                        "rpe_intensity_exponent")
            if name in raw}})
     scales = build_scales(payload["scales"])
     problems = []
@@ -374,7 +394,8 @@ def parse(text: str, source: Path) -> Rulebook:
     except DeclarationError as exc:
         problems.append(str(exc))
     for group, label in ((PERMIT_PARAMETERS, "permit thresholds"),
-                         (PERMIT_GRADED_PARAMETERS, "graded permit thresholds")):
+                         (PERMIT_GRADED_PARAMETERS, "graded permit thresholds"),
+                         (RPE_MODEL_PARAMETERS, "expected-RPE thresholds")):
         declared = [name for name in group if name in raw]
         if declared and len(declared) != len(group):
             problems.append(f"parameters: the {label} go together, missing "

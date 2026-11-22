@@ -57,7 +57,6 @@ struct TodayHero: View {
         } else if let minutes = targets.durationCapMin {
             result = ("\(minutes)′", ["au plus"])
         }
-        if let range = targets.rpeRange, result != nil { result!.side.append("RPE \(range)") }
         return result
     }
 }

@@ -15,11 +15,11 @@ from typing import TYPE_CHECKING, Any
 
 from redline.coach.fr import hot_cache as text
 from redline.coach.fr import ledger as ledger_text
-from redline.model import iso_week, program, vault_layout
+from redline.model import iso_week, vault_layout
 from redline.model.views import apply
 from redline.model.vocabulary import DeadlineStatus
 
-from . import ledger
+from . import expected_rpe, ledger
 
 if TYPE_CHECKING:
     from redline.storage import OperationalStore
@@ -38,10 +38,10 @@ def _round(value: float) -> str:
     return f"{value:.2f}".rstrip("0").rstrip(".").replace(".", ",")
 
 
-def render(rows: list, instruments: dict, targets: dict,
+def render(rows: list, instruments: dict, above: dict,
            today: dt.date | None = None, zones: list | None = None) -> str:
     """The Forme paragraph for the latest week of the ledger."""
-    per_week = ledger.eq_hours_per_week(rows, instruments, targets)
+    per_week = ledger.eq_hours_per_week(rows, instruments, above)
     if not per_week:
         return text.EMPTY_LEDGER
     # A week whose rows all have zero weight (e.g. a spontaneous reading logged before the
@@ -52,7 +52,7 @@ def render(rows: list, instruments: dict, targets: dict,
     week = [row for row in rows if row.week == label]
 
     instr = instruments.get(label, ledger.Instruments())
-    h_eq, level, _ = ledger.equivalent_hours(week, instr, targets)
+    h_eq, level, _ = ledger.equivalent_hours(week, instr, above)
     ratio = ledger.acute_chronic_ratio(per_week, label)
 
     # Volume comes from `ledger.week_volume` only: this line and `redline ledger --week`
@@ -62,9 +62,9 @@ def render(rows: list, instruments: dict, targets: dict,
 
     # Walking share of the gauge: it tells whether a red comes from the injury or is
     # merely systemic.
-    walk_h = sum(ledger.row_weight(row, targets)[0] for row in week
+    walk_h = sum(ledger.row_weight(row, above)[0] for row in week
                  if row.type in ledger.WALK_TYPES)
-    base = sum(ledger.row_weight(row, targets)[0] for row in week) or 1.0
+    base = sum(ledger.row_weight(row, above)[0] for row in week) or 1.0
     walk_share = round(100 * walk_h / base)
 
     # Two series, never merged: "during effort" and "at rest" answer different questions
@@ -165,16 +165,16 @@ def refresh(vault: Path, rows: list, instruments: dict,
             today: dt.date | None = None) -> bool:
     """True if a block had drifted. With `check`, nothing is written.
 
-    RPE targets are resolved HERE, from the vault: the Forme block must render exactly the
-    same gauge as `redline ledger --week`, and a second source of targets would let them
-    diverge silently. The ÉTAT block is rendered only if the file carries its markers and
+    The sessions above their expected RPE are resolved HERE, from the store, as `redline
+    ledger --week` resolves them: the Forme block must render exactly the same gauge.
+    Without a store none is known. The ÉTAT block is rendered only if the file carries its markers and
     a store is provided.
     """
     day = today or dt.date.today()
-    targets = program.rpe_targets(vault)
+    above = expected_rpe.above_range(store, rows) if store is not None else {}
     zones = ledger.pain_zones(store) if store is not None else []
     drifted = apply(target(vault), BLOCK,
-                    render(rows, instruments, targets, today=day, zones=zones),
+                    render(rows, instruments, above, today=day, zones=zones),
                     check=check)
     path = target(vault)
     if store is not None and f"<!-- {STATE_BLOCK}_START -->" in path.read_text(

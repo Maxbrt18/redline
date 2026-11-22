@@ -77,7 +77,6 @@ SESSION_SCHEMA = Schema("session", [
           note="the slugs, IN ORDER (the order is not negotiable)"),
     field("aliases", list, required=False, item=field("alias", str)),
     field("capabilities", list, required=False, item=field("cap", str)),
-    field("target_rpe", int, required=False, minimum=1, maximum=10),
     field("duration_min", int, required=False, minimum=5, maximum=120),
     field("phase", list, required=False, item=field("phase", str)),
     field("contraindications", list, required=False, item=field("ci", str)),
@@ -325,31 +324,6 @@ def _workout_notes(vault: Path) -> list[tuple[Path, dict]]:
     if problems:
         raise NoteError("\n".join(problems))
     return notes
-
-
-def rpe_targets(vault: Path) -> dict[tuple[str, str | None], float]:
-    """The RPE target of each (kind, routine), read from the workout notes.
-
-    A kind without a declared `target_rpe` is absent: the caller compares nothing
-    rather than inventing a target. So is a kind whose effort accumulates with its
-    duration (`session_kinds.ACCUMULATING`): one figure cannot hold for every duration.
-    """
-    targets: dict[tuple[str, str | None], float] = {}
-    for _, data in _workout_notes(vault):
-        target = data.get("target_rpe")
-        if target is None:
-            continue
-        if "routine" in data:
-            targets[(session_kinds.STRENGTH, data["routine"])] = float(target)
-        for kind in data.get("kinds") or ():
-            if kind not in session_kinds.ACCUMULATING:
-                targets[(kind, None)] = float(target)
-    return targets
-
-
-def target_for(targets: dict[tuple[str, str | None], float], kind: str,
-               routine: str | None = None) -> float | None:
-    return targets.get((kind, routine if kind == session_kinds.STRENGTH else None))
 
 
 def load(vault: Path) -> Program:
