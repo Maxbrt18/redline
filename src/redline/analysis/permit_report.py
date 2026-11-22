@@ -20,15 +20,7 @@ from redline.model import (
     prescription,
     session_kinds,
 )
-from redline.model.activity import Activity
 from redline.model.vocabulary import SessionStatus
-
-
-def _strava_id(key: str) -> int | None:
-    prefix = "strava:"
-    if key.startswith(prefix) and key[len(prefix):].isdigit():
-        return int(key[len(prefix):])
-    return None
 
 
 def _plans(store: Any, weeks: set[str]
@@ -63,26 +55,14 @@ def _weeks(start: dt.date, today: dt.date) -> set[str]:
     return out
 
 
-def _group(store: Any, activity_id: int) -> bool | None:
-    try:
-        count = Activity.from_json(store.strava_intake(activity_id)["distilled"]).athlete_count
-    except Exception:  # no capture: the group stays unknown, never assumed
-        return None
-    return None if count is None else int(count) > 1
-
-
-def _profile(store: Any, activity_id: int) -> easy_load.Profile | None:
-    streams = store.strava_streams(activity_id)
-    return None if not streams else easy_load.profile(streams)
-
-
 def _loaded(store: Any, runs: list[permit.Run], groups: dict[int, bool],
             since: dt.date) -> list[permit.Run]:
     """The easy runs from `since` with their load at the reference pace of their day; the
     runs before `since` only set the reference."""
     profiles = {run.strava_id: found for run in runs
                 if run.type == session_kinds.EASY and run.strava_id is not None
-                for found in [_profile(store, run.strava_id)] if found is not None}
+                for found in [easy_load.stored_profile(store, run.strava_id)]
+                if found is not None}
     found = easy_load.samples((run.date, profiles[run.strava_id], groups.get(run.strava_id))
                               for run in runs if run.strava_id in profiles)
     out = []
@@ -115,7 +95,7 @@ def report(store: Any, today: dt.date, week: str | None = None) -> list[str]:
              else period.start)
     runs = [permit.Run(row.date, row.type,
                        None if row.hours is None else row.hours * 60,
-                       row.hr_valid, _strava_id(row.idempotency_key))
+                       row.hr_valid, easy_load.strava_id(row.idempotency_key))
             for row in rows if row.date >= since]
     # The permit is judged on the WORST morning trace across all zones: one complaining
     # zone is enough to refuse it. This is the only place zones are merged, and they are
@@ -126,7 +106,7 @@ def report(store: Any, today: dt.date, week: str | None = None) -> list[str]:
             traces[row.date] = max(traces.get(row.date, 0), *row.pains.values())
     weeks = {choice["iso_week"] for choice in choices} | _weeks(period.start, today)
     groups = {run.strava_id: group for run in runs if run.type == session_kinds.EASY and run.strava_id
-              for group in [_group(store, run.strava_id)] if group is not None}
+              for group in [easy_load.group_of(store, run.strava_id)] if group is not None}
     if counts_load:
         runs = _loaded(store, runs, groups, period.start)
     caps, envelopes, efforts = _plans(store, weeks)

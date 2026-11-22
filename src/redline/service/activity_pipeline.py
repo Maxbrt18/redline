@@ -11,6 +11,7 @@ from redline.analysis import descent
 from redline.integrations import strava
 from redline.model import activity as activity_model
 from redline.model.activity import Activity, Lap
+from redline.model.vocabulary import HrDoubt
 from redline.storage import StorageError
 from redline.storage.repository import OperationalStore
 
@@ -120,6 +121,9 @@ class ActivityPipeline:
         gaps, session, day = self._gaps(activity_id, captured.get("observation_id"), splits)
         if gaps:
             snapshot["gaps"] = gaps
+        verdict = self._verdict(activity_id, session, splits, streams)
+        if verdict:
+            snapshot["verdict"] = verdict
         comparables = self._comparables(activity_id)
         if comparables:
             snapshot["comparables"] = comparables
@@ -235,6 +239,32 @@ class ActivityPipeline:
         except Exception as exc:
             log.warning("Gaps of activity %s not computed: %s", activity_id, exc)
             return [], None, None
+
+    def _verdict(self, activity_id: int, session: dict | None, splits: list,
+                 streams: dict | None) -> list[str]:
+        """The service's verdict on the run's execution against its prescription, kept,
+        then rendered for the coach, who writes it and does not decide it. A failed
+        reading costs the debrief its verdict, never its departure."""
+        if session is None:
+            return []
+        try:
+            from redline.analysis import easy_load, execution, ledger
+
+            rows = ledger.parse_ledger(self.store)
+            row = next((row for row in rows
+                        if row.idempotency_key == f"strava:{activity_id}"), None)
+            if row is None:
+                return []
+            ruled = execution.judge(
+                session, splits, streams, dplus=row.dplus, dminus=row.dminus,
+                reference_pace_s=easy_load.reference_pace_s(self.store, rows, row.date),
+                hr_trusted=row.hr_doubt != HrDoubt.NO_SENSOR)
+            self.store.store_debrief_verdict(activity_id, str(ruled.verdict),
+                                             [finding.as_json() for finding in ruled.findings])
+            return execution.render(ruled)
+        except Exception as exc:
+            log.warning("Verdict of activity %s not ruled: %s", activity_id, exc)
+            return []
 
     def _comparables(self, activity_id: int) -> list[dict]:
         """The athlete's previous sessions this one compares with, if its effort accumulates.

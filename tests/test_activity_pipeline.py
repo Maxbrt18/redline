@@ -49,6 +49,9 @@ class Store:
     def observation_feelings(self, observation_id):
         return {}
 
+    def store_debrief_verdict(self, activity_id, verdict, findings, *, actor=""):
+        self.verdict = (activity_id, verdict, findings)
+
 
 def activity():
     return {
@@ -203,7 +206,10 @@ def test_the_feelings_already_given_travel_with_the_snapshot():
         captured_store(), activity_fetch=lambda _: activity()).run(42)["snapshot"]
 
 
-def test_computed_gaps_reach_the_snapshot(monkeypatch):
+@pytest.mark.parametrize("dplus, compared", [(100, True), (347, False)])
+def test_computed_gaps_reach_the_snapshot(monkeypatch, dplus, compared):
+    """The session's mean HR is compared to its cap on a flat run only: over relief the
+    climbs raise it whatever the athlete chose, and the flat kilometres are judged apart."""
     import datetime as dt
 
     from redline.analysis import ledger
@@ -219,16 +225,25 @@ def test_computed_gaps_reach_the_snapshot(monkeypatch):
 
         def load_plan(self, week):
             return {"sessions": [{"id": "w40-sam-sl", "title": "SL", "hr_cap_bpm": 157,
-                                  "distance_cap_km": 16.0}]}
+                                  "distance_cap_km": 16.0, "dplus_cap_m": 200}]}
 
     monkeypatch.setattr(ledger, "parse_ledger", lambda store: [ledger.Row(
         date=dt.date(2026, 10, 3), type="long", idempotency_key="strava:42", km=15.84,
-        hours=1.72, hr_avg=164, dplus=347)])
+        hours=1.72, hr_avg=164, dplus=dplus)])
     monkeypatch.setattr(weekly_plan, "active", lambda plan: plan)
-    result = ActivityPipeline(Linked(), activity_fetch=lambda activity_id: activity(),
+    store = Linked()
+    result = ActivityPipeline(store, activity_fetch=lambda activity_id: activity(),
                               stream_fetch=lambda activity_id: [250, 310],
                               weather_fetch=lambda weather_reading: 20.0).run(42)
-    assert "FC moyenne 164 pour un plafond de 157 (+7)" in result["snapshot"]["gaps"]
+    assert ("FC moyenne 164 pour un plafond de 157 (+7)"
+            in result["snapshot"]["gaps"]) is compared
+    if compared:
+        assert store.verdict[1] == "undetermined"
+    else:
+        assert store.verdict[1] == "execution_gap"
+        assert result["snapshot"]["verdict"] == [
+            "verdict du service : écart d'exécution",
+            "D+ 347 m pour 200 m au plus (+74 %) ; choix du parcours, à part de la FC"]
 
 
 def test_a_gap_failure_never_blocks_the_debrief():

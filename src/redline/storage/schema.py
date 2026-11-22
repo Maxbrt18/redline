@@ -101,6 +101,11 @@ strava_activity_intakes = sa.Table(
     # start. Provider data fetched once, on first display; never read by the coach.
     sa.Column("streams", JSONB),
     sa.Column("weather", JSONB),
+    # The service's verdict on the run's execution against its typed prescription, ruled
+    # before the coach writes (`redline.analysis.execution`): kept so that unjustified
+    # reproaches can be counted against it.
+    sa.Column("debrief_verdict", sa.Text),
+    sa.Column("debrief_findings", JSONB(none_as_null=True)),
     sa.Column("fetched_at", sa.DateTime(timezone=True), nullable=False,
               server_default=UTC_NOW),
     sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False,
@@ -110,6 +115,13 @@ strava_activity_intakes = sa.Table(
         f"status IN ({voc.sql_values(voc.IntakeStatus)})",
         name="ck_strava_activity_intakes_status"),
     sa.CheckConstraint("sport <> ''", name="ck_strava_activity_intakes_sport"),
+    sa.CheckConstraint(
+        f"debrief_verdict IS NULL OR debrief_verdict IN ({voc.sql_values(voc.DebriefVerdict)})",
+        name="ck_strava_activity_intakes_debrief_verdict"),
+    sa.CheckConstraint(
+        "(debrief_verdict IS NULL) = (debrief_findings IS NULL) AND (debrief_findings IS "
+        "NULL OR jsonb_typeof(debrief_findings) = 'array')",
+        name="ck_strava_activity_intakes_debrief_findings"),
     sa.CheckConstraint(
         f"elevation_loss_state IN ({voc.sql_values(voc.EnrichmentState)})",
         name="ck_strava_activity_intakes_elevation_loss_state"),

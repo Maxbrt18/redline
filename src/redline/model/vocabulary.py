@@ -220,6 +220,50 @@ class SessionStructure(StrEnum):
     EFFORTS = "efforts"
 
 
+class DebriefVerdict(StrEnum):
+    """What the service rules on a run's execution against its typed prescription
+    (`strava_activity_intakes.debrief_verdict`), before the coach writes."""
+
+    #: The run followed its prescription: nothing to correct.
+    CONFORMING = "conforming"
+    #: A choice of the athlete, during the run or of its route, went past the prescription.
+    EXECUTION_GAP = "execution_gap"
+    #: No prescription or no reading to judge against.
+    UNDETERMINED = "undetermined"
+
+
+class FindingKind(StrEnum):
+    """One reading of a run against its prescription (`debrief_findings`)."""
+
+    #: Flat HR above the cap at a pace faster than the reference easy pace.
+    FLAT_TOO_FAST = "flat_too_fast"
+    #: Flat HR above the cap at the reference easy pace or slower: a state or sensor sign.
+    FLAT_HR_HIGH = "flat_hr_high"
+    DPLUS_OVER = "dplus_over"
+    DMINUS_OVER = "dminus_over"
+    #: A climb walked on a run whose climbs were to be run.
+    CLIMB_WALKED = "climb_walked"
+    #: A grade past the power-hike threshold run instead of walked.
+    STEEP_RUN = "steep_run"
+    #: The share of the grades past the power-hike threshold that was walked.
+    STEEP_WALKED_SHARE = "steep_walked_share"
+    #: A descent run faster than the flat easy pace on a run whose descents were held.
+    DESCENT_NOT_HELD = "descent_not_held"
+
+
+class FindingOwner(StrEnum):
+    """Whose a finding is: what the coach does with it."""
+
+    #: A choice made during the run: it receives the correction.
+    ATHLETE = "athlete"
+    #: A choice made before leaving, the route: named as such, apart from the HR.
+    ROUTE = "route"
+    #: The body's answer: a state or sensor sign, at most a question, never a reproach.
+    BODY = "body"
+    #: A fact to name, without reproach.
+    NOTE = "note"
+
+
 class ProactiveKind(StrEnum):
     """What a proactive job does (`proactive_jobs.kind`)."""
 

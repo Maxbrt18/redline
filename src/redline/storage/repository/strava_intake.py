@@ -283,6 +283,33 @@ class StravaIntake(SessionCycles):
             _audit(connection, actor, "strava.detail_kept", "strava_activity",
                    aggregate_id, {"kept": sorted(values)})
 
+    def store_debrief_verdict(self, activity_id: int, verdict: str, findings: list[dict],
+                              *, actor: str = "strava-ingestion") -> None:
+        """Keep the service's verdict on a run's execution; a replay replaces it."""
+        with self.database.transaction() as connection:
+            updated = connection.execute(sa.update(strava_activity_intakes).where(
+                strava_activity_intakes.c.activity_id == int(activity_id),
+                strava_activity_intakes.c.athlete_id == self.athlete_id,
+            ).values(debrief_verdict=verdict, debrief_findings=findings,
+                     updated_at=sa.func.now()))
+            if updated.rowcount != 1:
+                raise StorageError(f"Strava activity not captured: {activity_id}")
+            _audit(connection, actor, "strava.debrief_verdict", "strava_activity",
+                   uuid.uuid5(uuid.NAMESPACE_URL, f"strava:{int(activity_id)}"),
+                   {"verdict": verdict, "findings": [item["kind"] for item in findings]})
+
+    def debrief_verdict(self, activity_id: int) -> dict | None:
+        """The kept verdict of a run and its findings, or None before one is ruled."""
+        with self.database.engine.connect() as connection:
+            row = connection.execute(sa.select(
+                strava_activity_intakes.c.debrief_verdict,
+                strava_activity_intakes.c.debrief_findings).where(
+                strava_activity_intakes.c.activity_id == int(activity_id),
+                strava_activity_intakes.c.athlete_id == self.athlete_id)).one_or_none()
+        if row is None or row.debrief_verdict is None:
+            return None
+        return {"verdict": row.debrief_verdict, "findings": row.debrief_findings}
+
     def observation_feelings(self, observation_id: Any) -> dict:
         """Known RPE, enjoyment and per-zone pain of an observation, without the wait."""
         metrics = ("rpe", "enjoyment")

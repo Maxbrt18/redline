@@ -198,6 +198,17 @@ def test_the_streams_kept_at_capture_are_read_back_by_activity(store):
 
 
 @pytestmark_db
+def test_the_debrief_verdict_is_kept_and_a_replay_replaces_it(store):
+    activity_id = store.strava_detail(seed_threshold(store))["activity_id"]
+    assert store.debrief_verdict(activity_id) is None
+    finding = {"kind": "dplus_over", "owner": "route", "value": 652.0, "reference": 400.0,
+               "kms": []}
+    store.store_debrief_verdict(activity_id, "execution_gap", [finding])
+    store.store_debrief_verdict(activity_id, "conforming", [])
+    assert store.debrief_verdict(activity_id) == {"verdict": "conforming", "findings": []}
+
+
+@pytestmark_db
 def test_a_threshold_detail_reads_its_reps_and_asks_for_the_reserve_once(store):
     observation_id = seed_threshold(store)
     when = dt.datetime(2026, 10, 26, 20, 0, tzinfo=PARIS)

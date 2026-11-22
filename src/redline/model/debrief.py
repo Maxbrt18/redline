@@ -19,7 +19,7 @@ from typing import Any
 from redline.coach.fr import debrief as text
 from redline.model.vocabulary import HrDoubt
 
-from . import rulebook, session_kinds, terrain, weekly_plan
+from . import prescription, rulebook, session_kinds, terrain, weekly_plan
 from .activity import Lap
 from .notebook_views import KmSplit
 
@@ -42,9 +42,12 @@ def planned_vs_done(row: Any, session: dict | None) -> list[str]:
             and not shown_by_distance):
         minutes = row.hours * 60
         out.append(text.DURATION_GAP.format(minutes=minutes, duration_cap_min=session["duration_cap_min"], signed=text.signed(round(minutes - session["duration_cap_min"]))))
-    # HR recorded without the armband is never compared to a cap.
+    # HR recorded without the armband is never compared to a cap. Nor is the session's
+    # mean over relief or prescribed efforts: the climbs and the efforts raise it whatever
+    # the athlete chose, and the flat kilometres are judged on their own.
     hr = row.hr_avg if getattr(row, "hr_doubt", None) != HrDoubt.NO_SENSOR else None
-    if hr is not None and session.get("hr_cap_bpm") is not None:
+    if (hr is not None and session.get("hr_cap_bpm") is not None
+            and not prescription.has_efforts(session) and _flat_run(row)):
         out.append(text.HR_GAP.format(hr=hr, hr_cap_bpm=session["hr_cap_bpm"], signed=text.signed(hr - session["hr_cap_bpm"])))
     band = weekly_plan.rpe_band(session)
     if row.rpe is not None and band is not None:
@@ -53,6 +56,15 @@ def planned_vs_done(row: Any, session: dict | None) -> list[str]:
             text.AT_MOST.format(high=text.number(high))
         out.append(text.RPE_GAP.format(rpe=text.number(row.rpe), span=span))
     return out
+
+
+def _flat_run(row: Any) -> bool:
+    """A run with no relief to speak of, by its gain and loss per kilometre."""
+    km = getattr(row, "km", None)
+    if not km:
+        return True
+    return terrain.of(km * 1000, getattr(row, "dplus", 0) or 0,
+                      getattr(row, "dminus", 0) or 0) is terrain.Terrain.FLAT
 
 
 def gaps(row: Any, session: dict | None, drift: Any | None,

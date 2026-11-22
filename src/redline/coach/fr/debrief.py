@@ -62,3 +62,30 @@ RELIEF_KMS = {"climb": "{kms} en montée", "descent": "{kms} en descente",
 RELIEF = "relief : {parts} ; FC et allure jugées sur {count} km de plat"
 
 RELIEF_NO_FLAT = "relief : {parts} ; aucun km plat, FC et allure des kilomètres non jugées"
+
+#: The service's verdict on a run's execution, by `DebriefVerdict` slug.
+VERDICT = "verdict du service : {verdict}"
+VERDICTS = {
+    "conforming": "conforme à la consigne",
+    "execution_gap": "écart d'exécution",
+    "undetermined": "indéterminé (pas de consigne ou rien à lire)",
+}
+#: Each finding says whose it is, so the coach knows what to do with it.
+FINDINGS = {
+    "flat_too_fast": ("plat trop rapide : FC au-dessus du plafond sur {kms} à {pace}/km, plus "
+                      "vite que l'allure EF de référence ({reference_pace}/km) ; choix d'allure, "
+                      "à corriger"),
+    "flat_hr_high": ("FC haute sur le plat ({kms}) à {pace}/km, pas plus vite que l'allure EF de "
+                     "référence ({reference_pace}/km) ; signal d'état ou capteur, jamais un "
+                     "reproche"),
+    "dplus_over": ("D+ {value} m pour {reference} m au plus ({signed} %) ; choix du parcours, "
+                   "à part de la FC"),
+    "dminus_over": ("D- {value} m pour {reference} m au plus ({signed} %) ; choix du parcours, "
+                    "à part de la FC"),
+    "climb_walked": "montées marchées : {kms} (consigne : toutes en courant) ; à nommer, sans reproche",
+    "steep_run": ("pentes de {reference} % et plus courues : {kms} (consigne : marche vite) ; "
+                  "écart d'exécution"),
+    "steep_walked_share": "pentes de {reference} % et plus marchées à {share} %",
+    "descent_not_held": ("descentes plus rapides que l'allure EF à plat : {kms} à {pace}/km "
+                         "(consigne : retenues) ; écart d'exécution"),
+}

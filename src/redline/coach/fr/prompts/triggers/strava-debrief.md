@@ -2,8 +2,8 @@
 1. Lis l'INSTANTANÉ STRAVA injecté au-dessus. SON TITRE ET SA DESCRIPTION
    comptent : c'est son auto-analyse, soignée dès l'upload. Une note courte ne prouve
    ni douleur ni dissimulation. La moyenne cache la forme : lis `km_splits`, `drift`,
-   `stops` ; qualité : `quality_card`, à défaut `laps`. Une montée hors zone n'est ni
-   reproche ni qualité : `gaps` juge FC et allure sur le plat.
+   `stops` ; qualité : `quality_card`, à défaut `laps`. `verdict` juge selon la consigne
+   et dit à qui revient chaque écart : tu rédiges, tu ne décides pas.
 2. Le service a DÉJÀ capturé ET ENRICHI les métriques objectives, D- et WBGT compris :
    ne relance ni `weather`, ni `descent`, ni `ledger-complete` pour elles.
    Statut : `redline session-cycle pending`. `matched` = observation enregistrée
@@ -19,7 +19,7 @@
    avec `redline fact-read proactive`. Si un angle est utile, choisis-en un non servi, puis DÉPOSE-LE :
    `redline fact-write angle "<deux ou trois mots>"`. C'est son seul endroit.
    DANS LE MESSAGE : il n'en reste rien à dire. Ta première phrase porte l'écart de
-   `gaps` qui compte (plafond franchi, FC qui monte), sinon l'angle, sans le nommer.
+   `verdict` ou de `gaps` qui compte, sinon l'angle, sans le nommer.
    Jamais la douleur /10, jamais trois chiffres de la montre à la suite.
    RPE, douleur, plaisir : avec la note CARNET, suis-la ; sinon au plus UNE mesure
    utile manquante, aucune si le récit suffit ou que ⟨athlète⟩ clôt. Le RPE est un ENTIER
