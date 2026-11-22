@@ -765,14 +765,15 @@ def distance_of(session: dict) -> str:
     return ""
 
 
-def details_of(session: dict, *, cadence_unit: str = "") -> list[str]:
+def details_of(session: dict, *, cadence_unit: str = "", note: bool = True) -> list[str]:
     """Everything a session commits to, in order, without its title or status.
 
     The order is part of the contract: distance, HR zone, cadence, the typed
     prescription (relief, climbs, descents, efforts), fuelling, note. Each
     rendering only decides its separator and markup -- and `cadence_unit` is the one real
     difference, the journal naming the unit that the text message and the card leave
-    implicit.
+    implicit. `note=False` leaves the free-text note out, for a render that names only
+    what changed.
     """
     details = [distance_of(session)]
     if session.get("hr_zone"):
@@ -784,7 +785,7 @@ def details_of(session: dict, *, cadence_unit: str = "") -> list[str]:
         details.append(" ".join(filter(None, (
             text.CARBS.format(grams=session["carbs_target_g_h"]),
             text.CARBS_MIX.get(session.get("carbs_mix") or "")))))
-    if session.get("note"):
+    if note and session.get("note"):
         details.append(session["note"])
     return [part for part in details if part]
 

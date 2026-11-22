@@ -224,5 +224,44 @@ def test_reactive_revision_renders_only_its_delta():
 
     message = render_plan_delta(before, after, "2026-W33", today="2026-08-11")
 
-    assert "SL vallonnée déplacé" in message
-    assert "Repos" not in message
+    assert message == ("Changement au programme : SL vallonnée passe de dim. 16/08 à "
+                       "sam. 15/08.")
+
+
+def _delta(*changes):
+    """The delta of revision 3 over revision 2, each change a (session id, fields) pair."""
+    edits = dict(changes)
+    after = [{**session, **edits[session["id"]]} if session["id"] in edits else session
+             for session in SESSIONS]
+    return render_plan_delta({"revision": 2, "sessions": SESSIONS},
+                             {"revision": 3, "sessions": after}, "2026-W33",
+                             today="2026-08-11")
+
+
+def test_a_swap_names_the_days_and_repeats_no_detail():
+    message = _delta(("w33-r1-dim-sl", {"date": "2026-08-15"}),
+                     ("w33-r2-mar-repos", {"date": "2026-08-16"}))
+    assert message == ("Changements au programme :\n"
+                       "Repos (Renfo A reporté) passe de mar. 11/08 à dim. 16/08.\n"
+                       "SL vallonnée passe de dim. 16/08 à sam. 15/08.")
+
+
+def test_a_changed_session_names_only_what_changed_and_never_its_note():
+    shorter = _delta(("w33-r1-dim-sl", {"distance_target_km": 8.0, "distance_cap_km": 9.0,
+                                        "note": "Raccourcie : trace au réveil légère."}))
+    assert shorter == "Changement au programme : dim. 16/08 : SL vallonnée, cible 8 km, plafond 9 km."
+    moved = _delta(("w33-r1-dim-sl", {"date": "2026-08-15", "start_time": "21:00"}))
+    assert moved == ("Changement au programme : SL vallonnée passe de dim. 16/08 à sam. 15/08, "
+                     "à 21:00.")
+    noted = _delta(("w33-r1-dim-sl", {"note": "Frontale."}))
+    assert noted == "Changement au programme : dim. 16/08 : SL vallonnée, consigne précisée."
+
+
+def test_an_added_session_shows_what_it_commits_to_without_its_note():
+    added = {"id": "w33-r3-jeu-ef", "title": "EF", "date": "2026-08-13", "kind": "run",
+             "workout": "easy", "status": "planned", "distance_cap_km": 6.0,
+             "demanding": False, "note": "Avec les amis, sans renfo derrière."}
+    message = render_plan_delta({"revision": 2, "sessions": SESSIONS},
+                                {"revision": 3, "sessions": [*SESSIONS, added]}, "2026-W33",
+                                today="2026-08-11")
+    assert message == "Changement au programme : jeu. 13/08 : EF, plafond 6 km."
