@@ -85,6 +85,22 @@ def _full(session: dict) -> str:
     return ", ".join([head, *details])
 
 
+def _parts(session: dict) -> list[str]:
+    """What a session commits to, as the text message shows it, without its note."""
+    parts = ([wording.MESSENGER_AT.format(time=session["start_time"]).strip()]
+             if session.get("start_time") else [])
+    parts += weekly_plan_model.details_of(session, note=False)
+    if session.get("location_label"):
+        parts.append(wording.MESSENGER_PLACE + session["location_label"])
+    return parts
+
+
+def _changed(previous: dict, session: dict) -> list[str]:
+    """What a revision changed of a session, in reading order; its note never."""
+    before = set(_parts(previous))
+    return [part for part in _parts(session) if part not in before]
+
+
 def _label(day: date) -> str:
     return wording.MESSENGER_DAY.format(weekday=dates.weekday(day, "abbreviated"), day=day)
 
@@ -196,7 +212,9 @@ def render_plan_for_scope(revision: dict | None, week: str, scope: str, *, today
 
 def render_plan_delta(before: dict | None, after: dict | None, week: str, *, today: str,
                       exclude_ids: frozenset[str] = frozenset()) -> str:
-    """A reactive revision announces its changes, never the whole week."""
+    """A reactive revision announces its changes, never the whole week: a session moved
+    names its days, a session changed names only what changed, and no note is repeated
+    (the notebook and the card carry the whole session)."""
     if after is None:
         return ""
     old = {session["id"]: session for session in (before or {}).get("sessions", [])}
@@ -212,14 +230,19 @@ def render_plan_delta(before: dict | None, after: dict | None, week: str, *, tod
         day = date.fromisoformat(session["date"])
         if session.get("status") == SessionStatus.CANCELLED:
             changed.append(wording.MESSENGER_CANCELLED.format(day=_label(day), title=session["title"]))
-        elif previous is not None and previous.get("date") != session.get("date"):
+        elif previous is None:
+            changed.append(f"{_label(day)} : " + ", ".join(
+                [session["title"] + _done(session), *_parts(session)]))
+        elif previous.get("date") != session.get("date"):
             old_day = date.fromisoformat(previous["date"])
-            changed.append(
+            changed.append(", ".join([
                 wording.MESSENGER_MOVED.format(title=session["title"], before=_label(old_day),
-                                               after=_label(day))
-                + ", ".join(weekly_plan_model.details_of(session)))
+                                               after=_label(day)),
+                *_changed(previous, session)]))
         else:
-            changed.append(f"{_label(day)} : {_full(session)}")
+            changed.append(f"{_label(day)} : " + ", ".join(
+                [session["title"] + _done(session),
+                 *(_changed(previous, session) or [wording.MESSENGER_NOTE_ONLY])]))
     for session_id, session in old.items():
         if session_id in new or session.get("date", "") < today or session_id in exclude_ids:
             continue

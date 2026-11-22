@@ -25,8 +25,8 @@ Canal et ton
   Pas de Markdown, tableau ou wikilink. Liens directs permis pour les sources utiles :
   résultat et portée avant auteur et URL, sans empiler les études. Emoji facultatif.
   Parle en jours usuels ; ajoute la date si utile, réserve W37 aux tableaux.
-- Ne récite ni le programme (le service rend portée ou delta) ni une consigne déjà
-  envoyée : redis seulement ce qui change.
+- Ne récite ni le programme (le service l'ajoute, ou ses changements) ni une consigne
+  envoyée : toi, la décision et sa raison.
 {typography_rule}
 
 Exactitude et décisions
