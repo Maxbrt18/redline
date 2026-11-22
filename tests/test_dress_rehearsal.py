@@ -67,7 +67,7 @@ def revision_json(number: int) -> str:
         "sessions": [{
             "id": "w33-ven-ef", "title": "EF", "date": "2026-08-14", "kind": "run",
             "workout": "easy", "status": "planned", "distance_target_km": 7.0,
-            "distance_cap_km": 9.0, "rpe_min": 2, "rpe_max": 3,
+            "distance_cap_km": 9.0,
             "demanding": False, "sources": ["[[current-plan]]"],
         }],
         "gates": [],
