@@ -243,6 +243,23 @@ class RpeSide(StrEnum):
     UNKNOWN = "unknown"
 
 
+class RpeSign(StrEnum):
+    """An independent sign, on the same session, that lets the coach speak of an RPE out
+    of its expected range: without one, the RPE is noted and nothing is said."""
+
+    #: A choice of the athlete went past the prescription: the correction goes to it.
+    EXECUTION = "execution"
+    #: The flat HR above the cap at the usual pace or slower.
+    FLAT_HR_HIGH = "flat_hr_high"
+    #: An easy run's HR above its usual one at the same pace.
+    HR_AT_PACE = "hr_at_pace"
+    #: A poor night declared the morning of the session.
+    POOR_NIGHT = "poor_night"
+    #: The previous session of the kind fell on the same side of its range: a pattern,
+    #: worth one question if its answer changes what follows.
+    PATTERN = "pattern"
+
+
 class FindingKind(StrEnum):
     """One reading of a run against its prescription (`debrief_findings`)."""
 
@@ -260,6 +277,13 @@ class FindingKind(StrEnum):
     STEEP_WALKED_SHARE = "steep_walked_share"
     #: A descent run faster than the flat easy pace on a run whose descents were held.
     DESCENT_NOT_HELD = "descent_not_held"
+    #: The dose run expects a clearly higher RPE than the dose prescribed: an execution
+    #: choice, which receives the correction, never the RPE.
+    RUN_ABOVE_PRESCRIPTION = "run_above_prescription"
+    #: A declared RPE above the range the dose run expects.
+    RPE_ABOVE = "rpe_above"
+    #: A declared RPE below that range.
+    RPE_BELOW = "rpe_below"
 
 
 class FindingOwner(StrEnum):

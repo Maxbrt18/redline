@@ -88,4 +88,29 @@ FINDINGS = {
     "steep_walked_share": "pentes de {reference} % et plus marchées à {share} %",
     "descent_not_held": ("descentes plus rapides que l'allure EF à plat : {kms} à {pace}/km "
                          "(consigne : retenues) ; écart d'exécution"),
+    "run_above_prescription": ("séance courue au-dessus de la consigne : sa dose attend un RPE "
+                               "de {value}, au-delà de {reference} pour la séance prescrite ; "
+                               "choix d'exécution, à corriger, jamais le chiffre"),
 }
+#: The RPE the dose should cost, computed on the athlete's history: never a target.
+EXPECTED_RUN = "RPE attendu pour la séance courue : {low}-{high} ({count} séances de calibration)"
+EXPECTED_PRESCRIBED = " ; pour la séance prescrite : {low}-{high}"
+#: A declared RPE out of its range, by `FindingKind` slug and by what the signs allow.
+RPE_SIDES = {"rpe_above": "au-dessus", "rpe_below": "en dessous"}
+RPE_SIGNS = {
+    "execution": "écart d'exécution",
+    "flat_hr_high": "FC haute sur le plat à allure habituelle",
+    "hr_at_pace": "FC haute à allure comparable",
+    "poor_night": "mauvaise nuit déclarée",
+    "pattern": "deuxième séance de suite du même côté",
+}
+RPE_SILENT = ("RPE {rpe} {side} de la fourchette, sans second indice : n'en parle pas, la "
+              "séance est notée")
+RPE_ABOVE_EXECUTION = ("RPE {rpe} au-dessus de la fourchette ({signs}) : il suit "
+                       "l'exécution ; la correction porte sur le choix, jamais sur le chiffre")
+RPE_ABOVE_COSTLIER = ("RPE {rpe} au-dessus de la fourchette, avec {signs} : ça a coûté plus "
+                      "que prévu ; nomme l'indice une fois, on ajuste la suite, sans reproche")
+RPE_BELOW_SPOKEN = ("RPE {rpe} en dessous de la fourchette, avec {signs} : nomme-le une fois ; "
+                    "jamais de hausse de dose sur ce seul signe")
+RPE_PATTERN = ("RPE {rpe} {side} de la fourchette, deuxième séance de suite du même côté : "
+               "une seule question, si sa réponse change la suite")

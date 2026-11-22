@@ -85,5 +85,37 @@
     "session": {"workout": "easy", "descent_intent": "held"},
     "legs": [[1000, 380, 0, 85, 150], [1000, 330, -5, 88, 142], [1000, 380, 0, 85, 150]],
     "expected": {"verdict": "execution_gap", "findings": ["descent_not_held"]}
+  },
+  {
+    "id": "long-run-costing-what-its-dose-expects",
+    "about": "A long run with gain declared at 6, inside the range its dose expects: no word on the RPE, whatever a band once said.",
+    "session": {"workout": "long", "distance_cap_km": 23, "dplus_cap_m": 450},
+    "legs": [[3000, 380, 0, 85, 150]],
+    "cost": {"declared": 6, "run": [6.0, 5, 7], "prescribed": [6.1, 5, 7]},
+    "expected": {"verdict": "conforming", "findings": []}
+  },
+  {
+    "id": "long-run-run-as-a-race",
+    "about": "A long run prescribed at the easy pace, run as a race: its RPE is normal for what was run, the choice of running it so receives the correction.",
+    "session": {"workout": "long", "distance_cap_km": 15},
+    "legs": [[3000, 380, 0, 85, 150]],
+    "cost": {"declared": 6, "run": [5.6, 5, 7], "prescribed": [4.0, 3, 5]},
+    "expected": {"verdict": "execution_gap", "findings": ["run_above_prescription"]}
+  },
+  {
+    "id": "rpe-above-without-a-second-sign",
+    "about": "An RPE above its range and nothing else on the session: noted, not said.",
+    "session": {"workout": "easy"},
+    "legs": [[3000, 380, 0, 85, 150]],
+    "cost": {"declared": 6, "run": [3.0, 2, 4]},
+    "expected": {"verdict": "conforming", "findings": ["rpe_above"]}
+  },
+  {
+    "id": "rpe-above-after-a-poor-night",
+    "about": "The same RPE after a poor night: it cost more than planned, said once, without reproach.",
+    "session": {"workout": "easy"},
+    "legs": [[3000, 380, 0, 85, 150]],
+    "cost": {"declared": 6, "run": [3.0, 2, 4], "signs": ["poor_night"]},
+    "expected": {"verdict": "conforming", "findings": ["rpe_above"], "spoken": ["rpe_above"]}
   }
 ]

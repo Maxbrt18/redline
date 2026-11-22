@@ -383,3 +383,46 @@ def test_an_easy_run_too_fast_shows_in_the_gaps(monkeypatch):
                             detail_fetch=lambda _: streams).run(42)["snapshot"]["gaps"]
     assert "FC au-dessus du plafond de 150 sur 1 km (km 1), jusqu'à 160" in gaps
     assert any(gap.startswith("départ rapide : 1er km en 4:37") for gap in gaps)
+
+
+def test_the_debrief_reads_the_rpe_against_the_range_of_the_dose_run(monkeypatch):
+    """Three long runs calibrate the kind; the run's RPE is above its range on the morning
+    after a poor night: the coach may speak of it, without reproach."""
+    import datetime as dt
+
+    from redline.analysis import ledger
+    from redline.model import weekly_plan
+
+    class Linked(Store):
+        def ingest_strava_activity(self, activity):
+            return {"activity_id": activity.id, "status": "matched", "observation_id": "obs"}
+
+        def week_session_links(self, week):
+            return {"w40-dim-sl": {"observation_id": "obs"}}
+
+        def load_plan(self, week):
+            return {"sessions": [{"id": "w40-dim-sl", "title": "SL", "workout": "long",
+                                  "distance_cap_km": 16}]}
+
+        def daily_rows(self):
+            return [{"checked_on": dt.date(2026, 10, 11), "sleep": "poor"}]
+
+    def long_run(day, km, rpe, key=""):
+        return ledger.Row(date=dt.date(2026, 10, day), type="long", idempotency_key=key,
+                          km=km, hours=km / 10, rpe=rpe)
+
+    monkeypatch.setattr(ledger, "parse_ledger", lambda store: [
+        long_run(11, 16.0, 9, "strava:42"), long_run(4, 12.0, 4), long_run(1, 16.0, 5),
+        long_run(2, 20.0, 6)])
+    monkeypatch.setattr(weekly_plan, "active", lambda plan: plan)
+    store = Linked(elevation="known", wbgt="known")
+    snapshot = ActivityPipeline(store, activity_fetch=lambda _: activity(),
+                                detail_fetch=lambda _: None).run(42)["snapshot"]
+    assert snapshot["expected_rpe"]["run"]["sessions"] == 3
+    assert snapshot["expected_rpe"]["prescribed"] == snapshot["expected_rpe"]["run"]
+    assert any(line.startswith("RPE attendu pour la séance courue")
+               for line in snapshot["verdict"])
+    findings = store.verdict[2]
+    assert findings == [{"kind": "rpe_above", "owner": "body", "value": 9.0,
+                         "reference": float(snapshot["expected_rpe"]["run"]["high"]),
+                         "kms": [], "signs": ["poor_night"]}]

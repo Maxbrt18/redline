@@ -17,7 +17,10 @@ les km de montée, de descente ou vallonnés, que ces écarts ne jugent pas.
 consigne typée (relief, montées, descentes, efforts) : conforme, écart d'exécution ou
 indéterminé, puis chaque constat avec son propriétaire. Un choix d'allure reçoit la
 correction ; un choix du parcours se nomme à part de la FC ; un signal d'état n'appelle
-au plus qu'une question ; un constat « sans reproche » se nomme tel quel.
+au plus qu'une question ; un constat « sans reproche » se nomme tel quel. Il dit aussi le
+RPE attendu et, si le RPE déclaré sort de sa fourchette, ce que tu peux en dire : rien
+sans second indice ; une séance courue au-dessus de la consigne reçoit la correction,
+jamais le chiffre.
 `expected_rpe` porte le RPE que la dose devait coûter, calculé sur l'historique de
 ⟨athlète⟩ : `run` pour la séance courue, `prescribed` pour la séance prescrite (footing
 ou sortie longue), chacun avec sa valeur, sa fourchette (`low`-`high`), le nombre de
