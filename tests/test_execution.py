@@ -4,6 +4,7 @@ import pytest
 from test_weekly_plan import session
 
 from redline.analysis import execution
+from redline.evaluation.debrief_bench import synthetic_streams
 from redline.model.vocabulary import DebriefVerdict, FindingKind, FindingOwner
 from redline.service import session_detail
 
@@ -11,23 +12,8 @@ from redline.service import session_detail
 REFERENCE = 374.0
 
 
-def _streams(legs):
-    """One sample a second along `legs`: (metres, s/km, grade %, cadence per leg, HR)."""
-    t, d, alt, v, cad, hr = [0], [0.0], [100.0], [0.0], [85], [140]
-    for metres, pace, grade, cadence, beat in legs:
-        speed = 1000 / pace
-        for _ in range(int(metres / speed)):
-            t.append(t[-1] + 1)
-            d.append(round(d[-1] + speed, 1))
-            alt.append(round(alt[-1] + speed * grade / 100, 2))
-            v.append(round(speed, 2))
-            cad.append(cadence)
-            hr.append(beat)
-    return {"t": t, "d": d, "alt": alt, "v": v, "cad": cad, "hr": hr}
-
-
 def _judge(prescribed, legs, *, dplus=None, dminus=None, reference=REFERENCE):
-    streams = _streams(legs)
+    streams = synthetic_streams([list(leg) for leg in legs])
     splits = session_detail.km_splits(streams) or []
     return execution.judge(prescribed, splits, streams, dplus=dplus, dminus=dminus,
                            reference_pace_s=reference)

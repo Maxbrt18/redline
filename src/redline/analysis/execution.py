@@ -46,6 +46,9 @@ WALKED_SHARE = 0.5
 #: Gain and loss measured by a watch drift: a relief within this share above its cap is
 #: within the measure's noise.
 RELIEF_NOISE_PCT = 10
+#: A pace from GPS and kilometre splits drifts by a few percent: a flat pace within this
+#: share faster than the reference is the same pace.
+PACE_NOISE_PCT = 3
 
 OWNERS = {
     FindingKind.FLAT_TOO_FAST: FindingOwner.ATHLETE,
@@ -154,7 +157,8 @@ def _flat(session: dict, splits: Sequence[KmSplit], reference_pace_s: float | No
     if not above:
         return []
     pace, kms = _pace(above), tuple(row["n"] for row in above)
-    kind = FindingKind.FLAT_TOO_FAST if pace < reference_pace_s else FindingKind.FLAT_HR_HIGH
+    faster = pace < reference_pace_s * (1 - PACE_NOISE_PCT / 100)
+    kind = FindingKind.FLAT_TOO_FAST if faster else FindingKind.FLAT_HR_HIGH
     return [Finding(kind, round(pace), round(reference_pace_s), kms)]
 
 
