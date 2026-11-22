@@ -3852,6 +3852,38 @@ public extension Notebook {
         }
     }
 
+    struct RpeRange: Codable, Hashable, Sendable {
+        public let low: Int
+        public let high: Int
+        public let sessions: Int
+
+        public init(low: Int, high: Int, sessions: Int) {
+            self.low = low
+            self.high = high
+            self.sessions = sessions
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case low = "low"
+            case high = "high"
+            case sessions = "sessions"
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            low = try container.decode(Int.self, forKey: .low)
+            high = try container.decode(Int.self, forKey: .high)
+            sessions = try container.decode(Int.self, forKey: .sessions)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(low, forKey: .low)
+            try container.encode(high, forKey: .high)
+            try container.encode(sessions, forKey: .sessions)
+        }
+    }
+
     struct DetailFact: Codable, Hashable, Sendable {
         public let observationId: String
         public let kind: String
@@ -3869,8 +3901,9 @@ public extension Notebook {
         public let hrMax: Double?
         public let cadence: Double?
         public let reserve: Double?
+        public let rpeExpected: RpeRange?
 
-        public init(observationId: String, kind: String, date: String, km: Double? = nil, durationMin: Int? = nil, hrAvg: Double? = nil, rpe: Double? = nil, pains: [PainReading], enjoyment: Double? = nil, dplus: Double? = nil, startedAt: String? = nil, over: [String], movingS: Double? = nil, hrMax: Double? = nil, cadence: Double? = nil, reserve: Double? = nil) {
+        public init(observationId: String, kind: String, date: String, km: Double? = nil, durationMin: Int? = nil, hrAvg: Double? = nil, rpe: Double? = nil, pains: [PainReading], enjoyment: Double? = nil, dplus: Double? = nil, startedAt: String? = nil, over: [String], movingS: Double? = nil, hrMax: Double? = nil, cadence: Double? = nil, reserve: Double? = nil, rpeExpected: RpeRange? = nil) {
             self.observationId = observationId
             self.kind = kind
             self.date = date
@@ -3887,6 +3920,7 @@ public extension Notebook {
             self.hrMax = hrMax
             self.cadence = cadence
             self.reserve = reserve
+            self.rpeExpected = rpeExpected
         }
 
         enum CodingKeys: String, CodingKey {
@@ -3906,6 +3940,7 @@ public extension Notebook {
             case hrMax = "hr_max"
             case cadence = "cadence"
             case reserve = "reserve"
+            case rpeExpected = "rpe_expected"
         }
 
         public init(from decoder: any Decoder) throws {
@@ -3926,6 +3961,7 @@ public extension Notebook {
             hrMax = try container.decode(Double?.self, forKey: .hrMax)
             cadence = try container.decode(Double?.self, forKey: .cadence)
             reserve = try container.decode(Double?.self, forKey: .reserve)
+            rpeExpected = try container.decode(RpeRange?.self, forKey: .rpeExpected)
         }
 
         public func encode(to encoder: any Encoder) throws {
@@ -3946,6 +3982,7 @@ public extension Notebook {
             try container.encode(hrMax, forKey: .hrMax)
             try container.encode(cadence, forKey: .cadence)
             try container.encode(reserve, forKey: .reserve)
+            try container.encode(rpeExpected, forKey: .rpeExpected)
         }
     }
 

@@ -30,7 +30,12 @@
     "moving_s": 2880,
     "hr_max": null,
     "cadence": null,
-    "reserve": null
+    "reserve": null,
+    "rpe_expected": {
+      "low": 2,
+      "high": 4,
+      "sessions": 6
+    }
   },
   "plan": {
     "targets": {

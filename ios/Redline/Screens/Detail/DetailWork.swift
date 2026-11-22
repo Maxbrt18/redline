@@ -50,8 +50,17 @@ struct DetailWork: View {
         return line + "."
     }
 
+    /// The declared RPE against what the dose run expects; never a target.
+    private func costRow() -> (String, String, String?)? {
+        guard let rpe = detail.fact.rpe, let range = detail.fact.rpeExpected else { return nil }
+        let title = rpe > Double(range.high) ? "Plus coûteux que la dose"
+            : rpe < Double(range.low) ? "Moins coûteux que la dose" : "Coût conforme à la dose"
+        return ("gauge.with.needle", title, "RPE \(Numbers.text(rpe)) pour \(range.low)-\(range.high) attendus")
+    }
+
     private func qualityRead() -> [(String, String, String?)] {
         var rows: [(String, String, String?)] = []
+        if let cost = costRow() { rows.append(cost) }
         if let reading = detail.reading {
             let range = "\(Numbers.pace(Double(reading.fastestBefore))) – \(Numbers.pace(Double(reading.slowestBefore)))"
             rows.append(reading.finalAcceleration
@@ -76,6 +85,7 @@ struct DetailWork: View {
                          abs(delta) < 3 ? "Pas de dérive cardiaque" : "FC \(delta > 0 ? "en hausse" : "en baisse") de \(abs(delta)) bpm",
                          "\(drift.first) sur la 1ʳᵉ moitié, \(drift.second) sur la 2ᵈᵉ"))
         }
+        if let cost = costRow() { rows.append(cost) }
         return rows
     }
 }
