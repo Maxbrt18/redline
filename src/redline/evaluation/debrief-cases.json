@@ -1,0 +1,89 @@
+[
+  {
+    "id": "flat-easy-run",
+    "about": "A flat easy run under its cap: nothing to say.",
+    "session": {"workout": "easy", "hr_cap_bpm": 157},
+    "legs": [[3000, 380, 0, 85, 150]],
+    "expected": {"verdict": "conforming", "findings": []}
+  },
+  {
+    "id": "climb-at-the-same-hr",
+    "about": "The same easy run with a climb run at 165 bpm: the cap never applies on a climb.",
+    "session": {"workout": "easy", "hr_cap_bpm": 157},
+    "legs": [[1000, 380, 0, 85, 150], [800, 520, 6, 82, 165], [1200, 380, 0, 85, 150]],
+    "expected": {"verdict": "conforming", "findings": []}
+  },
+  {
+    "id": "group-at-ease",
+    "about": "A group run slower than the usual easy pace, HR under the cap.",
+    "session": {"workout": "easy", "hr_cap_bpm": 157},
+    "legs": [[5000, 420, 0, 84, 148]],
+    "expected": {"verdict": "conforming", "findings": []}
+  },
+  {
+    "id": "group-hanging-on",
+    "about": "A group run faster than the usual easy pace, HR over the cap: the pace was a choice.",
+    "session": {"workout": "easy", "hr_cap_bpm": 157},
+    "legs": [[1000, 374, 0, 85, 150], [4000, 340, 0, 88, 163]],
+    "expected": {"verdict": "execution_gap", "findings": ["flat_too_fast"]}
+  },
+  {
+    "id": "high-hr-at-the-usual-pace",
+    "about": "HR over the cap at the usual easy pace: a state or sensor sign, never a reproach.",
+    "session": {"workout": "easy", "hr_cap_bpm": 157},
+    "legs": [[4000, 376, 0, 85, 163]],
+    "expected": {"verdict": "conforming", "findings": ["flat_hr_high"]}
+  },
+  {
+    "id": "pyramid-prescribed-as-an-easy-run",
+    "about": "A friend's pyramid prescribed as an easy run, mean HR cap carried from an older revision: the efforts are the prescription's.",
+    "session": {"workout": "easy", "hr_cap_bpm": 157, "structure": "efforts"},
+    "legs": [[1000, 374, 0, 85, 150], [600, 300, 0, 92, 168], [600, 450, 0, 80, 152],
+             [900, 290, 0, 93, 169], [900, 374, 0, 85, 155]],
+    "expected": {"verdict": "conforming", "findings": []}
+  },
+  {
+    "id": "reconnaissance-long-run",
+    "about": "Power hike from 10 %: the steep climbs walked as asked, the flat run faster than the easy pace at 164 bpm.",
+    "session": {"workout": "long", "hr_cap_bpm": 157, "climb_intent": "power_hike",
+                "power_hike_from_pct": 10, "dminus_cap_m": 550},
+    "legs": [[2000, 356, 0, 87, 164], [600, 1000, 14, 55, 168], [800, 520, 6, 80, 166],
+             [2000, 356, 0, 87, 164]],
+    "dplus": 393, "dminus": 400,
+    "expected": {"verdict": "execution_gap", "findings": ["flat_too_fast", "steep_walked_share"]}
+  },
+  {
+    "id": "night-long-run",
+    "about": "A route with 63 % more gain than its cap, steep grades run, and a high flat HR at a slow pace.",
+    "session": {"workout": "long", "hr_cap_bpm": 157, "climb_intent": "power_hike",
+                "power_hike_from_pct": 10, "dplus_cap_m": 400, "dminus_cap_m": 400},
+    "legs": [[2000, 401, 0, 84, 163], [500, 650, 14, 80, 172], [1000, 401, 0, 84, 163],
+             [400, 1000, 12, 55, 170], [2000, 401, 0, 84, 163]],
+    "dplus": 652, "dminus": 640,
+    "expected": {"verdict": "execution_gap",
+                 "findings": ["dplus_over", "dminus_over", "flat_hr_high", "steep_walked_share",
+                              "steep_run"]}
+  },
+  {
+    "id": "relief-within-the-noise",
+    "about": "A gain 7 % over its cap: within what a watch measures.",
+    "session": {"workout": "easy", "dplus_cap_m": 400},
+    "legs": [[3000, 380, 0, 85, 150]],
+    "dplus": 430,
+    "expected": {"verdict": "conforming", "findings": []}
+  },
+  {
+    "id": "climb-walked-on-a-run-slow-day",
+    "about": "Climbs were to be run slowly; one was walked: named, without reproach.",
+    "session": {"workout": "easy", "climb_intent": "run_slow"},
+    "legs": [[1000, 380, 0, 85, 150], [600, 900, 8, 55, 160], [1000, 380, 0, 85, 150]],
+    "expected": {"verdict": "conforming", "findings": ["climb_walked"]}
+  },
+  {
+    "id": "held-descents-let-go",
+    "about": "Descents were to be held for the shin; one was run faster than the flat easy pace.",
+    "session": {"workout": "easy", "descent_intent": "held"},
+    "legs": [[1000, 380, 0, 85, 150], [1000, 330, -5, 88, 142], [1000, 380, 0, 85, 150]],
+    "expected": {"verdict": "execution_gap", "findings": ["descent_not_held"]}
+  }
+]

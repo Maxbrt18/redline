@@ -19,9 +19,11 @@ import datetime as dt
 import statistics
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import Any
 
 from redline.analysis.race_pace import SEGMENT_M, strava_2017
-from redline.model import terrain
+from redline.model import session_kinds, terrain
+from redline.model.activity import Activity
 from redline.model.streams import GAP_S, MOVING_MPS
 
 #: The exponent of the relative speed: the rTSS convention, to calibrate on the bone's
@@ -126,3 +128,40 @@ def reference_mps(found: Iterable[Sample], day: dt.date) -> float | None:
     since = day - dt.timedelta(weeks=REFERENCE_WEEKS)
     speeds = [sample.flat_mps for sample in found if since <= sample.date < day]
     return statistics.median(speeds) if len(speeds) >= REFERENCE_MIN_RUNS else None
+
+
+def strava_id(key: str) -> int | None:
+    """The Strava activity of a ledger row's idempotency key, if it came from Strava."""
+    prefix = "strava:"
+    if key.startswith(prefix) and key[len(prefix):].isdigit():
+        return int(key[len(prefix):])
+    return None
+
+
+def group_of(store: Any, activity_id: int) -> bool | None:
+    """Whether a captured run was run in a group; None when unknown, never assumed."""
+    try:
+        count = Activity.from_json(store.strava_intake(activity_id)["distilled"]).athlete_count
+    except Exception:  # no capture: the group stays unknown, never assumed
+        return None
+    return None if count is None else int(count) > 1
+
+
+def stored_profile(store: Any, activity_id: int) -> Profile | None:
+    streams = store.strava_streams(activity_id)
+    return None if not streams else profile(streams)
+
+
+def reference_pace_s(store: Any, rows: Iterable[Any], day: dt.date) -> float | None:
+    """The reference easy pace on `day`, in s/km, from the ledger and the kept streams."""
+    since = day - dt.timedelta(weeks=REFERENCE_WEEKS)
+    runs = []
+    for row in rows:
+        activity = strava_id(row.idempotency_key)
+        if row.type != session_kinds.EASY or activity is None or not since <= row.date < day:
+            continue
+        shape = stored_profile(store, activity)
+        if shape is not None:
+            runs.append((row.date, shape, group_of(store, activity)))
+    speed = reference_mps(samples(runs), day)
+    return None if speed is None else 1000 / speed

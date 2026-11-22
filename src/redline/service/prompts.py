@@ -206,7 +206,7 @@ def plan_change_note() -> str:
     The triage flags such a message, but only the classifier reads the triage rules;
     this note is how the answering model learns the message may change the plan.
     """
-    return note("plan-change")
+    return note("plan-change") + "\n\n" + PRESCRIPTION_NOTE
 
 
 def stale_plan_note(week: str) -> str:
@@ -299,6 +299,11 @@ DEFAULT_DEPTH = "N1"
 
 HELP_TEXT = prompt("help")
 
+#: How a run's prescription is typed, for every turn that may write a revision.
+PRESCRIPTION_NOTE = note("prescription")
+#: The proactive turns that write a revision.
+REVISING_TRIGGERS = frozenset({"weekly", "weekly_repair"})
+
 PROACTIVE_TRIGGERS = {
     kind: agent_cli(prompt("triggers/" + kind.replace("_", "-")))
     for kind in ("strava_debrief", "strava_debrief_late", "morning", "daily_signal",
@@ -326,6 +331,8 @@ def _with_scales(text: str) -> str:
 
 def build_proactive_prompt(kind: str, detail: str) -> str:
     instructions = _with_scales(PROACTIVE_TRIGGERS[kind].replace("{detail}", detail))
+    if kind in REVISING_TRIGGERS:
+        instructions += "\n\n" + PRESCRIPTION_NOTE
     if kind == "weekly":
         ending = note("ending-weekly")
     elif policy(kind).must_speak:

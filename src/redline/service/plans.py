@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta
 
 from redline.coach import dates
 from redline.coach.fr import plan as wording
-from redline.model import iso_week
+from redline.model import iso_week, prescription
 from redline.model import weekly_plan as weekly_plan_model
 from redline.model.vocabulary import SETTLED_STATUSES, SessionStatus
 
@@ -146,6 +146,7 @@ _PRESCRIPTION_FIELDS = (
     "title", "date", "start_time", "workout", "status", "distance_target_km", "distance_cap_km",
     "duration_cap_min", "rpe_min", "rpe_max", "hr_zone", "cadence_target",
     "demanding", "carbs_target_g_h", "location_label", "strength", "note",
+    *prescription.FIELDS,
 )
 
 

@@ -41,6 +41,8 @@ MINUTES = "{minutes} min"
 #: What a run counts for against an envelope counted in load.
 LOAD = " ({minutes} min à l'allure EF de {pace}/km)"
 LOAD_UNKNOWN = " (charge inconnue : minutes brutes)"
+#: A run the plan prescribed efforts on: its pace and HR followed the prescription.
+EFFORTS = " (efforts prescrits : durée brute, FC non jugée)"
 LINE = "- {weekday} {date:%d/%m} {session} [{status}] : {detail}{flags}"
 RESTRICTION = "Restriction {week} : {reasons}."
 GRANT = ("Obtention ({week}) : {run} EF courues (≥{needed} requises), {agreements} accords à "

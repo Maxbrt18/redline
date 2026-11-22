@@ -101,6 +101,11 @@ strava_activity_intakes = sa.Table(
     # start. Provider data fetched once, on first display; never read by the coach.
     sa.Column("streams", JSONB),
     sa.Column("weather", JSONB),
+    # The service's verdict on the run's execution against its typed prescription, ruled
+    # before the coach writes (`redline.analysis.execution`): kept so that unjustified
+    # reproaches can be counted against it.
+    sa.Column("debrief_verdict", sa.Text),
+    sa.Column("debrief_findings", JSONB(none_as_null=True)),
     sa.Column("fetched_at", sa.DateTime(timezone=True), nullable=False,
               server_default=UTC_NOW),
     sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False,
@@ -110,6 +115,13 @@ strava_activity_intakes = sa.Table(
         f"status IN ({voc.sql_values(voc.IntakeStatus)})",
         name="ck_strava_activity_intakes_status"),
     sa.CheckConstraint("sport <> ''", name="ck_strava_activity_intakes_sport"),
+    sa.CheckConstraint(
+        f"debrief_verdict IS NULL OR debrief_verdict IN ({voc.sql_values(voc.DebriefVerdict)})",
+        name="ck_strava_activity_intakes_debrief_verdict"),
+    sa.CheckConstraint(
+        "(debrief_verdict IS NULL) = (debrief_findings IS NULL) AND (debrief_findings IS "
+        "NULL OR jsonb_typeof(debrief_findings) = 'array')",
+        name="ck_strava_activity_intakes_debrief_findings"),
     sa.CheckConstraint(
         f"elevation_loss_state IN ({voc.sql_values(voc.EnrichmentState)})",
         name="ck_strava_activity_intakes_elevation_loss_state"),
@@ -468,6 +480,14 @@ planned_sessions = sa.Table(
     sa.Column("hr_zone", sa.Text),
     sa.Column("hr_cap_bpm", sa.SmallInteger),
     sa.Column("cadence_target", sa.SmallInteger),
+    # The typed prescription of a run (`redline.model.prescription`).
+    sa.Column("dplus_cap_m", sa.Integer),
+    sa.Column("dplus_target_m", sa.Integer),
+    sa.Column("dminus_cap_m", sa.Integer),
+    sa.Column("climb_intent", sa.Text),
+    sa.Column("power_hike_from_pct", sa.SmallInteger),
+    sa.Column("descent_intent", sa.Text),
+    sa.Column("structure", sa.Text),
     sa.Column("demanding", sa.Boolean, nullable=False),
     sa.Column("priority", sa.Text),
     # Typed guardrail: the kind that drops out of the last 30 days. NULL = known session.
@@ -525,6 +545,27 @@ planned_sessions = sa.Table(
     sa.CheckConstraint(
         f"priority IS NULL OR priority IN ({voc.sql_values(voc.SessionPriority)})",
         name="ck_planned_sessions_priority"),
+    sa.CheckConstraint(
+        "(dplus_cap_m IS NULL OR dplus_cap_m >= 0) AND (dplus_target_m IS NULL OR "
+        "dplus_target_m >= 0) AND (dminus_cap_m IS NULL OR dminus_cap_m >= 0)",
+        name="ck_planned_sessions_relief"),
+    sa.CheckConstraint(
+        "dplus_target_m IS NULL OR dplus_cap_m IS NULL OR dplus_target_m <= dplus_cap_m",
+        name="ck_planned_sessions_dplus_order"),
+    sa.CheckConstraint(
+        f"climb_intent IS NULL OR climb_intent IN ({voc.sql_values(voc.ClimbIntent)})",
+        name="ck_planned_sessions_climb_intent"),
+    sa.CheckConstraint(
+        f"(climb_intent IS NOT DISTINCT FROM '{voc.ClimbIntent.POWER_HIKE}') = "
+        "(power_hike_from_pct IS NOT NULL) AND (power_hike_from_pct IS NULL OR "
+        "power_hike_from_pct BETWEEN 3 AND 40)",
+        name="ck_planned_sessions_power_hike"),
+    sa.CheckConstraint(
+        f"descent_intent IS NULL OR descent_intent IN ({voc.sql_values(voc.DescentIntent)})",
+        name="ck_planned_sessions_descent_intent"),
+    sa.CheckConstraint(
+        f"structure IS NULL OR structure IN ({voc.sql_values(voc.SessionStructure)})",
+        name="ck_planned_sessions_structure"),
     sa.CheckConstraint(
         "strength_spec IS NULL OR jsonb_typeof(strength_spec) = 'object'",
         name="ck_planned_sessions_strength_spec"),

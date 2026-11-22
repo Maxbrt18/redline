@@ -2963,6 +2963,27 @@ def test_a_session_priority_is_stored_and_read_back(store):
     assert "priority" not in stored["w33-mar-ef"]
 
 
+def test_a_typed_prescription_is_stored_and_read_back(store):
+    from test_weekly_plan import revision as build_revision
+    from test_weekly_plan import session
+
+    hilly = session("w33-dim-sl", "2026-08-16", "long", dplus_cap_m=400, dplus_target_m=350,
+                    dminus_cap_m=400, climb_intent="power_hike", power_hike_from_pct=10,
+                    descent_intent="held")
+    pyramid = session("w33-jeu-ef", "2026-08-13", "easy", structure="efforts")
+    plain = session("w33-mar-ef", "2026-08-11", "easy")
+    store.append_plan_revision("2026-W33", build_revision(
+        1, sessions=[plain, pyramid, hilly], computed_at="2026-08-09T19:10:00+02:00"))
+    stored = {item["id"]: item for item in store.load_plan("2026-W33")["revisions"][0]["sessions"]}
+    assert {key: stored["w33-dim-sl"][key] for key in (
+        "dplus_cap_m", "dplus_target_m", "dminus_cap_m", "climb_intent", "power_hike_from_pct",
+        "descent_intent")} == {"dplus_cap_m": 400, "dplus_target_m": 350, "dminus_cap_m": 400,
+                               "climb_intent": "power_hike", "power_hike_from_pct": 10,
+                               "descent_intent": "held"}
+    assert stored["w33-jeu-ef"]["structure"] == "efforts"
+    assert not set(stored["w33-mar-ef"]) & {"structure", "climb_intent", "dplus_cap_m"}
+
+
 def test_the_due_predictions_are_read_from_the_store_as_dates(store):
     """`fact-read predictions --due` compares the due date with today."""
     from redline.cli import fact_read

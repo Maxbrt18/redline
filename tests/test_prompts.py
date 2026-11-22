@@ -812,13 +812,15 @@ def test_an_observation_does_not_hijack_a_social_message():
 def test_the_debrief_opens_on_a_computed_gap_not_on_the_watch():
     """A debrief must not open on three raw watch figures in a row."""
     debrief = _flat(PROACTIVE_TRIGGERS["strava_debrief"])
-    assert "Ta première phrase porte l'écart de `gaps` qui compte" in debrief
+    assert "Ta première phrase porte l'écart de `verdict` ou de `gaps` qui compte" in debrief
+    assert "tu rédiges, tu ne décides pas" in debrief
     assert "jamais trois chiffres de la montre à la suite" in debrief
     # The snapshot carries no raw streams: the debrief reads their kilometres.
     assert "`streams`" not in debrief and "`km_splits`" in debrief
     note = prompts.strava_snapshot_note({})
     assert "`gaps`, s'il est présent" in note
     assert "`km_splits`, s'il est présent" in note
+    assert "`verdict`, s'il est présent" in note
 
 
 def test_a_skipped_session_is_cancelled_in_the_same_turn():
@@ -842,3 +844,10 @@ def test_the_workout_card_is_no_longer_the_models_choice():
     assert "chart-workout" not in " ".join(PROACTIVE_TRIGGERS.values())
     assert "chart-workout" not in STYLE_PROMPT
     assert "chart-workout" not in (AGENT_CLI_DIR / "agent-cli-tools.txt").read_text()
+
+
+def test_every_turn_that_may_revise_learns_the_typed_prescription():
+    assert "`structure` = `efforts`" in prompts.plan_change_note()
+    for kind in prompts.REVISING_TRIGGERS:
+        assert "CONSIGNE TYPÉE" in prompts.build_proactive_prompt(kind, "2026-W33")
+    assert "CONSIGNE TYPÉE" not in prompts.build_proactive_prompt("morning", "")

@@ -35,6 +35,7 @@ from redline.model import (
     debrief,
     iso_week,
     local_time,
+    prescription,
     program,
     rulebook,
     session_kinds,
@@ -199,6 +200,7 @@ def _planned(session: dict) -> list[str]:
         parts.append(session["hr_zone"])
     if session.get("cadence_target"):
         parts.append(f"cadence ~{session['cadence_target']}")
+    parts += prescription.readout(session)
     if session.get("carbs_target_g_h") is not None:
         parts.append(" ".join(filter(None, (
             notebook_text.CARBS.format(grams=session["carbs_target_g_h"]),

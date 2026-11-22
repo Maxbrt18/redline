@@ -14,7 +14,16 @@ from itertools import pairwise
 from redline.coach import dates
 from redline.coach.fr import plan as text
 
-from . import formats, iso_week, paths, rulebook, session_kinds, transitions, typography
+from . import (
+    formats,
+    iso_week,
+    paths,
+    prescription,
+    rulebook,
+    session_kinds,
+    transitions,
+    typography,
+)
 from . import program as strength_program
 from .notes import NoteError
 from .program import GATE_SCHEMA as STRENGTH_GATE_SCHEMA
@@ -23,9 +32,12 @@ from .vocabulary import (
     INTENT_STATUSES,
     SETTLED_STATUSES,
     CarbMix,
+    ClimbIntent,
     Decider,
+    DescentIntent,
     SessionPriority,
     SessionStatus,
+    SessionStructure,
 )
 
 STAMP_RE = r"20\d{2}-\d{2}-\d{2}T.+"
@@ -71,6 +83,23 @@ SESSION_SCHEMA = Schema("planned session", [
           note="cap on the session's AVERAGE heart rate, in bpm: the figure hr_zone "
                "states in words; required on write with hr_zone"),
     field("cadence_target", int, required=False, minimum=120, maximum=220),
+    # The typed prescription of a run (`redline.model.prescription`): relief allowed,
+    # what the climbs and descents ask, steady or with prescribed efforts.
+    field("dplus_cap_m", int, required=False, minimum=0, maximum=10000,
+          note="most elevation gain the route may hold, in metres"),
+    field("dplus_target_m", int, required=False, minimum=0, maximum=10000,
+          note="elevation gain the route should hold, in metres; at most dplus_cap_m"),
+    field("dminus_cap_m", int, required=False, minimum=0, maximum=10000,
+          note="most elevation loss the route may hold, in metres"),
+    field("climb_intent", str, required=False, choices=tuple(ClimbIntent),
+          note="what the climbs ask; absent, easy (hard on a hill session)"),
+    field("power_hike_from_pct", int, required=False, minimum=3, maximum=40,
+          note="the grade, in %, brisk walking starts at; with climb_intent=power_hike only"),
+    field("descent_intent", str, required=False, choices=tuple(DescentIntent),
+          note="what the descents ask; absent, relaxed"),
+    field("structure", str, required=False, choices=tuple(SessionStructure),
+          note="an easy or long run run steady, or with prescribed efforts (a pyramid, "
+               "strides, a structure set by the group); absent, steady"),
     field("demanding", bool),
     field("priority", str, required=False, choices=tuple(SessionPriority),
           note="what the session weighs when days run short: key is never dropped by a "
@@ -128,6 +157,7 @@ CHANGE_FIELDS = (
     # they are re-read and validated in full.
     "calibration",
     "carbs_target_g_h", "carbs_mix", "location_label", "strength", "note",
+    *prescription.FIELDS,
 )
 
 #: A restriction names its premise as a type. A restriction without a premise is the most
@@ -740,7 +770,8 @@ def rpe_band(session: dict) -> tuple[int | None, int] | None:
 def details_of(session: dict, *, cadence_unit: str = "") -> list[str]:
     """Everything a session commits to, in order, without its title or status.
 
-    The order is part of the contract: distance, RPE, HR zone, cadence, note. Each
+    The order is part of the contract: distance, RPE, HR zone, cadence, the typed
+    prescription (relief, climbs, descents, efforts), fuelling, note. Each
     rendering only decides its separator and markup -- and `cadence_unit` is the one real
     difference, the journal naming the unit that the text message and the card leave
     implicit.
@@ -753,6 +784,7 @@ def details_of(session: dict, *, cadence_unit: str = "") -> list[str]:
         details.append(session["hr_zone"])
     if session.get("cadence_target"):
         details.append(text.CADENCE.format(cadence=session["cadence_target"], unit=cadence_unit))
+    details += prescription.readout(session)
     if session.get("carbs_target_g_h") is not None:
         details.append(" ".join(filter(None, (
             text.CARBS.format(grams=session["carbs_target_g_h"]),
