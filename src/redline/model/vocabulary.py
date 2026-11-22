@@ -277,6 +277,8 @@ class FindingKind(StrEnum):
     STEEP_WALKED_SHARE = "steep_walked_share"
     #: A descent run faster than the flat easy pace on a run whose descents were held.
     DESCENT_NOT_HELD = "descent_not_held"
+    #: Repetitions run faster than their prescribed pace (`rep_pace_s`).
+    REPS_FASTER = "reps_faster"
     #: The dose run expects a clearly higher RPE than the dose prescribed: an execution
     #: choice, which receives the correction, never the RPE.
     RUN_ABOVE_PRESCRIPTION = "run_above_prescription"

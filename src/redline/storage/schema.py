@@ -488,6 +488,11 @@ planned_sessions = sa.Table(
     sa.Column("power_hike_from_pct", sa.SmallInteger),
     sa.Column("descent_intent", sa.Text),
     sa.Column("structure", sa.Text),
+    # The typed dose of a session of repetitions.
+    sa.Column("reps", sa.SmallInteger),
+    sa.Column("rep_seconds", sa.Integer),
+    sa.Column("recovery_seconds", sa.Integer),
+    sa.Column("rep_pace_s", sa.SmallInteger),
     sa.Column("demanding", sa.Boolean, nullable=False),
     sa.Column("priority", sa.Text),
     # Typed guardrail: the kind that drops out of the last 30 days. NULL = known session.
@@ -566,6 +571,15 @@ planned_sessions = sa.Table(
     sa.CheckConstraint(
         f"structure IS NULL OR structure IN ({voc.sql_values(voc.SessionStructure)})",
         name="ck_planned_sessions_structure"),
+    sa.CheckConstraint(
+        "(reps IS NULL) = (rep_seconds IS NULL) AND (reps IS NULL OR reps BETWEEN 1 AND 60) "
+        "AND (rep_seconds IS NULL OR rep_seconds BETWEEN 10 AND 3600)",
+        name="ck_planned_sessions_reps"),
+    sa.CheckConstraint(
+        "(recovery_seconds IS NULL OR (reps IS NOT NULL AND recovery_seconds BETWEEN 0 AND "
+        "1800)) AND (rep_pace_s IS NULL OR (reps IS NOT NULL AND rep_pace_s BETWEEN 120 AND "
+        "900))",
+        name="ck_planned_sessions_rep_dose"),
     sa.CheckConstraint(
         "strength_spec IS NULL OR jsonb_typeof(strength_spec) = 'object'",
         name="ck_planned_sessions_strength_spec"),

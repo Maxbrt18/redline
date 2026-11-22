@@ -117,5 +117,23 @@
     "legs": [[3000, 380, 0, 85, 150]],
     "cost": {"declared": 6, "run": [3.0, 2, 4], "signs": ["poor_night"]},
     "expected": {"verdict": "conforming", "findings": ["rpe_above"], "spoken": ["rpe_above"]}
+  },
+  {
+    "id": "threshold-at-rpe-9-paces-held",
+    "about": "5 x 7 min at threshold, every repetition at its pace, declared 9 inside the range its dose expects: a success, not a missed session.",
+    "session": {"workout": "threshold", "reps": 5, "rep_seconds": 420, "recovery_seconds": 120, "rep_pace_s": 275},
+    "legs": [[2000, 380, 0, 85, 140], [7600, 276, 0, 92, 168], [1500, 380, 0, 85, 140]],
+    "reps": [[420, 1525], [420, 1530], [420, 1528], [420, 1532], [420, 1535]],
+    "cost": {"declared": 9, "run": [8.4, 7, 9]},
+    "expected": {"verdict": "conforming", "findings": []}
+  },
+  {
+    "id": "threshold-last-repetition-pushed",
+    "about": "The same session with the last repetition run well under its pace: the execution receives the correction, the RPE is not spoken of on its own.",
+    "session": {"workout": "threshold", "reps": 5, "rep_seconds": 420, "recovery_seconds": 120, "rep_pace_s": 275},
+    "legs": [[2000, 380, 0, 85, 140], [7600, 270, 0, 92, 170], [1500, 380, 0, 85, 140]],
+    "reps": [[420, 1525], [420, 1530], [420, 1528], [420, 1532], [420, 1660]],
+    "cost": {"declared": 10, "run": [8.4, 7, 9]},
+    "expected": {"verdict": "execution_gap", "findings": ["reps_faster", "rpe_above"], "spoken": ["rpe_above"]}
   }
 ]

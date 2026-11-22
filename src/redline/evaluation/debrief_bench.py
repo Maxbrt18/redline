@@ -2,7 +2,8 @@
 findings a fair coach expects.
 
 Each case is a typed prescription and a synthetic run (legs of steady pace, grade,
-cadence and HR), and may carry its cost: the declared RPE, the ranges expected of the
+cadence and HR), may carry the repetitions read from its laps ([seconds, metres] each)
+and its cost: the declared RPE, the ranges expected of the
 dose run and of the dose prescribed, the signs read off the run. The bench rules each one
 with the production code (`redline.analysis.execution`) and counts what matters to the
 athlete: an unjustified reproach is a finding the coach would correct (an athlete or
@@ -78,7 +79,9 @@ def rule(case: dict) -> execution.Execution:
     return execution.judge(session, session_detail.km_splits(streams) or [], streams,
                            dplus=case.get("dplus"), dminus=case.get("dminus"),
                            reference_pace_s=case.get("reference_pace_s", REFERENCE_PACE_S),
-                           cost=_cost(case.get("cost")))
+                           cost=_cost(case.get("cost")),
+                           reps=[{"time_s": seconds, "dist_m": metres}
+                                 for seconds, metres in case.get("reps") or ()])
 
 
 def outcome(case: dict) -> Outcome:

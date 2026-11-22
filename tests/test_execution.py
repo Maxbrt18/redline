@@ -12,11 +12,12 @@ from redline.service import session_detail
 REFERENCE = 374.0
 
 
-def _judge(prescribed, legs, *, dplus=None, dminus=None, reference=REFERENCE, cost=None):
+def _judge(prescribed, legs, *, dplus=None, dminus=None, reference=REFERENCE, cost=None,
+           reps=()):
     streams = synthetic_streams([list(leg) for leg in legs])
     splits = session_detail.km_splits(streams) or []
     return execution.judge(prescribed, splits, streams, dplus=dplus, dminus=dminus,
-                           reference_pace_s=reference, cost=cost)
+                           reference_pace_s=reference, cost=cost, reps=reps)
 
 
 def _kinds(ruled):
@@ -154,3 +155,17 @@ def test_a_flat_hr_high_is_a_second_sign():
     ruled = _judge(capped, [FLAT, (1000, 400, 0, 85, 163), (1000, 400, 0, 85, 163)],
                    cost=_cost(7))
     assert ruled.findings[-1].signs == (RpeSign.FLAT_HR_HIGH,)
+
+
+def test_repetitions_faster_than_their_pace_are_an_execution_gap():
+    threshold = session(workout="threshold", reps=3, rep_seconds=420, rep_pace_s=275)
+    held = [{"time_s": 420, "dist_m": 1530}, {"time_s": 420, "dist_m": 1525},
+            {"time_s": 420, "dist_m": 1540}]
+    assert _judge(threshold, [FLAT], reps=held).findings == ()
+    pushed = [*held[:2], {"time_s": 420, "dist_m": 1650}]
+    ruled = _judge(threshold, [FLAT], reps=pushed)
+    assert _kinds(ruled) == [FindingKind.REPS_FASTER]
+    assert ruled.findings[0].kms == (3,) and ruled.verdict is DebriefVerdict.EXECUTION_GAP
+    assert "R3 à 4:15/km pour 4:35/km" in execution.render(ruled)[-1]
+    assert _judge(session(workout="threshold"), [FLAT], reps=pushed).findings == (), \
+        "without a typed pace, the repetitions are compared within the session only"

@@ -129,7 +129,7 @@ class ActivityPipeline:
             snapshot["expected_rpe"] = {
                 "run": cost.run.as_json(),
                 **({} if cost.prescribed is None else {"prescribed": cost.prescribed.as_json()})}
-        verdict = self._verdict(activity_id, session, splits, streams, cost)
+        verdict = self._verdict(activity_id, session, splits, streams, cost, activity.laps)
         if verdict:
             snapshot["verdict"] = verdict
         from redline.model import debrief
@@ -246,7 +246,8 @@ class ActivityPipeline:
             return [], None, None
 
     def _verdict(self, activity_id: int, session: dict | None, splits: list,
-                 streams: dict | None, cost: Cost | None = None) -> list[str]:
+                 streams: dict | None, cost: Cost | None = None,
+                 laps: tuple[Lap, ...] = ()) -> list[str]:
         """The service's verdict on the run's execution against its prescription, kept,
         then rendered for the coach, who writes it and does not decide it. A failed
         reading costs the debrief its verdict, never its departure."""
@@ -254,6 +255,7 @@ class ActivityPipeline:
             return []
         try:
             from redline.analysis import easy_load, execution, ledger
+            from redline.model import debrief
 
             rows = ledger.parse_ledger(self.store)
             row = next((row for row in rows
@@ -263,7 +265,8 @@ class ActivityPipeline:
             ruled = execution.judge(
                 session, splits, streams, dplus=row.dplus, dminus=row.dminus,
                 reference_pace_s=easy_load.reference_pace_s(self.store, rows, row.date),
-                hr_trusted=row.hr_doubt != HrDoubt.NO_SENSOR, cost=cost)
+                hr_trusted=row.hr_doubt != HrDoubt.NO_SENSOR, cost=cost,
+                reps=(debrief.workout_reps(laps) or []) if debrief.is_quality(session) else [])
             self.store.store_debrief_verdict(activity_id, str(ruled.verdict),
                                              [finding.as_json() for finding in ruled.findings])
             return execution.render(ruled, cost)

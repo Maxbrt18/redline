@@ -38,6 +38,12 @@ DESCENT_INTENTS = {
     "worked": "descentes travaillées",
 }
 EFFORTS = "efforts prescrits : allure et FC suivent la consigne, pas un plafond"
+#: The typed dose of a session of repetitions: « 5 × 7 min, récup 2 min, à 4:35/km ».
+REPS = "{reps} × {duration}"
+RECOVERY = ", récup {duration}"
+REP_PACE = ", à {pace}/km"
+MINUTES = "{minutes} min"
+SECONDS = "{seconds} s"
 
 DONE = "fait"
 WITH_TRANSITION = ", transition {label}"

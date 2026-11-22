@@ -84,6 +84,8 @@ FINDINGS = {
     "steep_walked_share": "pentes de {reference} % et plus marchées à {share} %",
     "descent_not_held": ("descentes plus rapides que l'allure EF à plat : {kms} à {pace}/km "
                          "(consigne : retenues) ; écart d'exécution"),
+    "reps_faster": ("répétitions plus rapides que prescrit : {reps} à {pace}/km pour "
+                    "{reference_pace}/km ; écart d'exécution, à corriger"),
     "run_above_prescription": ("séance courue au-dessus de la consigne : sa dose attend un RPE "
                                "de {value}, au-delà de {reference} pour la séance prescrite ; "
                                "choix d'exécution, à corriger, jamais le chiffre"),

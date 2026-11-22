@@ -12,7 +12,9 @@ What the intents ask (`redline.model.prescription`):
   state or sensor sign;
 - a run's relief is a route choice, made before leaving, never mixed with the HR;
 - `run_slow` names a walked climb; `power_hike` names a steep grade run and gives the
-  share walked; `held` descents faster than the flat easy pace are an execution gap.
+  share walked; `held` descents faster than the flat easy pace are an execution gap;
+- repetitions run faster than their typed pace (`rep_pace_s`) are an execution gap: the
+  pace is the prescription's, a faster one spends what the session was to keep.
 
 The cost (`redline.analysis.expected_rpe`): a run whose dose expects an RPE above the
 prescribed session's range was run above its prescription, an execution choice that
@@ -68,6 +70,7 @@ OWNERS = {
     FindingKind.FLAT_HR_HIGH: FindingOwner.BODY,
     FindingKind.CLIMB_WALKED: FindingOwner.NOTE,
     FindingKind.STEEP_WALKED_SHARE: FindingOwner.NOTE,
+    FindingKind.REPS_FASTER: FindingOwner.ATHLETE,
     FindingKind.RUN_ABOVE_PRESCRIPTION: FindingOwner.ATHLETE,
     FindingKind.RPE_ABOVE: FindingOwner.BODY,
     FindingKind.RPE_BELOW: FindingOwner.NOTE,
@@ -242,6 +245,22 @@ def _descents(session: dict, splits: Sequence[KmSplit],
                     tuple(row["n"] for row in fast))]
 
 
+def _reps(session: dict, reps: Sequence[dict]) -> list[Finding]:
+    """The repetitions (`redline.model.debrief.workout_reps`) faster than their pace."""
+    pace = session.get("rep_pace_s")
+    if pace is None or not reps:
+        return []
+    fast = [(number, rep) for number, rep in enumerate(reps, start=1)
+            if rep["dist_m"] > 0
+            and rep["time_s"] * 1000 / rep["dist_m"] < pace * (1 - PACE_NOISE_PCT / 100)]
+    if not fast:
+        return []
+    metres = sum(rep["dist_m"] for _, rep in fast)
+    seconds = sum(rep["time_s"] for _, rep in fast)
+    return [Finding(FindingKind.REPS_FASTER, round(seconds * 1000 / metres), float(pace),
+                    tuple(number for number, _ in fast))]
+
+
 def _above_prescription(cost: Cost | None) -> list[Finding]:
     if cost is None or cost.run is None or cost.prescribed is None:
         return []
@@ -273,14 +292,17 @@ def _rpe(cost: Cost | None, findings: Sequence[Finding]) -> list[Finding]:
 
 def judge(session: dict | None, splits: Sequence[KmSplit], streams: dict | None, *,
           dplus: float | None, dminus: float | None, reference_pace_s: float | None,
-          hr_trusted: bool = True, cost: Cost | None = None) -> Execution:
-    """The findings of a run against its prescription and the verdict they make."""
+          hr_trusted: bool = True, cost: Cost | None = None,
+          reps: Sequence[dict] = ()) -> Execution:
+    """The findings of a run against its prescription and the verdict they make; `reps`
+    are the repetitions read from its laps."""
     if session is None:
         return Execution(DebriefVerdict.UNDETERMINED, ())
     findings = [*_relief(session, dplus, dminus),
                 *_flat(session, splits, reference_pace_s, hr_trusted),
                 *_climb_intent(session, streams),
                 *_descents(session, splits, reference_pace_s),
+                *_reps(session, reps),
                 *_above_prescription(cost)]
     findings += _rpe(cost, findings)
     if any(finding.owner in (FindingOwner.ATHLETE, FindingOwner.ROUTE) for finding in findings):
@@ -326,6 +348,7 @@ def render(execution: Execution, cost: Cost | None = None) -> list[str]:
             value=text.number(finding.value), reference=text.number(finding.reference),
             pace=text.pace(finding.value), reference_pace=text.pace(finding.reference),
             kms=text.kilometres(finding.kms) if finding.kms else "",
+            reps=", ".join(f"R{number}" for number in finding.kms),
             share=round(finding.value * 100), signed=text.signed(
                 round((finding.value - finding.reference) / finding.reference * 100))
             if finding.reference else ""))

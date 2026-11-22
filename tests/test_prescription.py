@@ -94,3 +94,29 @@ def test_every_rendering_carries_the_typed_prescription():
     assert any(part.startswith("montées toutes en courant") for part in details)
     assert any(part.startswith("efforts prescrits") for part in details)
     assert "D+ 150 m au plus" in notebook_board._planned(pyramid)
+
+
+# ------------------------------------------------------------------ the dose of repetitions
+
+
+def test_a_session_of_repetitions_types_its_dose_and_reads_it():
+    threshold = session("w32-jeu-seuil", workout="threshold", reps=5, rep_seconds=420,
+                        recovery_seconds=120, rep_pace_s=275)
+    weekly_plan.validate(plan([threshold]))
+    assert prescription.errors(None, revision(sessions=[threshold])) == []
+    assert prescription.dose_of(threshold) == "5 × 7 min, récup 2 min, à 4:35/km"
+    assert prescription.readout(threshold)[0] == "5 × 7 min, récup 2 min, à 4:35/km"
+    short = session("w32-jeu-seuil", workout="threshold", reps=8, rep_seconds=90)
+    assert prescription.dose_of(short) == "8 × 1 min 30"
+    assert prescription.dose_of(session(workout="strides", reps=6, rep_seconds=20)) == "6 × 20 s"
+
+
+@pytest.mark.parametrize("workout, overrides, message", [
+    ("easy", {"reps": 5, "rep_seconds": 60}, "only a session of repetitions types its dose"),
+    ("threshold", {"reps": 5}, "reps and rep_seconds go together"),
+    ("threshold", {"recovery_seconds": 60}, "needs reps and rep_seconds"),
+    ("hills", {"reps": 6, "rep_seconds": 60, "rep_pace_s": 300}, "its pace is the grade's"),
+])
+def test_a_contradictory_dose_is_refused(workout, overrides, message):
+    found = prescription.errors(None, revision(sessions=[session(workout=workout, **overrides)]))
+    assert any(message in problem for problem in found), found
