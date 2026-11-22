@@ -66,6 +66,8 @@ LADDER_END = "  bout de l'échelle : une hausse demande une variante ou une nouv
 #: The readings the engine can ask for, as the coach asks for them.
 SIGNALS = {
     "session_rpe": "RPE de séance",
+    "rpe_over_range": "RPE attendu de la dose (calibration en cours)",
+    "execution_gaps": "verdict du débrief",
     "reserve_reps": "répétitions en réserve",
     "set_reps_min": "compte de répétitions par série",
     "difficulty": "difficulté de l'exercice (0-10)",

@@ -106,10 +106,15 @@ def after_session(rows: Sequence[Row], on: dt.date, zones: Sequence[str],
 
 
 def interval_exposure(rows: Sequence[Row], session: Row, dose: Dose, zones: Sequence[str],
-                      reserve: float | None) -> Exposure:
-    """A quality session. The reserve is declared by the athlete; absent, it is unknown."""
+                      reserve: float | None, *, over_range: float | None = None,
+                      gaps: float | None = None) -> Exposure:
+    """A quality session. The reserve is declared by the athlete; absent, it is unknown.
+    `over_range` is the declared RPE minus the top of the range its dose expects, `gaps`
+    the athlete's execution gaps in the debrief verdict: each unknown without its source."""
     fact = f"{session.type} {session.date.isoformat()}"
     readings = [Reading(Signal.SESSION_RPE, session.rpe, fact=fact),
+                Reading(Signal.RPE_OVER_RANGE, over_range, fact=fact),
+                Reading(Signal.EXECUTION_GAPS, gaps, fact=fact),
                 Reading(Signal.RESERVE_REPS, reserve, fact=fact)]
     readings.extend(Reading(Signal.EFFORT_PAIN, session.pain_at(zone), zone, fact)
                     for zone in zones)

@@ -55,6 +55,8 @@ class Row:
     dplus: int = 0
     dminus: int = 0
     rpe: float | None = None
+    #: Whole repetitions still possible at the same effort, declared after a quality session.
+    reserve: float | None = None
     #: The known pain of each monitored zone: {zone: /10}. Never merged: a series
     #: is read zone by zone (`pain_at`).
     pains: dict[str, float] = field(default_factory=dict)
@@ -176,6 +178,7 @@ def parse_ledger(store: LedgerStore) -> list[Row]:
             dplus=_known_int(observation, "elevation_gain_m") or 0,
             dminus=_known_int(observation, "elevation_loss_m") or 0,
             rpe=_known(observation, "rpe"),
+            reserve=_known(observation, "reps_in_reserve"),
             pains={zone: float(reading["value"])
                    for zone, reading in (observation.get("pains") or {}).items()
                    if table.known(reading) is not None},

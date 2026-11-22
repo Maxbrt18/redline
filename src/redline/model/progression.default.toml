@@ -147,7 +147,9 @@ passes_in_a_row = 1
 move = "up"
 
 # Repetitions of a quality session: cumulative time first (one more repetition), then a
-# longer repetition with the count back to its minimum; never a faster pace.
+# longer repetition with the count back to its minimum, then a shorter recovery with the
+# volume back to its start; never a faster pace. The RPE is no ceiling: more dose costs
+# more. A session passes when it cost what its dose expects and was run as prescribed.
 [[families]]
 slug = "intervals"
 unit = "session"
@@ -160,10 +162,19 @@ name = "reps"
 [[families.ladder]]
 name = "rep_seconds"
 
+[[families.ladder]]
+name = "recovery_seconds"
+direction = "down"
+
 [[families.criteria]]
-id = "within-band"
-signal = "session_rpe"
-at_most_ref = "rpe_max"
+id = "cost-as-expected"
+signal = "rpe_over_range"
+at_most = 0
+
+[[families.criteria]]
+id = "execution-held"
+signal = "execution_gaps"
+at_most = 0
 
 [[families.criteria]]
 id = "reserve-kept"

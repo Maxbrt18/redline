@@ -53,8 +53,8 @@ HOLD = lineage("single-leg-stance", "strength-time", seconds=(15, 45, 5),
                parameters=(("difficulty_progress_up_to", 5), ("difficulty_regress_above", 7),
                            ("pain_cap", 2)))
 HILLS = lineage("hill-threshold", "intervals", reps=(4, 6, 1), rep_seconds=(180, 300, 60),
-                parameters=(("rpe_max", 7), ("reserve_min", 1), ("pain_cap", 2),
-                            ("following_pain_max", 1.5)))
+                recovery_seconds=(60, 120, 30),
+                parameters=(("reserve_min", 1), ("pain_cap", 2), ("following_pain_max", 1.5)))
 FUEL = lineage("long-run-carbs", "fuelling", carbs_g_h=(0, 90, 15),
                parameters=(("gut_max", 3),))
 
@@ -66,12 +66,16 @@ def strength(on, reps, load, counted, difficulty=6, pain=0.0, disrupted=None):
     return Exposure(on, Dose.of(reps=reps, load_kg=load), None, readings, disrupted)
 
 
-def hills(on, reps, rpe, reserve=1.0, pain=0.5, following=1.0, wake=0.0):
-    readings = (Reading(Signal.SESSION_RPE, rpe), Reading(Signal.RESERVE_REPS, reserve),
+def hills(on, reps, rpe, reserve=1.0, pain=0.5, following=1.0, wake=0.0, over=0.0, gaps=0.0,
+          seconds=180, recovery=120):
+    """`over`: the RPE above the top of the range its dose expects; `gaps`: the athlete's
+    execution gaps in the debrief verdict."""
+    readings = (Reading(Signal.SESSION_RPE, rpe), Reading(Signal.RPE_OVER_RANGE, over),
+                Reading(Signal.EXECUTION_GAPS, gaps), Reading(Signal.RESERVE_REPS, reserve),
                 Reading(Signal.EFFORT_PAIN, pain, ZONE),
                 Reading(Signal.FOLLOWING_PAIN, following, ZONE),
                 Reading(Signal.WAKE_ABOVE_BASE, wake, ZONE))
-    dose = Dose.of(reps=reps, rep_seconds=180)
+    dose = Dose.of(reps=reps, rep_seconds=seconds, recovery_seconds=recovery)
     return Exposure(on, dose, dose, readings)
 
 
@@ -193,7 +197,7 @@ def test_a_hold_rises_on_its_difficulty_alone():
 def test_a_tolerated_session_adds_a_repetition_never_pace():
     proposal = propose("intervals", HILLS, [hills(day(0), 4, 7)])
     assert proposal.move == Move.UP
-    assert proposal.dose == Dose.of(reps=5, rep_seconds=180)
+    assert proposal.dose == Dose.of(reps=5, rep_seconds=180, recovery_seconds=120)
 
 
 def test_a_reserve_not_declared_is_asked_not_assumed():
@@ -209,12 +213,33 @@ def test_the_runs_after_a_session_must_be_in_before_it_counts():
 
 def test_pain_after_a_session_steps_down():
     proposal = propose("intervals", HILLS, [hills(day(0), 5, 7, following=2.0)])
-    assert (proposal.move, proposal.dose) == (Move.DOWN, Dose.of(reps=4, rep_seconds=180))
+    assert (proposal.move, proposal.dose) == (Move.DOWN, Dose.of(reps=4, rep_seconds=180, recovery_seconds=120))
 
 
-def test_a_session_rated_above_its_band_holds():
-    proposal = propose("intervals", HILLS, [hills(day(0), 5, 8)])
-    assert (proposal.move, proposal.clause) == (Move.HOLD, "keep")
+def test_more_dose_costing_more_never_blocks_the_ladder():
+    """An RPE of 9 is no failure when the dose expects it: the RPE is no ceiling."""
+    proposal = propose("intervals", HILLS, [hills(day(0), 6, 9)])
+    assert proposal.move == Move.UP
+
+
+def test_a_session_costlier_than_its_dose_or_run_too_fast_holds():
+    costlier = propose("intervals", HILLS, [hills(day(0), 5, 8, over=1.0)])
+    assert (costlier.move, costlier.clause) == (Move.HOLD, "keep")
+    fast = propose("intervals", HILLS, [hills(day(0), 5, 7, gaps=1.0)])
+    assert (fast.move, fast.clause) == (Move.HOLD, "keep")
+    unknown = propose("intervals", HILLS, [hills(day(0), 5, 7, over=None)])
+    assert (unknown.move, unknown.clause) == (Move.HOLD, "wait-reading")
+
+
+def test_the_ladder_shortens_the_recovery_once_the_volume_is_at_its_top():
+    top = propose("intervals", HILLS, [hills(day(0), 6, 7, seconds=300)])
+    assert top.dose == Dose.of(reps=4, rep_seconds=180, recovery_seconds=90), \
+        "a shorter recovery, the volume back to its start"
+    floor = propose("intervals", HILLS, [hills(day(0), 6, 7, seconds=300, recovery=60)])
+    assert floor.ladder_end and floor.move == Move.HOLD
+    down = propose("intervals", HILLS, [hills(day(0), 4, 7, recovery=90, following=2.0)])
+    assert down.dose == Dose.of(reps=6, rep_seconds=300, recovery_seconds=120), \
+        "a step down from the shorter recovery gives back the longest volume"
 
 
 # ------------------------------------------------------------------ vetoes and limits
@@ -226,7 +251,7 @@ def test_a_rise_never_passes_a_veto(kind):
     proposal = propose("intervals", HILLS, [hills(day(0), 4, 7)], vetoes=[veto])
     assert (proposal.rule_move, proposal.move) == (Move.UP, Move.HOLD)
     assert proposal.vetoes == (veto,)
-    assert proposal.ceiling == Dose.of(reps=4, rep_seconds=180)
+    assert proposal.ceiling == Dose.of(reps=4, rep_seconds=180, recovery_seconds=120)
 
 
 def test_a_veto_never_blocks_a_step_down():
@@ -253,7 +278,7 @@ def test_a_comeback_after_the_transition_window_steps_down():
     proposal = propose("intervals", HILLS, [hills(day(0), 6, 7)], today=day(45),
                        lookback_days=30)
     assert (proposal.move, proposal.clause, proposal.reentry) == (Move.DOWN, "reentry", True)
-    assert proposal.dose == Dose.of(reps=5, rep_seconds=180)
+    assert proposal.dose == Dose.of(reps=5, rep_seconds=180, recovery_seconds=120)
 
 
 def test_a_session_without_its_count_is_no_absence():
@@ -277,7 +302,7 @@ def test_a_reading_older_than_the_window_decides_no_move():
 
 
 def test_a_newest_exposure_without_its_reading_waits_for_it():
-    unread = Exposure(day(7), Dose.of(reps=5, rep_seconds=180), None,
+    unread = Exposure(day(7), Dose.of(reps=5, rep_seconds=180, recovery_seconds=120), None,
                       (Reading(Signal.SESSION_RPE, None),))
     proposal = propose("intervals", HILLS, [hills(day(0), 4, 7), unread])
     assert (proposal.rule_move, proposal.move, proposal.clause) == (
@@ -426,16 +451,18 @@ def test_the_readings_of_a_session_wait_for_the_morning_and_the_next_runs():
             Row(day(1), session_kinds.WAKE_TRACE, pains=zoned(0.5)),
             Row(day(1), "easy", km=6, hours=0.6, pains=zoned(1.0)),
             Row(day(3), "easy", km=6, hours=0.6, pains=zoned(0.5))]
-    dose = Dose.of(reps=4, rep_seconds=180)
-    exposure = progression_readings.interval_exposure(rows, rows[1], dose, [ZONE], reserve=1)
+    dose = Dose.of(reps=4, rep_seconds=180, recovery_seconds=120)
+    exposure = progression_readings.interval_exposure(rows, rows[1], dose, [ZONE], reserve=1,
+                                                      over_range=-1.0, gaps=0.0)
     readings = {reading.signal: reading.value for reading in exposure.readings}
     assert readings[Signal.WAKE_ABOVE_BASE] == -0.5
     assert readings[Signal.FOLLOWING_PAIN] is None
     rows.append(Row(day(4), "long", km=16, hours=1.6, pains=zoned(1.0)))
-    exposure = progression_readings.interval_exposure(rows, rows[1], dose, [ZONE], reserve=1)
+    exposure = progression_readings.interval_exposure(rows, rows[1], dose, [ZONE], reserve=1,
+                                                      over_range=-1.0, gaps=0.0)
     assert {reading.signal: reading.value for reading in exposure.readings}[
         Signal.FOLLOWING_PAIN] == 1.0
-    assert propose("intervals", HILLS, [exposure]).dose == Dose.of(reps=5, rep_seconds=180)
+    assert propose("intervals", HILLS, [exposure]).dose == Dose.of(reps=5, rep_seconds=180, recovery_seconds=120)
 
 
 def test_a_strength_report_without_counts_reads_its_difficulty_only():

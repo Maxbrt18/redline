@@ -1,5 +1,7 @@
 """The strength lineages, read from the ledger: what the progression engine proposes.
 
+The report renders them with the run lineages (`redline.analysis.progression_runs`).
+
 Read-only. A lineage is declared in `[progression]` of the instance's `rulebook.toml`,
 one per exercise sheet. Its exposures come from the strength reports (`strength_results`
 and the counts of `strength_sets`); its current dose is the sheet's `dose`, as the
@@ -58,9 +60,12 @@ class Coverage:
 
 
 def coverage(declared: Lineages, sheets: dict[str, dict]) -> Coverage:
-    """The lineages against the sheets, keyed by slug (`program.load(...).exercises`)."""
+    """The exercise lineages against the sheets, keyed by slug (`program.load(...).exercises`);
+    a run lineage follows a planned kind, not a sheet."""
     missing, mismatched = [], []
     for lineage in declared.lineages:
+        if lineage.workout:
+            continue
         sheet = sheets.get(lineage.slug)
         if sheet is None:
             missing.append(lineage.slug)
@@ -124,7 +129,8 @@ def proposals(store: Any, root: Path, today: dt.date, week: str | None = None) -
     """
     book = rulebook.load(root)
     declared = book.progression
-    if not declared.lineages:
+    exercises = [lineage for lineage in declared.lineages if not lineage.workout]
+    if not exercises:
         return []
     sheets = program.load(root).exercises
     if refused := coverage(declared, sheets).refused:
@@ -135,7 +141,7 @@ def proposals(store: Any, root: Path, today: dt.date, week: str | None = None) -
     history = store.strength_history()
     vetoed = vetoes(store, book, week or iso_week.of(today), today)
     found = []
-    for lineage in declared.lineages:
+    for lineage in exercises:
         current = current_dose(sheets[lineage.slug], lineage.slug)
         exposures = [exposure for session in history
                      if current is not None
@@ -199,6 +205,10 @@ def render(found: Sequence[Proposal], declared: Lineages) -> list[str]:
 
 
 def report(store: Any, root: Path, today: dt.date, week: str | None = None) -> list[str]:
-    """`render` of `proposals`: what the command prints and the review dossier carries."""
-    declared = rulebook.load(root).progression
-    return render(proposals(store, root, today, week), declared)
+    """`render` of the exercise and run proposals: what the command prints and the review
+    dossier carries."""
+    from .progression_runs import proposals as run_proposals
+
+    book = rulebook.load(root)
+    return render([*proposals(store, root, today, week),
+                   *run_proposals(store, book, today, week)], book.progression)
