@@ -185,6 +185,41 @@ class SessionPriority(StrEnum):
     OPTIONAL = "optional"
 
 
+class ClimbIntent(StrEnum):
+    """What a planned run asks of its climbs (`climb_intent`): what the debrief judges
+    there. The HR cap never applies on a climb; the intent says what does."""
+
+    #: Easy effort, walking allowed: only the flat is judged.
+    EASY = "easy"
+    #: Every climb run, as slowly as needed; the HR may rise. A walked climb is named.
+    RUN_SLOW = "run_slow"
+    #: Climbs at race effort: the effort's regularity from one climb to the next.
+    RACE_EFFORT = "race_effort"
+    #: The climbs are the repetitions: the rules of a quality session.
+    HARD = "hard"
+    #: Brisk walking from a grade on (`power_hike_from_pct`), easy running below.
+    POWER_HIKE = "power_hike"
+
+
+class DescentIntent(StrEnum):
+    """What a planned run asks of its descents (`descent_intent`)."""
+
+    #: Free descents, under the descent cap.
+    RELAXED = "relaxed"
+    #: Held or walked: clearly slower than the flat easy pace.
+    HELD = "held"
+    #: A descent dose: its loss and the next morning's trace.
+    WORKED = "worked"
+
+
+class SessionStructure(StrEnum):
+    """Whether an easy or long run is run steady or carries prescribed efforts
+    (`structure`): a pyramid, strides, a structure set by the group."""
+
+    STEADY = "steady"
+    EFFORTS = "efforts"
+
+
 class ProactiveKind(StrEnum):
     """What a proactive job does (`proactive_jobs.kind`)."""
 

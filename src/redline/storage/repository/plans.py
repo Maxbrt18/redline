@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Connection
 
-from redline.model import iso_week, ledger, session_cycle, weekly_plan
+from redline.model import iso_week, ledger, prescription, session_cycle, weekly_plan
 from redline.model import vocabulary as voc
 
 from ..database import StorageError
@@ -128,6 +128,7 @@ class Plans(StoreBase):
                 rpe_min=session.get("rpe_min"), rpe_max=session.get("rpe_max"),
                 hr_zone=session.get("hr_zone"), hr_cap_bpm=session.get("hr_cap_bpm"),
                 cadence_target=session.get("cadence_target"),
+                **{name: session.get(name) for name in prescription.FIELDS},
                 demanding=session["demanding"],
                 priority=session.get("priority"),
                 transition=session.get("transition"),
@@ -330,7 +331,8 @@ class Plans(StoreBase):
                         session[key] = float(stored[key])
                 for key in ("routine", "duration_cap_min", "rpe_min", "rpe_max", "hr_zone",
                             "hr_cap_bpm", "cadence_target", "priority", "transition",
-                            "location_label", "carbs_target_g_h", "carbs_mix", "note"):
+                            "location_label", "carbs_target_g_h", "carbs_mix", "note",
+                            *prescription.FIELDS):
                     if stored[key] is not None:
                         session[key] = stored[key]
                 if stored["strength_spec"] is not None:
