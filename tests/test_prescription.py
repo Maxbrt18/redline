@@ -71,3 +71,26 @@ def test_a_mean_hr_cap_the_previous_revision_held_over_efforts_is_carried():
     assert prescription.errors(previous, revision(2, sessions=[dict(held)])) == []
     lowered = dict(held, hr_cap_bpm=150)
     assert prescription.errors(previous, revision(2, sessions=[lowered]))
+
+
+def test_the_readout_shows_only_what_the_coach_declared():
+    assert prescription.readout(session()) == []
+    assert prescription.readout(session(dplus_cap_m=250, dminus_cap_m=250)) == [
+        "D+ et D- 250 m au plus"]
+    hilly = session(dplus_target_m=350, dplus_cap_m=400, dminus_cap_m=300,
+                    climb_intent="power_hike", power_hike_from_pct=10, descent_intent="held")
+    assert prescription.readout(hilly) == [
+        "D+ ~350 m, 400 m au plus, D- 300 m au plus",
+        "marche vite dès 10 %, cours facile en dessous", "descentes retenues ou marchées"]
+
+
+def test_every_rendering_carries_the_typed_prescription():
+    """The text message, journal and card read `details_of`; the notebook its own parts."""
+    from redline.service import notebook_board
+
+    pyramid = session(structure="efforts", climb_intent="run_slow", dplus_cap_m=150)
+    details = weekly_plan.details_of(pyramid)
+    assert "D+ 150 m au plus" in details
+    assert any(part.startswith("montées toutes en courant") for part in details)
+    assert any(part.startswith("efforts prescrits") for part in details)
+    assert "D+ 150 m au plus" in notebook_board._planned(pyramid)

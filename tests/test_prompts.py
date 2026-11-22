@@ -842,3 +842,10 @@ def test_the_workout_card_is_no_longer_the_models_choice():
     assert "chart-workout" not in " ".join(PROACTIVE_TRIGGERS.values())
     assert "chart-workout" not in STYLE_PROMPT
     assert "chart-workout" not in (AGENT_CLI_DIR / "agent-cli-tools.txt").read_text()
+
+
+def test_every_turn_that_may_revise_learns_the_typed_prescription():
+    assert "`structure` = `efforts`" in prompts.plan_change_note()
+    for kind in prompts.REVISING_TRIGGERS:
+        assert "CONSIGNE TYPÉE" in prompts.build_proactive_prompt(kind, "2026-W33")
+    assert "CONSIGNE TYPÉE" not in prompts.build_proactive_prompt("morning", "")

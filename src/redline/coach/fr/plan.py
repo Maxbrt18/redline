@@ -18,6 +18,27 @@ CADENCE_UNIT = " pas/min"
 CARBS = "glucides {grams} g/h"
 #: How a named sugar mix reads after the target.
 CARBS_MIX = {"glucose": "glucose", "glucose_fructose": "glucose-fructose"}
+#: The relief a run allows, as the athlete reads it before leaving.
+RELIEF_BOTH_CAP = "D+ et D- {cap} m au plus"
+DPLUS_CAP = "D+ {cap} m au plus"
+DPLUS_TARGET = "D+ ~{target} m"
+DPLUS_TARGET_AND_CAP = "D+ ~{target} m, {cap} m au plus"
+DMINUS_CAP = "D- {cap} m au plus"
+#: What a run's climbs ask, by `ClimbIntent` slug.
+CLIMB_INTENTS = {
+    "easy": "montées à effort facile, marche si tu veux",
+    "run_slow": "montées toutes en courant, aussi lentement qu'il faut, la FC peut monter",
+    "race_effort": "montées à ton effort de course",
+    "hard": "les côtes sont tes répétitions",
+    "power_hike": "marche vite dès {grade} %, cours facile en dessous",
+}
+#: What a run's descents ask, by `DescentIntent` slug.
+DESCENT_INTENTS = {
+    "relaxed": "descentes relâchées",
+    "held": "descentes retenues ou marchées",
+    "worked": "descentes travaillées",
+}
+EFFORTS = "efforts prescrits : allure et FC suivent la consigne, pas un plafond"
 
 DONE = "fait"
 WITH_TRANSITION = ", transition {label}"

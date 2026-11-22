@@ -770,7 +770,8 @@ def rpe_band(session: dict) -> tuple[int | None, int] | None:
 def details_of(session: dict, *, cadence_unit: str = "") -> list[str]:
     """Everything a session commits to, in order, without its title or status.
 
-    The order is part of the contract: distance, RPE, HR zone, cadence, note. Each
+    The order is part of the contract: distance, RPE, HR zone, cadence, the typed
+    prescription (relief, climbs, descents, efforts), fuelling, note. Each
     rendering only decides its separator and markup -- and `cadence_unit` is the one real
     difference, the journal naming the unit that the text message and the card leave
     implicit.
@@ -783,6 +784,7 @@ def details_of(session: dict, *, cadence_unit: str = "") -> list[str]:
         details.append(session["hr_zone"])
     if session.get("cadence_target"):
         details.append(text.CADENCE.format(cadence=session["cadence_target"], unit=cadence_unit))
+    details += prescription.readout(session)
     if session.get("carbs_target_g_h") is not None:
         details.append(" ".join(filter(None, (
             text.CARBS.format(grams=session["carbs_target_g_h"]),

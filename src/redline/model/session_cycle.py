@@ -11,6 +11,7 @@ import datetime as dt
 import hashlib
 import json
 
+from . import prescription
 from .local_time import zone as local_time_zone
 from .vocabulary import CycleState, SessionStatus
 
@@ -45,6 +46,8 @@ def plan_digest(session: dict) -> str:
     # Added only when present, so the cycles stored before the field keep their print.
     if session.get("carbs_mix") is not None:
         visible["carbs_mix"] = session["carbs_mix"]
+    visible.update({name: session[name] for name in prescription.FIELDS
+                    if session.get(name) is not None})
     canonical = json.dumps(visible, ensure_ascii=False, sort_keys=True,
                            separators=(",", ":"), default=str)
     return hashlib.sha256(canonical.encode()).hexdigest()

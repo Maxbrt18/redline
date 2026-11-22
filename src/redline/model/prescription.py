@@ -11,8 +11,10 @@ contradicts itself before the run, such as a cap on the session's mean HR over e
 
 from __future__ import annotations
 
+from redline.coach.fr import plan as text
+
 from . import session_kinds
-from .vocabulary import ClimbIntent, SessionStatus, SessionStructure
+from .vocabulary import ClimbIntent, DescentIntent, SessionStatus, SessionStructure
 
 #: The relief caps apply on foot; the intents to runs only.
 RELIEF_FAMILIES = frozenset({"run", "hike"})
@@ -28,6 +30,11 @@ def climb_intent(session: dict) -> ClimbIntent:
     return ClimbIntent.HARD if session.get("workout") == session_kinds.HILLS else ClimbIntent.EASY
 
 
+def descent_intent(session: dict) -> DescentIntent:
+    declared = session.get("descent_intent")
+    return DescentIntent.RELAXED if declared is None else DescentIntent(declared)
+
+
 def structure(session: dict) -> SessionStructure:
     declared = session.get("structure")
     return SessionStructure.STEADY if declared is None else SessionStructure(declared)
@@ -38,6 +45,38 @@ def has_efforts(session: dict) -> bool:
     athlete's choice."""
     return (structure(session) == SessionStructure.EFFORTS
             or climb_intent(session) == ClimbIntent.HARD)
+
+
+def relief_of(session: dict) -> str:
+    """The relief allowed, as the athlete reads it; empty when none is declared."""
+    up, target, down = (session.get("dplus_cap_m"), session.get("dplus_target_m"),
+                        session.get("dminus_cap_m"))
+    if up is not None and up == down and target is None:
+        return text.RELIEF_BOTH_CAP.format(cap=up)
+    parts = []
+    if target is not None and up is not None:
+        parts.append(text.DPLUS_TARGET_AND_CAP.format(target=target, cap=up))
+    elif target is not None:
+        parts.append(text.DPLUS_TARGET.format(target=target))
+    elif up is not None:
+        parts.append(text.DPLUS_CAP.format(cap=up))
+    if down is not None:
+        parts.append(text.DMINUS_CAP.format(cap=down))
+    return ", ".join(parts)
+
+
+def readout(session: dict) -> list[str]:
+    """What the declared prescription asks, in reading order: relief, climbs, descents,
+    efforts. A default the coach did not declare is not shown."""
+    parts = [relief_of(session)]
+    if session.get("climb_intent") is not None:
+        parts.append(text.CLIMB_INTENTS[climb_intent(session)].format(
+            grade=session.get("power_hike_from_pct")))
+    if session.get("descent_intent") is not None:
+        parts.append(text.DESCENT_INTENTS[descent_intent(session)])
+    if session.get("structure") == SessionStructure.EFFORTS:
+        parts.append(text.EFFORTS)
+    return [part for part in parts if part]
 
 
 def _mean_hr_cap_refused(session: dict) -> bool:
