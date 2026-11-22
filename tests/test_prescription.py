@@ -116,6 +116,10 @@ def test_a_session_of_repetitions_types_its_dose_and_reads_it():
     ("threshold", {"reps": 5}, "reps and rep_seconds go together"),
     ("threshold", {"recovery_seconds": 60}, "needs reps and rep_seconds"),
     ("hills", {"reps": 6, "rep_seconds": 60, "rep_pace_s": 300}, "its pace is the grade's"),
+    ("threshold", {"reps": 5, "rep_seconds": 60, "override_reason": "tolerated_more"},
+     "override_reason and override_prediction go together"),
+    ("threshold", {"override_reason": "race_demand", "override_prediction": "w11-seuil"},
+     "needs reps and rep_seconds"),
 ])
 def test_a_contradictory_dose_is_refused(workout, overrides, message):
     found = prescription.errors(None, revision(sessions=[session(workout=workout, **overrides)]))

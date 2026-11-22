@@ -156,5 +156,8 @@ ACTIVE_MISSING = ("ABSENTE OU INVALIDE : ne prescris aucune séance. Une répara
 TAPER_UNREADABLE = ("Affûtage : lecture du registre impossible ({name}), la baisse du "
                     "volume n'est pas contrôlée pour cette révision.")
 
+PROGRESSION_UNREADABLE = ("Progression : lecture du registre impossible ({name}), les doses "
+                          "de qualité ne sont pas contrôlées contre leur plafond.")
+
 PAIN_RULES_UNREADABLE = ("Règles n3 et n4 : lecture du registre impossible ({name}), la "
                          "qualité et le volume ne sont pas contrôlés pour cette révision.")

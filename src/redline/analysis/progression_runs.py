@@ -18,7 +18,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from redline.model import iso_week, rulebook, weekly_plan
+from redline.model import iso_week, prescription, rulebook, weekly_plan
 from redline.model.progression import (
     RUN_FAMILIES,
     Dose,
@@ -34,7 +34,7 @@ from redline.model.progression import (
 from redline.model.vocabulary import FindingOwner, SessionStatus
 
 from . import easy_load, expected_rpe, ledger, pain_rules
-from .progression import judge, propose
+from .progression import above, judge, propose, step_up
 from .progression_readings import gate_exposure, interval_exposure
 from .progression_strength import vetoes as calendar_vetoes
 
@@ -159,3 +159,86 @@ def proposals(store: Any, book: rulebook.Rulebook, today: dt.date,
             current=current_dose(family, lineage, plans, week), vetoes=vetoed, today=today,
             lookback_days=book.parameters.transition_lookback_days))
     return found
+
+
+def _changed(session: dict, before: dict | None) -> bool:
+    """A dose given by this revision, not carried unchanged from the previous one."""
+    names = (*prescription.DOSE_FIELDS, *prescription.OVERRIDE_FIELDS, "date")
+    return before is None or any(session.get(name) != before.get(name) for name in names)
+
+
+def override_errors(store: Any, book: rulebook.Rulebook, week: str, revision: dict,
+                    previous: dict | None, today: dt.date) -> list[str]:
+    """The typed dose of each quality session a revision gives, against its lineage.
+
+    At or under the ceiling, no override is declared. One step above, the bounded
+    override: no veto in force, a typed reason, an open prediction sealed on it, and never
+    twice in a row on the lineage. Beyond one step, or under a veto, refused.
+    """
+    lineages = {lineage.workout: lineage for lineage in book.progression.lineages
+                if lineage.family in RUN_FAMILIES}
+    sessions = [session for session in revision.get("sessions") or []
+                if session.get("workout") in lineages and session.get("reps") is not None
+                and session.get("status") != SessionStatus.CANCELLED]
+    before = {session["id"]: session for session in (previous or {}).get("sessions") or []}
+    sessions = [session for session in sessions if _changed(session, before.get(session["id"]))]
+    if not sessions:
+        return []
+    found = {proposal.lineage: proposal for proposal in proposals(store, book, today, week)}
+    rows = ledger.parse_ledger(store)
+    vetoed = vetoes(store, book, rows, week, today, ledger.pain_zones(store))
+    open_keys = {row["prediction_key"] for row in store.prediction_rows()
+                 if row.get("status") == "open"}
+    plans = Plans(store)
+    families = default()
+    problems = []
+    for session in sessions:
+        lineage = lineages[session["workout"]]
+        family, proposal = families[lineage.family], found[lineage.slug]
+        where = f"{week} revision {revision.get('revision')}.{session['id']}"
+        dose, ceiling = planned_dose(family, session), proposal.ceiling
+        declared = session.get("override_reason") is not None
+        if dose is None or ceiling is None or not above(family, dose, ceiling):
+            if declared:
+                problems.append(f"{where}: no override at or under the ceiling of "
+                                f"{lineage.slug} ({ceiling})")
+            continue
+        step = step_up(family, lineage, ceiling)
+        if step is None or above(family, dose, step):
+            problems.append(f"{where}: {dose} is more than one step above the ceiling of "
+                            f"{lineage.slug} ({ceiling})")
+            continue
+        if vetoed:
+            problems.append(f"{where}: {dose} is above the ceiling of {lineage.slug} "
+                            f"({proposal.ceiling}) under a veto: "
+                            + "; ".join(f"{veto.rule} {veto.fact}" for veto in vetoed))
+            continue
+        if not declared:
+            problems.append(f"{where}: {dose} is one step above the ceiling of {lineage.slug} "
+                            f"({proposal.ceiling}) -- declare override_reason and the "
+                            "override_prediction sealed on it, or prescribe at most the "
+                            "ceiling")
+            continue
+        if session["override_prediction"] not in open_keys:
+            problems.append(f"{where}.override_prediction: no open prediction "
+                            f"{session['override_prediction']}")
+        last = _last_planned(plans, lineage, dt.date.fromisoformat(session["date"]), week)
+        if last is not None and last.get("override_reason") is not None:
+            problems.append(f"{where}: the previous {lineage.workout} of {lineage.slug} "
+                            f"({last['date']}) was already an override; never twice in a row")
+    return problems
+
+
+def _last_planned(plans: Plans, lineage: Lineage, before: dt.date, week: str) -> dict | None:
+    """The latest planned session of the lineage's workout with a typed dose before
+    `before`, within the transition window's weeks."""
+    for offset in range(6):
+        candidates = sorted((session for session in plans.sessions(iso_week.shift(week, -offset))
+                             if session["workout"] == lineage.workout
+                             and session.get("reps") is not None
+                             and session.get("status") != SessionStatus.CANCELLED
+                             and session["date"] < before.isoformat()),
+                            key=lambda session: session["date"], reverse=True)
+        if candidates:
+            return candidates[0]
+    return None

@@ -493,6 +493,8 @@ planned_sessions = sa.Table(
     sa.Column("rep_seconds", sa.Integer),
     sa.Column("recovery_seconds", sa.Integer),
     sa.Column("rep_pace_s", sa.SmallInteger),
+    sa.Column("override_reason", sa.Text),
+    sa.Column("override_prediction", sa.Text),
     sa.Column("demanding", sa.Boolean, nullable=False),
     sa.Column("priority", sa.Text),
     # Typed guardrail: the kind that drops out of the last 30 days. NULL = known session.
@@ -580,6 +582,11 @@ planned_sessions = sa.Table(
         "1800)) AND (rep_pace_s IS NULL OR (reps IS NOT NULL AND rep_pace_s BETWEEN 120 AND "
         "900))",
         name="ck_planned_sessions_rep_dose"),
+    sa.CheckConstraint(
+        "(override_reason IS NULL) = (override_prediction IS NULL) AND (override_reason IS "
+        f"NULL OR (reps IS NOT NULL AND override_reason IN "
+        f"({voc.sql_values(voc.OverrideReason)})))",
+        name="ck_planned_sessions_override"),
     sa.CheckConstraint(
         "strength_spec IS NULL OR jsonb_typeof(strength_spec) = 'object'",
         name="ck_planned_sessions_strength_spec"),

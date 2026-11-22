@@ -3,8 +3,8 @@
 For each lineage declared in `[progression]` of `rulebook.toml`, an exercise or the
 repetitions of a planned quality kind: the move (up, hold, down), the clause that decided
 it, the verdicts and the facts behind them, the readings still missing and the ceiling,
-the weekly rise budget of its group applied. Read-only: it writes no dose and refuses
-nothing.
+the weekly rise budget of its group applied. Read-only: it writes no dose; a revision
+above a run lineage's ceiling is checked when it is written (the bounded override).
 
     redline progression                    # for the current week
     redline progression --week 2030-W41    # for the week being planned

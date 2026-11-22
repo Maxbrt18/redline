@@ -35,6 +35,7 @@ from .vocabulary import (
     ClimbIntent,
     Decider,
     DescentIntent,
+    OverrideReason,
     SessionPriority,
     SessionStatus,
     SessionStructure,
@@ -107,6 +108,11 @@ SESSION_SCHEMA = Schema("planned session", [
           note="the recovery between two repetitions, in seconds"),
     field("rep_pace_s", int, required=False, minimum=120, maximum=900,
           note="the pace of a repetition, in s/km; not on a hill session"),
+    field("override_reason", str, required=False, choices=tuple(OverrideReason),
+          note="why the dose goes one step above its lineage's ceiling; with "
+               "override_prediction"),
+    field("override_prediction", str, required=False, pattern=formats.KEY,
+          note="the key of the open prediction sealed on that step"),
     field("structure", str, required=False, choices=tuple(SessionStructure),
           note="an easy or long run run steady, or with prescribed efforts (a pyramid, "
                "strides, a structure set by the group); absent, steady"),

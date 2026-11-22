@@ -11,7 +11,7 @@ from test_weekly_plan import revision, session
 from redline.analysis import expected_rpe, ledger, progression_runs, progression_strength
 from redline.analysis.progression import propose
 from redline.model import rulebook
-from redline.model.progression import Bound, Dose, Move, Signal, VetoKind, default
+from redline.model.progression import Bound, Dose, Move, Signal, Veto, VetoKind, default
 
 MONDAY = dt.date(2030, 3, 4)
 ZONE = "knee"
@@ -162,3 +162,78 @@ def test_a_gate_that_did_not_open_vetoes_a_rise(monkeypatch):
                                     day(0), zones)
     assert [veto.kind for veto in found] == [VetoKind.GATE]
     assert "2030-W09" in found[0].fact
+
+
+# ------------------------------------------------------------------ the bounded override
+
+CEILING = Dose.of(reps=5, rep_seconds=300, recovery_seconds=120)
+
+
+class Written(Store):
+    def prediction_rows(self):
+        return [{"prediction_key": "w11-seuil", "status": "open"},
+                {"prediction_key": "w09-old", "status": "resolved"}]
+
+    def pain_zones(self):
+        return []
+
+
+@pytest.fixture
+def ruled(monkeypatch):
+    """The lineage's ceiling is 5 x 5 min, recovery 2 min; `vetoed` sets the vetoes."""
+    from redline.model.progression import Proposal
+
+    state = {"vetoes": ()}
+    monkeypatch.setattr(ledger, "parse_ledger", lambda store: [])
+    monkeypatch.setattr(progression_runs, "proposals", lambda store, book, today, week: [
+        Proposal("threshold-reps", "intervals", Move.UP, Move.UP, "tolerated", CEILING,
+                 CEILING, CEILING)])
+    monkeypatch.setattr(progression_runs, "vetoes", lambda *args: state["vetoes"])
+
+    def check(*sessions, before=(), plans=None):
+        store = Written(plans or {}, {})
+        return progression_runs.override_errors(
+            store, book_with(PROGRESSION + RUNS), "2030-W11", revision(sessions=list(sessions)),
+            revision(sessions=list(before)) if before else None, day(7))
+
+    check.state = state
+    return check
+
+
+def written(reps, seconds=300, recovery=120, **extra):
+    return {**threshold(day(10), reps, seconds=seconds, recovery=recovery), **extra}
+
+
+OVERRIDE = {"override_reason": "tolerated_more", "override_prediction": "w11-seuil"}
+
+
+def test_a_dose_at_its_ceiling_declares_no_override(ruled):
+    assert ruled(written(5)) == []
+    assert ruled(written(4)) == [], "a plan may always prescribe less"
+    assert "no override at or under the ceiling" in ruled(written(5, **OVERRIDE))[0]
+
+
+def test_one_step_above_the_ceiling_is_the_bounded_override(ruled):
+    assert ruled(written(6, **OVERRIDE)) == []
+    assert "declare override_reason" in ruled(written(6))[0]
+    assert "more than one step above" in ruled(written(6, seconds=360, **OVERRIDE))[0]
+
+
+def test_the_override_needs_an_open_prediction_and_no_veto(ruled):
+    late = {**OVERRIDE, "override_prediction": "w09-old"}
+    assert "no open prediction w09-old" in ruled(written(6, **late))[0]
+    ruled.state["vetoes"] = (Veto(VetoKind.TAPER, "taper_weeks", "race 2030-04-06"),)
+    assert "under a veto: taper_weeks race 2030-04-06" in ruled(written(6, **OVERRIDE))[0]
+
+
+def test_never_two_overrides_in_a_row_on_a_lineage(ruled):
+    earlier = {**threshold(day(3), 5), **OVERRIDE}
+    found = ruled(written(6, **OVERRIDE), plans={"2030-W10": [earlier]})
+    assert len(found) == 1 and "never twice in a row" in found[0]
+    plain = threshold(day(3), 5)
+    assert ruled(written(6, **OVERRIDE), plans={"2030-W10": [plain]}) == []
+
+
+def test_a_dose_carried_unchanged_is_not_checked_again(ruled):
+    assert ruled(written(7), before=[written(7)]) == []
+    assert ruled(written(7), before=[written(6)]) != []

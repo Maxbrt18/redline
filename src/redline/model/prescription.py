@@ -11,7 +11,9 @@ contradicts itself before the run, such as a cap on the session's mean HR over e
 A session made of repetitions (`session_kinds.REPETITIONS`) may type its dose: how many
 (`reps`), how long each (`rep_seconds`), the recovery between two (`recovery_seconds`)
 and, off a hill, the pace of a repetition (`rep_pace_s`). The progression engine reads
-this dose, and the debrief holds the repetitions run to their pace.
+this dose, and the debrief holds the repetitions run to their pace. A dose one step above
+the ceiling of its lineage declares why (`override_reason`) and the prediction sealed on
+it (`override_prediction`); `redline.analysis.progression_runs` checks the rest.
 """
 
 from __future__ import annotations
@@ -19,14 +21,20 @@ from __future__ import annotations
 from redline.coach.fr import plan as text
 
 from . import session_kinds
-from .vocabulary import ClimbIntent, DescentIntent, SessionStatus, SessionStructure
+from .vocabulary import (
+    ClimbIntent,
+    DescentIntent,
+    SessionStatus,
+    SessionStructure,
+)
 
 #: The relief caps apply on foot; the intents to runs only.
 RELIEF_FAMILIES = frozenset({"run", "hike"})
 INTENT_FIELDS = ("climb_intent", "power_hike_from_pct", "descent_intent", "structure")
 RELIEF_FIELDS = ("dplus_cap_m", "dplus_target_m", "dminus_cap_m")
 DOSE_FIELDS = ("reps", "rep_seconds", "recovery_seconds", "rep_pace_s")
-FIELDS = (*RELIEF_FIELDS, *INTENT_FIELDS, *DOSE_FIELDS)
+OVERRIDE_FIELDS = ("override_reason", "override_prediction")
+FIELDS = (*RELIEF_FIELDS, *INTENT_FIELDS, *DOSE_FIELDS, *OVERRIDE_FIELDS)
 
 
 def climb_intent(session: dict) -> ClimbIntent:
@@ -142,7 +150,8 @@ def session_errors(session: dict, where: str) -> list[str]:
 
 
 def _dose_errors(session: dict, where: str) -> list[str]:
-    declared = [name for name in DOSE_FIELDS if session.get(name) is not None]
+    declared = [name for name in (*DOSE_FIELDS, *OVERRIDE_FIELDS)
+                if session.get(name) is not None]
     if not declared:
         return []
     workout = session.get("workout")
@@ -154,7 +163,9 @@ def _dose_errors(session: dict, where: str) -> list[str]:
         problems.append(f"{where}: reps and rep_seconds go together")
     if session.get("reps") is None:
         problems += [f"{where}.{name}: needs reps and rep_seconds" for name in declared
-                     if name in ("recovery_seconds", "rep_pace_s")]
+                     if name in ("recovery_seconds", "rep_pace_s", *OVERRIDE_FIELDS)]
+    if (session.get("override_reason") is None) != (session.get("override_prediction") is None):
+        problems.append(f"{where}: override_reason and override_prediction go together")
     if session.get("rep_pace_s") is not None and workout == session_kinds.HILLS:
         problems.append(f"{where}.rep_pace_s: a hill repetition is run by its effort; its "
                         "pace is the grade's")

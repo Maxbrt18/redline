@@ -63,6 +63,21 @@ def pain_errors(store, week: str, revision: dict, existing: dict | None,
                             previous)
 
 
+def progression_errors(store, week: str, revision: dict, previous: dict | None,
+                       warn: Callable[[str], None]) -> list[str]:
+    """The quality doses against their lineages' ceilings, the bounded override at most.
+    A measurement that fails costs the check, never the prescription."""
+    from redline.analysis import progression_runs
+    from redline.model import rulebook
+    today = dt.date.fromisoformat(revision["computed_at"][:10])
+    try:
+        return progression_runs.override_errors(store, rulebook.current(), week, revision,
+                                                previous, today)
+    except Exception as exc:
+        warn(wording.PROGRESSION_UNREADABLE.format(name=exc.__class__.__name__))
+        return []
+
+
 def checked(store, week: str, revision: dict, existing: dict | None, *, stamp: str,
             warn: Callable[[str], None]) -> tuple[dict | None, dict]:
     """The previous revision and the new one, stamped and measured, or SchemaError."""
@@ -100,6 +115,7 @@ def checked(store, week: str, revision: dict, existing: dict | None, *, stamp: s
         *fuelling_errors(current, where),
         *taper_errors(store, week, current, warn),
         *pain_errors(store, week, current, existing, warn),
+        *progression_errors(store, week, current, previous, warn),
     ]
     if mistakes:
         raise SchemaError(mistakes)

@@ -232,6 +232,18 @@ class DebriefVerdict(StrEnum):
     UNDETERMINED = "undetermined"
 
 
+class OverrideReason(StrEnum):
+    """Why a planned session goes one step above its lineage's ceiling
+    (`planned_sessions.override_reason`): the bounded override, never twice in a row."""
+
+    #: The latest sessions showed more tolerance than the ladder credits.
+    TOLERATED_MORE = "tolerated_more"
+    #: The race requires this dose before the taper, and the weeks left do not wait.
+    RACE_DEMAND = "race_demand"
+    #: The athlete asked for it, informed of the ceiling.
+    ATHLETE_CHOICE = "athlete_choice"
+
+
 class RpeSide(StrEnum):
     """Where a declared RPE falls against the range its dose expects
     (`redline.analysis.expected_rpe`)."""
