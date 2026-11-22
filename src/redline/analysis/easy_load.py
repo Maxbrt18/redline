@@ -24,7 +24,7 @@ from typing import Any
 from redline.analysis.race_pace import SEGMENT_M, strava_2017
 from redline.model import session_kinds, terrain
 from redline.model.activity import Activity
-from redline.model.streams import GAP_S, MOVING_MPS
+from redline.model.streams import GAP_S, MOVING_MPS, WALK_CADENCE_PER_LEG, WALKED_SHARE
 
 #: The exponent of the relative speed: the rTSS convention, to calibrate on the bone's
 #: answer (the next morning's trace after long slow runs).
@@ -35,10 +35,21 @@ REFERENCE_MIN_RUNS = 3
 
 @dataclass(frozen=True)
 class Stretch:
-    """A stretch of run: its moving time and its flat-equivalent speed."""
+    """A stretch of run: its moving time and its flat-equivalent speed; where it lies,
+    its net grade, its mean HR over the moving samples (None without an HR stream) and
+    its walked time (none without a cadence stream)."""
 
     moving_s: float
     flat_mps: float
+    start_m: float = 0.0
+    end_m: float = 0.0
+    grade_pct: float = 0.0
+    hr: float | None = None
+    walked_s: float = 0.0
+
+    @property
+    def walked(self) -> bool:
+        return self.moving_s > 0 and self.walked_s / self.moving_s >= WALKED_SHARE
 
 
 @dataclass(frozen=True)
@@ -78,13 +89,19 @@ def profile(streams: dict) -> Profile | None:
     if not time or not distance or len(distance) != len(time):
         return None
     speed, altitude = streams.get("v"), streams.get("alt")
+    heart, cadence = streams.get("hr"), streams.get("cad")
     stretches: list[Stretch] = []
     dplus = dminus = 0.0
-    start_k, moving = 0, 0.0
+    start_k, moving, walked, beats, timed = 0, 0.0, 0.0, 0.0, 0.0
     for k in range(1, len(time)):
         step = time[k] - time[k - 1]
         if step <= GAP_S and (speed is None or (speed[k] or 0) >= MOVING_MPS):
             moving += step
+            if cadence and cadence[k] is not None and cadence[k] < WALK_CADENCE_PER_LEG:
+                walked += step
+            if heart and heart[k] is not None:
+                beats += heart[k] * step
+                timed += step
         if altitude and altitude[k] is not None and altitude[k - 1] is not None:
             rise = altitude[k] - altitude[k - 1]
             dplus += max(rise, 0)
@@ -92,9 +109,11 @@ def profile(streams: dict) -> Profile | None:
         span = (distance[k] or 0) - (distance[start_k] or 0)
         if span >= SEGMENT_M or k == len(time) - 1:
             if span > 0 and moving > 0:
-                stretches.append(Stretch(moving, span / moving / strava_2017(
-                    _grade(altitude, start_k, k, span))))
-            start_k, moving = k, 0.0
+                grade = _grade(altitude, start_k, k, span)
+                stretches.append(Stretch(
+                    moving, span / moving / strava_2017(grade), distance[start_k] or 0.0,
+                    distance[k] or 0.0, grade, beats / timed if timed else None, walked))
+            start_k, moving, walked, beats, timed = k, 0.0, 0.0, 0.0, 0.0
     total = (distance[-1] or 0) - (distance[0] or 0)
     return Profile(tuple(stretches), total, dplus, dminus) if stretches else None
 
@@ -152,8 +171,10 @@ def stored_profile(store: Any, activity_id: int) -> Profile | None:
     return None if not streams else profile(streams)
 
 
-def reference_pace_s(store: Any, rows: Iterable[Any], day: dt.date) -> float | None:
-    """The reference easy pace on `day`, in s/km, from the ledger and the kept streams."""
+def easy_runs(store: Any, rows: Iterable[Any],
+              day: dt.date) -> list[tuple[dt.date, Profile, bool | None]]:
+    """The easy runs of the `REFERENCE_WEEKS` weeks before `day` with kept streams: their
+    day, their stretches and whether they were run in a group."""
     since = day - dt.timedelta(weeks=REFERENCE_WEEKS)
     runs = []
     for row in rows:
@@ -163,5 +184,10 @@ def reference_pace_s(store: Any, rows: Iterable[Any], day: dt.date) -> float | N
         shape = stored_profile(store, activity)
         if shape is not None:
             runs.append((row.date, shape, group_of(store, activity)))
-    speed = reference_mps(samples(runs), day)
+    return runs
+
+
+def reference_pace_s(store: Any, rows: Iterable[Any], day: dt.date) -> float | None:
+    """The reference easy pace on `day`, in s/km, from the ledger and the kept streams."""
+    speed = reference_mps(samples(easy_runs(store, rows, day)), day)
     return None if speed is None else 1000 / speed

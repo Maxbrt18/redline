@@ -39,7 +39,7 @@ from redline.analysis.expected_rpe import Expectation
 from redline.coach.fr import debrief as text
 from redline.model import prescription, rulebook, terrain
 from redline.model.notebook_views import KmSplit
-from redline.model.streams import GAP_S, MOVING_MPS
+from redline.model.streams import GAP_S, MOVING_MPS, WALK_CADENCE_PER_LEG, WALKED_SHARE
 from redline.model.vocabulary import (
     ClimbIntent,
     DebriefVerdict,
@@ -50,10 +50,6 @@ from redline.model.vocabulary import (
     RpeSign,
 )
 
-#: Strava's running cadence counts one leg: below this, the athlete walks.
-WALK_CADENCE_PER_LEG = 70
-#: A climb or a grade is walked when at least this share of its moving time is.
-WALKED_SHARE = 0.5
 #: Gain and loss measured by a watch drift: a relief within this share above its cap is
 #: within the measure's noise.
 RELIEF_NOISE_PCT = 10
