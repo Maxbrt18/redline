@@ -14,6 +14,44 @@ NONE_DECLARED = (
 
 UNAVAILABLE = "Propositions de progression indisponibles : {reason}"
 
+TALLY_HEADER = (
+    "Bilan des crans des qualités : ce qui a suivi chaque hausse courue et chaque "
+    "dérogation. Une suggestion, jamais appliquée : un cran change dans [progression] de "
+    "rulebook.toml, par décision avec l'athlète :")
+
+TALLY_LINE = "- {lineage} : {counts} · {suggestion}"
+
+TALLY_NO_RISE = "- {lineage} : aucune hausse courue"
+
+TALLY_COUNT = "{label} {count} ({days})"
+
+#: What followed a rise, by `RiseOutcome` slug.
+TALLY_OUTCOMES = {"tolerated": "tolérées", "failed": "ratées", "harmed": "nuisibles",
+                  "unread": "non attribuables"}
+
+#: The tally's suggestion, by `Move` slug.
+TALLY_SUGGESTIONS = {"up": "le cran pourrait grandir", "hold": "le cran tient",
+                     "down": "le cran devrait rétrécir"}
+
+TALLY_TOO_FEW = "trop peu de hausses lues pour juger le cran ({read} sur {minimum})"
+
+OVERRIDE = "  dérogation du {day:%d/%m} ({reason}) : {followed}, prédiction {prediction}"
+
+#: Why a session went one step above the ceiling, by `OverrideReason` slug.
+OVERRIDE_REASONS = {"tolerated_more": "tolérance au-delà de l'échelle",
+                    "race_demand": "exigence de la course",
+                    "athlete_choice": "choix de l'athlète"}
+
+#: What followed an override, by `RiseOutcome` slug.
+OVERRIDE_FOLLOWED = {"tolerated": "tolérée", "failed": "ratée", "harmed": "nuisible",
+                     "unread": "non attribuable"}
+
+PREDICTION_OPEN = "pas encore tranchée"
+
+PREDICTION_BORNE_OUT = "vérifiée"
+
+PREDICTION_REFUTED = "démentie"
+
 #: The move, as the coach reads it.
 MOVES = {"up": "monter", "hold": "tenir", "down": "redescendre"}
 

@@ -50,6 +50,18 @@ class Verdict(StrEnum):
     UNKNOWN = "unknown"
 
 
+class RiseOutcome(StrEnum):
+    """What followed a session run one step above the dose before it."""
+
+    TOLERATED = "tolerated"
+    FAILED = "failed"
+    #: A criterion that calls for a step down failed.
+    HARMED = "harmed"
+    #: Not attributable: disrupted, another lineage rose the same week, or a reading the
+    #: verdict needs was not taken.
+    UNREAD = "unread"
+
+
 class Severity(StrEnum):
     """What the failure of a criterion calls for on its own."""
 
