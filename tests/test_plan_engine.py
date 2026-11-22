@@ -8,6 +8,7 @@ import pytest
 
 from redline.analysis import ledger, plan_engine
 from redline.model.errors import ConfigError, InputError
+from redline.model.vocabulary import PlanPhase
 
 TODAY = dt.date(2030, 11, 27)
 GOAL = {"distance_km": 21.1, "terrain": "road", "peak_volume_km": 50,
@@ -76,6 +77,50 @@ def test_the_chosen_skeleton_is_computed_again_from_today(runs):
     assert later.weeks[0].label == "2031-W02", "re-planned from where the athlete stands"
     lines = plan_engine.report(Store(chosen), TODAY)
     assert any(line.startswith("Squelette choisi : « balanced »") for line in lines)
+
+
+# ------------------------------------------------------------------ the bounds
+
+
+def _skeleton(runs_rows):
+    chosen = {**GOAL, "skeleton": {"candidate": "balanced", "specific_weeks": 6,
+                                   "deload_every": 4, "second_quality": "specific"}}
+    return plan_engine.chosen(Store(chosen), TODAY)
+
+
+def _session(identifier, workout, km=None, status="planned"):
+    return {"id": identifier, "workout": workout, "status": status,
+            **({"distance_cap_km": km} if km is not None else {})}
+
+
+def test_a_revision_stays_within_its_weeks_bounds(runs):
+    skeleton = _skeleton(runs)
+    week = skeleton.week("2030-W48")
+    assert week.phase == PlanPhase.BASE and week.qualities == 1
+    fine = {"revision": 1, "volume_target_km": week.volume_km,
+            "sessions": [_session("sun", "long", week.long_run_km), _session("thu", "threshold")]}
+    assert plan_engine.revision_errors(skeleton, "2030-W48", fine, None) == []
+    over = {"revision": 1, "volume_target_km": week.volume_km + 5,
+            "sessions": [_session("sun", "long", week.long_run_km + 3),
+                         _session("tue", "threshold"), _session("thu", "hills")]}
+    found = plan_engine.revision_errors(skeleton, "2030-W48", over, None)
+    assert len(found) == 4, found
+    assert "volume_target_km" in found[0] and "skeleton « balanced »" in found[0]
+    assert any("2 quality sessions for 1" in problem for problem in found)
+    assert any("hills is not a family of the week" in problem for problem in found)
+    assert plan_engine.revision_errors(skeleton, "2031-W30", over, None) == [], \
+        "a week outside the skeleton is not bound"
+
+
+def test_what_the_previous_revision_held_is_carried_not_given_again(runs):
+    skeleton = _skeleton(runs)
+    week = skeleton.week("2030-W48")
+    held = {"revision": 1, "volume_target_km": week.volume_km + 5,
+            "sessions": [_session("sun", "long", week.long_run_km + 3)]}
+    again = {**held, "revision": 2}
+    assert plan_engine.revision_errors(skeleton, "2030-W48", again, held) == []
+    more = {**held, "revision": 2, "volume_target_km": week.volume_km + 6}
+    assert len(plan_engine.revision_errors(skeleton, "2030-W48", more, held)) == 1
 
 
 def _run(monkeypatch, store, *args):

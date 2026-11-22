@@ -16,11 +16,11 @@ from typing import Any
 
 from redline.coach.fr import plan_skeleton as text
 from redline.coach.fr import session_labels
-from redline.model import iso_week, plan_skeleton, plan_templates, rulebook
+from redline.model import iso_week, plan_skeleton, plan_templates, rulebook, session_kinds
 from redline.model import race as race_model
 from redline.model.errors import ConfigError, InputError
 from redline.model.plan_skeleton import Levers, Limits, Skeleton, Start
-from redline.model.vocabulary import DeadlineStatus
+from redline.model.vocabulary import DeadlineStatus, SessionStatus
 
 from . import ledger
 
@@ -28,6 +28,8 @@ from . import ledger
 START_WEEKS = 3
 #: A race run this close before the skeleton starts calls for a recovery first.
 RECOVERY_DAYS = 21
+#: The skeleton's figures are rounded to 0.1 km: a bound is met within this.
+EPSILON_KM = 0.05
 
 
 @dataclass(frozen=True)
@@ -186,6 +188,55 @@ def report(store: Any, today: dt.date) -> list[str]:
     current = chosen(store, today)
     return render(found, [current] if current is not None else skeletons,
                   chosen=current is not None)
+
+
+def _distance(session: dict) -> float | None:
+    value = session.get("distance_cap_km") or session.get("distance_target_km")
+    return None if value is None else float(value)
+
+
+def revision_errors(skeleton: Skeleton, week: str, revision: dict,
+                    previous: dict | None) -> list[str]:
+    """A weekly revision against the chosen skeleton's week: its volume target, its long
+    run, its quality sessions and their families. A plan may always ask less; what the
+    previous revision already held is carried, not given again."""
+    bound = skeleton.week(week)
+    if bound is None:
+        return []
+    where = f"{week} revision {revision.get('revision')}"
+    tail = (f" -- skeleton « {skeleton.candidate} » (`redline plan-skeleton`); change a "
+            "lever and choose again rather than exceed a week")
+    live = [session for session in revision.get("sessions") or []
+            if session.get("status") != SessionStatus.CANCELLED]
+    before = {session["id"]: session for session in (previous or {}).get("sessions") or []
+              if session.get("status") != SessionStatus.CANCELLED}
+    problems = []
+    volume, held = revision.get("volume_target_km"), (previous or {}).get("volume_target_km")
+    if (volume is not None and volume > bound.volume_km + EPSILON_KM
+            and (held is None or volume > held)):
+        problems.append(f"{where}.volume_target_km: {volume:g} km above the "
+                        f"{bound.volume_km:g} km of the week" + tail)
+    for session in live:
+        if session.get("workout") != session_kinds.LONG:
+            continue
+        distance, old = _distance(session), before.get(session["id"])
+        if (distance is not None and distance > bound.long_run_km + EPSILON_KM
+                and (old is None or (_distance(old) or 0) < distance)):
+            problems.append(f"{where}.{session['id']}: long run of {distance:g} km above the "
+                            f"{bound.long_run_km:g} km of the week" + tail)
+    quality = [session for session in live if session.get("workout") in session_kinds.QUALITY]
+    held_quality = [session for session in before.values()
+                    if session.get("workout") in session_kinds.QUALITY]
+    if len(quality) > bound.qualities and len(quality) > len(held_quality):
+        problems.append(f"{where}: {len(quality)} quality sessions for {bound.qualities} in "
+                        "the week" + tail)
+    for session in quality:
+        old = before.get(session["id"])
+        if session["workout"] not in bound.families and (
+                old is None or old.get("workout") != session["workout"]):
+            problems.append(f"{where}.{session['id']}: {session['workout']} is not a family "
+                            f"of the week ({', '.join(bound.families) or 'none'})" + tail)
+    return problems
 
 
 def bounds_line(skeleton: Skeleton, week: plan_skeleton.Week) -> str:
