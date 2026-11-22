@@ -718,11 +718,21 @@ class RaceView(TypedDict):
     archives: list[Entry]
 
 
+class RpeRange(TypedDict):
+    """The RPE the dose run expects, calibrated on `sessions` declared RPE of its kind."""
+
+    low: int
+    high: int
+    sessions: int
+
+
 class DetailFact(Fact):
     moving_s: float | None
     hr_max: float | None
     cadence: float | None
     reserve: float | None
+    #: Given only once the RPE is declared: shown before, it would steer the answer.
+    rpe_expected: RpeRange | None
 
 
 class DetailPlan(TypedDict):

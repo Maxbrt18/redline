@@ -169,3 +169,15 @@ def test_repetitions_faster_than_their_pace_are_an_execution_gap():
     assert "R3 à 4:15/km pour 4:35/km" in execution.render(ruled)[-1]
     assert _judge(session(workout="threshold"), [FLAT], reps=pushed).findings == (), \
         "without a typed pace, the repetitions are compared within the session only"
+
+
+def test_an_rpe_ruled_again_keeps_the_other_findings_and_reads_them_as_signs():
+    kept = [{"kind": "flat_too_fast", "owner": "athlete", "value": 340.0, "reference": 374.0,
+             "kms": [2, 3]},
+            {"kind": "rpe_below", "owner": "note", "value": 1.0, "reference": 3.0, "kms": [],
+             "signs": []}]
+    again = execution.rejudged(kept, _cost(7))
+    assert again[0] == kept[0]
+    assert again[1]["kind"] == "rpe_above" and again[1]["signs"] == ["execution"]
+    assert execution.rejudged(kept, _cost(4)) == kept[:1], "within its range: nothing kept"
+    assert execution.rejudged(kept, None) == kept[:1]

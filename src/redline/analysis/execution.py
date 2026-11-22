@@ -104,6 +104,13 @@ class Finding:
             out["signs"] = [str(sign) for sign in self.signs]
         return out
 
+    @classmethod
+    def from_json(cls, data: dict) -> Finding:
+        """A finding as `as_json` kept it with the verdict."""
+        return cls(FindingKind(data["kind"]), float(data["value"]), float(data["reference"]),
+                   tuple(data.get("kms") or ()),
+                   tuple(RpeSign(sign) for sign in data.get("signs") or ()))
+
 
 @dataclass(frozen=True)
 class Cost:
@@ -270,9 +277,9 @@ def _above_prescription(cost: Cost | None) -> list[Finding]:
                     float(cost.prescribed.high))]
 
 
-def _rpe(cost: Cost | None, findings: Sequence[Finding]) -> list[Finding]:
+def rpe_findings(cost: Cost | None, findings: Sequence[Finding]) -> list[Finding]:
     """A declared RPE out of the range of the dose run, with the signs that let the
-    coach speak of it."""
+    coach speak of it; `findings` are the run's others, which may be a sign."""
     if cost is None or cost.run is None:
         return []
     side = cost.run.side(cost.declared)
@@ -304,7 +311,7 @@ def judge(session: dict | None, splits: Sequence[KmSplit], streams: dict | None,
                 *_descents(session, splits, reference_pace_s),
                 *_reps(session, reps),
                 *_above_prescription(cost)]
-    findings += _rpe(cost, findings)
+    findings += rpe_findings(cost, findings)
     if any(finding.owner in (FindingOwner.ATHLETE, FindingOwner.ROUTE) for finding in findings):
         verdict = DebriefVerdict.EXECUTION_GAP
     elif splits or findings:
@@ -312,6 +319,14 @@ def judge(session: dict | None, splits: Sequence[KmSplit], streams: dict | None,
     else:
         verdict = DebriefVerdict.UNDETERMINED
     return Execution(verdict, tuple(findings))
+
+
+def rejudged(kept: Sequence[dict], cost: Cost | None) -> list[dict]:
+    """The findings kept with a verdict, their RPE read again: an RPE declared after the
+    debrief is ruled on the same findings, the others untouched."""
+    others = [Finding.from_json(item) for item in kept
+              if FindingKind(item["kind"]) not in RPE_FINDINGS.values()]
+    return [finding.as_json() for finding in (*others, *rpe_findings(cost, others))]
 
 
 def _render_rpe(finding: Finding) -> str:

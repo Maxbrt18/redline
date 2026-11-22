@@ -281,3 +281,31 @@ def test_each_kilometre_carries_its_loss_as_well_as_its_gain():
         stream(climb=-0.1))
     assert up[0]["dplus"] > 30 and up[0]["dminus"] == 0
     assert down[0]["dminus"] > 30 and down[0]["dplus"] == 0
+
+
+@pytestmark_db
+def test_an_rpe_declared_after_the_debrief_is_ruled_and_its_range_shown(store, monkeypatch):
+    """The debrief went out without the RPE: the notebook answer rules it on the kept
+    verdict, whose execution gap is the second sign, and the detail shows the range only
+    once the RPE is given."""
+    from redline.analysis import expected_rpe
+
+    monkeypatch.setattr(expected_rpe.History, "expectation",
+                        lambda self, row: expected_rpe.Expectation(6.0, 5, 7, 7, 0.3))
+    observation_id = seed_threshold(store)
+    activity_id = store.strava_detail(observation_id)["activity_id"]
+    fast = {"kind": "reps_faster", "owner": "athlete", "value": 255.0, "reference": 275.0,
+            "kms": [4]}
+    store.store_debrief_verdict(activity_id, "execution_gap", [fast])
+    when = dt.datetime(2026, 10, 26, 20, 0, tzinfo=PARIS)
+    board = Board(store, Repo(store), ENGINE_ROOT, when.date(), when, SAM)
+    view = board.session_view(str(observation_id), store.strava_detail(observation_id))
+    assert view["fact"]["rpe_expected"] is None, "no range before the RPE: it would steer it"
+    board.answer(f"{view['ask']['id']}:rpe", 9)
+    kept = store.debrief_verdict(activity_id)
+    assert kept["verdict"] == "execution_gap"
+    assert kept["findings"] == [fast, {"kind": "rpe_above", "owner": "body", "value": 9.0,
+                                       "reference": 7.0, "kms": [], "signs": ["execution"]}]
+    again = Board(store, Repo(store), ENGINE_ROOT, when.date(), when)
+    view = again.session_view(str(observation_id), store.strava_detail(observation_id))
+    assert view["fact"]["rpe_expected"] == {"low": 5, "high": 7, "sessions": 7}

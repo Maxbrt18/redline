@@ -306,6 +306,7 @@ class VaultRepo:
             return PersistenceResult(False, detail=detail, restored=restored,
                                      failure=PersistenceFailure.WRITE_REFUSED,
                                      refused=self._refused_kinds(turn_id))
+        self._rejudge_rpe(receipts)
         # Weeks actually revised are checked even if triage did not identify a
         # program change.
         required_weeks = tuple(dict.fromkeys((*required_weeks, *(
@@ -403,6 +404,26 @@ class VaultRepo:
                 log.warning("Applying turn %s postponed (%s); retrying",
                             turn_id, exc)
         raise AssertionError("apply loop exhausted")  # pragma: no cover
+
+    def _rejudge_rpe(self, receipts: tuple[dict, ...]) -> None:
+        """An RPE the turn declared, ruled on its run's kept verdict (`ledger-complete`)."""
+        from redline.model import commands
+
+        from .activity_pipeline import rejudge_declared_rpe
+
+        if self._store is None:
+            return
+        for receipt in receipts:
+            payload = receipt["payload"]
+            if receipt["kind"] != commands.MEASUREMENT_COMPLETE or payload.get("metric") != "rpe":
+                continue
+            try:
+                observation_id = self._store.observation_id(payload["idempotency_key"])
+            except Exception as exc:
+                log.warning("Observation %s unreadable: %s", payload.get("idempotency_key"), exc)
+                continue
+            if observation_id is not None:
+                rejudge_declared_rpe(self._store, observation_id)
 
     def _refused_kinds(self, turn_id: str) -> tuple[str, ...]:
         if not turn_id or self._store is None:

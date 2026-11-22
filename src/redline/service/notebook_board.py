@@ -702,6 +702,10 @@ class Board:
             number = _scale(metric, value)
             self.ops.complete_measurement(observation_id, metric, number, zone=zone or None,
                                           actor=ACTOR)
+            if metric == "rpe":
+                from .activity_pipeline import rejudge_declared_rpe
+
+                rejudge_declared_rpe(self.ops, observation_id)
         alert = None
         effort = rulebook.current().scales.effort_pain
         if metric == "pain" and effort.above_cap(number):
@@ -821,6 +825,18 @@ class Board:
                                "planned": same[0]["planned"]}
         return out
 
+    def _rpe_expected(self, observation: dict) -> views.RpeRange | None:
+        """The range the dose run expects (`analysis.expected_rpe`), or None without one."""
+        config = expected_rpe.settings()
+        row = next((row for row in self.rows
+                    if row.idempotency_key == observation.get("idempotency_key")
+                    and row.date == observation["occurred_on"]), None)
+        if config is None or row is None:
+            return None
+        found = expected_rpe.history(self.ops, self.rows, config).expectation(row)
+        return None if found is None else {"low": found.low, "high": found.high,
+                                           "sessions": found.sessions}
+
     def session_view(self, observation_id: str, intake: dict | None) -> views.SessionView | None:
         """The detail of a completed session: the fact, the plan, the streams read, the context."""
         observation = self._observation(observation_id)
@@ -865,7 +881,9 @@ class Board:
             "fact": {**fact, "moving_s": _known(observation, "duration_s"),
                      "hr_max": _known(observation, "hr_max_bpm") if hr_valid else None,
                      "cadence": _known(observation, "cadence_spm"),
-                     "reserve": _known(observation, "reps_in_reserve")},
+                     "reserve": _known(observation, "reps_in_reserve"),
+                     "rpe_expected": (self._rpe_expected(observation)
+                                      if fact["rpe"] is not None else None)},
             "plan": None if not session else {
                 "targets": _targets(session), "note": session.get("note")},
             "ask": None if ask is None else {
