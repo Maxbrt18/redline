@@ -65,6 +65,11 @@ def bin_of(grade_pct: float) -> int | None:
     return math.floor(grade_pct / BIN_PCT + 0.5) * BIN_PCT
 
 
+def climbing(grade_pct: float) -> bool:
+    """A grade past the flat bin, on the curve."""
+    return (bin_of(grade_pct) or 0) > 0
+
+
 def curve(runs: Iterable[tuple[dt.date, Sequence[easy_load.Stretch]]],
           day: dt.date) -> Curve | None:
     """The curve on `day` from the runs of the weeks before it; None without a kept bin."""

@@ -2,8 +2,8 @@
 findings a fair coach expects.
 
 Each case is a typed prescription and a synthetic run (legs of steady pace, grade,
-cadence and HR), may carry the repetitions read from its laps ([seconds, metres] each)
-and its cost: the declared RPE, the ranges expected of the
+cadence and HR), may carry the repetitions read from its laps ([seconds, metres] each),
+the athlete's easy HR by grade ([grade %, HR] each) and its cost: the declared RPE, the ranges expected of the
 dose run and of the dose prescribed, the signs read off the run. The bench rules each one
 with the production code (`redline.analysis.execution`) and counts what matters to the
 athlete: an unjustified reproach is a finding the coach would correct (an athlete or
@@ -14,11 +14,12 @@ the athlete contests.
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from redline.analysis import execution, expected_rpe
+from redline.analysis import execution, expected_rpe, grade_hr
 from redline.model.vocabulary import FindingKind, FindingOwner, RpeSide, RpeSign
 from redline.service import session_detail
 
@@ -73,6 +74,15 @@ def _cost(data: dict | None) -> execution.Cost | None:
         tuple(RpeSign(sign) for sign in data.get("signs") or ()))
 
 
+def _curve(points: list[list[float]] | None) -> grade_hr.Curve | None:
+    """[grade %, HR] bins as a curve kept on a settled history."""
+    if not points:
+        return None
+    return grade_hr.Curve(dt.date.min, grade_hr.MIN_RUNS, tuple(
+        grade_hr.Bin(int(grade), float(hr), grade_hr.MIN_STRETCHES, grade_hr.MIN_RUNS)
+        for grade, hr in points))
+
+
 def rule(case: dict) -> execution.Execution:
     streams = synthetic_streams(case["legs"])
     session = {"id": case["id"], "kind": "run", **case["session"]}
@@ -81,7 +91,8 @@ def rule(case: dict) -> execution.Execution:
                            reference_pace_s=case.get("reference_pace_s", REFERENCE_PACE_S),
                            cost=_cost(case.get("cost")),
                            reps=[{"time_s": seconds, "dist_m": metres}
-                                 for seconds, metres in case.get("reps") or ()])
+                                 for seconds, metres in case.get("reps") or ()],
+                           curve=_curve(case.get("grade_hr")))
 
 
 def outcome(case: dict) -> Outcome:

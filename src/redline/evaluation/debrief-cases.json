@@ -135,5 +135,21 @@
     "reps": [[420, 1525], [420, 1530], [420, 1528], [420, 1532], [420, 1660]],
     "cost": {"declared": 10, "run": [8.4, 7, 9]},
     "expected": {"verdict": "execution_gap", "findings": ["reps_faster", "rpe_above"], "spoken": ["rpe_above"]}
+  },
+  {
+    "id": "climb-hr-at-the-athletes-own",
+    "about": "An easy run whose climb passes the flat cap at the athlete's usual easy HR for that grade: nothing to say.",
+    "session": {"workout": "easy", "hr_cap_bpm": 150},
+    "legs": [[2000, 374, 0, 85, 145], [800, 480, 6, 85, 156], [1000, 374, 0, 85, 146]],
+    "grade_hr": [[0, 142], [6, 153]],
+    "expected": {"verdict": "conforming", "findings": []}
+  },
+  {
+    "id": "climb-pushed-above-the-athletes-own",
+    "about": "The same run with the climb pushed: HR well above the athlete's usual easy HR at that grade, at a grade-adjusted pace faster than easy: the correction.",
+    "session": {"workout": "easy", "hr_cap_bpm": 150},
+    "legs": [[2000, 374, 0, 85, 145], [800, 420, 6, 85, 168], [1000, 374, 0, 85, 146]],
+    "grade_hr": [[0, 142], [6, 153]],
+    "expected": {"verdict": "execution_gap", "findings": ["climb_too_fast"]}
   }
 ]

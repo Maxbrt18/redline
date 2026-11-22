@@ -10,6 +10,9 @@ What the intents ask (`redline.model.prescription`):
 - the HR cap never applies on a climb; on the flat, an HR above the cap reads with the
   pace: faster than the reference easy pace is a choice, the same pace or slower is a
   state or sensor sign;
+- the climbs of an easy run, where they are run, read their HR against the athlete's own
+  easy HR at their grade (`redline.analysis.grade_hr`), with the grade-adjusted pace in
+  the same way; a grade the athlete's history does not cover is not judged;
 - a run's relief is a route choice, made before leaving, never mixed with the HR;
 - `run_slow` names a walked climb; `power_hike` names a steep grade run and gives the
   share walked; `held` descents faster than the flat easy pace are an execution gap;
@@ -29,12 +32,12 @@ cadence stream; without it, no walking is claimed.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 import numpy as np
 
-from redline.analysis import climbs
+from redline.analysis import climbs, easy_load, grade_hr
 from redline.analysis.expected_rpe import Expectation
 from redline.coach.fr import debrief as text
 from redline.model import prescription, rulebook, terrain
@@ -64,6 +67,8 @@ OWNERS = {
     FindingKind.DPLUS_OVER: FindingOwner.ROUTE,
     FindingKind.DMINUS_OVER: FindingOwner.ROUTE,
     FindingKind.FLAT_HR_HIGH: FindingOwner.BODY,
+    FindingKind.CLIMB_TOO_FAST: FindingOwner.ATHLETE,
+    FindingKind.CLIMB_HR_HIGH: FindingOwner.BODY,
     FindingKind.CLIMB_WALKED: FindingOwner.NOTE,
     FindingKind.STEEP_WALKED_SHARE: FindingOwner.NOTE,
     FindingKind.REPS_FASTER: FindingOwner.ATHLETE,
@@ -71,13 +76,17 @@ OWNERS = {
     FindingKind.RPE_ABOVE: FindingOwner.BODY,
     FindingKind.RPE_BELOW: FindingOwner.NOTE,
 }
+#: The climb intents whose climbs are run easy: their HR is the athlete's easy HR at the
+#: grade.
+EASY_CLIMBS = (ClimbIntent.EASY, ClimbIntent.RUN_SLOW, ClimbIntent.POWER_HIKE)
 RPE_FINDINGS = {RpeSide.ABOVE: FindingKind.RPE_ABOVE, RpeSide.BELOW: FindingKind.RPE_BELOW}
 
 
 @dataclass(frozen=True)
 class Finding:
     """`value` is what was done and `reference` what it is held against: s/km for the
-    paces, metres for the relief, the walked share against the grade threshold, the
+    paces, the climbs' HR against the athlete's easy HR at their grade, metres for the
+    relief, the walked share against the grade threshold, the
     walked climbs against the climbs found, the RPE expected of the dose run against the
     top of the prescribed range, a declared RPE against the bound of its range. `kms`
     names the kilometres concerned; `signs`, on an RPE out of range, the independent
@@ -201,6 +210,48 @@ def _flat(session: dict, splits: Sequence[KmSplit], reference_pace_s: float | No
     return [Finding(kind, round(pace), round(reference_pace_s), kms)]
 
 
+def _climb_hr(session: dict, streams: dict | None, curve: grade_hr.Curve | None,
+              reference_pace_s: float | None, hr_trusted: bool) -> list[Finding]:
+    """The climbs of an easy run whose HR exceeds the athlete's easy HR at their grade,
+    read with their grade-adjusted pace. Only the stretches that climb, run, with an HR
+    and on a grade the curve covers, are read: the climb found by the relief starts and
+    ends on the flat."""
+    margin = rulebook.current().parameters.climb_hr_margin_bpm
+    if (curve is None or margin is None or reference_pace_s is None or not hr_trusted
+            or not streams or session.get("hr_cap_bpm") is None
+            or prescription.has_efforts(session)
+            or prescription.climb_intent(session) not in EASY_CLIMBS):
+        return []
+    shape = easy_load.profile(streams)
+    if shape is None:
+        return []
+    high: list[tuple[int, list[tuple[easy_load.Stretch, float]]]] = []
+    for climb in _climbs(streams):
+        read = [(stretch, expected) for stretch in shape.stretches
+                if climb.start_m <= (stretch.start_m + stretch.end_m) / 2 <= climb.end_m
+                and grade_hr.climbing(stretch.grade_pct)
+                and stretch.hr is not None and not stretch.walked
+                and (expected := curve.hr_at(stretch.grade_pct)) is not None]
+        if read and _mean(read, lambda stretch, expected: (stretch.hr or 0) - expected) > margin:
+            high.append((int(climb.start_m // 1000) + 1, read))
+    if not high:
+        return []
+    read = [pair for _, pairs in high for pair in pairs]
+    pace = 1000 / _mean(read, lambda stretch, _: stretch.flat_mps)
+    faster = pace < reference_pace_s * (1 - PACE_NOISE_PCT / 100)
+    return [Finding(FindingKind.CLIMB_TOO_FAST if faster else FindingKind.CLIMB_HR_HIGH,
+                    round(_mean(read, lambda stretch, _: stretch.hr or 0)),
+                    round(_mean(read, lambda _, expected: expected)),
+                    tuple(dict.fromkeys(km for km, _ in high)))]
+
+
+def _mean(read: Sequence[tuple[easy_load.Stretch, float]],
+          value: Callable[[easy_load.Stretch, float], float]) -> float:
+    """A value over stretches, weighted by their moving time."""
+    moving = sum(stretch.moving_s for stretch, _ in read)
+    return sum(value(stretch, expected) * stretch.moving_s for stretch, expected in read) / moving
+
+
 def _relief(session: dict, dplus: float | None, dminus: float | None) -> list[Finding]:
     out = []
     for kind, done, cap in ((FindingKind.DPLUS_OVER, dplus, session.get("dplus_cap_m")),
@@ -286,6 +337,8 @@ def rpe_findings(cost: Cost | None, findings: Sequence[Finding]) -> list[Finding
         signs.insert(0, RpeSign.EXECUTION)
     if any(finding.kind is FindingKind.FLAT_HR_HIGH for finding in findings):
         signs.append(RpeSign.FLAT_HR_HIGH)
+    if any(finding.kind is FindingKind.CLIMB_HR_HIGH for finding in findings):
+        signs.append(RpeSign.CLIMB_HR_HIGH)
     if cost.previous is side:
         signs.append(RpeSign.PATTERN)
     bound = cost.run.high if side is RpeSide.ABOVE else cost.run.low
@@ -296,13 +349,15 @@ def rpe_findings(cost: Cost | None, findings: Sequence[Finding]) -> list[Finding
 def judge(session: dict | None, splits: Sequence[KmSplit], streams: dict | None, *,
           dplus: float | None, dminus: float | None, reference_pace_s: float | None,
           hr_trusted: bool = True, cost: Cost | None = None,
-          reps: Sequence[dict] = ()) -> Execution:
+          reps: Sequence[dict] = (), curve: grade_hr.Curve | None = None) -> Execution:
     """The findings of a run against its prescription and the verdict they make; `reps`
-    are the repetitions read from its laps."""
+    are the repetitions read from its laps, `curve` the athlete's easy HR by grade on
+    the day."""
     if session is None:
         return Execution(DebriefVerdict.UNDETERMINED, ())
     findings = [*_relief(session, dplus, dminus),
                 *_flat(session, splits, reference_pace_s, hr_trusted),
+                *_climb_hr(session, streams, curve, reference_pace_s, hr_trusted),
                 *_climb_intent(session, streams),
                 *_descents(session, splits, reference_pace_s),
                 *_reps(session, reps),

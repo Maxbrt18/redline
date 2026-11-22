@@ -1,9 +1,11 @@
 """A run's execution against its typed prescription: findings, owners, verdict."""
 
+import datetime as dt
+
 import pytest
 from test_weekly_plan import session
 
-from redline.analysis import execution, expected_rpe
+from redline.analysis import execution, expected_rpe, grade_hr
 from redline.evaluation.debrief_bench import synthetic_streams
 from redline.model.vocabulary import DebriefVerdict, FindingKind, FindingOwner, RpeSide, RpeSign
 from redline.service import session_detail
@@ -13,11 +15,11 @@ REFERENCE = 374.0
 
 
 def _judge(prescribed, legs, *, dplus=None, dminus=None, reference=REFERENCE, cost=None,
-           reps=()):
+           reps=(), curve=None):
     streams = synthetic_streams([list(leg) for leg in legs])
     splits = session_detail.km_splits(streams) or []
     return execution.judge(prescribed, splits, streams, dplus=dplus, dminus=dminus,
-                           reference_pace_s=reference, cost=cost, reps=reps)
+                           reference_pace_s=reference, cost=cost, reps=reps, curve=curve)
 
 
 def _kinds(ruled):
@@ -181,3 +183,44 @@ def test_an_rpe_ruled_again_keeps_the_other_findings_and_reads_them_as_signs():
     assert again[1]["kind"] == "rpe_above" and again[1]["signs"] == ["execution"]
     assert execution.rejudged(kept, _cost(4)) == kept[:1], "within its range: nothing kept"
     assert execution.rejudged(kept, None) == kept[:1]
+
+
+# ------------------------------------------------------------------ climbs against the athlete
+
+#: The fictional athlete's easy HR: 142 on the flat, 153 at 6 %.
+CURVE = grade_hr.Curve(dt.date(2030, 3, 18), 3, (
+    grade_hr.Bin(0, 142.0, 6, 3), grade_hr.Bin(6, 153.0, 6, 3)))
+LEAD, TAIL = (2000, 374, 0, 85, 145), (1000, 374, 0, 85, 146)
+
+
+def _climb(pace, hr, *, grade=6, cadence=85, **prescribed):
+    return _judge(session(hr_cap_bpm=150, **prescribed),
+                  [LEAD, (800, pace, grade, cadence, hr), TAIL], curve=CURVE)
+
+
+def test_a_climb_reads_its_hr_against_the_athletes_own_at_its_grade():
+    """Above the flat cap at the athlete's usual HR for the grade: nothing to say."""
+    assert _climb(480, 156).findings == ()
+    body = _climb(480, 165)
+    assert _kinds(body) == [FindingKind.CLIMB_HR_HIGH] and body.findings[0].kms == (3,)
+    assert body.findings[0].value == 165 and body.findings[0].reference == 153
+    assert body.verdict is DebriefVerdict.CONFORMING
+    assert "jamais un reproche" in execution.render(body)[1]
+    pushed = _climb(420, 168)
+    assert _kinds(pushed) == [FindingKind.CLIMB_TOO_FAST]
+    assert pushed.verdict is DebriefVerdict.EXECUTION_GAP
+
+
+def test_a_climb_the_curve_cannot_read_is_not_judged():
+    assert _climb(520, 175, grade=10).findings == (), "no bin at 10 %: nothing interpolated"
+    assert _climb(900, 165, cadence=55).findings == (), "a walked climb has no running HR"
+    assert _climb(420, 175, climb_intent="race_effort").findings == ()
+    no_curve = _judge(session(hr_cap_bpm=150), [LEAD, (800, 420, 6, 85, 175), TAIL])
+    assert no_curve.findings == ()
+
+
+def test_a_climb_hr_high_is_a_second_sign():
+    ruled = _judge(session(hr_cap_bpm=150), [LEAD, (800, 480, 6, 85, 165), TAIL],
+                   curve=CURVE, cost=_cost(6, run=(4.3, 3, 5)))
+    rpe = ruled.findings[-1]
+    assert rpe.kind is FindingKind.RPE_ABOVE and RpeSign.CLIMB_HR_HIGH in rpe.signs
