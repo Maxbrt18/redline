@@ -27,7 +27,7 @@ def test_question_review_cli_preserves_partial_and_deferred_states():
     args = parse("question", "--question-id", "q1", "--answer-id", "m1",
                  "--status", "deferred", "--note", "Reprise lundi.",
                  "--follow-up-on", "2026-09-07")
-    _, kind, payload = fact_write._payload(args)
+    _, kind, payload = fact_write.payload_of(args)
     assert kind == "question.review"
     assert payload["status"] == "deferred"
     assert payload["follow_up_on"] == dt.date(2026, 9, 7)
@@ -35,7 +35,7 @@ def test_question_review_cli_preserves_partial_and_deferred_states():
 
 def test_ask_cli_names_only_the_measurement_actually_requested():
     args = parse("ask", "--text", "Quel était ton RPE ?", "--cell", "2026-09-05:easy:rpe")
-    _, kind, payload = fact_write._payload(args)
+    _, kind, payload = fact_write.payload_of(args)
     assert kind == "question.ask"
     assert payload == {"text": "Quel était ton RPE ?", "cells": ["2026-09-05:easy:rpe"]}
 
@@ -55,7 +55,7 @@ def deadline_row(**overrides) -> dict:
 def test_patch_touches_only_the_cited_field():
     existing = deadline_row()
     args = parse("deadline", "--key", "d-1", "--patch", "--due-on", "2026-08-23")
-    _, _, payload = fact_write._payload(args, existing)
+    _, _, payload = fact_write.payload_of(args, existing)
     assert payload["due_on"] == dt.date(2026, 8, 23)
     assert payload["item"] == existing["item"]
     assert payload["fact_owner"] == existing["fact_owner"]
@@ -66,7 +66,7 @@ def test_patch_touches_only_the_cited_field():
 def test_the_payload_stays_complete_so_the_queue_keeps_its_contract():
     """A payload with holes would break `apply_turn_with_receipts` silently."""
     args = parse("deadline", "--key", "d-1", "--patch", "--due-on", "2026-08-23")
-    _, kind, payload = fact_write._payload(args, deadline_row())
+    _, kind, payload = fact_write.payload_of(args, deadline_row())
     assert kind == "deadline.upsert"
     assert set(payload) == {"deadline_key", "due_on", "item", "fact_owner",
                             "blocks", "status", "completed_on", "kind", "starts_on",
@@ -78,7 +78,7 @@ def test_patch_on_a_thread_keeps_its_body():
                 "kind": "promise", "body": "corps très long", "status": "open",
                 "follow_up_on": dt.date(2026, 8, 12)}
     args = parse("thread", "--key", "t-1", "--patch", "--status", "closed")
-    _, _, payload = fact_write._payload(args, existing)
+    _, _, payload = fact_write.payload_of(args, existing)
     assert payload["status"] == "closed"
     assert payload["body"] == "corps très long"
     assert payload["kind"] == "promise"
@@ -89,7 +89,7 @@ def test_without_patch_a_missing_required_field_is_refused_and_named():
     """The obligation lives outside argparse: if it is not tested, it disappears."""
     args = parse("deadline", "--key", "d-1", "--due-on", "2026-08-23")
     with pytest.raises(InputError) as refusal:
-        fact_write._payload(args, None)
+        fact_write.payload_of(args, None)
     message = str(refusal.value)
     assert "--item" in message and "--fact-owner" in message and "--status" in message
     assert "--due-on" not in message
@@ -99,7 +99,7 @@ def test_without_patch_the_full_form_writes_the_whole_row():
     args = parse("deadline", "--key", "d-1", "--due-on", "2026-08-23",
                  "--item", "neuf", "--fact-owner", "`coaching/strength.md`",
                  "--status", "todo")
-    _, _, payload = fact_write._payload(args, None)
+    _, _, payload = fact_write.payload_of(args, None)
     assert payload["item"] == "neuf"
     assert payload["blocks"] is None and payload["completed_on"] is None
 
@@ -110,13 +110,13 @@ def test_patch_on_a_missing_key_refuses_instead_of_creating_holes():
             return [deadline_row(deadline_key="autre")]
 
     with pytest.raises(InputError, match="key that does not exist"):
-        fact_write._existing(Store(), "deadline", "d-1")
+        fact_write.existing_row(Store(), "deadline", "d-1")
 
 
 def test_a_cited_empty_value_really_overwrites():
     """`--blocks ''` is a value, not an absence -- otherwise nothing could be emptied."""
     args = parse("deadline", "--key", "d-1", "--patch", "--blocks", "")
-    _, _, payload = fact_write._payload(args, deadline_row())
+    _, _, payload = fact_write.payload_of(args, deadline_row())
     assert payload["blocks"] == ""
 
 
@@ -128,7 +128,7 @@ def test_exposure_carries_intent_separately_from_the_observed_cadence():
         "--status", "confirmed", "--duration-min", "44",
         "--target-value", "172", "--target-unit", "spm", "--tolerance", "easy")
 
-    entity, kind, payload = fact_write._payload(args)
+    entity, kind, payload = fact_write.payload_of(args)
 
     assert entity == "exposure:cadence:2026-09-02:ef"
     assert kind == "exposure.upsert"
@@ -140,10 +140,10 @@ def test_the_notebook_label_survives_a_patch_and_an_empty_string_removes_it():
     """A deadline keeps its label when its date is shifted."""
     existing = deadline_row(athlete_label="Acheter la frontale")
     args = parse("deadline", "--key", "d-1", "--patch", "--due-on", "2026-08-23")
-    _, _, payload = fact_write._payload(args, existing)
+    _, _, payload = fact_write.payload_of(args, existing)
     assert payload["athlete_label"] == "Acheter la frontale"
     args = parse("deadline", "--key", "d-1", "--patch", "--athlete-label", " ")
-    _, _, payload = fact_write._payload(args, existing)
+    _, _, payload = fact_write.payload_of(args, existing)
     assert payload["athlete_label"] is None
 
 
@@ -155,16 +155,16 @@ def test_a_correction_enters_the_database_only_once_written_to_the_journal(tmp_p
     (tmp_path / "coaching" / "corrections.md").write_text(f"## {entry}\n\nTexte.\n")
     monkeypatch.setenv("VAULT_PATH", str(tmp_path))
     args = parse("correction", "--correction-key", "k", "--summary", "s", "--entry", entry)
-    _, kind, payload = fact_write._payload(args)
+    _, kind, payload = fact_write.payload_of(args)
     assert kind == "correction.register"
     assert payload == {"correction_key": "k", "summary": "s"}
     with pytest.raises(InputError, match="is not an entry"):
-        fact_write._payload(parse("correction", "--correction-key", "k", "--summary", "s",
+        fact_write.payload_of(parse("correction", "--correction-key", "k", "--summary", "s",
                                   "--entry", "2026-09-17 — inventée"))
 
 
 def test_a_settled_prediction_is_corrected_with_its_reason():
-    _, _, payload = fact_write._payload(parse("prediction", "--key", "w40", "--rectify",
+    _, _, payload = fact_write.payload_of(parse("prediction", "--key", "w40", "--rectify",
                                               "condition non tenue"))
     assert payload == {"prediction_key": "w40", "operation": "rectify",
                        "reason": "condition non tenue"}
@@ -173,13 +173,13 @@ def test_a_settled_prediction_is_corrected_with_its_reason():
 def test_a_body_prediction_attaches_to_the_wake_reading_that_settles_it():
     base = ("prediction", "--key", "w42-sl", "--domain", "corps", "--statement", "trace",
             "--probability", "0.75", "--due-on", "2026-10-19")
-    _, _, payload = fact_write._payload(parse(*base, "--resolves", "wake-trace", "--resolves-on",
+    _, _, payload = fact_write.payload_of(parse(*base, "--resolves", "wake-trace", "--resolves-on",
                                               "2026-10-19", "--success-if", "<=1"))
     assert payload["resolves_on"] == {"kind": "wake-trace", "date": "2026-10-19",
                                       "success_if": "<=1"}
-    assert "resolves_on" not in fact_write._payload(parse(*base))[2]
+    assert "resolves_on" not in fact_write.payload_of(parse(*base))[2]
     with pytest.raises(InputError, match="go together"):
-        fact_write._payload(parse(*base, "--resolves", "wake-trace"))
+        fact_write.payload_of(parse(*base, "--resolves", "wake-trace"))
 
 
 def test_a_prediction_reason_must_fit_its_outcome():
@@ -199,14 +199,14 @@ def test_a_patched_context_merges_key_by_key_and_null_removes_a_key():
                                                    "taper_weeks": 3})
     args = parse("deadline", "--key", "d-1", "--patch", "--context",
                  '{"stop_minutes": 2.5, "target": null, "taper_weeks": 2}')
-    _, _, payload = fact_write._payload(args, existing)
+    _, _, payload = fact_write.payload_of(args, existing)
     assert payload["context"] == {"start_time": "23:00", "taper_weeks": 2, "stop_minutes": 2.5}
 
 
 def test_a_patch_without_context_keeps_it_whole():
     existing = deadline_row(kind="race", context={"start_time": "23:00"})
     args = parse("deadline", "--key", "d-1", "--patch", "--due-on", "2026-08-23")
-    _, _, payload = fact_write._payload(args, existing)
+    _, _, payload = fact_write.payload_of(args, existing)
     assert payload["context"] == {"start_time": "23:00"}
 
 
@@ -214,10 +214,10 @@ def test_a_merged_race_context_is_still_checked():
     existing = deadline_row(kind="race", context={"taper_cut_max_pct": 50})
     args = parse("deadline", "--key", "d-1", "--patch", "--context", '{"taper_cut_min_pct": 70}')
     with pytest.raises(InputError, match="is above taper_cut_max_pct"):
-        fact_write._payload(args, existing)
+        fact_write.payload_of(args, existing)
 
 
 def test_a_context_that_is_not_an_object_is_refused():
     args = parse("deadline", "--key", "d-1", "--patch", "--context", "[1, 2]")
     with pytest.raises(InputError, match="a JSON object"):
-        fact_write._payload(args, deadline_row())
+        fact_write.payload_of(args, deadline_row())

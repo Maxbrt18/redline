@@ -108,7 +108,7 @@ def merge(fields: tuple, args: argparse.Namespace, existing: dict | None) -> dic
     return payload
 
 
-def _existing(store: Any, command: str, key: str) -> dict:
+def existing_row(store: Any, command: str, key: str) -> dict:
     """The row targeted by `--patch`, or a refusal. No partial row is created."""
     rows = (store.thread_rows() if command == "thread" else store.deadline_rows())
     field = "thread_key" if command == "thread" else "deadline_key"
@@ -275,7 +275,7 @@ COMMANDS: dict[str, Command] = {
 }
 
 
-def _payload(args, existing: dict | None = None) -> tuple[str, str, dict]:
+def payload_of(args, existing: dict | None = None) -> tuple[str, str, dict]:
     kind, build, entity = COMMANDS[args.command]
     payload = build(args, existing)
     identity = entity(args, payload) if entity else args.key
@@ -444,13 +444,13 @@ def main() -> int:
     store = open_store(ACTOR)
     # The merge precedes the hash: the queued payload stays complete, so `command_key`
     # and `apply_turn_with_receipts` keep the contract they had before `--patch`.
-    existing = _existing(store, args.command, args.key) if getattr(
+    existing = existing_row(store, args.command, args.key) if getattr(
         args, "patch", False) else None
     if args.command in TURN_ONLY and not turn_id:
         raise InputError(
             "This command qualifies the message of the current turn: outside a turn "
             f"({agent_input.TURN_VARIABLE} missing) there is no message to qualify.")
-    entity_key, kind, payload = _payload(args, existing)
+    entity_key, kind, payload = payload_of(args, existing)
     command_key = f"{entity_key}:{commands.digest(payload)}"
     if turn_id and args.command in {"ask", "question"}:
         command_key = f"{turn_id}:{command_key}"

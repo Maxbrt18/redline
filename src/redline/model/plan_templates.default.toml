@@ -1,0 +1,173 @@
+# The engine's plan templates: the phases a preparation runs through, backwards from the
+# race, by race distance and terrain. An instance's `plan_templates.toml` at its vault
+# root replaces this file as a whole.
+#
+# A template is a method, not an athlete's plan: the peak volume, the peak long run, the
+# number of quality sessions a week and the families allowed are the instance's, in the
+# race's context. No model is clearly better for an amateur; a linear progression with
+# deloads is the default (coaching report § 3.4).
+#
+# `weeks` is a [minimum, maximum] range: the specific block's length is a lever of the
+# candidates, base absorbs what remains. `taper_weeks` counts the race week. Deloads come
+# every `deload_every` weeks, counted backwards from the specific block, and cut the
+# week's volume and long run by `deload_cut_pct`. `qualities` is the most a week of the
+# phase carries, `families` the quality workouts it may hold.
+
+[[templates]]
+slug = "short-road"
+terrain = "road"
+distance_km_max = 15
+taper_weeks = 2
+deload_every = [3, 4]
+deload_cut_pct = 25
+
+[templates.recovery]
+weeks = [1, 2]
+qualities = 0
+families = []
+
+[templates.base]
+weeks = [3, 5]
+qualities = 1
+families = ["strides", "threshold"]
+
+[templates.development]
+weeks = [4, 6]
+qualities = 2
+families = ["threshold", "hills", "strides"]
+
+[templates.specific]
+weeks = [3, 5]
+qualities = 2
+families = ["threshold", "strides"]
+
+[templates.taper]
+qualities = 1
+families = ["threshold", "strides"]
+
+[[templates]]
+slug = "half-road"
+terrain = "road"
+distance_km_max = 25
+taper_weeks = 2
+deload_every = [3, 4]
+deload_cut_pct = 25
+
+[templates.recovery]
+weeks = [1, 2]
+qualities = 0
+families = []
+
+[templates.base]
+weeks = [4, 5]
+qualities = 1
+families = ["threshold", "strides"]
+
+[templates.development]
+weeks = [5, 6]
+qualities = 2
+families = ["threshold", "hills"]
+
+[templates.specific]
+weeks = [5, 6]
+qualities = 2
+families = ["threshold"]
+
+[templates.taper]
+qualities = 1
+families = ["threshold"]
+
+[[templates]]
+slug = "marathon-road"
+terrain = "road"
+distance_km_max = 45
+taper_weeks = 3
+deload_every = [3, 4]
+deload_cut_pct = 25
+
+[templates.recovery]
+weeks = [1, 2]
+qualities = 0
+families = []
+
+[templates.base]
+weeks = [4, 6]
+qualities = 1
+families = ["threshold", "strides"]
+
+[templates.development]
+weeks = [5, 6]
+qualities = 2
+families = ["threshold", "hills"]
+
+[templates.specific]
+weeks = [6, 8]
+qualities = 2
+families = ["threshold"]
+
+[templates.taper]
+qualities = 1
+families = ["threshold"]
+
+[[templates]]
+slug = "trail"
+terrain = "trail"
+distance_km_max = 45
+taper_weeks = 2
+deload_every = [3, 4]
+deload_cut_pct = 25
+
+[templates.recovery]
+weeks = [1, 2]
+qualities = 0
+families = []
+
+[templates.base]
+weeks = [4, 6]
+qualities = 1
+families = ["hills", "threshold"]
+
+[templates.development]
+weeks = [5, 6]
+qualities = 2
+families = ["hills", "threshold"]
+
+[templates.specific]
+weeks = [5, 6]
+qualities = 2
+families = ["hills"]
+
+[templates.taper]
+qualities = 1
+families = ["hills"]
+
+[[templates]]
+slug = "ultra"
+distance_km_max = 400
+taper_weeks = 3
+deload_every = [3, 4]
+deload_cut_pct = 30
+
+[templates.recovery]
+weeks = [1, 2]
+qualities = 0
+families = []
+
+[templates.base]
+weeks = [5, 8]
+qualities = 1
+families = ["hills"]
+
+[templates.development]
+weeks = [6, 8]
+qualities = 1
+families = ["hills", "threshold"]
+
+[templates.specific]
+weeks = [6, 8]
+qualities = 1
+families = ["hills"]
+
+[templates.taper]
+qualities = 1
+families = ["hills"]

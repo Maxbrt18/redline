@@ -20,6 +20,7 @@ from redline.analysis import (
     feasibility,
     ledger,
     permit_report,
+    plan_engine,
     progression_strength,
     signals,
     week_review,
@@ -36,6 +37,18 @@ if TYPE_CHECKING:
 
 #: Beyond this, the dossier summarises instead of listing: it is injected into a prompt.
 MAX_LISTED = 12
+
+
+def _skeleton(store: OperationalStore, week: str, today: dt.date) -> list[str]:
+    """The bounds the chosen skeleton gives the week the review prepares."""
+    upcoming = iso_week.shift(week, 1)
+    try:
+        skeleton = plan_engine.chosen(store, iso_week.monday(upcoming))
+    except RedlineError:
+        return []
+    bound = skeleton.week(upcoming) if skeleton is not None else None
+    return [] if skeleton is None or bound is None else ["", plan_engine.bounds_line(skeleton,
+                                                                                   bound)]
 
 
 def _progression(store: OperationalStore, root: Path, week: str, today: dt.date) -> list[str]:
@@ -84,6 +97,7 @@ def render(store: OperationalStore, root: Path, week: str, today: dt.date) -> st
         lines.extend(permit_lines)
 
     lines += ["", *feasibility.report(store, rows, today)]
+    lines += _skeleton(store, week, today)
     lines += ["", *_progression(store, root, week, today)]
 
     capabilities = store.latest_capabilities()

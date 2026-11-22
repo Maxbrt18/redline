@@ -78,6 +78,21 @@ def progression_errors(store, week: str, revision: dict, previous: dict | None,
         return []
 
 
+def skeleton_errors(store, week: str, revision: dict, previous: dict | None,
+                    warn: Callable[[str], None]) -> list[str]:
+    """The week against the next race's chosen skeleton, when it has one. A measurement
+    that fails costs the check, never the prescription."""
+    from redline.analysis import plan_engine
+    today = dt.date.fromisoformat(revision["computed_at"][:10])
+    try:
+        skeleton = plan_engine.chosen(store, today)
+    except Exception as exc:
+        warn(wording.SKELETON_UNREADABLE.format(name=exc.__class__.__name__))
+        return []
+    return [] if skeleton is None else plan_engine.revision_errors(skeleton, week, revision,
+                                                                   previous)
+
+
 def checked(store, week: str, revision: dict, existing: dict | None, *, stamp: str,
             warn: Callable[[str], None]) -> tuple[dict | None, dict]:
     """The previous revision and the new one, stamped and measured, or SchemaError."""
@@ -116,6 +131,7 @@ def checked(store, week: str, revision: dict, existing: dict | None, *, stamp: s
         *taper_errors(store, week, current, warn),
         *pain_errors(store, week, current, existing, warn),
         *progression_errors(store, week, current, previous, warn),
+        *skeleton_errors(store, week, current, previous, warn),
     ]
     if mistakes:
         raise SchemaError(mistakes)

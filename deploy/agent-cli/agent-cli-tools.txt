@@ -12,6 +12,7 @@ knowledge-search
 ledger
 ledger-add
 ledger-complete
+plan-skeleton
 progression
 race-plan
 session-cycle
