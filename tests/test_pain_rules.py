@@ -315,3 +315,18 @@ def test_in_a_week_in_progress_the_gate_and_the_report_read_the_same_window():
     report = week_review.wake_lines(rows, ZONE, iso_week.as_of("2026-W41", day(3)))
     assert "  ✓ réveils 14 j : 0.5 → 0.21 (en baisse)" in lines
     assert report[0] == "  réveils 14 j : 11 lecture(s), 0.5 → 0.21 (en baisse)"
+
+
+def test_declaring_a_past_session_differently_is_not_held_to_the_volume_cut():
+    """A pyramid run three days ago, declared now as prescribed efforts: nothing ahead
+    changes, so the week's load does not either."""
+    past = run("w41-mon-easy", "2026-10-05", "easy", hr_zone="Z2", hr_cap_bpm=157)
+    previous = written(past, SUNDAY_EASY, volume=40)
+    declared = {key: value for key, value in past.items() if key not in {"hr_zone", "hr_cap_bpm"}}
+    current = written({**declared, "structure": "efforts"}, SUNDAY_EASY, volume=40)
+    assert weekly_plan.reschedules_only(previous, current, settled_before=WRITTEN[:10])
+    assert not weekly_plan.reschedules_only(previous, current)
+    assert weekly_plan.pain_rule_errors(current, [], [CEILING], previous=previous) == []
+    ahead = written({**declared, "structure": "efforts"},
+                    {**SUNDAY_EASY, "distance_target_km": 12.0}, volume=40)
+    assert weekly_plan.pain_rule_errors(ahead, [], [CEILING], previous=previous)
