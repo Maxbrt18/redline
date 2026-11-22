@@ -8,7 +8,8 @@ injury before the athlete admits it.
 **What this script does NOT do, and why.** Four of the checks in section D live in Strava,
 not in the ledger: downhill pace on reference segments, shortened routes, unusual pauses at
 the end of a run, note length. They stay with the coach at the weekly review, via
-`redline strava`: this script only reads the ledger.
+`redline strava`: this script reads the ledger, and the command adds the athlete's easy
+HR by grade from the kept streams (`redline.analysis.grade_hr`).
 
 **The thresholds are coarse, on purpose.** They need not be right: they must force a look.
 A signal that comes out here is never a verdict, it is a line to go and check, the same
@@ -25,6 +26,7 @@ import statistics
 from dataclasses import dataclass
 
 from redline.analysis import ledger as gauge
+from redline.analysis.grade_hr import Curve
 from redline.coach.fr import signals as text
 from redline.model import (
     iso_week,
@@ -198,7 +200,9 @@ def signals(rows: list, weeks: list, intentional_keys: frozenset[str]) -> list:
 
 
 def render(rows: list, weeks: list, intentional_keys: frozenset[str],
-           today: dt.date | None = None) -> str:
+           today: dt.date | None = None, grade_hr: Curve | None = None) -> str:
+    """The rows of the last weeks, the signals found, and the athlete's easy HR by grade
+    when the caller read it from the kept streams."""
     lines = ["", text.TITLE.format(first=weeks[0], last=weeks[-1]), ""]
     lines.append(text.CADENCE_ROW + " · ".join(
         f"{label[-3:]} {value:.0f}" if value else f"{label[-3:]} —"
@@ -214,6 +218,9 @@ def render(rows: list, weeks: list, intentional_keys: frozenset[str],
     lines.append(text.HR_AT_PACE_ROW + (" · ".join(
         f"{drift.date:%d/%m} {drift.delta:+.0f}" for drift in drifts)
         or text.NO_COMPARABLE))
+    lines.append(text.GRADE_HR_ROW + (" · ".join(
+        text.GRADE_HR_BIN.format(grade=item.grade_pct, hr=item.hr) for item in grade_hr.bins)
+        + text.GRADE_HR_FROM.format(runs=grade_hr.runs) if grade_hr else text.NO_GRADE_HR))
     found = signals(rows, weeks, intentional_keys)
     lines += ["", *[str(signal) for signal in found]] if found else [
         "", text.NOTHING]

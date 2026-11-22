@@ -74,6 +74,12 @@ FINDINGS = {
     "flat_hr_high": ("FC haute sur le plat ({kms}) à {pace}/km, pas plus vite que l'allure EF de "
                      "référence ({reference_pace}/km) ; signal d'état ou capteur, jamais un "
                      "reproche"),
+    "climb_too_fast": ("montées trop rapides ({kms}) : FC {value} pour {reference} habituels en "
+                       "EF à ces pentes, à une allure ajustée à la pente plus vive que l'allure "
+                       "EF de référence ; choix d'allure, à corriger"),
+    "climb_hr_high": ("FC haute en montée ({kms}) : {value} pour {reference} habituels en EF à "
+                      "ces pentes, sans aller plus vite que l'allure EF une fois la pente "
+                      "comptée ; signal d'état ou capteur, jamais un reproche"),
     "dplus_over": ("D+ {value} m pour {reference} m au plus ({signed} %) ; choix du parcours, "
                    "à part de la FC"),
     "dminus_over": ("D- {value} m pour {reference} m au plus ({signed} %) ; choix du parcours, "
@@ -98,6 +104,7 @@ RPE_SIDES = {"rpe_above": "au-dessus", "rpe_below": "en dessous"}
 RPE_SIGNS = {
     "execution": "écart d'exécution",
     "flat_hr_high": "FC haute sur le plat à allure habituelle",
+    "climb_hr_high": "FC haute en montée pour la pente, à allure habituelle",
     "hr_at_pace": "FC haute à allure comparable",
     "poor_night": "mauvaise nuit déclarée",
     "pattern": "deuxième séance de suite du même côté",

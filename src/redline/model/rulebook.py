@@ -154,6 +154,11 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
               note="half-width while the kind has fewer declared RPE than settled"),
         field("rpe_intensity_exponent", float, required=False, minimum=0, maximum=4,
               note="exponent of a run's intensity in its dose"),
+        # Optional: absent, the climbs of an easy run are not judged by their HR
+        # (`redline.analysis.grade_hr`).
+        field("climb_hr_margin_bpm", int, required=False, minimum=0, maximum=30,
+              note="climbs of an easy run whose mean HR exceeds the athlete's easy HR at "
+                   "their grade by more than this, in bpm, are named"),
         # Optional: absent, the debrief of an easy or long run carries no gap of that
         # kind. Read on the kilometres of the run (`redline.model.debrief.split_gaps`).
         field("split_hr_margin_bpm", int, required=False, minimum=0, maximum=30,
@@ -274,6 +279,7 @@ class Parameters:
     rpe_range_width: float | None = None
     rpe_range_width_unsettled: float | None = None
     rpe_intensity_exponent: float | None = None
+    climb_hr_margin_bpm: int | None = None
     split_hr_margin_bpm: int | None = None
     split_fast_start_pct: float | None = None
     split_fade_pct: float | None = None

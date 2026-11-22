@@ -205,10 +205,12 @@ def render(found: Sequence[Proposal], declared: Lineages) -> list[str]:
 
 
 def report(store: Any, root: Path, today: dt.date, week: str | None = None) -> list[str]:
-    """`render` of the exercise and run proposals: what the command prints and the review
-    dossier carries."""
+    """`render` of the exercise and run proposals, then the tally of the run lineages:
+    what the command prints and the review dossier carries."""
     from .progression_runs import proposals as run_proposals
+    from .progression_runs import render_reviews, reviews
 
     book = rulebook.load(root)
-    return render([*proposals(store, root, today, week),
-                   *run_proposals(store, book, today, week)], book.progression)
+    return [*render([*proposals(store, root, today, week),
+                     *run_proposals(store, book, today, week)], book.progression),
+            *render_reviews(reviews(store, book))]

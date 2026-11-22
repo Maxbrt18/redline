@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import datetime as dt
 
 import pytest
@@ -9,9 +10,19 @@ from test_progression_strength import PROGRESSION, book_with
 from test_weekly_plan import revision, session
 
 from redline.analysis import expected_rpe, ledger, progression_runs, progression_strength
-from redline.analysis.progression import propose
+from redline.analysis.progression import StepTally, propose
 from redline.model import rulebook
-from redline.model.progression import Bound, Dose, Move, Signal, Veto, VetoKind, default
+from redline.model.progression import (
+    Bound,
+    Dose,
+    Move,
+    RiseOutcome,
+    Signal,
+    Veto,
+    VetoKind,
+    default,
+)
+from redline.model.vocabulary import OverrideReason
 
 MONDAY = dt.date(2030, 3, 4)
 ZONE = "knee"
@@ -237,3 +248,106 @@ def test_never_two_overrides_in_a_row_on_a_lineage(ruled):
 def test_a_dose_carried_unchanged_is_not_checked_again(ruled):
     assert ruled(written(7), before=[written(7)]) == []
     assert ruled(written(7), before=[written(6)]) != []
+
+
+# ------------------------------------------------------------------ the tally
+
+HILLS = """
+[[progression.lineages]]
+slug = "hill-reps"
+family = "intervals"
+workout = "hills"
+reps = { minimum = 6, maximum = 10, step = 1 }
+rep_seconds = { minimum = 60, maximum = 90, step = 15 }
+recovery_seconds = { minimum = 60, maximum = 120, step = 30 }
+"""
+
+
+def hills(on: dt.date, reps: int) -> dict:
+    return session(f"hil-{on.isoformat()}", on.isoformat(), "hills", reps=reps,
+                   rep_seconds=60, recovery_seconds=120)
+
+
+class Tallied(Store):
+    def __init__(self, plans, verdicts, predictions=()):
+        super().__init__(plans, verdicts)
+        self.predictions = list(predictions)
+
+    def prediction_rows(self):
+        return self.predictions
+
+
+def answered(on: dt.date, activity: int, kind: str = "threshold") -> list[ledger.Row]:
+    """A quality session, its next morning and the easy runs after it, all clean."""
+    quality = run(on, activity)
+    if kind != "threshold":
+        quality = ledger.Row(on, kind, idempotency_key=f"strava:{activity}", km=10,
+                             hours=1.0, rpe=7.0, reserve=1.0, pains={ZONE: 0.5})
+    return [quality, morning(on + dt.timedelta(days=1)), easy(on + dt.timedelta(days=1)),
+            easy(on + dt.timedelta(days=2)), easy(on + dt.timedelta(days=4))]
+
+
+@pytest.fixture
+def reviewed(monkeypatch):
+    """The reviews of the declared lineages over `rows`, every RPE within its range."""
+    def within(store, rows, config):
+        history = expected_rpe.History(rows, lambda row: None, lambda day: None, config)
+        history.expectation = lambda row: expected_rpe.Expectation(7.0, 6, 8, 5, 0.3)  # type: ignore[method-assign]
+        return history
+
+    monkeypatch.setattr(expected_rpe, "settings",
+                        lambda: expected_rpe.Settings(26, 3, 5, 1.0, 1.5, 2.0))
+    monkeypatch.setattr(expected_rpe, "history", within)
+    monkeypatch.setattr(ledger, "pain_zones", lambda store: [ledger.PainZone(ZONE, "Genou")])
+
+    def review(store, rows, declared=RUNS):
+        monkeypatch.setattr(ledger, "parse_ledger", lambda _: rows)
+        return progression_runs.reviews(store, book_with(PROGRESSION + declared))
+
+    return review
+
+
+def test_the_tally_reads_each_rise_and_each_override(reviewed):
+    plans = {"2030-W10": [threshold(day(1), 4)], "2030-W11": [threshold(day(8), 5)],
+             "2030-W12": [{**threshold(day(15), 6), "override_reason": "athlete_choice",
+                           "override_prediction": "w12-seuil"}]}
+    store = Tallied(plans, {11: [], 12: [], 13: [{"owner": "athlete"}]},
+                    [{"prediction_key": "w12-seuil", "status": "resolved", "outcome": False}])
+    rows = [*answered(day(1), 11), *answered(day(8), 12), *answered(day(15), 13)]
+    [found] = reviewed(store, rows)
+    assert found.tally.tolerated == (day(8),)
+    assert found.tally.failed == (day(15),)
+    assert found.tally.suggestion is None, "two rises read say nothing of the step"
+    [override] = found.overrides
+    assert override.on == day(15) and override.prediction == "w12-seuil"
+    assert override.followed == RiseOutcome.FAILED and override.borne_out is False
+
+
+def test_two_lineages_rising_the_same_week_are_unread_for_both(reviewed, monkeypatch):
+    book = rulebook.current()
+    monkeypatch.setattr(rulebook, "current", lambda: dataclasses.replace(
+        book, parameters=dataclasses.replace(book.parameters, quality_sessions_per_week=2)))
+    plans = {"2030-W10": [threshold(day(1), 4), hills(day(3), 6)],
+             "2030-W11": [threshold(day(8), 5), hills(day(10), 7)]}
+    store = Tallied(plans, {11: [], 12: [], 21: [], 22: []})
+    rows = [*answered(day(1), 11), *answered(day(3), 21, "hills"),
+            *answered(day(8), 12), *answered(day(10), 22, "hills")]
+    found = {review.lineage: review.tally for review in reviewed(store, rows, RUNS + HILLS)}
+    assert found["threshold-reps"].unread == (day(8),)
+    assert found["hill-reps"].unread == (day(10),)
+    assert not found["threshold-reps"].tolerated and not found["hill-reps"].tolerated
+
+
+def test_the_tally_reads_as_the_coach_reads_it():
+    tally = StepTally((day(8), day(22)), (day(15),), (), ())
+    override = progression_runs.Override(day(15), OverrideReason.ATHLETE_CHOICE, "w12-seuil",
+                                         RiseOutcome.FAILED, None)
+    lines = progression_runs.render_reviews([
+        progression_runs.Review("threshold-reps", tally, (override,)),
+        progression_runs.Review("hill-reps", StepTally((), (), (), ()), ())])
+    assert lines[1] == ("- threshold-reps : tolérées 2 (12/03, 26/03) ; ratées 1 (19/03) · "
+                        "trop peu de hausses lues pour juger le cran (3 sur 5)")
+    assert lines[2] == ("  dérogation du 19/03 (choix de l'athlète) : ratée, prédiction pas "
+                        "encore tranchée")
+    assert lines[3] == "- hill-reps : aucune hausse courue"
+    assert progression_runs.render_reviews([]) == []

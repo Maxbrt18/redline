@@ -128,6 +128,10 @@ rpe_model_settled_sessions = 5
 # A run's dose is its effort-kilometres times its intensity (flat-equivalent speed over
 # the reference easy speed) to this power: the rTSS convention, to calibrate.
 rpe_intensity_exponent = 2.0
+# The climbs of an easy run read their HR against the athlete's easy HR at their grade
+# (median of the six weeks of solo easy runs before): more than this above it (bpm), with
+# the grade-adjusted pace, they are named.
+climb_hr_margin_bpm = 6
 # The debrief of an easy or long run reads its kilometres. A kilometre whose mean HR
 # exceeds the session's HR cap by more than this (bpm) is named ...
 split_hr_margin_bpm = 0

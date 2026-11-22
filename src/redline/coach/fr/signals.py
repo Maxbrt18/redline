@@ -31,6 +31,15 @@ HR_AT_PACE_ROW = "  FC à allure (EF plates)    "
 
 NO_COMPARABLE = "aucune EF comparable"
 
+#: The athlete's easy HR by grade (`redline.analysis.grade_hr`): what a climb is held to.
+GRADE_HR_ROW = "  FC en EF par pente         "
+
+GRADE_HR_BIN = "{grade} % {hr:.0f}"
+
+GRADE_HR_FROM = " ({runs} EF seules, six semaines)"
+
+NO_GRADE_HR = "pas assez d'EF seules avec FC pour une courbe"
+
 NOTHING = "  Rien à signaler sur ces semaines."
 
 STRAVA_CHECKS = "  Les 4 contrôles Strava du § D (allure en descente, parcours écourtés,"

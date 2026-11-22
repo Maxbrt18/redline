@@ -187,9 +187,10 @@ class SessionPriority(StrEnum):
 
 class ClimbIntent(StrEnum):
     """What a planned run asks of its climbs (`climb_intent`): what the debrief judges
-    there. The HR cap never applies on a climb; the intent says what does."""
+    there. The HR cap never applies on a climb; the intent says what does, and the climbs
+    run easy read their HR against the athlete's easy HR at their grade."""
 
-    #: Easy effort, walking allowed: only the flat is judged.
+    #: Easy effort, walking allowed: the HR of the climbs run is the athlete's own.
     EASY = "easy"
     #: Every climb run, as slowly as needed; the HR may rise. A walked climb is named.
     RUN_SLOW = "run_slow"
@@ -263,6 +264,8 @@ class RpeSign(StrEnum):
     EXECUTION = "execution"
     #: The flat HR above the cap at the usual pace or slower.
     FLAT_HR_HIGH = "flat_hr_high"
+    #: Climbs run above the athlete's easy HR at their grade, at the usual pace.
+    CLIMB_HR_HIGH = "climb_hr_high"
     #: An easy run's HR above its usual one at the same pace.
     HR_AT_PACE = "hr_at_pace"
     #: A poor night declared the morning of the session.
@@ -279,6 +282,12 @@ class FindingKind(StrEnum):
     FLAT_TOO_FAST = "flat_too_fast"
     #: Flat HR above the cap at the reference easy pace or slower: a state or sensor sign.
     FLAT_HR_HIGH = "flat_hr_high"
+    #: Climbs run above the athlete's easy HR at their grade, at a grade-adjusted pace
+    #: faster than the reference easy pace.
+    CLIMB_TOO_FAST = "climb_too_fast"
+    #: Climbs run above the athlete's easy HR at their grade, at the reference easy pace
+    #: or slower once adjusted to the grade: a state or sensor sign.
+    CLIMB_HR_HIGH = "climb_hr_high"
     DPLUS_OVER = "dplus_over"
     DMINUS_OVER = "dminus_over"
     #: A climb walked on a run whose climbs were to be run.

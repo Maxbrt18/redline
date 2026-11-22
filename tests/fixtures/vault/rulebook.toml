@@ -86,6 +86,10 @@ rpe_model_settled_sessions = 5
 rpe_range_width = 1.0
 rpe_range_width_unsettled = 1.5
 rpe_intensity_exponent = 2.0
+# The climbs of an easy run read their HR against the athlete's easy HR at their grade
+# (median of the six weeks of solo easy runs before): more than this above it (bpm), with
+# the grade-adjusted pace, they are named.
+climb_hr_margin_bpm = 6
 # The debrief of an easy or long run reads its kilometres. A kilometre whose mean HR
 # exceeds the session's HR cap by more than this (bpm) is named ...
 split_hr_margin_bpm = 0

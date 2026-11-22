@@ -37,6 +37,7 @@ from redline.model.progression import (
     Lineage,
     Move,
     Proposal,
+    RiseOutcome,
     Severity,
     Side,
     Signal,
@@ -425,34 +426,43 @@ class StepTally:
         return Move.UP if share >= TALLY_GROW_SHARE else Move.HOLD
 
 
-def tally(family: Family, lineage: Lineage, history: Sequence[Exposure],
-          confounded: frozenset[dt.date] = frozenset()) -> StepTally:
-    """For each first exposure at a raised dose: tolerated, failed or harmed.
-
-    `confounded` holds the days another lineage also rose on: what followed cannot be
-    attributed, and those rises are counted as unread.
-    """
+def rises(family: Family, history: Sequence[Exposure]) -> list[Exposure]:
+    """The first exposure at each raised dose: the sessions that tested a step."""
     evidence = sorted((exposure for exposure in history if _counts(family, exposure)),
                       key=lambda exposure: exposure.on)
-    tolerated: list[dt.date] = []
-    failed: list[dt.date] = []
-    harmed: list[dt.date] = []
-    unread: list[dt.date] = []
+    found = []
     for before, after in itertools.pairwise(evidence):
         dose_before, dose_after = before.dose(family.anchor), after.dose(family.anchor)
-        if dose_before is None or dose_after is None or not above(family, dose_after,
-                                                                  dose_before):
-            continue
-        judgements = judge(family, lineage, after)
-        if after.on in confounded or after.disrupted is not None:
-            unread.append(after.on)
-        elif _severe(judgements):
-            harmed.append(after.on)
-        elif _failed(judgements):
-            failed.append(after.on)
-        elif _passed(judgements):
-            tolerated.append(after.on)
-        else:
-            unread.append(after.on)
-    return StepTally(tuple(tolerated), tuple(failed), tuple(harmed), tuple(unread))
+        if (dose_before is not None and dose_after is not None
+                and above(family, dose_after, dose_before)):
+            found.append(after)
+    return found
 
+
+def outcome(family: Family, lineage: Lineage, exposure: Exposure,
+            confounded: frozenset[dt.date] = frozenset()) -> RiseOutcome:
+    """What a session showed of the dose it ran: tolerated, failed, harmed or unread."""
+    if exposure.on in confounded or exposure.disrupted is not None:
+        return RiseOutcome.UNREAD
+    judgements = judge(family, lineage, exposure)
+    if _severe(judgements):
+        return RiseOutcome.HARMED
+    if _failed(judgements):
+        return RiseOutcome.FAILED
+    if _passed(judgements):
+        return RiseOutcome.TOLERATED
+    return RiseOutcome.UNREAD
+
+
+def tally(family: Family, lineage: Lineage, history: Sequence[Exposure],
+          confounded: frozenset[dt.date] = frozenset()) -> StepTally:
+    """For each first exposure at a raised dose: tolerated, failed, harmed or unread.
+
+    `confounded` holds the days of rises whose answer cannot be attributed to this
+    lineage (another one rose the same week): they are counted as unread.
+    """
+    found: dict[RiseOutcome, list[dt.date]] = {kind: [] for kind in RiseOutcome}
+    for exposure in rises(family, history):
+        found[outcome(family, lineage, exposure, confounded)].append(exposure.on)
+    return StepTally(tuple(found[RiseOutcome.TOLERATED]), tuple(found[RiseOutcome.FAILED]),
+                     tuple(found[RiseOutcome.HARMED]), tuple(found[RiseOutcome.UNREAD]))

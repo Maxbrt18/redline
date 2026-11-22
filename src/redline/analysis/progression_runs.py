@@ -9,6 +9,10 @@ reserve, the pain of the session, the next morning and the runs that follow.
 
 A rise passes no veto: the weeks of the taper, an assimilation week, a quality hold of
 rules n3 and n4, a gate that did not open on the closed week before.
+
+The tally (`reviews`) says what followed each rise a lineage ran and each bounded
+override: the falsification of its step, a suggestion the declaration changes only by
+decision.
 """
 
 from __future__ import annotations
@@ -18,6 +22,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from redline.coach.fr import progression as text
 from redline.model import iso_week, prescription, rulebook, weekly_plan
 from redline.model.progression import (
     RUN_FAMILIES,
@@ -26,15 +31,26 @@ from redline.model.progression import (
     Family,
     Lineage,
     Proposal,
+    RiseOutcome,
     Verdict,
     Veto,
     VetoKind,
     default,
 )
-from redline.model.vocabulary import FindingOwner, SessionStatus
+from redline.model.vocabulary import FindingOwner, OverrideReason, SessionStatus
 
 from . import easy_load, expected_rpe, ledger, pain_rules
-from .progression import above, judge, propose, step_up
+from .progression import (
+    TALLY_MIN_RISES,
+    StepTally,
+    above,
+    judge,
+    outcome,
+    propose,
+    rises,
+    step_up,
+    tally,
+)
 from .progression_readings import gate_exposure, interval_exposure
 from .progression_strength import vetoes as calendar_vetoes
 
@@ -85,22 +101,31 @@ def _over_range(history: expected_rpe.History | None, row: ledger.Row) -> float 
     return None if expected is None else row.rpe - expected.high
 
 
-def exposures(store: Any, rows: Sequence[ledger.Row], lineage: Lineage, family: Family,
-              plans: Plans, zones: Sequence[str],
-              history: expected_rpe.History | None) -> list[Exposure]:
-    """The sessions of the lineage's workout run with a typed dose, oldest first."""
+def runs(store: Any, rows: Sequence[ledger.Row], lineage: Lineage, family: Family,
+         plans: Plans, zones: Sequence[str],
+         history: expected_rpe.History | None) -> list[tuple[dict, Exposure]]:
+    """The sessions of the lineage's workout run with a typed dose, oldest first, each
+    with the planned session it ran."""
     found = []
     for row in sorted(rows, key=lambda item: item.date):
         if row.type != lineage.workout:
             continue
         session = plans.session_on(lineage.workout, row.date)
         dose = planned_dose(family, session) if session is not None else None
-        if dose is None:
+        if session is None or dose is None:
             continue
-        found.append(interval_exposure(rows, row, dose, zones, row.reserve,
-                                       over_range=_over_range(history, row),
-                                       gaps=_gaps(store, row)))
+        found.append((session, interval_exposure(rows, row, dose, zones, row.reserve,
+                                                 over_range=_over_range(history, row),
+                                                 gaps=_gaps(store, row))))
     return found
+
+
+def exposures(store: Any, rows: Sequence[ledger.Row], lineage: Lineage, family: Family,
+              plans: Plans, zones: Sequence[str],
+              history: expected_rpe.History | None) -> list[Exposure]:
+    """The sessions of the lineage's workout run with a typed dose, oldest first."""
+    return [exposure for _, exposure in runs(store, rows, lineage, family, plans, zones,
+                                             history)]
 
 
 def current_dose(family: Family, lineage: Lineage, plans: Plans, week: str) -> Dose | None:
@@ -242,3 +267,107 @@ def _last_planned(plans: Plans, lineage: Lineage, before: dt.date, week: str) ->
         if candidates:
             return candidates[0]
     return None
+
+
+@dataclass(frozen=True)
+class Override:
+    """A session run one step above its lineage's ceiling, and what followed it."""
+
+    on: dt.date
+    reason: OverrideReason
+    prediction: str
+    followed: RiseOutcome
+    #: The sealed prediction, once resolved: borne out or refuted; None while open.
+    borne_out: bool | None
+
+
+@dataclass(frozen=True)
+class Review:
+    """The tally of a run lineage's steps and of its overrides."""
+
+    lineage: str
+    tally: StepTally
+    overrides: tuple[Override, ...]
+
+
+def _borne_out(row: dict | None) -> bool | None:
+    if row is None or row.get("status") != "resolved" or row.get("outcome") is None:
+        return None
+    return bool(row["outcome"])
+
+
+def reviews(store: Any, book: rulebook.Rulebook) -> list[Review]:
+    """What followed each rise and each override of the declared run lineages.
+
+    Two lineages that rose in the same week cannot tell which one a bad answer belongs
+    to: those rises are unread for both.
+    """
+    declared = [lineage for lineage in book.progression.lineages
+                if lineage.family in RUN_FAMILIES]
+    if not declared:
+        return []
+    families = default()
+    rows = ledger.parse_ledger(store)
+    zones = [zone.slug for zone in ledger.pain_zones(store)]
+    config = expected_rpe.settings()
+    history = expected_rpe.history(store, rows, config) if config is not None else None
+    plans = Plans(store)
+    ran = {lineage.slug: runs(store, rows, lineage, families[lineage.family], plans, zones,
+                              history) for lineage in declared}
+    risen = {lineage.slug: [exposure.on for exposure in rises(
+        families[lineage.family], [exposure for _, exposure in ran[lineage.slug]])]
+        for lineage in declared}
+    predictions = {row["prediction_key"]: row for row in store.prediction_rows()}
+    found = []
+    for lineage in declared:
+        family = families[lineage.family]
+        others = {iso_week.of(day) for slug, days in risen.items() if slug != lineage.slug
+                  for day in days}
+        confounded = frozenset(day for day in risen[lineage.slug] if iso_week.of(day) in others)
+        overrides = tuple(
+            Override(exposure.on, OverrideReason(session["override_reason"]),
+                     session["override_prediction"],
+                     outcome(family, lineage, exposure, confounded),
+                     _borne_out(predictions.get(session["override_prediction"])))
+            for session, exposure in ran[lineage.slug]
+            if session.get("override_reason") is not None)
+        found.append(Review(lineage.slug, tally(family, lineage,
+                                                [exposure for _, exposure in ran[lineage.slug]],
+                                                confounded), overrides))
+    return found
+
+
+def _days(days: Sequence[dt.date]) -> str:
+    return ", ".join(f"{day:%d/%m}" for day in days)
+
+
+def render_reviews(found: Sequence[Review]) -> list[str]:
+    """The tally of the run lineages as the coach reads it; nothing without a lineage."""
+    if not found:
+        return []
+    lines = [text.TALLY_HEADER]
+    for review in found:
+        counted = [(kind, days) for kind, days in (
+            (RiseOutcome.TOLERATED, review.tally.tolerated),
+            (RiseOutcome.FAILED, review.tally.failed),
+            (RiseOutcome.HARMED, review.tally.harmed),
+            (RiseOutcome.UNREAD, review.tally.unread)) if days]
+        if not counted:
+            lines.append(text.TALLY_NO_RISE.format(lineage=review.lineage))
+        else:
+            suggestion = review.tally.suggestion
+            read = sum(len(days) for kind, days in counted if kind != RiseOutcome.UNREAD)
+            lines.append(text.TALLY_LINE.format(
+                lineage=review.lineage,
+                counts=" ; ".join(text.TALLY_COUNT.format(
+                    label=text.TALLY_OUTCOMES[kind], count=len(days), days=_days(days))
+                    for kind, days in counted),
+                suggestion=(text.TALLY_TOO_FEW.format(read=read, minimum=TALLY_MIN_RISES)
+                            if suggestion is None else text.TALLY_SUGGESTIONS[suggestion])))
+        lines.extend(text.OVERRIDE.format(
+            day=item.on, reason=text.OVERRIDE_REASONS[item.reason],
+            followed=text.OVERRIDE_FOLLOWED[item.followed],
+            prediction=text.PREDICTION_OPEN if item.borne_out is None
+            else text.PREDICTION_BORNE_OUT if item.borne_out else text.PREDICTION_REFUTED)
+            for item in review.overrides)
+    return lines
