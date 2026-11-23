@@ -1346,9 +1346,16 @@ class TurnWorker:
             self._discard_outbox(outbox_before)
             self._log_vault_alerts()
             if policy(job.kind).debrief:
-                # A debrief exists ONLY because an activity just arrived: its silence means the
-                # output was not read. One retry only.
-                cause = "automatic debrief stayed silent"
+                # A typed silence on an activity the ledger holds is a debrief handled
+                # with nothing worth sending. Without the typed choice, or with the activity
+                # missing from the ledger, the output was not read: one retry only.
+                if result.silent and job.detail and self._repo.activity_recorded(job.detail) is True:
+                    log.info("Proactive %s -> activity %s recorded, nothing to send",
+                             job.kind, job.detail)
+                    self._complete_job(job)
+                    return
+                cause = ("automatic debrief stayed silent on an unrecorded activity"
+                         if result.silent else "automatic debrief returned no text")
                 if job.attempts >= 2:
                     self._fail_job(job, cause)
                 else:

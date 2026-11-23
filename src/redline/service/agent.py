@@ -210,13 +210,18 @@ PROACTIVE_REPLY_SCHEMA = {
 
 
 def structured_reply(raw: object) -> tuple[bool, str]:
-    """Validate the typed output of an initiative; raise ValueError if it is unreadable."""
+    """Validate the typed output of an initiative; raise ValueError if it is unreadable.
+
+    `send` true with an empty text is out of contract: it is neither a message nor the
+    typed choice of silence, and must not pass for the latter."""
     data = json.loads(raw) if isinstance(raw, str) else raw
     if (not isinstance(data, dict) or set(data) != {"send", "text"}
             or type(data["send"]) is not bool or not isinstance(data["text"], str)):
-        raise ValueError("sortie d'initiative hors contrat {send, text}")
+        raise ValueError("initiative output outside its {send, text} contract")
     text = data["text"].strip()
-    return (bool(data["send"] and text), text if data["send"] else "")
+    if data["send"] and not text:
+        raise ValueError("initiative output asks to send an empty text")
+    return (data["send"], text if data["send"] else "")
 
 
 @dataclass
