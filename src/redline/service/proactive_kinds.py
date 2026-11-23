@@ -14,8 +14,10 @@ class KindPolicy:
     staleness_hours: float = 4.0
     #: Runs on the heavy route: a long read of the whole period.
     heavy: bool = False
-    #: Starts from an activity that just arrived: there is always something to say, so a
-    #: silence is a read failure, retried once, and the activity must end up recorded.
+    #: Starts from an activity that just arrived, which must end up recorded. A typed
+    #: silence on a recorded activity is a debrief handled with nothing worth sending; an
+    #: empty output, or a silence on an activity the ledger lacks, is a read failure,
+    #: retried once.
     debrief: bool = False
     #: Must produce a text: staying silent is not an editorial option.
     must_speak: bool = False
