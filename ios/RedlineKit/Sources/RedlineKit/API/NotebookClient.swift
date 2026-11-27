@@ -75,6 +75,15 @@ public extension Endpoint where Value == Notebook.RacePlanView {
     static var racePlan: Self { Self(path: ["race-plan"]) }
 }
 
+public extension Endpoint where Value == Notebook.PlanView {
+    static var plan: Self { Self(path: ["plan"]) }
+}
+
+public extension Endpoint where Value == Notebook.CycleProposalView {
+    /// The preparation proposed and still open; a 404 when there is none.
+    static var planProposal: Self { Self(path: ["plan", "proposal"], kept: false) }
+}
+
 public extension Endpoint where Value == Notebook.HabitsView {
     static var habits: Self { Self(path: ["habits"]) }
 }
@@ -207,6 +216,11 @@ public struct NotebookClient: Sendable {
     public func takeProposal(_ id: String) async throws(NotebookError) -> Int {
         let revised: Notebook.Revised = try await write(["proposals", "take"], ["id": id])
         return revised.revision
+    }
+
+    /// The athlete takes the preparation proposed; a conflict when it is no longer open.
+    public func takeCycleProposal(_ id: String) async throws(NotebookError) {
+        let _: Notebook.Done = try await write(["plan", "proposal", "take"], ["id": id])
     }
 
     public func dismissProposals(_ week: String) async throws(NotebookError) {
