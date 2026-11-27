@@ -21,7 +21,7 @@ from .agent import (
     PROACTIVE_REPLY_SCHEMA,
     TRIAGE_SCHEMA,
     AgentActivity,
-    AgentCall,
+    Consumption,
     FailureKind,
     RunnerBase,
     RunResult,
@@ -96,12 +96,12 @@ def _count(usage: dict, key: str) -> int:
     return value if isinstance(value, int) and value >= 0 else 0
 
 
-def reported_call(payload: dict, purpose: CallPurpose, model: str | None, *,
-                  psid: str | None = None, turn_id: str | None = None) -> AgentCall | None:
+def consumption(payload: dict, model: str | None) -> Consumption | None:
     """What a `claude -p` result says the call consumed; None when it reports nothing.
 
     The result event of `--output-format json` and `stream-json` carries the same fields:
-    the whole invocation's token counts and its price at API rates.
+    the whole invocation's token counts and its price at API rates. Claude already counts
+    cache reads and writes apart from `input_tokens`.
     """
     usage = payload.get("usage")
     cost = payload.get("total_cost_usd")
@@ -109,15 +109,14 @@ def reported_call(payload: dict, purpose: CallPurpose, model: str | None, *,
         return None
     usage = usage if isinstance(usage, dict) else {}
     duration = payload.get("duration_ms")
-    return AgentCall(
-        provider="claude", purpose=purpose, model=model,
-        cost_usd=float(cost) if isinstance(cost, int | float) and cost >= 0 else None,
+    return Consumption(
+        model=model,
         input_tokens=_count(usage, "input_tokens"),
         output_tokens=_count(usage, "output_tokens"),
         cache_read_tokens=_count(usage, "cache_read_input_tokens"),
         cache_write_tokens=_count(usage, "cache_creation_input_tokens"),
-        duration_ms=duration if isinstance(duration, int) and duration >= 0 else None,
-        psid=psid, turn_id=turn_id)
+        cost_usd=float(cost) if isinstance(cost, int | float) and cost >= 0 else None,
+        duration_ms=duration if isinstance(duration, int) and duration >= 0 else None)
 
 
 @dataclass
@@ -225,10 +224,8 @@ class ClaudeCodeRunner(RunnerBase):
                 self._runs.finish(psid, active)
             drainer.join(timeout=5)
             stderr = "".join(stderr_lines).strip()
-            if turn_id:
-                self._record_call(reported_call(parsed.result or {}, CallPurpose.TURN,
-                                                parsed.model or spec.model,
-                                                psid=psid, turn_id=turn_id))
+            self._record_call(consumption(parsed.result or {}, parsed.model or spec.model),
+                              CallPurpose.TURN, psid=psid, turn_id=turn_id)
 
             if parsed.session and not isolated and not fork_session:
                 self._state.set_session(psid, self.provider, parsed.session,
@@ -310,7 +307,7 @@ class ClaudeCodeRunner(RunnerBase):
         except ValueError:
             payload = {}
         if isinstance(payload, dict):
-            self._record_call(reported_call(payload, CallPurpose.TRIAGE, candidate.model))
+            self._record_call(consumption(payload, candidate.model), CallPurpose.TRIAGE)
         if proc.returncode != 0:
             log.warning("Claude triage failed (code %d); falling back to N1", proc.returncode)
             return Triage()
@@ -355,15 +352,6 @@ class ClaudeCodeRunner(RunnerBase):
                 raise RuntimeError(f"{label}: no structured output")
             return json.dumps(structured, ensure_ascii=False)
         return str(payload.get("result") or "")
-
-    def _record_call(self, call: AgentCall | None) -> None:
-        """Register what a call consumed; a failure here never costs the reply."""
-        if call is None:
-            return
-        try:
-            self._state.record_call(call)
-        except Exception:
-            log.exception("Consumption of a %s call could not be recorded", call.purpose)
 
     def close(self) -> None:
         """Claude Code keeps no process between two turns."""

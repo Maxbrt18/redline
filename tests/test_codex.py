@@ -497,3 +497,91 @@ def test_the_one_shot_process_is_restarted_after_a_crash(make_config, store, mon
     assert runner.classify("salut") == Triage()
     assert client.closed is True
     assert runner._one_shot_client is None
+
+
+# ---- what each call consumed
+
+def _usage(total, last=None):
+    def breakdown(input_tokens, cached, output):
+        return SimpleNamespace(input_tokens=input_tokens, cached_input_tokens=cached,
+                               cache_write_input_tokens=0, output_tokens=output)
+    return SimpleNamespace(total=breakdown(*total), last=breakdown(*(last or total)))
+
+
+def _metered(client, usages):
+    """Each turn of the client reports the next thread usage."""
+    reports = iter(usages)
+    original = client._thread
+
+    def thread(thread_id):
+        made = original(thread_id)
+        turn = made.turn
+
+        def metered_turn(message, **kwargs):
+            handle = turn(message, **kwargs)
+            usage = next(reports)
+            run = handle.run
+            handle.run = lambda: SimpleNamespace(**vars(run()), usage=usage, duration_ms=700)
+            return handle
+
+        made.turn = metered_turn
+        return made
+
+    client._thread = thread
+
+
+def test_a_codex_turn_records_its_tokens_without_a_price(make_config, store):
+    runner, client, _ = _runner(make_config, store)
+    _metered(client, [_usage((1000, 800, 50))])
+
+    runner.run("4242", "salut", turn_id="turn-1")
+
+    [call] = store.calls
+    assert (call.provider, call.turn_id, call.psid) == ("codex", "turn-1", "4242")
+    spent = call.consumption
+    assert (spent.input_tokens, spent.cache_read_tokens, spent.output_tokens) == (200, 800, 50)
+    assert (spent.cost_usd, spent.duration_ms) == (None, 700)
+
+
+def test_a_resumed_thread_counts_only_what_its_turn_added(make_config, store):
+    runner, client, _ = _runner(make_config, store)
+    _metered(client, [_usage((1000, 800, 50)), _usage((2500, 2000, 120))])
+
+    runner.run("4242", "salut", turn_id="turn-1")
+    runner.run("4242", "encore", turn_id="turn-2")
+
+    spent = store.calls[1].consumption
+    assert (spent.input_tokens, spent.cache_read_tokens, spent.output_tokens) == (300, 1200, 70)
+
+
+def test_a_thread_resumed_after_a_restart_counts_its_last_request(make_config, store):
+    store.set_session("4242", "codex", "thread-old", instruction_digest("."))
+    runner, client, _ = _runner(make_config, store)
+    _metered(client, [_usage((90000, 80000, 900), last=(3000, 2500, 40))])
+
+    runner.run("4242", "salut", turn_id="turn-1")
+
+    spent = store.calls[0].consumption
+    assert (spent.input_tokens, spent.cache_read_tokens, spent.output_tokens) == (500, 2500, 40)
+
+
+def test_a_codex_triage_records_its_call(make_config, store):
+    answer = json.dumps({"depth": "N2", "emotional": False, "holding": None,
+                         "plan_change": False, "plan_asked": False, "plan_scope": "none"})
+    runner, client, _ = _runner(make_config, store, response=answer)
+    _metered(client, [_usage((400, 0, 20))])
+
+    assert runner.classify("salut").depth == "N2"
+
+    [call] = store.calls
+    assert (call.purpose.value, call.turn_id, call.consumption.input_tokens) == ("triage", None, 400)
+
+
+def test_an_unreadable_usage_never_costs_the_turn(make_config, store):
+    runner, client, _ = _runner(make_config, store)
+    _metered(client, [SimpleNamespace(total=None, last=None)])
+
+    result = runner.run("4242", "salut", turn_id="turn-1")
+
+    assert result.full_text == "réponse" and result.error is None
+    assert store.calls == []

@@ -8,15 +8,18 @@ import logging
 import os
 import threading
 import time
+from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any
 
 from redline.model import paths
+from redline.model.vocabulary import CallPurpose
 
 from .agent import (
     PROACTIVE_REPLY_SCHEMA,
     TRIAGE_SCHEMA,
     AgentActivity,
+    Consumption,
     FailureKind,
     RunnerBase,
     RunResult,
@@ -56,6 +59,51 @@ NETWORK_OVERRIDE = "sandbox_workspace_write.network_access=true"
 
 def _writable_roots_override() -> str:
     return f"sandbox_workspace_write.writable_roots={json.dumps([str(paths.state_dir())])}"
+
+
+@dataclass(frozen=True)
+class Tokens:
+    """A Codex token breakdown in the shared shape of `Consumption`.
+
+    Codex counts cached prompt tokens inside `input_tokens`; they are taken out here so
+    that the three prompt counts add up to the whole prompt, as Claude reports them.
+    """
+
+    input: int = 0
+    output: int = 0
+    cache_read: int = 0
+    cache_write: int = 0
+
+    @classmethod
+    def of(cls, breakdown: Any) -> Tokens:
+        cached = breakdown.cached_input_tokens or 0
+        written = breakdown.cache_write_input_tokens or 0
+        return cls(input=max(breakdown.input_tokens - cached - written, 0),
+                   output=breakdown.output_tokens, cache_read=cached, cache_write=written)
+
+    def since(self, before: Tokens) -> Tokens:
+        return Tokens(*(max(now - then, 0) for now, then in zip(
+            (self.input, self.output, self.cache_read, self.cache_write),
+            (before.input, before.output, before.cache_read, before.cache_write),
+            strict=True)))
+
+
+def spent(usage: Any, before: Tokens | None) -> Tokens:
+    """What a turn consumed, from the thread usage Codex reports after it.
+
+    Codex reports its thread's running total: the turn is the difference with the total
+    after the thread's previous turn. Without that total (a thread resumed or forked
+    before this process saw it), only the turn's last request is known: a lower bound.
+    """
+    return Tokens.of(usage.total).since(before) if before is not None else Tokens.of(usage.last)
+
+
+def turn_consumption(tokens: Tokens, model: str | None, result: Any) -> Consumption:
+    """Codex reports no price: the cost stays unknown."""
+    return Consumption(model=model, input_tokens=tokens.input, output_tokens=tokens.output,
+                       cache_read_tokens=tokens.cache_read, cache_write_tokens=tokens.cache_write,
+                       duration_ms=getattr(result, "duration_ms", None))
+
 
 class _WatchdogError(RuntimeError):
     pass
@@ -100,6 +148,9 @@ class CodexRunner(RunnerBase):
         # Long-lived process with no shell and no project document: the triage of each
         # message reuses it instead of relaunching an `app-server`.
         self._one_shot_client: Any = None
+        # The running token total of each thread after its last turn, to measure the next
+        # one; a thread this process started begins at zero.
+        self._thread_totals: dict[str, Tokens] = {}
 
     def _start(self, overrides: tuple[str, ...], turn_id: str | None) -> Any:
         self._sdk = self._sdk or _load_sdk()
@@ -198,7 +249,35 @@ class CodexRunner(RunnerBase):
                 source, ephemeral=True, include_turns=False, **options)
         if mode is SessionMode.CONTINUE and source:
             return codex.thread_resume(source, **options)
-        return codex.thread_start(ephemeral=mode is not SessionMode.CONTINUE, **options)
+        thread = codex.thread_start(ephemeral=mode is not SessionMode.CONTINUE, **options)
+        self._thread_totals[thread.id] = Tokens()
+        return thread
+
+    def _record_turn(self, psid: str, turn_id: str | None, thread: Any, result: Any,
+                     model: str | None, mode: SessionMode) -> None:
+        before = (self._thread_totals.get(thread.id) if mode is SessionMode.CONTINUE
+                  else self._thread_totals.pop(thread.id, None))
+        consumed = self._consumed(result, model, before)
+        if consumed is None:
+            return
+        tokens, total = consumed
+        if mode is SessionMode.CONTINUE:
+            self._thread_totals[thread.id] = total
+        self._record_call(tokens, CallPurpose.TURN, psid=psid, turn_id=turn_id)
+
+    @staticmethod
+    def _consumed(result: Any, model: str | None,
+                  before: Tokens | None) -> tuple[Consumption, Tokens] | None:
+        """What a turn consumed and its thread's new total; None when Codex reported no
+        usage. An unreadable usage is logged and never costs the turn it describes."""
+        usage = getattr(result, "usage", None)
+        if usage is None:
+            return None
+        try:
+            return turn_consumption(spent(usage, before), model, result), Tokens.of(usage.total)
+        except (AttributeError, TypeError):
+            log.exception("Codex usage unreadable; the call is not recorded")
+            return None
 
     def _turn(self, psid: str, thread: Any, message: str, *, model: str | None,
               effort: str | None,
@@ -267,6 +346,7 @@ class CodexRunner(RunnerBase):
                     psid, thread, with_turn_input(message, turn_id), model=spec.model,
                     effort=spec.effort, timeout=spec.timeout,
                     output_schema=PROACTIVE_REPLY_SCHEMA if spec.structured_reply else None)
+                self._record_turn(psid, turn_id, thread, result, spec.model, session_mode)
                 response = result.final_response or ""
                 silent = False
                 if spec.structured_reply:
@@ -324,6 +404,11 @@ class CodexRunner(RunnerBase):
         Used for the triage of each message, on a reused process, and for the
         out-of-production evaluation bench. Raises the SDK exception on failure.
         """
+        return self._one_shot_turn(message, spec=spec, output_schema=output_schema,
+                                   instructions=instructions, label=label).final_response or ""
+
+    def _one_shot_turn(self, message: str, *, spec: RunSpec, output_schema: dict | None,
+                       instructions: str | None, label: str) -> Any:
         codex = self._one_shot_codex()
         try:
             thread = codex.thread_start(
@@ -337,7 +422,7 @@ class CodexRunner(RunnerBase):
             # A dead process is not reused: the next call restarts it.
             self._close_one_shot_client()
             raise
-        return result.final_response or ""
+        return result
 
     def classify(self, message: str, *, spec: RunSpec | None = None) -> Triage:
         """A single fast classifier; its absence falls back to the deterministic default."""
@@ -345,9 +430,14 @@ class CodexRunner(RunnerBase):
             return Triage()
         candidate = spec or self._config.routing.plan(Route.TRIAGE).primary
         try:
-            raw = self.one_shot(TRIAGE_PROMPT + message, spec=candidate,
-                                output_schema=TRIAGE_SCHEMA, label="__triage__")
-            return parse_triage(json.loads(raw or "{}"))
+            result = self._one_shot_turn(TRIAGE_PROMPT + message, spec=candidate,
+                                         output_schema=TRIAGE_SCHEMA, instructions=None,
+                                         label="__triage__")
+            # A one-shot thread is fresh: its running total is the call itself.
+            consumed = self._consumed(result, candidate.model, Tokens())
+            if consumed is not None:
+                self._record_call(consumed[0], CallPurpose.TRIAGE)
+            return parse_triage(json.loads(result.final_response or "{}"))
         except (_WatchdogError, _CancelledError):
             log.warning("Codex triage timed out after %d s; falling back to N1", candidate.timeout)
         except Exception as exc:

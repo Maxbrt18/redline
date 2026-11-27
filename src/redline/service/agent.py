@@ -200,22 +200,31 @@ class TurnIdentity:
 
 
 @dataclass(frozen=True)
-class AgentCall:
-    """What one provider call consumed, as the provider reports it.
+class Consumption:
+    """What a provider reports one call consumed, in one shape for every provider.
 
-    ``cost_usd`` is the price of the call at API rates, reported even when a
-    subscription pays for it; None when the provider reports no price.
+    ``input_tokens`` counts only the prompt tokens read neither from nor into the cache:
+    the three prompt counts add up to the whole prompt. ``cost_usd`` is the price of the
+    call at API rates, reported even when a subscription pays for it; None when the
+    provider reports no price.
     """
 
-    provider: str
-    purpose: CallPurpose
     model: str | None
-    cost_usd: float | None
     input_tokens: int
     output_tokens: int
     cache_read_tokens: int
     cache_write_tokens: int
-    duration_ms: int | None
+    cost_usd: float | None = None
+    duration_ms: int | None = None
+
+
+@dataclass(frozen=True)
+class AgentCall:
+    """One provider call: what it consumed, and what it was for."""
+
+    provider: str
+    purpose: CallPurpose
+    consumption: Consumption
     psid: str | None = None
     turn_id: str | None = None
 
@@ -316,7 +325,10 @@ def live_session(state: StateStore, config: Config, provider: str,
 
 
 class RunnerBase:
-    """What every provider adapter shares: its runs, the athlete's name, its retries."""
+    """What every provider adapter shares: its runs, the athlete's name, its retries and
+    the register of what its calls consumed."""
+
+    provider: str
 
     # Attempts with the same profile while no work has started (dead session, binary
     # crashing at startup); beyond that, the route tries its fallback profile.
@@ -340,6 +352,22 @@ class RunnerBase:
 
     def _pause_before_retry(self, attempt: int) -> None:
         time.sleep(self.RETRY_DELAY * attempt)
+
+    def _record_call(self, consumption: Consumption | None, purpose: CallPurpose, *,
+                     psid: str | None = None, turn_id: str | None = None) -> None:
+        """Register what a call consumed; a failure here never costs the reply.
+
+        Nothing is recorded when the provider reported nothing, nor for a turn call
+        without its turn: the register ties every turn call to the turn that made it.
+        """
+        if consumption is None or (purpose is CallPurpose.TURN and not turn_id):
+            return
+        call = AgentCall(provider=self.provider, purpose=purpose, consumption=consumption,
+                         psid=psid, turn_id=turn_id)
+        try:
+            self._state.record_call(call)
+        except Exception:
+            log.exception("Consumption of a %s call could not be recorded", purpose)
 
 
 class AgentRunner(Protocol):

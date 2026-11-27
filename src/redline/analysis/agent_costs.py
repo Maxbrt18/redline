@@ -55,7 +55,7 @@ def render(window: CallWindow, now: dt.datetime) -> str:
     header = ("route", "model", "calls", "turns", "cost USD", "input", "output",
               "cache read", "cache write")
     rows = [(_label(tally), tally.model or "-", str(tally.calls), str(tally.turns),
-             f"{tally.cost_usd:.2f}", f"{tally.input_tokens:,}", f"{tally.output_tokens:,}",
+             "-" if tally.unpriced_calls == tally.calls else f"{tally.cost_usd:.2f}", f"{tally.input_tokens:,}", f"{tally.output_tokens:,}",
              f"{tally.cache_read_tokens:,}", f"{tally.cache_write_tokens:,}")
             for tally in sorted(window.tallies, key=lambda tally: -tally.cost_usd)]
     widths = [max(len(row[index]) for row in (header, *rows)) for index in range(len(header))]
@@ -74,4 +74,7 @@ def render(window: CallWindow, now: dt.datetime) -> str:
                      f"per athlete per {MONTH_DAYS} days")
     if projection.cache_read_share is not None:
         lines.append(f"cache reads: {projection.cache_read_share:.0%} of prompt tokens")
+    unpriced = sum(tally.unpriced_calls for tally in window.tallies)
+    if unpriced:
+        lines.append(f"{unpriced} call(s) without a reported price are left out of the cost")
     return "\n".join(lines)
