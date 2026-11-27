@@ -33,6 +33,7 @@ from .vocabulary import (
     SETTLED_STATUSES,
     CarbMix,
     ClimbIntent,
+    Cut,
     Decider,
     DescentIntent,
     OverrideReason,
@@ -906,7 +907,7 @@ def _changed_session_fields(previous: dict | None, current: dict,
     return changed
 
 
-def restrictions(old: dict, new: dict | None) -> list[str]:
+def restrictions(old: dict, new: dict | None) -> list[Cut]:
     """What, from one revision to the next, REMOVES from a future session.
 
     Adding, moving or lengthening is not one: only restriction needs a typed premise.
@@ -915,33 +916,33 @@ def restrictions(old: dict, new: dict | None) -> list[str]:
     if old.get("status") == SessionStatus.CANCELLED:
         return []
     if new is None:
-        return ["removed"]
+        return [Cut.REMOVED]
     if new.get("status") == SessionStatus.CANCELLED:
-        return ["cancelled"]
+        return [Cut.CANCELLED]
     found = []
     old_cap, new_cap = old.get("distance_cap_km"), new.get("distance_cap_km")
     if new_cap is not None and (
             (old_cap is not None and new_cap < old_cap)
             or (old_cap is None and old.get("distance_target_km") is not None
                 and new_cap < old["distance_target_km"])):
-        found.append("distance cap lowered")
+        found.append(Cut.DISTANCE_CAP_LOWERED)
     old_target, new_target = old.get("distance_target_km"), new.get("distance_target_km")
     if old_target is not None and new_target is not None and new_target < old_target:
-        found.append("distance target lowered")
+        found.append(Cut.DISTANCE_TARGET_LOWERED)
     old_minutes, new_minutes = old.get("duration_cap_min"), new.get("duration_cap_min")
     if old_minutes is not None and new_minutes is not None and new_minutes < old_minutes:
-        found.append("duration cap lowered")
+        found.append(Cut.DURATION_CAP_LOWERED)
     if old.get("workout") in HARD_WORKOUTS and new.get("workout") not in HARD_WORKOUTS:
-        found.append(f"{old['workout']} replaced by {new['workout']}")
+        found.append(Cut.HARD_REPLACED)
     old_strength, new_strength = old.get("strength") or {}, new.get("strength") or {}
     if set(new_strength.get("drop") or []) - set(old_strength.get("drop") or []):
-        found.append("exercise dropped from strength")
+        found.append(Cut.STRENGTH_EXERCISE_DROPPED)
     if new_strength.get("half_dose") and not old_strength.get("half_dose"):
-        found.append("strength at half dose")
+        found.append(Cut.STRENGTH_HALF_DOSE)
     return found
 
 
-def _restriction_errors(session_id: str, entry: dict, cuts: list[str],
+def _restriction_errors(session_id: str, entry: dict, cuts: list[Cut],
                         evidence: list[str]) -> list[str]:
     restriction = entry.get("restriction")
     if not restriction:

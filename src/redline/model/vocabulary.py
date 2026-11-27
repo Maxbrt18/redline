@@ -357,6 +357,21 @@ class ProactiveKind(StrEnum):
     WAKE_TRACE = "wake_trace"
 
 
+class Cut(StrEnum):
+    """What a revision removes from a future session (`weekly_plan.restrictions`): each
+    one needs a typed premise."""
+
+    REMOVED = "removed"
+    CANCELLED = "cancelled"
+    DISTANCE_CAP_LOWERED = "distance cap lowered"
+    DISTANCE_TARGET_LOWERED = "distance target lowered"
+    DURATION_CAP_LOWERED = "duration cap lowered"
+    #: A demanding workout replaced by one that is not.
+    HARD_REPLACED = "hard session replaced"
+    STRENGTH_EXERCISE_DROPPED = "exercise dropped from strength"
+    STRENGTH_HALF_DOSE = "strength at half dose"
+
+
 class SessionStatus(StrEnum):
     """A planned session's status in a revision (`planned_sessions.status`).
 
