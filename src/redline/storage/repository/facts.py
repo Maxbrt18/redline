@@ -12,6 +12,7 @@ from sqlalchemy.engine import Connection
 from redline.coach.fr import gear as gear_text
 from redline.model import race as race_model
 from redline.model import vocabulary as voc
+from redline.model.calibration import Calibration
 from redline.model.vocabulary import DeadlineKind, JobStatus, RacePriority, RaceState, ThreadStatus
 
 from ..database import StorageError
@@ -23,6 +24,7 @@ from ..schema import (
     conversation_threads,
     correction_deliveries,
     deadlines,
+    fitness_calibrations,
     gear_items,
     observation_metrics,
     observations,
@@ -45,6 +47,10 @@ from ._common import (
 )
 from .pain_zones import PainZones
 
+#: The columns a calibration fills from its fields: every one but the row's identity, its
+#: evidence (a list) and its timestamp.
+CALIBRATION_COLUMNS = tuple(column.name for column in fitness_calibrations.columns
+                            if column.name not in ("id", "athlete_id", "evidence", "created_at"))
 
 class Facts(PainZones):
 
@@ -529,6 +535,24 @@ class Facts(PainZones):
             return [_native(row) for row in connection.execute(sa.select(all_out_efforts).where(
                 all_out_efforts.c.athlete_id == self.athlete_id
             ).order_by(all_out_efforts.c.done_on, all_out_efforts.c.effort_key)).mappings()]
+
+    def adopt_calibration_in(self, connection: Connection, calibration: Calibration,
+                             *, actor: str = "application") -> None:
+        """A calibration adopted: a new row, the previous ones untouched."""
+        values = {"id": _uuid(None), "athlete_id": self.athlete_id,
+                  **{name: getattr(calibration, name) for name in CALIBRATION_COLUMNS},
+                  "evidence": list(calibration.evidence)}
+        connection.execute(fitness_calibrations.insert().values(**values))
+        _audit(connection, actor, "calibration.adopted", "fitness_calibration", values["id"],
+               _jsonable(values))
+
+    def calibration_rows(self) -> list[dict]:
+        """Every calibration, in adoption order."""
+        with self.database.engine.connect() as connection:
+            return [dict(row) for row in connection.execute(sa.select(fitness_calibrations).where(
+                fitness_calibrations.c.athlete_id == self.athlete_id
+            ).order_by(fitness_calibrations.c.adopted_on,
+                       fitness_calibrations.c.created_at)).mappings()]
 
     def upsert_break_in(self, connection: Connection, row: dict,
                         *, actor: str = "application") -> None:

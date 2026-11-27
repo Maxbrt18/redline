@@ -73,6 +73,9 @@ class Store:
     def break_rows(self) -> list[dict]:
         return []
 
+    def calibration_rows(self) -> list[dict]:
+        return []
+
     def deadline_rows(self) -> list[dict]:
         return [{"deadline_key": "race", "kind": DeadlineKind.RACE,
                  "status": DeadlineStatus.SCHEDULED, "priority": RacePriority.A,

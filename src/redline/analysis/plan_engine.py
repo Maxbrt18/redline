@@ -17,9 +17,11 @@ from typing import Any
 
 from redline.coach.fr import plan_skeleton as text
 from redline.coach.fr import session_labels
+from redline.model import calibration as calibration_model
 from redline.model import efforts as effort_model
 from redline.model import iso_week, plan_skeleton, plan_templates, rulebook, session_kinds
 from redline.model import race as race_model
+from redline.model.calibration import Calibration
 from redline.model.errors import ConfigError, InputError
 from redline.model.plan_skeleton import NOTHING_HELD, Held, Levers, Limits, Skeleton, Start
 from redline.model.vocabulary import (
@@ -30,7 +32,7 @@ from redline.model.vocabulary import (
     SessionStatus,
 )
 
-from . import critical_speed, expected_rpe, ledger, race_estimate, signals
+from . import calibration, critical_speed, expected_rpe, ledger, race_estimate, signals
 
 #: The closed weeks the starting volume is the mean of.
 START_WEEKS = 3
@@ -69,19 +71,19 @@ def goal_reading(store: Any, rows: list[ledger.Row], goal: race_model.Goal,
 
 
 @dataclass(frozen=True)
-class CriticalReading:
-    """The critical-speed fit of the recent efforts, None without one, and its settings."""
+class CalibrationReading:
+    """The calibration in force, None before the first, and the domains' shares of CS."""
 
-    config: critical_speed.Settings
-    fit: critical_speed.Fit | None
+    calibration: Calibration | None
+    critical: critical_speed.Settings | None
 
 
-def critical_reading(store: Any, today: dt.date) -> CriticalReading | None:
-    config = critical_speed.settings()
-    if config is None:
+def calibration_reading(store: Any) -> CalibrationReading | None:
+    """None when the rulebook declares no calibration."""
+    if calibration.settings() is None:
         return None
-    return CriticalReading(config, critical_speed.fit(
-        effort_model.efforts(store.effort_rows()), today, config))
+    return CalibrationReading(calibration_model.in_force(store.calibration_rows()),
+                              critical_speed.settings())
 
 
 @dataclass(frozen=True)
@@ -99,9 +101,8 @@ class Frame:
     #: What the declared all-out efforts say of a road goal's time; None for a trail goal
     #: or when the rulebook declares no estimate.
     reading: GoalReading | None = None
-    #: The critical speed of the recent all-out efforts; None when the rulebook declares
-    #: none.
-    critical: CriticalReading | None = None
+    #: The calibration of fitness in force; None when the rulebook declares none.
+    calibration: CalibrationReading | None = None
 
 
 def start_of(rows: list[ledger.Row], today: dt.date) -> Start:
@@ -178,7 +179,7 @@ def frame(store: Any, today: dt.date) -> Frame:
     held = (held_of(rows, expected_rpe.history(store, rows, config), today)
             if config is not None else NOTHING_HELD)
     return Frame(race, goal, template, start_of(rows, today), limits, first, recovering, held,
-                 goal_reading(store, rows, goal, today), critical_reading(store, today))
+                 goal_reading(store, rows, goal, today), calibration_reading(store))
 
 
 def candidates(store: Any, today: dt.date) -> tuple[Frame, list[Skeleton]]:
@@ -267,29 +268,39 @@ def _pace(seconds: float) -> str:
     return f"{minutes}:{rest:02d}"
 
 
-def _critical_lines(reading: CriticalReading | None) -> list[str]:
-    """The critical speed and the domains around it, or the test that would give one."""
+def _calibration_lines(reading: CalibrationReading | None) -> list[str]:
+    """The calibration in force, its critical speed and the domains around it, or the
+    test that would give one."""
     if reading is None:
         return []
-    found, config = reading.fit, reading.config
+    found, config = reading.calibration, reading.critical
     if found is None:
-        return [text.NO_CRITICAL_SPEED.format(weeks=config.weeks)]
-    if found.speed_se is None:
-        error = text.CRITICAL_SPEED_TWO
-    else:
-        slower = 1000 / (found.speed_mps - found.speed_se) - found.pace_s
-        error = text.CRITICAL_SPEED_ERROR.format(error=f"{slower:.0f}")
-    return [text.CRITICAL_SPEED.format(
-                pace=_pace(found.pace_s), speed=text.number(found.speed_mps * 3.6),
-                d_prime=f"{found.d_prime_m:.0f}", n=len(found.efforts),
-                first=found.efforts[0].on, last=found.efforts[-1].on, error=error),
+        return [text.NO_CALIBRATION]
+    lines = [text.CALIBRATION.format(
+        on=found.adopted_on, source=text.CALIBRATION_SOURCES[found.source],
+        decided=text.DECIDERS[found.decided_by],
+        confidence=text.CONFIDENCES[found.confidence], n=len(found.evidence))]
+    if found.vdot is not None and found.vdot_sd is not None:
+        lines.append(text.CALIBRATION_VDOT.format(vdot=text.number(found.vdot),
+                                                  sd=text.number(found.vdot_sd)))
+    cs = found.cs_mps
+    if cs is None or found.d_prime_m is None or config is None:
+        return [*lines, text.NO_CRITICAL_SPEED]
+
+    def pace_at(pct: float) -> str:
+        return _pace(1000 / (cs * pct / 100))
+
+    error = (text.CRITICAL_SPEED_TWO if found.cs_se_mps is None else
+             text.CRITICAL_SPEED_ERROR.format(error=f"{1000 / (cs - found.cs_se_mps) - 1000 / cs:.0f}"))
+    return [*lines,
+            text.CRITICAL_SPEED.format(pace=pace_at(100), speed=text.number(cs * 3.6),
+                                       d_prime=f"{found.d_prime_m:.0f}", error=error),
             text.CRITICAL_SPEED_DOMAINS.format(
-                easy=_pace(found.pace_at(config.first_threshold_pct)),
+                easy=pace_at(config.first_threshold_pct),
                 first=text.number(config.first_threshold_pct),
-                low=_pace(found.pace_at(config.threshold_low_pct)),
-                high=_pace(found.pace_at(config.threshold_high_pct)),
+                low=pace_at(config.threshold_low_pct), high=pace_at(config.threshold_high_pct),
                 low_pct=text.number(config.threshold_low_pct),
-                high_pct=text.number(config.threshold_high_pct), pace=_pace(found.pace_s))]
+                high_pct=text.number(config.threshold_high_pct), pace=pace_at(100))]
 
 
 def _estimate_lines(reading: GoalReading | None) -> list[str]:
@@ -355,7 +366,7 @@ def render(found: Frame, skeletons: list[Skeleton], *, chosen: bool = False) -> 
                                long_run=f"{found.start.long_run_km:g}",
                                recovery=text.RECOVERY if found.recovering else ""),
              *_estimate_lines(found.reading),
-             *_critical_lines(found.critical),
+             *_calibration_lines(found.calibration),
              _held_line(found.held)]
     for skeleton in skeletons:
         levers = skeleton.levers

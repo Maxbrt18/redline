@@ -161,6 +161,14 @@ critical_speed_first_threshold_pct = 82.3
 # to check against the athlete's heart rate and RPE.
 critical_speed_threshold_low_pct = 90.0
 critical_speed_threshold_high_pct = 97.0
+# The calibration (`redline.analysis.calibration`), two thresholds declared together or
+# not at all. Today's estimate leaves the calibration in force beyond this many of its
+# standard deviations, about 95 % of a normal spread: a test is proposed, nothing is
+# adopted ...
+calibration_band_sd = 2.0
+# ... and a calibration whose newest all-out effort is older than this many weeks is
+# provisional.
+calibration_fresh_weeks = 12
 # The climbs of an easy run read their HR against the athlete's easy HR at their grade
 # (median of the six weeks of solo easy runs before): more than this above it (bpm), with
 # the grade-adjusted pace, they are named.

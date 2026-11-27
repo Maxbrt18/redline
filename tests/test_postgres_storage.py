@@ -3136,3 +3136,25 @@ def test_an_effort_and_a_break_are_written_over_their_key(store):
     with pytest.raises(StorageError):
         write(store, commands.BREAK_UPSERT, {**pause, "break_key": "x",
                                               "ends_on": "2030-04-01"})
+
+
+def test_the_daily_pass_adopts_a_calibration_once_and_keeps_it_unchanged(store):
+    now = dt.datetime(2030, 3, 10, 12, tzinfo=dt.UTC)
+    effort = {"effort_key": "ten-2030", "done_on": "2030-03-02", "distance_km": 10,
+              "duration_s": 2400, "terrain": "flat", "kind": "race", "note": ""}
+    write(store, commands.EFFORT_UPSERT, effort)
+    state = PostgresStateStore(store.database)
+    state.materialize_intelligence(now)
+    state.materialize_intelligence(now)
+    [found] = store.calibration_rows()
+    assert (found["source"], found["confidence"], found["decided_by"]) == (
+        "initial", "measured", "rule")
+    assert found["evidence"] == ["ten-2030"] and found["cs_mps"] is None
+    write(store, commands.EFFORT_UPSERT, {**effort, "effort_key": "five-2030",
+                                          "done_on": "2030-03-09", "distance_km": 5,
+                                          "duration_s": 1170})
+    state.materialize_intelligence(now)
+    assert [row["source"] for row in store.calibration_rows()] == ["initial", "race"]
+    with store.database.engine.begin() as connection, pytest.raises(
+            sa.exc.DBAPIError, match="a fitness calibration is append-only"):
+        connection.execute(sa.text("UPDATE redline.fitness_calibrations SET vdot = 60"))

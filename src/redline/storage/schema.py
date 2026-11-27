@@ -900,6 +900,42 @@ all_out_efforts = sa.Table(
     sa.UniqueConstraint("athlete_id", "effort_key", name="uq_all_out_efforts_key"),
 )
 
+#: A calibration of the athlete's fitness, adopted on declared all-out efforts and never
+#: changed: the next one is a new row, and the one in force is the latest adopted. Paces
+#: are rendered from it, never stored.
+fitness_calibrations = sa.Table(
+    "fitness_calibrations", metadata,
+    _id(),
+    sa.Column("athlete_id", sa.Text, sa.ForeignKey("redline.athletes.id"), nullable=False),
+    sa.Column("adopted_on", sa.Date, nullable=False),
+    sa.Column("cs_mps", sa.Numeric(5, 3)),
+    sa.Column("d_prime_m", sa.Numeric(6, 1)),
+    #: Standard error of CS; NULL with two efforts, which leave no residual.
+    sa.Column("cs_se_mps", sa.Numeric(5, 3)),
+    sa.Column("vdot", sa.Numeric(5, 2)),
+    sa.Column("vdot_sd", sa.Numeric(5, 2)),
+    sa.Column("hr_first_threshold_bpm", sa.SmallInteger),
+    sa.Column("hr_second_threshold_bpm", sa.SmallInteger),
+    sa.Column("confidence", sa.Text, nullable=False),
+    sa.Column("source", sa.Text, nullable=False),
+    sa.Column("evidence", JSONB, nullable=False, server_default=sa.text("'[]'::jsonb")),
+    sa.Column("decided_by", sa.Text, nullable=False),
+    sa.Column("created_at", sa.DateTime(timezone=True), nullable=False,
+              server_default=sa.text("timezone('utc', now())")),
+    sa.CheckConstraint("cs_mps IS NOT NULL OR vdot IS NOT NULL",
+                       name="ck_fitness_calibrations_reference"),
+    sa.CheckConstraint("(cs_mps IS NULL) = (d_prime_m IS NULL)",
+                       name="ck_fitness_calibrations_critical_speed"),
+    sa.CheckConstraint("(vdot IS NULL) = (vdot_sd IS NULL)",
+                       name="ck_fitness_calibrations_vdot"),
+    sa.CheckConstraint(f"confidence IN ({voc.sql_values(voc.CalibrationConfidence)})",
+                       name="ck_fitness_calibrations_confidence"),
+    sa.CheckConstraint(f"source IN ({voc.sql_values(voc.CalibrationSource)})",
+                       name="ck_fitness_calibrations_source"),
+    sa.CheckConstraint(f"decided_by IN ({voc.sql_values(voc.CALIBRATION_DECIDERS)})",
+                       name="ck_fitness_calibrations_decided_by"),
+)
+
 #: A stretch the athlete declared without training (injury, illness, life): an all-out
 #: effort run before it is no more than an upper bound of the form after it.
 training_breaks = sa.Table(
@@ -1414,6 +1450,7 @@ TRIGGERS: dict[str, str] = {
     "trg_audit_event_immutable": "audit_events",
     "trg_proactive_message_immutable": "proactive_messages",
     "trg_strength_session_link_immutable": "strength_session_links",
+    "trg_fitness_calibration_immutable": "fitness_calibrations",
 }
 
 
