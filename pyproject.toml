@@ -84,9 +84,11 @@ paths = ["src"]
 # The stored vocabularies are reached by iterating their enums (CLI choices, CHECK
 # constraints, the notebook's answers), never member by member. The notebook's views are
 # JSON shapes: their keys are read as strings, and by the iOS app. The progression
-# vocabularies are iterated the same way, by their declaration's schema.
+# vocabularies are iterated the same way, by their declaration's schema. The cycle
+# templates are a declaration too: their objects carry every field of the format, which
+# the plan generator reads.
 exclude = ["*/tests/*", "*/model/vocabulary.py", "*/model/notebook_views.py",
-           "*/model/progression.py"]
+           "*/model/progression.py", "*/model/cycle_templates.py"]
 min_confidence = 60
 # Flask routes: called by the framework, never by the code.
 ignore_decorators = ["@app.get", "@app.post", "@app.before_request", "@app.after_request", "@app.errorhandler"]
