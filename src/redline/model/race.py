@@ -162,6 +162,10 @@ class Race:
     unread: tuple[str, ...] = ()
     #: The context names a chosen skeleton, readable or not.
     declares_skeleton: bool = False
+    #: The deadline's key.
+    key: str = ""
+    #: The race's distance, said with or without its terrain: what a recovery reads.
+    distance_km: float | None = None
 
 
 def _goal(context: dict) -> Goal | None:
@@ -228,7 +232,9 @@ def from_row(row: dict) -> Race:
                 pace_s_per_km=_number(context.get("pace_s_per_km")),
                 goal=goal,
                 unread=tuple(sorted(set(written) - set(context))),
-                declares_skeleton=bool(written.get("skeleton")))
+                declares_skeleton=bool(written.get("skeleton")),
+                key=str(row.get("deadline_key") or ""),
+                distance_km=_number(context.get("distance_km")))
 
 
 def _clock(value: object) -> dt.time | None:

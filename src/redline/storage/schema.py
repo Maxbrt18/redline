@@ -448,6 +448,8 @@ plan_revisions = sa.Table(
     # revisions written before the register.
     sa.Column("decision", JSONB),
     sa.Column("state_snapshot", JSONB),
+    # The cycle version in force when the revision was written; absent before cycles.
+    sa.Column("cycle_version_id", UUID_PK, sa.ForeignKey("redline.cycle_versions.id")),
     sa.UniqueConstraint("plan_id", "revision", name="uq_plan_revisions_number"),
     sa.CheckConstraint("revision >= 1", name="ck_plan_revisions_number"),
     sa.CheckConstraint("calibration_target IS NULL OR calibration_target IN (0, 2, 3)",
@@ -952,6 +954,118 @@ training_breaks = sa.Table(
     sa.UniqueConstraint("athlete_id", "break_key", name="uq_training_breaks_key"),
 )
 
+#: A version of a training cycle (`redline.model.cycles`): its trame is written once, in
+#: `cycle_weeks` and `cycle_key_sessions`, and only its state moves afterwards, by the
+#: transitions a trigger allows. Versions of one cycle share its `cycle_key` and are
+#: numbered from 1 without a gap.
+cycle_versions = sa.Table(
+    "cycle_versions", metadata,
+    _id(),
+    sa.Column("athlete_id", sa.Text, sa.ForeignKey("redline.athletes.id"), nullable=False),
+    sa.Column("cycle_key", UUID_PK, nullable=False),
+    sa.Column("version", sa.SmallInteger, nullable=False),
+    sa.Column("kind", sa.Text, nullable=False),
+    #: The race a preparation is for, or the race a recovery follows.
+    sa.Column("race_id", UUID_PK, sa.ForeignKey("redline.deadlines.id")),
+    sa.Column("level", sa.Text),
+    sa.Column("state", sa.Text, nullable=False),
+    sa.Column("starts_on", sa.Date, nullable=False),
+    sa.Column("ends_on", sa.Date, nullable=False),
+    sa.Column("template", sa.Text, nullable=False),
+    sa.Column("candidate", sa.Text, nullable=False, server_default=""),
+    sa.Column("levers", JSONB),
+    sa.Column("goal", JSONB),
+    #: The frozen inputs (`redline.model.cycles.hypotheses_of`).
+    sa.Column("hypotheses", JSONB, nullable=False),
+    sa.Column("risks", JSONB, nullable=False, server_default=sa.text("'[]'::jsonb")),
+    sa.Column("cause", JSONB, nullable=False),
+    sa.Column("decision", JSONB),
+    sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=UTC_NOW),
+    sa.Column("taken_at", sa.DateTime(timezone=True)),
+    sa.Column("settled_at", sa.DateTime(timezone=True)),
+    sa.Column("expires_at", sa.DateTime(timezone=True)),
+    sa.CheckConstraint("version >= 1", name="ck_cycle_versions_number"),
+    sa.CheckConstraint(f"kind IN ({voc.sql_values(voc.CycleKind)})",
+                       name="ck_cycle_versions_kind"),
+    sa.CheckConstraint(f"state IN ({voc.sql_values(voc.CycleVersionState)})",
+                       name="ck_cycle_versions_state"),
+    sa.CheckConstraint(f"level IS NULL OR level IN ({voc.sql_values(voc.GeneralLevel)})",
+                       name="ck_cycle_versions_level"),
+    sa.CheckConstraint("(kind = 'general') = (level IS NOT NULL)",
+                       name="ck_cycle_versions_general_level"),
+    sa.CheckConstraint("kind <> 'preparation' OR race_id IS NOT NULL",
+                       name="ck_cycle_versions_preparation_race"),
+    sa.CheckConstraint("starts_on <= ends_on", name="ck_cycle_versions_range"),
+    sa.CheckConstraint("extract(isodow FROM starts_on) = 1 AND extract(isodow FROM ends_on) = 7",
+                       name="ck_cycle_versions_weeks"),
+    sa.CheckConstraint(f"cause->>'kind' IN ({voc.sql_values(voc.CycleCause)})",
+                       name="ck_cycle_versions_cause"),
+    sa.CheckConstraint("state <> 'proposed' OR expires_at IS NOT NULL",
+                       name="ck_cycle_versions_expiry"),
+    sa.UniqueConstraint("cycle_key", "version", name="uq_cycle_versions_number"),
+)
+
+#: One week of a version's trame.
+cycle_weeks = sa.Table(
+    "cycle_weeks", metadata,
+    sa.Column("cycle_version_id", UUID_PK,
+              sa.ForeignKey("redline.cycle_versions.id"), primary_key=True),
+    sa.Column("iso_week", sa.Text, primary_key=True),
+    sa.Column("phase", sa.Text, nullable=False),
+    sa.Column("deload", sa.Boolean, nullable=False),
+    sa.Column("volume_km", sa.Numeric(5, 1), nullable=False),
+    sa.Column("long_run_km", sa.Numeric(5, 1), nullable=False),
+    sa.Column("qualities", sa.SmallInteger, nullable=False),
+    #: The part of the long run run at an intensity, all four or none.
+    sa.Column("segment_km", sa.Numeric(5, 1)),
+    sa.Column("segment_ref", sa.Text),
+    sa.Column("segment_low", sa.Numeric(5, 1)),
+    sa.Column("segment_high", sa.Numeric(5, 1)),
+    sa.CheckConstraint("iso_week ~ '^20[0-9]{2}-W(0[1-9]|[1-4][0-9]|5[0-3])$'",
+                       name="ck_cycle_weeks_iso_week"),
+    sa.CheckConstraint(f"phase IN ({voc.sql_values(voc.PlanPhase)})",
+                       name="ck_cycle_weeks_phase"),
+    sa.CheckConstraint("volume_km >= 0 AND long_run_km >= 0 AND qualities >= 0",
+                       name="ck_cycle_weeks_figures"),
+    sa.CheckConstraint(
+        "(segment_km IS NULL) = (segment_ref IS NULL) AND (segment_ref IS NULL) = "
+        "(segment_low IS NULL) AND (segment_low IS NULL) = (segment_high IS NULL)",
+        name="ck_cycle_weeks_segment"),
+    sa.CheckConstraint(f"segment_ref IS NULL OR segment_ref IN ({voc.sql_values(voc.IntensityRef)})",
+                       name="ck_cycle_weeks_segment_ref"),
+)
+
+#: A key session of a version's trame, in its week.
+cycle_key_sessions = sa.Table(
+    "cycle_key_sessions", metadata,
+    _id(),
+    sa.Column("cycle_version_id", UUID_PK, nullable=False),
+    sa.Column("iso_week", sa.Text, nullable=False),
+    sa.Column("position", sa.SmallInteger, nullable=False),
+    sa.Column("workout", sa.Text, nullable=False),
+    sa.Column("role", sa.Text, nullable=False),
+    #: The dose, `[[variable, value], ...]` in the ladder's order; NULL for a test.
+    sa.Column("dose", JSONB),
+    sa.Column("intensity_ref", sa.Text),
+    sa.Column("intensity_low", sa.Numeric(5, 1)),
+    sa.Column("intensity_high", sa.Numeric(5, 1)),
+    sa.ForeignKeyConstraint(["cycle_version_id", "iso_week"],
+                            ["redline.cycle_weeks.cycle_version_id",
+                             "redline.cycle_weeks.iso_week"],
+                            name="fk_cycle_key_sessions_week"),
+    sa.CheckConstraint(f"role IN ({voc.sql_values(voc.KeyRole)})",
+                       name="ck_cycle_key_sessions_role"),
+    sa.CheckConstraint(
+        "(intensity_ref IS NULL) = (intensity_low IS NULL) AND "
+        "(intensity_low IS NULL) = (intensity_high IS NULL)",
+        name="ck_cycle_key_sessions_intensity"),
+    sa.CheckConstraint(
+        f"intensity_ref IS NULL OR intensity_ref IN ({voc.sql_values(voc.IntensityRef)})",
+        name="ck_cycle_key_sessions_intensity_ref"),
+    sa.UniqueConstraint("cycle_version_id", "iso_week", "position",
+                        name="uq_cycle_key_sessions_position"),
+)
+
 def _day_state(table: str) -> list:
     """How a day presents itself (`redline.model.week_days`): the kind and its details."""
     return [
@@ -1451,6 +1565,10 @@ TRIGGERS: dict[str, str] = {
     "trg_proactive_message_immutable": "proactive_messages",
     "trg_strength_session_link_immutable": "strength_session_links",
     "trg_fitness_calibration_immutable": "fitness_calibrations",
+    "trg_cycle_version_contiguous": "cycle_versions",
+    "trg_cycle_version_immutable": "cycle_versions",
+    "trg_cycle_week_immutable": "cycle_weeks",
+    "trg_cycle_key_session_immutable": "cycle_key_sessions",
 }
 
 
@@ -1489,6 +1607,9 @@ sa.Index("ix_coach_predictions_resolves", coach_predictions.c.resolves_kind,
          coach_predictions.c.resolves_on,
          postgresql_where=sa.text("status = 'open' AND resolves_kind IS NOT NULL"))
 sa.Index("ix_audit_events_created", audit_events.c.created_at)
+# At most one cycle in force; "at least one" is the planner's invariant.
+sa.Index("ix_cycle_versions_active", cycle_versions.c.athlete_id, unique=True,
+         postgresql_where=cycle_versions.c.state == "active")
 
 notebook_entries = sa.Table(
     "notebook_entries", metadata,

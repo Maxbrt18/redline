@@ -17,13 +17,14 @@ import sqlalchemy as sa
 from sqlalchemy import RowMapping
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from redline.analysis import calibration
+from redline.analysis import calibration, cycle_inputs
 from redline.analysis import signals as signal_model
 from redline.coach.fr import relationship as wording
 from redline.coach.fr import signals as signal_wording
 from redline.model import calibration as calibration_model
-from redline.model import commands, local_time, rulebook
+from redline.model import commands, cycle_templates, cycle_transitions, local_time, paths, rulebook
 from redline.model import efforts as effort_model
+from redline.model import race as race_model
 from redline.model import vocabulary as voc
 from redline.model.errors import StorageError
 from redline.model.vocabulary import (
@@ -666,7 +667,8 @@ class PostgresStateStore(StateStore):
                     + self._materialize_daily_signal(connection, store, predictions,
                                                      local, utc)
                     + self._materialize_gear(connection, utc)
-                    + self._materialize_calibration(connection, store, local))
+                    + self._materialize_calibration(connection, store, local)
+                    + self._materialize_cycle(connection, store, local, utc))
 
     @staticmethod
     def _materialize_cycles(connection, store: OperationalStore, local: dt.datetime,
@@ -842,6 +844,38 @@ class PostgresStateStore(StateStore):
         if found is not None:
             store.adopt_calibration_in(connection, found, actor="intelligence")
         return 0
+
+    @staticmethod
+    def _materialize_cycle(connection, store: OperationalStore, local: dt.datetime,
+                           utc: dt.datetime) -> int:
+        """One cycle in force: the takeover of an instance without one, then the transition
+        due, written and announced in the same transaction; the takeover is not announced.
+        Off while the rulebook declares no cycle thresholds."""
+        if not cycle_inputs.declared():
+            return 0
+        today = local.date()
+        templates = cycle_templates.load(paths.vault_root())
+        transition = cycle_transitions.next_cycle(
+            store.active_cycle_in(connection), race_model.typed(store),
+            effort_model.breaks(store.break_rows()),
+            cycle_inputs.standing(store, templates, today, store.planned_low_weeks_in(connection)),
+            today, templates, first=not store.has_cycle_in(connection))
+        if transition is None:
+            return 0
+        trame = cycle_transitions.trame(transition, templates,
+                                        cycle_inputs.inputs(store, templates, today))
+        version = store.apply_transition_in(
+            connection, trame, transition.cause, level=transition.level,
+            race_key=transition.race.key if transition.race is not None else None,
+            actor="intelligence")
+        if transition.cause == voc.CycleCause.MIGRATION:
+            return 0
+        detail = {"kind": str(version.kind), "level": version.level,
+                  "starts_on": trame.weeks[0].label, "weeks": len(trame.weeks),
+                  "volume_km": max(week.volume_km for week in trame.weeks)}
+        return int(PostgresProactiveState._enqueue(
+            connection, f"cycle-transition:{version.id}", voc.ProactiveKind.CYCLE_TRANSITION,
+            json.dumps(detail, ensure_ascii=False, sort_keys=True), utc.timestamp()))
 
     @staticmethod
     def _materialize_gear(connection, utc: dt.datetime) -> int:

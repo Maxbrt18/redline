@@ -1,4 +1,4 @@
-"""What the coach reads of a cycle's trame (`redline cycle candidates`)."""
+"""What the coach reads of a cycle's trame (`redline cycle`) and of the version in force."""
 
 from __future__ import annotations
 
@@ -50,3 +50,9 @@ UNCALIBRATED = "(allure à calibrer)"
 NO_DURATION = "?"
 UNKNOWN_DISTANCE = ("aucune course courue ou abandonnée dont lire la distance : la "
                     "récupération suit une course")
+VERSION = ("Cycle en cours : {kind}{level}, version {version} ({cause}), de {start} à "
+           "{end}. La semaine se prépare dans son cadre.")
+VERSION_LEVEL = " « {level} »"
+CAUSES = {"create": "créée pour l'objectif", "replan": "replanifiée",
+          "transition": "après le cycle précédent", "level_change": "nouveau niveau",
+          "block_end": "bloc suivant", "migration": "reprise de l'existant"}

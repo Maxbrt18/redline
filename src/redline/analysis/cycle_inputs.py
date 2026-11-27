@@ -10,17 +10,22 @@ gathers, for a cycle starting the week after `today`,
   states them, and their easy pace over the recent weeks;
 - the calibration in force, and whether it is measured and recent;
 - the dose each run lineage stands at.
+
+And where the athlete stands for the transitions (`standing`): the same start before its
+floor, without the weeks a cycle planned low.
 """
 
 from __future__ import annotations
 
 import datetime as dt
 import statistics
+from collections.abc import Collection
 from typing import Any
 
 from redline.model import calibration as calibration_model
 from redline.model import iso_week, rulebook, session_kinds, week_days
 from redline.model.cycle_templates import CycleTemplates
+from redline.model.cycle_transitions import Standing
 from redline.model.errors import ConfigError
 from redline.model.plan_generator import Inputs
 from redline.model.progression import Dose
@@ -79,25 +84,70 @@ def _lineages(store: Any, book: rulebook.Rulebook, today: dt.date) -> tuple[tupl
     return tuple(found)
 
 
+def declared() -> bool:
+    """Whether the rulebook declares what a trame is generated with."""
+    parameters = rulebook.current().parameters
+    return (parameters.cycle_held_weeks is not None
+            and parameters.skeleton_ramp_max_pct is not None
+            and parameters.skeleton_long_step_max_pct is not None)
+
+
+def _parameters() -> rulebook.Parameters:
+    parameters = rulebook.current().parameters
+    if not declared():
+        raise ConfigError("rulebook.toml declares no cycle thresholds (cycle_held_weeks, "
+                          "skeleton_ramp_max_pct, skeleton_long_step_max_pct)")
+    return parameters
+
+
+def _closed(today: dt.date, parameters: rulebook.Parameters) -> list[str]:
+    """The closed weeks the start reads, assimilation weeks left out."""
+    current = iso_week.of(today)
+    assimilation = set(parameters.assimilation_weeks)
+    return [week for week in (iso_week.shift(current, -offset)
+                              for offset in range(1, START_WEEKS + 1))
+            if week not in assimilation]
+
+
+def _held(rows: list[ledger.Row], today: dt.date, parameters: rulebook.Parameters) -> float:
+    current = iso_week.of(today)
+    assert parameters.cycle_held_weeks is not None
+    weeks = [iso_week.shift(current, -offset)
+             for offset in range(1, parameters.cycle_held_weeks + 1)]
+    return max(_volumes(rows, weeks), default=0.0)
+
+
+def _mean(rows: list[ledger.Row], weeks: list[str]) -> float | None:
+    return statistics.fmean(_volumes(rows, weeks)) if weeks else None
+
+
+def standing(store: Any, templates: CycleTemplates, today: dt.date,
+             planned_low: Collection[str]) -> Standing:
+    """Where the athlete stands on `today`; `planned_low`: the weeks a cycle planned low."""
+    parameters = _parameters()
+    rows = ledger.parse_ledger(store)
+    closed = _closed(today, parameters)
+    floor = _held(rows, today, parameters) * templates.rebuild.floor_pct / 100
+    return Standing(round(_mean(rows, closed) or 0.0, 1),
+                    _round(_mean(rows, [week for week in closed if week not in planned_low])),
+                    round(floor, 1))
+
+
+def _round(value: float | None) -> float | None:
+    return None if value is None else round(value, 1)
+
+
 def inputs(store: Any, templates: CycleTemplates, today: dt.date) -> Inputs:
     """The inputs of a cycle starting the week after `today`."""
     book = rulebook.current()
-    parameters = book.parameters
-    if (parameters.cycle_held_weeks is None or parameters.skeleton_ramp_max_pct is None
-            or parameters.skeleton_long_step_max_pct is None):
-        raise ConfigError("rulebook.toml declares no cycle thresholds (cycle_held_weeks, "
-                          "skeleton_ramp_max_pct, skeleton_long_step_max_pct)")
+    parameters = _parameters()
+    assert parameters.skeleton_ramp_max_pct is not None
+    assert parameters.skeleton_long_step_max_pct is not None
     rows = ledger.parse_ledger(store)
     current = iso_week.of(today)
-    assimilation = set(parameters.assimilation_weeks)
-    closed = [week for week in (iso_week.shift(current, -offset)
-                                for offset in range(1, START_WEEKS + 1))
-              if week not in assimilation]
-    held_weeks = [iso_week.shift(current, -offset)
-                  for offset in range(1, parameters.cycle_held_weeks + 1)]
-    held = max(_volumes(rows, held_weeks), default=0.0)
-    start = statistics.fmean(_volumes(rows, closed)) if closed else 0.0
-    start = max(start, held * templates.rebuild.floor_pct / 100)
+    held = _held(rows, today, parameters)
+    start = max(_mean(rows, _closed(today, parameters)) or 0.0,
+                held * templates.rebuild.floor_pct / 100)
     found = calibration_model.in_force(store.calibration_rows())
     fresh = parameters.calibration_fresh_weeks
     calibrated = (found is not None and found.confidence == CalibrationConfidence.MEASURED

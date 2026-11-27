@@ -52,6 +52,8 @@ POLICIES: dict[str, KindPolicy] = {
     Kind.OPERATOR_MESSAGE: KindPolicy(staleness_hours=6.0),
     # The notebook does not take the trace after 14:00: `expires_at` already bounds the job.
     Kind.WAKE_TRACE: KindPolicy(staleness_hours=3.5),
+    # The cycle stays in force for weeks: its announcement is still news the next day.
+    Kind.CYCLE_TRANSITION: KindPolicy(staleness_hours=36.0),
 }
 
 
