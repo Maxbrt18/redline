@@ -60,7 +60,8 @@ def test_the_instance_file_is_read_when_it_exists(tmp_path):
 
 def test_the_file_says_its_version_and_declares_every_sort():
     refused("version = 2", "version = 1", "this engine reads version 2")
-    refused("[[rebuild]]\nfloor_pct = 50\nramp_max_pct = 10\n", "", "'rebuild' missing")
+    refused("[[rebuild]]\nfloor_pct = 50\nramp_max_pct = 10\nlong_run_share_max = 0.25\n", "",
+            "'rebuild' missing")
     assert set(cycle_templates.SORTS) == set(CycleKind)
 
 

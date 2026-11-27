@@ -114,13 +114,16 @@ distance_km_max = 25
 weeks = [1, 2]
 no_quality_days = 7
 volume_pct = [40, 60]
+long_run_share_max = 0.25
 
 [[recovery]]
 distance_km_max = 400
 weeks = [2, 4]
 no_quality_days = 10
 volume_pct = [30, 50]
+long_run_share_max = 0.25
 
 [[rebuild]]
 floor_pct = 50
 ramp_max_pct = 10
+long_run_share_max = 0.25

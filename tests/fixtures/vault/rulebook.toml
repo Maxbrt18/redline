@@ -127,6 +127,9 @@ calibration_band_sd = 2.0
 # ... and a calibration whose newest all-out effort is older than this many weeks is
 # provisional.
 calibration_fresh_weeks = 12
+# The highest weekly volume an athlete held is read over this many closed weeks: the
+# reference of a trame's volume bands and of its peak.
+cycle_held_weeks = 26
 # The climbs of an easy run read their HR against the athlete's easy HR at their grade
 # (median of the six weeks of solo easy runs before): more than this above it (bpm), with
 # the grade-adjusted pace, they are named.

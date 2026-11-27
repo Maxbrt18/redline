@@ -255,12 +255,14 @@ RECOVERY = Schema("[[recovery]]", [
     _range("weeks", int, 0, 8),
     field("no_quality_days", int, minimum=0, maximum=28),
     _range("volume_pct", float, 0, 150, note="% of the highest weekly volume held"),
+    field("long_run_share_max", float, minimum=0, maximum=1),
 ], check=_ordered("weeks", "volume_pct"))
 
 REBUILD = Schema("[[rebuild]]", [
     field("floor_pct", float, minimum=0, maximum=100,
           note="% of the highest weekly volume held, where the way back starts"),
     field("ramp_max_pct", float, minimum=0, maximum=20),
+    field("long_run_share_max", float, minimum=0, maximum=1),
 ])
 
 SORTS: dict[CycleKind, Schema] = {CycleKind.PREPARATION: PREPARATION,
@@ -377,12 +379,14 @@ class Recovery:
     weeks: Range
     no_quality_days: int
     volume_pct: Range
+    long_run_share_max: float
 
 
 @dataclass(frozen=True)
 class Rebuild:
     floor_pct: float
     ramp_max_pct: float
+    long_run_share_max: float
 
 
 @dataclass(frozen=True)
@@ -477,10 +481,11 @@ def parse(text: str, source: Path) -> CycleTemplates:
         tuple(_preparation(item) for item in payload[CycleKind.PREPARATION]),
         tuple(_general(item) for item in payload[CycleKind.GENERAL]),
         tuple(Recovery(float(item["distance_km_max"]), Range.of(item["weeks"]),
-                       item["no_quality_days"], Range.of(item["volume_pct"]))
+                       item["no_quality_days"], Range.of(item["volume_pct"]),
+                       float(item["long_run_share_max"]))
               for item in payload[CycleKind.RECOVERY]),
         Rebuild(*(float(payload[CycleKind.REBUILD][0][name])
-                  for name in ("floor_pct", "ramp_max_pct"))),
+                  for name in ("floor_pct", "ramp_max_pct", "long_run_share_max"))),
         GeneralLevel(payload["default_level"]))
     problems = []
     if doubled := _doubled([template.slug for template in found.preparation]):

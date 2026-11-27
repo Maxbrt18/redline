@@ -200,6 +200,9 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
               maximum=100, note="slowest pace of a threshold session, in % of CS"),
         field("critical_speed_threshold_high_pct", float, required=False, minimum=50,
               maximum=100, note="fastest pace of a threshold session, in % of CS"),
+        # Optional: absent, no cycle trame is generated (`redline.analysis.cycle_inputs`).
+        field("cycle_held_weeks", int, required=False, minimum=4, maximum=104,
+              note="weeks back the highest weekly volume held is read"),
         # Optional, both or none (`CALIBRATION_PARAMETERS`): absent, no calibration is
         # adopted.
         field("calibration_band_sd", float, required=False, minimum=0.5, maximum=5,
@@ -345,6 +348,7 @@ class Parameters:
     critical_speed_first_threshold_pct: float | None = None
     critical_speed_threshold_low_pct: float | None = None
     critical_speed_threshold_high_pct: float | None = None
+    cycle_held_weeks: int | None = None
     calibration_band_sd: float | None = None
     calibration_fresh_weeks: int | None = None
     climb_hr_margin_bpm: int | None = None

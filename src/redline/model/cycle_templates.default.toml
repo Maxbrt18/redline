@@ -53,15 +53,15 @@ qualities = 2
   workout = "threshold"
   intensity = { ref = "critical_speed", band = [90, 95] }
   start = { reps = 3, rep_seconds = 360, recovery_seconds = 90 }
-  arrival = { reps = 5, rep_seconds = 480, recovery_seconds = 60 }
-  step = { reps = 1, rep_seconds = 60, recovery_seconds = 15 }
+  arrival = { reps = 4, rep_seconds = 480, recovery_seconds = 90 }
+  step = { reps = 1, rep_seconds = 120, recovery_seconds = 15 }
 
   [[preparation.development.key]]
   workout = "hills"
   intensity = { ref = "rpe", band = [7, 8] }
   start = { reps = 6, rep_seconds = 45, recovery_seconds = 120 }
-  arrival = { reps = 10, rep_seconds = 60, recovery_seconds = 120 }
-  step = { reps = 1, rep_seconds = 15, recovery_seconds = 15 }
+  arrival = { reps = 8, rep_seconds = 60, recovery_seconds = 120 }
+  step = { reps = 2, rep_seconds = 15, recovery_seconds = 15 }
 
 [preparation.specific]
 weeks = [3, 5]
@@ -81,7 +81,7 @@ qualities = 2
   intensity = { ref = "critical_speed", band = [92, 97] }
   start = { reps = 4, rep_seconds = 480, recovery_seconds = 60 }
   arrival = { reps = 3, rep_seconds = 720, recovery_seconds = 60 }
-  step = { reps = 1, rep_seconds = 120, recovery_seconds = 15 }
+  step = { reps = 1, rep_seconds = 240, recovery_seconds = 15 }
 
 [preparation.taper]
 qualities = 1
@@ -90,7 +90,7 @@ qualities = 1
   workout = "race-pace"
   intensity = { ref = "goal_pace", band = [99, 101] }
   start = { reps = 4, rep_seconds = 180, recovery_seconds = 90 }
-  arrival = { reps = 3, rep_seconds = 120, recovery_seconds = 90 }
+  arrival = { reps = 3, rep_seconds = 180, recovery_seconds = 90 }
   step = { reps = 1, rep_seconds = 60, recovery_seconds = 15 }
 
 [[preparation]]
@@ -117,15 +117,15 @@ qualities = 2
   workout = "threshold"
   intensity = { ref = "critical_speed", band = [90, 95] }
   start = { reps = 3, rep_seconds = 480, recovery_seconds = 90 }
-  arrival = { reps = 4, rep_seconds = 600, recovery_seconds = 60 }
-  step = { reps = 1, rep_seconds = 60, recovery_seconds = 15 }
+  arrival = { reps = 4, rep_seconds = 600, recovery_seconds = 90 }
+  step = { reps = 1, rep_seconds = 120, recovery_seconds = 15 }
 
   [[preparation.development.key]]
   workout = "hills"
   intensity = { ref = "rpe", band = [7, 8] }
   start = { reps = 6, rep_seconds = 45, recovery_seconds = 120 }
-  arrival = { reps = 10, rep_seconds = 60, recovery_seconds = 120 }
-  step = { reps = 1, rep_seconds = 15, recovery_seconds = 15 }
+  arrival = { reps = 8, rep_seconds = 60, recovery_seconds = 120 }
+  step = { reps = 2, rep_seconds = 15, recovery_seconds = 15 }
 
 [preparation.specific]
 weeks = [4, 6]
@@ -137,8 +137,8 @@ long_run_segments = { ref = "goal_pace", band = [98, 102], share = [0.2, 0.5] }
   workout = "race-pace"
   intensity = { ref = "goal_pace", band = [99, 101] }
   start = { reps = 3, rep_seconds = 600, recovery_seconds = 120 }
-  arrival = { reps = 2, rep_seconds = 1500, recovery_seconds = 180 }
-  step = { reps = 1, rep_seconds = 300, recovery_seconds = 30 }
+  arrival = { reps = 2, rep_seconds = 1500, recovery_seconds = 120 }
+  step = { reps = 1, rep_seconds = 450, recovery_seconds = 30 }
   flagship = 2
 
   [[preparation.specific.key]]
@@ -146,7 +146,7 @@ long_run_segments = { ref = "goal_pace", band = [98, 102], share = [0.2, 0.5] }
   intensity = { ref = "critical_speed", band = [90, 95] }
   start = { reps = 4, rep_seconds = 600, recovery_seconds = 60 }
   arrival = { reps = 3, rep_seconds = 900, recovery_seconds = 60 }
-  step = { reps = 1, rep_seconds = 120, recovery_seconds = 15 }
+  step = { reps = 1, rep_seconds = 300, recovery_seconds = 15 }
 
 [preparation.taper]
 qualities = 1
@@ -182,15 +182,15 @@ qualities = 2
   workout = "threshold"
   intensity = { ref = "critical_speed", band = [88, 93] }
   start = { reps = 3, rep_seconds = 600, recovery_seconds = 90 }
-  arrival = { reps = 4, rep_seconds = 900, recovery_seconds = 60 }
-  step = { reps = 1, rep_seconds = 120, recovery_seconds = 15 }
+  arrival = { reps = 4, rep_seconds = 900, recovery_seconds = 90 }
+  step = { reps = 1, rep_seconds = 300, recovery_seconds = 15 }
 
   [[preparation.development.key]]
   workout = "hills"
   intensity = { ref = "rpe", band = [7, 8] }
   start = { reps = 6, rep_seconds = 45, recovery_seconds = 120 }
-  arrival = { reps = 10, rep_seconds = 60, recovery_seconds = 120 }
-  step = { reps = 1, rep_seconds = 15, recovery_seconds = 15 }
+  arrival = { reps = 8, rep_seconds = 60, recovery_seconds = 120 }
+  step = { reps = 2, rep_seconds = 15, recovery_seconds = 15 }
 
 [preparation.specific]
 weeks = [5, 8]
@@ -202,8 +202,8 @@ long_run_segments = { ref = "goal_pace", band = [98, 102], share = [0.2, 0.5] }
   workout = "race-pace"
   intensity = { ref = "goal_pace", band = [99, 101] }
   start = { reps = 3, rep_seconds = 900, recovery_seconds = 120 }
-  arrival = { reps = 2, rep_seconds = 2700, recovery_seconds = 180 }
-  step = { reps = 1, rep_seconds = 600, recovery_seconds = 30 }
+  arrival = { reps = 2, rep_seconds = 2700, recovery_seconds = 120 }
+  step = { reps = 1, rep_seconds = 900, recovery_seconds = 30 }
   flagship = 2
 
   [[preparation.specific.key]]
@@ -211,7 +211,7 @@ long_run_segments = { ref = "goal_pace", band = [98, 102], share = [0.2, 0.5] }
   intensity = { ref = "critical_speed", band = [88, 93] }
   start = { reps = 4, rep_seconds = 600, recovery_seconds = 60 }
   arrival = { reps = 3, rep_seconds = 1200, recovery_seconds = 60 }
-  step = { reps = 1, rep_seconds = 180, recovery_seconds = 15 }
+  step = { reps = 1, rep_seconds = 600, recovery_seconds = 15 }
 
 [preparation.taper]
 qualities = 1
@@ -250,14 +250,14 @@ qualities = 2
   intensity = { ref = "rpe", band = [7, 8] }
   start = { reps = 6, rep_seconds = 60, recovery_seconds = 120 }
   arrival = { reps = 8, rep_seconds = 180, recovery_seconds = 120 }
-  step = { reps = 1, rep_seconds = 30, recovery_seconds = 15 }
+  step = { reps = 2, rep_seconds = 120, recovery_seconds = 15 }
 
   [[preparation.development.key]]
   workout = "threshold"
   intensity = { ref = "critical_speed", band = [88, 93] }
   start = { reps = 3, rep_seconds = 480, recovery_seconds = 90 }
-  arrival = { reps = 4, rep_seconds = 600, recovery_seconds = 60 }
-  step = { reps = 1, rep_seconds = 60, recovery_seconds = 15 }
+  arrival = { reps = 4, rep_seconds = 600, recovery_seconds = 90 }
+  step = { reps = 1, rep_seconds = 120, recovery_seconds = 15 }
 
 [preparation.specific]
 weeks = [4, 6]
@@ -269,7 +269,7 @@ qualities = 1
   intensity = { ref = "rpe", band = [6, 7] }
   start = { reps = 4, rep_seconds = 300, recovery_seconds = 180 }
   arrival = { reps = 4, rep_seconds = 600, recovery_seconds = 180 }
-  step = { reps = 1, rep_seconds = 60, recovery_seconds = 30 }
+  step = { reps = 1, rep_seconds = 150, recovery_seconds = 30 }
   flagship = 2
 
 [preparation.taper]
@@ -279,7 +279,7 @@ qualities = 1
   workout = "hills"
   intensity = { ref = "rpe", band = [6, 7] }
   start = { reps = 4, rep_seconds = 180, recovery_seconds = 180 }
-  arrival = { reps = 3, rep_seconds = 120, recovery_seconds = 180 }
+  arrival = { reps = 3, rep_seconds = 180, recovery_seconds = 180 }
   step = { reps = 1, rep_seconds = 60, recovery_seconds = 30 }
 
 [[preparation]]
@@ -306,7 +306,7 @@ qualities = 1
   intensity = { ref = "rpe", band = [6, 7] }
   start = { reps = 6, rep_seconds = 120, recovery_seconds = 120 }
   arrival = { reps = 6, rep_seconds = 300, recovery_seconds = 120 }
-  step = { reps = 1, rep_seconds = 60, recovery_seconds = 15 }
+  step = { reps = 1, rep_seconds = 90, recovery_seconds = 15 }
 
 [preparation.specific]
 weeks = [5, 8]
@@ -372,7 +372,7 @@ ramp_max_pct = 8
   intensity = { ref = "first_threshold", band = [95, 100] }
   start = { reps = 3, rep_seconds = 480, recovery_seconds = 60 }
   arrival = { reps = 4, rep_seconds = 720, recovery_seconds = 60 }
-  step = { reps = 1, rep_seconds = 120, recovery_seconds = 15 }
+  step = { reps = 1, rep_seconds = 240, recovery_seconds = 15 }
 
 [[general]]
 level = "light"
@@ -396,26 +396,31 @@ distance_km_max = 15
 weeks = [1, 1]
 no_quality_days = 5
 volume_pct = [50, 70]
+long_run_share_max = 0.25
 
 [[recovery]]
 distance_km_max = 25
 weeks = [1, 2]
 no_quality_days = 7
 volume_pct = [40, 60]
+long_run_share_max = 0.25
 
 [[recovery]]
 distance_km_max = 45
 weeks = [2, 3]
 no_quality_days = 10
 volume_pct = [30, 50]
+long_run_share_max = 0.25
 
 [[recovery]]
 distance_km_max = 400
 weeks = [3, 4]
 no_quality_days = 14
 volume_pct = [20, 40]
+long_run_share_max = 0.25
 
 # After a break, from half of the highest volume held (decided), at most 10 % a week.
 [[rebuild]]
 floor_pct = 50
 ramp_max_pct = 10
+long_run_share_max = 0.25
