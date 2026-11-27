@@ -127,10 +127,12 @@ LINEAGES_COUNT = "{count} lignée(s), chacune sur sa fiche"
 
 CYCLE_TEMPLATES = "gabarits de cycles lisibles"
 
-NO_CYCLE_TEMPLATES = "aucun cycle_templates.toml dans le vault"
+CYCLE_TEMPLATES_COUNT = ("{owner} : {preparation} préparation(s), {general} niveau(x) de "
+                         "générale, {recovery} récupération(s)")
 
-CYCLE_TEMPLATES_COUNT = ("{preparation} préparation(s), {general} niveau(x) de générale, "
-                         "{recovery} récupération(s)")
+INSTANCE_TEMPLATES = "gabarits du vault"
+
+ENGINE_TEMPLATES = "gabarits du moteur"
 
 FOLDER_EMPTY = "{capabilities_dir}/ est vide"
 

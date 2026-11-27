@@ -14,6 +14,7 @@ public extension Notebook {
         "long": SessionKind(short: "SL", name: "Sortie longue", family: "run"),
         "threshold": SessionKind(short: "seuil", name: "Seuil", family: "run"),
         "hills": SessionKind(short: "côtes", name: "Côtes", family: "run"),
+        "race-pace": SessionKind(short: "allure", name: "Allure course", family: "run"),
         "strides": SessionKind(short: "lignes", name: "Lignes", family: "run"),
         "cadence": SessionKind(short: "cad.", name: "Cadence", family: "run"),
         "race": SessionKind(short: "course", name: "Course", family: "run"),

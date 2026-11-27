@@ -24,6 +24,8 @@ DEFAULT = Path(__file__).with_name("plan_templates.default.toml")
 INSTANCE_NAME = "plan_templates.toml"
 #: The phases whose length is a range; the taper's is `taper_weeks`.
 RANGED = (PlanPhase.RECOVERY, PlanPhase.BASE, PlanPhase.DEVELOPMENT, PlanPhase.SPECIFIC)
+#: The phases a skeleton template declares, in the order they run.
+PHASES = (*RANGED, PlanPhase.TAPER)
 QUALITY_WORKOUTS = tuple(sorted(session_kinds.REPETITIONS))
 
 
@@ -57,7 +59,7 @@ TEMPLATE_SCHEMA = Schema("[[templates]]", [
           item=field("weeks", int, minimum=2, maximum=6)),
     field("deload_cut_pct", int, minimum=10, maximum=50),
     *(field(str(phase), dict, schema=_phase_schema(str(phase), phase in RANGED))
-      for phase in PlanPhase),
+      for phase in PHASES),
 ])
 DECLARATION_SCHEMA = Schema("plan_templates.toml", [
     field("templates", list, minimum=1, maximum=20,
@@ -96,7 +98,7 @@ class Template:
 
 def _template(data: dict) -> Template:
     phases = []
-    for phase in PlanPhase:
+    for phase in PHASES:
         raw = data[str(phase)]
         low, high = raw.get("weeks", [data["taper_weeks"], data["taper_weeks"]])
         phases.append((phase, Phase(low, high, raw["qualities"], tuple(raw["families"]))))

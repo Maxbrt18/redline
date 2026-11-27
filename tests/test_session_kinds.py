@@ -16,12 +16,12 @@ def test_slugs_are_lowercase_ascii():
 
 
 def test_the_derived_sets_keep_their_meaning():
-    assert {"easy", "long", "threshold", "hills", "strides", "cadence",
+    assert {"easy", "long", "threshold", "hills", "race-pace", "strides", "cadence",
             "race"} == session_kinds.RUN
     assert {"easy", "long"} == session_kinds.EASY_RUNS
-    assert {"threshold", "hills"} == session_kinds.QUALITY
-    assert {"threshold", "hills", "strides"} == session_kinds.REPETITIONS
-    assert {"long", "threshold", "hills", "race"} == session_kinds.DEMANDING
+    assert {"threshold", "hills", "race-pace"} == session_kinds.QUALITY
+    assert {"threshold", "hills", "race-pace", "strides"} == session_kinds.REPETITIONS
+    assert {"long", "threshold", "hills", "race-pace", "race"} == session_kinds.DEMANDING
     assert {"hike", "bike", "strength"} == session_kinds.HALF_LOAD
     assert set(session_kinds.READINGS) == {"wake-trace", "rest-reading"}
     assert "strength" in session_kinds.EFFORT and "instruments" not in session_kinds.EFFORT
@@ -29,7 +29,7 @@ def test_the_derived_sets_keep_their_meaning():
 
 def test_a_strava_sport_matches_the_planned_kinds_of_its_family():
     assert session_kinds.planned_for_sport("TrailRun") == (
-        "easy", "long", "threshold", "hills", "strides", "cadence", "race")
+        "easy", "long", "threshold", "hills", "race-pace", "strides", "cadence", "race")
     assert session_kinds.planned_for_sport("Walk") == ("hike",)
     assert session_kinds.planned_for_sport("WeightTraining") == ()
 

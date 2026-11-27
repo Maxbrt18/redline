@@ -1,0 +1,426 @@
+# The engine's cycle templates, version 2: the method each kind of training cycle
+# follows (`redline.model.cycle_templates`). An instance's `cycle_templates.toml` at its
+# vault root replaces this file as a whole.
+#
+# A template is a method, never an athlete's plan: volumes are shares of the highest
+# weekly volume the athlete held, intensities bands around a reference (% of its speed for
+# a speed reference, the 1-10 scale for rpe). Where a value comes from the literature, its
+# source is named; the others are conventions of the method, to check against what the
+# athlete answers.
+#
+# Sources:
+# - taper: 41 to 60 % of volume over 8 to 14 days, frequency and intensity kept (Bosquet
+#   et al. 2007; Wang et al. 2023); 14 to 21 days before a marathon;
+# - critical speed: the upper limit of a threshold session, the heavy domain below it
+#   (Jones et al. 2019); the first threshold near 82 % of CS (Hunter et al. 2024);
+# - general preparation: at least one first-threshold session a week, started easy, 20 to
+#   30 % in reserve; volume at 70 to 80 % of the highest held for higher-volume runners,
+#   at it for low-volume ones; short long run; deloads in blocks of 2 to 4 days rather
+#   than weeks; a domain of at least 40 to 50 km a week (RunWise, a single author; the
+#   elite review of Casado et al. 2022 describes two quality sessions a week instead);
+# - long run: at most 25 to 30 % of the week's volume (Daniels, Running Formula).
+version = 2
+default_level = "maintain"
+
+# ------------------------------------------------------------------ preparations
+#
+# The window before the race: development, specific block, taper. The weeks before it are
+# the general preparation. Deloads are scheduled every 3 to 4 weeks and cut a quarter of
+# the week (a convention of linear plans). A candidate's peak never exceeds 120 % of the
+# highest weekly volume held (a convention: lost weeks are never caught up).
+
+[[preparation]]
+slug = "short-road"
+terrain = "road"
+distance_km_max = 15
+taper_weeks = 2
+taper_cut_pct = [41, 60]
+deload_mode = "scheduled"
+deload_every_weeks = [3, 4]
+deload_cut_pct = 25
+phases = ["development", "specific", "taper"]
+window_weeks = [7, 12]
+min_held_km = 30
+peak_pct_of_held = 120
+long_run_km_max = 16
+
+[preparation.development]
+weeks = [4, 6]
+long_run_share_max = 0.30
+qualities = 2
+
+  [[preparation.development.key]]
+  workout = "threshold"
+  intensity = { ref = "critical_speed", band = [90, 95] }
+  start = { reps = 3, rep_seconds = 360, recovery_seconds = 90 }
+  arrival = { reps = 4, rep_seconds = 480, recovery_seconds = 90 }
+  step = { reps = 1, rep_seconds = 120, recovery_seconds = 15 }
+
+  [[preparation.development.key]]
+  workout = "hills"
+  intensity = { ref = "rpe", band = [7, 8] }
+  start = { reps = 6, rep_seconds = 45, recovery_seconds = 120 }
+  arrival = { reps = 8, rep_seconds = 60, recovery_seconds = 120 }
+  step = { reps = 2, rep_seconds = 15, recovery_seconds = 15 }
+
+[preparation.specific]
+weeks = [3, 5]
+long_run_share_max = 0.30
+qualities = 2
+
+  [[preparation.specific.key]]
+  workout = "race-pace"
+  intensity = { ref = "goal_pace", band = [99, 101] }
+  start = { reps = 5, rep_seconds = 180, recovery_seconds = 90 }
+  arrival = { reps = 5, rep_seconds = 300, recovery_seconds = 90 }
+  step = { reps = 1, rep_seconds = 60, recovery_seconds = 15 }
+  flagship = 2
+
+  [[preparation.specific.key]]
+  workout = "threshold"
+  intensity = { ref = "critical_speed", band = [92, 97] }
+  start = { reps = 4, rep_seconds = 480, recovery_seconds = 60 }
+  arrival = { reps = 3, rep_seconds = 720, recovery_seconds = 60 }
+  step = { reps = 1, rep_seconds = 240, recovery_seconds = 15 }
+
+[preparation.taper]
+qualities = 1
+
+  [[preparation.taper.key]]
+  workout = "race-pace"
+  intensity = { ref = "goal_pace", band = [99, 101] }
+  start = { reps = 4, rep_seconds = 180, recovery_seconds = 90 }
+  arrival = { reps = 3, rep_seconds = 180, recovery_seconds = 90 }
+  step = { reps = 1, rep_seconds = 60, recovery_seconds = 15 }
+
+[[preparation]]
+slug = "half-road"
+terrain = "road"
+distance_km_max = 25
+taper_weeks = 2
+taper_cut_pct = [41, 60]
+deload_mode = "scheduled"
+deload_every_weeks = [3, 4]
+deload_cut_pct = 25
+phases = ["development", "specific", "taper"]
+window_weeks = [8, 14]
+min_held_km = 35
+peak_pct_of_held = 120
+long_run_km_max = 22
+
+[preparation.development]
+weeks = [4, 6]
+long_run_share_max = 0.30
+qualities = 2
+
+  [[preparation.development.key]]
+  workout = "threshold"
+  intensity = { ref = "critical_speed", band = [90, 95] }
+  start = { reps = 3, rep_seconds = 480, recovery_seconds = 90 }
+  arrival = { reps = 4, rep_seconds = 600, recovery_seconds = 90 }
+  step = { reps = 1, rep_seconds = 120, recovery_seconds = 15 }
+
+  [[preparation.development.key]]
+  workout = "hills"
+  intensity = { ref = "rpe", band = [7, 8] }
+  start = { reps = 6, rep_seconds = 45, recovery_seconds = 120 }
+  arrival = { reps = 8, rep_seconds = 60, recovery_seconds = 120 }
+  step = { reps = 2, rep_seconds = 15, recovery_seconds = 15 }
+
+[preparation.specific]
+weeks = [4, 6]
+long_run_share_max = 0.35
+qualities = 2
+long_run_segments = { ref = "goal_pace", band = [98, 102], share = [0.2, 0.5] }
+
+  [[preparation.specific.key]]
+  workout = "race-pace"
+  intensity = { ref = "goal_pace", band = [99, 101] }
+  start = { reps = 3, rep_seconds = 600, recovery_seconds = 120 }
+  arrival = { reps = 2, rep_seconds = 1500, recovery_seconds = 120 }
+  step = { reps = 1, rep_seconds = 450, recovery_seconds = 30 }
+  flagship = 2
+
+  [[preparation.specific.key]]
+  workout = "threshold"
+  intensity = { ref = "critical_speed", band = [90, 95] }
+  start = { reps = 4, rep_seconds = 600, recovery_seconds = 60 }
+  arrival = { reps = 3, rep_seconds = 900, recovery_seconds = 60 }
+  step = { reps = 1, rep_seconds = 300, recovery_seconds = 15 }
+
+[preparation.taper]
+qualities = 1
+
+  [[preparation.taper.key]]
+  workout = "race-pace"
+  intensity = { ref = "goal_pace", band = [99, 101] }
+  start = { reps = 3, rep_seconds = 480, recovery_seconds = 120 }
+  arrival = { reps = 3, rep_seconds = 360, recovery_seconds = 120 }
+  step = { reps = 1, rep_seconds = 120, recovery_seconds = 30 }
+
+[[preparation]]
+slug = "marathon-road"
+terrain = "road"
+distance_km_max = 45
+taper_weeks = 3
+taper_cut_pct = [41, 60]
+deload_mode = "scheduled"
+deload_every_weeks = [3, 4]
+deload_cut_pct = 25
+phases = ["development", "specific", "taper"]
+window_weeks = [10, 16]
+min_held_km = 45
+peak_pct_of_held = 120
+long_run_km_max = 32
+
+[preparation.development]
+weeks = [4, 6]
+long_run_share_max = 0.30
+qualities = 2
+
+  [[preparation.development.key]]
+  workout = "threshold"
+  intensity = { ref = "critical_speed", band = [88, 93] }
+  start = { reps = 3, rep_seconds = 600, recovery_seconds = 90 }
+  arrival = { reps = 4, rep_seconds = 900, recovery_seconds = 90 }
+  step = { reps = 1, rep_seconds = 300, recovery_seconds = 15 }
+
+  [[preparation.development.key]]
+  workout = "hills"
+  intensity = { ref = "rpe", band = [7, 8] }
+  start = { reps = 6, rep_seconds = 45, recovery_seconds = 120 }
+  arrival = { reps = 8, rep_seconds = 60, recovery_seconds = 120 }
+  step = { reps = 2, rep_seconds = 15, recovery_seconds = 15 }
+
+[preparation.specific]
+weeks = [5, 8]
+long_run_share_max = 0.35
+qualities = 2
+long_run_segments = { ref = "goal_pace", band = [98, 102], share = [0.2, 0.5] }
+
+  [[preparation.specific.key]]
+  workout = "race-pace"
+  intensity = { ref = "goal_pace", band = [99, 101] }
+  start = { reps = 3, rep_seconds = 900, recovery_seconds = 120 }
+  arrival = { reps = 2, rep_seconds = 2700, recovery_seconds = 120 }
+  step = { reps = 1, rep_seconds = 900, recovery_seconds = 30 }
+  flagship = 2
+
+  [[preparation.specific.key]]
+  workout = "threshold"
+  intensity = { ref = "critical_speed", band = [88, 93] }
+  start = { reps = 4, rep_seconds = 600, recovery_seconds = 60 }
+  arrival = { reps = 3, rep_seconds = 1200, recovery_seconds = 60 }
+  step = { reps = 1, rep_seconds = 600, recovery_seconds = 15 }
+
+[preparation.taper]
+qualities = 1
+
+  [[preparation.taper.key]]
+  workout = "race-pace"
+  intensity = { ref = "goal_pace", band = [99, 101] }
+  start = { reps = 2, rep_seconds = 1200, recovery_seconds = 180 }
+  arrival = { reps = 2, rep_seconds = 600, recovery_seconds = 180 }
+  step = { reps = 1, rep_seconds = 300, recovery_seconds = 30 }
+
+# A trail's pace depends on its ground: its key sessions read effort and the critical
+# speed, never a goal pace.
+[[preparation]]
+slug = "trail"
+terrain = "trail"
+distance_km_max = 45
+taper_weeks = 2
+taper_cut_pct = [30, 50]
+deload_mode = "scheduled"
+deload_every_weeks = [3, 4]
+deload_cut_pct = 25
+phases = ["development", "specific", "taper"]
+window_weeks = [8, 14]
+min_held_km = 35
+peak_pct_of_held = 120
+long_run_km_max = 30
+
+[preparation.development]
+weeks = [4, 6]
+long_run_share_max = 0.35
+qualities = 2
+
+  [[preparation.development.key]]
+  workout = "hills"
+  intensity = { ref = "rpe", band = [7, 8] }
+  start = { reps = 6, rep_seconds = 60, recovery_seconds = 120 }
+  arrival = { reps = 8, rep_seconds = 180, recovery_seconds = 120 }
+  step = { reps = 2, rep_seconds = 120, recovery_seconds = 15 }
+
+  [[preparation.development.key]]
+  workout = "threshold"
+  intensity = { ref = "critical_speed", band = [88, 93] }
+  start = { reps = 3, rep_seconds = 480, recovery_seconds = 90 }
+  arrival = { reps = 4, rep_seconds = 600, recovery_seconds = 90 }
+  step = { reps = 1, rep_seconds = 120, recovery_seconds = 15 }
+
+[preparation.specific]
+weeks = [4, 6]
+long_run_share_max = 0.40
+qualities = 1
+
+  [[preparation.specific.key]]
+  workout = "hills"
+  intensity = { ref = "rpe", band = [6, 7] }
+  start = { reps = 4, rep_seconds = 300, recovery_seconds = 180 }
+  arrival = { reps = 4, rep_seconds = 600, recovery_seconds = 180 }
+  step = { reps = 1, rep_seconds = 150, recovery_seconds = 30 }
+  flagship = 2
+
+[preparation.taper]
+qualities = 1
+
+  [[preparation.taper.key]]
+  workout = "hills"
+  intensity = { ref = "rpe", band = [6, 7] }
+  start = { reps = 4, rep_seconds = 180, recovery_seconds = 180 }
+  arrival = { reps = 3, rep_seconds = 180, recovery_seconds = 180 }
+  step = { reps = 1, rep_seconds = 60, recovery_seconds = 30 }
+
+[[preparation]]
+slug = "ultra"
+distance_km_max = 400
+taper_weeks = 3
+taper_cut_pct = [30, 50]
+deload_mode = "scheduled"
+deload_every_weeks = [3, 4]
+deload_cut_pct = 30
+phases = ["development", "specific", "taper"]
+window_weeks = [12, 18]
+min_held_km = 50
+peak_pct_of_held = 120
+long_run_km_max = 40
+
+[preparation.development]
+weeks = [5, 8]
+long_run_share_max = 0.40
+qualities = 1
+
+  [[preparation.development.key]]
+  workout = "hills"
+  intensity = { ref = "rpe", band = [6, 7] }
+  start = { reps = 6, rep_seconds = 120, recovery_seconds = 120 }
+  arrival = { reps = 6, rep_seconds = 300, recovery_seconds = 120 }
+  step = { reps = 1, rep_seconds = 90, recovery_seconds = 15 }
+
+[preparation.specific]
+weeks = [5, 8]
+long_run_share_max = 0.45
+qualities = 1
+
+  [[preparation.specific.key]]
+  workout = "hills"
+  intensity = { ref = "rpe", band = [5, 6] }
+  start = { reps = 3, rep_seconds = 600, recovery_seconds = 180 }
+  arrival = { reps = 3, rep_seconds = 1200, recovery_seconds = 180 }
+  step = { reps = 1, rep_seconds = 300, recovery_seconds = 30 }
+  flagship = 2
+
+[preparation.taper]
+qualities = 1
+
+  [[preparation.taper.key]]
+  workout = "hills"
+  intensity = { ref = "rpe", band = [5, 6] }
+  start = { reps = 3, rep_seconds = 300, recovery_seconds = 180 }
+  arrival = { reps = 2, rep_seconds = 300, recovery_seconds = 180 }
+  step = { reps = 1, rep_seconds = 60, recovery_seconds = 30 }
+
+# ------------------------------------------------------------------ general preparation
+#
+# One quality session a week at every level (RunWise, decided over the elite practice),
+# the first threshold started easy. Deloads are triggered blocks of 2 to 4 days, outside
+# the trame. A version covers a block of 4 weeks (O6).
+
+[[general]]
+level = "maintain"
+deload_mode = "triggered"
+deload_days = [2, 4]
+block_weeks = 4
+volume_pct = [70, 80]
+band_from_km = 40
+qualities = 1
+long_run_share_max = 0.25
+min_held_km = 40
+
+  [[general.key]]
+  workout = "threshold"
+  intensity = { ref = "first_threshold", band = [95, 100] }
+  start = { reps = 3, rep_seconds = 480, recovery_seconds = 60 }
+  arrival = { reps = 3, rep_seconds = 720, recovery_seconds = 60 }
+  step = { reps = 1, rep_seconds = 120, recovery_seconds = 15 }
+
+[[general]]
+level = "progress"
+deload_mode = "triggered"
+deload_days = [2, 4]
+block_weeks = 4
+volume_pct = [80, 100]
+band_from_km = 40
+qualities = 1
+long_run_share_max = 0.25
+min_held_km = 40
+ramp_max_pct = 8
+
+  [[general.key]]
+  workout = "threshold"
+  intensity = { ref = "first_threshold", band = [95, 100] }
+  start = { reps = 3, rep_seconds = 480, recovery_seconds = 60 }
+  arrival = { reps = 4, rep_seconds = 720, recovery_seconds = 60 }
+  step = { reps = 1, rep_seconds = 240, recovery_seconds = 15 }
+
+[[general]]
+level = "light"
+deload_mode = "triggered"
+deload_days = [2, 4]
+block_weeks = 4
+volume_pct = [50, 70]
+band_from_km = 30
+qualities = 0
+long_run_share_max = 0.25
+min_held_km = 20
+
+# ------------------------------------------------------------------ recovery and rebuild
+#
+# After a race, by its distance: the first days without a quality session, then a volume
+# coming back within its band. These lengths are conventions, sourced at the transitions;
+# a recovery is lengthened while pain or the morning trace stays above its base.
+
+[[recovery]]
+distance_km_max = 15
+weeks = [1, 1]
+no_quality_days = 5
+volume_pct = [50, 70]
+long_run_share_max = 0.25
+
+[[recovery]]
+distance_km_max = 25
+weeks = [1, 2]
+no_quality_days = 7
+volume_pct = [40, 60]
+long_run_share_max = 0.25
+
+[[recovery]]
+distance_km_max = 45
+weeks = [2, 3]
+no_quality_days = 10
+volume_pct = [30, 50]
+long_run_share_max = 0.25
+
+[[recovery]]
+distance_km_max = 400
+weeks = [3, 4]
+no_quality_days = 14
+volume_pct = [20, 40]
+long_run_share_max = 0.25
+
+# After a break, from half of the highest volume held (decided), at most 10 % a week.
+[[rebuild]]
+floor_pct = 50
+ramp_max_pct = 10
+long_run_share_max = 0.25

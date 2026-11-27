@@ -46,6 +46,8 @@ KINDS = (
                 repetitions=True, demanding=True),
     SessionKind("hills", "run", planned=True, recorded=True, quality=True,
                 repetitions=True, demanding=True),
+    SessionKind("race-pace", "run", planned=True, recorded=True, quality=True,
+                repetitions=True, demanding=True),
     SessionKind("strides", "run", planned=True, recorded=True, repetitions=True),
     SessionKind("cadence", "run", planned=True, recorded=True),
     SessionKind("race", "run", planned=True, recorded=True, demanding=True, fuelled=True),

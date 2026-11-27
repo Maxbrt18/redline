@@ -38,6 +38,7 @@ from .vocabulary import (
     RaceTerrain,
 )
 
+DEFAULT = Path(__file__).with_name("cycle_templates.default.toml")
 INSTANCE_NAME = "cycle_templates.toml"
 VERSION = 2
 #: The phases of a preparation's window, in the order they run; the taper ends it.
@@ -115,10 +116,12 @@ def _dose_schema(name: str) -> Schema:
 
 
 def _key_check(data: dict) -> list[str]:
-    if set(data["start"]) != set(data["arrival"]):
-        return [f"{data['workout']}: start and arrival name different variables "
-                f"({', '.join(sorted(data['start']))} / {', '.join(sorted(data['arrival']))})"]
-    return []
+    named = {name: set(data[name]) for name in ("start", "arrival", "step")}
+    if len({frozenset(variables) for variables in named.values()}) > 1:
+        return [f"{data['workout']}: start, arrival and step name different variables ("
+                + " / ".join(", ".join(sorted(variables)) for variables in named.values()) + ")"]
+    return [f"{data['workout']}: the step of {name} is not positive"
+            for name, value in sorted(data["step"].items()) if value <= 0]
 
 
 KEY = Schema("key", [
@@ -126,6 +129,8 @@ KEY = Schema("key", [
     field("intensity", dict, schema=INTENSITY),
     field("start", dict, schema=_dose_schema("start")),
     field("arrival", dict, schema=_dose_schema("arrival")),
+    field("step", dict, schema=_dose_schema("step"),
+          note="the most each variable moves from one exposure to the next"),
     field("flagship", int, required=False, minimum=0, maximum=6,
           note="the last exposures that are flagship sessions"),
 ], check=_key_check)
@@ -143,7 +148,10 @@ def _qualities_check(data: dict) -> list[str]:
 def _phase_schema(phase: PlanPhase) -> Schema:
     ranged = phase != PlanPhase.TAPER
     return Schema(f"[preparation.{phase}]", [
-        *([_range("weeks", int, 0, 20)] if ranged else []),
+        *([_range("weeks", int, 0, 20),
+           field("long_run_share_max", float, minimum=0, maximum=1,
+                 note="the largest share of a week's volume its long run takes")]
+          if ranged else []),
         field("qualities", int, minimum=0, maximum=4),
         field("key", list, required=False, maximum=4, item=field("key", dict, schema=KEY)),
         field("long_run_segments", dict, required=False, schema=SEGMENTS),
@@ -205,6 +213,11 @@ PREPARATION = Schema("[[preparation]]", [
     _range("window_weeks", int, 1, 40, note="the phases from the first to the race week"),
     field("min_held_km", float, minimum=0,
           note="under this highest weekly volume held, the template is out of its domain"),
+    field("peak_pct_of_held", float, minimum=100, maximum=200,
+          note="the highest peak a candidate may propose, in % of the highest weekly volume "
+               "held"),
+    field("long_run_km_max", float, minimum=5, maximum=80,
+          note="the longest long run of the preparation"),
     *(field(str(phase), dict, required=False, schema=_phase_schema(phase))
       for phase in PREPARATION_PHASES),
 ], check=_all(_ordered("taper_cut_pct", "window_weeks", "deload_every_weeks", "deload_days"),
@@ -242,12 +255,14 @@ RECOVERY = Schema("[[recovery]]", [
     _range("weeks", int, 0, 8),
     field("no_quality_days", int, minimum=0, maximum=28),
     _range("volume_pct", float, 0, 150, note="% of the highest weekly volume held"),
+    field("long_run_share_max", float, minimum=0, maximum=1),
 ], check=_ordered("weeks", "volume_pct"))
 
 REBUILD = Schema("[[rebuild]]", [
     field("floor_pct", float, minimum=0, maximum=100,
           note="% of the highest weekly volume held, where the way back starts"),
     field("ramp_max_pct", float, minimum=0, maximum=20),
+    field("long_run_share_max", float, minimum=0, maximum=1),
 ])
 
 SORTS: dict[CycleKind, Schema] = {CycleKind.PREPARATION: PREPARATION,
@@ -288,6 +303,8 @@ class KeySession:
     intensity: Intensity
     start: Dose
     arrival: Dose
+    #: The most each variable moves from one exposure to the next.
+    step: Dose
     #: The last exposures that are flagship sessions.
     flagship: int = 0
 
@@ -308,6 +325,9 @@ class Phase:
     qualities: int
     keys: tuple[KeySession, ...] = ()
     segments: Segments | None = None
+    #: The largest share of a week's volume its long run takes; None in the taper, whose
+    #: long run follows its cut.
+    long_run_share_max: float | None = None
 
 
 @dataclass(frozen=True)
@@ -329,6 +349,14 @@ class Preparation:
     phases: tuple[Phase, ...]
     window_weeks: Range
     min_held_km: float
+    peak_pct_of_held: float
+    long_run_km_max: float
+
+    def phase(self, name: PlanPhase) -> Phase | None:
+        return next((phase for phase in self.phases if phase.name == name), None)
+
+    def serves(self, distance_km: float, terrain: RaceTerrain) -> bool:
+        return distance_km <= self.distance_km_max and self.terrain in (None, terrain)
 
 
 @dataclass(frozen=True)
@@ -351,12 +379,14 @@ class Recovery:
     weeks: Range
     no_quality_days: int
     volume_pct: Range
+    long_run_share_max: float
 
 
 @dataclass(frozen=True)
 class Rebuild:
     floor_pct: float
     ramp_max_pct: float
+    long_run_share_max: float
 
 
 @dataclass(frozen=True)
@@ -366,6 +396,16 @@ class CycleTemplates:
     recovery: tuple[Recovery, ...]
     rebuild: Rebuild
     default_level: GeneralLevel
+
+    def preparation_for(self, distance_km: float, terrain: RaceTerrain) -> Preparation | None:
+        """The first preparation template that serves the race, in declaration order."""
+        return next((template for template in self.preparation
+                     if template.serves(distance_km, terrain)), None)
+
+    def recovery_after(self, distance_km: float) -> Recovery | None:
+        """The recovery of the shortest distance band that holds the race."""
+        held = [template for template in self.recovery if distance_km <= template.distance_km_max]
+        return min(held, key=lambda template: template.distance_km_max, default=None)
 
     def general_at(self, level: GeneralLevel) -> General | None:
         return next((template for template in self.general if template.level == level), None)
@@ -381,7 +421,7 @@ def _dose(data: dict) -> Dose:
 
 def _keys(data: dict) -> tuple[KeySession, ...]:
     return tuple(KeySession(key["workout"], _intensity(key["intensity"]), _dose(key["start"]),
-                            _dose(key["arrival"]), key.get("flagship") or 0)
+                            _dose(key["arrival"]), _dose(key["step"]), key.get("flagship") or 0)
                  for key in data.get("key") or [])
 
 
@@ -397,14 +437,17 @@ def _preparation(data: dict) -> Preparation:
         raw, phase = data[name], PlanPhase(name)
         segments = raw.get("long_run_segments")
         weeks = raw.get("weeks", [data["taper_weeks"], data["taper_weeks"]])
+        share = raw.get("long_run_share_max")
         phases.append(Phase(phase, Range.of(weeks), raw["qualities"], _keys(raw),
                             Segments(_intensity(segments), Range.of(segments["share"]))
-                            if segments else None))
+                            if segments else None,
+                            None if share is None else float(share)))
     terrain = data.get("terrain")
     return Preparation(data["slug"], RaceTerrain(terrain) if terrain else None,
                        float(data["distance_km_max"]), data["taper_weeks"],
                        Range.of(data["taper_cut_pct"]), _deload(data), tuple(phases),
-                       Range.of(data["window_weeks"]), float(data["min_held_km"]))
+                       Range.of(data["window_weeks"]), float(data["min_held_km"]),
+                       float(data["peak_pct_of_held"]), float(data["long_run_km_max"]))
 
 
 def _general(data: dict) -> General:
@@ -438,10 +481,11 @@ def parse(text: str, source: Path) -> CycleTemplates:
         tuple(_preparation(item) for item in payload[CycleKind.PREPARATION]),
         tuple(_general(item) for item in payload[CycleKind.GENERAL]),
         tuple(Recovery(float(item["distance_km_max"]), Range.of(item["weeks"]),
-                       item["no_quality_days"], Range.of(item["volume_pct"]))
+                       item["no_quality_days"], Range.of(item["volume_pct"]),
+                       float(item["long_run_share_max"]))
               for item in payload[CycleKind.RECOVERY]),
         Rebuild(*(float(payload[CycleKind.REBUILD][0][name])
-                  for name in ("floor_pct", "ramp_max_pct"))),
+                  for name in ("floor_pct", "ramp_max_pct", "long_run_share_max"))),
         GeneralLevel(payload["default_level"]))
     problems = []
     if doubled := _doubled([template.slug for template in found.preparation]):
@@ -461,3 +505,8 @@ def load_instance(vault: Path) -> CycleTemplates | None:
     """The instance's cycle templates, or None when it declares none."""
     path = vault / INSTANCE_NAME
     return parse(path.read_text(encoding="utf-8"), path) if path.is_file() else None
+
+
+def load(vault: Path) -> CycleTemplates:
+    """The instance's cycle templates when it declares them, else the engine's."""
+    return load_instance(vault) or parse(DEFAULT.read_text(encoding="utf-8"), DEFAULT)

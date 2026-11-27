@@ -542,13 +542,17 @@ class GoalSource(StrEnum):
 
 
 class PlanPhase(StrEnum):
-    """The phases of a plan skeleton, in the order they run (`redline.model.plan_skeleton`)."""
+    """The phase of a week: of a plan skeleton (`redline.model.plan_skeleton`, recovery to
+    taper) or of a cycle's trame (`redline.model.plan_generator`), whose general preparation
+    replaces the skeleton's base."""
 
     RECOVERY = "recovery"
     BASE = "base"
     DEVELOPMENT = "development"
     SPECIFIC = "specific"
     TAPER = "taper"
+    GENERAL = "general"
+    REBUILD = "rebuild"
 
 
 class CycleKind(StrEnum):
@@ -615,6 +619,15 @@ class RetestReason(StrEnum):
 
 #: Who adopts a calibration: the rule on a declared effort, or the athlete's request.
 CALIBRATION_DECIDERS = (Decider.RULE, Decider.REQUEST)
+
+
+class KeyRole(StrEnum):
+    """What a key session of a trame is: a key session, one of the flagship sessions that
+    end its block, or a test."""
+
+    KEY = "key"
+    FLAGSHIP = "flagship"
+    TEST = "test"
 
 
 class DeloadMode(StrEnum):

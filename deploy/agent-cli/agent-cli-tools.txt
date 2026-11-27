@@ -3,6 +3,7 @@
 # turn really needs it. CI checks existence, ordering and prompt references.
 chart-month
 chart-week
+cycle
 decisions-index
 descent
 fact-read

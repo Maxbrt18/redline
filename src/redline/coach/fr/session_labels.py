@@ -13,6 +13,7 @@ LABELS = {
     "long": ("SL", "Sortie longue"),
     "threshold": ("seuil", "Seuil"),
     "hills": ("côtes", "Côtes"),
+    "race-pace": ("allure", "Allure course"),
     "strides": ("lignes", "Lignes"),
     "cadence": ("cad.", "Cadence"),
     "race": ("course", "Course"),
