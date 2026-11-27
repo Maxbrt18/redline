@@ -212,9 +212,6 @@ def bound(pieces: Iterable[tuple[dt.date, float, float]]) -> Bound | None:
 def pieces(store: Any, rows: Iterable[Row], today: dt.date,
            config: Settings) -> list[tuple[dt.date, float, float]]:
     """The flat runs of the recent weeks, whole, and the repetitions their laps show."""
-    from redline.model import debrief
-    from redline.model.activity import Activity
-
     from . import easy_load
 
     since = today - dt.timedelta(weeks=config.bound_weeks)
@@ -225,13 +222,6 @@ def pieces(store: Any, rows: Iterable[Row], today: dt.date,
                 or terrain.of(row.km * 1000, row.dplus, row.dminus) is not terrain.Terrain.FLAT:
             continue
         out.append((row.date, row.km, row.hours * 3600))
-        activity = easy_load.strava_id(row.idempotency_key)
-        if activity is None:
-            continue
-        try:
-            laps = Activity.from_json(store.strava_intake(activity)["distilled"]).laps
-        except Exception:  # no capture or an unreadable one: the run stands whole
-            continue
         out.extend((row.date, rep["dist_m"] / 1000, rep["time_s"])
-                   for rep in debrief.workout_reps(laps) or [])
+                   for rep in easy_load.stored_reps(store, row) or [])
     return out
