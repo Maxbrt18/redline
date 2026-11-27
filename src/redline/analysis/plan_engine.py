@@ -21,9 +21,9 @@ from redline.model import iso_week, plan_skeleton, plan_templates, rulebook, ses
 from redline.model import race as race_model
 from redline.model.errors import ConfigError, InputError
 from redline.model.plan_skeleton import NOTHING_HELD, Held, Levers, Limits, Skeleton, Start
-from redline.model.vocabulary import DeadlineStatus, SessionStatus
+from redline.model.vocabulary import DeadlineStatus, RaceTerrain, SessionStatus
 
-from . import expected_rpe, ledger
+from . import expected_rpe, ledger, race_estimate
 
 #: The closed weeks the starting volume is the mean of.
 START_WEEKS = 3
@@ -47,6 +47,8 @@ class Frame:
     first: dt.date
     recovering: bool
     held: Held = NOTHING_HELD
+    #: The goal's time by VDOT equivalence from a recent flat race; road goals only.
+    estimate: race_estimate.Estimate | None = None
 
 
 def start_of(rows: list[ledger.Row], today: dt.date) -> Start:
@@ -117,7 +119,10 @@ def frame(store: Any, today: dt.date) -> Frame:
     config = expected_rpe.settings()
     held = (held_of(rows, expected_rpe.history(store, rows, config), today)
             if config is not None else NOTHING_HELD)
-    return Frame(race, goal, template, start_of(rows, today), limits, first, recovering, held)
+    estimate = (race_estimate.estimate(rows, today, goal.distance_km)
+                if goal.terrain == RaceTerrain.ROAD else None)
+    return Frame(race, goal, template, start_of(rows, today), limits, first, recovering,
+                 held, estimate)
 
 
 def candidates(store: Any, today: dt.date) -> tuple[Frame, list[Skeleton]]:
@@ -176,12 +181,29 @@ def _week_line(week: plan_skeleton.Week) -> str:
         load=text.LOAD.format(load=week.load) if week.load is not None else text.NO_LOAD)
 
 
+def _clock(seconds: float) -> str:
+    hours, rest = divmod(round(seconds), 3600)
+    return f"{hours}:{rest // 60:02d}:{rest % 60:02d}"
+
+
 def _goal_line(goal: race_model.Goal) -> str:
     if goal.goal_time_s is None or goal.goal_source is None:
         return ""
-    hours, rest = divmod(goal.goal_time_s, 3600)
-    return text.GOAL.format(time=f"{hours}:{rest // 60:02d}:{rest % 60:02d}",
+    return text.GOAL.format(time=_clock(goal.goal_time_s),
                             source=text.GOAL_SOURCES[goal.goal_source])
+
+
+def _estimate_line(found: Frame) -> list[str]:
+    """The VDOT equivalence of a road goal, or why there is none."""
+    if found.goal.terrain != RaceTerrain.ROAD:
+        return []
+    item = found.estimate
+    if item is None:
+        return [text.NO_ESTIMATE.format(weeks=race_estimate.RECENT_WEEKS,
+                                        km=f"{race_estimate.MIN_SOURCE_KM:g}")]
+    return [text.ESTIMATE.format(time=_clock(item.time_s), vdot=text.number(item.vdot),
+                                 km=text.number(item.source_km), on=item.source_on,
+                                 source=_clock(item.source_s))]
 
 
 def _risks(skeleton: Skeleton) -> str:
@@ -210,6 +232,7 @@ def render(found: Frame, skeletons: list[Skeleton], *, chosen: bool = False) -> 
              text.START.format(volume=f"{found.start.volume_km:g}",
                                long_run=f"{found.start.long_run_km:g}",
                                recovery=text.RECOVERY if found.recovering else ""),
+             *_estimate_line(found),
              _held_line(found.held)]
     for skeleton in skeletons:
         levers = skeleton.levers

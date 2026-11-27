@@ -21,6 +21,11 @@ HELD = ("Ce que l'athlète a tenu (contre-lecture) : une qualité ajoute {premiu
 UNKNOWN = "inconnu"
 LOAD = ", charge {load:g}"
 NO_LOAD = ", charge inconnue"
+ESTIMATE = ("Équivalence VDOT : {time} (VDOT {vdot}, depuis {km} km en {source} le "
+            "{on:%d/%m/%Y}). Une estimation, pas un objectif : si l'athlète la retient, "
+            "`goal_source = equivalence`.")
+NO_ESTIMATE = ("Équivalence VDOT : aucune course à plat d'au moins {km} km dans les {weeks} "
+               "dernières semaines.")
 CANDIDATE = ("Candidat « {candidate} » : bloc spécifique {specific} sem., décharge toutes les "
              "{deload} sem., 2e qualité à partir du {second}.")
 CHOSEN = "Squelette choisi : « {candidate} » (spécifique {specific} sem., décharge /{deload}, 2e qualité en {second})."

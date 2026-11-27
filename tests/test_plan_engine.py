@@ -166,3 +166,13 @@ def test_what_the_athlete_held_is_read_from_the_closed_weeks(runs):
     assert held.long_share == pytest.approx(14 / 40)
     line = plan_engine._held_line(held)
     assert "une qualité ajoute 6,9 de charge" in line and "35 %" in line
+
+
+def test_a_road_goal_shows_its_vdot_equivalence(runs, monkeypatch):
+    rows = [*runs, ledger.Row(dt.date(2030, 10, 12), "race", km=10, hours=44 / 60)]
+    monkeypatch.setattr(ledger, "parse_ledger", lambda store: rows)
+    lines = plan_engine.report(Store(), TODAY)
+    line = next(line for line in lines if line.startswith("Équivalence VDOT"))
+    assert "depuis 10 km en 0:44:00 le 12/10/2030" in line and "goal_source = equivalence" in line
+    monkeypatch.setattr(ledger, "parse_ledger", lambda store: runs)
+    assert any("aucune course à plat" in line for line in plan_engine.report(Store(), TODAY))
