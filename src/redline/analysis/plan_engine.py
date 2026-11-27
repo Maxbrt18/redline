@@ -3,7 +3,8 @@
 The computation lives in `redline.model.plan_skeleton`; this module gathers its inputs:
 the race and its goal, the template that serves it, the rulebook's thresholds, and where
 the athlete stands (the mean weekly running volume of the closed weeks before, the
-longest run of the last 30 days). The skeleton starts with the current week, so a week
+longest run of the last 30 days), and what the athlete held (`held_of`), the
+counter-reading's reference. The skeleton starts with the current week, so a week
 off is read at the next computation: what is left compresses or lengthens, never made up.
 """
 
@@ -19,10 +20,10 @@ from redline.coach.fr import session_labels
 from redline.model import iso_week, plan_skeleton, plan_templates, rulebook, session_kinds
 from redline.model import race as race_model
 from redline.model.errors import ConfigError, InputError
-from redline.model.plan_skeleton import Levers, Limits, Skeleton, Start
+from redline.model.plan_skeleton import NOTHING_HELD, Held, Levers, Limits, Skeleton, Start
 from redline.model.vocabulary import DeadlineStatus, SessionStatus
 
-from . import ledger
+from . import expected_rpe, ledger
 
 #: The closed weeks the starting volume is the mean of.
 START_WEEKS = 3
@@ -30,6 +31,8 @@ START_WEEKS = 3
 RECOVERY_DAYS = 21
 #: The skeleton's figures are rounded to 0.1 km: a bound is met within this.
 EPSILON_KM = 0.05
+#: A week's long-run share is read from this many runs: with fewer, one run is the week.
+SHARE_MIN_RUNS = 3
 
 
 @dataclass(frozen=True)
@@ -43,6 +46,7 @@ class Frame:
     limits: Limits
     first: dt.date
     recovering: bool
+    held: Held = NOTHING_HELD
 
 
 def start_of(rows: list[ledger.Row], today: dt.date) -> Start:
@@ -53,6 +57,29 @@ def start_of(rows: list[ledger.Row], today: dt.date) -> Start:
                for week in weeks]
     return Start(round(statistics.fmean(volumes), 1),
                  ledger.longest_recent(rows, today) or 0.0)
+
+
+def held_of(rows: list[ledger.Row], history: expected_rpe.History, today: dt.date) -> Held:
+    """What the athlete held over the closed weeks of the RPE model's window: the median
+    load a quality run adds beyond its effort-kilometres, the highest weekly run load
+    (weeks whose every run has a dose), the largest share of a week's kilometres its
+    longest run took."""
+    current = iso_week.of(today)
+    weeks = {iso_week.shift(current, -offset) for offset in range(1, history.config.weeks + 1)}
+    runs = [row for row in rows if row.week in weeks and row.type in session_kinds.RUN
+            and row.km]
+    premiums = [dose.value - dose.effort_km for row in runs if row.type in session_kinds.QUALITY
+                for dose in [history.dose(row)] if dose is not None and dose.effort_km]
+    loads, shares = [], []
+    for week in weeks:
+        own = [row for row in runs if row.week == week]
+        doses = [history.dose(row) for row in own]
+        if own and all(dose is not None for dose in doses):
+            loads.append(sum(dose.value for dose in doses if dose is not None))
+        if len(own) >= SHARE_MIN_RUNS:
+            shares.append(max(row.km or 0.0 for row in own) / sum(row.km or 0.0 for row in own))
+    return Held(statistics.median(premiums) if len(premiums) >= history.config.min_sessions
+                else None, max(loads) if loads else None, max(shares) if shares else None)
 
 
 def frame(store: Any, today: dt.date) -> Frame:
@@ -87,14 +114,17 @@ def frame(store: Any, today: dt.date) -> Frame:
         quality = min(quality, book.quality_sessions_per_week)
     limits = Limits(book.skeleton_ramp_max_pct, book.skeleton_long_step_max_pct, taper_cut,
                     quality, frozenset(book.assimilation_weeks))
-    return Frame(race, goal, template, start_of(rows, today), limits, first, recovering)
+    config = expected_rpe.settings()
+    held = (held_of(rows, expected_rpe.history(store, rows, config), today)
+            if config is not None else NOTHING_HELD)
+    return Frame(race, goal, template, start_of(rows, today), limits, first, recovering, held)
 
 
 def candidates(store: Any, today: dt.date) -> tuple[Frame, list[Skeleton]]:
     found = frame(store, today)
     return found, plan_skeleton.candidates(
         found.template, found.goal, found.start, found.limits, found.first,
-        found.race.on, recovering=found.recovering)
+        found.race.on, recovering=found.recovering, held=found.held)
 
 
 def chosen(store: Any, today: dt.date) -> Skeleton | None:
@@ -111,7 +141,7 @@ def chosen(store: Any, today: dt.date) -> Skeleton | None:
                     goal.skeleton.second_quality)
     return plan_skeleton.generate(found.template, goal, levers, found.start, found.limits,
                                   found.first, found.race.on, recovering=found.recovering,
-                                  candidate=goal.skeleton.candidate)
+                                  candidate=goal.skeleton.candidate, held=found.held)
 
 
 def race_key(store: Any, race: race_model.Race) -> str:
@@ -142,7 +172,8 @@ def _week_line(week: plan_skeleton.Week) -> str:
     return text.WEEK.format(
         week=week.label, phase=text.PHASES[week.phase], deload=text.DELOAD if week.deload else "",
         volume=week.volume_km, long_run=_long_run(week), qualities=_qualities(week),
-        intent=text.INTENTS[week.climb_intent].format(grade=week.power_hike_from_pct))
+        intent=text.INTENTS[week.climb_intent].format(grade=week.power_hike_from_pct),
+        load=text.LOAD.format(load=week.load) if week.load is not None else text.NO_LOAD)
 
 
 def _goal_line(goal: race_model.Goal) -> str:
@@ -157,8 +188,17 @@ def _risks(skeleton: Skeleton) -> str:
     if not skeleton.risks:
         return text.NO_RISK
     return text.RISKS.format(risks="; ".join(
-        text.RISK_TEXT[risk.kind].format(value=risk.value, reference=risk.reference)
+        text.RISK_TEXT[risk.kind].format(value=risk.value, reference=risk.reference,
+                                         week=risk.week)
         for risk in skeleton.risks))
+
+
+def _held_line(held: Held) -> str:
+    return text.HELD.format(
+        premium=text.number(held.quality_premium) if held.quality_premium is not None
+        else text.UNKNOWN,
+        load=text.number(held.week_load) if held.week_load is not None else text.UNKNOWN,
+        share=f"{held.long_share * 100:.0f} %" if held.long_share is not None else text.UNKNOWN)
 
 
 def render(found: Frame, skeletons: list[Skeleton], *, chosen: bool = False) -> list[str]:
@@ -169,7 +209,8 @@ def render(found: Frame, skeletons: list[Skeleton], *, chosen: bool = False) -> 
                                 template=found.template.slug),
              text.START.format(volume=f"{found.start.volume_km:g}",
                                long_run=f"{found.start.long_run_km:g}",
-                               recovery=text.RECOVERY if found.recovering else "")]
+                               recovery=text.RECOVERY if found.recovering else ""),
+             _held_line(found.held)]
     for skeleton in skeletons:
         levers = skeleton.levers
         line = text.CHOSEN if chosen else text.CANDIDATE

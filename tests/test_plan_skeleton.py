@@ -137,3 +137,43 @@ def test_the_candidates_vary_the_real_levers():
 def test_a_goal_without_its_peaks_has_no_skeleton():
     with pytest.raises(ValueError, match="peak"):
         build(goal=Goal(21.1, RaceTerrain.ROAD))
+
+
+def test_a_week_that_adds_a_quality_holds_the_volume_of_the_last_build_week():
+    skeleton = build()
+    builds = [week for week in skeleton.weeks if not week.deload
+              and week.phase in plan_skeleton.BUILD_PHASES]
+    added = [(before, week) for before, week in itertools.pairwise(builds)
+             if week.qualities > before.qualities]
+    assert added, "the second quality arrives in this skeleton"
+    for before, week in added:
+        assert (week.volume_km, week.long_run_km) == (before.volume_km, before.long_run_km)
+    rising = [(before, week) for before, week in itertools.pairwise(builds)
+              if week.qualities == before.qualities and week.volume_km > before.volume_km]
+    assert rising, "the ramp resumes the week after"
+
+
+def test_each_week_expects_its_load_from_what_a_quality_costs_the_athlete():
+    held = plan_skeleton.Held(quality_premium=4.0)
+    skeleton = build(held=held)
+    week = next(week for week in skeleton.weeks if week.qualities == 2)
+    assert week.load == pytest.approx(week.volume_km + 8.0, abs=0.05)
+    unknown = build()
+    assert all(week.load is None for week in unknown.weeks if week.qualities)
+    easy_only = build(goal=Goal(21.1, RaceTerrain.ROAD, peak_volume_km=50, peak_long_run_km=20,
+                                families=()))
+    assert all(week.load == week.volume_km for week in easy_only.weeks), \
+        "a week without quality counts its kilometres"
+
+
+def test_the_counter_reading_holds_a_candidate_to_what_the_athlete_held():
+    skeleton = build(held=plan_skeleton.Held(quality_premium=4.0, week_load=45.0,
+                                             long_share=0.35))
+    load = next(risk for risk in skeleton.risks if risk.kind == SkeletonRisk.LOAD_ABOVE_HELD)
+    peak = max(skeleton.weeks, key=lambda week: week.load or 0.0)
+    assert (load.value, load.reference, load.week) == (peak.load, 45.0, peak.label)
+    share = next(risk for risk in skeleton.risks
+                 if risk.kind == SkeletonRisk.LONG_SHARE_ABOVE_HELD)
+    assert share.value > 35 and share.reference == 35
+    roomy = build(held=plan_skeleton.Held(quality_premium=4.0, week_load=80.0, long_share=0.6))
+    assert roomy.risks == (), "within what was held, nothing to read"

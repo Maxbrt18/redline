@@ -1,5 +1,11 @@
 """What the coach reads of a plan skeleton: candidates, chosen skeleton, weekly bounds."""
 
+
+def number(value: float) -> str:
+    """`46,2`: one decimal at most, with a decimal comma."""
+    return f"{value:.1f}".rstrip("0").rstrip(".").replace(".", ",")
+
+
 HEADER = ("Squelette à rebours — {race} le {race_on:%d/%m/%Y} ({distance} km, {terrain}{goal}), "
           "gabarit {template}")
 GOAL = ", objectif {time} ({source})"
@@ -8,6 +14,13 @@ GOAL_SOURCES = {"athlete": "choix de l'athlète", "coach": "posé avec le coach"
 START = ("Point de départ : {volume} km/semaine en moyenne sur les 3 semaines closes, plus longue "
          "sortie des 30 jours {long_run} km{recovery}.")
 RECOVERY = " ; course récente : récupération d'abord"
+HELD = ("Ce que l'athlète a tenu (contre-lecture) : une qualité ajoute {premium} de charge à ses "
+        "km, plus forte semaine {load}, sortie longue jusqu'à {share} des km de sa semaine. "
+        "La charge est celle du RPE attendu : km effort × intensité au carré, une EF compte "
+        "ses km.")
+UNKNOWN = "inconnu"
+LOAD = ", charge {load:g}"
+NO_LOAD = ", charge inconnue"
 CANDIDATE = ("Candidat « {candidate} » : bloc spécifique {specific} sem., décharge toutes les "
              "{deload} sem., 2e qualité à partir du {second}.")
 CHOSEN = "Squelette choisi : « {candidate} » (spécifique {specific} sem., décharge /{deload}, 2e qualité en {second})."
@@ -20,11 +33,14 @@ RISK_TEXT = {
     "peak_volume_unreached": "pic de volume à {value:g} km au lieu de {reference:g}",
     "peak_long_run_unreached": "plus longue sortie à {value:g} km au lieu de {reference:g}",
     "specific_short": "bloc spécifique de {value:g} sem. pour {reference:g} demandées",
+    "load_above_held": "{week} : charge {value:g}, au-delà de la plus forte semaine tenue ({reference:g})",
+    "long_share_above_held": ("{week} : sortie longue à {value:g} % des km de la semaine, "
+                              "au-delà de ce qui a été tenu ({reference:g} %)"),
 }
 PHASES = {"recovery": "récup", "base": "base", "development": "développement",
           "specific": "spécifique", "taper": "affûtage"}
 SECOND = {"development": "développement", "specific": "spécifique"}
-WEEK = "  {week} {phase}{deload} : {volume:g} km, SL {long_run}, {qualities}{intent}"
+WEEK = "  {week} {phase}{deload} : {volume:g} km{load}, SL {long_run}, {qualities}{intent}"
 DELOAD = " (décharge)"
 RACE_WEEK = "course"
 LONG_RUN = "{km:g} km au plus"

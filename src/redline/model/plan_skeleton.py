@@ -20,6 +20,14 @@ How it is laid out:
 - a deload cuts the last build week by `deload_cut_pct`, the taper by the race's taper
   band.
 
+Each week carries its expected load, in the unit of a run's dose
+(`redline.analysis.expected_rpe`): its kilometres, plus each quality session at what the
+athlete's quality sessions cost beyond their kilometres. The counter-reading (`review`)
+holds every candidate to what the athlete held: a week above the highest weekly load, or
+a long run taking a larger share of its week than ever. A week that adds a quality
+session holds the volume and the long run of the last build week: volume and intensity
+never rise together, so what follows can be attributed.
+
 Re-planning is the same computation run again from what was done: the skeleton always
 starts from the athlete's actual state and the levers chosen, so a week off compresses
 or lengthens what is left, it is never made up.
@@ -36,6 +44,9 @@ from .plan_templates import Template
 from .race import Goal
 from .vocabulary import ClimbIntent, PlanPhase, RaceTerrain
 
+#: The phases whose weeks build: the long run's share is read on them.
+BUILD_PHASES = (PlanPhase.BASE, PlanPhase.DEVELOPMENT, PlanPhase.SPECIFIC)
+
 
 class SkeletonRisk(StrEnum):
     """What a candidate asks that deserves to be read before it is chosen."""
@@ -48,6 +59,10 @@ class SkeletonRisk(StrEnum):
     PEAK_LONG_RUN_UNREACHED = "peak_long_run_unreached"
     #: The specific block is shorter than the lever asked: too few weeks.
     SPECIFIC_SHORT = "specific_short"
+    #: A week expects a load above the highest weekly load the athlete held.
+    LOAD_ABOVE_HELD = "load_above_held"
+    #: A long run takes a larger share of its week than the athlete's ever did.
+    LONG_SHARE_ABOVE_HELD = "long_share_above_held"
 
 
 @dataclass(frozen=True)
@@ -79,6 +94,21 @@ class Limits:
 
 
 @dataclass(frozen=True)
+class Held:
+    """What the athlete's history shows they held, the counter-reading's reference: the
+    load a quality session adds beyond its kilometres (median), the highest weekly load,
+    the largest share of a week's kilometres its long run took. None: too little history."""
+
+    quality_premium: float | None = None
+    week_load: float | None = None
+    long_share: float | None = None
+
+
+#: No history: no load for a week with quality sessions, no counter-reading.
+NOTHING_HELD = Held()
+
+
+@dataclass(frozen=True)
 class Week:
     label: str
     phase: PlanPhase
@@ -90,6 +120,9 @@ class Week:
     families: tuple[str, ...]
     climb_intent: ClimbIntent
     power_hike_from_pct: int | None = None
+    #: The load the week expects; None when it carries quality sessions and their cost is
+    #: unknown.
+    load: float | None = None
 
 
 @dataclass(frozen=True)
@@ -97,6 +130,8 @@ class Risk:
     kind: SkeletonRisk
     value: float
     reference: float
+    #: The week it falls on, for a risk of one week.
+    week: str = ""
 
 
 @dataclass(frozen=True)
@@ -179,9 +214,38 @@ def _climb(goal: Goal, phase: PlanPhase) -> tuple[ClimbIntent, int | None]:
     return ClimbIntent.RUN_SLOW, None
 
 
+def _load(volume_km: float, qualities: int, held: Held) -> float | None:
+    if not qualities:
+        return round(volume_km, 1)
+    if held.quality_premium is None:
+        return None
+    return round(volume_km + qualities * held.quality_premium, 1)
+
+
+def review(weeks: tuple[Week, ...], held: Held) -> list[Risk]:
+    """The counter-reading of a skeleton against what the athlete held."""
+    found = []
+    if held.week_load is not None:
+        over = [week for week in weeks
+                if week.load is not None and week.load > held.week_load + 0.05]
+        if over:
+            worst = max(over, key=lambda week: week.load or 0.0)
+            found.append(Risk(SkeletonRisk.LOAD_ABOVE_HELD, worst.load or 0.0,
+                              round(held.week_load, 1), worst.label))
+    if held.long_share is not None:
+        shares = [(week.long_run_km / week.volume_km, week) for week in weeks
+                  if week.volume_km and week.phase in BUILD_PHASES]
+        over_share = [(share, week) for share, week in shares if share > held.long_share + 0.005]
+        if over_share:
+            share, week = max(over_share, key=lambda item: item[0])
+            found.append(Risk(SkeletonRisk.LONG_SHARE_ABOVE_HELD, round(share * 100),
+                              round(held.long_share * 100), week.label))
+    return found
+
+
 def generate(template: Template, goal: Goal, levers: Levers, start: Start, limits: Limits,
              first: dt.date, race_on: dt.date, *, recovering: bool = False,
-             candidate: str = "") -> Skeleton:
+             candidate: str = "", held: Held = NOTHING_HELD) -> Skeleton:
     """The skeleton from the week of `first` to the race week."""
     if goal.peak_volume_km is None or goal.peak_long_run_km is None:
         raise ValueError("a skeleton needs the goal's peak volume and peak long run")
@@ -201,26 +265,9 @@ def generate(template: Template, goal: Goal, levers: Levers, start: Start, limit
     peak_volume, peak_long = start.volume_km, start.long_run_km
     weeks: list[Week] = []
     previous_qualities = 0
+    build_qualities = 0
     for index, (label, phase) in enumerate(zip(labels, phases, strict=True)):
         deload = index in deloads
-        if phase == PlanPhase.RECOVERY:
-            week_volume, week_long = start.volume_km * (1 - cut), start.long_run_km * (1 - cut)
-        elif phase == PlanPhase.TAPER:
-            week_volume = peak_volume * (1 - taper_cut)
-            week_long = 0.0 if label == labels[-1] else peak_long * (1 - taper_cut)
-        elif deload:
-            week_volume, week_long = volume * (1 - cut), long_run * (1 - cut)
-        else:
-            step = builds.index(index) + 1
-            share = step / len(builds)
-            target_volume = start.volume_km + (goal.peak_volume_km - start.volume_km) * share
-            target_long = (start.long_run_km
-                           + (goal.peak_long_run_km - start.long_run_km) * share)
-            volume = max(min(target_volume, volume * (1 + limits.ramp_max_pct / 100)), volume)
-            long_run = max(min(target_long, long_run * (1 + limits.long_step_max_pct / 100)),
-                           long_run)
-            peak_volume, peak_long = volume, long_run
-            week_volume, week_long = volume, long_run
         phase_spec = template.phase(phase)
         qualities = phase_spec.qualities
         if limits.quality_per_week is not None:
@@ -231,18 +278,44 @@ def generate(template: Template, goal: Goal, levers: Levers, start: Start, limit
         if deload:
             qualities = min(qualities, previous_qualities)
         previous_qualities = qualities
+        if phase == PlanPhase.RECOVERY:
+            week_volume, week_long = start.volume_km * (1 - cut), start.long_run_km * (1 - cut)
+        elif phase == PlanPhase.TAPER:
+            week_volume = peak_volume * (1 - taper_cut)
+            week_long = 0.0 if label == labels[-1] else peak_long * (1 - taper_cut)
+        elif deload:
+            week_volume, week_long = volume * (1 - cut), long_run * (1 - cut)
+        else:
+            # A week that adds a quality session holds the volume and the long run of the
+            # last build week: one change at a time, so the answer can be attributed.
+            if qualities <= build_qualities:
+                step = builds.index(index) + 1
+                share = step / len(builds)
+                target_volume = (start.volume_km
+                                 + (goal.peak_volume_km - start.volume_km) * share)
+                target_long = (start.long_run_km
+                               + (goal.peak_long_run_km - start.long_run_km) * share)
+                volume = max(min(target_volume, volume * (1 + limits.ramp_max_pct / 100)),
+                             volume)
+                long_run = max(min(target_long,
+                                   long_run * (1 + limits.long_step_max_pct / 100)), long_run)
+            build_qualities = qualities
+            peak_volume, peak_long = volume, long_run
+            week_volume, week_long = volume, long_run
         families = tuple(family for family in phase_spec.families
                          if goal.families is None or family in goal.families)
         intent, grade = _climb(goal, phase)
+        carried = qualities if families else 0
         weeks.append(Week(label, phase, deload, round(week_volume, 1), round(week_long, 1),
-                          qualities if families else 0, families, intent, grade))
+                          carried, families, intent, grade, _load(week_volume, carried, held)))
     if builds and peak_volume < goal.peak_volume_km - 0.05:
         risks.append(Risk(SkeletonRisk.PEAK_VOLUME_UNREACHED, round(peak_volume, 1),
                           goal.peak_volume_km))
     if builds and peak_long < goal.peak_long_run_km - 0.05:
         risks.append(Risk(SkeletonRisk.PEAK_LONG_RUN_UNREACHED, round(peak_long, 1),
                           goal.peak_long_run_km))
-    return Skeleton(candidate, levers, template.slug, tuple(weeks), tuple(risks))
+    return Skeleton(candidate, levers, template.slug, tuple(weeks),
+                    (*risks, *review(tuple(weeks), held)))
 
 
 def candidate_levers(template: Template) -> dict[str, Levers]:
@@ -264,8 +337,9 @@ def candidate_levers(template: Template) -> dict[str, Levers]:
 
 
 def candidates(template: Template, goal: Goal, start: Start, limits: Limits,
-               first: dt.date, race_on: dt.date, *, recovering: bool = False) -> list[Skeleton]:
+               first: dt.date, race_on: dt.date, *, recovering: bool = False,
+               held: Held = NOTHING_HELD) -> list[Skeleton]:
     """The engine's candidates for the race: cautious, balanced, specific."""
     return [generate(template, goal, levers, start, limits, first, race_on,
-                     recovering=recovering, candidate=slug)
+                     recovering=recovering, candidate=slug, held=held)
             for slug, levers in candidate_levers(template).items()]
