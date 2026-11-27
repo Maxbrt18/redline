@@ -3,8 +3,9 @@ review week by week is shown, and what the gate lets them run (`trajectory.py`).
 
 The trame is generated once, when the candidate is taken, and read by every review after
 it: what the recomputed skeleton lost week after week (its deloads, its ramp, its phases)
-holds. The strict expected failures are what is still missing, labelled with their code in
-the planning audit (C2, C3) or by the lot that brings it.
+holds, and the gate holds each week to it: a taper week to the week before the taper, its
+cut to the taper band. The strict expected failure is what is still missing, labelled with
+its code in the planning audit (C3).
 """
 
 from __future__ import annotations
@@ -109,16 +110,14 @@ def test_the_taper_band_accepts_a_first_taper_week_cut_by_a_fifth(followed):
 
 # ------------------------------------------------------------------ what is still missing
 
-#: The gate reads the taper band, not the version's weeks (lot 7).
-GATE = "lot 7: the gate does not hold a week to the version in force"
 #: A trame multiplies the start, and zero times anything is zero.
 C3 = "C3: from a zero start every volume of the trame is zero"
 
 
-@pytest.mark.xfail(strict=True, reason=GATE)
-def test_the_review_shows_the_bound_the_gate_applies(followed):
+def test_the_review_shows_the_bound_the_gate_applies_before_the_taper(followed):
     apart = [(lived.week, lived.shown.volume_km, lived.ceiling_km) for lived in followed
-             if lived.shown and abs(lived.shown.volume_km - lived.ceiling_km) > ROUNDING_KM]
+             if lived.shown and lived.shown.phase != PlanPhase.TAPER
+             and abs(lived.shown.volume_km - lived.ceiling_km) > ROUNDING_KM]
     assert apart == []
 
 

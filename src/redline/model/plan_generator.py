@@ -198,7 +198,7 @@ def _labels(origin: str, count: int) -> list[str]:
 # ------------------------------------------------------------------ doses
 
 
-def _work(dose: Dose) -> float:
+def work(dose: Dose) -> float:
     return (dose.get("reps") or 1) * (dose.get("rep_seconds") or 0)
 
 
@@ -206,17 +206,17 @@ def _towards(current: float, target: float, step: float) -> float:
     return min(current + step, target) if target > current else max(current - step, target)
 
 
-def _next_dose(dose: Dose, key: KeySession) -> Dose:
+def next_dose(dose: Dose, key: KeySession) -> Dose:
     """One variable by one step towards the arrival: the one with the most steps left
     whose move keeps the work within the larger of the start's and the arrival's."""
-    ceiling = max(_work(key.start), _work(key.arrival), _work(dose))
+    ceiling = max(work(key.start), work(key.arrival), work(dose))
     moves = []
     for name, value in dose.values:
         target, step = key.arrival.get(name), key.step.get(name)
         if target is None or step is None or value == target:
             continue
         moved = dose.with_value(name, _towards(value, target, step))
-        if _work(moved) <= ceiling:
+        if work(moved) <= ceiling:
             moves.append((-abs(target - value) / step, moved))
     return min(moves, key=lambda move: move[0])[1] if moves else dose
 
@@ -341,7 +341,7 @@ def _keys(template: Preparation, weeks: Sequence[Week], inputs: Inputs,
                 key = spec.keys[(turn + position) % len(spec.keys)]
                 state = doses[key.workout]
                 if state.exposures and progress[week.label]:
-                    state.dose = _next_dose(state.dose, key)
+                    state.dose = next_dose(state.dose, key)
                 state.exposures += 1
                 exposures[key.workout].append(len(keys))
                 keys.append(Key(week.label, position + 1, key.workout, KeyRole.KEY, state.dose,
@@ -542,7 +542,7 @@ def general(template: General, inputs: Inputs) -> Trame:
                           template.qualities))
         for position, key in enumerate(template.keys[:template.qualities], start=1):
             if index:
-                dose[key.workout] = _next_dose(dose[key.workout], key)
+                dose[key.workout] = next_dose(dose[key.workout], key)
             keys.append(Key(label, position, key.workout, KeyRole.KEY, dose[key.workout],
                             key.intensity))
     return Trame(CycleKind.GENERAL, str(template.level), "", tuple(weeks), tuple(keys), (),

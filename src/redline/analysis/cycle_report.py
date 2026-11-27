@@ -65,7 +65,8 @@ def _intensity(found: Intensity | None, refs: intensity.References) -> str:
 def _key(key: Key, refs: intensity.References) -> str:
     if key.role == KeyRole.TEST:
         return text.TEST
-    return text.KEY.format(role=text.FLAGSHIP if key.role == KeyRole.FLAGSHIP else "",
+    return text.KEY.format(position=key.position,
+                           role=text.FLAGSHIP if key.role == KeyRole.FLAGSHIP else "",
                            workout=key.workout, dose=_dose(key.dose),
                            intensity=_intensity(key.intensity, refs)).strip()
 

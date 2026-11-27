@@ -67,6 +67,24 @@ class Cycles(StoreBase):
             found = self._versions_in(connection, cycle_versions.c.id == version_id)
         return found[0] if found else None
 
+    def cycle_for_week(self, week: str) -> CycleVersion | None:
+        """The version that holds `week`: of the taken versions whose trame has it, the
+        latest written."""
+        holding = sa.exists().where(cycle_weeks.c.cycle_version_id == cycle_versions.c.id,
+                                    cycle_weeks.c.iso_week == week)
+        with self.database.engine.connect() as connection:
+            found = self._versions_in(connection, cycle_versions.c.taken_at.is_not(None),
+                                      holding)
+        return found[-1] if found else None
+
+    def first_cycle_week(self) -> str | None:
+        """The first week a taken version holds; the weeks before it have no version."""
+        with self.database.engine.connect() as connection:
+            return connection.execute(sa.select(sa.func.min(cycle_weeks.c.iso_week)).join(
+                cycle_versions, cycle_versions.c.id == cycle_weeks.c.cycle_version_id).where(
+                cycle_versions.c.athlete_id == self.athlete_id,
+                cycle_versions.c.taken_at.is_not(None))).scalar_one_or_none()
+
     def has_cycle_in(self, connection: Connection) -> bool:
         """Whether the instance ever had a version."""
         return connection.execute(sa.select(sa.exists().where(

@@ -233,6 +233,21 @@ class DebriefVerdict(StrEnum):
     UNDETERMINED = "undetermined"
 
 
+class OverrideTarget(StrEnum):
+    """What a revision takes one step beyond its cycle version (`cycle_overrides`): the
+    week's volume or long run in the general preparation, a key session's dose, or a
+    repetition's pace outside the key session's band."""
+
+    VOLUME = "volume"
+    LONG_RUN = "long_run"
+    KEY_DOSE = "key_dose"
+    REP_PACE = "rep_pace"
+
+
+#: The overrides that name the session they bear on.
+SESSION_OVERRIDES = (OverrideTarget.KEY_DOSE, OverrideTarget.REP_PACE)
+
+
 class OverrideReason(StrEnum):
     """Why a planned session goes one step above its lineage's ceiling
     (`planned_sessions.override_reason`): the bounded override, never twice in a row."""
@@ -543,11 +558,9 @@ class GoalSource(StrEnum):
 
 
 class PlanPhase(StrEnum):
-    """The phase of a week of a cycle's trame (`redline.model.plan_generator`). `base` is
-    the format-1 plan templates', which the general preparation replaced."""
+    """The phase of a week of a cycle's trame (`redline.model.plan_generator`)."""
 
     RECOVERY = "recovery"
-    BASE = "base"
     DEVELOPMENT = "development"
     SPECIFIC = "specific"
     TAPER = "taper"

@@ -450,6 +450,8 @@ plan_revisions = sa.Table(
     sa.Column("state_snapshot", JSONB),
     # The cycle version in force when the revision was written; absent before cycles.
     sa.Column("cycle_version_id", UUID_PK, sa.ForeignKey("redline.cycle_versions.id")),
+    # One step beyond the week's version (`weekly_plan.CYCLE_OVERRIDE_SCHEMA`).
+    sa.Column("cycle_overrides", JSONB),
     sa.UniqueConstraint("plan_id", "revision", name="uq_plan_revisions_number"),
     sa.CheckConstraint("revision >= 1", name="ck_plan_revisions_number"),
     sa.CheckConstraint("calibration_target IS NULL OR calibration_target IN (0, 2, 3)",
@@ -473,6 +475,8 @@ planned_sessions = sa.Table(
     sa.Column("kind", sa.Text, nullable=False),
     sa.Column("workout", sa.Text, nullable=False),
     sa.Column("routine", sa.Text),
+    #: The key session of the week's cycle version the session runs.
+    sa.Column("key_session_id", UUID_PK, sa.ForeignKey("redline.cycle_key_sessions.id")),
     sa.Column("status", sa.Text, nullable=False),
     sa.Column("distance_target_km", sa.Numeric(7, 2)),
     sa.Column("distance_cap_km", sa.Numeric(7, 2)),

@@ -2,8 +2,8 @@
 
 The trajectory tests ask the planner two questions, whatever owns the plan: the bound the
 Sunday review shows for the week it prepares, and the refusals of the write gate for a
-revision written that Sunday. `CyclePlanner` answers them from the cycle version in force,
-as the weekly dossier reads it and as the gate applies it.
+revision written that Sunday. `CyclePlanner` answers them from the cycle version that
+holds the week, as the weekly dossier reads it and as the gate applies it.
 
 The athlete is scripted: they take the goal's balanced candidate when its window opens,
 then each week they run what the review showed, within what the gate accepts, and nothing
@@ -88,6 +88,18 @@ class Store:
     def active_cycle(self) -> CycleVersion | None:
         return self.cycle
 
+    def cycle_for_week(self, week: str) -> CycleVersion | None:
+        return self.cycle if self.cycle is not None and self.cycle.week(week) else None
+
+    def first_cycle_week(self) -> str | None:
+        return self.cycle.trame.weeks[0].label if self.cycle is not None else None
+
+    def load_plan(self, week: str) -> dict | None:
+        return None
+
+    def prediction_rows(self) -> list[dict]:
+        return []
+
     def deadline_rows(self) -> list[dict]:
         return [{"deadline_key": "race", "kind": DeadlineKind.RACE,
                  "status": DeadlineStatus.SCHEDULED, "priority": RacePriority.A,
@@ -115,8 +127,8 @@ class Planner(Protocol):
 
 
 class CyclePlanner:
-    """The cycle version in force, as the weekly dossier reads it and as the gate applies
-    it: the gate reads the taper band, not yet the version."""
+    """The cycle version that holds the week, as the weekly dossier reads it and as the
+    gate applies it, with the taper band."""
 
     def shown(self, store: Store, week: str) -> Bound | None:
         found = cycle_report.review_bound(store, iso_week.shift(week, -1))
@@ -127,7 +139,8 @@ class CyclePlanner:
 
     def refusals(self, store: Store, week: str, revision: dict) -> list[str]:
         unread: list[str] = []
-        found = plan_revision.taper_errors(store, week, revision, unread.append)
+        found = [*plan_revision.cycle_errors(store, week, revision, None, unread.append),
+                 *plan_revision.taper_errors(store, week, revision, unread.append)]
         # A check that cannot read its frame accepts everything: the simulation would
         # then measure nothing.
         assert not unread, f"the gate could not read its frame: {unread}"

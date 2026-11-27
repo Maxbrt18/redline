@@ -31,6 +31,7 @@ from .program import GATE_SCHEMA as STRENGTH_GATE_SCHEMA
 from .schema import Schema, SchemaError, field
 from .vocabulary import (
     INTENT_STATUSES,
+    SESSION_OVERRIDES,
     SETTLED_STATUSES,
     CarbMix,
     ClimbIntent,
@@ -38,6 +39,7 @@ from .vocabulary import (
     Decider,
     DescentIntent,
     OverrideReason,
+    OverrideTarget,
     SessionPriority,
     SessionStatus,
     SessionStructure,
@@ -115,6 +117,9 @@ SESSION_SCHEMA = Schema("planned session", [
                "override_prediction"),
     field("override_prediction", str, required=False, pattern=formats.KEY,
           note="the key of the open prediction sealed on that step"),
+    field("key_position", int, required=False, minimum=0, maximum=9,
+          note="the key session of the week's cycle version this session runs, by its "
+               "position in the week (0: the test)"),
     field("structure", str, required=False, choices=tuple(SessionStructure),
           note="an easy or long run run steady, or with prescribed efforts (a pyramid, "
                "strides, a structure set by the group); absent, steady"),
@@ -251,6 +256,25 @@ DECISION_SCHEMA = Schema("decision", [
           note="the options considered and set aside, with the reason"),
 ], check=_decision_coherent)
 
+def _override_coherent(override: dict) -> list[str]:
+    named = override.get("session") is not None
+    if named != (override.get("target") in SESSION_OVERRIDES):
+        return ["field `session`: names the session of a key_dose or rep_pace override, "
+                "and only theirs"]
+    return []
+
+
+#: One step beyond the week's cycle version (`redline.model.cycle_gate`), sealed on an
+#: open prediction like a dose above its lineage's ceiling.
+CYCLE_OVERRIDE_SCHEMA = Schema("cycle override", [
+    field("target", str, choices=tuple(OverrideTarget)),
+    field("session", str, required=False, pattern=formats.KEY,
+          note="the id of the session, for key_dose and rep_pace"),
+    field("reason", str, choices=tuple(OverrideReason)),
+    field("prediction", str, pattern=formats.KEY,
+          note="the key of the open prediction sealed on that step"),
+], check=_override_coherent)
+
 #: Computed by the engine when the revision is written (`analysis.decision_state`).
 STATE_SNAPSHOT_SCHEMA = Schema("decision state", [
     field("as_of", str, pattern=formats.DATE),
@@ -283,6 +307,8 @@ REVISION_SCHEMA = Schema("weekly revision", [
     # (`decision_errors`); the snapshot is the engine's, never the model's.
     field("decision", dict, required=False, schema=DECISION_SCHEMA),
     field("state_snapshot", dict, required=False, schema=STATE_SNAPSHOT_SCHEMA),
+    field("cycle_overrides", list, required=False, maximum=len(OverrideTarget) * 4,
+          item=field("cycle override", dict, schema=CYCLE_OVERRIDE_SCHEMA)),
 ])
 
 #: What the coach proposes when the athlete asks for more than a reorganisation: one to

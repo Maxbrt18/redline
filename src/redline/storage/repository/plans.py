@@ -17,7 +17,9 @@ from ..database import StorageError
 from ..plan_policy import enforce_gate_resolution
 from ..schema import (
     coach_predictions,
+    cycle_key_sessions,
     cycle_versions,
+    cycle_weeks,
     deadlines,
     observation_metrics,
     observations,
@@ -105,7 +107,9 @@ class Plans(StoreBase):
             cycle_version_id=sa.select(cycle_versions.c.id).where(
                 cycle_versions.c.athlete_id == self.athlete_id,
                 cycle_versions.c.state == voc.CycleVersionState.ACTIVE).scalar_subquery(),
+            cycle_overrides=revision.get("cycle_overrides"),
         ))
+        holding = self._holding_version_in(connection, week)
         cycle_inputs = []
         for session in revision.get("sessions", []):
             session_id = _uuid(session.get("db_id"))
@@ -115,6 +119,8 @@ class Plans(StoreBase):
                 start_time=(dt.time.fromisoformat(session["start_time"])
                             if session.get("start_time") else None), kind=session["kind"],
                 workout=session["workout"], routine=session.get("routine"),
+                key_session_id=self._key_session_in(connection, holding, week,
+                                                    session.get("key_position")),
                 status=session["status"],
                 distance_target_km=session.get("distance_target_km"),
                 distance_cap_km=session.get("distance_cap_km"),
@@ -153,6 +159,29 @@ class Plans(StoreBase):
         if loaded is None:  # impossible after the INSERT, barring transactional corruption
             raise StorageError(f"plan {week} not found after writing")
         return loaded
+
+    def _holding_version_in(self, connection: Connection, week: str) -> uuid.UUID | None:
+        """The taken version whose trame holds `week`, the latest written."""
+        return connection.execute(sa.select(cycle_versions.c.id).join(
+            cycle_weeks, cycle_weeks.c.cycle_version_id == cycle_versions.c.id).where(
+            cycle_versions.c.athlete_id == self.athlete_id,
+            cycle_versions.c.taken_at.is_not(None), cycle_weeks.c.iso_week == week,
+        ).order_by(cycle_versions.c.created_at.desc()).limit(1)).scalar_one_or_none()
+
+    @staticmethod
+    def _key_session_in(connection: Connection, version_id: uuid.UUID | None, week: str,
+                        position: int | None) -> uuid.UUID | None:
+        if position is None:
+            return None
+        found = None if version_id is None else connection.execute(sa.select(
+            cycle_key_sessions.c.id).where(
+            cycle_key_sessions.c.cycle_version_id == version_id,
+            cycle_key_sessions.c.iso_week == week,
+            cycle_key_sessions.c.position == position)).scalar_one_or_none()
+        if found is None:
+            raise StorageError(f"{week}: no key session at position {position} in the cycle "
+                               "version that holds the week")
+        return found
 
     def active_plans(self) -> dict[str, dict]:
         """The active revision of each week that has a program, keyed by ISO week."""
@@ -288,7 +317,7 @@ class Plans(StoreBase):
             }
             if row["volume_target_km"] is not None:
                 revision["volume_target_km"] = float(row["volume_target_km"])
-            for name in ("decision", "state_snapshot"):
+            for name in ("decision", "state_snapshot", "cycle_overrides"):
                 if row[name] is not None:
                     revision[name] = row[name]
             session_rows = connection.execute(sa.select(planned_sessions).where(
@@ -322,6 +351,10 @@ class Plans(StoreBase):
                         session[key] = stored[key]
                 if stored["strength_spec"] is not None:
                     session["strength"] = dict(stored["strength_spec"])
+                if stored["key_session_id"] is not None:
+                    session["key_position"] = connection.execute(sa.select(
+                        cycle_key_sessions.c.position).where(
+                        cycle_key_sessions.c.id == stored["key_session_id"])).scalar_one()
                 session["sources"] = list(connection.execute(sa.select(
                     planned_session_sources.c.source).where(
                         planned_session_sources.c.session_id == stored["id"]
