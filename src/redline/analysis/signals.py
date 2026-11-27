@@ -175,6 +175,45 @@ def hr_at_pace(rows: list) -> list[HrDrift]:
     return out
 
 
+@dataclass(frozen=True)
+class Efficiency:
+    """Metres run per heartbeat on the flat easy runs, then and now: an indicator of the
+    form between two dates of the ledger, never a correction of an estimate."""
+
+    since: dt.date
+    before: float
+    now: float
+    runs_before: int
+    runs_now: int
+
+    @property
+    def change_pct(self) -> float:
+        return (self.now / self.before - 1) * 100
+
+
+def _metres_per_beat(row) -> float:
+    return row.km * 1000 / (row.hours * 60) / row.hr_avg
+
+
+def efficiency(rows: list, since: dt.date, today: dt.date) -> Efficiency | None:
+    """The median metres per beat of the comparable easy runs of the six weeks from the
+    first one on or after `since`, against the six weeks before `today`; None while the
+    two stretches overlap or either has fewer than `HR_BASELINE_MIN` runs."""
+    runs = [row for row in _flat_easy_runs(rows) if since <= row.date <= today]
+    if not runs:
+        return None
+    start = runs[0].date
+    window = dt.timedelta(days=HR_BASELINE_DAYS)
+    if start + window > today - window:
+        return None
+    before = [_metres_per_beat(row) for row in runs if row.date < start + window]
+    now = [_metres_per_beat(row) for row in runs if row.date > today - window]
+    if len(before) < HR_BASELINE_MIN or len(now) < HR_BASELINE_MIN:
+        return None
+    return Efficiency(start, statistics.median(before), statistics.median(now),
+                      len(before), len(now))
+
+
 def signals(rows: list, weeks: list, intentional_keys: frozenset[str]) -> list:
     """What deserves a look this week. Empty = nothing to report, and that is normal."""
     found = []

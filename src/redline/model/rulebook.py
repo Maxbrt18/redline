@@ -71,6 +71,11 @@ SKELETON_PARAMETERS = ("skeleton_ramp_max_pct", "skeleton_long_step_max_pct")
 RPE_MODEL_PARAMETERS = ("rpe_model_weeks", "rpe_model_min_sessions",
                         "rpe_model_settled_sessions", "rpe_range_width",
                         "rpe_range_width_unsettled", "rpe_intensity_exponent")
+#: The goal-time estimate (`redline.analysis.race_estimate`), declared together or not at
+#: all; in this order, the fields of its `Settings`.
+ESTIMATE_PARAMETERS = ("estimate_window_weeks", "estimate_min_source_km", "estimate_noise_vdot",
+                       "estimate_drift_vdot2_month", "estimate_exponent_sd",
+                       "estimate_band_pct", "estimate_break_min_days", "estimate_bound_weeks")
 
 RULEBOOK_SCHEMA = Schema("rulebook.toml", [
     field("parameters", dict, schema=Schema("[parameters]", [
@@ -154,6 +159,25 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
               note="half-width while the kind has fewer declared RPE than settled"),
         field("rpe_intensity_exponent", float, required=False, minimum=0, maximum=4,
               note="exponent of a run's intensity in its dose"),
+        # Optional, all eight or none (`ESTIMATE_PARAMETERS`): absent, no goal time is
+        # estimated from the declared all-out efforts.
+        field("estimate_window_weeks", int, required=False, minimum=4, maximum=260,
+              note="weeks back an all-out effort still informs the estimate"),
+        field("estimate_min_source_km", float, required=False, minimum=0.4, maximum=50,
+              note="shortest flat all-out effort an estimate reads, in km"),
+        field("estimate_noise_vdot", float, required=False, minimum=0.1, maximum=5,
+              note="standard deviation of one all-out effort around the form, in VDOT"),
+        field("estimate_drift_vdot2_month", float, required=False, minimum=0, maximum=5,
+              note="variance the form gains each month without an effort, in VDOT²"),
+        field("estimate_exponent_sd", float, required=False, minimum=0, maximum=0.2,
+              note="uncertainty of the endurance exponent, on the log of the time per unit "
+                   "of log distance"),
+        field("estimate_band_pct", int, required=False, minimum=50, maximum=99,
+              note="coverage of the estimate's range, in %"),
+        field("estimate_break_min_days", int, required=False, minimum=1, maximum=365,
+              note="a declared break this long after the last effort makes it an upper bound"),
+        field("estimate_bound_weeks", int, required=False, minimum=1, maximum=52,
+              note="weeks of sessions whose held pieces bound the form from below"),
         # Optional: absent, the climbs of an easy run are not judged by their HR
         # (`redline.analysis.grade_hr`).
         field("climb_hr_margin_bpm", int, required=False, minimum=0, maximum=30,
@@ -279,6 +303,14 @@ class Parameters:
     rpe_range_width: float | None = None
     rpe_range_width_unsettled: float | None = None
     rpe_intensity_exponent: float | None = None
+    estimate_window_weeks: int | None = None
+    estimate_min_source_km: float | None = None
+    estimate_noise_vdot: float | None = None
+    estimate_drift_vdot2_month: float | None = None
+    estimate_exponent_sd: float | None = None
+    estimate_band_pct: int | None = None
+    estimate_break_min_days: int | None = None
+    estimate_bound_weeks: int | None = None
     climb_hr_margin_bpm: int | None = None
     split_hr_margin_bpm: int | None = None
     split_fast_start_pct: float | None = None
@@ -401,7 +433,9 @@ def parse(text: str, source: Path) -> Rulebook:
                         "split_decoupling_pct", "permit_tolerance_pct", "permit_minor_pct",
                         "rpe_range_width", "rpe_range_width_unsettled",
                         "rpe_intensity_exponent", "skeleton_ramp_max_pct",
-                        "skeleton_long_step_max_pct")
+                        "skeleton_long_step_max_pct", "estimate_min_source_km",
+                        "estimate_noise_vdot", "estimate_drift_vdot2_month",
+                        "estimate_exponent_sd")
            if name in raw}})
     scales = build_scales(payload["scales"])
     problems = []
@@ -413,6 +447,7 @@ def parse(text: str, source: Path) -> Rulebook:
     for group, label in ((PERMIT_PARAMETERS, "permit thresholds"),
                          (PERMIT_GRADED_PARAMETERS, "graded permit thresholds"),
                          (RPE_MODEL_PARAMETERS, "expected-RPE thresholds"),
+                         (ESTIMATE_PARAMETERS, "goal-estimate thresholds"),
                          (SKELETON_PARAMETERS, "skeleton thresholds")):
         declared = [name for name in group if name in raw]
         if declared and len(declared) != len(group):

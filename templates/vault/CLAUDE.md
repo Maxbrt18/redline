@@ -82,6 +82,7 @@ savoir et les raisons.
 | Erreurs du coach corrigées par l'athlète | `coaching/corrections.md` |
 | État du jour (sommeil, charge de vie, envie) | PostgreSQL via `redline fact-write daily` |
 | Fils ouverts + date de relance | PostgreSQL via `redline fact-write thread` |
+| Efforts à fond (course ou test) · arrêts d'entraînement | PostgreSQL via `redline fact-write effort` · `redline fact-write break` : déclarés avec l'athlète, jamais déduits du type de séance ni du RPE |
 
 **État dérivé — n'a aucun propriétaire et ne se stocke pas** : forme instantanée, tendance
 douleur, charge de la semaine. Tout ça se **recalcule** depuis le registre, les décisions et

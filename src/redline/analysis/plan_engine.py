@@ -17,13 +17,14 @@ from typing import Any
 
 from redline.coach.fr import plan_skeleton as text
 from redline.coach.fr import session_labels
+from redline.model import efforts as effort_model
 from redline.model import iso_week, plan_skeleton, plan_templates, rulebook, session_kinds
 from redline.model import race as race_model
 from redline.model.errors import ConfigError, InputError
 from redline.model.plan_skeleton import NOTHING_HELD, Held, Levers, Limits, Skeleton, Start
-from redline.model.vocabulary import DeadlineStatus, SessionStatus
+from redline.model.vocabulary import DeadlineStatus, RaceTerrain, SessionStatus
 
-from . import expected_rpe, ledger
+from . import expected_rpe, ledger, race_estimate, signals
 
 #: The closed weeks the starting volume is the mean of.
 START_WEEKS = 3
@@ -33,6 +34,32 @@ RECOVERY_DAYS = 21
 EPSILON_KM = 0.05
 #: A week's long-run share is read from this many runs: with fewer, one run is the week.
 SHARE_MIN_RUNS = 3
+
+
+@dataclass(frozen=True)
+class GoalReading:
+    """A road goal's estimated time, the bound the recent sessions prove and the easy
+    runs' efficiency since the last effort."""
+
+    config: race_estimate.Settings
+    estimate: race_estimate.Estimate | None
+    bound: race_estimate.Bound | None
+    efficiency: signals.Efficiency | None
+
+
+def goal_reading(store: Any, rows: list[ledger.Row], goal: race_model.Goal,
+                 today: dt.date) -> GoalReading | None:
+    config = race_estimate.settings()
+    if goal.terrain != RaceTerrain.ROAD or config is None:
+        return None
+    found = race_estimate.estimate(effort_model.efforts(store.effort_rows()),
+                                   effort_model.breaks(store.break_rows()), today,
+                                   goal.distance_km, config)
+    since = (found.sources[-1].effort.on if found is not None
+             else today - dt.timedelta(weeks=config.window_weeks))
+    return GoalReading(config, found,
+                       race_estimate.bound(race_estimate.pieces(store, rows, today, config)),
+                       signals.efficiency(rows, since, today))
 
 
 @dataclass(frozen=True)
@@ -47,6 +74,9 @@ class Frame:
     first: dt.date
     recovering: bool
     held: Held = NOTHING_HELD
+    #: What the declared all-out efforts say of a road goal's time; None for a trail goal
+    #: or when the rulebook declares no estimate.
+    reading: GoalReading | None = None
 
 
 def start_of(rows: list[ledger.Row], today: dt.date) -> Start:
@@ -117,7 +147,8 @@ def frame(store: Any, today: dt.date) -> Frame:
     config = expected_rpe.settings()
     held = (held_of(rows, expected_rpe.history(store, rows, config), today)
             if config is not None else NOTHING_HELD)
-    return Frame(race, goal, template, start_of(rows, today), limits, first, recovering, held)
+    return Frame(race, goal, template, start_of(rows, today), limits, first, recovering, held,
+                 goal_reading(store, rows, goal, today))
 
 
 def candidates(store: Any, today: dt.date) -> tuple[Frame, list[Skeleton]]:
@@ -176,12 +207,61 @@ def _week_line(week: plan_skeleton.Week) -> str:
         load=text.LOAD.format(load=week.load) if week.load is not None else text.NO_LOAD)
 
 
+def _clock(seconds: float) -> str:
+    hours, rest = divmod(round(seconds), 3600)
+    return f"{hours}:{rest // 60:02d}:{rest % 60:02d}"
+
+
 def _goal_line(goal: race_model.Goal) -> str:
     if goal.goal_time_s is None or goal.goal_source is None:
         return ""
-    hours, rest = divmod(goal.goal_time_s, 3600)
-    return text.GOAL.format(time=f"{hours}:{rest // 60:02d}:{rest % 60:02d}",
+    return text.GOAL.format(time=_clock(goal.goal_time_s),
                             source=text.GOAL_SOURCES[goal.goal_source])
+
+
+def _source_line(source: race_estimate.Source) -> str:
+    effort = source.effort
+    return text.ESTIMATE_SOURCE.format(
+        kind=text.EFFORT_KINDS[effort.kind], km=text.number(effort.km),
+        clock=_clock(effort.seconds), on=effort.on, months=text.number(source.months),
+        vdot=text.number(source.vdot), equivalent=_clock(source.equivalent_s),
+        share=f"{source.share * 100:.0f}")
+
+
+def _estimate_lines(reading: GoalReading | None) -> list[str]:
+    """What the declared efforts say of a road goal's time, with its controls."""
+    if reading is None:
+        return []
+    found, config = reading.estimate, reading.config
+    if found is None:
+        lines = [text.NO_ESTIMATE.format(km=text.number(config.min_source_km),
+                                         weeks=config.window_weeks)]
+    else:
+        lines = [text.ESTIMATE.format(time=_clock(found.time_s), low=_clock(found.low_s),
+                                      high=_clock(found.high_s), band=found.band_pct,
+                                      vdot=text.number(found.vdot),
+                                      sd=text.number(found.vdot_sd))]
+        if found.capped_by is not None:
+            lines.append(text.ESTIMATE_CAPPED.format(start=found.capped_by.starts_on,
+                                                     end=found.capped_by.ends_on,
+                                                     time=_clock(found.time_s)))
+        if len(found.sources) == 1:
+            lines.append(text.ESTIMATE_SINGLE.format(months=text.number(found.sources[0].months)))
+        lines += [_source_line(source) for source in found.sources]
+    held = reading.bound
+    if held is not None:
+        above = found is not None and held.vdot > found.vdot
+        lines.append(text.BOUND.format(weeks=config.bound_weeks, vdot=text.number(held.vdot),
+                                       km=text.number(held.km), clock=_clock(held.seconds),
+                                       on=held.on) + (text.BOUND_ABOVE if above else ""))
+    trend = reading.efficiency
+    if trend is not None:
+        lines.append(text.EFFICIENCY.format(
+            change=f"{trend.change_pct:+.1f}".replace(".", ","), since=trend.since,
+            before=f"{trend.before:.2f}".replace(".", ","),
+            now=f"{trend.now:.2f}".replace(".", ","), runs_before=trend.runs_before,
+            runs_now=trend.runs_now))
+    return lines
 
 
 def _risks(skeleton: Skeleton) -> str:
@@ -210,6 +290,7 @@ def render(found: Frame, skeletons: list[Skeleton], *, chosen: bool = False) -> 
              text.START.format(volume=f"{found.start.volume_km:g}",
                                long_run=f"{found.start.long_run_km:g}",
                                recovery=text.RECOVERY if found.recovering else ""),
+             *_estimate_lines(found.reading),
              _held_line(found.held)]
     for skeleton in skeletons:
         levers = skeleton.levers

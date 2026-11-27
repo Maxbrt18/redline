@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+from types import SimpleNamespace
 
 import pytest
 
@@ -16,10 +17,17 @@ GOAL = {"distance_km": 21.1, "terrain": "road", "peak_volume_km": 50,
 
 
 class Store:
-    def __init__(self, context=None, rows=()):
+    def __init__(self, context=None, rows=(), efforts=(), breaks=()):
         self.context = GOAL if context is None else context
         self.rows = list(rows)
+        self.efforts, self.breaks = list(efforts), list(breaks)
         self.submitted = []
+
+    def effort_rows(self):
+        return self.efforts
+
+    def break_rows(self):
+        return self.breaks
 
     def deadline_rows(self):
         return [{"deadline_key": "half-2031", "kind": "race", "status": "scheduled",
@@ -166,3 +174,42 @@ def test_what_the_athlete_held_is_read_from_the_closed_weeks(runs):
     assert held.long_share == pytest.approx(14 / 40)
     line = plan_engine._held_line(held)
     assert "une qualité ajoute 6,9 de charge" in line and "35 %" in line
+
+
+def _effort(key, on, km, seconds, terrain="flat"):
+    return {"effort_key": key, "done_on": on, "distance_km": km, "duration_s": seconds,
+            "terrain": terrain, "kind": "race", "note": ""}
+
+
+def test_a_road_goal_reads_its_declared_efforts_with_their_range(runs):
+    store = Store(efforts=[_effort("ten", dt.date(2030, 3, 2), 10, 40 * 60)])
+    lines = plan_engine.report(store, TODAY)
+    found = next(line for line in lines if line.startswith("Estimation du chrono"))
+    assert "fourchette" in found and "goal_source = equivalence" in found
+    assert any("ne repose que sur un effort" in line for line in lines)
+    assert any("course de 10 km en 0:40:00 le 02/03/2030" in line and "part 100 %" in line
+               for line in lines)
+
+
+def test_a_break_after_the_effort_keeps_only_the_slow_half(runs):
+    store = Store(efforts=[_effort("ten", dt.date(2030, 3, 2), 10, 40 * 60)],
+                  breaks=[{"break_key": "shin", "starts_on": dt.date(2030, 5, 1),
+                           "ends_on": dt.date(2030, 6, 15), "note": ""}])
+    reading = plan_engine.frame(store, TODAY).reading
+    assert reading is not None and reading.estimate is not None
+    assert reading.estimate.low_s == reading.estimate.time_s
+    lines = plan_engine.report(store, TODAY)
+    assert any("arrêt déclaré du 01/05/2030 au 15/06/2030" in line for line in lines)
+
+
+def test_without_an_effort_the_estimate_says_what_would_give_one(runs):
+    store = Store(efforts=[_effort("trail", dt.date(2030, 9, 1), 20, 2 * 3600, "hilly")])
+    lines = plan_engine.report(store, TODAY)
+    assert any(line.startswith("Estimation du chrono : aucun effort à fond") for line in lines)
+    assert any("contrôle : les séances à plat" in line for line in lines)
+
+
+def test_a_trail_goal_has_no_estimate(runs):
+    store = Store(efforts=[_effort("ten", dt.date(2030, 9, 1), 10, 40 * 60)])
+    trail = SimpleNamespace(terrain="trail", distance_km=30.0)
+    assert plan_engine.goal_reading(store, runs, trail, TODAY) is None

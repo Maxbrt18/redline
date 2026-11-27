@@ -10,7 +10,7 @@ HEADER = ("Squelette à rebours — {race} le {race_on:%d/%m/%Y} ({distance} km,
           "gabarit {template}")
 GOAL = ", objectif {time} ({source})"
 GOAL_SOURCES = {"athlete": "choix de l'athlète", "coach": "posé avec le coach",
-                "equivalence": "équivalence d'une course récente"}
+                "equivalence": "équivalence d'un effort à fond déclaré"}
 START = ("Point de départ : {volume} km/semaine en moyenne sur les 3 semaines closes, plus longue "
          "sortie des 30 jours {long_run} km{recovery}.")
 RECOVERY = " ; course récente : récupération d'abord"
@@ -18,6 +18,24 @@ HELD = ("Ce que l'athlète a tenu (contre-lecture) : une qualité ajoute {premiu
         "km, plus forte semaine {load}, sortie longue jusqu'à {share} des km de sa semaine. "
         "La charge est celle du RPE attendu : km effort × intensité au carré, une EF compte "
         "ses km.")
+ESTIMATE = ("Estimation du chrono (efforts à fond déclarés) : {time}, fourchette {low} – {high} "
+            "à {band} % (VDOT {vdot} ± {sd}). Une estimation, pas un objectif : si l'athlète la "
+            "retient, `goal_source = equivalence`.")
+ESTIMATE_CAPPED = ("  arrêt déclaré du {start:%d/%m/%Y} au {end:%d/%m/%Y}, après le dernier effort : "
+                   "{time} est un « au mieux », la fourchette ne garde que sa moitié lente.")
+ESTIMATE_SINGLE = "  elle ne repose que sur un effort, vieux de {months} mois."
+ESTIMATE_SOURCE = ("  source : {kind} de {km} km en {clock} le {on:%d/%m/%Y} (il y a {months} mois), "
+                   "VDOT {vdot}, équivalent {equivalent}, part {share} %")
+EFFORT_KINDS = {"race": "course", "test": "test"}
+NO_ESTIMATE = ("Estimation du chrono : aucun effort à fond déclaré à plat d'au moins {km} km dans "
+               "les {weeks} dernières semaines (`redline fact-write effort`). Un test de 1 200 m "
+               "puis 3 600 m à fond, à plat, en donnerait un.")
+BOUND = ("  contrôle : les séances à plat des {weeks} dernières semaines prouvent au moins un "
+         "VDOT de {vdot} ({km} km en {clock} le {on:%d/%m/%Y}).")
+BOUND_ABOVE = " C'est plus que l'estimation : elle est périmée, l'athlète est plus en forme."
+EFFICIENCY = ("  allure à FC égale (EF à plat) : {change} % depuis le {since:%d/%m/%Y} "
+              "({before} → {now} m par battement, {runs_before} puis {runs_now} sorties). Un "
+              "indicateur, pas une correction du chiffre.")
 UNKNOWN = "inconnu"
 LOAD = ", charge {load:g}"
 NO_LOAD = ", charge inconnue"

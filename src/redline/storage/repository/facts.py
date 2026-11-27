@@ -15,6 +15,7 @@ from redline.model.vocabulary import JobStatus, ThreadStatus
 
 from ..database import StorageError
 from ..schema import (
+    all_out_efforts,
     audit_events,
     capability_evaluations,
     coach_predictions,
@@ -27,6 +28,7 @@ from ..schema import (
     pain_readings,
     permit_choices,
     proactive_jobs,
+    training_breaks,
 )
 from ._common import (
     CORRECTION_ANNOUNCE_WINDOW,
@@ -475,6 +477,48 @@ class Facts(PainZones):
                 conversation_threads).where(
                     conversation_threads.c.athlete_id == self.athlete_id
                 ).order_by(conversation_threads.c.opened_on.desc())).mappings()]
+
+    def upsert_effort_in(self, connection: Connection, row: dict,
+                         *, actor: str = "application") -> None:
+        """An all-out effort, written over the one of the same key."""
+        values = {"id": _uuid(None), "athlete_id": self.athlete_id,
+                  "effort_key": row["effort_key"], "done_on": row["done_on"],
+                  "distance_km": row["distance_km"], "duration_s": row["duration_s"],
+                  "terrain": row["terrain"], "kind": row["kind"],
+                  "note": row.get("note") or ""}
+        actual_id = connection.execute(
+            pg_insert(all_out_efforts).values(**values).on_conflict_do_update(
+                constraint="uq_all_out_efforts_key",
+                set_={key: value for key, value in values.items()
+                      if key not in ("id", "athlete_id", "effort_key")}
+            ).returning(all_out_efforts.c.id)).scalar_one()
+        _audit(connection, actor, "effort.upserted", "effort", actual_id, _jsonable(values))
+
+    def effort_rows(self) -> list[dict]:
+        with self.database.engine.connect() as connection:
+            return [_native(row) for row in connection.execute(sa.select(all_out_efforts).where(
+                all_out_efforts.c.athlete_id == self.athlete_id
+            ).order_by(all_out_efforts.c.done_on, all_out_efforts.c.effort_key)).mappings()]
+
+    def upsert_break_in(self, connection: Connection, row: dict,
+                        *, actor: str = "application") -> None:
+        """A declared training break, written over the one of the same key."""
+        values = {"id": _uuid(None), "athlete_id": self.athlete_id,
+                  "break_key": row["break_key"], "starts_on": row["starts_on"],
+                  "ends_on": row["ends_on"], "note": row.get("note") or ""}
+        actual_id = connection.execute(
+            pg_insert(training_breaks).values(**values).on_conflict_do_update(
+                constraint="uq_training_breaks_key",
+                set_={key: value for key, value in values.items()
+                      if key not in ("id", "athlete_id", "break_key")}
+            ).returning(training_breaks.c.id)).scalar_one()
+        _audit(connection, actor, "break.upserted", "break", actual_id, _jsonable(values))
+
+    def break_rows(self) -> list[dict]:
+        with self.database.engine.connect() as connection:
+            return [_native(row) for row in connection.execute(sa.select(training_breaks).where(
+                training_breaks.c.athlete_id == self.athlete_id
+            ).order_by(training_breaks.c.starts_on, training_breaks.c.break_key)).mappings()]
 
     def deadline_rows(self) -> list[dict]:
         with self.database.engine.connect() as connection:
