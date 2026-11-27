@@ -26,6 +26,7 @@ from redline.analysis import (
     signals,
     week_review,
 )
+from redline.coach.fr import debrief as debrief_text
 from redline.coach.fr import progression as progression_text
 from redline.coach.fr import weekly_dossier as text
 from redline.model import iso_week
@@ -60,6 +61,22 @@ def _progression(store: OperationalStore, root: Path, week: str, today: dt.date)
         return [progression_text.UNAVAILABLE.format(reason=str(exc).replace("\n", " "))]
 
 
+def _effects(store: OperationalStore, rows: list, today: dt.date) -> list[str]:
+    """What heat, night and group add to the RPE, as calibrated today."""
+    config = expected_rpe.settings()
+    if config is None:
+        return []
+    effects = expected_rpe.history(store, rows, config).effects(today)
+    return ["", text.EFFECTS.format(effects=" ; ".join(
+        text.EFFECT.format(
+            condition=debrief_text.CONDITIONS[effect.condition],
+            value=debrief_text.signed(round(effect.value, 2)),
+            unit=text.EFFECT_UNITS[effect.condition].format(
+                threshold=expected_rpe.HEAT_FROM_WBGT_C),
+            sessions=effect.sessions, state=text.EFFECT_STATES[effect.supported])
+        for effect in effects))]
+
+
 def render(store: OperationalStore, root: Path, week: str, today: dt.date) -> str:
     """The dossier for week `week` (the one that CLOSES), seen from `today`."""
     rows = ledger.parse_ledger(store)
@@ -85,6 +102,7 @@ def render(store: OperationalStore, root: Path, week: str, today: dt.date) -> st
     calibration = prediction_model.calibration_lines(every, today)
     lines += ["", text.CALIBRATION]
     lines.extend(calibration or [text.NO_PREDICTION])
+    lines += _effects(store, rows, today)
     cautious = caution_review.report(store, rows, week)
     if cautious:
         lines += ["", *cautious]
