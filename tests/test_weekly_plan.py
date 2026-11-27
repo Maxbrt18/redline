@@ -765,3 +765,38 @@ def test_an_easy_run_takes_its_duration_or_its_distance_never_both():
     long_run = session("sl", "2030-03-17", "long", duration_cap_min=180, distance_cap_km=26.0)
     for alone in (duration_only, distance_only, long_run):
         assert weekly_plan.easy_bound_errors(None, {"revision": 2, "sessions": [alone]}) == []
+
+
+# ------------------------------------------------------------------ the load increase
+
+
+def test_a_session_rises_when_it_becomes_demanding_or_a_figure_climbs():
+    before = {"w32-lun-ef": session(), "w32-sam-sl": session("w32-sam-sl", workout="long")}
+    same = [session(), session("w32-sam-sl", workout="long")]
+    assert weekly_plan.session_rises(before, same) == []
+    longer = [session(distance_target_km=8.0), session("w32-sam-sl", workout="long")]
+    assert weekly_plan.session_rises(before, longer) == ["w32-lun-ef.distance_target_km: 7.0 -> 8.0"]
+    added = [*same, session("w32-jeu-seuil", workout="threshold")]
+    assert weekly_plan.session_rises(before, added) == ["w32-jeu-seuil: new demanding session"]
+    cancelled = [*same, session("w32-jeu-seuil", workout="threshold", status="cancelled")]
+    assert weekly_plan.session_rises(before, cancelled) == [], "a cancelled session adds nothing"
+
+
+def test_a_first_revision_rises_against_the_last_revision_of_the_week_before():
+    week_before = revision(sessions=[session(), session("w32-sam-sl", workout="long",
+                                                        distance_target_km=14.0,
+                                                        distance_cap_km=14.0)],
+                           volume_target_km=30.0)
+    held = revision(sessions=[session("w33-lun-ef"), session(
+        "w33-sam-sl", workout="long", distance_target_km=14.0, distance_cap_km=14.0)],
+        volume_target_km=30.0)
+    assert weekly_plan.week_rises(week_before, held) == []
+    assert weekly_plan.week_rises(week_before, {**held, "volume_target_km": 27.0}) == []
+    more = {**held, "volume_target_km": 33.0,
+            "sessions": [*held["sessions"], session("w33-jeu-seuil", workout="threshold")]}
+    assert weekly_plan.week_rises(week_before, more) == [
+        "volume_target_km: 30 -> 33 km", "demanding sessions: 1 -> 2"]
+    longer = {**held, "sessions": [session("w33-lun-ef"), session(
+        "w33-sam-sl", workout="long", distance_target_km=16.0, distance_cap_km=16.0)]}
+    assert weekly_plan.week_rises(week_before, longer) == ["long run: 14 -> 16 km"]
+    assert weekly_plan.week_rises(None, more) == [], "a first week compares with nothing"

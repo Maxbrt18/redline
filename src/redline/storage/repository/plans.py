@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
-from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -64,22 +63,13 @@ class Plans(StoreBase):
                         planned_sessions.c.revision_id == previous_revision["id"])
                 ).mappings()
             }
-            if self._raises_load(previous_sessions, revision.get("sessions", [])):
-                prediction = connection.execute(sa.select(coach_predictions).where(
-                    coach_predictions.c.athlete_id == self.athlete_id,
-                    coach_predictions.c.direction == "increase",
-                    coach_predictions.c.status == "open",
-                    coach_predictions.c.challenged_at.is_not(None),
-                    coach_predictions.c.used_at.is_(None),
-                ).order_by(coach_predictions.c.challenged_at.desc()).limit(1).with_for_update(
-                )).mappings().one_or_none()
-                if prediction is None:
-                    raise StorageError(
-                        "load increase blocked: create a prediction direction=increase, then let the "
-                        "challenger challenge it before revising")
-                connection.execute(coach_predictions.update().where(
-                    coach_predictions.c.id == prediction["id"]
-                ).values(used_at=dt.datetime.now(dt.UTC)))
+            rises = weekly_plan.session_rises(previous_sessions, revision.get("sessions", []))
+        else:
+            week_before = self._load_plan_connection(connection, iso_week.shift(week, -1))
+            rises = weekly_plan.week_rises(
+                week_before["revisions"][-1] if week_before else None, revision)
+        if rises:
+            self._consume_challenged_increase(connection, rises)
         unavailable = list(connection.execute(sa.select(deadlines).where(
             deadlines.c.athlete_id == self.athlete_id,
             deadlines.c.kind == "availability",
@@ -201,26 +191,23 @@ class Plans(StoreBase):
                 f"fuelling progression blocked: {highest} g/h is above the allowed step of "
                 f"{baseline + 15} g/h")
 
-    @staticmethod
-    def _raises_load(previous: dict[str, Any], proposed: list[dict]) -> bool:
-        """Detect a concrete increase, without confusing closure with new load."""
-        numeric = ("distance_target_km", "distance_cap_km", "duration_cap_min",
-                   "carbs_target_g_h")
-        for session in proposed:
-            if session.get("status") == voc.SessionStatus.CANCELLED:
-                continue
-            old = previous.get(session["id"])
-            if old is None:
-                if session.get("demanding"):
-                    return True
-                continue
-            if session.get("demanding") and not old["demanding"]:
-                return True
-            for field in numeric:
-                new_value, old_value = session.get(field), old[field]
-                if new_value is not None and (old_value is None or float(new_value) > float(old_value)):
-                    return True
-        return False
+    def _consume_challenged_increase(self, connection: Connection, rises: list[str]) -> None:
+        """A load increase uses one open, challenged and unused increase prediction."""
+        prediction = connection.execute(sa.select(coach_predictions).where(
+            coach_predictions.c.athlete_id == self.athlete_id,
+            coach_predictions.c.direction == "increase",
+            coach_predictions.c.status == "open",
+            coach_predictions.c.challenged_at.is_not(None),
+            coach_predictions.c.used_at.is_(None),
+        ).order_by(coach_predictions.c.challenged_at.desc()).limit(1).with_for_update(
+        )).mappings().one_or_none()
+        if prediction is None:
+            raise StorageError(
+                f"load increase blocked ({'; '.join(rises)}): create a prediction "
+                "direction=increase, then let the challenger challenge it before revising")
+        connection.execute(coach_predictions.update().where(
+            coach_predictions.c.id == prediction["id"]
+        ).values(used_at=dt.datetime.now(dt.UTC)))
 
     def _sync_session_cycles(self, connection: Connection, plan_id: uuid.UUID,
                              sessions: list[tuple[uuid.UUID, dict]]) -> None:

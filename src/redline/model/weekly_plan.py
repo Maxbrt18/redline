@@ -8,6 +8,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from itertools import pairwise
 
@@ -1290,3 +1291,59 @@ def orphan_sessions(previous: dict | None, current: dict) -> list[str]:
             orphans.append(text.ORPHAN_DAY.format(
                 day=_day_label(stamp), titles=", ".join(s["title"] for s in fresh)))
     return orphans
+
+
+#: The figures of a session whose rise is new load.
+LOAD_FIELDS = ("distance_target_km", "distance_cap_km", "duration_cap_min", "carbs_target_g_h")
+
+
+def _live(sessions: list[dict]) -> list[dict]:
+    return [session for session in sessions
+            if session.get("status") != SessionStatus.CANCELLED]
+
+
+def session_rises(previous: Mapping[str, Mapping], proposed: list[dict]) -> list[str]:
+    """What a revision raises against the previous revision of its week, session by
+    session: a new demanding session, a session become demanding, a figure that rises. A
+    session closed or cancelled is never new load."""
+    rises = []
+    for session in _live(proposed):
+        old = previous.get(session["id"])
+        if old is None:
+            if session.get("demanding"):
+                rises.append(f"{session['id']}: new demanding session")
+            continue
+        if session.get("demanding") and not old.get("demanding"):
+            rises.append(f"{session['id']}: now demanding")
+        for name in LOAD_FIELDS:
+            new, before = session.get(name), old.get(name)
+            if new is not None and (before is None or float(new) > float(before)):
+                rises.append(f"{session['id']}.{name}: {before} -> {new}")
+    return rises
+
+
+def _longest_run(sessions: list[dict]) -> float:
+    return max((float(session.get("distance_cap_km") or session.get("distance_target_km") or 0)
+                for session in sessions if session.get("workout") == session_kinds.LONG),
+               default=0.0)
+
+
+def week_rises(previous_week: dict | None, revision: dict) -> list[str]:
+    """What the first revision of a week raises against the last revision of the week
+    before: its volume target, its longest run, its count of demanding sessions. Without a
+    week before, nothing is compared."""
+    if previous_week is None:
+        return []
+    before, now = _live(previous_week.get("sessions") or []), _live(revision.get("sessions") or [])
+    rises = []
+    volume, held = revision.get("volume_target_km"), previous_week.get("volume_target_km")
+    if volume is not None and held is not None and float(volume) > float(held):
+        rises.append(f"volume_target_km: {held:g} -> {volume:g} km")
+    longest, held_longest = _longest_run(now), _longest_run(before)
+    if longest > held_longest:
+        rises.append(f"long run: {held_longest:g} -> {longest:g} km")
+    demanding = sum(1 for session in now if session.get("demanding"))
+    held_demanding = sum(1 for session in before if session.get("demanding"))
+    if demanding > held_demanding:
+        rises.append(f"demanding sessions: {held_demanding} -> {demanding}")
+    return rises
