@@ -144,3 +144,25 @@ def test_choosing_a_candidate_keeps_its_levers_in_the_races_context(runs, monkey
     assert payload["context"]["peak_volume_km"] == 50, "the rest of the goal is kept"
     with pytest.raises(InputError, match="candidat inconnu"):
         _run(monkeypatch, store, "--choose", "bold")
+
+
+def test_what_the_athlete_held_is_read_from_the_closed_weeks(runs):
+    from redline.analysis import expected_rpe
+
+    quality = [ledger.Row(dt.date(2030, 11, 25) - dt.timedelta(weeks=week, days=-2), "threshold",
+                          km=10, hours=0.9) for week in range(1, 4)]
+    rows = [*runs, *quality]
+    history = expected_rpe.History(rows, lambda row: None, lambda day: None,
+                                   expected_rpe.Settings(26, 3, 5, 1.0, 1.5, 2.0))
+
+    def dose(row):
+        intensity = 1.3 if row.type == "threshold" else 1.0
+        return expected_rpe.run_dose(row.km or 0.0, 0.0, intensity, 2.0)
+
+    history.dose = dose  # type: ignore[method-assign]
+    held = plan_engine.held_of(rows, history, TODAY)
+    assert held.quality_premium == pytest.approx(10 * 1.3 ** 2 - 10)
+    assert held.week_load == pytest.approx(30 + 10 * 1.3 ** 2)
+    assert held.long_share == pytest.approx(14 / 40)
+    line = plan_engine._held_line(held)
+    assert "une qualité ajoute 6,9 de charge" in line and "35 %" in line
