@@ -3,6 +3,88 @@
 Each release groups what `main` gathered once it has proven itself on a real server; see
 [CONTRIBUTING.md](CONTRIBUTING.md#releases). Each tag carries its date.
 
+## 0.4.0
+
+### Added
+
+- **Expected RPE**: a session's dose (effort-km weighted by speed against the athlete's
+  dated easy speed, or minutes) predicts its RPE from the athlete's own history, as a
+  range of three integers. A quality session progresses on it, and a declared RPE outside
+  its range is spoken of only with an independent sign (an execution gap, a high flat HR, a
+  poor night, a pattern). An RPE given after the debrief is ruled too, and the app shows
+  the expected range once the RPE is declared
+  ([#128](https://github.com/Maxbrt18/redline/pull/128),
+  [#129](https://github.com/Maxbrt18/redline/pull/129)).
+- **Typed prescription and ruled debrief**: a planned run declares what it asks (relief or
+  efforts, climb and descent intents, a typed quality dose: reps, durations, recovery,
+  pace), and the debrief's verdict is ruled from it and kept with the run
+  ([#126](https://github.com/Maxbrt18/redline/pull/126),
+  [#128](https://github.com/Maxbrt18/redline/pull/128)).
+- **Bounded override**: a revision may go one step above a run lineage's ceiling only with
+  a typed reason and a sealed prediction, never twice in a row
+  ([#128](https://github.com/Maxbrt18/redline/pull/128)).
+- **Preparation built backwards from the race**: a race carries a typed goal; engine
+  templates by distance and terrain (replaceable by an instance `plan_templates.toml`)
+  give three skeleton candidates, cautious, balanced and specific, with the risks of any
+  compression named ([#130](https://github.com/Maxbrt18/redline/pull/130)).
+- **Step tally**: `redline progression` and the Sunday dossier end with the tally of every
+  run lineage's rises and bounded overrides. Climbs are judged against the athlete's own
+  easy HR at their grade ([#131](https://github.com/Maxbrt18/redline/pull/131)).
+- **Graded easy-run permit**: an enveloped easy run gets a graded verdict (tolerated, minor
+  gap, failure) instead of a cliff. Every planned easy run with a duration cap is judged,
+  and the envelope counts in load with a raw-duration guard
+  ([#124](https://github.com/Maxbrt18/redline/pull/124),
+  [#125](https://github.com/Maxbrt18/redline/pull/125)).
+- **Model call costs**: every Claude and Codex call records its tokens, duration and,
+  for Claude, its price at API rates in `agent_calls`. `redline agent-costs` sums them by
+  route and model and projects them per athlete over a month
+  ([#134](https://github.com/Maxbrt18/redline/pull/134),
+  [#135](https://github.com/Maxbrt18/redline/pull/135)).
+- **Unplanned and ambiguous activities in the notebook**, and a recorded run filled with
+  the measures its Strava capture holds
+  ([#119](https://github.com/Maxbrt18/redline/pull/119),
+  [#120](https://github.com/Maxbrt18/redline/pull/120)).
+
+### Changed
+
+- **The default rulebook carries no athlete's choices**: rule n1 cites a typed
+  `quality_sessions_per_week`, which `week-plan revise` enforces, and the permit reads its
+  thresholds from the rulebook ([#122](https://github.com/Maxbrt18/redline/pull/122)).
+- **No fixed RPE target**: new revisions refuse `rpe_min`/`rpe_max` on every session
+  (stored ones stay readable, never shown nor compared). The six `rpe_*` thresholds
+  replace `comparable_*`, and the app drops its « Effort ≤N »
+  ([#128](https://github.com/Maxbrt18/redline/pull/128)).
+- A revision that only moves sessions, or only changes past ones, passes the n3 volume cut
+  ([#121](https://github.com/Maxbrt18/redline/pull/121),
+  [#127](https://github.com/Maxbrt18/redline/pull/127)).
+- A debrief reads kilometre gaps on flat ground only
+  ([#123](https://github.com/Maxbrt18/redline/pull/123)).
+- A plan change sent to Messenger says only what changed, and a debrief may stay silent on
+  an activity it has recorded ([#132](https://github.com/Maxbrt18/redline/pull/132),
+  [#133](https://github.com/Maxbrt18/redline/pull/133)).
+
+### Upgrading
+
+Five migrations (0009 to 0013): run `deploy/release` with `MIGRATOR_DATABASE_URL`.
+
+The instance's `rulebook.toml`, when it replaces the default, takes new keys. The running
+0.3.0 engine refuses keys it does not know, so pass them with `--declarations`:
+
+```bash
+deploy/release v0.4.0 --declarations <dir with the updated rulebook.toml>
+```
+
+- Replace `comparable_duration_pct` and `comparable_sessions` with the six `rpe_*` keys,
+  and rewrite rule n6 (see `rulebook.default.toml`).
+- The four `permit_*` thresholds (`permit_weeks`, `permit_min_runs`,
+  `permit_agreement_min`, `permit_withdrawal_days`) go together; without them no permit is
+  judged. The five graded ones and `permit_raw_guard_pct` are optional, on top of them.
+- Optional: `quality_sessions_per_week` cited in n1, `skeleton_ramp_max_pct` and
+  `skeleton_long_step_max_pct` (both or none; without them no skeleton is built), and
+  `climb_hr_margin_bpm` (without it, climbs are not judged by their HR).
+- Deploy the server before installing the new iOS app: the app decodes the new notebook
+  payloads strictly.
+
 ## 0.3.0
 
 ### Added
