@@ -24,7 +24,7 @@ from redline.model.errors import ConfigError, InputError
 from redline.model.plan_skeleton import NOTHING_HELD, Held, Levers, Limits, Skeleton, Start
 from redline.model.vocabulary import DeadlineStatus, RaceTerrain, SessionStatus
 
-from . import expected_rpe, ledger, race_estimate, signals
+from . import critical_speed, expected_rpe, ledger, race_estimate, signals
 
 #: The closed weeks the starting volume is the mean of.
 START_WEEKS = 3
@@ -63,6 +63,22 @@ def goal_reading(store: Any, rows: list[ledger.Row], goal: race_model.Goal,
 
 
 @dataclass(frozen=True)
+class CriticalReading:
+    """The critical-speed fit of the recent efforts, None without one, and its settings."""
+
+    config: critical_speed.Settings
+    fit: critical_speed.Fit | None
+
+
+def critical_reading(store: Any, today: dt.date) -> CriticalReading | None:
+    config = critical_speed.settings()
+    if config is None:
+        return None
+    return CriticalReading(config, critical_speed.fit(
+        effort_model.efforts(store.effort_rows()), today, config))
+
+
+@dataclass(frozen=True)
 class Frame:
     """Everything a skeleton is computed from, but the levers."""
 
@@ -77,6 +93,9 @@ class Frame:
     #: What the declared all-out efforts say of a road goal's time; None for a trail goal
     #: or when the rulebook declares no estimate.
     reading: GoalReading | None = None
+    #: The critical speed of the recent all-out efforts; None when the rulebook declares
+    #: none.
+    critical: CriticalReading | None = None
 
 
 def start_of(rows: list[ledger.Row], today: dt.date) -> Start:
@@ -148,7 +167,7 @@ def frame(store: Any, today: dt.date) -> Frame:
     held = (held_of(rows, expected_rpe.history(store, rows, config), today)
             if config is not None else NOTHING_HELD)
     return Frame(race, goal, template, start_of(rows, today), limits, first, recovering, held,
-                 goal_reading(store, rows, goal, today))
+                 goal_reading(store, rows, goal, today), critical_reading(store, today))
 
 
 def candidates(store: Any, today: dt.date) -> tuple[Frame, list[Skeleton]]:
@@ -228,6 +247,36 @@ def _source_line(source: race_estimate.Source) -> str:
         share=f"{source.share * 100:.0f}")
 
 
+def _pace(seconds: float) -> str:
+    minutes, rest = divmod(round(seconds), 60)
+    return f"{minutes}:{rest:02d}"
+
+
+def _critical_lines(reading: CriticalReading | None) -> list[str]:
+    """The critical speed and the domains around it, or the test that would give one."""
+    if reading is None:
+        return []
+    found, config = reading.fit, reading.config
+    if found is None:
+        return [text.NO_CRITICAL_SPEED.format(weeks=config.weeks)]
+    if found.speed_se is None:
+        error = text.CRITICAL_SPEED_TWO
+    else:
+        slower = 1000 / (found.speed_mps - found.speed_se) - found.pace_s
+        error = text.CRITICAL_SPEED_ERROR.format(error=f"{slower:.0f}")
+    return [text.CRITICAL_SPEED.format(
+                pace=_pace(found.pace_s), speed=text.number(found.speed_mps * 3.6),
+                d_prime=f"{found.d_prime_m:.0f}", n=len(found.efforts),
+                first=found.efforts[0].on, last=found.efforts[-1].on, error=error),
+            text.CRITICAL_SPEED_DOMAINS.format(
+                easy=_pace(found.pace_at(config.first_threshold_pct)),
+                first=text.number(config.first_threshold_pct),
+                low=_pace(found.pace_at(config.threshold_low_pct)),
+                high=_pace(found.pace_at(config.threshold_high_pct)),
+                low_pct=text.number(config.threshold_low_pct),
+                high_pct=text.number(config.threshold_high_pct), pace=_pace(found.pace_s))]
+
+
 def _estimate_lines(reading: GoalReading | None) -> list[str]:
     """What the declared efforts say of a road goal's time, with its controls."""
     if reading is None:
@@ -291,6 +340,7 @@ def render(found: Frame, skeletons: list[Skeleton], *, chosen: bool = False) -> 
                                long_run=f"{found.start.long_run_km:g}",
                                recovery=text.RECOVERY if found.recovering else ""),
              *_estimate_lines(found.reading),
+             *_critical_lines(found.critical),
              _held_line(found.held)]
     for skeleton in skeletons:
         levers = skeleton.levers
