@@ -163,6 +163,11 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
               note="half-width while the kind has fewer declared RPE than settled"),
         field("rpe_intensity_exponent", float, required=False, minimum=0, maximum=4,
               note="exponent of a run's intensity in its dose"),
+        # Optional: absent or false, a quality run's RPE is read against its whole-session
+        # dose; true, against its WER load (`redline.analysis.rep_dose`), once
+        # `redline evaluate-quality-dose` shows it predicts the athlete's RPE better.
+        field("rpe_quality_dose_reps", bool, required=False,
+              note="a quality run's RPE is read against its WER load"),
         # Optional, all eight or none (`ESTIMATE_PARAMETERS`): absent, no goal time is
         # estimated from the declared all-out efforts.
         field("estimate_window_weeks", int, required=False, minimum=4, maximum=260,
@@ -317,6 +322,7 @@ class Parameters:
     rpe_range_width: float | None = None
     rpe_range_width_unsettled: float | None = None
     rpe_intensity_exponent: float | None = None
+    rpe_quality_dose_reps: bool = False
     estimate_window_weeks: int | None = None
     estimate_min_source_km: float | None = None
     estimate_noise_vdot: float | None = None

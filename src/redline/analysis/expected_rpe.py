@@ -307,6 +307,7 @@ def key_of(row: Row) -> tuple[str, str | None]:
 ProfileOf = Callable[[Row], "easy_load.Profile | None"]
 ReferenceOf = Callable[[dt.date], "float | None"]
 ConditionsOf = Callable[[Row], Conditions]
+QualityOf = Callable[[Row], "float | None"]
 
 
 def heat_of(row: Row) -> float | None:
@@ -321,8 +322,11 @@ class History:
     """
 
     def __init__(self, rows: Iterable[Row], profile_of: ProfileOf, reference_of: ReferenceOf,
-                 config: Settings, conditions_of: ConditionsOf | None = None):
+                 config: Settings, conditions_of: ConditionsOf | None = None,
+                 quality_of: QualityOf | None = None):
         self.config = config
+        self._quality_of = quality_of
+        self._quality: dict[tuple, Dose | None] = {}
         self.rows = sorted(rows, key=lambda row: row.date)
         self._profile_of, self._reference_of = profile_of, reference_of
         self._conditions_of = conditions_of or (lambda row: Conditions(heat_c=heat_of(row)))
@@ -342,6 +346,19 @@ class History:
                                        self.config.exponent)
         return self._doses[key]
 
+    def rpe_dose(self, row: Row) -> Dose | None:
+        """The dose a session's RPE is read against: a quality run's WER load when the
+        rulebook reads quality sessions by their repetitions (`redline.analysis.rep_dose`),
+        else its dose. A quality run without a WER load then has none: a kind is never
+        calibrated on two units at once."""
+        if self._quality_of is None or row.type not in session_kinds.QUALITY:
+            return self.dose(row)
+        key = (row.idempotency_key, row.date, row.type, row.km, row.hours)
+        if key not in self._quality:
+            load = self._quality_of(row)
+            self._quality[key] = None if load is None or load <= 0 else Dose(load)
+        return self._quality[key]
+
     def model(self, key: tuple[str, str | None], before: dt.date) -> Model | None:
         """The model of a kind from the sessions of the window before `before`."""
         since = before - dt.timedelta(weeks=self.config.weeks)
@@ -349,7 +366,7 @@ class History:
         for row in self.rows:
             if not since <= row.date < before or row.rpe is None or key_of(row) != key:
                 continue
-            dose = self.dose(row)
+            dose = self.rpe_dose(row)
             if dose is not None:
                 points.append((dose.value, row.rpe))
         return fit(points, self.config)
@@ -365,7 +382,7 @@ class History:
         """The expectation of the dose alone, from the sessions before it."""
         key = (row.idempotency_key, row.date, row.type, row.km, row.hours, row.dplus)
         if key not in self._bases:
-            dose = self.dose(row)
+            dose = self.rpe_dose(row)
             found = self.model(key_of(row), row.date) if dose is not None else None
             self._bases[key] = (None if found is None or dose is None
                                 else expect(found, dose, self.config))
@@ -385,7 +402,7 @@ class History:
     def expectation(self, row: Row) -> Expectation | None:
         """What a recorded session should have cost, from the sessions before it: its
         dose, then each supported effect of the conditions it met."""
-        dose = self.dose(row)
+        dose = self.rpe_dose(row)
         found = self.model(key_of(row), row.date) if dose is not None else None
         if found is None or dose is None:
             return None
@@ -471,7 +488,12 @@ def history(store: Any, rows: Iterable[Row], config: Settings) -> History:
             return Conditions(heat_c=heat_of(row))
         return Conditions(heat_c=heat_of(row), night=night_of(store, activity))
 
-    return History(rows, profile_of, reference_of, config, conditions_of)
+    quality_of = None
+    if rulebook.current().parameters.rpe_quality_dose_reps:
+        from . import rep_dose
+
+        quality_of = rep_dose.quality_doses(store)
+    return History(rows, profile_of, reference_of, config, conditions_of, quality_of)
 
 
 def night_of(store: Any, activity: int) -> bool | None:

@@ -166,6 +166,21 @@ def group_of(store: Any, activity_id: int) -> bool | None:
     return None if count is None else int(count) > 1
 
 
+def stored_reps(store: Any, row: Any) -> list[dict] | None:
+    """The repetitions the kept laps of a captured run show
+    (`redline.model.debrief.workout_reps`); None without a capture or a clear alternation."""
+    from redline.model import debrief
+
+    activity = strava_id(row.idempotency_key)
+    if activity is None:
+        return None
+    try:
+        laps = Activity.from_json(store.strava_intake(activity)["distilled"]).laps
+    except Exception:  # no capture or an unreadable one: no repetitions are read
+        return None
+    return debrief.workout_reps(laps)
+
+
 def stored_profile(store: Any, activity_id: int) -> Profile | None:
     streams = store.strava_streams(activity_id)
     return None if not streams else profile(streams)
