@@ -164,5 +164,8 @@ SKELETON_UNREADABLE = ("Squelette : lecture du registre impossible ({name}), la 
 PROGRESSION_UNREADABLE = ("Progression : lecture du registre impossible ({name}), les doses "
                           "de qualité ne sont pas contrôlées contre leur plafond.")
 
+GUT_UNREADABLE = ("Entraînement digestif : lecture du registre impossible ({name}), les "
+                  "cibles de glucides ne sont pas contrôlées contre leur plafond.")
+
 PAIN_RULES_UNREADABLE = ("Règles n3 et n4 : lecture du registre impossible ({name}), la "
                          "qualité et le volume ne sont pas contrôlés pour cette révision.")

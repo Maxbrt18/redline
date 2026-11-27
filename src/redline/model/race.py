@@ -148,6 +148,10 @@ class Race:
     carbs_g_h: int | None = None
     pace_s_per_km: float | None = None
     goal: Goal | None = None
+    #: The context's keys that could not be read, dropped by the reading.
+    unread: tuple[str, ...] = ()
+    #: The context names a chosen skeleton, readable or not.
+    declares_skeleton: bool = False
 
 
 def _goal(context: dict) -> Goal | None:
@@ -181,11 +185,12 @@ def from_row(row: dict) -> Race:
     """A race as stored. A context written before its keys were typed is read anyway: an
     unreadable key costs the reader its value, never the race."""
     due = row["due_on"]
-    context = row.get("context") or {}
-    if CONTEXT_SCHEMA.errors(context):
-        context = {spec.name: context[spec.name] for spec in CONTEXT_SCHEMA.fields
-                   if spec.name in context
-                   and not Schema("race context", [spec]).errors({spec.name: context[spec.name]})}
+    written = row.get("context") or {}
+    context = written
+    if CONTEXT_SCHEMA.errors(written):
+        context = {spec.name: written[spec.name] for spec in CONTEXT_SCHEMA.fields
+                   if spec.name in written
+                   and not Schema("race context", [spec]).errors({spec.name: written[spec.name]})}
     defaults = rulebook.current().parameters
     goal = _goal(context)
     template = template_of(goal)
@@ -211,7 +216,9 @@ def from_row(row: dict) -> Race:
                 stop_minutes=float(context.get("stop_minutes") or 0),
                 carbs_g_h=context.get("carbs_g_h"),
                 pace_s_per_km=_number(context.get("pace_s_per_km")),
-                goal=goal)
+                goal=goal,
+                unread=tuple(sorted(set(written) - set(context))),
+                declares_skeleton=bool(written.get("skeleton")))
 
 
 def _clock(value: object) -> dt.time | None:

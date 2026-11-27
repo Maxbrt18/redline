@@ -65,11 +65,9 @@ class Coverage:
 
 def coverage(declared: Lineages, sheets: dict[str, dict]) -> Coverage:
     """The exercise lineages against the sheets, keyed by slug (`program.load(...).exercises`);
-    a run lineage follows a planned kind, not a sheet."""
+    a run or a fuelling lineage follows no sheet."""
     missing, mismatched = [], []
-    for lineage in declared.lineages:
-        if lineage.workout:
-            continue
+    for lineage in declared.exercises:
         sheet = sheets.get(lineage.slug)
         if sheet is None:
             missing.append(lineage.slug)
@@ -155,7 +153,7 @@ def proposals(store: Any, root: Path, today: dt.date, week: str | None = None) -
     """
     book = rulebook.load(root)
     declared = book.progression
-    exercises = [lineage for lineage in declared.lineages if not lineage.workout]
+    exercises = declared.exercises
     if not exercises:
         return []
     sheets = program.load(root).exercises
@@ -255,7 +253,7 @@ def report(store: Any, root: Path, today: dt.date, week: str | None = None) -> l
 def followed(store: Any, root: Path) -> list[tuple[Lineage, list[Exposure]]]:
     """Each declared exercise lineage with its reports, for the tally of its steps."""
     book = rulebook.load(root)
-    exercises = [lineage for lineage in book.progression.lineages if not lineage.workout]
+    exercises = book.progression.exercises
     if not exercises:
         return []
     sheets = program.load(root).exercises

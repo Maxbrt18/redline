@@ -178,15 +178,20 @@ def candidates(store: Any, today: dt.date) -> tuple[Frame, list[Skeleton]]:
 
 
 def chosen(store: Any, today: dt.date) -> Skeleton | None:
-    """The skeleton the race's context chose, computed again from today; None when the
-    race chose none or cannot be framed."""
-    try:
-        found = frame(store, today)
-    except (InputError, ConfigError):
+    """The skeleton the next race's context chose, computed again from today; None when
+    no race is ahead or it chose none. A chosen skeleton whose frame cannot be read is a
+    ConfigError or an InputError naming what is missing, never no skeleton."""
+    race = race_model.upcoming(store, today)
+    if race is None or not race.declares_skeleton:
         return None
+    if race.unread:
+        raise ConfigError(f"the context of the race of {race.on.isoformat()} has keys that "
+                          f"cannot be read ({', '.join(race.unread)}): write them again with "
+                          "`redline fact-write deadline`")
+    found = frame(store, today)
     goal = found.goal
-    if goal.skeleton is None:
-        return None
+    # Declared and read: a readable `skeleton` key is the goal's chosen skeleton.
+    assert goal.skeleton is not None
     levers = Levers(goal.skeleton.specific_weeks, goal.skeleton.deload_every,
                     goal.skeleton.second_quality)
     return plan_skeleton.generate(found.template, goal, levers, found.start, found.limits,

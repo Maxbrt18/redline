@@ -10,9 +10,12 @@ from __future__ import annotations
 import datetime as dt
 from collections.abc import Callable
 
+from sqlalchemy.exc import SQLAlchemyError
+
 from redline.analysis import decision_state
 from redline.coach.fr import plan as wording
 from redline.model import prescription
+from redline.model.errors import ExternalError, RedlineError, StorageError
 from redline.model.schema import SchemaError
 from redline.model.weekly_plan import (
     change_evidence_errors,
@@ -27,71 +30,109 @@ from redline.model.weekly_plan import (
     written_text_errors,
 )
 
+#: A measurement that cannot be taken: a read of the store or of a service that fails. It
+#: costs the check, with a warning, never the prescription.
+UNAVAILABLE = (StorageError, ExternalError, OSError, SQLAlchemyError)
+
+
+def _guarded(name: str, where: str, unavailable: str, warn: Callable[[str], None],
+             check: Callable[[], list[str]]) -> list[str]:
+    """The refusals of one guard. Only an unavailable measurement lets the revision through
+    unchecked, with a warning; a declared frame that cannot be read refuses, and so does a
+    failure of the check itself."""
+    try:
+        return check()
+    except UNAVAILABLE as exc:
+        warn(unavailable.format(name=exc.__class__.__name__))
+        return []
+    except RedlineError as exc:
+        return [f"{where}: the {name} check cannot read its frame: {exc}"]
+    # A guard that fails on a defect refuses: no revision passes a check that was not
+    # made, and the refusal names the failure so the coach can report it.
+    except Exception as exc:
+        return [f"{where}: the {name} check failed ({exc.__class__.__name__}: {exc}); "
+                "the revision waits for it to be fixed"]
+
+
+def _where(week: str, revision: dict) -> str:
+    return f"{week} revision {revision.get('revision')}"
+
 
 def taper_errors(store, week: str, revision: dict, warn: Callable[[str], None]) -> list[str]:
-    """The taper band, when `week` is in one. A measurement that fails costs the check,
-    never the prescription."""
+    """The taper band, when `week` is in one."""
     from redline.analysis import ledger, taper
-    try:
+
+    def check() -> list[str]:
         frame = taper.race_window(store, week)
-        rows = ledger.parse_ledger(store) if frame else []
-    except Exception as exc:
-        warn(wording.TAPER_UNREADABLE.format(name=exc.__class__.__name__))
-        return []
-    if frame is None:
-        return []
-    return taper.plan_errors(rows, frame, week, revision,
-                             f"{week} revision {revision['revision']}")
+        if frame is None:
+            return []
+        return taper.plan_errors(ledger.parse_ledger(store), frame, week, revision,
+                                 _where(week, revision))
+
+    return _guarded("taper", _where(week, revision), wording.TAPER_UNREADABLE, warn, check)
 
 
 def pain_errors(store, week: str, revision: dict, existing: dict | None,
                 warn: Callable[[str], None]) -> list[str]:
-    """Rules n3 and n4, from the ledger at the instant of writing. A measurement that
-    fails costs the check, never the prescription."""
+    """Rules n3 and n4, from the ledger at the instant of writing."""
     from redline.analysis import ledger, pain_rules
     today = dt.date.fromisoformat(revision["computed_at"][:10])
-    try:
+
+    def check() -> list[str]:
         rows = [row for row in ledger.parse_ledger(store) if row.date <= today]
         zones = [zone.slug for zone in ledger.pain_zones(store)]
         holds = pain_rules.holds(rows, store.daily_rows(), zones, today)
         ceilings = pain_rules.volume_ceilings(
             rows, zones, week, (existing or {}).get("revisions", []), today)
-    except Exception as exc:
-        warn(wording.PAIN_RULES_UNREADABLE.format(name=exc.__class__.__name__))
-        return []
-    previous = existing["revisions"][-1] if existing else None
-    return pain_rule_errors(revision, holds, ceilings, f"{week} revision {revision['revision']}",
-                            previous)
+        previous = existing["revisions"][-1] if existing else None
+        return pain_rule_errors(revision, holds, ceilings, _where(week, revision), previous)
+
+    return _guarded("pain rules", _where(week, revision), wording.PAIN_RULES_UNREADABLE, warn,
+                    check)
 
 
 def progression_errors(store, week: str, revision: dict, previous: dict | None,
                        warn: Callable[[str], None]) -> list[str]:
-    """The quality doses against their lineages' ceilings, the bounded override at most.
-    A measurement that fails costs the check, never the prescription."""
+    """The quality doses against their lineages' ceilings, the bounded override at most."""
     from redline.analysis import progression_runs
     from redline.model import rulebook
     today = dt.date.fromisoformat(revision["computed_at"][:10])
-    try:
+
+    def check() -> list[str]:
         return progression_runs.override_errors(store, rulebook.current(), week, revision,
                                                 previous, today)
-    except Exception as exc:
-        warn(wording.PROGRESSION_UNREADABLE.format(name=exc.__class__.__name__))
-        return []
+
+    return _guarded("progression", _where(week, revision), wording.PROGRESSION_UNREADABLE,
+                    warn, check)
+
+
+def gut_errors(store, week: str, revision: dict, warn: Callable[[str], None]) -> list[str]:
+    """The carbohydrate targets against the gut-training lineage, when one is declared."""
+    from redline.analysis import progression_fuelling
+    from redline.model import rulebook
+    today = dt.date.fromisoformat(revision["computed_at"][:10])
+
+    def check() -> list[str]:
+        return progression_fuelling.ceiling_errors(store, rulebook.current(), week, revision,
+                                                   today)
+
+    return _guarded("gut training", _where(week, revision), wording.GUT_UNREADABLE, warn,
+                    check)
 
 
 def skeleton_errors(store, week: str, revision: dict, previous: dict | None,
                     warn: Callable[[str], None]) -> list[str]:
-    """The week against the next race's chosen skeleton, when it has one. A measurement
-    that fails costs the check, never the prescription."""
+    """The week against the next race's chosen skeleton, when it has one."""
     from redline.analysis import plan_engine
     today = dt.date.fromisoformat(revision["computed_at"][:10])
-    try:
+
+    def check() -> list[str]:
         skeleton = plan_engine.chosen(store, today)
-    except Exception as exc:
-        warn(wording.SKELETON_UNREADABLE.format(name=exc.__class__.__name__))
-        return []
-    return [] if skeleton is None else plan_engine.revision_errors(skeleton, week, revision,
-                                                                   previous)
+        return [] if skeleton is None else plan_engine.revision_errors(skeleton, week,
+                                                                       revision, previous)
+
+    return _guarded("skeleton", _where(week, revision), wording.SKELETON_UNREADABLE, warn,
+                    check)
 
 
 def checked(store, week: str, revision: dict, existing: dict | None, *, stamp: str,
@@ -133,6 +174,7 @@ def checked(store, week: str, revision: dict, existing: dict | None, *, stamp: s
         *taper_errors(store, week, current, warn),
         *pain_errors(store, week, current, existing, warn),
         *progression_errors(store, week, current, previous, warn),
+        *gut_errors(store, week, current, warn),
         *skeleton_errors(store, week, current, previous, warn),
     ]
     if mistakes:

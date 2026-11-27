@@ -48,7 +48,6 @@ class Plans(StoreBase):
             raise StorageError(
                 ("a revision only carries the planned/cancelled intent; execution belongs to the"
                  " cycles: ") + ", ".join(forbidden))
-        self._enforce_gut_progression(connection, revision.get("sessions", []))
         previous_revision = connection.execute(sa.select(
             plan_revisions.c.id, plan_revisions.c.computed_at,
         ).join(weekly_plans, weekly_plans.c.id == plan_revisions.c.plan_id).where(
@@ -64,22 +63,13 @@ class Plans(StoreBase):
                         planned_sessions.c.revision_id == previous_revision["id"])
                 ).mappings()
             }
-            if self._raises_load(previous_sessions, revision.get("sessions", [])):
-                prediction = connection.execute(sa.select(coach_predictions).where(
-                    coach_predictions.c.athlete_id == self.athlete_id,
-                    coach_predictions.c.direction == "increase",
-                    coach_predictions.c.status == "open",
-                    coach_predictions.c.challenged_at.is_not(None),
-                    coach_predictions.c.used_at.is_(None),
-                ).order_by(coach_predictions.c.challenged_at.desc()).limit(1).with_for_update(
-                )).mappings().one_or_none()
-                if prediction is None:
-                    raise StorageError(
-                        "load increase blocked: create a prediction direction=increase, then let the "
-                        "challenger challenge it before revising")
-                connection.execute(coach_predictions.update().where(
-                    coach_predictions.c.id == prediction["id"]
-                ).values(used_at=dt.datetime.now(dt.UTC)))
+            rises = weekly_plan.session_rises(previous_sessions, revision.get("sessions", []))
+        else:
+            week_before = self._load_plan_connection(connection, iso_week.shift(week, -1))
+            rises = weekly_plan.week_rises(
+                week_before["revisions"][-1] if week_before else None, revision)
+        if rises:
+            self._consume_challenged_increase(connection, rises)
         unavailable = list(connection.execute(sa.select(deadlines).where(
             deadlines.c.athlete_id == self.athlete_id,
             deadlines.c.kind == "availability",
@@ -169,58 +159,49 @@ class Plans(StoreBase):
             plans = {week: self._load_plan_connection(connection, week) for week in weeks}
         return {week: plan["revisions"][-1] for week, plan in plans.items() if plan}
 
-    def _enforce_gut_progression(self, connection: Connection, proposed: list[dict]) -> None:
-        targets = [session["carbs_target_g_h"] for session in proposed
-                   if session.get("status") != voc.SessionStatus.CANCELLED
-                   and session.get("carbs_target_g_h") is not None]
-        if not targets:
-            return
-        last = connection.execute(sa.select(
-            planned_sessions.c.carbs_target_g_h,
-            observation_metrics.c.gut_symptoms,
-        ).join(session_cycles,
-               session_cycles.c.source_session_id == planned_sessions.c.id).join(
-            observation_metrics,
-            observation_metrics.c.observation_id == session_cycles.c.observation_id).where(
-                session_cycles.c.athlete_id == self.athlete_id,
-                planned_sessions.c.carbs_target_g_h.is_not(None),
-                observation_metrics.c.carbs_g_h_state == "known",
-                observation_metrics.c.gut_symptoms_state == "known",
-        ).order_by(session_cycles.c.observed_started_at.desc()).limit(1)).mappings().one_or_none()
-        if last is None:
-            return
-        baseline = int(last["carbs_target_g_h"])
-        highest = max(targets)
-        if highest <= baseline:
-            return
-        if float(last["gut_symptoms"]) > 3:
-            raise StorageError(
-                "fuelling progression blocked: the last exposure is above 3/10")
-        if highest > baseline + 15:
-            raise StorageError(
-                f"fuelling progression blocked: {highest} g/h is above the allowed step of "
-                f"{baseline + 15} g/h")
+    def fuelled_sessions(self) -> list[dict]:
+        """Each fuelled session run, newest first: its day, the target it was prescribed,
+        the carbohydrate taken and the gut symptoms, None when not known."""
+        with self.database.engine.connect() as connection:
+            rows = connection.execute(sa.select(
+                observations.c.occurred_on, planned_sessions.c.logical_key,
+                planned_sessions.c.carbs_target_g_h,
+                observation_metrics.c.carbs_g_h, observation_metrics.c.carbs_g_h_state,
+                observation_metrics.c.gut_symptoms, observation_metrics.c.gut_symptoms_state,
+            ).join(session_cycles,
+                   session_cycles.c.source_session_id == planned_sessions.c.id).join(
+                observations, observations.c.id == session_cycles.c.observation_id).join(
+                observation_metrics,
+                observation_metrics.c.observation_id == session_cycles.c.observation_id).where(
+                    session_cycles.c.athlete_id == self.athlete_id,
+                    planned_sessions.c.carbs_target_g_h.is_not(None),
+            ).order_by(session_cycles.c.observed_started_at.desc())).mappings().all()
 
-    @staticmethod
-    def _raises_load(previous: dict[str, Any], proposed: list[dict]) -> bool:
-        """Detect a concrete increase, without confusing closure with new load."""
-        numeric = ("distance_target_km", "distance_cap_km", "duration_cap_min",
-                   "carbs_target_g_h")
-        for session in proposed:
-            if session.get("status") == voc.SessionStatus.CANCELLED:
-                continue
-            old = previous.get(session["id"])
-            if old is None:
-                if session.get("demanding"):
-                    return True
-                continue
-            if session.get("demanding") and not old["demanding"]:
-                return True
-            for field in numeric:
-                new_value, old_value = session.get(field), old[field]
-                if new_value is not None and (old_value is None or float(new_value) > float(old_value)):
-                    return True
-        return False
+        def known(row: Any, metric: str) -> float | None:
+            return float(row[metric]) if row[f"{metric}_state"] == "known" else None
+
+        return [{"on": row["occurred_on"], "session": row["logical_key"],
+                 "target_g_h": float(row["carbs_target_g_h"]),
+                 "carbs_taken_g_h": known(row, "carbs_g_h"),
+                 "gut_symptoms": known(row, "gut_symptoms")} for row in rows]
+
+    def _consume_challenged_increase(self, connection: Connection, rises: list[str]) -> None:
+        """A load increase uses one open, challenged and unused increase prediction."""
+        prediction = connection.execute(sa.select(coach_predictions).where(
+            coach_predictions.c.athlete_id == self.athlete_id,
+            coach_predictions.c.direction == "increase",
+            coach_predictions.c.status == "open",
+            coach_predictions.c.challenged_at.is_not(None),
+            coach_predictions.c.used_at.is_(None),
+        ).order_by(coach_predictions.c.challenged_at.desc()).limit(1).with_for_update(
+        )).mappings().one_or_none()
+        if prediction is None:
+            raise StorageError(
+                f"load increase blocked ({'; '.join(rises)}): create a prediction "
+                "direction=increase, then let the challenger challenge it before revising")
+        connection.execute(coach_predictions.update().where(
+            coach_predictions.c.id == prediction["id"]
+        ).values(used_at=dt.datetime.now(dt.UTC)))
 
     def _sync_session_cycles(self, connection: Connection, plan_id: uuid.UUID,
                              sessions: list[tuple[uuid.UUID, dict]]) -> None:

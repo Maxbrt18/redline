@@ -685,6 +685,34 @@ def test_a_load_increase_waits_for_and_consumes_one_challenge(store):
     assert prediction["used_at"] is not None
 
 
+def test_a_week_that_rises_above_the_week_before_waits_for_a_challenge(store):
+    from test_weekly_plan import revision as build_revision
+    from test_weekly_plan import session
+
+    store.append_plan_revision("2026-W32", build_revision(
+        1, sessions=[session()], computed_at="2026-08-02T19:10:00+02:00",
+        volume_target_km=30.0))
+    held = build_revision(1, sessions=[session("w33-lun-ef", date="2026-08-10")],
+                          computed_at="2026-08-09T19:10:00+02:00", volume_target_km=30.0)
+    store.append_plan_revision("2026-W33", held)
+    risen = build_revision(1, sessions=[session("w34-lun-ef", date="2026-08-17")],
+                           computed_at="2026-08-16T19:10:00+02:00", volume_target_km=33.0)
+    with pytest.raises(StorageError, match=r"load increase blocked \(volume_target_km: 30 -> 33"):
+        store.append_plan_revision("2026-W34", risen)
+
+    write(store, commands.PREDICTION_UPSERT, {
+        "prediction_key": "w34-charge", "domain": "charge",
+        "statement": "33 km restent assimilables", "probability": .7,
+        "due_on": dt.date(2026, 8, 23), "direction": "increase"})
+    write(store, commands.PREDICTION_UPSERT, {"prediction_key": "w34-charge",
+                                              "operation": "challenge",
+                                              "challenge": "Trois semaines au même volume."})
+    store.append_plan_revision("2026-W34", risen)
+    with store.database.engine.connect() as connection:
+        prediction = connection.execute(sa.select(coach_predictions)).mappings().one()
+    assert prediction["used_at"] is not None
+
+
 def test_a_prediction_resolved_without_its_observation_is_rectified_to_void(store):
     # A prediction settled false while its condition was not met and its wake-up question
     # was still open must be rectifiable to void.
@@ -2829,11 +2857,12 @@ def test_the_decision_state_counts_only_what_was_visible_that_day(store):
 
 def test_the_fuelling_answer_is_awaited_recorded_and_drives_the_progression(store):
     """The gut review asks two figures; the coach must be able to record them, and the
-    progression guard reads them."""
+    gate's gut-training check reads them."""
     from test_weekly_plan import revision as build_revision
     from test_weekly_plan import session
 
     from redline.model import ledger as ledger_model
+    from redline.service import plan_revision
 
     long_run = session("w33-dim-sl", "2026-08-16", "long", carbs_target_g_h=60)
     store.append_plan_revision("2026-W33", build_revision(
@@ -2861,9 +2890,15 @@ def test_the_fuelling_answer_is_awaited_recorded_and_drives_the_progression(stor
     assert not {"carbs_g_h", "gut_symptoms"} & set(ledger_model.missing_observation_fields(row))
 
     following = session("w34-dim-sl", "2026-08-23", "long", carbs_target_g_h=80)
-    with pytest.raises(StorageError, match="above the allowed step of 75"):
-        store.append_plan_revision("2026-W34", build_revision(
-            1, sessions=[following], computed_at="2026-08-17T19:10:00+02:00"))
+    warned: list[str] = []
+    risen = build_revision(1, sessions=[following], computed_at="2026-08-17T19:10:00+02:00")
+    [refusal] = plan_revision.gut_errors(store, "2026-W34", risen, warned.append)
+    assert "80 g/h is above the ceiling of gut-training (carbs_g_h=75" in refusal
+    assert plan_revision.gut_errors(
+        store, "2026-W34", build_revision(1, sessions=[{**following, "carbs_target_g_h": 75}],
+                                          computed_at="2026-08-17T19:10:00+02:00"),
+        warned.append) == []
+    assert warned == []
 
 
 def test_the_fuel_registry_is_recorded_by_the_command_and_read_by_the_coach(store):

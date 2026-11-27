@@ -127,6 +127,15 @@ def seed_neighbour_weeks(store):
     store.add_observation({
         "occurred_on": dt.date(2026, 9, 29), "kind": "easy", "idempotency_key": "manual:w40",
         "measurements": {"distance_km": {"state": "known", "value": 9.5}}})
+    # The week after rises above the current one: a load increase, so it uses a challenged
+    # increase prediction, as the coach's would.
+    write(store, commands.PREDICTION_UPSERT, {
+        "prediction_key": "w42-hausse", "domain": "charge", "direction": "increase",
+        "statement": "44 km restent assimilables", "probability": .7,
+        "due_on": dt.date(2026, 10, 18)})
+    write(store, commands.PREDICTION_UPSERT, {"prediction_key": "w42-hausse",
+                                              "operation": "challenge",
+                                              "challenge": "La semaine en cours est incomplète."})
     store.append_plan_revision("2026-W42", revision(
         sessions=[ef("w42-mar-ef", "2026-10-13")], computed_at="2026-10-11T20:00:00+02:00",
         volume_target_km=44.0))

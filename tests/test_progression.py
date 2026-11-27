@@ -348,7 +348,7 @@ def fuel(on, target, gut, taken=None):
     (40, 4, 40, True), (40, 6, 30, True), (75, 1, 90, True), (60, 2, 80, False),
 ])
 def test_the_gut_guard_is_one_instance_of_the_engine(baseline, gut, proposed, allowed):
-    """`Plans._enforce_gut_progression`: above 3/10 no rise, otherwise 15 g/h at most."""
+    """Gut training: above the symptom ceiling no rise, otherwise one step at most."""
     proposal = propose("fuelling", FUEL, [fuel(day(0), baseline, gut)])
     assert progression.allows(FAMILIES["fuelling"], proposal,
                               Dose.of(carbs_g_h=proposed)) is allowed
