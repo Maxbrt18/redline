@@ -380,10 +380,10 @@ def parser() -> argparse.ArgumentParser:
     deadline.add_argument("--starts-on", type=_args.day, default=UNSET)
     deadline.add_argument("--ends-on", type=_args.day, default=UNSET)
     deadline.add_argument("--context", type=json.loads, default=UNSET,
-                          help="JSON object of the deadline's details; a race may set its taper "
-                               "(taper_weeks, taper_cut_min_pct, taper_cut_max_pct) and its "
+                          help="JSON object of the deadline's details; a race sets its goal "
+                               "(distance_km, terrain, goal_time_s with goal_source) and its "
                                "plan (route_gpx, aid_stations, stop_minutes, carbs_g_h, "
-                               "pace_s_per_km)")
+                               "pace_s_per_km); its taper is its cycle template's")
     deadline.add_argument(
         "--athlete-label", default=UNSET,
         help="short label (3-80 chars): the deadline is an action of the athlete, shown in "

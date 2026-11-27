@@ -1,9 +1,10 @@
 """A typed race (`redline fact-write deadline --kind race`): its taper and its plan.
 
 A 10 km, a marathon and a 100-mile race do not taper alike, and one athlete may run all
-three. So the race carries its own taper in its `context` (`taper_weeks`,
-`taper_cut_min_pct`, `taper_cut_max_pct`), and the rulebook only supplies what a race
-leaves unsaid. Every reader of the taper goes through `Race`, never the rulebook.
+three. So a race tapers as the cycle template that serves its goal says (`taper_weeks`,
+`taper_cut_pct`), the template its preparation's trame was generated from; the rulebook
+only supplies the taper of a race no template serves. Every reader of the taper goes
+through `Race`, never the template or the rulebook.
 
 The race also carries what its plan needs (`route_gpx`, `aid_stations`, `stop_minutes`,
 `carbs_g_h`, `pace_s_per_km`): figures, typed, while the race sheet keeps the reasons. The
@@ -11,8 +12,8 @@ pace is the one chosen with the coach, never a default: without it, the plan has
 passages.
 
 And the goal the preparation is built backwards from (`Goal`): distance and terrain,
-which pick the cycle template and, when the race says nothing, its taper (the plan
-template's); the climbing it asks, its time goal. The peaks and the levers of a preparation are the cycle
+which pick the cycle template and its taper; the climbing it asks, its time goal. The
+peaks, the levers and the taper of a preparation are its template's and its cycle
 version's (`redline.model.cycles`), never the race's.
 """
 
@@ -22,7 +23,7 @@ import datetime as dt
 from dataclasses import dataclass
 from typing import Protocol
 
-from . import plan_templates, rulebook
+from . import cycle_templates, rulebook
 from .schema import Schema, field
 from .vocabulary import (
     CLOSED_RACE_STATES,
@@ -35,14 +36,10 @@ from .vocabulary import (
 )
 
 
-def _band_ordered(context: dict) -> list[str]:
-    low, high = context.get("taper_cut_min_pct"), context.get("taper_cut_max_pct")
-    problems = []
-    if low is not None and high is not None and low > high:
-        problems.append(f"taper_cut_min_pct ({low}) is above taper_cut_max_pct ({high})")
+def _goal_coherent(context: dict) -> list[str]:
     if (context.get("goal_time_s") is None) != (context.get("goal_source") is None):
-        problems.append("goal_time_s and goal_source go together")
-    return problems
+        return ["goal_time_s and goal_source go together"]
+    return []
 
 
 AID_STATION_SCHEMA = Schema("aid station", [
@@ -53,12 +50,6 @@ AID_STATION_SCHEMA = Schema("aid station", [
 #: The keys of a race's context the engine reads. The others describe the race for the
 #: notebook and are left as they are.
 CONTEXT_SCHEMA = Schema("race context", [
-    field("taper_weeks", int, required=False, minimum=1, maximum=6,
-          note="weeks of taper, race week included"),
-    field("taper_cut_min_pct", int, required=False, minimum=0, maximum=100,
-          note="least drop of the taper's mean weekly volume, in %"),
-    field("taper_cut_max_pct", int, required=False, minimum=0, maximum=100,
-          note="largest drop of the taper's mean weekly volume, in %"),
     field("route_gpx", str, required=False, pattern=r"[\w./-]+\.gpx",
           note="the route, a GPX path relative to the vault root"),
     field("aid_stations", list, required=False, maximum=30,
@@ -78,7 +69,7 @@ CONTEXT_SCHEMA = Schema("race context", [
     field("goal_source", str, required=False, choices=tuple(GoalSource)),
     field("power_hike_from_pct", int, required=False, minimum=3, maximum=40,
           note="on a trail, the grade the long runs walk briskly from"),
-], extra=True, check=_band_ordered)
+], extra=True, check=_goal_coherent)
 
 
 class DeadlineStore(Protocol):
@@ -135,12 +126,13 @@ def _goal(context: dict) -> Goal | None:
         goal_source=GoalSource(context["goal_source"]) if context.get("goal_source") else None)
 
 
-def template_of(goal: Goal | None) -> plan_templates.Template | None:
-    """The template that serves the race's goal, from the instance's templates."""
+def template_of(goal: Goal | None) -> cycle_templates.Preparation | None:
+    """The preparation template that serves the race's goal, from the instance's cycle
+    templates or the engine's."""
     if goal is None:
         return None
     vault = rulebook.current().source.parent
-    return plan_templates.for_race(plan_templates.load(vault), goal.distance_km, goal.terrain)
+    return cycle_templates.load(vault).preparation_for(goal.distance_km, goal.terrain)
 
 
 def from_row(row: dict) -> Race:
@@ -157,18 +149,15 @@ def from_row(row: dict) -> Race:
     goal = _goal(context)
     template = template_of(goal)
 
-    def said(name: str) -> int | None:
-        value = context.get(name)
-        return getattr(defaults, name) if value is None else int(value)
-
-    # A race's own taper first, then its template's, by distance, then the rulebook's.
-    taper_weeks = (int(context["taper_weeks"]) if context.get("taper_weeks") is not None
-                   else template.taper_weeks if template is not None else defaults.taper_weeks)
+    band = template.taper_cut_pct if template is not None else None
     return Race(on=due if isinstance(due, dt.date) else dt.date.fromisoformat(due),
                 priority=RacePriority(row["priority"]), state=RaceState(row["race_state"]),
-                taper_weeks=taper_weeks,
-                taper_cut_min_pct=said("taper_cut_min_pct"),
-                taper_cut_max_pct=said("taper_cut_max_pct"),
+                taper_weeks=(template.taper_weeks if template is not None
+                             else defaults.taper_weeks),
+                taper_cut_min_pct=(round(band.low) if band is not None
+                                   else defaults.taper_cut_min_pct),
+                taper_cut_max_pct=(round(band.high) if band is not None
+                                   else defaults.taper_cut_max_pct),
                 name=str(row.get("athlete_label") or row.get("item") or ""),
                 start_time=_clock(context.get("start_time")),
                 route_gpx=context.get("route_gpx"),

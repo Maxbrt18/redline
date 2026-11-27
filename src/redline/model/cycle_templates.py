@@ -21,6 +21,7 @@ from __future__ import annotations
 import tomllib
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 from . import formats, session_kinds
@@ -501,12 +502,22 @@ def parse(text: str, source: Path) -> CycleTemplates:
     return found
 
 
+@lru_cache(maxsize=8)
+def _read(path: Path, modified_ns: int) -> CycleTemplates:
+    """A declaration read once while its file is unchanged."""
+    return parse(path.read_text(encoding="utf-8"), path)
+
+
+def _cached(path: Path) -> CycleTemplates:
+    return _read(path, path.stat().st_mtime_ns)
+
+
 def load_instance(vault: Path) -> CycleTemplates | None:
     """The instance's cycle templates, or None when it declares none."""
     path = vault / INSTANCE_NAME
-    return parse(path.read_text(encoding="utf-8"), path) if path.is_file() else None
+    return _cached(path) if path.is_file() else None
 
 
 def load(vault: Path) -> CycleTemplates:
     """The instance's cycle templates when it declares them, else the engine's."""
-    return load_instance(vault) or parse(DEFAULT.read_text(encoding="utf-8"), DEFAULT)
+    return load_instance(vault) or _cached(DEFAULT)

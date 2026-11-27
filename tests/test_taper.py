@@ -161,22 +161,18 @@ def test_a_week_in_progress_is_shown_but_never_judged():
         "Affûtage : aucune course à pied en W44-W45, baisse non mesurable."]
 
 
-def test_a_race_sets_its_own_taper_and_band():
-    short = {**RACE_ROW, "context": {"taper_weeks": 1, "taper_cut_min_pct": 20,
-                                     "taper_cut_max_pct": 40}}
-    frame = taper.window(race_model.from_row(short))
-    assert frame.weeks == ("2030-W48",) and frame.reference == ("2030-W46", "2030-W47")
-    rows = _week("2030-W46", 10.0) + _week("2030-W47", 10.0)
-    problems = taper.plan_errors(rows, frame, "2030-W48", _revision(_runs("2030-W48", 11.0, 4)))
-    assert len(problems) == 1 and "under the 20 % floor" in problems[0]
-    assert taper.plan_errors(rows, frame, "2030-W48", _revision(_runs("2030-W48", 8.0, 4))) == []
-    assert taper.race_window(Store(short), "2030-W47") is None
+def test_a_race_takes_the_taper_and_band_of_its_cycle_template():
+    road = {**RACE_ROW, "context": {"distance_km": 21.1, "terrain": "road"}}
+    frame = taper.window(race_model.from_row(road))
+    assert frame.weeks == ("2030-W47", "2030-W48"), "the test vault's half-road: two weeks"
+    assert frame.reference == ("2030-W45", "2030-W46")
+    assert taper.race_window(Store(road), "2030-W46") is None
 
 
 def test_each_race_of_the_season_keeps_its_own_taper():
     spring = {"kind": "race", "status": "done", "priority": "a", "race_state": "run", "due_on": "2030-04-13",
-              "context": {"taper_weeks": 1}}
+              "context": {"distance_km": 21.1, "terrain": "road"}}
     store = Store(spring, RACE_ROW)
-    assert taper.race_window(store, "2030-W15").weeks == ("2030-W15",)
-    assert taper.race_window(store, "2030-W14") is None
+    assert taper.race_window(store, "2030-W15").weeks == ("2030-W14", "2030-W15")
+    assert taper.race_window(store, "2030-W13") is None
     assert taper.race_window(store, "2030-W46").weeks[-1] == "2030-W48"

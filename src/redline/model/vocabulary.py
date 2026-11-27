@@ -544,8 +544,7 @@ class GoalSource(StrEnum):
 
 class PlanPhase(StrEnum):
     """The phase of a week of a cycle's trame (`redline.model.plan_generator`). `base` is
-    the format-1 plan templates' (`redline.model.plan_templates`), which the general
-    preparation replaces in a trame."""
+    the format-1 plan templates', which the general preparation replaced."""
 
     RECOVERY = "recovery"
     BASE = "base"

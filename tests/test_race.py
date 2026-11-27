@@ -15,20 +15,23 @@ def test_a_race_falls_back_on_the_rulebook_for_what_it_leaves_unsaid():
     assert (typed.taper_weeks, typed.taper_cut_min_pct, typed.taper_cut_max_pct) == (3, 41, 60)
 
 
-def test_a_race_overrides_the_rulebook():
-    typed = race.from_row({"kind": "race", "status": "scheduled", "priority": "a", "race_state": "active",
-                           "due_on": dt.date(2030, 4, 13),
-                           "context": {"taper_weeks": 1, "taper_cut_max_pct": 50,
-                                       "distance_km": 10}})
-    assert (typed.taper_weeks, typed.taper_cut_min_pct, typed.taper_cut_max_pct) == (1, 41, 50)
+def _taper(context):
+    typed = race.from_row({"kind": "race", "status": "scheduled", "priority": "a",
+                           "race_state": "active", "due_on": dt.date(2030, 4, 13),
+                           "context": context})
+    return typed.taper_weeks, typed.taper_cut_min_pct, typed.taper_cut_max_pct
 
 
-def test_the_taper_keys_are_checked_and_the_others_left_alone():
-    race.CONTEXT_SCHEMA.validate({"taper_weeks": 2, "start_time": "23:00"})
-    with pytest.raises(SchemaError, match="taper_weeks"):
-        race.CONTEXT_SCHEMA.validate({"taper_weeks": 9})
-    with pytest.raises(SchemaError, match="is above taper_cut_max_pct"):
-        race.CONTEXT_SCHEMA.validate({"taper_cut_min_pct": 70, "taper_cut_max_pct": 50})
+def test_a_race_tapers_as_its_cycle_template_and_the_rulebook_fills_in():
+    assert _taper({"distance_km": 10, "terrain": "road"}) == (2, 41, 60), \
+        "the test vault's half-road template"
+    assert _taper({"distance_km": 10}) == (3, 41, 60), "without a terrain, the rulebook's"
+
+
+def test_the_taper_s_keys_are_no_longer_the_race_s():
+    retired = {"distance_km": 10, "terrain": "road", "taper_weeks": 1, "taper_cut_max_pct": 50}
+    race.CONTEXT_SCHEMA.validate({**retired, "taper_weeks": 9})
+    assert _taper(retired) == (2, 41, 60)
 
 
 def _row(on, priority, state, kind="race"):
@@ -85,8 +88,8 @@ def test_the_plan_keys_are_checked_on_write():
 
 def test_an_unreadable_key_costs_its_value_never_the_race():
     typed = race.from_row({"kind": "race", "status": "scheduled", "priority": "a", "race_state": "active", "due_on": "2030-11-30",
-                           "context": {"taper_weeks": 1, "pace_s_per_km": "fast"}})
-    assert typed.taper_weeks == 1 and typed.pace_s_per_km is None
+                           "context": {"carbs_g_h": 60, "pace_s_per_km": "fast"}})
+    assert typed.carbs_g_h == 60 and typed.pace_s_per_km is None
 
 
 GOAL = {"distance_km": 21.1, "terrain": "road", "goal_time_s": 6300, "goal_source": "coach"}
@@ -109,8 +112,6 @@ def test_a_race_that_says_no_taper_takes_its_templates_by_distance():
 
     assert taper({"distance_km": 21.1, "terrain": "road"}) == 2
     assert taper({"distance_km": 42.2, "terrain": "road"}) == 3
-    assert taper({"distance_km": 21.1, "terrain": "road", "taper_weeks": 1}) == 1, \
-        "the race's own taper first"
     assert taper({"distance_km": 21.1}) == 3, "without a terrain, the rulebook's"
 
 
