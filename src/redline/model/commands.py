@@ -33,6 +33,9 @@ PLAN_PROPOSE = "plan.propose"
 #: An effort declared run all out, and a declared training break.
 EFFORT_UPSERT = "effort.upsert"
 BREAK_UPSERT = "break.upsert"
+#: A preparation proposed to the athlete, and a new level of the general preparation.
+CYCLE_PROPOSE = "cycle.propose"
+CYCLE_LEVEL = "cycle.level"
 
 ACTIVE = (
     OBSERVATION_ADD, ACTIVITY_LINK, MEASUREMENT_COMPLETE, HR_DOUBT, EXPOSURE_UPSERT, PLAN_REVISE,
@@ -41,7 +44,7 @@ ACTIVE = (
     SESSION_START, SESSION_MATCH,
     PROACTIVE_ANGLE,
     GEAR_UPSERT, PREDICTION_UPSERT, CORRECTION_REGISTER, PERMIT_SEAL, PLAN_PROPOSE,
-    EFFORT_UPSERT, BREAK_UPSERT,
+    EFFORT_UPSERT, BREAK_UPSERT, CYCLE_PROPOSE, CYCLE_LEVEL,
 )
 
 

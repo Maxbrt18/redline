@@ -19,7 +19,7 @@ new cycle starts, of which kind and why. It reads arguments only.
 
 A transition starts with the week after `today`: on a cycle's last day, the Sunday its
 review is written, the next cycle follows its last week. Entering a preparation is never
-automatic: the athlete takes it.
+automatic: the athlete takes a proposal.
 """
 
 from __future__ import annotations

@@ -12,6 +12,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Connection
 
 from redline.model import commands, ledger
+from redline.model import vocabulary as voc
 from redline.model.errors import InputError
 
 from ..database import StorageError
@@ -22,6 +23,7 @@ from ..schema import (
     turn_commands,
 )
 from ._common import _audit, _jsonable, _uuid
+from .cycles import Cycles
 from .days import Days
 from .proposals import Proposals
 from .strava_intake import StravaIntake
@@ -36,7 +38,7 @@ class Submitted:
     result: object = None
 
 
-class TurnCommands(StravaIntake, Strength, Proposals, Days):
+class TurnCommands(StravaIntake, Strength, Proposals, Days, Cycles):
     def stage_command(self, turn_id: str, command_key: str, kind: str,
                       payload: dict) -> uuid.UUID:
         """Record an intent only if the whole turn remains applicable.
@@ -168,6 +170,8 @@ class TurnCommands(StravaIntake, Strength, Proposals, Days):
             commands.GEAR_UPSERT: self._apply_gear,
             commands.EFFORT_UPSERT: self._apply_effort,
             commands.BREAK_UPSERT: self._apply_break,
+            commands.CYCLE_PROPOSE: self._apply_cycle_propose,
+            commands.CYCLE_LEVEL: self._apply_cycle_level,
             commands.PREDICTION_UPSERT: self._apply_prediction,
             commands.CORRECTION_REGISTER: self._apply_correction,
             commands.PERMIT_SEAL: self._apply_permit_seal,
@@ -378,6 +382,25 @@ class TurnCommands(StravaIntake, Strength, Proposals, Days):
     def _apply_effort(self, connection: Connection, payload: dict, actor: str) -> None:
         payload["done_on"] = dt.date.fromisoformat(str(payload["done_on"]))
         self.upsert_effort_in(connection, payload, actor=actor)
+
+    def _apply_cycle_propose(self, connection: Connection, payload: dict,
+                             actor: str) -> str:
+        from redline.model import cycles as cycle_model
+        now = dt.datetime.now(dt.UTC)
+        expires = dt.datetime.fromisoformat(payload["expires_at"])
+        version = self.propose_cycle_in(connection, cycle_model.from_payload(payload["trame"]),
+                                        payload["decision"], payload["race_key"], expires,
+                                        actor=actor)
+        self.offer_cycle_in(connection, version, payload["race"], expires, now)
+        return str(version.id)
+
+    def _apply_cycle_level(self, connection: Connection, payload: dict, actor: str) -> str:
+        from redline.model import cycles as cycle_model
+        version = self.apply_transition_in(
+            connection, cycle_model.from_payload(payload["trame"]), voc.CycleCause.LEVEL_CHANGE,
+            level=voc.GeneralLevel(payload["level"]), actor=actor)
+        self.announce_cycle_in(connection, version, dt.datetime.now(dt.UTC))
+        return str(version.id)
 
     def _apply_break(self, connection: Connection, payload: dict, actor: str) -> None:
         for key in ("starts_on", "ends_on"):

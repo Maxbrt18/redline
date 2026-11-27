@@ -27,6 +27,8 @@ class ClosedProactive:
     text: str
     markers: tuple[str, ...] = ()
     question: str = ""
+    #: The answers the athlete may tap under the text, each a (title, payload).
+    replies: tuple[tuple[str, str], ...] = ()
 
 
 def _object(detail: str) -> dict:
@@ -145,6 +147,27 @@ def _cycle_transition(detail: str) -> ClosedProactive | None:
         cycle_text.number(volume)))
 
 
+#: The payloads of the two answers to a proposal, followed by the version's id.
+TAKE_CYCLE = "cycle-take:"
+LEAVE_CYCLE = "cycle-later:"
+
+
+def _cycle_proposal(detail: str) -> ClosedProactive | None:
+    """A preparation proposed: its summary, and the two answers that settle it."""
+    data = _object(detail)
+    version = str(data.get("version_id") or "")
+    peak, long_run = _number(data.get("peak_km")), _number(data.get("long_run_km"))
+    if not version or peak is None or long_run is None:
+        return None
+    text = initiatives.cycle_proposal(
+        str(data.get("race") or ""), iso_week.monday(str(data["starts_on"])),
+        int(data.get("weeks") or 1), cycle_text.number(peak), cycle_text.number(long_run),
+        int(data.get("flagships") or 0), int(data.get("risks") or 0),
+        dt.date.fromisoformat(str(data["expires_on"])))
+    return ClosedProactive(text, replies=((initiatives.TAKE, TAKE_CYCLE + version),
+                                          (initiatives.LATER, LEAVE_CYCLE + version)))
+
+
 def _operator_message(detail: str) -> ClosedProactive | None:
     """A text written outside the service (e.g. a review made from a laptop), delivered as is."""
     text = str(_object(detail).get("text") or "").strip()
@@ -160,6 +183,7 @@ _COMPOSERS = {
     "operator_message": _operator_message,
     "wake_trace": _wake_trace,
     "cycle_transition": _cycle_transition,
+    "cycle_proposal": _cycle_proposal,
 }
 
 CLOSED_KINDS = frozenset(_COMPOSERS)

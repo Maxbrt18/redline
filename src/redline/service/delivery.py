@@ -31,6 +31,8 @@ class TextPart:
     text: str
     mode: Literal["text", "burst"] = "burst"
     pause_before: bool = False
+    #: The answers the athlete may tap under the text, each a (title, payload).
+    replies: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -86,7 +88,8 @@ def envelope_payload(envelope: OutboundEnvelope) -> dict:
     for part in envelope.parts:
         if isinstance(part, TextPart):
             parts.append({"kind": "text", "text": part.text, "mode": part.mode,
-                          "pause_before": part.pause_before})
+                          "pause_before": part.pause_before,
+                          "replies": [list(reply) for reply in part.replies]})
     return {"messaging_type": envelope.messaging_type, "tag": envelope.tag,
             "parts": parts, "meta": dict(envelope.meta)}
 
@@ -97,7 +100,9 @@ def envelope_from_payload(stored: StoredDelivery) -> OutboundEnvelope:
     for item in payload.get("parts", ()):
         if item.get("kind") == "text":
             parts.append(TextPart(str(item["text"]), item.get("mode", "burst"),
-                                  bool(item.get("pause_before"))))
+                                  bool(item.get("pause_before")),
+                                  tuple((str(title), str(payload))
+                                        for title, payload in item.get("replies") or ())))
         elif item.get("kind") == "notebook_button":
             # A stored envelope may still carry the retired notebook button: its text goes
             # out alone.
@@ -139,10 +144,11 @@ class EnvelopeBuilder:
         self.metadata.update(values)
         return self
 
-    def text(self, value: str, *, burst: bool = True,
-             pause_before: bool = False) -> EnvelopeBuilder:
+    def text(self, value: str, *, burst: bool = True, pause_before: bool = False,
+             replies: tuple[tuple[str, str], ...] = ()) -> EnvelopeBuilder:
         if value.strip():
-            self.parts.append(TextPart(value, "burst" if burst else "text", pause_before))
+            self.parts.append(TextPart(value, "text" if replies else "burst" if burst
+                                       else "text", pause_before, replies))
         return self
 
     def images(self, outbox: Outbox, before: OutboxSnapshot) -> EnvelopeBuilder:
@@ -276,6 +282,10 @@ class DeliveryService:
         if isinstance(part, TextPart):
             if part.pause_before:
                 self.client.pause_before(envelope.psid, part.text)
+            if part.replies:
+                return self.client.send_quick_replies(
+                    envelope.psid, part.text, part.replies,
+                    messaging_type=envelope.messaging_type, tag=envelope.tag)
             sender = self.client.send_burst if part.mode == "burst" else self.client.send_text
             return sender(
                 envelope.psid, part.text, messaging_type=envelope.messaging_type,
@@ -303,8 +313,12 @@ class DeliveryService:
     def _digest(envelope: OutboundEnvelope) -> str:
         def payload(part: OutboundPart) -> dict:
             if isinstance(part, TextPart):
+                # Replies count only when there are: a text without them keeps the digest
+                # it always had.
                 return {"kind": "text", "text": part.text, "mode": part.mode,
-                        "pause_before": part.pause_before}
+                        "pause_before": part.pause_before,
+                        **({"replies": [list(reply) for reply in part.replies]}
+                           if part.replies else {})}
             return {"kind": "image", "path": part.path.name, "link": part.link}
 
         canonical = json.dumps({

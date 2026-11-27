@@ -59,6 +59,12 @@ CAUSES = {"create": "créée pour l'objectif", "replan": "replanifiée",
 NO_WEEK = "  Aucune semaine {week} dans ce cycle."
 NO_CYCLE = "Aucun cycle en cours : le planificateur en met un en place à son prochain passage."
 WINDOW_OPEN = ("La fenêtre de préparation de « {race} » ({on:%d/%m/%Y}) s'ouvre en {week} : "
-               "`redline cycle candidates` donne les trames. Entrer en préparation est le "
-               "choix de l'athlète.")
+               "`redline cycle propose` en écrit un candidat (`redline cycle candidates`), "
+               "l'athlète le prend.")
 UNNAMED_RACE = "l'objectif"
+PROPOSED = ("Candidat « {candidate} » proposé pour « {race} », ouvert jusqu'au {on:%d/%m} : "
+            "l'athlète le prend d'un tap, le service lui envoie le résumé.")
+LEVELED = "Préparation générale « {level} » à partir de {week}, annoncée à l'athlète."
+STAGED = "{done} (appliqué à la fin du tour)"
+PROPOSAL_OPEN = ("Proposition « {candidate} » envoyée, en attente de l'athlète jusqu'au "
+                 "{until:%d/%m/%Y}.")

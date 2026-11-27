@@ -83,6 +83,27 @@ class MessengerClient:
                 return DeliveryResult.failure(result.detail, delivered, tuple(messages))
         return DeliveryResult.success(delivered, tuple(messages))
 
+    #: Messenger caps a quick reply's title at 20 characters.
+    REPLY_TITLE_MAX = 20
+
+    def send_quick_replies(self, psid: str, text: str, replies: tuple[tuple[str, str], ...],
+                           messaging_type: str = "RESPONSE",
+                           tag: str | None = None) -> DeliveryResult:
+        """One text with the answers the athlete may tap, each a (title, payload): the
+        payload comes back as a postback, the title as what the athlete said."""
+        text = strip_links(text).strip()
+        if not text:
+            return DeliveryResult.success(0)
+        message = {
+            "recipient": {"id": psid}, "messaging_type": messaging_type,
+            "message": {"text": text[:self.MAX_LEN], "quick_replies": [
+                {"content_type": "text", "title": title[:self.REPLY_TITLE_MAX],
+                 "payload": payload} for title, payload in replies]},
+        }
+        if tag:
+            message["tag"] = tag
+        return self._post(message)
+
     PAUSE_MAX = 2.5          # nobody waits eight seconds between two texts
     PAUSE_BASE = 0.6
     PAUSE_PER_CHAR = 0.01

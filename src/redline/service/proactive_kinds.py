@@ -54,6 +54,8 @@ POLICIES: dict[str, KindPolicy] = {
     Kind.WAKE_TRACE: KindPolicy(staleness_hours=3.5),
     # The cycle stays in force for weeks: its announcement is still news the next day.
     Kind.CYCLE_TRANSITION: KindPolicy(staleness_hours=36.0),
+    # Open until the proposal expires: `expires_at` bounds it.
+    Kind.CYCLE_PROPOSAL: KindPolicy(staleness_hours=168.0),
 }
 
 

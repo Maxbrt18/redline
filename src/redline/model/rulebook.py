@@ -204,6 +204,9 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
         # Optional: absent, no cycle trame is generated (`redline.analysis.cycle_inputs`).
         field("cycle_held_weeks", int, required=False, minimum=4, maximum=104,
               note="weeks back the highest weekly volume held is read"),
+        # Optional: absent, no preparation is proposed (`redline cycle propose`).
+        field("cycle_proposal_days", int, required=False, minimum=1, maximum=30,
+              note="days a proposed cycle version stays open to be taken"),
         # Optional, both or none (`CALIBRATION_PARAMETERS`): absent, no calibration is
         # adopted.
         field("calibration_band_sd", float, required=False, minimum=0.5, maximum=5,
@@ -350,6 +353,7 @@ class Parameters:
     critical_speed_threshold_low_pct: float | None = None
     critical_speed_threshold_high_pct: float | None = None
     cycle_held_weeks: int | None = None
+    cycle_proposal_days: int | None = None
     calibration_band_sd: float | None = None
     calibration_fresh_weeks: int | None = None
     climb_hr_margin_bpm: int | None = None

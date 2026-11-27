@@ -45,6 +45,8 @@ class CycleVersion:
     level: GeneralLevel | None = None
     #: The day the version was written, in UTC.
     created_on: dt.date | None = None
+    #: The day a proposal expires, in UTC; None for a version never proposed.
+    expires_on: dt.date | None = None
 
     @property
     def kind(self) -> CycleKind:
@@ -93,7 +95,7 @@ def version_values(trame: Trame) -> dict:
         "starts_on": starts_on(trame), "ends_on": ends_on(trame),
         "levers": None if levers is None else {
             "specific_weeks": levers.specific_weeks, "deload_every": levers.deload_every,
-            "second_quality": str(levers.second_quality)},
+            "second_quality": str(levers.second_quality), "peak_km": levers.peak_km},
         "goal": None if trame.goal is None else {
             "on": trame.goal.on.isoformat(), "distance_km": trame.goal.distance_km},
         "hypotheses": hypotheses_of(trame.hypotheses),
@@ -192,19 +194,52 @@ def trame_of(version: dict, weeks: list[dict], keys: list[dict]) -> Trame:
         CycleKind(version["kind"]), version["template"], version.get("candidate") or "",
         tuple(_week(row) for row in sorted(weeks, key=lambda row: row["iso_week"])),
         tuple(_key(row) for row in ordered_keys), risks, inputs_of(version["hypotheses"]),
-        None if not levers else Levers(int(levers["specific_weeks"]),
-                                       int(levers["deload_every"]),
-                                       PlanPhase(levers["second_quality"])),
+        None if not levers else Levers(
+            int(levers["specific_weeks"]), int(levers["deload_every"]),
+            PlanPhase(levers["second_quality"]),
+            float(levers["peak_km"]) if levers.get("peak_km") is not None else None),
         None if not goal else Goal(dt.date.fromisoformat(goal["on"]),
                                    float(goal["distance_km"])))
 
 
+def announcement(version: CycleVersion) -> dict:
+    """What the message of a version put in force says: its kind, level, first week, length
+    and highest weekly volume."""
+    weeks = version.trame.weeks
+    return {"kind": str(version.kind), "level": version.level, "starts_on": weeks[0].label,
+            "weeks": len(weeks), "volume_km": max(week.volume_km for week in weeks)}
+
+
+def proposal(version: CycleVersion, race: str, expires_on: dt.date) -> dict:
+    """What the message of a proposal says, with what the athlete's answer names."""
+    weeks = version.trame.weeks
+    return {"version_id": str(version.id), "race": race, "candidate": version.trame.candidate,
+            "starts_on": weeks[0].label, "weeks": len(weeks),
+            "peak_km": max(week.volume_km for week in weeks),
+            "long_run_km": max(week.long_run_km for week in weeks),
+            "flagships": sum(1 for key in version.trame.keys if key.role == KeyRole.FLAGSHIP),
+            "risks": len(version.trame.risks), "expires_on": expires_on.isoformat()}
+
+
+def payload_of(trame: Trame) -> dict:
+    """The trame as JSON, the rows it is written to: what a command carries."""
+    version = version_values(trame)
+    version["starts_on"] = version["starts_on"].isoformat()
+    version["ends_on"] = version["ends_on"].isoformat()
+    return {"version": version, "weeks": week_values(trame), "keys": key_values(trame)}
+
+
+def from_payload(payload: dict) -> Trame:
+    return trame_of(payload["version"], payload["weeks"], payload["keys"])
+
+
 def from_rows(version: dict, weeks: list[dict], keys: list[dict]) -> CycleVersion:
     """A version as stored, with its trame."""
-    created = version.get("created_at")
+    created, expires = version.get("created_at"), version.get("expires_at")
     return CycleVersion(
         version["id"], version["cycle_key"], int(version["version"]),
         CycleVersionState(version["state"]), trame_of(version, weeks, keys),
         CycleCause(version["cause"]["kind"]), version.get("race_key"),
         GeneralLevel(version["level"]) if version.get("level") else None,
-        created.astimezone(dt.UTC).date() if isinstance(created, dt.datetime) else None)
+        created.astimezone(dt.UTC).date() if isinstance(created, dt.datetime) else None,
+        expires.astimezone(dt.UTC).date() if isinstance(expires, dt.datetime) else None)

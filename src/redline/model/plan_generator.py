@@ -97,6 +97,8 @@ class Levers:
     deload_every: int
     #: The phase from which a week may carry its second quality session.
     second_quality: PlanPhase
+    #: A peak chosen under the proposed one; None: the proposed peak.
+    peak_km: float | None = None
 
 
 @dataclass(frozen=True)
@@ -424,6 +426,8 @@ def preparation(template: Preparation, goal: Goal, levers: Levers, inputs: Input
     turns = _turns(phases, deloads, qualities)
     climbs = turns.count(_Turn.VOLUME)
     peak, peak_risks = _peak(template, inputs, climbs)
+    if levers.peak_km is not None:
+        peak = max(min(peak, levers.peak_km), inputs.start_km)
     risks += peak_risks
     if inputs.held_km < template.min_held_km:
         risks.append(Risk(TrameRisk.BELOW_DOMAIN, inputs.held_km, template.min_held_km))

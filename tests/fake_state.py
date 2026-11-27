@@ -143,6 +143,8 @@ class FakeProactiveState:
 class FakeStateStore:
     def __init__(self) -> None:
         self.proactive = FakeProactiveState()
+        #: The proposals the athlete may still take, by version id.
+        self.cycles_open: dict = {}
         self.turns: list = []
         self.calls: list = []
         self._sessions: dict[str, dict] = {}
@@ -168,6 +170,11 @@ class FakeStateStore:
 
     def materialize_intelligence(self, now: datetime) -> int:
         return 0
+
+    def take_cycle(self, version_id):
+        """What `cycles_open` holds for the version: its first Monday and the weeks
+        written; None when it is not open."""
+        return self.cycles_open.pop(version_id, None)
 
     def missed_session_is_current(self, job_id: str) -> bool:
         return any(job_id == f"missed-session:{row['id']}" and row["state"] == "missed"

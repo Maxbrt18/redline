@@ -21,7 +21,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import ClassVar
 
-from redline.coach.fr import replies
+from redline.coach.fr import initiatives, replies
 from redline.coach.fr import transcription as voice_wording
 from redline.coach.fr.replies import (
     ATTACHMENT_UNREADABLE,
@@ -73,6 +73,8 @@ from .proactive import (
 from .proactive_kinds import policy
 from .proactive_messages import (
     CLOSED_KINDS,
+    LEAVE_CYCLE,
+    TAKE_CYCLE,
     ClosedProactive,
     compose_closed_proactive,
     gut_review_in_notebook,
@@ -257,6 +259,9 @@ class TurnWorker:
 
     def submit_event(self, psid: str, kind: str, text: str, *, message_id: str) -> None:
         """Dispatch one durably claimed Messenger event."""
+        if kind == "postback" and text.startswith((TAKE_CYCLE, LEAVE_CYCLE)):
+            self._answer_cycle_proposal(psid, text, message_id)
+            return
         if kind in {"text", "postback"}:
             self.submit_inbound(psid, text, message_id=message_id)
             return
@@ -267,6 +272,24 @@ class TurnWorker:
             return
         else:
             raise ValueError(f"unknown Messenger event type: {kind}")
+        self._state.complete_inbound((message_id,))
+
+    def _answer_cycle_proposal(self, psid: str, payload: str, message_id: str) -> None:
+        """The athlete's answer to a proposal, settled by the service without the model:
+        taking it puts it in force, leaving it changes nothing."""
+        try:
+            if payload.startswith(TAKE_CYCLE):
+                taken = self._state.take_cycle(uuid.UUID(payload.removeprefix(TAKE_CYCLE)))
+                answer = (initiatives.CYCLE_GONE if taken is None else
+                          initiatives.cycle_taken(taken[0], list(taken[1])))
+            else:
+                answer = initiatives.CYCLE_LEFT
+        except ValueError:
+            answer = initiatives.CYCLE_GONE
+        result = self._client.send_text(psid, answer)
+        if result.ok:
+            self._state.record_outbound(psid, answer, source_key=f"cycle-answer:{message_id}",
+                                        platform_messages=self._platform_messages(result))
         self._state.complete_inbound((message_id,))
 
     def submit_inbound(self, psid: str, text: str, *, message_id: str = "") -> None:
@@ -1857,7 +1880,7 @@ class TurnWorker:
             log.info("Closed follow-up %s ignored: question already asked", job.kind)
             self._complete_job(job)
             return
-        envelope = (self._proactive_builder(job).text(message.text)
+        envelope = (self._proactive_builder(job).text(message.text, replies=message.replies)
                     .meta(kind=job.kind, memory=message.text,
                           markers=list(message.markers),
                           questions=[message.question] if message.question else []).build())
