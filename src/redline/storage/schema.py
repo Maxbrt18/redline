@@ -857,6 +857,46 @@ deadlines = sa.Table(
     sa.UniqueConstraint("athlete_id", "deadline_key", name="uq_deadlines_key"),
 )
 
+#: An effort the athlete declared run all out: a race or a test. Declared, never inferred
+#: from a session's kind or RPE; it may predate the ledger.
+all_out_efforts = sa.Table(
+    "all_out_efforts", metadata,
+    _id(),
+    sa.Column("athlete_id", sa.Text, sa.ForeignKey("redline.athletes.id"), nullable=False),
+    sa.Column("effort_key", sa.Text, nullable=False),
+    sa.Column("done_on", sa.Date, nullable=False),
+    sa.Column("distance_km", sa.Numeric(7, 3), nullable=False),
+    sa.Column("duration_s", sa.Numeric(8, 1), nullable=False),
+    sa.Column("terrain", sa.Text, nullable=False),
+    sa.Column("kind", sa.Text, nullable=False),
+    sa.Column("note", sa.Text, nullable=False, server_default=""),
+    sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=UTC_NOW),
+    sa.CheckConstraint("effort_key <> ''", name="ck_all_out_efforts_key"),
+    sa.CheckConstraint("distance_km > 0", name="ck_all_out_efforts_distance"),
+    sa.CheckConstraint("duration_s > 0", name="ck_all_out_efforts_duration"),
+    sa.CheckConstraint(f"terrain IN ({voc.sql_values(voc.EffortTerrain)})",
+                       name="ck_all_out_efforts_terrain"),
+    sa.CheckConstraint(f"kind IN ({voc.sql_values(voc.EffortKind)})",
+                       name="ck_all_out_efforts_kind"),
+    sa.UniqueConstraint("athlete_id", "effort_key", name="uq_all_out_efforts_key"),
+)
+
+#: A stretch the athlete declared without training (injury, illness, life): an all-out
+#: effort run before it is no more than an upper bound of the form after it.
+training_breaks = sa.Table(
+    "training_breaks", metadata,
+    _id(),
+    sa.Column("athlete_id", sa.Text, sa.ForeignKey("redline.athletes.id"), nullable=False),
+    sa.Column("break_key", sa.Text, nullable=False),
+    sa.Column("starts_on", sa.Date, nullable=False),
+    sa.Column("ends_on", sa.Date, nullable=False),
+    sa.Column("note", sa.Text, nullable=False, server_default=""),
+    sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=UTC_NOW),
+    sa.CheckConstraint("break_key <> ''", name="ck_training_breaks_key"),
+    sa.CheckConstraint("starts_on <= ends_on", name="ck_training_breaks_range"),
+    sa.UniqueConstraint("athlete_id", "break_key", name="uq_training_breaks_key"),
+)
+
 def _day_state(table: str) -> list:
     """How a day presents itself (`redline.model.week_days`): the kind and its details."""
     return [

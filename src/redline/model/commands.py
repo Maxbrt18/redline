@@ -30,6 +30,9 @@ CORRECTION_REGISTER = "correction.register"
 PERMIT_SEAL = "permit.seal"
 #: Revisions the coach proposes for a week; none is active until the athlete takes one.
 PLAN_PROPOSE = "plan.propose"
+#: An effort declared run all out, and a declared training break.
+EFFORT_UPSERT = "effort.upsert"
+BREAK_UPSERT = "break.upsert"
 
 ACTIVE = (
     OBSERVATION_ADD, ACTIVITY_LINK, MEASUREMENT_COMPLETE, HR_DOUBT, EXPOSURE_UPSERT, PLAN_REVISE,
@@ -38,6 +41,7 @@ ACTIVE = (
     SESSION_START, SESSION_MATCH,
     PROACTIVE_ANGLE,
     GEAR_UPSERT, PREDICTION_UPSERT, CORRECTION_REGISTER, PERMIT_SEAL, PLAN_PROPOSE,
+    EFFORT_UPSERT, BREAK_UPSERT,
 )
 
 

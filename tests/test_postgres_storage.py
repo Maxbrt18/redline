@@ -3037,3 +3037,20 @@ def test_every_call_is_recorded_and_summed_by_the_route_of_its_turn(store):
     assert by_route["n1"].cost_usd == pytest.approx(0.07)
     assert (by_route["triage"].calls, by_route["triage"].unpriced_calls) == (1, 1)
     assert window.athletes == 1
+
+
+def test_an_effort_and_a_break_are_written_over_their_key(store):
+    effort = {"effort_key": "ten-2030", "done_on": "2030-03-02", "distance_km": 10,
+              "duration_s": 2400, "terrain": "flat", "kind": "race", "note": ""}
+    write(store, commands.EFFORT_UPSERT, effort)
+    write(store, commands.EFFORT_UPSERT, {**effort, "duration_s": 2390.5, "note": "chip"})
+    rows = store.effort_rows()
+    assert len(rows) == 1 and rows[0]["duration_s"] == 2390.5 and rows[0]["note"] == "chip"
+    assert rows[0]["done_on"] == dt.date(2030, 3, 2)
+    pause = {"break_key": "shin", "starts_on": "2030-05-01", "ends_on": "2030-06-15",
+             "note": ""}
+    write(store, commands.BREAK_UPSERT, pause)
+    assert store.break_rows()[0]["ends_on"] == dt.date(2030, 6, 15)
+    with pytest.raises(StorageError):
+        write(store, commands.BREAK_UPSERT, {**pause, "break_key": "x",
+                                              "ends_on": "2030-04-01"})

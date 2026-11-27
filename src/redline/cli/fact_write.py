@@ -216,6 +216,21 @@ def _permit(args, _) -> dict:
             "probability": args.probability, "due_on": sunday}
 
 
+def _effort(args, _) -> dict:
+    if args.km <= 0:
+        raise InputError("--km: a positive distance")
+    return {"effort_key": args.key, "done_on": args.date, "distance_km": args.km,
+            "duration_s": args.time, "terrain": args.terrain, "kind": args.kind,
+            "note": args.note.strip()}
+
+
+def _break(args, _) -> dict:
+    if args.ends_on < args.starts_on:
+        raise InputError("--ends-on comes on or after --starts-on")
+    return {"break_key": args.key, "starts_on": args.starts_on, "ends_on": args.ends_on,
+            "note": args.note.strip()}
+
+
 def _exposure(args, _) -> dict:
     if (args.target_value is None) != (args.target_unit is None):
         raise InputError("--target-value and --target-unit go together")
@@ -270,6 +285,8 @@ COMMANDS: dict[str, Command] = {
     "correction": Command(commands.CORRECTION_REGISTER, _correction,
                           lambda args, payload: args.correction_key),
     "exposure": Command(commands.EXPOSURE_UPSERT, _exposure),
+    "effort": Command(commands.EFFORT_UPSERT, _effort),
+    "break": Command(commands.BREAK_UPSERT, _break),
     "permit": Command(commands.PERMIT_SEAL, _permit,
                       lambda args, payload: f"{args.week}:{args.session_key}"),
 }
@@ -433,6 +450,25 @@ def parser() -> argparse.ArgumentParser:
         "--tolerance", choices=tuple(voc.Tolerance),
         default=voc.Tolerance.UNKNOWN)
     exposure.add_argument("--note", default="")
+
+    effort = commands.add_parser(
+        "effort", help="an effort the athlete ran ALL OUT, a race or a test: declared with them, "
+                       "never inferred from a session's kind or RPE; it may predate the ledger")
+    effort.add_argument("--key", required=True)
+    effort.add_argument("--date", type=_args.day, required=True)
+    effort.add_argument("--km", type=float, required=True)
+    effort.add_argument("--time", type=_args.clock, required=True, metavar="H:MM:SS")
+    effort.add_argument("--terrain", choices=tuple(voc.EffortTerrain), required=True,
+                        help="flat: the only ground a road equivalence reads")
+    effort.add_argument("--kind", choices=tuple(voc.EffortKind), required=True)
+    effort.add_argument("--note", default="")
+    pause = commands.add_parser(
+        "break", help="a stretch without training (injury, illness, life), declared: an all-out "
+                      "effort run before it no longer says more than an upper bound")
+    pause.add_argument("--key", required=True)
+    pause.add_argument("--starts-on", type=_args.day, required=True)
+    pause.add_argument("--ends-on", type=_args.day, required=True)
+    pause.add_argument("--note", default="")
     return root
 
 

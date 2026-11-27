@@ -166,6 +166,8 @@ class TurnCommands(StravaIntake, Strength, Proposals, Days):
             commands.SESSION_MATCH: self._apply_session_match,
             commands.PROACTIVE_ANGLE: self._apply_proactive_angle,
             commands.GEAR_UPSERT: self._apply_gear,
+            commands.EFFORT_UPSERT: self._apply_effort,
+            commands.BREAK_UPSERT: self._apply_break,
             commands.PREDICTION_UPSERT: self._apply_prediction,
             commands.CORRECTION_REGISTER: self._apply_correction,
             commands.PERMIT_SEAL: self._apply_permit_seal,
@@ -372,6 +374,15 @@ class TurnCommands(StravaIntake, Strength, Proposals, Days):
 
     def _apply_gear(self, connection: Connection, payload: dict, actor: str) -> None:
         self.upsert_gear_in(connection, payload, actor=actor)
+
+    def _apply_effort(self, connection: Connection, payload: dict, actor: str) -> None:
+        payload["done_on"] = dt.date.fromisoformat(str(payload["done_on"]))
+        self.upsert_effort_in(connection, payload, actor=actor)
+
+    def _apply_break(self, connection: Connection, payload: dict, actor: str) -> None:
+        for key in ("starts_on", "ends_on"):
+            payload[key] = dt.date.fromisoformat(str(payload[key]))
+        self.upsert_break_in(connection, payload, actor=actor)
 
     def _apply_prediction(self, connection: Connection, payload: dict, actor: str) -> None:
         if payload.get("due_on") and isinstance(payload["due_on"], str):

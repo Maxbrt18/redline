@@ -43,6 +43,8 @@ UNRECORDED_LABELS = {
     commands.SESSION_MATCH: "le rattachement de ta sortie",
     commands.ACTIVITY_LINK: "le rattachement de ta sortie",
     commands.GEAR_UPSERT: "ton matériel",
+    commands.EFFORT_UPSERT: "ton effort à fond",
+    commands.BREAK_UPSERT: "ton arrêt",
 }
 
 

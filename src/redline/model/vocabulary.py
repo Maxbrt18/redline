@@ -488,6 +488,21 @@ class RaceTerrain(StrEnum):
     TRAIL = "trail"
 
 
+class EffortKind(StrEnum):
+    """What an all-out effort was (`all_out_efforts.kind`)."""
+
+    RACE = "race"
+    TEST = "test"
+
+
+class EffortTerrain(StrEnum):
+    """The ground of an all-out effort (`all_out_efforts.terrain`): only a flat one reads
+    as a road equivalence."""
+
+    FLAT = "flat"
+    HILLY = "hilly"
+
+
 class GoalSource(StrEnum):
     """Where a race's time goal comes from (`context.goal_source`)."""
 
