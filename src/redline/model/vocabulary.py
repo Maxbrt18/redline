@@ -364,6 +364,7 @@ class ProactiveKind(StrEnum):
     CALIBRATION_EVE = "calibration_eve"
     OPERATOR_MESSAGE = "operator_message"
     WAKE_TRACE = "wake_trace"
+    CYCLE_TRANSITION = "cycle_transition"
 
 
 class Cut(StrEnum):
@@ -542,9 +543,9 @@ class GoalSource(StrEnum):
 
 
 class PlanPhase(StrEnum):
-    """The phase of a week: of a plan skeleton (`redline.model.plan_skeleton`, recovery to
-    taper) or of a cycle's trame (`redline.model.plan_generator`), whose general preparation
-    replaces the skeleton's base."""
+    """The phase of a week of a cycle's trame (`redline.model.plan_generator`). `base` is
+    the format-1 plan templates' (`redline.model.plan_templates`), which the general
+    preparation replaces in a trame."""
 
     RECOVERY = "recovery"
     BASE = "base"
@@ -564,6 +565,36 @@ class CycleKind(StrEnum):
     GENERAL = "general"
     RECOVERY = "recovery"
     REBUILD = "rebuild"
+
+
+class CycleVersionState(StrEnum):
+    """Where a version of a cycle stands (`cycle_versions.state`): proposed to the athlete,
+    the one in force, replaced by a newer version, a proposal left untaken, or ended by
+    a transition to another cycle."""
+
+    PROPOSED = "proposed"
+    ACTIVE = "active"
+    SUPERSEDED = "superseded"
+    EXPIRED = "expired"
+    CLOSED = "closed"
+
+
+#: The states a version leaves no more.
+SETTLED_CYCLE_STATES = (CycleVersionState.SUPERSEDED, CycleVersionState.EXPIRED,
+                        CycleVersionState.CLOSED)
+
+
+class CycleCause(StrEnum):
+    """Why a version of a cycle was written: created for a goal, replanned, a transition
+    from the cycle before, a new general level, the next block of the general
+    preparation, or the takeover of an instance that had no cycle."""
+
+    CREATE = "create"
+    REPLAN = "replan"
+    TRANSITION = "transition"
+    LEVEL_CHANGE = "level_change"
+    BLOCK_END = "block_end"
+    MIGRATION = "migration"
 
 
 class GeneralLevel(StrEnum):

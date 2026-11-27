@@ -9,8 +9,7 @@ import trajectory
 from conftest import AGENT_CLI_DIR
 
 from redline import cli
-from redline.analysis import cycle_inputs, progression_runs
-from redline.cli import cycle
+from redline.analysis import cycle_inputs, cycle_report, progression_runs
 from redline.model import cycle_templates, iso_week
 from redline.model.errors import InputError
 from redline.model.progression import Dose
@@ -97,39 +96,35 @@ def test_a_lineage_gives_its_dose_to_the_workout_it_follows(monkeypatch):
 
 
 def test_the_goal_s_candidates_come_by_default_with_their_risks_and_weeks():
-    trames, refs = cycle.candidates(store(), TODAY, None, None)
-    assert [trame.candidate for trame in trames] == ["cautious", "balanced", "specific"]
-    lines = cycle.render(trames, refs)
+    lines = cycle_report.candidates(store(), TODAY, None, None)
     assert lines[0].startswith("Préparation « half-road » à partir de la semaine")
     assert "  Aucune calibration : les allures attendent un test." in lines
-    assert any(line.startswith("Candidat « balanced »") for line in lines)
+    assert [line.split("»")[0] for line in lines if line.startswith("Candidat")] == [
+        "Candidat « cautious ", "Candidat « balanced ", "Candidat « specific "]
     assert any("test 1 200 m puis 3 600 m à fond" in line for line in lines)
     assert any("(allure à calibrer)" in line for line in lines)
 
 
 def test_without_an_active_goal_the_general_preparation_comes_at_the_default_level():
-    goalless = store()
-    goalless.goal = {**trajectory.HALF}
-    trames, _ = cycle.candidates(goalless, trajectory.RACE_ON + dt.timedelta(days=1), None,
-                                 None)
-    assert [trame.kind for trame in trames] == [CycleKind.GENERAL]
-    assert trames[0].template == GeneralLevel.MAINTAIN
-    trames, refs = cycle.candidates(store(), TODAY, CycleKind.GENERAL, GeneralLevel.PROGRESS)
-    assert trames[0].template == GeneralLevel.PROGRESS
-    assert cycle.render(trames, refs)[0].startswith("Préparation générale « progresser »")
+    lines = cycle_report.candidates(store(), trajectory.RACE_ON + dt.timedelta(days=1), None,
+                                    None)
+    assert lines[0].startswith("Préparation générale « maintenir »")
+    lines = cycle_report.candidates(store(), TODAY, CycleKind.GENERAL, GeneralLevel.PROGRESS)
+    assert lines[0].startswith("Préparation générale « progresser »")
 
 
 def test_a_recovery_follows_the_last_race_run_and_a_rebuild_needs_none():
     with pytest.raises(InputError, match="la récupération suit une course"):
-        cycle.candidates(store(), TODAY, CycleKind.RECOVERY, None)
+        cycle_report.candidates(store(), TODAY, CycleKind.RECOVERY, None)
     ran = {"deadline_key": "ten", "kind": "race", "priority": "b",
            "race_state": RaceState.RUN, "status": "done", "due_on": dt.date(2030, 11, 10),
-           "item": "Ten", "context": {"distance_km": 10, "terrain": "road"},
+           "item": "Ten", "context": {"distance_km": 10},
            "fact_owner": "athlete/goals.md", "athlete_label": "Ten"}
-    trames, _ = cycle.candidates(store(ran), TODAY, CycleKind.RECOVERY, None)
-    assert trames[0].template == "recovery-25", "the test vault's first band"
-    trames, refs = cycle.candidates(store(), TODAY, CycleKind.REBUILD, None)
-    assert cycle.render(trames, refs)[0].startswith("Reprise « rebuild »")
+    lines = cycle_report.candidates(store(ran), TODAY, CycleKind.RECOVERY, None)
+    assert lines[0].startswith("Récupération « recovery-25 »"), \
+        "the test vault's first band, read from a distance said without its terrain"
+    lines = cycle_report.candidates(store(), TODAY, CycleKind.REBUILD, None)
+    assert lines[0].startswith("Reprise « rebuild »")
 
 
 def test_the_command_is_listed_for_the_coach():

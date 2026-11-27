@@ -23,6 +23,12 @@ from redline.service.proactive_messages import (
     ("gut_review", '{"title":"SL","target_g_h":60}', "glucides par heure"),
     ("gear_alert", '{"name":"Novablast","km":540.2,"limit":600}', "540.2 km"),
     ("operator_message", '{"text":"Bilan W39 : semaine tenue."}', "Bilan W39"),
+    ("cycle_transition", json.dumps({"kind": "general", "level": "maintain",
+                                     "starts_on": "2030-W49", "weeks": 4, "volume_km": 47.5}),
+     "lundi 02/12 : Préparation générale « maintenir », 4 semaines, jusqu’à 47,5 km"),
+    ("cycle_transition", json.dumps({"kind": "recovery", "level": None,
+                                     "starts_on": "2030-W49", "weeks": 1, "volume_km": 20}),
+     "Récupération, 1 semaine, jusqu’à 20 km"),
 ])
 def test_closed_initiatives_are_rendered_from_their_typed_detail(kind, detail, fragment):
     rendered = compose_closed_proactive(kind, detail)
@@ -36,6 +42,7 @@ def test_only_explicitly_closed_kinds_skip_judgement():
     assert "morning" not in CLOSED_KINDS
     assert compose_closed_proactive("calibration_eve", '{"title":"SL"}') is None  # removed
     assert compose_closed_proactive("operator_message", '{"text":"  "}') is None
+    assert compose_closed_proactive("cycle_transition", '{"kind":"preparation-x"}') is None
 
 
 @pytest.mark.parametrize("kind,detail", [

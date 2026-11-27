@@ -17,6 +17,7 @@ from ..database import StorageError
 from ..plan_policy import enforce_gate_resolution
 from ..schema import (
     coach_predictions,
+    cycle_versions,
     deadlines,
     observation_metrics,
     observations,
@@ -101,6 +102,9 @@ class Plans(StoreBase):
             volume_target_km=revision.get("volume_target_km"),
             decision=revision.get("decision"),
             state_snapshot=revision.get("state_snapshot"),
+            cycle_version_id=sa.select(cycle_versions.c.id).where(
+                cycle_versions.c.athlete_id == self.athlete_id,
+                cycle_versions.c.state == voc.CycleVersionState.ACTIVE).scalar_subquery(),
         ))
         cycle_inputs = []
         for session in revision.get("sessions", []):

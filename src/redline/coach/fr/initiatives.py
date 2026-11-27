@@ -66,3 +66,12 @@ def gear_alert(name: str, km: float | None, limit: float | None) -> str:
                else " approche de son seuil d'inspection")
     return (f"{name}{counter}. Fais un contrôle visuel et de sensation : "
             "qu'est-ce que tu observes ?")
+
+
+def cycle_transition(kind: str, level: str, monday: dt.date, weeks: int,
+                     volume: str) -> str:
+    """A new cycle in force: `kind` and `level` are already French labels."""
+    named = f"{kind} « {level} »" if level else kind
+    span = "1 semaine" if weeks == 1 else f"{weeks} semaines"
+    return (f"Nouveau cycle à partir du lundi {monday:%d/%m} : {named}, {span}, jusqu’à "
+            f"{volume} km par semaine. Je prépare chaque semaine dans ce cadre.")

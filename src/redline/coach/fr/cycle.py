@@ -1,4 +1,4 @@
-"""What the coach reads of a cycle's trame (`redline cycle candidates`)."""
+"""What the coach reads of a cycle's trame (`redline cycle`) and of the version in force."""
 
 from __future__ import annotations
 
@@ -50,3 +50,15 @@ UNCALIBRATED = "(allure à calibrer)"
 NO_DURATION = "?"
 UNKNOWN_DISTANCE = ("aucune course courue ou abandonnée dont lire la distance : la "
                     "récupération suit une course")
+VERSION = ("Cycle en cours : {kind}{level}, version {version} ({cause}), de {start} à "
+           "{end}. La semaine se prépare dans son cadre.")
+VERSION_LEVEL = " « {level} »"
+CAUSES = {"create": "créée pour l'objectif", "replan": "replanifiée",
+          "transition": "après le cycle précédent", "level_change": "nouveau niveau",
+          "block_end": "bloc suivant", "migration": "reprise de l'existant"}
+NO_WEEK = "  Aucune semaine {week} dans ce cycle."
+NO_CYCLE = "Aucun cycle en cours : le planificateur en met un en place à son prochain passage."
+WINDOW_OPEN = ("La fenêtre de préparation de « {race} » ({on:%d/%m/%Y}) s'ouvre en {week} : "
+               "`redline cycle candidates` donne les trames. Entrer en préparation est le "
+               "choix de l'athlète.")
+UNNAMED_RACE = "l'objectif"

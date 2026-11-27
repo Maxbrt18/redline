@@ -500,6 +500,13 @@ def candidate_levers(template: Preparation) -> dict[str, Levers]:
     return unique
 
 
+def window_start(template: Preparation, race_on: dt.date) -> str:
+    """The first week of the longest window the candidates may ask: from it, the
+    preparation can be taken."""
+    longest = max(_longest(template, levers) for levers in candidate_levers(template).values())
+    return iso_week.shift(iso_week.of(race_on), 1 - longest)
+
+
 def candidates(template: Preparation, goal: Goal, inputs: Inputs) -> list[Trame]:
     """The engine's candidates for the race: cautious, balanced, specific."""
     return [preparation(template, goal, levers, inputs, candidate=slug)

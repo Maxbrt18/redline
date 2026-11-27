@@ -11,8 +11,9 @@ import datetime as dt
 import json
 from dataclasses import dataclass
 
+from redline.coach.fr import cycle as cycle_text
 from redline.coach.fr import initiatives, session_labels
-from redline.model import ledger, rulebook
+from redline.model import iso_week, ledger, rulebook
 
 
 @dataclass(frozen=True)
@@ -132,6 +133,18 @@ def _gear_alert(detail: str) -> ClosedProactive:
     return ClosedProactive(text, question=text)
 
 
+def _cycle_transition(detail: str) -> ClosedProactive | None:
+    """The cycle the planner just put in force; it awaits no reply."""
+    data = _object(detail)
+    kind, volume = data.get("kind"), _number(data.get("volume_km"))
+    if kind not in cycle_text.KINDS or volume is None:
+        return None
+    return ClosedProactive(initiatives.cycle_transition(
+        cycle_text.KINDS[kind], cycle_text.LEVELS.get(str(data.get("level") or ""), ""),
+        iso_week.monday(str(data["starts_on"])), int(data.get("weeks") or 1),
+        cycle_text.number(volume)))
+
+
 def _operator_message(detail: str) -> ClosedProactive | None:
     """A text written outside the service (e.g. a review made from a laptop), delivered as is."""
     text = str(_object(detail).get("text") or "").strip()
@@ -146,6 +159,7 @@ _COMPOSERS = {
     "gear_alert": _gear_alert,
     "operator_message": _operator_message,
     "wake_trace": _wake_trace,
+    "cycle_transition": _cycle_transition,
 }
 
 CLOSED_KINDS = frozenset(_COMPOSERS)
