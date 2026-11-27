@@ -252,8 +252,6 @@ class Condition(StrEnum):
     HEAT = "heat"
     #: At least half the run below civil twilight.
     NIGHT = "night"
-    #: Run with others (Strava athlete count above one).
-    GROUP = "group"
 
 
 class RpeSide(StrEnum):

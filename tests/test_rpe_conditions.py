@@ -1,4 +1,4 @@
-"""Heat, night and group: calibrated on the athlete's RPE residuals, applied once established."""
+"""Heat and night: calibrated on the athlete's RPE residuals, applied once established."""
 
 from __future__ import annotations
 
@@ -31,8 +31,10 @@ def test_a_condition_is_applied_once_enough_runs_establish_it():
 
 
 def test_noise_is_not_an_effect():
-    noisy = [(Conditions(group=index % 2 == 0), (-1) ** (index // 2) * 0.8) for index in range(16)]
-    assert not effect(expected_rpe.calibrate(noisy, 5), Condition.GROUP).supported
+    noisy = [(Conditions(night=index % 2 == 0), (-1) ** (index // 2) * 0.8) for index in range(16)]
+    assert not effect(expected_rpe.calibrate(noisy, 5), Condition.NIGHT).supported
+    assert {item.condition for item in expected_rpe.calibrate(noisy, 5)} == {
+        Condition.HEAT, Condition.NIGHT}, "a group is no condition"
 
 
 def test_heat_counts_per_wbgt_degree_above_the_optimum():

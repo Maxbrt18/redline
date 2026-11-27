@@ -15,16 +15,16 @@ The dose of a session, by family:
 - a hike: its effort-kilometres;
 - any other session (bike, strength): its minutes.
 
-What the dose does not see: heat, night and running with others. Each run reads them
+What the dose does not see: heat and night. Each run reads them
 (`Conditions`), and their effect on the RPE is calibrated on the athlete, never taken
 from a table (`calibrate`): the RPE residuals of the runs of the window, against the
 dose model, with and without the condition (per WBGT degree above `HEAT_FROM_WBGT_C` for
 heat). An effect shifts a run's expectation only once `rpe_model_settled_sessions` runs
 carry the condition and the effect stands more than `EFFECT_SIGNIFICANCE` standard
 errors from zero; until then it is reported and changes nothing. Published work gives a
-heat optimum, not an RPE cost per degree, finds no RPE change from a group at a given
-pace, and a darker run feeling harder without a usable size: the athlete's own history
-decides.
+heat optimum, not an RPE cost per degree, and a darker run feeling harder without a
+usable size: the athlete's own history decides. A group is no condition: the pace it
+sets is already in the dose, and at a given pace it leaves the RPE about unchanged.
 
 The model, per kind (per routine for strength): RPE = a + b × ln(dose), fit by least
 squares on the sessions of the `rpe_model_weeks` weeks before, with a declared RPE and a
@@ -212,14 +212,12 @@ class Conditions:
     #: WBGT degrees above `HEAT_FROM_WBGT_C`, 0 when cooler.
     heat_c: float | None = None
     night: bool | None = None
-    group: bool | None = None
 
     def amount(self, condition: Condition) -> float | None:
-        """The quantity an effect multiplies: degrees for heat, 0 or 1 otherwise."""
+        """The quantity an effect multiplies: degrees for heat, 0 or 1 for night."""
         if condition is Condition.HEAT:
             return self.heat_c
-        present = self.night if condition is Condition.NIGHT else self.group
-        return None if present is None else float(present)
+        return None if self.night is None else float(self.night)
 
 
 NO_CONDITIONS = Conditions()
@@ -471,10 +469,7 @@ def history(store: Any, rows: Iterable[Row], config: Settings) -> History:
         activity = easy_load.strava_id(row.idempotency_key)
         if activity is None:
             return Conditions(heat_c=heat_of(row))
-        if activity not in groups:
-            groups[activity] = easy_load.group_of(store, activity)
-        return Conditions(heat_c=heat_of(row), night=night_of(store, activity),
-                          group=groups[activity])
+        return Conditions(heat_c=heat_of(row), night=night_of(store, activity))
 
     return History(rows, profile_of, reference_of, config, conditions_of)
 
