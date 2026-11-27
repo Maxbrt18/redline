@@ -1,5 +1,9 @@
 """The plan over a whole preparation: what the generator promises, and what an athlete who
 follows the review week by week is actually allowed to run (`trajectory.py`).
+
+The strict expected failures are the known defects of the recomputed skeleton, labelled
+with their code in the planning audit (C1, C2, C3, M2) or by what they do when the audit
+has none. Fixing one makes its test pass, which fails the suite until its mark is removed.
 """
 
 from __future__ import annotations
@@ -144,3 +148,84 @@ def test_the_taper_band_accepts_a_first_taper_week_cut_by_a_fifth(followed):
     unread: list[str] = []
     assert plan_revision.taper_errors(store, week, cut, unread.append) == []
     assert not unread
+
+
+# ------------------------------------------------------------------ known defects
+
+#: The skeleton is computed again from today, so its deloads drift
+#: into the first weeks of the horizon, where none is placed.
+C1 = "C1: recomputed from today, the skeleton never reaches a deload"
+#: The review reads the skeleton on Monday, the gate on Sunday.
+C2 = "C2: the bound the review shows is not the bound the gate applies"
+#: The current week always holds the mean of the closed weeks.
+C2_RAMP = "C2: the current week holds the closed weeks' mean, so the ramp never starts"
+#: A ramp multiplies the start, and zero times anything is zero.
+C3 = "C3: from a zero start every bound is zero"
+#: The skeleton caps each taper week at the band's middle, the taper
+#: module bounds the taper's mean.
+M2 = "M2: the skeleton caps a taper week the taper band accepts"
+#: Recomputed from today, the current week is always the horizon's first, so base.
+PHASES = "recomputed from today, the current week is base until the specific block"
+#: One closed week at zero lowers the start for three weeks, and the ramp never starts.
+SINK = "a missed week lowers every later bound and the ramp never starts again"
+
+
+def _volume_rise(before: Lived, week: Lived) -> float:
+    return week.ceiling_km - before.ceiling_km
+
+
+@pytest.mark.xfail(strict=True, reason=C1)
+def test_the_gate_imposes_a_deload_at_least_every_few_build_weeks(followed):
+    every = max(plan_templates.for_race(TEMPLATES, 21.1, RaceTerrain.ROAD).deload_every)
+    builds = [lived for lived in followed if lived.shown and lived.shown.phase in BUILD_PHASES]
+    since = 0
+    for before, week in itertools.pairwise(builds):
+        since = 0 if _volume_rise(before, week) < 0 else since + 1
+        assert since < every, f"{week.week}: {since} build weeks without a deload"
+
+
+@pytest.mark.xfail(strict=True, reason=C2)
+def test_the_review_shows_the_bound_the_gate_applies(followed):
+    apart = [(lived.week, lived.shown.volume_km, lived.ceiling_km) for lived in followed
+             if lived.shown and abs(lived.shown.volume_km - lived.ceiling_km) > ROUNDING_KM]
+    assert apart == []
+
+
+@pytest.mark.xfail(strict=True, reason=C2_RAMP)
+def test_an_athlete_who_follows_reaches_the_peak_before_the_taper(followed):
+    peak = max(lived.run_km for lived in followed)
+    assert peak >= trajectory.HALF["peak_volume_km"] - ROUNDING_KM, peak
+
+
+@pytest.mark.xfail(strict=True, reason=PHASES)
+def test_an_athlete_who_follows_lives_every_phase_of_the_template(followed):
+    lived = {week.shown.phase for week in followed if week.shown}
+    assert lived >= {PlanPhase.BASE, PlanPhase.DEVELOPMENT, PlanPhase.SPECIFIC,
+                     PlanPhase.TAPER}, lived
+
+
+@pytest.mark.xfail(strict=True, reason=C3)
+def test_an_athlete_without_history_is_given_a_volume_to_run():
+    lived = trajectory.simulate(start_km=0, start_long_km=0).weeks
+    assert all(week.ceiling_km > 0 for week in lived), [week.ceiling_km for week in lived]
+
+
+@pytest.mark.xfail(strict=True, reason=C3)
+def test_after_three_missed_weeks_the_athlete_is_given_a_volume_to_run_again():
+    lived = trajectory.simulate(missed={3, 4, 5}).weeks
+    after = lived[6:]
+    assert all(week.ceiling_km > 0 for week in after), [week.ceiling_km for week in after]
+
+
+@pytest.mark.xfail(strict=True, reason=SINK)
+def test_after_a_missed_week_the_athlete_climbs_back_to_what_they_held():
+    lived = trajectory.simulate(missed={3}).weeks
+    before = lived[2].run_km
+    builds = [week for week in lived[4:] if week.shown and week.shown.phase in BUILD_PHASES]
+    assert max(week.run_km for week in builds) >= before, [week.run_km for week in builds]
+
+
+@pytest.mark.xfail(strict=True, reason=M2)
+def test_the_gate_accepts_a_first_taper_week_cut_by_a_fifth(followed):
+    store, week, cut = _first_taper_week_cut_by_a_fifth(followed)
+    assert trajectory.SkeletonPlanner().refusals(store, week, cut) == []
