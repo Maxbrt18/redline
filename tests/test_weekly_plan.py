@@ -483,6 +483,12 @@ class NoFacts:
     def pain_zones(self):
         return []
 
+    def cycle_for_week(self, week):
+        return None
+
+    def first_cycle_week(self):
+        return None
+
 
 def test_a_new_revision_does_not_persist_a_schema_version(monkeypatch, capsys):
     from conftest import load_script
@@ -545,6 +551,8 @@ def test_plan_cli_distinguishes_preview_from_pending_application(command, monkey
     cli = load_script("week-plan")
     store = MagicMock()
     store.load_plan.return_value = None
+    store.cycle_for_week.return_value = None
+    store.first_cycle_week.return_value = None
     fresh = written_today(number=1, sessions=[session()])
     fresh["gates"] = [gate(when="after")]
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(fresh)))

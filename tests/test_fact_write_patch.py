@@ -211,9 +211,9 @@ def test_a_patch_without_context_keeps_it_whole():
 
 
 def test_a_merged_race_context_is_still_checked():
-    existing = deadline_row(kind="race", context={"taper_cut_max_pct": 50})
-    args = parse("deadline", "--key", "d-1", "--patch", "--context", '{"taper_cut_min_pct": 70}')
-    with pytest.raises(InputError, match="is above taper_cut_max_pct"):
+    existing = deadline_row(kind="race", context={"goal_time_s": 6300, "goal_source": "coach"})
+    args = parse("deadline", "--key", "d-1", "--patch", "--context", '{"goal_source": null}')
+    with pytest.raises(InputError, match="goal_time_s and goal_source go together"):
         fact_write.payload_of(args, existing)
 
 

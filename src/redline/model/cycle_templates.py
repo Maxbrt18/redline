@@ -21,6 +21,7 @@ from __future__ import annotations
 import tomllib
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 from . import formats, session_kinds
@@ -410,6 +411,20 @@ class CycleTemplates:
     def general_at(self, level: GeneralLevel) -> General | None:
         return next((template for template in self.general if template.level == level), None)
 
+    def key_sessions(self, kind: CycleKind, template: str,
+                     phase: PlanPhase) -> dict[str, KeySession]:
+        """The key sessions a trame's week was generated from, by workout: a preparation's
+        phase by its template's slug, the general level's; none for the other kinds."""
+        keys: tuple[KeySession, ...] = ()
+        if kind == CycleKind.PREPARATION:
+            found = next((item for item in self.preparation if item.slug == template), None)
+            spec = found.phase(phase) if found is not None else None
+            keys = spec.keys if spec is not None else ()
+        elif kind == CycleKind.GENERAL and template in tuple(GeneralLevel):
+            general = self.general_at(GeneralLevel(template))
+            keys = general.keys if general is not None else ()
+        return {key.workout: key for key in keys}
+
 
 def _intensity(data: dict) -> Intensity:
     return Intensity(IntensityRef(data["ref"]), Range.of(data["band"]))
@@ -501,12 +516,22 @@ def parse(text: str, source: Path) -> CycleTemplates:
     return found
 
 
+@lru_cache(maxsize=8)
+def _read(path: Path, modified_ns: int) -> CycleTemplates:
+    """A declaration read once while its file is unchanged."""
+    return parse(path.read_text(encoding="utf-8"), path)
+
+
+def _cached(path: Path) -> CycleTemplates:
+    return _read(path, path.stat().st_mtime_ns)
+
+
 def load_instance(vault: Path) -> CycleTemplates | None:
     """The instance's cycle templates, or None when it declares none."""
     path = vault / INSTANCE_NAME
-    return parse(path.read_text(encoding="utf-8"), path) if path.is_file() else None
+    return _cached(path) if path.is_file() else None
 
 
 def load(vault: Path) -> CycleTemplates:
     """The instance's cycle templates when it declares them, else the engine's."""
-    return load_instance(vault) or parse(DEFAULT.read_text(encoding="utf-8"), DEFAULT)
+    return load_instance(vault) or _cached(DEFAULT)

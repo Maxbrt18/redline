@@ -17,7 +17,7 @@ from redline.model import plan_generator as generator
 from redline.model.vocabulary import CycleCause, CycleKind, GeneralLevel
 from redline.service.postgres_state import PostgresStateStore
 from redline.service.proactive_messages import compose_closed_proactive
-from redline.storage import Database, OperationalStore
+from redline.storage import Database, OperationalStore, StorageError
 from redline.storage.schema import cycle_versions, plan_revisions
 
 URL = os.environ.get("TEST_DATABASE_URL", "")
@@ -179,3 +179,33 @@ def test_the_weeks_a_taken_version_planned_low_are_not_a_start(store):
     with store.database.engine.connect() as connection:
         assert store.planned_low_weeks_in(connection) == low | {"2030-W23"}
     assert found.kind == CycleKind.PREPARATION
+
+
+def test_a_week_is_held_by_the_version_whose_trame_has_it(store):
+    assert store.first_cycle_week() is None and store.cycle_for_week("2030-W12") is None
+    first = _apply(store, _general(), CycleCause.MIGRATION, level=GeneralLevel.MAINTAIN)
+    nxt = _apply(store, _general("2030-W16"), CycleCause.BLOCK_END, level=GeneralLevel.MAINTAIN)
+    assert store.first_cycle_week() == "2030-W12"
+    assert store.cycle_for_week("2030-W15").id == first.id, "a superseded version keeps its weeks"
+    assert store.cycle_for_week("2030-W16").id == nxt.id
+    assert store.cycle_for_week("2030-W20") is None
+
+
+def test_a_session_keeps_the_key_session_it_runs_and_a_revision_its_overrides(store):
+    from test_weekly_plan import revision, session
+    found = _apply(store, _general(), CycleCause.MIGRATION, level=GeneralLevel.MAINTAIN)
+    [key] = [key for key in found.trame.keys if key.week == "2030-W12"]
+    overrides = [{"target": "key_dose", "session": "w12-q", "reason": "athlete_choice",
+                  "prediction": "p-step"}]
+    written = store.append_plan_revision("2030-W12", revision(
+        computed_at="2030-03-15T19:10:00+01:00", cycle_overrides=overrides,
+        sessions=[session("w12-q", date="2030-03-19", workout="threshold",
+                          key_position=key.position)]))
+    [read] = written["revisions"][-1]["sessions"]
+    assert read["key_position"] == key.position
+    assert written["revisions"][-1]["cycle_overrides"] == overrides
+    with pytest.raises(StorageError, match="no key session at position 5"):
+        store.append_plan_revision("2030-W12", revision(
+            2, computed_at="2030-03-16T19:10:00+01:00",
+            sessions=[session("w12-q", date="2030-03-19", workout="threshold",
+                              key_position=5)]))

@@ -25,6 +25,7 @@ SESSION_COLUMNS = {
     "date": "scheduled_on",
     "strength": "strength_spec",
     "weather": "weather_policy",
+    "key_position": "key_session_id",  # resolved to the key session it names, read back
 }
 REVISION_COLUMNS = {
     "revision": "revision",     # the NUMBER; `id` stays the technical key

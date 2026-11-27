@@ -120,6 +120,53 @@ def gut_errors(store, week: str, revision: dict, warn: Callable[[str], None]) ->
                     check)
 
 
+def _overridden(revision: dict | None) -> frozenset:
+    """What a revision overrode, by target and by the workout of the session it names."""
+    from redline.model.vocabulary import OverrideTarget
+    if revision is None:
+        return frozenset()
+    workouts = {session["id"]: session.get("workout") or ""
+                for session in revision.get("sessions") or []}
+    return frozenset((OverrideTarget(item["target"]),
+                      workouts.get(item.get("session") or "", "") if item.get("session")
+                      else "")
+                     for item in revision.get("cycle_overrides") or [])
+
+
+def cycle_errors(store, week: str, revision: dict, previous: dict | None,
+                 warn: Callable[[str], None]) -> list[str]:
+    """The week against the cycle version that holds it. A week before the first version
+    has none and is free; a later week no version holds is refused."""
+    from redline.analysis import cycle_report
+    from redline.model import cycle_gate, cycle_templates, iso_week, paths
+    from redline.model import race as race_model
+    where = _where(week, revision)
+
+    def check() -> list[str]:
+        version = store.cycle_for_week(week)
+        if version is None:
+            first = store.first_cycle_week()
+            if first is None or week < first:
+                return []
+            return [f"{where}: no cycle version holds the week (`redline cycle show`); the "
+                    "planner writes the next one on the last day of the one in force"]
+        bound = version.week(week)
+        assert bound is not None, "the version holding a week has it"
+        goal = race_model.active_goal(store)
+        templates = cycle_templates.load(paths.vault_root())
+        before = store.load_plan(iso_week.shift(week, -1))
+        frame = cycle_gate.Frame(
+            version, bound, templates.key_sessions(version.kind, version.trame.template,
+                                                   bound.phase),
+            cycle_report.references(store, goal.goal if goal is not None else None),
+            frozenset(row["prediction_key"] for row in store.prediction_rows()
+                      if row.get("status") == "open"),
+            _overridden(before["revisions"][-1] if before else None))
+        return cycle_gate.errors(frame, revision, previous)
+
+    return _guarded("cycle", where, wording.CYCLE_UNREADABLE, warn, check)
+
+
 def checked(store, week: str, revision: dict, existing: dict | None, *, stamp: str,
             warn: Callable[[str], None]) -> tuple[dict | None, dict]:
     """The previous revision and the new one, stamped and measured, or SchemaError."""
@@ -160,6 +207,7 @@ def checked(store, week: str, revision: dict, existing: dict | None, *, stamp: s
         *pain_errors(store, week, current, existing, warn),
         *progression_errors(store, week, current, previous, warn),
         *gut_errors(store, week, current, warn),
+        *cycle_errors(store, week, current, previous, warn),
     ]
     if mistakes:
         raise SchemaError(mistakes)
