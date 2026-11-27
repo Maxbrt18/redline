@@ -464,13 +464,33 @@ def test_a_gate_cannot_hold_a_session_already_past_when_it_is_asked():
 
 # ------------------------------ the boundary every new revision must hold
 
+class NoFacts:
+    """A store with no race, no observation and no pain zone: the gate's guards read it
+    and find nothing to bind."""
+
+    def deadline_rows(self):
+        return []
+
+    def observation_rows(self):
+        return []
+
+    def strength_history(self):
+        return []
+
+    def daily_rows(self):
+        return []
+
+    def pain_zones(self):
+        return []
+
+
 def test_a_new_revision_does_not_persist_a_schema_version(monkeypatch, capsys):
     from conftest import load_script
 
     week_plan = load_script("week-plan")
     written = {}
 
-    class FakeStore:
+    class FakeStore(NoFacts):
         def load_plan(self, week):
             return None
 
@@ -497,7 +517,7 @@ def test_a_new_revision_may_no_longer_carry_an_untyped_gate(monkeypatch):
 
     week_plan = load_script("week-plan")
 
-    class FakeStore:
+    class FakeStore(NoFacts):
         def load_plan(self, week):
             return None
 
@@ -592,7 +612,7 @@ def test_the_cli_refuses_a_running_week_without_volume(monkeypatch, capsys):
 
     week_plan = load_script("week-plan")
 
-    class FakeStore:
+    class FakeStore(NoFacts):
         def load_plan(self, week):
             return None
 
