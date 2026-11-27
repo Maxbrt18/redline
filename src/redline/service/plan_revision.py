@@ -17,6 +17,7 @@ from redline.model.schema import SchemaError
 from redline.model.weekly_plan import (
     change_evidence_errors,
     decision_errors,
+    easy_bound_errors,
     fuelling_errors,
     intention_errors,
     pain_rule_errors,
@@ -125,6 +126,7 @@ def checked(store, week: str, revision: dict, existing: dict | None, *, stamp: s
         *change_evidence_errors(previous, current),
         *typed_target_errors(current, where),
         *rpe_band_errors(previous, current, where),
+        *easy_bound_errors(previous, current, where),
         *prescription.errors(previous, current, where),
         *decision_errors(current, where),
         *fuelling_errors(current, where),

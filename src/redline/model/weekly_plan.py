@@ -439,6 +439,33 @@ def rpe_band_errors(previous: dict | None, current: dict,
         if band(session) != (None, None) and before.get(session.get("id")) != band(session)]
 
 
+def easy_bound_errors(previous: dict | None, current: dict,
+                      where: str = "revision") -> list[str]:
+    """Refuse an easy run bounded by both its duration and a distance: together they
+    prescribe a pace, and an easy run is set by its effort. Run faster at the same heart
+    rate, it covers more kilometres in its duration: form, not a fault.
+
+    A pair the previous revision already held on the same session is carried, not given.
+    """
+    def bounds(session: dict) -> tuple:
+        return (session.get("duration_cap_min"), session.get("distance_cap_km"),
+                session.get("distance_target_km"))
+
+    before = {session["id"]: bounds(session)
+              for session in (previous or {}).get("sessions") or []}
+    return [
+        f"{where}.{session.get('id', '?')}: an easy run takes its duration "
+        "(duration_cap_min) or its distance, not both -- together they prescribe a pace, "
+        "and an easy run is set by its heart rate and its effort"
+        for session in current.get("sessions") or []
+        if session.get("workout") == session_kinds.EASY
+        and session.get("status") != SessionStatus.CANCELLED
+        and session.get("duration_cap_min") is not None
+        and (session.get("distance_cap_km") is not None
+             or session.get("distance_target_km") is not None)
+        and before.get(session.get("id")) != bounds(session)]
+
+
 def _session_errors(session: dict, where: str) -> list[str]:
     problems = []
     target, cap = session.get("distance_target_km"), session.get("distance_cap_km")

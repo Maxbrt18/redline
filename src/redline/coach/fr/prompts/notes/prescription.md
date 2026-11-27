@@ -12,4 +12,6 @@ plafond de sa lignée (`redline progression`), un seul cran, sans veto, avec
 `override_reason` et `override_prediction` (une prédiction ouverte), jamais deux fois de
 suite. Une course à objectif a un squelette (`redline plan-skeleton`) : la semaine reste
 dans ses bornes de volume, de SL et de qualités. Jamais de
-`rpe_min`/`rpe_max` : le RPE se calcule sur la dose, après la séance.]
+`rpe_min`/`rpe_max` : le RPE se calcule sur la dose, après la séance. Une EF se borne par
+sa durée ou sa distance, jamais les deux, et ne porte aucune allure : elle se cale sur
+la FC et l'effort.]

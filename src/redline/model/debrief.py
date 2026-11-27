@@ -29,7 +29,10 @@ def planned_vs_done(row: Any, session: dict | None) -> list[str]:
     if not session:
         return []
     out = []
-    if row.km is not None:
+    faster = _faster_within_duration(row, session)
+    if faster:
+        out.append(faster)
+    elif row.km is not None:
         for key, label in (("distance_target_km", text.TARGET), ("distance_cap_km", text.CAP)):
             if session.get(key) is not None:
                 out.append(text.DISTANCE_GAP.format(done=text.number(row.km), label=label, planned=text.number(session[key]), signed=text.signed(row.km - session[key])))
@@ -50,6 +53,19 @@ def planned_vs_done(row: Any, session: dict | None) -> list[str]:
             and not prescription.has_efforts(session) and _flat_run(row)):
         out.append(text.HR_GAP.format(hr=hr, hr_cap_bpm=session["hr_cap_bpm"], signed=text.signed(hr - session["hr_cap_bpm"])))
     return out
+
+
+def _faster_within_duration(row: Any, session: dict) -> str:
+    """An easy run whose duration held while it went past its distance: it was run
+    faster, which says form, not a gap. Carried revisions may still bound an easy run by
+    both (`weekly_plan.easy_bound_errors`)."""
+    cap, minutes_cap = session.get("distance_cap_km"), session.get("duration_cap_min")
+    if (session.get("workout") != session_kinds.EASY or cap is None or minutes_cap is None
+            or row.km is None or row.hours is None or row.km <= cap
+            or row.hours * 60 > minutes_cap):
+        return ""
+    return text.EASY_FASTER.format(done=text.number(row.km), minutes=row.hours * 60,
+                                   duration_cap_min=minutes_cap, cap=text.number(cap))
 
 
 def _flat_run(row: Any) -> bool:

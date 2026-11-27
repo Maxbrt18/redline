@@ -730,3 +730,18 @@ def test_a_week_with_more_quality_than_rule_n1_allows_is_refused():
     sessions[1]["status"] = "cancelled"
     assert not any("rule n1" in problem
                    for problem in weekly_plan.semantic_errors(plan(sessions), today=before))
+
+
+def test_an_easy_run_takes_its_duration_or_its_distance_never_both():
+    both = session("ef", "2030-03-14", "easy", duration_cap_min=25, distance_cap_km=4.0)
+    current = {"revision": 2, "sessions": [both]}
+    [problem] = weekly_plan.easy_bound_errors(None, current)
+    assert "takes its duration (duration_cap_min) or its distance, not both" in problem
+    assert weekly_plan.easy_bound_errors({"revision": 1, "sessions": [both]}, current) == [], \
+        "a pair carried unchanged is not given again"
+    duration_only = session("ef", "2030-03-14", "easy", duration_cap_min=25,
+                            distance_target_km=None, distance_cap_km=None)
+    distance_only = session("ef", "2030-03-14", "easy", distance_cap_km=4.0)
+    long_run = session("sl", "2030-03-17", "long", duration_cap_min=180, distance_cap_km=26.0)
+    for alone in (duration_only, distance_only, long_run):
+        assert weekly_plan.easy_bound_errors(None, {"revision": 2, "sessions": [alone]}) == []
