@@ -1076,6 +1076,41 @@ agent_turns = sa.Table(
                        name="ck_agent_turns_model_reported"),
 )
 
+#: What each provider call consumed, as the provider reports it: one row per call, so a
+#: turn retried or continued counts every call it made. The cost is what the call would
+#: be billed at API prices, reported even when a subscription pays for it. `turn_id`
+#: carries no foreign key: a call is recorded before its turn's identity row. Never
+#: purged; append-only for the service.
+agent_calls = sa.Table(
+    "agent_calls", metadata,
+    _id(),
+    sa.Column("turn_id", UUID_PK),
+    sa.Column("psid", sa.Text),
+    sa.Column("provider", sa.Text, nullable=False),
+    sa.Column("purpose", sa.Text, nullable=False),
+    sa.Column("model", sa.Text),
+    # Absent when the provider reports no price.
+    sa.Column("cost_usd", sa.Numeric(12, 6)),
+    sa.Column("input_tokens", sa.Integer, nullable=False),
+    sa.Column("output_tokens", sa.Integer, nullable=False),
+    sa.Column("cache_read_tokens", sa.Integer, nullable=False),
+    sa.Column("cache_write_tokens", sa.Integer, nullable=False),
+    sa.Column("duration_ms", sa.Integer),
+    sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=UTC_NOW),
+    sa.CheckConstraint("provider IN ('codex','claude')", name="ck_agent_calls_provider"),
+    sa.CheckConstraint(f"purpose IN ({voc.sql_values(voc.CallPurpose)})",
+                       name="ck_agent_calls_purpose"),
+    sa.CheckConstraint("psid IS NULL OR psid <> ''", name="ck_agent_calls_psid"),
+    sa.CheckConstraint("purpose <> 'turn' OR turn_id IS NOT NULL", name="ck_agent_calls_turn"),
+    sa.CheckConstraint("cost_usd IS NULL OR cost_usd >= 0", name="ck_agent_calls_cost"),
+    sa.CheckConstraint("input_tokens >= 0 AND output_tokens >= 0 AND cache_read_tokens >= 0 "
+                       "AND cache_write_tokens >= 0", name="ck_agent_calls_tokens"),
+    sa.CheckConstraint("duration_ms IS NULL OR duration_ms >= 0",
+                       name="ck_agent_calls_duration"),
+    sa.Index("ix_agent_calls_created_at", "created_at"),
+    sa.Index("ix_agent_calls_turn_id", "turn_id"),
+)
+
 handoffs = sa.Table(
     "handoffs", metadata,
     sa.Column("psid", sa.Text, primary_key=True),

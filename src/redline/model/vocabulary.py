@@ -275,6 +275,15 @@ class RpeSign(StrEnum):
     PATTERN = "pattern"
 
 
+class CallPurpose(StrEnum):
+    """Why the service called a model provider (`agent_calls.purpose`)."""
+
+    #: A coaching turn: a reply, an initiative, a debrief, a plan, an analysis.
+    TURN = "turn"
+    #: The small call that sizes how much a reply will read.
+    TRIAGE = "triage"
+
+
 class FindingKind(StrEnum):
     """One reading of a run against its prescription (`debrief_findings`)."""
 

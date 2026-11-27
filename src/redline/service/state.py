@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 from .config import Config
 
 if TYPE_CHECKING:
-    from .agent import TurnIdentity
+    from .agent import AgentCall, TurnIdentity
 
 
 class Disposition(StrEnum):
@@ -51,6 +51,7 @@ class StateStore(Protocol):
 
     def register_turn(self, turn_id: str, psid: str) -> None: ...
     def record_turn(self, identity: TurnIdentity) -> None: ...
+    def record_call(self, call: AgentCall) -> None: ...
     def materialize_intelligence(self, now: datetime) -> int: ...
     def missed_session_is_current(self, job_id: str) -> bool: ...
     def ingest_strava_activity(self, activity_id: int, *,

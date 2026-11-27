@@ -10,6 +10,7 @@ import sqlalchemy as sa
 from redline.model import vocabulary as voc
 
 from ..schema import (
+    agent_calls,
     agent_sessions,
     agent_turns,
     athlete_activity_states,
@@ -82,6 +83,7 @@ class Maintenance(StoreBase):
             "gear_items": gear_items, "coach_predictions": coach_predictions,
             "correction_deliveries": correction_deliveries,
             "agent_sessions": agent_sessions, "agent_turns": agent_turns,
+            "agent_calls": agent_calls,
             "handoffs": handoffs,
             "inbound_activity_states": inbound_activity_states,
             "inbound_messages": inbound_messages,

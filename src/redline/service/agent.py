@@ -15,6 +15,8 @@ from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import TYPE_CHECKING, Protocol
 
+from redline.model.vocabulary import CallPurpose
+
 from . import persona
 from .prompts import DEFAULT_DEPTH, instruction_digest
 
@@ -195,6 +197,27 @@ class TurnIdentity:
     instruction_digest: str
     rulebook_digest: str
     engine_tree: str | None
+
+
+@dataclass(frozen=True)
+class AgentCall:
+    """What one provider call consumed, as the provider reports it.
+
+    ``cost_usd`` is the price of the call at API rates, reported even when a
+    subscription pays for it; None when the provider reports no price.
+    """
+
+    provider: str
+    purpose: CallPurpose
+    model: str | None
+    cost_usd: float | None
+    input_tokens: int
+    output_tokens: int
+    cache_read_tokens: int
+    cache_write_tokens: int
+    duration_ms: int | None
+    psid: str | None = None
+    turn_id: str | None = None
 
 
 #: Output contract of an initiative, shared by both providers.

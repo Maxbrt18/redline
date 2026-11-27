@@ -144,6 +144,7 @@ class FakeStateStore:
     def __init__(self) -> None:
         self.proactive = FakeProactiveState()
         self.turns: list = []
+        self.calls: list = []
         self._sessions: dict[str, dict] = {}
         self._handoffs: dict[str, str] = {}
         self._inbound: dict[str, float] = {}
@@ -161,6 +162,9 @@ class FakeStateStore:
 
     def record_turn(self, identity) -> None:
         self.turns.append(identity)
+
+    def record_call(self, call) -> None:
+        self.calls.append(call)
 
     def materialize_intelligence(self, now: datetime) -> int:
         return 0
