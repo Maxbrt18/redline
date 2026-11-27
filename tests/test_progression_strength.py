@@ -73,7 +73,7 @@ def no_ledger(monkeypatch):
     """No run, one watched zone, no typed race: only the strength reports count."""
     monkeypatch.setattr(ledger, "parse_ledger", lambda store: [])
     monkeypatch.setattr(ledger, "pain_zones", lambda store: [ledger.PainZone(ZONE, "Genou")])
-    monkeypatch.setattr(progression_strength.race_model, "upcoming", lambda store, today: None)
+    monkeypatch.setattr(progression_strength.race_model, "active_goal", lambda store: None)
 
 
 def by_lineage(found):
@@ -213,7 +213,7 @@ def test_a_rise_never_passes_the_taper(no_ledger, monkeypatch):
         on = TODAY + dt.timedelta(days=10)
         taper_weeks = 3
 
-    monkeypatch.setattr(progression_strength.race_model, "upcoming", lambda store, today: Race)
+    monkeypatch.setattr(progression_strength.race_model, "active_goal", lambda store: Race)
     history = [report(TODAY - dt.timedelta(days=days), "calf-raise-bent", (15, 15))
                for days in (7, 3)]
     calf = by_lineage(progression_strength.proposals(Store(history), TEST_VAULT, TODAY))[

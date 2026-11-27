@@ -1,4 +1,4 @@
-"""The plan skeleton of the next typed race, read from PostgreSQL: candidates and the chosen one.
+"""The plan skeleton of the active goal, read from PostgreSQL: candidates and the chosen one.
 
 The computation lives in `redline.model.plan_skeleton`; this module gathers its inputs:
 the race and its goal, the template that serves it, the rulebook's thresholds, and where
@@ -22,7 +22,13 @@ from redline.model import iso_week, plan_skeleton, plan_templates, rulebook, ses
 from redline.model import race as race_model
 from redline.model.errors import ConfigError, InputError
 from redline.model.plan_skeleton import NOTHING_HELD, Held, Levers, Limits, Skeleton, Start
-from redline.model.vocabulary import DeadlineStatus, RaceTerrain, SessionStatus
+from redline.model.vocabulary import (
+    DeadlineKind,
+    RacePriority,
+    RaceState,
+    RaceTerrain,
+    SessionStatus,
+)
 
 from . import critical_speed, expected_rpe, ledger, race_estimate, signals
 
@@ -132,11 +138,16 @@ def held_of(rows: list[ledger.Row], history: expected_rpe.History, today: dt.dat
 
 
 def frame(store: Any, today: dt.date) -> Frame:
-    """The inputs of the next race's skeleton; InputError or ConfigError naming what is
+    """The inputs of the goal's skeleton; InputError or ConfigError naming what is
     missing."""
-    race = race_model.upcoming(store, today)
+    race = race_model.active_goal(store)
     if race is None:
-        raise InputError("no typed race ahead: `redline fact-write deadline --kind race`")
+        raise InputError("no active goal: `redline fact-write deadline --kind race "
+                         "--priority a`")
+    if race.on < today:
+        raise InputError(f"the goal of {race.on.isoformat()} is past: write its outcome with "
+                         "`redline fact-write deadline --race-state` (run, abandoned, "
+                         "cancelled)")
     goal = race.goal
     if goal is None or goal.peak_volume_km is None or goal.peak_long_run_km is None:
         raise InputError("the race's context lacks its goal: distance_km, terrain, "
@@ -178,10 +189,11 @@ def candidates(store: Any, today: dt.date) -> tuple[Frame, list[Skeleton]]:
 
 
 def chosen(store: Any, today: dt.date) -> Skeleton | None:
-    """The skeleton the next race's context chose, computed again from today; None when
-    no race is ahead or it chose none. A chosen skeleton whose frame cannot be read is a
-    ConfigError or an InputError naming what is missing, never no skeleton."""
-    race = race_model.upcoming(store, today)
+    """The skeleton the goal's context chose, computed again from today; None without an
+    active goal or when it chose none. A chosen skeleton whose frame cannot be read, a past
+    goal among them, is a ConfigError or an InputError naming what is missing, never no
+    skeleton."""
+    race = race_model.active_goal(store)
     if race is None or not race.declares_skeleton:
         return None
     if race.unread:
@@ -200,14 +212,12 @@ def chosen(store: Any, today: dt.date) -> Skeleton | None:
 
 
 def race_key(store: Any, race: race_model.Race) -> str:
-    """The deadline key of a typed race, to patch its context."""
+    """The deadline key of the active goal, to patch its context."""
     for row in store.deadline_rows():
-        due = row.get("due_on")
-        day = due if isinstance(due, dt.date) else dt.date.fromisoformat(str(due)) if due else None
-        if (day == race.on and row.get("kind") == "race"
-                and row.get("status") != DeadlineStatus.DONE):
+        if (row.get("kind") == DeadlineKind.RACE and row.get("priority") == RacePriority.A
+                and row.get("race_state") == RaceState.ACTIVE):
             return str(row["deadline_key"])
-    raise InputError(f"no deadline row for the race of {race.on.isoformat()}")
+    raise InputError(f"no deadline row for the goal of {race.on.isoformat()}")
 
 
 def _long_run(week: plan_skeleton.Week) -> str:

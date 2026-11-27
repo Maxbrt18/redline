@@ -20,10 +20,12 @@ from dataclasses import dataclass
 from redline.coach.fr import ledger as text
 from redline.model import iso_week, rulebook, session_kinds, transitions
 from redline.model import race as race_model
-from redline.model.vocabulary import Decider, SessionStatus
+from redline.model.vocabulary import Decider, RacePriority, RaceState, SessionStatus
 
 from . import ledger
 
+#: The states of a goal whose taper is read: ahead, or run.
+TAPERED = frozenset({RaceState.ACTIVE, RaceState.RUN})
 REFERENCE_WEEKS = 2
 #: Weeks searched back for the reference before giving up: a long block of assimilation
 #: weeks means no comparable load.
@@ -64,8 +66,11 @@ def window(race: race_model.Race) -> Window:
 
 
 def race_window(store: ledger.LedgerStore, week: str) -> Window | None:
-    """The typed race whose taper holds `week`, run or still ahead."""
+    """The goal whose taper holds `week`, run or still ahead: a race of priority A, active
+    or run. A race B or C, or one cancelled or abandoned, binds no taper band."""
     for race in race_model.typed(store):
+        if race.priority != RacePriority.A or race.state not in TAPERED:
+            continue
         found = window(race)
         if week in found.weeks:
             return found

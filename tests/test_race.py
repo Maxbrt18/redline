@@ -31,16 +31,33 @@ def test_the_taper_keys_are_checked_and_the_others_left_alone():
         race.CONTEXT_SCHEMA.validate({"taper_cut_min_pct": 70, "taper_cut_max_pct": 50})
 
 
-def test_the_upcoming_race_skips_the_ones_run_or_done():
-    class Store:
-        def deadline_rows(self):
-            return [{"kind": "race", "status": "done", "priority": "a", "race_state": "run", "due_on": "2030-09-01"},
-                    {"kind": "general", "status": "todo", "due_on": "2030-10-01"},
-                    {"kind": "race", "status": "scheduled", "priority": "a", "race_state": "active", "due_on": "2030-11-30"},
-                    {"kind": "race", "status": "scheduled", "priority": "a", "race_state": "active", "due_on": "2030-06-01"}]
-    assert race.upcoming(Store(), dt.date(2030, 7, 1)).on == dt.date(2030, 11, 30)
-    assert race.upcoming(Store(), dt.date(2030, 12, 1)) is None
-    assert [typed.on.month for typed in race.typed(Store())] == [6, 9, 11]
+def _row(on, priority, state, kind="race"):
+    return {"kind": kind, "priority": priority, "race_state": state,
+            "status": race.status_of(RaceState(state)) if state else "todo", "due_on": on}
+
+
+class Calendar:
+    def deadline_rows(self):
+        return [_row("2030-09-01", "a", "run"), _row("2030-10-01", None, None, "general"),
+                _row("2030-10-12", "b", "active"), _row("2030-10-19", "c", "cancelled"),
+                _row("2030-11-30", "a", "active"), _row("2031-02-01", "c", "active")]
+
+
+def test_the_goal_is_the_active_race_of_priority_a():
+    assert race.active_goal(Calendar()).on == dt.date(2030, 11, 30)
+    assert [typed.on.month for typed in race.typed(Calendar())] == [9, 10, 10, 11, 2]
+
+
+def test_the_next_race_is_the_next_active_one_whatever_its_priority():
+    assert race.next_race(Calendar(), dt.date(2030, 9, 2)).on == dt.date(2030, 10, 12)
+    assert race.next_race(Calendar(), dt.date(2030, 10, 12)).on == dt.date(2030, 10, 12), \
+        "a race is next on its own day"
+    assert race.next_race(Calendar(), dt.date(2031, 2, 2)) is None
+
+
+def test_a_goal_whose_day_passed_stays_the_goal_until_its_outcome_is_written():
+    assert race.active_goal(Calendar()).on == dt.date(2030, 11, 30)
+    assert race.next_race(Calendar(), dt.date(2030, 12, 1)).on == dt.date(2031, 2, 1)
 
 
 def test_a_race_carries_what_its_plan_needs():

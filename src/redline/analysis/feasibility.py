@@ -49,8 +49,8 @@ def novelties(sessions: list[dict], rows: list, as_of: dt.date) -> tuple[str, ..
 
 def build_problem(store: Any, rows: list, today: dt.date,
                   free: frozenset[str] = frozenset()) -> transitions.Problem | None:
-    race = race_model.upcoming(store, today)
-    if race is None:
+    race = race_model.active_goal(store)
+    if race is None or race.on <= today:
         return None
     race_on = race.on
     book = rulebook.current()

@@ -249,11 +249,18 @@ def typed(store: DeadlineStore) -> list[Race]:
                   key=lambda race: race.on)
 
 
-def upcoming(store: DeadlineStore, today: dt.date) -> Race | None:
-    """The next typed race still to run, never prose."""
-    ahead = [race for race in typed(store) if race.state not in CLOSED_RACE_STATES
-             and race.on > today]
-    return ahead[0] if ahead else None
+def active_goal(store: DeadlineStore) -> Race | None:
+    """The goal the preparation is built for: the race of priority A still active, past
+    or ahead. A goal whose day has passed stays the goal until its outcome is written."""
+    return next((race for race in typed(store)
+                 if race.priority == RacePriority.A and race.state == RaceState.ACTIVE), None)
+
+
+def next_race(store: DeadlineStore, today: dt.date) -> Race | None:
+    """The next active race from `today` on, whatever its priority: the one whose day and
+    logistics come first."""
+    return next((race for race in typed(store)
+                 if race.state == RaceState.ACTIVE and race.on >= today), None)
 
 
 #: The moves a race may make from each state; a closed state is left no more.
