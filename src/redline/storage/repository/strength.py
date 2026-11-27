@@ -183,6 +183,7 @@ class Strength(PainZones):
             strength_sessions.c.id.label("session_id"), strength_sessions.c.session_key,
             strength_sessions.c.performed_on, strength_sessions.c.workout,
             strength_sessions.c.duration_minutes, strength_sessions.c.note,
+            strength_sessions.c.prescription,
             strength_results.c.id.label("result_id"), strength_results.c.position,
             strength_results.c.exercise_slug,
             strength_results.c.difficulty, strength_results.c.skipped,
@@ -206,7 +207,8 @@ class Strength(PainZones):
                     "id": row["session_id"], "session_key": row["session_key"],
                     "performed_on": row["performed_on"], "workout": row["workout"],
                     "pains": {}, "duration_minutes": row["duration_minutes"],
-                    "note": row["note"], "exercises": []})
+                    "note": row["note"], "prescription": row["prescription"],
+                    "exercises": []})
                 if row["result_id"] is None:
                     continue
                 result = results.get(row["result_id"])
