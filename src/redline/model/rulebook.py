@@ -80,6 +80,9 @@ ESTIMATE_PARAMETERS = ("estimate_window_weeks", "estimate_min_source_km", "estim
 CRITICAL_SPEED_PARAMETERS = ("critical_speed_weeks", "critical_speed_first_threshold_pct",
                              "critical_speed_threshold_low_pct",
                              "critical_speed_threshold_high_pct")
+#: The calibration of fitness (`redline.analysis.calibration`), declared together or not at
+#: all.
+CALIBRATION_PARAMETERS = ("calibration_band_sd", "calibration_fresh_weeks")
 
 RULEBOOK_SCHEMA = Schema("rulebook.toml", [
     field("parameters", dict, schema=Schema("[parameters]", [
@@ -197,6 +200,13 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
               maximum=100, note="slowest pace of a threshold session, in % of CS"),
         field("critical_speed_threshold_high_pct", float, required=False, minimum=50,
               maximum=100, note="fastest pace of a threshold session, in % of CS"),
+        # Optional, both or none (`CALIBRATION_PARAMETERS`): absent, no calibration is
+        # adopted.
+        field("calibration_band_sd", float, required=False, minimum=0.5, maximum=5,
+              note="the estimate leaves the calibration's band beyond this many of its "
+                   "standard deviations"),
+        field("calibration_fresh_weeks", int, required=False, minimum=1, maximum=52,
+              note="a calibration whose newest effort is older is provisional"),
         # Optional: absent, the climbs of an easy run are not judged by their HR
         # (`redline.analysis.grade_hr`).
         field("climb_hr_margin_bpm", int, required=False, minimum=0, maximum=30,
@@ -335,6 +345,8 @@ class Parameters:
     critical_speed_first_threshold_pct: float | None = None
     critical_speed_threshold_low_pct: float | None = None
     critical_speed_threshold_high_pct: float | None = None
+    calibration_band_sd: float | None = None
+    calibration_fresh_weeks: int | None = None
     climb_hr_margin_bpm: int | None = None
     split_hr_margin_bpm: int | None = None
     split_fast_start_pct: float | None = None
@@ -460,7 +472,8 @@ def parse(text: str, source: Path) -> Rulebook:
                         "skeleton_long_step_max_pct", "estimate_min_source_km",
                         "estimate_noise_vdot", "estimate_drift_vdot2_month",
                         "estimate_exponent_sd", "critical_speed_first_threshold_pct",
-                        "critical_speed_threshold_low_pct", "critical_speed_threshold_high_pct")
+                        "critical_speed_threshold_low_pct", "critical_speed_threshold_high_pct",
+                        "calibration_band_sd")
            if name in raw}})
     scales = build_scales(payload["scales"])
     problems = []
@@ -474,6 +487,7 @@ def parse(text: str, source: Path) -> Rulebook:
                          (RPE_MODEL_PARAMETERS, "expected-RPE thresholds"),
                          (ESTIMATE_PARAMETERS, "goal-estimate thresholds"),
                          (CRITICAL_SPEED_PARAMETERS, "critical-speed thresholds"),
+                         (CALIBRATION_PARAMETERS, "calibration thresholds"),
                          (SKELETON_PARAMETERS, "skeleton thresholds")):
         declared = [name for name in group if name in raw]
         if declared and len(declared) != len(group):

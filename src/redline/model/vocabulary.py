@@ -588,6 +588,35 @@ SPEED_REFS = (IntensityRef.FIRST_THRESHOLD, IntensityRef.CRITICAL_SPEED,
               IntensityRef.GOAL_PACE)
 
 
+class CalibrationSource(StrEnum):
+    """What a calibration was adopted on (`fitness_calibrations.source`): a declared
+    all-out test, a declared race, or the first calibration of the athlete."""
+
+    TEST = "test"
+    RACE = "race"
+    INITIAL = "initial"
+
+
+class CalibrationConfidence(StrEnum):
+    """How far a calibration can be trusted: measured on a recent effort, or provisional
+    on older ones."""
+
+    PROVISIONAL = "provisional"
+    MEASURED = "measured"
+
+
+class RetestReason(StrEnum):
+    """Why a test is proposed rather than a calibration adopted: a session proved more than
+    the calibration's band, or a declared break followed its newest effort."""
+
+    SESSIONS_ABOVE = "sessions_above"
+    BREAK = "break"
+
+
+#: Who adopts a calibration: the rule on a declared effort, or the athlete's request.
+CALIBRATION_DECIDERS = (Decider.RULE, Decider.REQUEST)
+
+
 class DeloadMode(StrEnum):
     """How deloads come: weeks scheduled at a rhythm, or a few days triggered by
     signals."""

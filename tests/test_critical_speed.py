@@ -7,8 +7,10 @@ import datetime as dt
 import pytest
 
 from redline.analysis import critical_speed
+from redline.model.cycle_templates import Range
 from redline.model.efforts import Effort
-from redline.model.vocabulary import EffortKind, EffortTerrain
+from redline.model.intensity import References, render
+from redline.model.vocabulary import EffortKind, EffortTerrain, IntensityRef
 
 TODAY = dt.date(2030, 11, 27)
 CONFIG = critical_speed.Settings(weeks=12, first_threshold_pct=82.3, threshold_low_pct=90,
@@ -51,4 +53,7 @@ def test_efforts_outside_the_model_give_no_fit(efforts):
 def test_the_domains_read_as_shares_of_cs():
     found = critical_speed.fit([effort(240), effort(840)], TODAY, CONFIG)
     assert found is not None
-    assert found.pace_at(82.3) > found.pace_at(90) > found.pace_at(97) > found.pace_s
+    refs = References(critical_speed_mps=found.speed_mps)
+    paces = [render(IntensityRef.CRITICAL_SPEED, Range(pct, pct), refs).pace_s.low
+             for pct in (82.3, 90, 97)]
+    assert paces[0] > paces[1] > paces[2] > found.pace_s

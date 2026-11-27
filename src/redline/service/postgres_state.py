@@ -17,10 +17,13 @@ import sqlalchemy as sa
 from sqlalchemy import RowMapping
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from redline.analysis import calibration
 from redline.analysis import signals as signal_model
 from redline.coach.fr import relationship as wording
 from redline.coach.fr import signals as signal_wording
+from redline.model import calibration as calibration_model
 from redline.model import commands, local_time, rulebook
+from redline.model import efforts as effort_model
 from redline.model import vocabulary as voc
 from redline.model.errors import StorageError
 from redline.model.vocabulary import (
@@ -662,7 +665,8 @@ class PostgresStateStore(StateStore):
                     + self._materialize_challenges(connection, predictions, utc)
                     + self._materialize_daily_signal(connection, store, predictions,
                                                      local, utc)
-                    + self._materialize_gear(connection, utc))
+                    + self._materialize_gear(connection, utc)
+                    + self._materialize_calibration(connection, store, local))
 
     @staticmethod
     def _materialize_cycles(connection, store: OperationalStore, local: dt.datetime,
@@ -824,6 +828,20 @@ class PostgresStateStore(StateStore):
                 connection, f"daily-signal:{local.date().isoformat()}", "daily_signal",
                 json.dumps(signals, ensure_ascii=False), utc.timestamp(), priority=True))
         return created
+
+    @staticmethod
+    def _materialize_calibration(connection, store: OperationalStore, local: dt.datetime) -> int:
+        """A calibration adopted by rule on a declared effort newer than its evidence. It
+        creates no job: the coach reads it in the dossier."""
+        config = calibration.settings()
+        if config is None:
+            return 0
+        found = calibration.adoption(calibration_model.in_force(store.calibration_rows()),
+                                     effort_model.efforts(store.effort_rows()), local.date(),
+                                     config)
+        if found is not None:
+            store.adopt_calibration_in(connection, found, actor="intelligence")
+        return 0
 
     @staticmethod
     def _materialize_gear(connection, utc: dt.datetime) -> int:

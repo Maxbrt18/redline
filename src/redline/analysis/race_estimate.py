@@ -169,6 +169,24 @@ def _cap(breaks: Iterable[Break], last: dt.date, today: dt.date,
     return max(after, key=lambda pause: pause.ends_on, default=None)
 
 
+@dataclass(frozen=True)
+class Form:
+    """The filtered VDOT today, its standard deviation and the efforts it reads."""
+
+    vdot: float
+    vdot_sd: float
+    efforts: tuple[Effort, ...]
+
+
+def form(efforts: Iterable[Effort], today: dt.date, config: Settings) -> Form | None:
+    """The athlete's form today from the declared all-out efforts; None without one."""
+    found = usable(efforts, today, config)
+    if not found:
+        return None
+    mean, variance, _, _ = _filtered(found, today, config)
+    return Form(mean, math.sqrt(variance), tuple(found))
+
+
 def estimate(efforts: Iterable[Effort], breaks: Iterable[Break], today: dt.date, km: float,
              config: Settings) -> Estimate | None:
     """The goal distance's time from the declared all-out efforts; None without one."""

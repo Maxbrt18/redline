@@ -17,14 +17,18 @@ GOAL = {"distance_km": 21.1, "terrain": "road", "peak_volume_km": 50,
 
 
 class Store:
-    def __init__(self, context=None, rows=(), efforts=(), breaks=()):
+    def __init__(self, context=None, rows=(), efforts=(), breaks=(), calibrations=()):
         self.context = GOAL if context is None else context
         self.rows = list(rows)
         self.efforts, self.breaks = list(efforts), list(breaks)
+        self.calibrations = list(calibrations)
         self.submitted = []
 
     def effort_rows(self):
         return self.efforts
+
+    def calibration_rows(self):
+        return self.calibrations
 
     def break_rows(self):
         return self.breaks
@@ -215,18 +219,41 @@ def test_a_trail_goal_has_no_estimate(runs):
     assert plan_engine.goal_reading(store, runs, trail, TODAY) is None
 
 
-def test_two_test_efforts_give_the_critical_speed_and_its_domains(runs):
-    day = dt.date(2030, 11, 10)
-    store = Store(efforts=[{**_effort("t1200", day, 1.2, 4 * 60), "kind": "test"},
-                           {**_effort("t3600", day, 3.6, 14 * 60), "kind": "test"}])
+def _calibration(**values):
+    return {"adopted_on": dt.date(2030, 11, 12), "confidence": "measured", "source": "test",
+            "evidence": ["t1200", "t3600"], "decided_by": "rule", "cs_mps": None,
+            "d_prime_m": None, "cs_se_mps": None, "vdot": None, "vdot_sd": None,
+            "hr_first_threshold_bpm": None, "hr_second_threshold_bpm": None, **values}
+
+
+def test_the_calibration_in_force_gives_the_critical_speed_and_its_domains(runs):
+    store = Store(calibrations=[_calibration(cs_mps=4.0, d_prime_m=180.0, vdot=50.2,
+                                             vdot_sd=1.1)])
     lines = plan_engine.report(store, TODAY)
-    found = next(line for line in lines if line.startswith("Vitesse critique"))
-    assert "sur 2 efforts à fond du 10/11/2030 au 10/11/2030" in found
-    assert "aucune erreur d'ajustement" in found
-    assert any(line.startswith("  domaines : EF plus lente que") for line in lines)
+    assert any(line.startswith("Calibration du 12/11/2030, adoptée par la règle sur un test "
+                               "(2 effort(s) à fond), mesurée") for line in lines)
+    assert "  VDOT 50,2 ± 1,1." in lines
+    found = next(line for line in lines if line.startswith("  Vitesse critique"))
+    assert found.startswith("  Vitesse critique : 4:10/km (14,4 km/h) (deux efforts")
+    domains = next(line for line in lines if line.startswith("  domaines : EF plus lente que"))
+    assert "ou sous 149 bpm (haut de la Z2)" in domains
 
 
-def test_without_test_efforts_the_coach_may_propose_the_test(runs):
+def test_a_break_after_the_calibration_s_newest_effort_proposes_a_test(runs):
+    store = Store(efforts=[{**_effort("t1200", dt.date(2030, 10, 1), 1.2, 4 * 60), "kind": "test"}],
+                  breaks=[{"break_key": "shin", "starts_on": dt.date(2030, 10, 5),
+                           "ends_on": dt.date(2030, 11, 4), "note": ""}],
+                  calibrations=[_calibration(evidence=["t1200"], vdot=50.0, vdot_sd=1.0)])
+    lines = plan_engine.report(store, TODAY)
+    assert any(line.startswith("  Une pause déclarée jusqu'au 04/11/2030 suit le dernier effort")
+               for line in lines)
+
+
+def test_without_a_calibration_the_coach_may_propose_the_test(runs):
     lines = plan_engine.report(Store(), TODAY)
-    assert any(line.startswith("Vitesse critique : aucune") and "1 200 m puis 3 600 m" in line
+    assert any(line.startswith("Calibration : aucune") and "1 200 m puis 3 600 m" in line
+               for line in lines)
+    vdot_only = Store(calibrations=[_calibration(vdot=48.0, vdot_sd=1.5, source="race")])
+    lines = plan_engine.report(vdot_only, TODAY)
+    assert any(line.startswith("  Vitesse critique : aucune dans la calibration")
                for line in lines)
