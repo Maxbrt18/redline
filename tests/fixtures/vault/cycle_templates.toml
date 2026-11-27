@@ -15,9 +15,12 @@ deload_cut_pct = 25
 phases = ["development", "specific", "taper"]
 window_weeks = [8, 12]
 min_held_km = 40
+peak_pct_of_held = 120
+long_run_km_max = 22
 
 [preparation.development]
 weeks = [4, 6]
+long_run_share_max = 0.30
 qualities = 2
 
   [[preparation.development.key]]
@@ -25,15 +28,18 @@ qualities = 2
   intensity = { ref = "critical_speed", band = [90, 95] }
   start = { reps = 3, rep_seconds = 480, recovery_seconds = 90 }
   arrival = { reps = 4, rep_seconds = 600, recovery_seconds = 60 }
+  step = { reps = 1, rep_seconds = 60, recovery_seconds = 15 }
 
   [[preparation.development.key]]
   workout = "hills"
   intensity = { ref = "rpe", band = [7, 8] }
   start = { reps = 6, rep_seconds = 45, recovery_seconds = 120 }
   arrival = { reps = 10, rep_seconds = 60, recovery_seconds = 120 }
+  step = { reps = 1, rep_seconds = 60, recovery_seconds = 15 }
 
 [preparation.specific]
 weeks = [4, 6]
+long_run_share_max = 0.35
 qualities = 2
 long_run_segments = { ref = "goal_pace", band = [98, 102], share = [0.2, 0.5] }
 
@@ -42,6 +48,7 @@ long_run_segments = { ref = "goal_pace", band = [98, 102], share = [0.2, 0.5] }
   intensity = { ref = "goal_pace", band = [99, 101] }
   start = { reps = 3, rep_seconds = 600, recovery_seconds = 120 }
   arrival = { reps = 2, rep_seconds = 1500, recovery_seconds = 180 }
+  step = { reps = 1, rep_seconds = 60, recovery_seconds = 15 }
   flagship = 2
 
 [preparation.taper]
@@ -52,6 +59,7 @@ qualities = 1
   intensity = { ref = "goal_pace", band = [99, 101] }
   start = { reps = 3, rep_seconds = 480, recovery_seconds = 120 }
   arrival = { reps = 3, rep_seconds = 360, recovery_seconds = 120 }
+  step = { reps = 1, rep_seconds = 60, recovery_seconds = 15 }
 
 [[general]]
 level = "maintain"
@@ -69,6 +77,7 @@ min_held_km = 40
   intensity = { ref = "first_threshold", band = [100, 100] }
   start = { reps = 3, rep_seconds = 480, recovery_seconds = 60 }
   arrival = { reps = 3, rep_seconds = 600, recovery_seconds = 60 }
+  step = { reps = 1, rep_seconds = 60, recovery_seconds = 15 }
 
 [[general]]
 level = "progress"
@@ -87,6 +96,7 @@ ramp_max_pct = 8
   intensity = { ref = "first_threshold", band = [100, 103] }
   start = { reps = 3, rep_seconds = 480, recovery_seconds = 60 }
   arrival = { reps = 4, rep_seconds = 600, recovery_seconds = 60 }
+  step = { reps = 1, rep_seconds = 60, recovery_seconds = 15 }
 
 [[general]]
 level = "light"

@@ -78,7 +78,13 @@ def test_a_dose_names_the_variables_of_the_run_ladder_and_both_doses_the_same():
     refused("start = { reps = 3, rep_seconds = 480, recovery_seconds = 90 }",
             "start = { reps = 3, distance_m = 400 }", "field 'distance_m' unknown")
     refused("start = { reps = 3, rep_seconds = 480, recovery_seconds = 90 }",
-            "start = { reps = 3, rep_seconds = 480 }", "start and arrival name different")
+            "start = { reps = 3, rep_seconds = 480 }", "start, arrival and step name different")
+
+
+def test_a_step_is_positive():
+    refused("step = { reps = 1, rep_seconds = 60, recovery_seconds = 15 }",
+            "step = { reps = 0, rep_seconds = 60, recovery_seconds = 15 }",
+            "the step of reps is not positive")
 
 
 def test_a_key_session_is_a_quality_session_of_repetitions():
@@ -90,7 +96,8 @@ def test_qualities_and_key_sessions_agree():
             "[[preparation.taper.key]]", "key sessions without a quality session")
     refused("min_held_km = 20", "min_held_km = 20\n\n  [[general.key]]\n  workout = "
             '"threshold"\n  intensity = { ref = "rpe", band = [6, 7] }\n  start = { reps = 1 }'
-            "\n  arrival = { reps = 1 }", "key sessions without a quality session")
+            "\n  arrival = { reps = 1 }\n  step = { reps = 1 }",
+            "key sessions without a quality session")
 
 
 def test_the_phases_run_in_order_each_with_its_table_and_fit_the_window():
@@ -148,9 +155,20 @@ def _checked(root):
     return report
 
 
-def test_vault_check_reads_the_instance_templates(tmp_path):
+def test_vault_check_reads_the_instance_templates_or_the_engine_s(tmp_path):
     assert _checked(TEST_VAULT).failed == 0
-    assert _checked(tmp_path).skipped == 1, "an instance without the file is skipped"
+    assert _checked(tmp_path).failed == 0, "an instance without the file reads the engine's"
     (tmp_path / cycle_templates.INSTANCE_NAME).write_text(TEXT.replace("version = 2",
                                                                        "version = 1"))
     assert _checked(tmp_path).failed == 1
+
+
+def test_the_engine_s_templates_serve_every_distance_and_level():
+    found = cycle_templates.load(TEST_VAULT.parent / "no-vault")
+    assert found.preparation_for(10, RaceTerrain.ROAD).slug == "short-road"
+    assert found.preparation_for(21.1, RaceTerrain.ROAD).slug == "half-road"
+    assert found.preparation_for(42.2, RaceTerrain.ROAD).slug == "marathon-road"
+    assert found.preparation_for(30, RaceTerrain.TRAIL).slug == "trail"
+    assert found.preparation_for(80, RaceTerrain.TRAIL).slug == "ultra"
+    assert {template.level for template in found.general} == set(GeneralLevel)
+    assert found.recovery_after(21.1).distance_km_max == 25

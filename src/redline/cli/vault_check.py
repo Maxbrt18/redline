@@ -559,19 +559,18 @@ def check_progression_lineages(vault: Vault, report: Report) -> None:
 
 
 def check_cycle_templates(vault: Vault, report: Report) -> None:
-    """The instance's cycle templates, read in full when it declares them: a file the
-    planner cannot read is refused here, before a cycle depends on it."""
+    """The cycle templates the planner reads, the instance's or else the engine's, read in
+    full: a file the planner cannot read is refused here, before a cycle depends on it."""
+    own = (vault.root / cycle_templates.INSTANCE_NAME).is_file()
     try:
-        found = cycle_templates.load_instance(vault.root)
+        found = cycle_templates.load(vault.root)
     except cycle_templates.TemplateError as exc:
         report.fail(wording.CYCLE_TEMPLATES, str(exc).splitlines())
         return
-    if found is None:
-        report.skip(wording.CYCLE_TEMPLATES, wording.NO_CYCLE_TEMPLATES)
-        return
     report.ok(wording.CYCLE_TEMPLATES, wording.CYCLE_TEMPLATES_COUNT.format(
         preparation=len(found.preparation), general=len(found.general),
-        recovery=len(found.recovery)))
+        recovery=len(found.recovery),
+        owner=wording.INSTANCE_TEMPLATES if own else wording.ENGINE_TEMPLATES))
 
 
 def check_cockpit_freshness(vault: Vault, report: Report) -> None:
