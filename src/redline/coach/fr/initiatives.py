@@ -75,3 +75,38 @@ def cycle_transition(kind: str, level: str, monday: dt.date, weeks: int,
     span = "1 semaine" if weeks == 1 else f"{weeks} semaines"
     return (f"Nouveau cycle à partir du lundi {monday:%d/%m} : {named}, {span}, jusqu’à "
             f"{volume} km par semaine. Je prépare chaque semaine dans ce cadre.")
+
+
+#: The two answers to a proposal, as the athlete taps them.
+TAKE = "Je la prends"
+LATER = "Pas maintenant"
+
+
+def cycle_proposal(race: str, monday: dt.date, weeks: int, peak: str, long_run: str,
+                   flagships: int, risks: int, until: dt.date) -> str:
+    """A preparation proposed: its frame in a few figures, and until when it waits."""
+    target = f"pour « {race} »" if race else "pour l'objectif"
+    lines = [f"Je te propose une préparation {target} : {weeks} semaines à partir du lundi "
+             f"{monday:%d/%m}, jusqu’à {peak} km par semaine et une sortie longue de "
+             f"{long_run} km au plus."]
+    if flagships:
+        lines.append(f"{flagships} séance{'s' if flagships > 1 else ''} phare"
+                     f"{'s' if flagships > 1 else ''} pour finir le bloc spécifique.")
+    if risks:
+        lines.append(f"{risks} point{'s' if risks > 1 else ''} à surveiller : demande-moi "
+                     "le détail.")
+    lines.append(f"Elle t’attend jusqu’au {until:%d/%m} ; sans réponse, rien ne change.")
+    return " ".join(lines)
+
+
+def cycle_taken(monday: dt.date, written: list[str]) -> str:
+    """The proposal taken; the weeks already written are read again against it."""
+    text = f"C’est noté : la préparation commence le lundi {monday:%d/%m}."
+    if written:
+        text += (f" La semaine {', '.join(written)} déjà écrite sera relue dans ce cadre au "
+                 "prochain bilan.")
+    return text
+
+
+CYCLE_LEFT = "D’accord, rien ne change : la proposition reste ouverte jusqu’à sa date."
+CYCLE_GONE = "Cette proposition n’est plus ouverte : rien ne change."

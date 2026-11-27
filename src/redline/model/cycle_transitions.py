@@ -19,7 +19,8 @@ new cycle starts, of which kind and why. It reads arguments only.
 
 A transition starts with the week after `today`: on a cycle's last day, the Sunday its
 review is written, the next cycle follows its last week. Entering a preparation is never
-automatic: the athlete takes it.
+automatic: a plan review proposes it when a candidate can start (`review_week`), the
+athlete takes it.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ import datetime as dt
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from . import iso_week
 from . import plan_generator as generator
 from .cycle_templates import CycleTemplates
 from .cycles import CycleVersion, ends_on
@@ -130,6 +132,25 @@ def next_cycle(active: CycleVersion | None, races: Sequence[Race], breaks: Seque
             return _general(templates, CycleCause.BLOCK_END, active.level)
         return None
     return _general(templates) if last_day else None
+
+
+def review_week(active: CycleVersion | None, goal: Race | None, templates: CycleTemplates,
+                today: dt.date, *, proposal_open: bool, reviewed: bool) -> str | None:
+    """The week a plan review is due for, or None. It is due when a candidate of the goal's
+    preparation can start the week after today, while no preparation is in force nor
+    proposed: on the first week a candidate starts, or at once for a goal whose window was
+    already open when no review had been asked yet (`reviewed`)."""
+    if (goal is None or goal.goal is None or goal.on < today or proposal_open
+            or (active is not None and active.kind == CycleKind.PREPARATION)):
+        return None
+    template = templates.preparation_for(goal.goal.distance_km, goal.goal.terrain)
+    if template is None:
+        return None
+    upcoming = iso_week.shift(iso_week.of(today), 1)
+    starts = set(generator.candidate_starts(template, goal.on).values())
+    if upcoming < min(starts) or upcoming > iso_week.of(goal.on):
+        return None
+    return upcoming if upcoming in starts or not reviewed else None
 
 
 def trame(transition: Transition, templates: CycleTemplates, inputs: Inputs) -> Trame:

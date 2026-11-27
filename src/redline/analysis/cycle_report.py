@@ -211,7 +211,12 @@ def shown(store: Any, version: CycleVersion, today: dt.date) -> list[str]:
 
 def window_line(store: Any, templates: CycleTemplates, version: CycleVersion | None,
                 today: dt.date) -> str | None:
-    """The goal's preparation window, open while another cycle is in force."""
+    """The goal's preparation window, open while another cycle is in force, or the
+    proposal that waits for the athlete."""
+    proposal = store.open_cycle_proposal(dt.datetime.now(dt.UTC))
+    if proposal is not None:
+        return text.PROPOSAL_OPEN.format(candidate=proposal.trame.candidate,
+                                         until=proposal.expires_on)
     race = _goal_ahead(store, today)
     if race is None or race.goal is None or (
             version is not None and version.kind == CycleKind.PREPARATION):

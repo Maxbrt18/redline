@@ -97,6 +97,8 @@ class Levers:
     deload_every: int
     #: The phase from which a week may carry its second quality session.
     second_quality: PlanPhase
+    #: A peak chosen under the proposed one; None: the proposed peak.
+    peak_km: float | None = None
 
 
 @dataclass(frozen=True)
@@ -424,6 +426,8 @@ def preparation(template: Preparation, goal: Goal, levers: Levers, inputs: Input
     turns = _turns(phases, deloads, qualities)
     climbs = turns.count(_Turn.VOLUME)
     peak, peak_risks = _peak(template, inputs, climbs)
+    if levers.peak_km is not None:
+        peak = max(min(peak, levers.peak_km), inputs.start_km)
     risks += peak_risks
     if inputs.held_km < template.min_held_km:
         risks.append(Risk(TrameRisk.BELOW_DOMAIN, inputs.held_km, template.min_held_km))
@@ -500,11 +504,18 @@ def candidate_levers(template: Preparation) -> dict[str, Levers]:
     return unique
 
 
+def candidate_starts(template: Preparation, race_on: dt.date) -> dict[str, str]:
+    """The first week of each candidate's window, by candidate: from it, the candidate can
+    be proposed."""
+    race_week = iso_week.of(race_on)
+    return {slug: iso_week.shift(race_week, 1 - _longest(template, levers))
+            for slug, levers in candidate_levers(template).items()}
+
+
 def window_start(template: Preparation, race_on: dt.date) -> str:
     """The first week of the longest window the candidates may ask: from it, the
     preparation can be taken."""
-    longest = max(_longest(template, levers) for levers in candidate_levers(template).values())
-    return iso_week.shift(iso_week.of(race_on), 1 - longest)
+    return min(candidate_starts(template, race_on).values())
 
 
 def candidates(template: Preparation, goal: Goal, inputs: Inputs) -> list[Trame]:

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Protocol
+from uuid import UUID
 
 from .config import Config
 
@@ -54,6 +55,7 @@ class StateStore(Protocol):
     def record_call(self, call: AgentCall) -> None: ...
     def materialize_intelligence(self, now: datetime) -> int: ...
     def missed_session_is_current(self, job_id: str) -> bool: ...
+    def take_cycle(self, version_id: UUID) -> tuple[date, tuple[str, ...]] | None: ...
     def ingest_strava_activity(self, activity_id: int, *,
                                fresh_words: bool = False) -> dict: ...
 

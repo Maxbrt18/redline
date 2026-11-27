@@ -10,7 +10,6 @@ from ..database import Database, from_environment
 from ._common import ATHLETE, CORRECTION_ANNOUNCE_WINDOW
 from .agent_calls import AgentCalls
 from .conversation import Conversation
-from .cycles import Cycles
 from .maintenance import Maintenance
 from .proactive import ProactiveMessages
 from .turns import Submitted, TurnCommands
@@ -19,7 +18,7 @@ __all__ = ["ATHLETE", "CORRECTION_ANNOUNCE_WINDOW", "OperationalStore", "Submitt
 
 
 class OperationalStore(TurnCommands, Conversation, ProactiveMessages, Maintenance,
-                       AgentCalls, Cycles):
+                       AgentCalls):
     """Single fact API. Public calls open exactly one transaction."""
 
     def __init__(self, database: Database, *, athlete_id: str = ATHLETE) -> None:

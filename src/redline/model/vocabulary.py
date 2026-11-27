@@ -380,6 +380,8 @@ class ProactiveKind(StrEnum):
     OPERATOR_MESSAGE = "operator_message"
     WAKE_TRACE = "wake_trace"
     CYCLE_TRANSITION = "cycle_transition"
+    PLAN_REVIEW = "plan_review"
+    CYCLE_PROPOSAL = "cycle_proposal"
 
 
 class Cut(StrEnum):

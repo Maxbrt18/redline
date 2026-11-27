@@ -573,6 +573,21 @@ class VaultRepo:
             return ""
         return render_context_packet(self._store, depth, clock.today())
 
+    def cycle_candidates(self) -> str:
+        """The goal's candidates the plan review chooses among; a failure is reported,
+        never blocking: the model then reruns `redline cycle candidates` itself."""
+        if self._store is None:
+            return ""
+        from redline.analysis import cycle_report
+        from redline.coach.fr import cycle as wording
+        from redline.model.vocabulary import CycleKind
+        try:
+            return "\n".join(cycle_report.candidates(self._store, clock.today(),
+                                                     CycleKind.PREPARATION, None))
+        except Exception:  # the candidates are an aid, never a gate
+            log.exception("Cycle candidates not computed")
+            return wording.CANDIDATES_UNAVAILABLE
+
     def weekly_dossier(self, week: str) -> str:
         """The computed review dossier of `week`; a failure is reported, never blocking.
 

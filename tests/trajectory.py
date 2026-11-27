@@ -97,6 +97,9 @@ class Store:
     def load_plan(self, week: str) -> dict | None:
         return None
 
+    def open_cycle_proposal(self, now: dt.datetime) -> CycleVersion | None:
+        return None
+
     def prediction_rows(self) -> list[dict]:
         return []
 

@@ -6,6 +6,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import os
+import uuid
 
 import pytest
 import sqlalchemy as sa
@@ -209,3 +210,124 @@ def test_a_session_keeps_the_key_session_it_runs_and_a_revision_its_overrides(st
             2, computed_at="2030-03-16T19:10:00+01:00",
             sessions=[session("w12-q", date="2030-03-19", workout="threshold",
                               key_position=5)]))
+
+
+def _goal(store, on=dt.date(2030, 6, 30)):
+    write(store, commands.DEADLINE_UPSERT, {
+        "deadline_key": "half", "due_on": on, "item": "Semi", "fact_owner": "test",
+        "kind": "race", "priority": "a", "race_state": "active", "athlete_label": "Semi",
+        "context": {"distance_km": 21.1, "terrain": "road"}})
+
+
+def _proposal_trame(starts="2030-W12"):
+    from conftest import VAULT_ROOT
+    template = cycle_templates.load(VAULT_ROOT).preparation_for(21.1, "road")
+    goal = generator.Goal(dt.date(2030, 6, 30), 21.1)
+    return generator.candidates(template, goal, _inputs(starts))[0]
+
+
+def test_a_proposal_waits_for_the_athlete_and_only_the_open_one_is_taken(store):
+    _goal(store)
+    general = _apply(store, _general("2030-W10"), CycleCause.MIGRATION,
+                     level=GeneralLevel.MAINTAIN)
+    now = dt.datetime(2030, 3, 13, 12, tzinfo=dt.UTC)
+    later = now + dt.timedelta(days=7)
+    with store.database.transaction() as connection:
+        first = store.propose_cycle_in(connection, _proposal_trame(), {"by": "judgment"},
+                                       "half", later)
+        second = store.propose_cycle_in(connection, _proposal_trame(), {"by": "judgment"},
+                                        "half", later)
+    assert store.active_cycle().id == general.id, "a proposal changes nothing in force"
+    assert store.open_cycle_proposal(now).id == second.id
+    with store.database.transaction() as connection:
+        assert store.take_cycle_in(connection, first.id, now) is None, "replaced"
+        taken = store.take_cycle_in(connection, second.id, now)
+    assert taken is not None and store.active_cycle().id == second.id
+    assert [state for _, state in _states(store)] == ["closed", "superseded", "active"]
+    assert store.cycle_version(general.id).state == "closed"
+    assert store.cycle_version(first.id).state == "superseded"
+
+
+def test_a_proposal_left_untaken_expires_and_nothing_changes(store):
+    _goal(store)
+    _apply(store, _general("2030-W10"), CycleCause.MIGRATION, level=GeneralLevel.MAINTAIN)
+    now = dt.datetime(2030, 3, 13, 12, tzinfo=dt.UTC)
+    with store.database.transaction() as connection:
+        found = store.propose_cycle_in(connection, _proposal_trame(), {"by": "judgment"},
+                                       "half", now + dt.timedelta(days=7))
+    late = now + dt.timedelta(days=8)
+    with store.database.transaction() as connection:
+        assert store.expire_cycle_proposals_in(connection, late) == 1
+        assert store.take_cycle_in(connection, found.id, late) is None
+    assert store.cycle_version(found.id).state == "expired"
+    assert store.active_cycle().kind == CycleKind.GENERAL
+
+
+def test_the_coach_proposes_and_the_athlete_is_sent_the_summary(store, monkeypatch, capsys):
+    from conftest import VAULT_ROOT
+
+    from redline.cli import cycle
+    template = cycle_templates.load(VAULT_ROOT).preparation_for(21.1, "road")
+    race_on = dt.date(2030, 6, 30)
+    starts = generator.candidate_starts(template, race_on)
+    week = min(starts.values())
+    candidate = next(slug for slug, start in starts.items() if start == week)
+    sunday = (generator.iso_week.monday(week) - dt.timedelta(days=1)).isoformat()
+    _goal(store, race_on)
+    _apply(store, _general(generator.iso_week.shift(week, -4)), CycleCause.MIGRATION,
+           level=GeneralLevel.MAINTAIN)
+    monkeypatch.setattr("redline.storage.open_store", lambda actor: store)
+    monkeypatch.delenv("REDLINE_TURN_ID", raising=False)
+    decision = json.dumps({"by": "judgment", "alternatives": [
+        {"option": "attendre", "rejected_because": "la fenêtre est ouverte"}]})
+    monkeypatch.setattr("sys.argv", ["cycle", "propose", "--candidate", candidate,
+                                     "--decision", decision, "--date", sunday])
+    assert cycle.main() == 0
+    assert f"Candidat « {candidate} » proposé pour « Semi »" in capsys.readouterr().out
+    state = PostgresStateStore(store.database)
+    [job] = [job for job in state.proactive.jobs(active_only=True)
+             if job["kind"] == "cycle_proposal"]
+    rendered = compose_closed_proactive("cycle_proposal", job["detail"])
+    assert rendered is not None and rendered.replies[0][0] == "Je la prends"
+    version = uuid.UUID(json.loads(job["detail"])["version_id"])
+    monday, written = state.take_cycle(version)
+    assert monday == generator.iso_week.monday(week) and written == ()
+    assert store.active_cycle().kind == CycleKind.PREPARATION
+
+
+def test_the_coach_changes_the_level_and_the_athlete_is_told(store, monkeypatch):
+    from redline.cli import cycle
+    first = _apply(store, _general("2030-W10"), CycleCause.MIGRATION,
+                   level=GeneralLevel.MAINTAIN)
+    monkeypatch.setattr("redline.storage.open_store", lambda actor: store)
+    monkeypatch.delenv("REDLINE_TURN_ID", raising=False)
+    decision = json.dumps({"by": "request", "alternatives": []})
+    monkeypatch.setattr("sys.argv", ["cycle", "level", "--set", "progress", "--decision",
+                                     decision, "--date", "2030-03-10"])
+    assert cycle.main() == 0
+    found = store.active_cycle()
+    assert (found.level, found.cause, found.version) == (GeneralLevel.PROGRESS,
+                                                         CycleCause.LEVEL_CHANGE, 2)
+    assert found.cycle_key == first.cycle_key and found.trame.weeks[0].label == "2030-W11"
+    state = PostgresStateStore(store.database)
+    assert [job["kind"] for job in state.proactive.jobs(active_only=True)] == [
+        "cycle_transition"]
+
+
+def test_the_planner_asks_for_a_plan_review_once_a_candidate_can_start(store):
+    from conftest import VAULT_ROOT
+    template = cycle_templates.load(VAULT_ROOT).preparation_for(21.1, "road")
+    race_on = dt.date(2030, 6, 30)
+    week = generator.window_start(template, race_on)
+    _goal(store, race_on)
+    state = PostgresStateStore(store.database)
+    eve = dt.datetime.combine(generator.iso_week.monday(week) - dt.timedelta(days=1),
+                              dt.time(12), tzinfo=dt.UTC)
+    state.materialize_intelligence(eve - dt.timedelta(days=7))
+    assert not [job for job in state.proactive.jobs(active_only=True)
+                if job["kind"] == "plan_review"]
+    state.materialize_intelligence(eve)
+    state.materialize_intelligence(eve)
+    [job] = [job for job in state.proactive.jobs(active_only=True)
+             if job["kind"] == "plan_review"]
+    assert job["detail"] == "Semi"

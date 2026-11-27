@@ -338,3 +338,46 @@ def test_the_notebook_command_sends_the_link_to_paste_as_text(make_bot):
     psid, text = bot._client.send_text.call_args.args
     assert psid == "4242" and text.endswith("\nhttps://coach.example/carnet#t=jeton")
     bot._client.send_button.assert_not_called()
+
+
+def test_the_athlete_s_answer_to_a_proposal_is_settled_without_the_agent(make_bot, store):
+    import datetime as dt
+    import uuid
+    agent = FakeAgent()
+    bot = make_bot(agent=agent)
+    version = uuid.uuid4()
+    store.cycles_open[version] = (dt.date(2031, 1, 6), ("2031-W02",))
+    bot._client.send_text.return_value = MagicMock(ok=True, messages=())
+
+    def answer(payload, message_id):
+        store.claim_inbound(message_id, "4242", "postback", payload)
+        bot.submit_event("4242", "postback", payload, message_id=message_id)
+
+    answer(f"cycle-take:{version}", "m-1")
+    [taken] = bot._client.send_text.call_args_list
+    assert "la préparation commence le lundi 06/01" in taken.args[1]
+    assert "2031-W02 déjà écrite" in taken.args[1]
+    answer(f"cycle-take:{version}", "m-2")
+    assert "n’est plus ouverte" in bot._client.send_text.call_args.args[1]
+    answer(f"cycle-later:{version}", "m-3")
+    assert "rien ne change" in bot._client.send_text.call_args.args[1]
+    answer("cycle-take:not-a-uuid", "m-4")
+    assert "n’est plus ouverte" in bot._client.send_text.call_args.args[1]
+    assert agent.calls == []
+    assert not store.pending_inbound(), "each answer is settled"
+
+
+def test_a_proposal_goes_out_with_its_two_answers(make_bot, store):
+    import uuid
+    bot = make_bot(proactive_active_start=dtime(0, 0))
+    detail = json.dumps({"version_id": str(uuid.uuid4()), "race": "Semi",
+                         "candidate": "balanced", "starts_on": "2031-W02", "weeks": 13,
+                         "peak_km": 36.0, "long_run_km": 12.0, "flagships": 0, "risks": 0,
+                         "expires_on": "2031-01-11"})
+    store.proactive.enqueue_job("cycle-proposal:x", "cycle_proposal", detail, 0)
+    bot._respond_proactive(ProactiveJob(psid="4242", kind="cycle_proposal", prompt="",
+                                       detail=detail, job_id="cycle-proposal:x"))
+    bot._client.send_quick_replies.assert_called_once()
+    _, text, replies = bot._client.send_quick_replies.call_args.args[:3]
+    assert text.startswith("Je te propose une préparation pour « Semi »")
+    assert [title for title, _ in replies] == ["Je la prends", "Pas maintenant"]

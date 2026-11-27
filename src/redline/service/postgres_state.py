@@ -22,7 +22,15 @@ from redline.analysis import signals as signal_model
 from redline.coach.fr import relationship as wording
 from redline.coach.fr import signals as signal_wording
 from redline.model import calibration as calibration_model
-from redline.model import commands, cycle_templates, cycle_transitions, local_time, paths, rulebook
+from redline.model import (
+    commands,
+    cycle_templates,
+    cycle_transitions,
+    iso_week,
+    local_time,
+    paths,
+    rulebook,
+)
 from redline.model import efforts as effort_model
 from redline.model import race as race_model
 from redline.model import vocabulary as voc
@@ -641,6 +649,20 @@ class PostgresStateStore(StateStore):
             return bool(row and row["state"] == CycleState.MISSED and not store.strength_evidence_in(
                 connection, row["scheduled_on"], row["routine"]))
 
+    def take_cycle(self, version_id: uuid.UUID) -> tuple[dt.date, tuple[str, ...]] | None:
+        """The athlete takes a proposal still open: its first Monday, and the weeks of it
+        already written, which the next review reads within it. None when it is no longer
+        open."""
+        store = OperationalStore(self.database)
+        with self.database.transaction() as connection:
+            taken = store.take_cycle_in(connection, version_id, dt.datetime.now(dt.UTC),
+                                        actor="athlete")
+            if taken is None:
+                return None
+            written = tuple(week.label for week in taken.trame.weeks
+                            if store._load_plan_connection(connection, week.label) is not None)
+        return iso_week.monday(taken.trame.weeks[0].label), written
+
     def materialize_intelligence(self, now: dt.datetime) -> int:
         """Turn typed facts into durable jobs, once per cause.
 
@@ -855,27 +877,34 @@ class PostgresStateStore(StateStore):
             return 0
         today = local.date()
         templates = cycle_templates.load(paths.vault_root())
+        store.expire_cycle_proposals_in(connection, utc)
+        created = 0
         transition = cycle_transitions.next_cycle(
             store.active_cycle_in(connection), race_model.typed(store),
             effort_model.breaks(store.break_rows()),
             cycle_inputs.standing(store, templates, today, store.planned_low_weeks_in(connection)),
             today, templates, first=not store.has_cycle_in(connection))
-        if transition is None:
-            return 0
-        trame = cycle_transitions.trame(transition, templates,
-                                        cycle_inputs.inputs(store, templates, today))
-        version = store.apply_transition_in(
-            connection, trame, transition.cause, level=transition.level,
-            race_key=transition.race.key if transition.race is not None else None,
-            actor="intelligence")
-        if transition.cause == voc.CycleCause.MIGRATION:
-            return 0
-        detail = {"kind": str(version.kind), "level": version.level,
-                  "starts_on": trame.weeks[0].label, "weeks": len(trame.weeks),
-                  "volume_km": max(week.volume_km for week in trame.weeks)}
-        return int(PostgresProactiveState._enqueue(
-            connection, f"cycle-transition:{version.id}", voc.ProactiveKind.CYCLE_TRANSITION,
-            json.dumps(detail, ensure_ascii=False, sort_keys=True), utc.timestamp()))
+        if transition is not None:
+            trame = cycle_transitions.trame(transition, templates,
+                                            cycle_inputs.inputs(store, templates, today))
+            version = store.apply_transition_in(
+                connection, trame, transition.cause, level=transition.level,
+                race_key=transition.race.key if transition.race is not None else None,
+                actor="intelligence")
+            if transition.cause != voc.CycleCause.MIGRATION:
+                created += int(store.announce_cycle_in(connection, version, utc))
+        goal = race_model.active_goal(store)
+        prefix = f"plan-review:{goal.key}:" if goal is not None else ""
+        reviewed = bool(prefix) and connection.execute(sa.select(sa.exists().where(
+            proactive_jobs.c.job_key.startswith(prefix, autoescape=True)))).scalar_one()
+        week = cycle_transitions.review_week(
+            store.active_cycle_in(connection), goal, templates, today,
+            proposal_open=store.open_cycle_proposal(utc) is not None, reviewed=reviewed)
+        if week is not None and goal is not None:
+            created += int(PostgresProactiveState._enqueue(
+                connection, prefix + week, voc.ProactiveKind.PLAN_REVIEW,
+                goal.name or goal.key, utc.timestamp()))
+        return created
 
     @staticmethod
     def _materialize_gear(connection, utc: dt.datetime) -> int:

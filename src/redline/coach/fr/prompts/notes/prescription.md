@@ -17,7 +17,9 @@ clé porte `key_position` (le numéro entre crochets) et garde sa famille, sa do
 bande d'allure. Un cran au-delà se déclare dans `cycle_overrides` (`target` volume,
 long_run, key_dose ou rep_pace, `session` pour les deux derniers, `reason`, `prediction`
 ouverte), jamais deux semaines de suite ; volume et SL seulement en préparation
-générale. Jamais de
+générale. Au-delà, change la version : `redline cycle level --set <niveau> --decision ...`
+pour la préparation générale, `redline cycle propose` pour une préparation, que l'athlète
+prend lui-même. Jamais de
 `rpe_min`/`rpe_max` : le RPE se calcule sur la dose, après la séance. Une EF se borne par
 sa durée ou sa distance, jamais les deux, et ne porte aucune allure : elle se cale sur
 la FC et l'effort.]
