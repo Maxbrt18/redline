@@ -45,3 +45,20 @@ def test_the_command_fails_when_a_case_fails(tmp_path, monkeypatch, capsys):
     assert "0 unjustified reproaches, 0 missed interventions" in capsys.readouterr().out
     monkeypatch.setattr("sys.argv", ["evaluate-debriefs"])
     assert evaluate_debriefs.main() == 0
+
+
+def test_the_bench_checks_what_the_verdict_does_to_the_next_session():
+    held = next(case for case in CASES if case["id"] == "threshold-at-rpe-9-paces-held")
+    pushed = next(case for case in CASES if case["id"] == "threshold-last-repetition-pushed")
+    assert debrief_bench.outcome(held).next_move.value == "up"
+    assert debrief_bench.outcome(pushed).next_move.value == "hold"
+    wrong = debrief_bench.outcome({**pushed, "next": {"move": "up"}})
+    assert not wrong.next_matches and not wrong.passed
+    late = debrief_bench.outcome({**held, "next": {"move": "up", "after": {"wake": 2}}})
+    assert late.next_move.value == "hold", "a morning above its base keeps the dose"
+
+
+def test_a_case_without_next_says_nothing_of_it():
+    case = next(case for case in CASES if case["id"] == "flat-easy-run")
+    result = debrief_bench.outcome(case)
+    assert result.next_move is None and result.next_matches

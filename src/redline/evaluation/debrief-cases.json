@@ -125,7 +125,8 @@
     "legs": [[2000, 380, 0, 85, 140], [7600, 276, 0, 92, 168], [1500, 380, 0, 85, 140]],
     "reps": [[420, 1525], [420, 1530], [420, 1528], [420, 1532], [420, 1535]],
     "cost": {"declared": 9, "run": [8.4, 7, 9]},
-    "expected": {"verdict": "conforming", "findings": []}
+    "expected": {"verdict": "conforming", "findings": []},
+    "next": {"move": "up"}
   },
   {
     "id": "threshold-last-repetition-pushed",
@@ -134,7 +135,18 @@
     "legs": [[2000, 380, 0, 85, 140], [7600, 270, 0, 92, 170], [1500, 380, 0, 85, 140]],
     "reps": [[420, 1525], [420, 1530], [420, 1528], [420, 1532], [420, 1660]],
     "cost": {"declared": 10, "run": [8.4, 7, 9]},
-    "expected": {"verdict": "execution_gap", "findings": ["reps_faster", "rpe_above"], "spoken": ["rpe_above"]}
+    "expected": {"verdict": "execution_gap", "findings": ["reps_faster", "rpe_above"], "spoken": ["rpe_above"]},
+    "next": {"move": "hold"}
+  },
+  {
+    "id": "threshold-held-shin-above-its-cap",
+    "about": "The held 5 x 7 min, but the shin at 3 during the session: the dose steps back, whatever the execution.",
+    "session": {"workout": "threshold", "reps": 5, "rep_seconds": 420, "recovery_seconds": 120, "rep_pace_s": 275},
+    "legs": [[2000, 380, 0, 85, 140], [7600, 276, 0, 92, 168], [1500, 380, 0, 85, 140]],
+    "reps": [[420, 1525], [420, 1530], [420, 1528], [420, 1532], [420, 1535]],
+    "cost": {"declared": 9, "run": [8.4, 7, 9]},
+    "expected": {"verdict": "conforming", "findings": []},
+    "next": {"move": "down", "after": {"pain": 3}}
   },
   {
     "id": "climb-hr-at-the-athletes-own",

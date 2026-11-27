@@ -84,21 +84,29 @@ class Plans:
                      and session.get("status") != SessionStatus.CANCELLED), None)
 
 
+def athlete_gaps(findings: Sequence[dict]) -> float:
+    """The athlete's execution gaps among a verdict's findings, as kept (`as_json`)."""
+    return float(sum(1 for finding in findings if finding.get("owner") == FindingOwner.ATHLETE))
+
+
+def over_range(expected: expected_rpe.Expectation | None, rpe: float | None) -> float | None:
+    """The declared RPE minus the top of the range its dose expects; None without either."""
+    return None if expected is None or rpe is None else rpe - expected.high
+
+
 def _gaps(store: Any, row: ledger.Row) -> float | None:
     """The athlete's execution gaps in the kept verdict; None without a verdict."""
     activity = easy_load.strava_id(row.idempotency_key)
     found = store.debrief_verdict(activity) if activity is not None else None
     if not found:
         return None
-    return float(sum(1 for finding in found["findings"] or ()
-                     if finding.get("owner") == FindingOwner.ATHLETE))
+    return athlete_gaps(found["findings"] or ())
 
 
 def _over_range(history: expected_rpe.History | None, row: ledger.Row) -> float | None:
-    if history is None or row.rpe is None:
+    if history is None:
         return None
-    expected = history.expectation(row)
-    return None if expected is None else row.rpe - expected.high
+    return over_range(history.expectation(row) if row.rpe is not None else None, row.rpe)
 
 
 def runs(store: Any, rows: Sequence[ledger.Row], lineage: Lineage, family: Family,
