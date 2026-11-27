@@ -44,3 +44,17 @@ def test_a_strapless_heart_rate_is_never_held_against_its_cap():
     assert debrief.gaps(strapless, session, None) == []
     meal = Row(date=dt.date(2026, 10, 6), type="easy", hr_avg=162, hr_doubt="context")
     assert debrief.gaps(meal, session, None) == ["FC moyenne 162 pour un plafond de 157 (+5)"]
+
+
+def test_an_easy_run_faster_within_its_duration_is_form_not_a_gap():
+    """25 min and 4 km at most prescribe 6:15/km: run in 25 min at the same heart rate, the
+    kilometres past 4 are the pace, never a fault."""
+    session = {"workout": "easy", "duration_cap_min": 25, "distance_cap_km": 4.0,
+               "hr_cap_bpm": 150}
+    faster = Row(date=dt.date(2030, 3, 14), type="easy", km=4.98, hours=25 / 60, hr_avg=149)
+    [line, hr] = debrief.gaps(faster, session, None)
+    assert line.startswith("durée tenue (25 min pour 25 au plus) et 4,98 km au lieu de 4")
+    assert "jamais un écart" in line and not hr.startswith("distance")
+    longer = Row(date=dt.date(2030, 3, 14), type="easy", km=4.98, hours=31 / 60, hr_avg=149)
+    assert debrief.gaps(longer, session, None)[0] == \
+        "distance 4,98 km pour un plafond de 4 (+0,98)", "past both bounds, it ran more"

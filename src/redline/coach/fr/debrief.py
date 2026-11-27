@@ -32,6 +32,10 @@ DISTANCE_GAP = "distance {done} km pour un {label} de {planned} ({signed})"
 
 DURATION_GAP = "durée {minutes:.0f} min pour un plafond de {duration_cap_min} ({signed})"
 
+EASY_FASTER = ("durée tenue ({minutes:.0f} min pour {duration_cap_min} au plus) et {done} km "
+               "au lieu de {cap} : plus de km dans la durée, c'est l'allure, un signe de forme "
+               "si la FC reste sous son plafond ; jamais un écart ni un reproche")
+
 HR_GAP = "FC moyenne {hr} pour un plafond de {hr_cap_bpm} ({signed})"
 
 HR_AT_PACE = "FC à allure comparable : "
