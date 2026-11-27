@@ -15,7 +15,7 @@ NONE_DECLARED = (
 UNAVAILABLE = "Propositions de progression indisponibles : {reason}"
 
 TALLY_HEADER = (
-    "Bilan des crans des qualités : ce qui a suivi chaque hausse courue et chaque "
+    "Bilan des crans : ce qui a suivi chaque hausse, renfo et qualités, et chaque "
     "dérogation. Une suggestion, jamais appliquée : un cran change dans [progression] de "
     "rulebook.toml, par décision avec l'athlète :")
 

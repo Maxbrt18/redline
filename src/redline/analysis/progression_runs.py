@@ -10,8 +10,8 @@ reserve, the pain of the session, the next morning and the runs that follow.
 A rise passes no veto: the weeks of the taper, an assimilation week, a quality hold of
 rules n3 and n4, a gate that did not open on the closed week before.
 
-The tally (`reviews`) says what followed each rise a lineage ran and each bounded
-override: the falsification of its step, a suggestion the declaration changes only by
+The tally (`reviews`) says what followed each rise a lineage ran, strength exercises
+included, and each bounded override of a run lineage: the falsification of its step, a suggestion the declaration changes only by
 decision.
 """
 
@@ -304,30 +304,36 @@ def _borne_out(row: dict | None) -> bool | None:
     return bool(row["outcome"])
 
 
-def reviews(store: Any, book: rulebook.Rulebook) -> list[Review]:
-    """What followed each rise and each override of the declared run lineages.
+def reviews(store: Any, book: rulebook.Rulebook,
+            strength: Sequence[tuple[Lineage, list[Exposure]]] = ()) -> list[Review]:
+    """What followed each rise of the declared lineages, the exercises of `strength`
+    first, and each override of the run lineages.
 
     Two lineages that rose in the same week cannot tell which one a bad answer belongs
     to: those rises are unread for both.
     """
     declared = [lineage for lineage in book.progression.lineages
                 if lineage.family in RUN_FAMILIES]
-    if not declared:
-        return []
     families = default()
-    rows = ledger.parse_ledger(store)
-    zones = [zone.slug for zone in ledger.pain_zones(store)]
-    config = expected_rpe.settings()
-    history = expected_rpe.history(store, rows, config) if config is not None else None
-    plans = Plans(store)
-    ran = {lineage.slug: runs(store, rows, lineage, families[lineage.family], plans, zones,
-                              history) for lineage in declared}
-    risen = {lineage.slug: [exposure.on for exposure in rises(
-        families[lineage.family], [exposure for _, exposure in ran[lineage.slug]])]
-        for lineage in declared}
-    predictions = {row["prediction_key"]: row for row in store.prediction_rows()}
+    ran: dict[str, list[tuple[dict, Exposure]]] = {}
+    if declared:
+        rows = ledger.parse_ledger(store)
+        zones = [zone.slug for zone in ledger.pain_zones(store)]
+        config = expected_rpe.settings()
+        history = expected_rpe.history(store, rows, config) if config is not None else None
+        plans = Plans(store)
+        ran = {lineage.slug: runs(store, rows, lineage, families[lineage.family], plans,
+                                  zones, history) for lineage in declared}
+    followed = [*strength, *((lineage, [exposure for _, exposure in ran[lineage.slug]])
+                             for lineage in declared)]
+    if not followed:
+        return []
+    risen = {lineage.slug: [exposure.on for exposure in rises(families[lineage.family], seen)]
+             for lineage, seen in followed}
+    predictions = ({row["prediction_key"]: row for row in store.prediction_rows()}
+                   if declared else {})
     found = []
-    for lineage in declared:
+    for lineage, seen in followed:
         family = families[lineage.family]
         others = {iso_week.of(day) for slug, days in risen.items() if slug != lineage.slug
                   for day in days}
@@ -337,11 +343,9 @@ def reviews(store: Any, book: rulebook.Rulebook) -> list[Review]:
                      session["override_prediction"],
                      outcome(family, lineage, exposure, confounded),
                      _borne_out(predictions.get(session["override_prediction"])))
-            for session, exposure in ran[lineage.slug]
+            for session, exposure in ran.get(lineage.slug, [])
             if session.get("override_reason") is not None)
-        found.append(Review(lineage.slug, tally(family, lineage,
-                                                [exposure for _, exposure in ran[lineage.slug]],
-                                                confounded), overrides))
+        found.append(Review(lineage.slug, tally(family, lineage, seen, confounded), overrides))
     return found
 
 

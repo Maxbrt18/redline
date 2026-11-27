@@ -4,7 +4,8 @@ from __future__ import annotations
 
 
 def number(value: float) -> str:
-    """`6,5`: at most two decimals, with a decimal comma."""
+    """`6,5`: at most two decimals, with a decimal comma; never `-0`."""
+    value = round(value, 2) + 0.0
     return f"{value:.2f}".rstrip("0").rstrip(".").replace(".", ",")
 
 

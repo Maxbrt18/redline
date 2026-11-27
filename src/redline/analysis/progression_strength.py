@@ -8,8 +8,10 @@ and the counts of `strength_sets`); its current dose is the sheet's `dose`, as t
 strength page serves it. The proposals are handed to the coach, who cites them: nothing
 here writes a dose, and nothing refuses a prescription.
 
-Every exposure is read against the sheet's dose of today: the ledger keeps no typed
-dose per exercise and per session.
+Every exposure is read against the dose its session served: the session the app was
+given is kept with the report (`strength_sessions.prescription`), each exercise with its
+typed slots and the sheet's load. A report kept without it is read against the sheet's
+dose of today.
 """
 
 from __future__ import annotations
@@ -28,7 +30,9 @@ from redline.model.errors import ConfigError
 from redline.model.progression import (
     STRENGTH_FAMILIES,
     Dose,
+    Exposure,
     Family,
+    Lineage,
     Lineages,
     Proposal,
     Veto,
@@ -93,6 +97,28 @@ def current_dose(sheet: dict, slug: str) -> Dose | None:
     return None
 
 
+def served_dose(session: dict, slug: str) -> Dose | None:
+    """The dose a strength session served an exercise, read from its typed slots (reps
+    and seconds per set, contacts per block) and the load it carried; None when the
+    session kept no prescription or the exercise was not served on a ladder."""
+    exercises = (session.get("prescription") or {}).get("exercises") or []
+    served = next((item for item in exercises if item.get("slug") == slug), None)
+    dose = (served or {}).get("dose") or {}
+    targets = [slot["t"] for slot in dose.get("slots") or [] if slot.get("t") is not None]
+    if not targets:
+        return None
+    measure = dose.get("measure")
+    if measure == "reps":
+        load = (served or {}).get("load")
+        return (Dose.of(reps=max(targets), load_kg=float(load["kg"])) if load
+                else Dose.of(reps=max(targets)))
+    if measure == "time":
+        return Dose.of(seconds=max(targets))
+    if measure == "contacts":
+        return Dose.of(contacts=sum(targets))
+    return None
+
+
 def vetoes(store: Any, book: rulebook.Rulebook, week: str, today: dt.date) -> tuple[Veto, ...]:
     """The states outside the lineages that stop a rise in `week`."""
     found = []
@@ -143,14 +169,24 @@ def proposals(store: Any, root: Path, today: dt.date, week: str | None = None) -
     found = []
     for lineage in exercises:
         current = current_dose(sheets[lineage.slug], lineage.slug)
-        exposures = [exposure for session in history
-                     if current is not None
-                     and (exposure := strength_exposure(rows, session, lineage.slug, current,
-                                                        zones)) is not None]
-        found.append(propose(families[lineage.family], lineage, exposures, current=current,
-                             vetoes=vetoed, today=today,
+        found.append(propose(families[lineage.family], lineage,
+                             exposures(rows, history, lineage.slug, current, zones),
+                             current=current, vetoes=vetoed, today=today,
                              lookback_days=book.parameters.transition_lookback_days))
     return _arbitrated(found, declared, families)
+
+
+def exposures(rows: Sequence[ledger.Row], history: Sequence[dict], slug: str,
+              current: Dose | None, zones: Sequence[str]) -> list[Exposure]:
+    """The reports of an exercise, each read against the dose its session served, else
+    the sheet's dose of today."""
+    found = []
+    for session in history:
+        dose = served_dose(session, slug) or current
+        if dose is not None and (exposure := strength_exposure(rows, session, slug, dose,
+                                                               zones)) is not None:
+            found.append(exposure)
+    return found
 
 
 def _verdicts(proposal: Proposal) -> str:
@@ -213,4 +249,19 @@ def report(store: Any, root: Path, today: dt.date, week: str | None = None) -> l
     book = rulebook.load(root)
     return [*render([*proposals(store, root, today, week),
                      *run_proposals(store, book, today, week)], book.progression),
-            *render_reviews(reviews(store, book))]
+            *render_reviews(reviews(store, book, followed(store, root)))]
+
+
+def followed(store: Any, root: Path) -> list[tuple[Lineage, list[Exposure]]]:
+    """Each declared exercise lineage with its reports, for the tally of its steps."""
+    book = rulebook.load(root)
+    exercises = [lineage for lineage in book.progression.lineages if not lineage.workout]
+    if not exercises:
+        return []
+    sheets = program.load(root).exercises
+    rows = ledger.parse_ledger(store)
+    zones = [zone.slug for zone in ledger.pain_zones(store)]
+    history = store.strength_history()
+    return [(lineage, exposures(rows, history, lineage.slug,
+                                current_dose(sheets[lineage.slug], lineage.slug), zones))
+            for lineage in exercises if lineage.slug in sheets]

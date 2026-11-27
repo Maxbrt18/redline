@@ -337,3 +337,55 @@ def test_the_command_reads_the_counts_the_page_sends():
     assert process.returncode == 0, process.stderr
     assert "calf-raise-bent (strength-reps, groupe calves) : monter" in process.stdout
     assert "reps=12, load_kg=8" in process.stdout
+
+
+# ------------------------------------------------------------------ the served dose
+
+def served(on: dt.date, slug: str, counts, *, reps: int, kg: float | None = 6.0):
+    """A report whose session kept what it served: `reps` per set, the load in kg."""
+    session = report(on, slug, counts)
+    session["prescription"] = {"exercises": [{
+        "slug": slug, "load": {"kg": kg, "count": 1} if kg is not None else None,
+        "dose": {"measure": "reps", "slots": [{"n": index + 1, "of": len(counts), "t": reps}
+                                              for index in range(len(counts))]}}]}
+    return session
+
+
+def test_the_dose_a_session_served_is_read_from_its_typed_slots():
+    assert progression_strength.served_dose(served(TODAY, "calf", (15,), reps=15),
+                                            "calf") == Dose.of(reps=15, load_kg=6)
+    timed = {"prescription": {"exercises": [{"slug": "stance", "dose": {
+        "measure": "time", "slots": [{"n": 1, "of": 2, "t": 30}, {"n": 2, "of": 2, "t": 30}]}}]}}
+    assert progression_strength.served_dose(timed, "stance") == Dose.of(seconds=30)
+    blocks = {"prescription": {"exercises": [{"slug": "plyo", "dose": {
+        "measure": "contacts", "slots": [{"n": n, "of": 4, "t": 10} for n in (1, 2, 3, 4)]}}]}}
+    assert progression_strength.served_dose(blocks, "plyo") == Dose.of(contacts=40)
+    failure = {"prescription": {"exercises": [{"slug": "dip", "dose": {
+        "measure": "amrap", "slots": [{"n": 1, "of": 1}]}}]}}
+    assert progression_strength.served_dose(failure, "dip") is None
+    assert progression_strength.served_dose(report(TODAY, "calf", (15,)), "calf") is None, \
+        "a report kept without its session reads the sheet's dose"
+
+
+def test_each_report_is_read_against_the_dose_its_session_served():
+    history = [served(TODAY - dt.timedelta(days=14), "calf-raise-bent", (12, 12), reps=12),
+               report(TODAY - dt.timedelta(days=7), "calf-raise-bent", (15, 15))]
+    found = progression_strength.exposures([], history, "calf-raise-bent",
+                                           Dose.of(reps=15, load_kg=6), [ZONE])
+    assert [exposure.prescribed for exposure in found] == [Dose.of(reps=12, load_kg=6),
+                                                           Dose.of(reps=15, load_kg=6)]
+
+
+def test_the_tally_reads_the_rises_of_an_exercise():
+    from redline.analysis import progression_runs
+
+    calf = rulebook.load(TEST_VAULT).progression.of("calf-raise-bent")
+    history = [served(TODAY - dt.timedelta(days=21), "calf-raise-bent", (12, 12), reps=12),
+               served(TODAY - dt.timedelta(days=14), "calf-raise-bent", (13, 13), reps=13),
+               served(TODAY - dt.timedelta(days=7), "calf-raise-bent", (14, 13), reps=14)]
+    exposures = progression_strength.exposures([], history, "calf-raise-bent", None, [ZONE])
+    [review] = progression_runs.reviews(Store([]), rulebook.load(TEST_VAULT),
+                                        [(calf, exposures)])
+    assert review.lineage == "calf-raise-bent" and review.overrides == ()
+    assert review.tally.tolerated == (TODAY - dt.timedelta(days=14),)
+    assert review.tally.failed == (TODAY - dt.timedelta(days=7),), "14 reps asked, 13 done"
