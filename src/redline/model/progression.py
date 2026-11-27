@@ -490,6 +490,13 @@ STRENGTH_FAMILIES = {"reps": "strength-reps", "time": "strength-time",
 #: The families a run lineage may follow: its dose is typed on the planned session.
 RUN_FAMILIES = ("intervals",)
 
+#: The family of gut training: one lineage at most, the carbohydrate target of a fuelled
+#: session, whatever its kind.
+FUELLING_FAMILY = "fuelling"
+
+#: Every family a declared lineage may follow.
+LINEAGE_FAMILIES = (*STRENGTH_FAMILIES.values(), *RUN_FAMILIES, FUELLING_FAMILY)
+
 #: The lineage parameters the criteria cite (`at_most_ref`), from `[progression]` and the
 #: effort-pain scale of the rulebook.
 PROGRESS_UP_TO = "difficulty_progress_up_to"
@@ -497,6 +504,7 @@ REGRESS_ABOVE = "difficulty_regress_above"
 PAIN_CAP = "pain_cap"
 RESERVE_MIN = "reserve_min"
 FOLLOWING_PAIN_MAX = "following_pain_max"
+GUT_MAX = "gut_max"
 
 
 @dataclass(frozen=True)
@@ -509,6 +517,17 @@ class Lineages:
 
     def of(self, slug: str) -> Lineage | None:
         return next((lineage for lineage in self.lineages if lineage.slug == slug), None)
+
+    @property
+    def exercises(self) -> tuple[Lineage, ...]:
+        """The lineages that follow an exercise sheet: a strength family."""
+        return tuple(lineage for lineage in self.lineages
+                     if lineage.family in STRENGTH_FAMILIES.values())
+
+    def fuelling(self) -> Lineage | None:
+        """The gut-training lineage, when the instance declares one."""
+        return next((lineage for lineage in self.lineages
+                     if lineage.family == FUELLING_FAMILY), None)
 
 
 def _bound_check(data: dict) -> list[str]:
@@ -524,7 +543,7 @@ def _lineage_variables() -> tuple[str, ...]:
     """Every ladder variable a declared lineage may bound, in their declared order."""
     families = default()
     return tuple(dict.fromkeys(variable.name
-                               for slug in (*STRENGTH_FAMILIES.values(), *RUN_FAMILIES)
+                               for slug in LINEAGE_FAMILIES
                                for variable in families[slug].ladder))
 
 
@@ -534,7 +553,7 @@ def _lineages_schema() -> Schema:
     entry = Schema("[[progression.lineages]]", [
         spec("slug", str, pattern=formats.SLUG,
              note="an exercise: the name of coaching/exercises/<slug>.md"),
-        spec("family", str, choices=(*STRENGTH_FAMILIES.values(), *RUN_FAMILIES)),
+        spec("family", str, choices=LINEAGE_FAMILIES),
         spec("workout", str, required=False, choices=tuple(sorted(session_kinds.REPETITIONS)),
              note="the planned kind a run lineage follows; a run family only"),
         spec("group", str, required=False, pattern=formats.SLUG,
@@ -554,6 +573,9 @@ def _lineages_schema() -> Schema:
         spec(FOLLOWING_PAIN_MAX, float, required=False, minimum=0, maximum=10,
              note="effort pain the runs after a quality session may reach; with a run "
                   "lineage"),
+        spec(GUT_MAX, float, required=False, minimum=0, maximum=10,
+             note="gut symptoms a fuelled session may leave for the next target to rise; "
+                  "with a fuelling lineage"),
         spec("lineages", list, maximum=60, item=spec("lineage", dict, schema=entry)),
     ])
 
@@ -592,11 +614,17 @@ def parse_lineages(raw: dict | None, pain_cap: float) -> Lineages:
                         f"{REGRESS_ABOVE} {clean[REGRESS_ABOVE]}")
     parameters = ((PROGRESS_UP_TO, float(clean[PROGRESS_UP_TO])),
                   (REGRESS_ABOVE, float(clean[REGRESS_ABOVE])), (PAIN_CAP, pain_cap),
-                  *((name, float(clean[name])) for name in (RESERVE_MIN, FOLLOWING_PAIN_MAX)
+                  *((name, float(clean[name]))
+                    for name in (RESERVE_MIN, FOLLOWING_PAIN_MAX, GUT_MAX)
                     if clean.get(name) is not None))
     if any(entry["family"] in RUN_FAMILIES for entry in clean["lineages"]) and any(
             clean.get(name) is None for name in (RESERVE_MIN, FOLLOWING_PAIN_MAX)):
         problems.append(f"a run lineage needs {RESERVE_MIN} and {FOLLOWING_PAIN_MAX}")
+    fuelled = [entry for entry in clean["lineages"] if entry["family"] == FUELLING_FAMILY]
+    if fuelled and clean.get(GUT_MAX) is None:
+        problems.append(f"a fuelling lineage needs {GUT_MAX}")
+    if len(fuelled) > 1:
+        problems.append("one fuelling lineage at most: the gut is trained once")
     built = []
     for entry in clean["lineages"]:
         lineage, found = _lineage(entry, default(), parameters)

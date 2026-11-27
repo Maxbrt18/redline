@@ -2857,11 +2857,12 @@ def test_the_decision_state_counts_only_what_was_visible_that_day(store):
 
 def test_the_fuelling_answer_is_awaited_recorded_and_drives_the_progression(store):
     """The gut review asks two figures; the coach must be able to record them, and the
-    progression guard reads them."""
+    gate's gut-training check reads them."""
     from test_weekly_plan import revision as build_revision
     from test_weekly_plan import session
 
     from redline.model import ledger as ledger_model
+    from redline.service import plan_revision
 
     long_run = session("w33-dim-sl", "2026-08-16", "long", carbs_target_g_h=60)
     store.append_plan_revision("2026-W33", build_revision(
@@ -2889,9 +2890,15 @@ def test_the_fuelling_answer_is_awaited_recorded_and_drives_the_progression(stor
     assert not {"carbs_g_h", "gut_symptoms"} & set(ledger_model.missing_observation_fields(row))
 
     following = session("w34-dim-sl", "2026-08-23", "long", carbs_target_g_h=80)
-    with pytest.raises(StorageError, match="above the allowed step of 75"):
-        store.append_plan_revision("2026-W34", build_revision(
-            1, sessions=[following], computed_at="2026-08-17T19:10:00+02:00"))
+    warned: list[str] = []
+    risen = build_revision(1, sessions=[following], computed_at="2026-08-17T19:10:00+02:00")
+    [refusal] = plan_revision.gut_errors(store, "2026-W34", risen, warned.append)
+    assert "80 g/h is above the ceiling of gut-training (carbs_g_h=75" in refusal
+    assert plan_revision.gut_errors(
+        store, "2026-W34", build_revision(1, sessions=[{**following, "carbs_target_g_h": 75}],
+                                          computed_at="2026-08-17T19:10:00+02:00"),
+        warned.append) == []
+    assert warned == []
 
 
 def test_the_fuel_registry_is_recorded_by_the_command_and_read_by_the_coach(store):

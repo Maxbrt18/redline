@@ -69,6 +69,9 @@ def test_each_guard_closes_the_same_way(monkeypatch):
     assert plan_revision.pain_errors(store, WEEK, revision, None, print)
     monkeypatch.setattr("redline.analysis.progression_runs.override_errors", misconfigured)
     assert plan_revision.progression_errors(store, WEEK, revision, None, print)
+    monkeypatch.setattr("redline.analysis.progression_fuelling.ceiling_errors",
+                        misconfigured)
+    assert plan_revision.gut_errors(store, WEEK, revision, print)
 
 
 def test_a_race_without_a_chosen_skeleton_binds_nothing():

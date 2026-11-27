@@ -219,6 +219,28 @@ levels = [
   { value = 10, label = "Pire douleur imaginable." },
 ]
 
+# ------------------------------------------------------------------ progression
+
+# The lineages the progression engine follows. This default declares gut training only:
+# an instance adds one lineage per exercise sheet and per quality kind it follows.
+[progression]
+# Rule n1: at most this many rises per group of lineages in one week.
+rises_per_group_week = 1
+# A difficulty (0-10) at or below this lets a hold rise ...
+difficulty_progress_up_to = 5
+# ... and one above this steps the exercise back.
+difficulty_regress_above = 7
+# Gut symptoms (0-10) a fuelled session may leave for the next target to rise.
+gut_max = 3
+
+# Gut training: the carbohydrate target of a fuelled session rises by at most one step
+# (`carbs_g_h.step`) after a fuelled session whose gut symptoms stayed at or under
+# `gut_max` (0-10); above it, the target holds. The maximum is rule f1's ceiling.
+[[progression.lineages]]
+slug = "gut-training"
+family = "fuelling"
+carbs_g_h = { minimum = 0, maximum = 90, step = 15 }
+
 # ------------------------------------------------------------------ transitions
 
 # The session KINDS a transition may carry. The slug is what the program records; the

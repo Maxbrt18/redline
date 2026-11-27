@@ -106,6 +106,20 @@ def progression_errors(store, week: str, revision: dict, previous: dict | None,
                     warn, check)
 
 
+def gut_errors(store, week: str, revision: dict, warn: Callable[[str], None]) -> list[str]:
+    """The carbohydrate targets against the gut-training lineage, when one is declared."""
+    from redline.analysis import progression_fuelling
+    from redline.model import rulebook
+    today = dt.date.fromisoformat(revision["computed_at"][:10])
+
+    def check() -> list[str]:
+        return progression_fuelling.ceiling_errors(store, rulebook.current(), week, revision,
+                                                   today)
+
+    return _guarded("gut training", _where(week, revision), wording.GUT_UNREADABLE, warn,
+                    check)
+
+
 def skeleton_errors(store, week: str, revision: dict, previous: dict | None,
                     warn: Callable[[str], None]) -> list[str]:
     """The week against the next race's chosen skeleton, when it has one."""
@@ -160,6 +174,7 @@ def checked(store, week: str, revision: dict, existing: dict | None, *, stamp: s
         *taper_errors(store, week, current, warn),
         *pain_errors(store, week, current, existing, warn),
         *progression_errors(store, week, current, previous, warn),
+        *gut_errors(store, week, current, warn),
         *skeleton_errors(store, week, current, previous, warn),
     ]
     if mistakes:

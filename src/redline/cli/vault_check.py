@@ -540,11 +540,11 @@ def check_progression_lineages(vault: Vault, report: Report) -> None:
     an active sheet no lineage follows is reported, never refused."""
     try:
         declared = rulebook.load(vault.root).progression
-        sheets = load_program(vault.root).exercises if declared.lineages else {}
+        sheets = load_program(vault.root).exercises if declared.exercises else {}
     except (rulebook.RulebookError, NoteError) as exc:
         report.fail(wording.LINEAGES, str(exc).splitlines())
         return
-    if not declared.lineages:
+    if not declared.exercises:
         report.skip(wording.LINEAGES, wording.NO_LINEAGE)
         return
     found = coverage(declared, sheets)
@@ -554,7 +554,7 @@ def check_progression_lineages(vault: Vault, report: Report) -> None:
         report.warn(wording.LINEAGES, wording.UNLISTED_SHEETS.format(
             count=len(found.unlisted), sheets=", ".join(found.unlisted)))
     else:
-        report.ok(wording.LINEAGES, wording.LINEAGES_COUNT.format(count=len(declared.lineages)))
+        report.ok(wording.LINEAGES, wording.LINEAGES_COUNT.format(count=len(declared.exercises)))
 
 
 def check_cockpit_freshness(vault: Vault, report: Report) -> None:
