@@ -551,6 +551,51 @@ class PlanPhase(StrEnum):
     TAPER = "taper"
 
 
+class CycleKind(StrEnum):
+    """What a training cycle is for: preparing a goal, the general preparation between
+    goals, recovering from a race, rebuilding after a break. One cycle is active at a
+    time; each kind has its templates (`cycle_templates.toml`)."""
+
+    PREPARATION = "preparation"
+    GENERAL = "general"
+    RECOVERY = "recovery"
+    REBUILD = "rebuild"
+
+
+class GeneralLevel(StrEnum):
+    """How much the general preparation asks: to progress, to maintain what is held, or
+    to train lightly."""
+
+    PROGRESS = "progress"
+    MAINTAIN = "maintain"
+    LIGHT = "light"
+
+
+class IntensityRef(StrEnum):
+    """What a key session's intensity is relative to. The speed references
+    (`SPEED_REFS`) take a band in % of their speed, never of their pace; `rpe` takes a band
+    on the 1-10 effort scale, `hr_zone` a band of heart-rate zones."""
+
+    FIRST_THRESHOLD = "first_threshold"
+    CRITICAL_SPEED = "critical_speed"
+    GOAL_PACE = "goal_pace"
+    RPE = "rpe"
+    HR_ZONE = "hr_zone"
+
+
+#: The references a band reads in % of their speed.
+SPEED_REFS = (IntensityRef.FIRST_THRESHOLD, IntensityRef.CRITICAL_SPEED,
+              IntensityRef.GOAL_PACE)
+
+
+class DeloadMode(StrEnum):
+    """How deloads come: weeks scheduled at a rhythm, or a few days triggered by
+    signals."""
+
+    SCHEDULED = "scheduled"
+    TRIGGERED = "triggered"
+
+
 class DeadlineKind(StrEnum):
     """What a deadline is about (`deadlines.kind`)."""
 

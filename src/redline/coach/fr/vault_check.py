@@ -125,6 +125,13 @@ UNLISTED_SHEETS = "{count} fiche(s) active(s) sans lignée : {sheets}"
 
 LINEAGES_COUNT = "{count} lignée(s), chacune sur sa fiche"
 
+CYCLE_TEMPLATES = "gabarits de cycles lisibles"
+
+NO_CYCLE_TEMPLATES = "aucun cycle_templates.toml dans le vault"
+
+CYCLE_TEMPLATES_COUNT = ("{preparation} préparation(s), {general} niveau(x) de générale, "
+                         "{recovery} récupération(s)")
+
 FOLDER_EMPTY = "{capabilities_dir}/ est vide"
 
 COCKPIT = "cockpit à jour"

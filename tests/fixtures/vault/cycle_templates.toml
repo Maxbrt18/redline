@@ -1,0 +1,116 @@
+# The test vault's cycle templates, version 2: every sort and field of the format, with
+# fictional values. They test the format; the engine's own values are sourced apart.
+version = 2
+default_level = "maintain"
+
+[[preparation]]
+slug = "half-road"
+terrain = "road"
+distance_km_max = 25
+taper_weeks = 2
+taper_cut_pct = [41, 60]
+deload_mode = "scheduled"
+deload_every_weeks = [3, 4]
+deload_cut_pct = 25
+phases = ["development", "specific", "taper"]
+window_weeks = [8, 12]
+min_held_km = 40
+
+[preparation.development]
+weeks = [4, 6]
+qualities = 2
+
+  [[preparation.development.key]]
+  workout = "threshold"
+  intensity = { ref = "critical_speed", band = [90, 95] }
+  start = { reps = 3, rep_seconds = 480, recovery_seconds = 90 }
+  arrival = { reps = 4, rep_seconds = 600, recovery_seconds = 60 }
+
+  [[preparation.development.key]]
+  workout = "hills"
+  intensity = { ref = "rpe", band = [7, 8] }
+  start = { reps = 6, rep_seconds = 45, recovery_seconds = 120 }
+  arrival = { reps = 10, rep_seconds = 60, recovery_seconds = 120 }
+
+[preparation.specific]
+weeks = [4, 6]
+qualities = 2
+long_run_segments = { ref = "goal_pace", band = [98, 102], share = [0.2, 0.5] }
+
+  [[preparation.specific.key]]
+  workout = "threshold"
+  intensity = { ref = "goal_pace", band = [99, 101] }
+  start = { reps = 3, rep_seconds = 600, recovery_seconds = 120 }
+  arrival = { reps = 2, rep_seconds = 1500, recovery_seconds = 180 }
+  flagship = 2
+
+[preparation.taper]
+qualities = 1
+
+  [[preparation.taper.key]]
+  workout = "threshold"
+  intensity = { ref = "goal_pace", band = [99, 101] }
+  start = { reps = 3, rep_seconds = 480, recovery_seconds = 120 }
+  arrival = { reps = 3, rep_seconds = 360, recovery_seconds = 120 }
+
+[[general]]
+level = "maintain"
+deload_mode = "triggered"
+deload_days = [2, 4]
+block_weeks = 4
+volume_pct = [70, 80]
+band_from_km = 40
+qualities = 1
+long_run_share_max = 0.30
+min_held_km = 40
+
+  [[general.key]]
+  workout = "threshold"
+  intensity = { ref = "first_threshold", band = [100, 100] }
+  start = { reps = 3, rep_seconds = 480, recovery_seconds = 60 }
+  arrival = { reps = 3, rep_seconds = 600, recovery_seconds = 60 }
+
+[[general]]
+level = "progress"
+deload_mode = "triggered"
+deload_days = [2, 4]
+block_weeks = 4
+volume_pct = [80, 100]
+band_from_km = 40
+qualities = 1
+long_run_share_max = 0.30
+min_held_km = 40
+ramp_max_pct = 8
+
+  [[general.key]]
+  workout = "threshold"
+  intensity = { ref = "first_threshold", band = [100, 103] }
+  start = { reps = 3, rep_seconds = 480, recovery_seconds = 60 }
+  arrival = { reps = 4, rep_seconds = 600, recovery_seconds = 60 }
+
+[[general]]
+level = "light"
+deload_mode = "triggered"
+deload_days = [2, 4]
+block_weeks = 4
+volume_pct = [50, 70]
+band_from_km = 30
+qualities = 0
+long_run_share_max = 0.30
+min_held_km = 20
+
+[[recovery]]
+distance_km_max = 25
+weeks = [1, 2]
+no_quality_days = 7
+volume_pct = [40, 60]
+
+[[recovery]]
+distance_km_max = 400
+weeks = [2, 4]
+no_quality_days = 10
+volume_pct = [30, 50]
+
+[[rebuild]]
+floor_pct = 50
+ramp_max_pct = 10
