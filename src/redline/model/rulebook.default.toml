@@ -150,6 +150,17 @@ estimate_band_pct = 80
 estimate_break_min_days = 21
 # The flat runs and repetitions of this many weeks bound the form from below.
 estimate_bound_weeks = 8
+# The critical speed (`redline.analysis.critical_speed`), four thresholds declared
+# together or not at all. The flat all-out efforts of 2 to 20 minutes of this many weeks
+# enter the fit ...
+critical_speed_weeks = 12
+# ... the first threshold, the top of an easy run, sits at this share of CS (82.3 % on
+# average, Hunter et al. 2024) ...
+critical_speed_first_threshold_pct = 82.3
+# ... and a threshold session is run between these shares of CS, below it: a convention
+# to check against the athlete's heart rate and RPE.
+critical_speed_threshold_low_pct = 90.0
+critical_speed_threshold_high_pct = 97.0
 # The climbs of an easy run read their HR against the athlete's easy HR at their grade
 # (median of the six weeks of solo easy runs before): more than this above it (bpm), with
 # the grade-adjusted pace, they are named.

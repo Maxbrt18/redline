@@ -36,6 +36,18 @@ BOUND_ABOVE = " C'est plus que l'estimation : elle est périmée, l'athlète est
 EFFICIENCY = ("  allure à FC égale (EF à plat) : {change} % depuis le {since:%d/%m/%Y} "
               "({before} → {now} m par battement, {runs_before} puis {runs_now} sorties). Un "
               "indicateur, pas une correction du chiffre.")
+CRITICAL_SPEED = ("Vitesse critique : {pace}/km ({speed} km/h), D′ {d_prime} m, sur {n} efforts à "
+                  "fond du {first:%d/%m/%Y} au {last:%d/%m/%Y}{error}. C'est la limite haute du "
+                  "seuil : au-dessus, chaque répétition puise dans D′.")
+CRITICAL_SPEED_ERROR = ", ± {error} s/km"
+CRITICAL_SPEED_TWO = " (deux efforts : aucune erreur d'ajustement)"
+CRITICAL_SPEED_DOMAINS = ("  domaines : EF plus lente que {easy}/km ({first} % de la VC), séances de "
+                          "seuil entre {low}/km et {high}/km ({low_pct} à {high_pct} %, convention "
+                          "à vérifier sur la FC et le RPE), VMA plus vite que {pace}/km.")
+NO_CRITICAL_SPEED = ("Vitesse critique : aucune, faute de deux efforts à fond à plat de 2 à 20 min "
+                     "(au moins 5 min d'écart) dans les {weeks} dernières semaines. Le coach peut "
+                     "proposer le test : 1 200 m puis 3 600 m à fond, à plat, dans la même séance, "
+                     "30 min de récupération entre les deux. Jamais imposé.")
 UNKNOWN = "inconnu"
 LOAD = ", charge {load:g}"
 NO_LOAD = ", charge inconnue"

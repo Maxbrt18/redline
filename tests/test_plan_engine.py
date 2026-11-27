@@ -213,3 +213,20 @@ def test_a_trail_goal_has_no_estimate(runs):
     store = Store(efforts=[_effort("ten", dt.date(2030, 9, 1), 10, 40 * 60)])
     trail = SimpleNamespace(terrain="trail", distance_km=30.0)
     assert plan_engine.goal_reading(store, runs, trail, TODAY) is None
+
+
+def test_two_test_efforts_give_the_critical_speed_and_its_domains(runs):
+    day = dt.date(2030, 11, 10)
+    store = Store(efforts=[{**_effort("t1200", day, 1.2, 4 * 60), "kind": "test"},
+                           {**_effort("t3600", day, 3.6, 14 * 60), "kind": "test"}])
+    lines = plan_engine.report(store, TODAY)
+    found = next(line for line in lines if line.startswith("Vitesse critique"))
+    assert "sur 2 efforts à fond du 10/11/2030 au 10/11/2030" in found
+    assert "aucune erreur d'ajustement" in found
+    assert any(line.startswith("  domaines : EF plus lente que") for line in lines)
+
+
+def test_without_test_efforts_the_coach_may_propose_the_test(runs):
+    lines = plan_engine.report(Store(), TODAY)
+    assert any(line.startswith("Vitesse critique : aucune") and "1 200 m puis 3 600 m" in line
+               for line in lines)

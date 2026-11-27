@@ -76,6 +76,10 @@ RPE_MODEL_PARAMETERS = ("rpe_model_weeks", "rpe_model_min_sessions",
 ESTIMATE_PARAMETERS = ("estimate_window_weeks", "estimate_min_source_km", "estimate_noise_vdot",
                        "estimate_drift_vdot2_month", "estimate_exponent_sd",
                        "estimate_band_pct", "estimate_break_min_days", "estimate_bound_weeks")
+#: The critical speed (`redline.analysis.critical_speed`), declared together or not at all.
+CRITICAL_SPEED_PARAMETERS = ("critical_speed_weeks", "critical_speed_first_threshold_pct",
+                             "critical_speed_threshold_low_pct",
+                             "critical_speed_threshold_high_pct")
 
 RULEBOOK_SCHEMA = Schema("rulebook.toml", [
     field("parameters", dict, schema=Schema("[parameters]", [
@@ -178,6 +182,16 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
               note="a declared break this long after the last effort makes it an upper bound"),
         field("estimate_bound_weeks", int, required=False, minimum=1, maximum=52,
               note="weeks of sessions whose held pieces bound the form from below"),
+        # Optional, all four or none (`CRITICAL_SPEED_PARAMETERS`): absent, no critical
+        # speed is fitted.
+        field("critical_speed_weeks", int, required=False, minimum=1, maximum=104,
+              note="weeks back an all-out effort still enters the critical-speed fit"),
+        field("critical_speed_first_threshold_pct", float, required=False, minimum=50,
+              maximum=100, note="the first threshold, the top of an easy run, in % of CS"),
+        field("critical_speed_threshold_low_pct", float, required=False, minimum=50,
+              maximum=100, note="slowest pace of a threshold session, in % of CS"),
+        field("critical_speed_threshold_high_pct", float, required=False, minimum=50,
+              maximum=100, note="fastest pace of a threshold session, in % of CS"),
         # Optional: absent, the climbs of an easy run are not judged by their HR
         # (`redline.analysis.grade_hr`).
         field("climb_hr_margin_bpm", int, required=False, minimum=0, maximum=30,
@@ -311,6 +325,10 @@ class Parameters:
     estimate_band_pct: int | None = None
     estimate_break_min_days: int | None = None
     estimate_bound_weeks: int | None = None
+    critical_speed_weeks: int | None = None
+    critical_speed_first_threshold_pct: float | None = None
+    critical_speed_threshold_low_pct: float | None = None
+    critical_speed_threshold_high_pct: float | None = None
     climb_hr_margin_bpm: int | None = None
     split_hr_margin_bpm: int | None = None
     split_fast_start_pct: float | None = None
@@ -435,7 +453,8 @@ def parse(text: str, source: Path) -> Rulebook:
                         "rpe_intensity_exponent", "skeleton_ramp_max_pct",
                         "skeleton_long_step_max_pct", "estimate_min_source_km",
                         "estimate_noise_vdot", "estimate_drift_vdot2_month",
-                        "estimate_exponent_sd")
+                        "estimate_exponent_sd", "critical_speed_first_threshold_pct",
+                        "critical_speed_threshold_low_pct", "critical_speed_threshold_high_pct")
            if name in raw}})
     scales = build_scales(payload["scales"])
     problems = []
@@ -448,11 +467,16 @@ def parse(text: str, source: Path) -> Rulebook:
                          (PERMIT_GRADED_PARAMETERS, "graded permit thresholds"),
                          (RPE_MODEL_PARAMETERS, "expected-RPE thresholds"),
                          (ESTIMATE_PARAMETERS, "goal-estimate thresholds"),
+                         (CRITICAL_SPEED_PARAMETERS, "critical-speed thresholds"),
                          (SKELETON_PARAMETERS, "skeleton thresholds")):
         declared = [name for name in group if name in raw]
         if declared and len(declared) != len(group):
             problems.append(f"parameters: the {label} go together, missing "
                             + ", ".join(name for name in group if name not in raw))
+    if (raw.get("critical_speed_threshold_low_pct", 0)
+            > raw.get("critical_speed_threshold_high_pct", 100)):
+        problems.append("parameters: critical_speed_threshold_low_pct is above "
+                        "critical_speed_threshold_high_pct")
     if (any(name in raw for name in PERMIT_GRADED_PARAMETERS)
             and not all(name in raw for name in PERMIT_PARAMETERS)):
         problems.append("parameters: the graded permit thresholds need the permit thresholds")
