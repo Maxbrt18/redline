@@ -165,7 +165,7 @@ def test_a_session_without_a_typed_dose_is_no_exposure_and_the_plan_gives_the_cu
 # ------------------------------------------------------------------ vetoes
 
 def test_a_gate_that_did_not_open_vetoes_a_rise(monkeypatch):
-    monkeypatch.setattr(progression_strength.race_model, "upcoming", lambda store, today: None)
+    monkeypatch.setattr(progression_strength.race_model, "active_goal", lambda store: None)
     book = book_with(PROGRESSION + RUNS)
     monkeypatch.setattr(rulebook, "current", lambda: book)
     zones = [ledger.PainZone(ZONE, "Genou")]

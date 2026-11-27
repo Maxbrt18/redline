@@ -82,7 +82,13 @@ DEADLINE_FIELDS = (
     ("ends_on", "ends_on", False),
     ("context", "context", False),
     ("athlete_label", "athlete_label", False),
+    ("priority", "priority", False),
+    ("race_state", "race_state", False),
 )
+#: A race: its priority is required, its status follows its state.
+RACE_REQUIRED = {"priority": True, "status": False}
+RACE_FIELDS = tuple((key, name, RACE_REQUIRED.get(key, required))
+                    for key, name, required in DEADLINE_FIELDS)
 
 
 def merge(fields: tuple, args: argparse.Namespace, existing: dict | None) -> dict:
@@ -134,8 +140,17 @@ def _daily(args, _) -> dict:
 
 
 def _deadline(args, existing) -> dict:
-    payload = merge(DEADLINE_FIELDS, args, existing)
+    kind = args.kind if args.kind is not UNSET else (existing or {}).get("kind")
+    race = kind == voc.DeadlineKind.RACE
+    if race and args.status is not UNSET:
+        raise InputError("--status: a race's status follows its --race-state")
+    if not race and (args.priority is not UNSET or args.race_state is not UNSET):
+        raise InputError("--priority, --race-state: only a race (--kind race) carries them")
+    payload = merge(RACE_FIELDS if race else DEADLINE_FIELDS, args, existing)
     payload["kind"] = payload.get("kind") or voc.DeadlineKind.GENERAL
+    if race:
+        payload["race_state"] = payload.get("race_state") or voc.RaceState.ACTIVE
+        payload["status"] = race_model.status_of(voc.RaceState(payload["race_state"]))
     if getattr(args, "context", UNSET) is not UNSET and not isinstance(args.context, dict):
         raise InputError("--context: a JSON object")
     if existing is not None and getattr(args, "context", UNSET) is not UNSET:
@@ -373,6 +388,12 @@ def parser() -> argparse.ArgumentParser:
         "--athlete-label", default=UNSET,
         help="short label (3-80 chars): the deadline is an action of the athlete, shown in "
              "their notebook; an empty string keeps it for the coach alone")
+    deadline.add_argument("--priority", choices=tuple(voc.RacePriority), default=UNSET,
+                          help="a race: a, the goal a preparation is built for (one active at "
+                               "most); b, a race that serves it; c, a race run for its own sake")
+    deadline.add_argument("--race-state", choices=tuple(voc.RaceState), default=UNSET,
+                          help="a race: active when written (the default); run, abandoned "
+                               "(started, not finished), cancelled (not started), postponed")
     deadline.add_argument("--patch", action="store_true", help=PATCH_HELP)
 
     # The angle has a FIELD, so it does not belong in prose: without a place to record

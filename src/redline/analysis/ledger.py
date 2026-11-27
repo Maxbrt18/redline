@@ -842,8 +842,8 @@ def race_projection(rows: list[Row], today: dt.date, race_on: dt.date,
 
 
 def next_race_date(store: LedgerStore, today: dt.date) -> dt.date | None:
-    """The next TYPED race (`redline fact-write deadline --kind race`), never prose."""
-    race = race_model.upcoming(store, today)
+    """The day of the next active race, whatever its priority, never prose."""
+    race = race_model.next_race(store, today)
     return race.on if race else None
 
 

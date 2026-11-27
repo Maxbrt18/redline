@@ -120,7 +120,7 @@ def served_dose(session: dict, slug: str) -> Dose | None:
 def vetoes(store: Any, book: rulebook.Rulebook, week: str, today: dt.date) -> tuple[Veto, ...]:
     """The states outside the lineages that stop a rise in `week`."""
     found = []
-    race = race_model.upcoming(store, today)
+    race = race_model.active_goal(store)
     if race is not None:
         race_week = iso_week.of(race.on)
         taper = [iso_week.shift(race_week, -offset) for offset in range(race.taper_weeks)]

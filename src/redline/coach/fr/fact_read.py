@@ -86,6 +86,8 @@ BLOCKS = " · bloque {blocks}"
 
 PERIOD = " · période {start}→{end}"
 
+RACE = " · course {priority}, {state}"
+
 DEADLINE = (
     "{deadline_key} · {due_on} · {kind} · {status} · {item} · propriétaire "
     "{fact_owner}{blocked}")

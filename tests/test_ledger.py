@@ -545,8 +545,9 @@ def test_the_race_date_comes_from_a_typed_race_deadline_only():
         def deadline_rows(self):
             return [
                 {"kind": "general", "status": "open", "due_on": dt.date(2026, 10, 4)},
-                {"kind": "race", "status": "done", "due_on": dt.date(2026, 9, 1)},
-                {"kind": "race", "status": "open", "due_on": "2026-11-26"},
+                {"kind": "race", "status": "done", "priority": "a", "race_state": "run", "due_on": dt.date(2026, 9, 1)},
+                {"kind": "race", "status": "scheduled", "priority": "a", "race_state": "active",
+                 "due_on": "2026-11-26"},
             ]
     today = dt.date(2026, 9, 27)
     assert ledger.next_race_date(Store(), today) == dt.date(2026, 11, 26)

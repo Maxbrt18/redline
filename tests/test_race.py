@@ -6,16 +6,17 @@ import pytest
 
 from redline.model import race
 from redline.model.schema import SchemaError
+from redline.model.vocabulary import RaceState
 
 
 def test_a_race_falls_back_on_the_rulebook_for_what_it_leaves_unsaid():
-    typed = race.from_row({"kind": "race", "status": "scheduled", "due_on": "2030-11-30"})
+    typed = race.from_row({"kind": "race", "status": "scheduled", "priority": "a", "race_state": "active", "due_on": "2030-11-30"})
     assert typed.on == dt.date(2030, 11, 30)
     assert (typed.taper_weeks, typed.taper_cut_min_pct, typed.taper_cut_max_pct) == (3, 41, 60)
 
 
 def test_a_race_overrides_the_rulebook():
-    typed = race.from_row({"kind": "race", "status": "scheduled",
+    typed = race.from_row({"kind": "race", "status": "scheduled", "priority": "a", "race_state": "active",
                            "due_on": dt.date(2030, 4, 13),
                            "context": {"taper_weeks": 1, "taper_cut_max_pct": 50,
                                        "distance_km": 10}})
@@ -30,20 +31,37 @@ def test_the_taper_keys_are_checked_and_the_others_left_alone():
         race.CONTEXT_SCHEMA.validate({"taper_cut_min_pct": 70, "taper_cut_max_pct": 50})
 
 
-def test_the_upcoming_race_skips_the_ones_run_or_done():
-    class Store:
-        def deadline_rows(self):
-            return [{"kind": "race", "status": "done", "due_on": "2030-09-01"},
-                    {"kind": "general", "status": "todo", "due_on": "2030-10-01"},
-                    {"kind": "race", "status": "scheduled", "due_on": "2030-11-30"},
-                    {"kind": "race", "status": "scheduled", "due_on": "2030-06-01"}]
-    assert race.upcoming(Store(), dt.date(2030, 7, 1)).on == dt.date(2030, 11, 30)
-    assert race.upcoming(Store(), dt.date(2030, 12, 1)) is None
-    assert [typed.on.month for typed in race.typed(Store())] == [6, 9, 11]
+def _row(on, priority, state, kind="race"):
+    return {"kind": kind, "priority": priority, "race_state": state,
+            "status": race.status_of(RaceState(state)) if state else "todo", "due_on": on}
+
+
+class Calendar:
+    def deadline_rows(self):
+        return [_row("2030-09-01", "a", "run"), _row("2030-10-01", None, None, "general"),
+                _row("2030-10-12", "b", "active"), _row("2030-10-19", "c", "cancelled"),
+                _row("2030-11-30", "a", "active"), _row("2031-02-01", "c", "active")]
+
+
+def test_the_goal_is_the_active_race_of_priority_a():
+    assert race.active_goal(Calendar()).on == dt.date(2030, 11, 30)
+    assert [typed.on.month for typed in race.typed(Calendar())] == [9, 10, 10, 11, 2]
+
+
+def test_the_next_race_is_the_next_active_one_whatever_its_priority():
+    assert race.next_race(Calendar(), dt.date(2030, 9, 2)).on == dt.date(2030, 10, 12)
+    assert race.next_race(Calendar(), dt.date(2030, 10, 12)).on == dt.date(2030, 10, 12), \
+        "a race is next on its own day"
+    assert race.next_race(Calendar(), dt.date(2031, 2, 2)) is None
+
+
+def test_a_goal_whose_day_passed_stays_the_goal_until_its_outcome_is_written():
+    assert race.active_goal(Calendar()).on == dt.date(2030, 11, 30)
+    assert race.next_race(Calendar(), dt.date(2030, 12, 1)).on == dt.date(2031, 2, 1)
 
 
 def test_a_race_carries_what_its_plan_needs():
-    typed = race.from_row({"kind": "race", "status": "scheduled", "due_on": "2030-11-30",
+    typed = race.from_row({"kind": "race", "status": "scheduled", "priority": "a", "race_state": "active", "due_on": "2030-11-30",
                            "athlete_label": "Course fictive",
                            "context": {"start_time": "23:00", "route_gpx": "coaching/route.gpx",
                                        "aid_stations": [{"km": 26, "name": "B"},
@@ -66,7 +84,7 @@ def test_the_plan_keys_are_checked_on_write():
 
 
 def test_an_unreadable_key_costs_its_value_never_the_race():
-    typed = race.from_row({"kind": "race", "status": "scheduled", "due_on": "2030-11-30",
+    typed = race.from_row({"kind": "race", "status": "scheduled", "priority": "a", "race_state": "active", "due_on": "2030-11-30",
                            "context": {"taper_weeks": 1, "pace_s_per_km": "fast"}})
     assert typed.taper_weeks == 1 and typed.pace_s_per_km is None
 
@@ -79,19 +97,19 @@ GOAL = {"distance_km": 21.1, "terrain": "road", "peak_volume_km": 50, "peak_long
 
 
 def test_a_race_carries_the_goal_its_plan_is_built_from():
-    typed = race.from_row({"kind": "race", "status": "scheduled", "due_on": "2031-04-06",
+    typed = race.from_row({"kind": "race", "status": "scheduled", "priority": "a", "race_state": "active", "due_on": "2031-04-06",
                            "context": GOAL})
     goal = typed.goal
     assert (goal.distance_km, goal.terrain, goal.peak_volume_km) == (21.1, "road", 50)
     assert goal.families == ("threshold",) and goal.goal_time_s == 6300
     assert goal.skeleton == race.Skeleton("balanced", 6, 4, "specific")
-    assert race.from_row({"kind": "race", "status": "scheduled",
+    assert race.from_row({"kind": "race", "status": "scheduled", "priority": "a", "race_state": "active",
                           "due_on": "2031-04-06"}).goal is None
 
 
 def test_a_race_that_says_no_taper_takes_its_templates_by_distance():
     def taper(context):
-        return race.from_row({"kind": "race", "status": "scheduled", "due_on": "2031-04-06",
+        return race.from_row({"kind": "race", "status": "scheduled", "priority": "a", "race_state": "active", "due_on": "2031-04-06",
                               "context": context}).taper_weeks
 
     assert taper({"distance_km": 21.1, "terrain": "road"}) == 2
@@ -109,3 +127,21 @@ def test_the_goal_keys_are_typed():
         race.CONTEXT_SCHEMA.validate({"terrain": "track"})
     with pytest.raises(SchemaError, match="second_quality"):
         race.CONTEXT_SCHEMA.validate({"skeleton": {**GOAL["skeleton"], "second_quality": "base"}})
+
+
+@pytest.mark.parametrize(("before", "after", "allowed"), [
+    (None, "active", True), (None, "proposed", True), (None, "run", False),
+    ("proposed", "active", True), ("proposed", "dropped", True), ("proposed", "run", False),
+    ("active", "run", True), ("active", "abandoned", True), ("active", "cancelled", True),
+    ("active", "postponed", True), ("postponed", "active", True),
+    ("postponed", "cancelled", True), ("postponed", "run", False),
+    ("run", "active", False), ("cancelled", "active", False), ("active", "active", True),
+])
+def test_a_race_moves_only_along_its_life(before, after, allowed):
+    found = race.move_error(None if before is None else RaceState(before), RaceState(after))
+    assert (found is None) is allowed, found
+
+
+def test_a_race_is_done_once_its_state_is_closed():
+    assert [race.status_of(state) for state in RaceState] == [
+        "scheduled", "scheduled", "scheduled", "done", "done", "done", "done"]

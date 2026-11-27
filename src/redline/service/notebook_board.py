@@ -1043,7 +1043,7 @@ class Board:
                         key=lambda e: e.get("period") or "", reverse=True)[:3]
         return {
             "race": race,
-            "plan": race_plan.plan(race_model.upcoming(self.ops, self.today), self.root,
+            "plan": race_plan.plan(race_model.next_race(self.ops, self.today), self.root,
                                    self.instance) if race else None,
             "milestones": milestones, "capabilities": capabilities,
             "archives": [*monthly, *weekly],

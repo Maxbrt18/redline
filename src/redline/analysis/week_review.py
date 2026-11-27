@@ -201,7 +201,8 @@ def week_report(store: ledger.LedgerStore, rows: list[ledger.Row], instruments: 
         longest = ledger.longest_recent(rows, reference)
         if longest is not None:
             lines.append(text.REPORT_LONGEST.format(longest=longest))
-        race = race_model.upcoming(store, today)
+        race = race_model.active_goal(store)
+        race = race if race is not None and race.on > today else None
         projection = ledger.race_projection(rows, today, race.on, race.taper_weeks) if race else None
         if projection:
             lines.extend(ledger.projection_lines(projection, target_km))

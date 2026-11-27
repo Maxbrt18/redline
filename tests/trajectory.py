@@ -20,7 +20,13 @@ from typing import Protocol
 
 from redline.analysis import weekly_dossier
 from redline.model import iso_week
-from redline.model.vocabulary import DeadlineKind, DeadlineStatus, PlanPhase
+from redline.model.vocabulary import (
+    DeadlineKind,
+    DeadlineStatus,
+    PlanPhase,
+    RacePriority,
+    RaceState,
+)
 from redline.service import plan_revision
 
 #: A preparation run from where its first week stands: a half on the road, its peaks, and
@@ -42,11 +48,11 @@ PROBE_CEILING_KM = 400.0
 
 
 class Store:
-    """The facts the planner reads: one race and the runs; no effort, no break, no
-    strength session."""
+    """The facts the planner reads: the goal, other races, the runs; no effort, no break,
+    no strength session."""
 
-    def __init__(self, goal: dict, race_on: dt.date) -> None:
-        self.goal, self.race_on = goal, race_on
+    def __init__(self, goal: dict, race_on: dt.date, others: tuple[dict, ...] = ()) -> None:
+        self.goal, self.race_on, self.others = goal, race_on, others
         self.observations: list[dict] = []
 
     def run(self, day: dt.date, kind: str, km: float) -> None:
@@ -69,10 +75,11 @@ class Store:
 
     def deadline_rows(self) -> list[dict]:
         return [{"deadline_key": "race", "kind": DeadlineKind.RACE,
-                 "status": DeadlineStatus.SCHEDULED, "due_on": self.race_on, "item": "Race",
+                 "status": DeadlineStatus.SCHEDULED, "priority": RacePriority.A,
+                 "race_state": RaceState.ACTIVE, "due_on": self.race_on, "item": "Race",
                  "context": self.goal, "fact_owner": "athlete/goals.md", "blocks": None,
                  "completed_on": None, "starts_on": None, "ends_on": None,
-                 "athlete_label": "Race"}]
+                 "athlete_label": "Race"}, *self.others]
 
 
 @dataclass(frozen=True)

@@ -142,7 +142,7 @@ class NotebookService:
     def race_plan(self) -> views.RacePlanView | None:
         """The plan screen of the typed race; None when it declares no readable route."""
         board = self.board()
-        return race_plan.view(race_model.upcoming(board.ops, board.today), board.root,
+        return race_plan.view(race_model.next_race(board.ops, board.today), board.root,
                               board.instance, board.today)
 
     def connected(self, psid: str) -> bool:

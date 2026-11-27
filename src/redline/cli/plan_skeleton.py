@@ -1,4 +1,4 @@
-"""The `redline plan-skeleton` command: the next race's plan, built backwards by the engine.
+"""The `redline plan-skeleton` command: the goal's plan, built backwards by the engine.
 
 Without a choice it prints the race's chosen skeleton, computed again from today, or the
 engine's candidates when none is chosen yet: each week's phase, deload, volume, long run,

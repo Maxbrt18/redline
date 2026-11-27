@@ -25,7 +25,16 @@ from typing import Protocol
 
 from . import plan_templates, rulebook
 from .schema import Schema, field
-from .vocabulary import DeadlineKind, DeadlineStatus, GoalSource, PlanPhase, RaceTerrain
+from .vocabulary import (
+    CLOSED_RACE_STATES,
+    DeadlineKind,
+    DeadlineStatus,
+    GoalSource,
+    PlanPhase,
+    RacePriority,
+    RaceState,
+    RaceTerrain,
+)
 
 
 def _band_ordered(context: dict) -> list[str]:
@@ -136,7 +145,8 @@ class Goal:
 @dataclass(frozen=True)
 class Race:
     on: dt.date
-    status: str
+    priority: RacePriority
+    state: RaceState
     taper_weeks: int
     taper_cut_min_pct: int | None
     taper_cut_max_pct: int | None
@@ -203,7 +213,7 @@ def from_row(row: dict) -> Race:
     taper_weeks = (int(context["taper_weeks"]) if context.get("taper_weeks") is not None
                    else template.taper_weeks if template is not None else defaults.taper_weeks)
     return Race(on=due if isinstance(due, dt.date) else dt.date.fromisoformat(due),
-                status=str(row.get("status") or ""),
+                priority=RacePriority(row["priority"]), state=RaceState(row["race_state"]),
                 taper_weeks=taper_weeks,
                 taper_cut_min_pct=said("taper_cut_min_pct"),
                 taper_cut_max_pct=said("taper_cut_max_pct"),
@@ -239,7 +249,46 @@ def typed(store: DeadlineStore) -> list[Race]:
                   key=lambda race: race.on)
 
 
-def upcoming(store: DeadlineStore, today: dt.date) -> Race | None:
-    """The next typed race still to run, never prose."""
-    ahead = [race for race in typed(store) if race.status != DeadlineStatus.DONE and race.on > today]
-    return ahead[0] if ahead else None
+def active_goal(store: DeadlineStore) -> Race | None:
+    """The goal the preparation is built for: the race of priority A still active, past
+    or ahead. A goal whose day has passed stays the goal until its outcome is written."""
+    return next((race for race in typed(store)
+                 if race.priority == RacePriority.A and race.state == RaceState.ACTIVE), None)
+
+
+def next_race(store: DeadlineStore, today: dt.date) -> Race | None:
+    """The next active race from `today` on, whatever its priority: the one whose day and
+    logistics come first."""
+    return next((race for race in typed(store)
+                 if race.state == RaceState.ACTIVE and race.on >= today), None)
+
+
+#: The moves a race may make from each state; a closed state is left no more.
+MOVES: dict[RaceState, frozenset[RaceState]] = {
+    RaceState.PROPOSED: frozenset({RaceState.ACTIVE, RaceState.DROPPED}),
+    RaceState.ACTIVE: frozenset({RaceState.POSTPONED, RaceState.CANCELLED, RaceState.RUN,
+                                 RaceState.ABANDONED}),
+    RaceState.POSTPONED: frozenset({RaceState.ACTIVE, RaceState.CANCELLED}),
+}
+#: The states that call for a recovery: run, or started and not finished. A race not
+#: started (cancelled) calls for none.
+RECOVERED_FROM = frozenset({RaceState.RUN, RaceState.ABANDONED})
+#: The states a race is written in first.
+OPENING = frozenset({RaceState.PROPOSED, RaceState.ACTIVE})
+
+
+def move_error(before: RaceState | None, after: RaceState) -> str | None:
+    """Why a race may not go from `before` (None: not written yet) to `after`, or None."""
+    if before is None:
+        return (None if after in OPENING else
+                f"a race is written first as {' or '.join(sorted(OPENING))}, not {after}")
+    if before == after or after in MOVES.get(before, frozenset()):
+        return None
+    allowed = sorted(MOVES.get(before, frozenset()))
+    return (f"a race goes from {before} to {', '.join(allowed)}, not {after}" if allowed
+            else f"a race {before} is closed: it changes state no more")
+
+
+def status_of(state: RaceState) -> DeadlineStatus:
+    """A race's deadline status: done once its state is closed."""
+    return DeadlineStatus.DONE if state in CLOSED_RACE_STATES else DeadlineStatus.SCHEDULED

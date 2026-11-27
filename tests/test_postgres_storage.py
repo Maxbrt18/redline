@@ -30,6 +30,7 @@ from redline.storage.schema import (
     conversation_messages,
     conversation_questions,
     correction_deliveries,
+    deadlines,
     metadata,
     observation_metrics,
     observations,
@@ -1769,7 +1770,8 @@ def test_race_deadline_materializes_the_complete_surviving_roadmap(store):
     write(store, commands.DEADLINE_UPSERT, {
         "deadline_key": "race-test", "due_on": dt.date(2026, 11, 26),
         "item": "Course test", "fact_owner": "coach", "status": "scheduled",
-        "kind": "race", "context": {"distance_km": 45},
+        "kind": "race", "priority": "a", "race_state": "active",
+        "context": {"distance_km": 45},
     })
     state = PostgresStateStore(store.database)
     now = dt.datetime(2026, 8, 23, 12, tzinfo=dt.UTC)
@@ -1781,11 +1783,55 @@ def test_race_deadline_materializes_the_complete_surviving_roadmap(store):
     assert any(row["due"] <= now.timestamp() < row["expire_at"] for row in jobs)
 
 
+def _race(key, due_on, priority="a", state="active", **extra):
+    return {"deadline_key": key, "due_on": due_on, "item": key, "fact_owner": "coach",
+            "status": "scheduled", "kind": "race", "priority": priority, "race_state": state,
+            "context": {}, **extra}
+
+
+def _races(store):
+    return {row["deadline_key"]: (row["priority"], row["race_state"], row["status"])
+            for row in store.deadline_rows() if row["kind"] == "race"}
+
+
+def test_a_race_moves_along_its_life_and_its_status_follows(store):
+    write(store, commands.DEADLINE_UPSERT, _race("half", dt.date(2026, 11, 26)))
+    write(store, commands.DEADLINE_UPSERT, _race("half", dt.date(2026, 11, 26), state="run",
+                                                 status="scheduled"))
+    assert _races(store) == {"half": ("a", "run", "done")}, "the state sets the status"
+    with pytest.raises(StorageError, match="race half: a race run is closed"):
+        write(store, commands.DEADLINE_UPSERT, _race("half", dt.date(2026, 11, 26)))
+    with pytest.raises(StorageError, match="written first as active or proposed"):
+        write(store, commands.DEADLINE_UPSERT, _race("ten", dt.date(2026, 10, 4), state="run"))
+
+
+def test_one_race_at_most_is_the_active_goal(store):
+    write(store, commands.DEADLINE_UPSERT, _race("half", dt.date(2026, 11, 26)))
+    with pytest.raises(StorageError, match="half is already the active goal"):
+        write(store, commands.DEADLINE_UPSERT, _race("marathon", dt.date(2027, 4, 4)))
+    write(store, commands.DEADLINE_UPSERT, _race("half", dt.date(2026, 11, 26), priority="b"))
+    write(store, commands.DEADLINE_UPSERT, _race("marathon", dt.date(2027, 4, 4)))
+    assert _races(store) == {"half": ("b", "active", "scheduled"),
+                             "marathon": ("a", "active", "scheduled")}
+    with store.database.engine.begin() as connection, pytest.raises(sa.exc.IntegrityError):
+        connection.execute(deadlines.update().where(deadlines.c.deadline_key == "half")
+                           .values(priority="a"))
+
+
+def test_only_a_race_carries_a_priority_and_a_state(store):
+    with pytest.raises(StorageError, match="only a race carries"):
+        write(store, commands.DEADLINE_UPSERT, {**_race("appointment", dt.date(2026, 9, 1)),
+                                                "kind": "medical", "status": "todo"})
+    with pytest.raises(StorageError, match="carries its priority and its state"):
+        write(store, commands.DEADLINE_UPSERT, {**_race("half", dt.date(2026, 11, 26)),
+                                                "priority": None})
+
+
 def test_moving_a_race_date_cancels_the_old_roadmap(store):
     base = {
         "deadline_key": "race-moved", "due_on": dt.date(2026, 11, 26),
         "item": "Course déplacée", "fact_owner": "coach", "status": "scheduled",
-        "kind": "race", "context": {},
+        "kind": "race", "priority": "a", "race_state": "active", "context": {},
     }
     write(store, commands.DEADLINE_UPSERT, base)
     state = PostgresStateStore(store.database)
@@ -2254,7 +2300,8 @@ def test_the_weekly_dossier_is_computed_from_the_same_functions_as_the_clis(stor
     assert "--reason optimistic" in text and "narrative" not in text
     assert "Faisabilité à rebours : aucune course typée" in text
     write(store, commands.DEADLINE_UPSERT, {"deadline_key": "targetrace", "due_on": dt.date(2026, 11, 26),
-                           "kind": "race", "item": "TargetRace",
+                           "kind": "race", "priority": "a", "race_state": "active",
+                           "item": "TargetRace",
                            "fact_owner": "athlete/goals.md", "status": "scheduled"})
     text = weekly_dossier.render(store, VAULT_ROOT, "2026-W39", dt.date(2026, 9, 27))
     assert "Faisabilité à rebours (règle n8, calculée) : course le 26/11" in text

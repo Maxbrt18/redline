@@ -109,7 +109,7 @@ def seed_race_tab(store):
     write(store, commands.DEADLINE_UPSERT, {
         "deadline_key": "race-targetrace-2026", "due_on": dt.date(2026, 11, 26),
         "item": "TargetRace 45 km", "fact_owner": "coaching/race.md", "status": "scheduled",
-        "kind": "race", "athlete_label": "TargetRace",
+        "kind": "race", "priority": "a", "race_state": "active", "athlete_label": "TargetRace",
         "context": {"start_time": "09:00", "distance_km": 42.2, "elevation_gain_m": 900,
                     "elevation_loss_m": 900, "elevation_approximate": True, "target": "<4 h 30"}})
     write(store, commands.DEADLINE_UPSERT, {
