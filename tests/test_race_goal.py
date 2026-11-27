@@ -6,10 +6,10 @@ import datetime as dt
 
 import trajectory
 
-from redline.analysis import plan_engine, taper
-from redline.model import iso_week, race
-from redline.model.vocabulary import RaceState
-from redline.service import plan_revision
+from redline.analysis import taper
+from redline.model import cycle_templates, cycle_transitions, iso_week, race
+from redline.model.cycle_transitions import Standing
+from redline.model.vocabulary import CycleKind, RaceState
 
 FIRST = trajectory.FIRST_WEEK
 TODAY = iso_week.monday(FIRST)
@@ -28,28 +28,24 @@ def store(*others):
     return found
 
 
+TEMPLATES = cycle_templates.parse(cycle_templates.DEFAULT.read_text(encoding="utf-8"),
+                                  cycle_templates.DEFAULT)
 TEN = other("ten", dt.date(2031, 2, 9), "b", "active", distance_km=10, terrain="road")
 
 
-def test_a_race_b_before_the_goal_does_not_take_the_preparation_over():
-    skeleton = plan_engine.chosen(store(TEN), TODAY)
-    assert skeleton.weeks[-1].label == iso_week.of(trajectory.RACE_ON)
+def test_a_race_b_before_the_goal_does_not_take_the_taper_over():
     assert taper.race_window(store(TEN), iso_week.of(TEN["due_on"])) is None
     assert taper.race_window(store(TEN), iso_week.of(trajectory.RACE_ON)) is not None
 
 
 def test_only_a_race_run_or_started_opens_a_recovery():
-    def recovering(state):
-        ran = other("cross", TODAY - dt.timedelta(days=6), "a", state)
-        return plan_engine.frame(store(ran), TODAY).recovering
+    def kind(state):
+        ran = other("cross", TODAY - dt.timedelta(days=6), "a", state, distance_km=10)
+        transition = cycle_transitions.next_cycle(
+            None, race.typed(store(ran)), (), Standing(30, 30, 15), TODAY,
+            TEMPLATES)
+        assert transition is not None
+        return transition.kind
 
-    assert recovering("run") and recovering("abandoned")
-    assert not recovering("cancelled")
-
-
-def test_a_goal_whose_day_passed_refuses_the_next_week_until_its_outcome_is_written():
-    after = trajectory.RACE_ON + dt.timedelta(days=2)
-    week = iso_week.of(after + dt.timedelta(days=7))
-    revision = trajectory.revision(week, 20, 8, after)
-    [refusal] = plan_revision.skeleton_errors(store(), week, revision, None, print)
-    assert "is past: write its outcome" in refusal
+    assert kind("run") == kind("abandoned") == CycleKind.RECOVERY
+    assert kind("cancelled") == CycleKind.GENERAL

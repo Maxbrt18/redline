@@ -1,12 +1,16 @@
-"""What the coach reads of the cycles: the candidates the engine generates and the version
-in force.
+"""What the coach reads of the cycles: the candidates the engine generates, the version in
+force, and the week of it the Sunday review prepares.
 
 The candidates are generated from the athlete's real state, the store read once
 (`redline.analysis.cycle_inputs`): for the active goal, the preparation's candidates;
 without one, a block of the general preparation at the default level, or another kind or
 level when asked. Each week shows its phase, deload, volume, long run and key sessions,
 with today's paces rendered from the calibration in force; the fitness lines follow the
-header (`redline.analysis.fitness_report`)."""
+header (`redline.analysis.fitness_report`).
+
+The review reads the active version's next week, and is told when the goal's preparation
+window is open while another cycle is in force: entering a preparation is the athlete's.
+"""
 
 from __future__ import annotations
 
@@ -15,10 +19,10 @@ from typing import Any
 
 from redline.coach.fr import cycle as text
 from redline.model import calibration as calibration_model
-from redline.model import cycle_templates, instance, intensity, paths
+from redline.model import cycle_templates, instance, intensity, iso_week, paths
 from redline.model import plan_generator as generator
 from redline.model import race as race_model
-from redline.model.cycle_templates import Intensity
+from redline.model.cycle_templates import CycleTemplates, Intensity
 from redline.model.cycles import CycleVersion
 from redline.model.errors import ConfigError, InputError
 from redline.model.plan_generator import Key, Trame, Week
@@ -202,3 +206,49 @@ def shown(store: Any, version: CycleVersion, today: dt.date) -> list[str]:
     trame = version.trame
     return [version_line(version), *header(trame), *fitness_report.lines(store, today, goal),
             _risks(trame), *_weeks(trame, refs)]
+
+
+def window_line(store: Any, templates: CycleTemplates, version: CycleVersion | None,
+                today: dt.date) -> str | None:
+    """The goal's preparation window, open while another cycle is in force."""
+    race = _goal_ahead(store, today)
+    if race is None or race.goal is None or (
+            version is not None and version.kind == CycleKind.PREPARATION):
+        return None
+    template = templates.preparation_for(race.goal.distance_km, race.goal.terrain)
+    if template is None:
+        return None
+    opens = generator.window_start(template, race.on)
+    if iso_week.of(today) < iso_week.shift(opens, -1):
+        return None
+    return text.WINDOW_OPEN.format(race=race.name or text.UNNAMED_RACE, on=race.on, week=opens)
+
+
+def review_bound(store: Any, week: str) -> tuple[CycleVersion, Week] | None:
+    """The version in force and its week after `week`, the one the review of `week`
+    prepares; None without a version or that week."""
+    version = store.active_cycle()
+    upcoming = iso_week.shift(week, 1)
+    found = version.week(upcoming) if version is not None else None
+    return None if version is None or found is None else (version, found)
+
+
+def review_lines(store: Any, week: str, today: dt.date) -> list[str]:
+    """What the Sunday review of `week` reads of the cycles: the version in force and the
+    week it prepares within, or the open window of the goal's preparation."""
+    version = store.active_cycle()
+    lines = []
+    if version is not None:
+        lines.append(version_line(version))
+        found = review_bound(store, week)
+        if found is not None:
+            _, bound = found
+            race = _goal_ahead(store, today)
+            lines.append(week_line(bound, version.keys_of(bound.label),
+                                   references(store, race.goal if race else None)))
+        else:
+            lines.append(text.NO_WEEK.format(week=iso_week.shift(week, 1)))
+    else:
+        lines.append(text.NO_CYCLE)
+    opened = window_line(store, cycle_templates.load(paths.vault_root()), version, today)
+    return [*lines, *([opened] if opened else [])]

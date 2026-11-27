@@ -56,3 +56,9 @@ VERSION_LEVEL = " « {level} »"
 CAUSES = {"create": "créée pour l'objectif", "replan": "replanifiée",
           "transition": "après le cycle précédent", "level_change": "nouveau niveau",
           "block_end": "bloc suivant", "migration": "reprise de l'existant"}
+NO_WEEK = "  Aucune semaine {week} dans ce cycle."
+NO_CYCLE = "Aucun cycle en cours : le planificateur en met un en place à son prochain passage."
+WINDOW_OPEN = ("La fenêtre de préparation de « {race} » ({on:%d/%m/%Y}) s'ouvre en {week} : "
+               "`redline cycle candidates` donne les trames. Entrer en préparation est le "
+               "choix de l'athlète.")
+UNNAMED_RACE = "l'objectif"

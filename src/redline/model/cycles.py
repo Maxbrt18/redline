@@ -57,6 +57,9 @@ class CycleVersion:
     def week(self, label: str) -> Week | None:
         return self.trame.week(label)
 
+    def keys_of(self, label: str) -> list[Key]:
+        return [key for key in self.trame.keys if key.week == label]
+
 
 def starts_on(trame: Trame) -> dt.date:
     return iso_week.monday(trame.weeks[0].label)

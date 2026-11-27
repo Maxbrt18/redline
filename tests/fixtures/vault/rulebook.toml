@@ -71,11 +71,10 @@ pain_cut_pct = 30
 poor_nights_streak = 3
 # ... as an abnormally high easy-run HR does, for this many days.
 alarm_no_quality_days = 7
-# A plan skeleton (`redline.model.plan_skeleton`), both or none: from one build week to the
+# A cycle's trame (`redline.model.plan_generator`), both or none: from one build week to the
 # next, the weekly volume climbs by at most this (%) ...
 skeleton_ramp_max_pct = 10.0
-# ... and the long run by at most this (%). Lost weeks are never made up: the peak is then
-# out of reach, a risk the candidates name.
+# ... and the long run by at most this (%). The keys keep the names the instances declare.
 skeleton_long_step_max_pct = 10.0
 # The expected RPE: calibrated per kind on the declared RPE of these weeks, from these
 # many sessions, a range of plus or minus the width (wider while unsettled), a run's

@@ -120,21 +120,6 @@ def gut_errors(store, week: str, revision: dict, warn: Callable[[str], None]) ->
                     check)
 
 
-def skeleton_errors(store, week: str, revision: dict, previous: dict | None,
-                    warn: Callable[[str], None]) -> list[str]:
-    """The week against the next race's chosen skeleton, when it has one."""
-    from redline.analysis import plan_engine
-    today = dt.date.fromisoformat(revision["computed_at"][:10])
-
-    def check() -> list[str]:
-        skeleton = plan_engine.chosen(store, today)
-        return [] if skeleton is None else plan_engine.revision_errors(skeleton, week,
-                                                                       revision, previous)
-
-    return _guarded("skeleton", _where(week, revision), wording.SKELETON_UNREADABLE, warn,
-                    check)
-
-
 def checked(store, week: str, revision: dict, existing: dict | None, *, stamp: str,
             warn: Callable[[str], None]) -> tuple[dict | None, dict]:
     """The previous revision and the new one, stamped and measured, or SchemaError."""
@@ -175,7 +160,6 @@ def checked(store, week: str, revision: dict, existing: dict | None, *, stamp: s
         *pain_errors(store, week, current, existing, warn),
         *progression_errors(store, week, current, previous, warn),
         *gut_errors(store, week, current, warn),
-        *skeleton_errors(store, week, current, previous, warn),
     ]
     if mistakes:
         raise SchemaError(mistakes)

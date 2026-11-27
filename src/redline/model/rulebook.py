@@ -66,7 +66,8 @@ PERMIT_GRADED_PARAMETERS = ("permit_tolerance_min", "permit_tolerance_pct",
 PERMIT_LOAD_PARAMETER = "permit_raw_guard_pct"
 #: The expected-RPE method (`redline.analysis.expected_rpe`), declared together or not at
 #: all; in this order, the fields of its `Settings`.
-#: The climb of a plan skeleton (`redline.model.plan_skeleton`), declared together.
+#: The climb of a cycle's trame (`redline.model.plan_generator`), declared together; the
+#: keys keep the names the instances declare.
 SKELETON_PARAMETERS = ("skeleton_ramp_max_pct", "skeleton_long_step_max_pct")
 RPE_MODEL_PARAMETERS = ("rpe_model_weeks", "rpe_model_min_sessions",
                         "rpe_model_settled_sessions", "rpe_range_width",
@@ -146,12 +147,12 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
               note="consecutive poor nights that remove quality"),
         field("alarm_no_quality_days", int, required=False, minimum=1, maximum=14,
               note="days without quality after poor nights or a high easy-run HR"),
-        # Optional, both or none (`SKELETON_PARAMETERS`): absent, no plan skeleton is built.
+        # Optional, both or none (`SKELETON_PARAMETERS`): absent, no trame is generated.
         field("skeleton_ramp_max_pct", float, required=False, minimum=1, maximum=50,
-              note="most a skeleton's weekly volume climbs from one build week to the next, "
+              note="most a trame's weekly volume climbs from one build week to the next, "
                    "in %"),
         field("skeleton_long_step_max_pct", float, required=False, minimum=1, maximum=50,
-              note="most a skeleton's long run climbs from one build week to the next, in %"),
+              note="most a trame's long run climbs from one build week to the next, in %"),
         # Optional, all six or none (`RPE_MODEL_PARAMETERS`): absent, no session has an
         # expected RPE and none is read against one.
         field("rpe_model_weeks", int, required=False, minimum=2, maximum=104,
@@ -492,7 +493,7 @@ def parse(text: str, source: Path) -> Rulebook:
                          (ESTIMATE_PARAMETERS, "goal-estimate thresholds"),
                          (CRITICAL_SPEED_PARAMETERS, "critical-speed thresholds"),
                          (CALIBRATION_PARAMETERS, "calibration thresholds"),
-                         (SKELETON_PARAMETERS, "skeleton thresholds")):
+                         (SKELETON_PARAMETERS, "trame thresholds")):
         declared = [name for name in group if name in raw]
         if declared and len(declared) != len(group):
             problems.append(f"parameters: the {label} go together, missing "

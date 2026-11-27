@@ -86,7 +86,6 @@ class Template:
     distance_km_max: float
     taper_weeks: int
     deload_every: tuple[int, ...]
-    deload_cut_pct: int
     phases: tuple[tuple[PlanPhase, Phase], ...]
 
     def phase(self, name: PlanPhase) -> Phase:
@@ -105,7 +104,7 @@ def _template(data: dict) -> Template:
     terrain = data.get("terrain")
     return Template(data["slug"], RaceTerrain(terrain) if terrain else None,
                     float(data["distance_km_max"]), data["taper_weeks"],
-                    tuple(data["deload_every"]), data["deload_cut_pct"], tuple(phases))
+                    tuple(data["deload_every"]), tuple(phases))
 
 
 def parse(text: str, source: Path) -> tuple[Template, ...]:

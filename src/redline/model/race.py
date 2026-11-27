@@ -11,10 +11,9 @@ pace is the one chosen with the coach, never a default: without it, the plan has
 passages.
 
 And the goal the preparation is built backwards from (`Goal`): distance and terrain,
-which pick the plan template and, when the race says nothing, its taper; the peak weekly
-volume and long run, the quality sessions a week and the families allowed, set in the
-interview with the athlete; and the skeleton chosen among the candidates
-(`redline.model.plan_skeleton`), by its levers.
+which pick the cycle template and, when the race says nothing, its taper (the plan
+template's); the climbing it asks, its time goal. The peaks and the levers of a preparation are the cycle
+version's (`redline.model.cycles`), never the race's.
 """
 
 from __future__ import annotations
@@ -30,7 +29,6 @@ from .vocabulary import (
     DeadlineKind,
     DeadlineStatus,
     GoalSource,
-    PlanPhase,
     RacePriority,
     RaceState,
     RaceTerrain,
@@ -45,18 +43,6 @@ def _band_ordered(context: dict) -> list[str]:
     if (context.get("goal_time_s") is None) != (context.get("goal_source") is None):
         problems.append("goal_time_s and goal_source go together")
     return problems
-
-
-SECOND_QUALITY = (str(PlanPhase.DEVELOPMENT), str(PlanPhase.SPECIFIC))
-
-#: The skeleton chosen among the candidates, by the levers that make it.
-SKELETON_SCHEMA = Schema("race skeleton", [
-    field("candidate", str, pattern=r"[a-z][a-z-]{0,39}", note="the candidate's slug"),
-    field("specific_weeks", int, minimum=1, maximum=20),
-    field("deload_every", int, minimum=2, maximum=6),
-    field("second_quality", str, choices=SECOND_QUALITY,
-          note="the phase whose first week brings the second quality session"),
-])
 
 
 AID_STATION_SCHEMA = Schema("aid station", [
@@ -90,18 +76,8 @@ CONTEXT_SCHEMA = Schema("race context", [
     field("goal_time_s", int, required=False, minimum=600, maximum=360000,
           note="the time goal, in seconds; with goal_source"),
     field("goal_source", str, required=False, choices=tuple(GoalSource)),
-    field("quality_per_week", int, required=False, minimum=0, maximum=4,
-          note="most quality sessions a week of the preparation; within rule n1"),
-    field("peak_volume_km", float, required=False, minimum=5, maximum=300,
-          note="the weekly running volume the preparation peaks at"),
-    field("peak_long_run_km", float, required=False, minimum=3, maximum=120,
-          note="the long run the preparation peaks at"),
-    field("families", list, required=False, maximum=len(plan_templates.QUALITY_WORKOUTS),
-          item=field("workout", str, choices=plan_templates.QUALITY_WORKOUTS),
-          note="the quality workouts the athlete may run; absent, the template's"),
     field("power_hike_from_pct", int, required=False, minimum=3, maximum=40,
           note="on a trail, the grade the long runs walk briskly from"),
-    field("skeleton", dict, required=False, schema=SKELETON_SCHEMA),
 ], extra=True, check=_band_ordered)
 
 
@@ -116,30 +92,14 @@ class AidStation:
 
 
 @dataclass(frozen=True)
-class Skeleton:
-    """The levers of the chosen skeleton."""
-
-    candidate: str
-    specific_weeks: int
-    deload_every: int
-    second_quality: PlanPhase
-
-
-@dataclass(frozen=True)
 class Goal:
     """What the preparation is built backwards from: set in the interview, typed."""
 
     distance_km: float
     terrain: RaceTerrain
-    peak_volume_km: float | None = None
-    peak_long_run_km: float | None = None
-    quality_per_week: int | None = None
-    families: tuple[str, ...] | None = None
     dplus_m: int | None = None
     goal_time_s: int | None = None
     goal_source: GoalSource | None = None
-    power_hike_from_pct: int | None = None
-    skeleton: Skeleton | None = None
 
 
 @dataclass(frozen=True)
@@ -160,8 +120,6 @@ class Race:
     goal: Goal | None = None
     #: The context's keys that could not be read, dropped by the reading.
     unread: tuple[str, ...] = ()
-    #: The context names a chosen skeleton, readable or not.
-    declares_skeleton: bool = False
     #: The deadline's key.
     key: str = ""
     #: The race's distance, said with or without its terrain: what a recovery reads.
@@ -171,20 +129,10 @@ class Race:
 def _goal(context: dict) -> Goal | None:
     if context.get("distance_km") is None or context.get("terrain") is None:
         return None
-    chosen = context.get("skeleton")
-    families = context.get("families")
     return Goal(
         distance_km=float(context["distance_km"]), terrain=RaceTerrain(context["terrain"]),
-        peak_volume_km=_number(context.get("peak_volume_km")),
-        peak_long_run_km=_number(context.get("peak_long_run_km")),
-        quality_per_week=context.get("quality_per_week"),
-        families=None if families is None else tuple(families),
         dplus_m=context.get("dplus_m"), goal_time_s=context.get("goal_time_s"),
-        goal_source=GoalSource(context["goal_source"]) if context.get("goal_source") else None,
-        power_hike_from_pct=context.get("power_hike_from_pct"),
-        skeleton=None if not chosen else Skeleton(
-            chosen["candidate"], chosen["specific_weeks"], chosen["deload_every"],
-            PlanPhase(chosen["second_quality"])))
+        goal_source=GoalSource(context["goal_source"]) if context.get("goal_source") else None)
 
 
 def template_of(goal: Goal | None) -> plan_templates.Template | None:
@@ -232,7 +180,6 @@ def from_row(row: dict) -> Race:
                 pace_s_per_km=_number(context.get("pace_s_per_km")),
                 goal=goal,
                 unread=tuple(sorted(set(written) - set(context))),
-                declares_skeleton=bool(written.get("skeleton")),
                 key=str(row.get("deadline_key") or ""),
                 distance_km=_number(context.get("distance_km")))
 

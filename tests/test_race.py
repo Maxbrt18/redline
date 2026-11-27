@@ -89,20 +89,15 @@ def test_an_unreadable_key_costs_its_value_never_the_race():
     assert typed.taper_weeks == 1 and typed.pace_s_per_km is None
 
 
-GOAL = {"distance_km": 21.1, "terrain": "road", "peak_volume_km": 50, "peak_long_run_km": 20,
-        "quality_per_week": 2, "families": ["threshold"], "goal_time_s": 6300,
-        "goal_source": "coach",
-        "skeleton": {"candidate": "balanced", "specific_weeks": 6, "deload_every": 4,
-                     "second_quality": "specific"}}
+GOAL = {"distance_km": 21.1, "terrain": "road", "goal_time_s": 6300, "goal_source": "coach"}
 
 
 def test_a_race_carries_the_goal_its_plan_is_built_from():
     typed = race.from_row({"kind": "race", "status": "scheduled", "priority": "a", "race_state": "active", "due_on": "2031-04-06",
                            "context": GOAL})
     goal = typed.goal
-    assert (goal.distance_km, goal.terrain, goal.peak_volume_km) == (21.1, "road", 50)
-    assert goal.families == ("threshold",) and goal.goal_time_s == 6300
-    assert goal.skeleton == race.Skeleton("balanced", 6, 4, "specific")
+    assert (goal.distance_km, goal.terrain, goal.goal_time_s) == (21.1, "road", 6300)
+    assert typed.distance_km == 21.1
     assert race.from_row({"kind": "race", "status": "scheduled", "priority": "a", "race_state": "active",
                           "due_on": "2031-04-06"}).goal is None
 
@@ -125,8 +120,16 @@ def test_the_goal_keys_are_typed():
         race.CONTEXT_SCHEMA.validate({"goal_time_s": 6300})
     with pytest.raises(SchemaError, match="terrain"):
         race.CONTEXT_SCHEMA.validate({"terrain": "track"})
-    with pytest.raises(SchemaError, match="second_quality"):
-        race.CONTEXT_SCHEMA.validate({"skeleton": {**GOAL["skeleton"], "second_quality": "base"}})
+
+
+def test_the_skeleton_s_keys_are_the_cycle_version_s_and_left_unread():
+    retired = {**GOAL, "peak_volume_km": 50, "skeleton": {"candidate": "balanced"}}
+    race.CONTEXT_SCHEMA.validate(retired)
+    typed = race.from_row({"kind": "race", "status": "scheduled", "priority": "a",
+                           "race_state": "active", "due_on": "2031-04-06",
+                           "deadline_key": "half", "context": retired})
+    assert typed.unread == () and typed.key == "half"
+    assert not hasattr(typed.goal, "peak_volume_km")
 
 
 @pytest.mark.parametrize(("before", "after", "allowed"), [
