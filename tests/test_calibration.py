@@ -5,14 +5,15 @@ from __future__ import annotations
 import dataclasses
 import datetime as dt
 
-from redline.analysis import calibration
-from redline.model.efforts import Effort
+from redline.analysis import calibration, race_estimate
+from redline.model.efforts import Break, Effort
 from redline.model.vocabulary import (
     CalibrationConfidence,
     CalibrationSource,
     Decider,
     EffortKind,
     EffortTerrain,
+    RetestReason,
 )
 
 TODAY = dt.date(2030, 11, 27)
@@ -67,3 +68,27 @@ def test_measured_heart_rate_thresholds_carry_over_to_the_next_calibration():
                                   hr_first_threshold_bpm=152)
     found = calibration.adoption(current, [TEN, *TEST], TODAY, CONFIG)
     assert found.hr_first_threshold_bpm == 152
+
+
+def bound(vdot, on):
+    return race_estimate.Bound(on, 5.0, 1200.0, vdot)
+
+
+def test_a_session_beyond_the_band_proposes_a_test_and_adopts_nothing():
+    current = calibration.adoption(None, [TEN], TODAY, CONFIG)
+    top = current.vdot + CONFIG.band_sd * current.vdot_sd
+    within = calibration.retest_proposal(current, [TEN], [], bound(top - 0.1, TODAY), CONFIG)
+    assert within is None
+    found = calibration.retest_proposal(current, [TEN], [], bound(top + 1, TODAY), CONFIG)
+    assert found.reason == RetestReason.SESSIONS_ABOVE and found.band_top == round(top, 1)
+    assert calibration.adoption(current, [TEN], TODAY, CONFIG) is None
+
+
+def test_a_declared_break_after_the_newest_effort_proposes_a_test():
+    current = calibration.adoption(None, [TEN], TODAY, CONFIG)
+    short = Break("cold", TEN.on + dt.timedelta(days=2), TEN.on + dt.timedelta(days=4))
+    assert calibration.retest_proposal(current, [TEN], [short], None, CONFIG) is None
+    long = Break("shin", TEN.on + dt.timedelta(days=2), TEN.on + dt.timedelta(days=30))
+    found = calibration.retest_proposal(current, [TEN], [long], None, CONFIG)
+    assert (found.reason, found.on) == (RetestReason.BREAK, long.ends_on)
+    assert calibration.retest_proposal(None, [TEN], [long], None, CONFIG) is None

@@ -72,10 +72,6 @@ class Fit:
         """CS as a pace, in seconds per kilometre."""
         return 1000 / self.speed_mps
 
-    def pace_at(self, pct: float) -> float:
-        """The pace of `pct` % of CS, in seconds per kilometre."""
-        return 1000 / (self.speed_mps * pct / 100)
-
 
 def usable(efforts: Iterable[Effort], today: dt.date, weeks: int) -> list[Effort]:
     """The flat efforts of the recent weeks whose duration the model holds over."""

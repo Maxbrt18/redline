@@ -48,9 +48,15 @@ NO_CALIBRATION = ("Calibration : aucune, faute d'effort à fond déclaré. Le co
                   "récupération entre les deux. Jamais imposé.")
 CRITICAL_SPEED = ("  Vitesse critique : {pace}/km ({speed} km/h){error}, D′ {d_prime} m. C'est la "
                   "limite haute du seuil : au-dessus, chaque répétition puise dans D′.")
+TEST_SESSIONS_ABOVE = ("  Une séance du {on:%d/%m/%Y} a prouvé un VDOT de {vdot}, au-dessus de la "
+                       "bande de la calibration ({top}) : proposer un test. La calibration ne "
+                       "bouge pas avant.")
+TEST_AFTER_BREAK = ("  Une pause déclarée jusqu'au {on:%d/%m/%Y} suit le dernier effort de la "
+                    "calibration : proposer un test avant de se fier à ses allures.")
 CRITICAL_SPEED_ERROR = " ± {error} s/km"
 CRITICAL_SPEED_TWO = " (deux efforts : aucune erreur d'ajustement)"
-CRITICAL_SPEED_DOMAINS = ("  domaines : EF plus lente que {easy}/km ({first} % de la VC), séances de "
+CRITICAL_SPEED_DOMAINS = ("  domaines : EF plus lente que {easy}/km ({first} % de la VC) ou sous {hr} "
+                          "bpm (haut de la Z2), séances de "
                           "seuil entre {low}/km et {high}/km ({low_pct} à {high_pct} %, convention "
                           "à vérifier sur la FC et le RPE), VMA plus vite que {pace}/km.")
 NO_CRITICAL_SPEED = ("  Vitesse critique : aucune dans la calibration, faute de deux efforts à fond "

@@ -19,13 +19,24 @@ from redline.coach.fr import plan_skeleton as text
 from redline.coach.fr import session_labels
 from redline.model import calibration as calibration_model
 from redline.model import efforts as effort_model
-from redline.model import iso_week, plan_skeleton, plan_templates, rulebook, session_kinds
+from redline.model import (
+    instance,
+    intensity,
+    iso_week,
+    paths,
+    plan_skeleton,
+    plan_templates,
+    rulebook,
+    session_kinds,
+)
 from redline.model import race as race_model
 from redline.model.calibration import Calibration
+from redline.model.cycle_templates import Range
 from redline.model.errors import ConfigError, InputError
 from redline.model.plan_skeleton import NOTHING_HELD, Held, Levers, Limits, Skeleton, Start
 from redline.model.vocabulary import (
     DeadlineKind,
+    IntensityRef,
     RacePriority,
     RaceState,
     RaceTerrain,
@@ -33,6 +44,7 @@ from redline.model.vocabulary import (
 )
 
 from . import calibration, critical_speed, expected_rpe, ledger, race_estimate, signals
+from .calibration import RetestProposal
 
 #: The closed weeks the starting volume is the mean of.
 START_WEEKS = 3
@@ -72,18 +84,26 @@ def goal_reading(store: Any, rows: list[ledger.Row], goal: race_model.Goal,
 
 @dataclass(frozen=True)
 class CalibrationReading:
-    """The calibration in force, None before the first, and the domains' shares of CS."""
+    """The calibration in force, None before the first, the domains' shares of CS, and the
+    test the weak evidence proposes."""
 
     calibration: Calibration | None
     critical: critical_speed.Settings | None
+    proposal: RetestProposal | None = None
 
 
-def calibration_reading(store: Any) -> CalibrationReading | None:
+def calibration_reading(store: Any, rows: list[ledger.Row],
+                        today: dt.date) -> CalibrationReading | None:
     """None when the rulebook declares no calibration."""
-    if calibration.settings() is None:
+    config = calibration.settings()
+    if config is None:
         return None
-    return CalibrationReading(calibration_model.in_force(store.calibration_rows()),
-                              critical_speed.settings())
+    current = calibration_model.in_force(store.calibration_rows())
+    bound = (race_estimate.bound(race_estimate.pieces(store, rows, today, config.estimate))
+             if config.estimate is not None else None)
+    proposal = calibration.retest_proposal(current, effort_model.efforts(store.effort_rows()),
+                                         effort_model.breaks(store.break_rows()), bound, config)
+    return CalibrationReading(current, config.critical, proposal)
 
 
 @dataclass(frozen=True)
@@ -179,7 +199,7 @@ def frame(store: Any, today: dt.date) -> Frame:
     held = (held_of(rows, expected_rpe.history(store, rows, config), today)
             if config is not None else NOTHING_HELD)
     return Frame(race, goal, template, start_of(rows, today), limits, first, recovering, held,
-                 goal_reading(store, rows, goal, today), calibration_reading(store))
+                 goal_reading(store, rows, goal, today), calibration_reading(store, rows, today))
 
 
 def candidates(store: Any, today: dt.date) -> tuple[Frame, list[Skeleton]]:
@@ -283,24 +303,46 @@ def _calibration_lines(reading: CalibrationReading | None) -> list[str]:
     if found.vdot is not None and found.vdot_sd is not None:
         lines.append(text.CALIBRATION_VDOT.format(vdot=text.number(found.vdot),
                                                   sd=text.number(found.vdot_sd)))
+    lines += _proposal_lines(reading.proposal)
     cs = found.cs_mps
     if cs is None or found.d_prime_m is None or config is None:
         return [*lines, text.NO_CRITICAL_SPEED]
+    athlete = instance.load(paths.vault_root())
+    refs = calibration.references(found, config, hr_rest=athlete.hr_rest,
+                                  hr_max=athlete.hr_max)
+    easy_hr = intensity.render(IntensityRef.HR_ZONE, Range(1, 2), refs).hr_bpm
 
-    def pace_at(pct: float) -> str:
-        return _pace(1000 / (cs * pct / 100))
+    def pace(ref: IntensityRef, low: float, high: float) -> Range:
+        rendered = intensity.render(ref, Range(low, high), refs).pace_s
+        assert rendered is not None, "a calibration with CS renders its speed references"
+        return rendered
 
+    critical = pace(IntensityRef.CRITICAL_SPEED, 100, 100).low
+    threshold = pace(IntensityRef.CRITICAL_SPEED, config.threshold_low_pct,
+                     config.threshold_high_pct)
     error = (text.CRITICAL_SPEED_TWO if found.cs_se_mps is None else
-             text.CRITICAL_SPEED_ERROR.format(error=f"{1000 / (cs - found.cs_se_mps) - 1000 / cs:.0f}"))
+             text.CRITICAL_SPEED_ERROR.format(
+                 error=f"{1000 / (cs - found.cs_se_mps) - critical:.0f}"))
     return [*lines,
-            text.CRITICAL_SPEED.format(pace=pace_at(100), speed=text.number(cs * 3.6),
+            text.CRITICAL_SPEED.format(pace=_pace(critical), speed=text.number(cs * 3.6),
                                        d_prime=f"{found.d_prime_m:.0f}", error=error),
             text.CRITICAL_SPEED_DOMAINS.format(
-                easy=pace_at(config.first_threshold_pct),
+                easy=_pace(pace(IntensityRef.FIRST_THRESHOLD, 100, 100).low),
+                hr=f"{easy_hr.high:.0f}" if easy_hr is not None else "?",
                 first=text.number(config.first_threshold_pct),
-                low=pace_at(config.threshold_low_pct), high=pace_at(config.threshold_high_pct),
+                low=_pace(threshold.low), high=_pace(threshold.high),
                 low_pct=text.number(config.threshold_low_pct),
-                high_pct=text.number(config.threshold_high_pct), pace=pace_at(100))]
+                high_pct=text.number(config.threshold_high_pct), pace=_pace(critical))]
+
+
+def _proposal_lines(proposal: RetestProposal | None) -> list[str]:
+    """The test the weak evidence proposes; the calibration does not move before it."""
+    if proposal is None:
+        return []
+    if proposal.vdot is not None and proposal.band_top is not None:
+        return [text.TEST_SESSIONS_ABOVE.format(on=proposal.on, vdot=text.number(proposal.vdot),
+                                                top=text.number(proposal.band_top))]
+    return [text.TEST_AFTER_BREAK.format(on=proposal.on)]
 
 
 def _estimate_lines(reading: GoalReading | None) -> list[str]:

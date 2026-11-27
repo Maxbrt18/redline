@@ -20,12 +20,14 @@ from dataclasses import dataclass
 
 from redline.model import rulebook
 from redline.model.calibration import Calibration
-from redline.model.efforts import Effort
+from redline.model.efforts import Break, Effort
+from redline.model.intensity import References
 from redline.model.vocabulary import (
     CalibrationConfidence,
     CalibrationSource,
     Decider,
     EffortKind,
+    RetestReason,
 )
 
 from . import critical_speed, race_estimate
@@ -33,6 +35,7 @@ from . import critical_speed, race_estimate
 
 @dataclass(frozen=True)
 class Settings:
+    band_sd: float
     fresh_weeks: int
     estimate: race_estimate.Settings | None
     critical: critical_speed.Settings | None
@@ -46,7 +49,7 @@ def settings() -> Settings | None:
     if (book.calibration_band_sd is None or book.calibration_fresh_weeks is None
             or (estimate is None and critical is None)):
         return None
-    return Settings(book.calibration_fresh_weeks, estimate, critical)
+    return Settings(book.calibration_band_sd, book.calibration_fresh_weeks, estimate, critical)
 
 
 def adoption(current: Calibration | None, efforts: Iterable[Effort], today: dt.date,
@@ -80,3 +83,46 @@ def adoption(current: Calibration | None, efforts: Iterable[Effort], today: dt.d
         vdot_sd=round(form.vdot_sd, 2) if form else None,
         hr_first_threshold_bpm=current.hr_first_threshold_bpm if current else None,
         hr_second_threshold_bpm=current.hr_second_threshold_bpm if current else None)
+
+
+@dataclass(frozen=True)
+class RetestProposal:
+    """A test proposed instead of a calibration: why, and since when."""
+
+    reason: RetestReason
+    on: dt.date
+    #: The VDOT a session proved, for `sessions_above`; the calibration's band top.
+    vdot: float | None = None
+    band_top: float | None = None
+
+
+def retest_proposal(current: Calibration | None, efforts: Iterable[Effort],
+                  breaks: Iterable[Break], bound: race_estimate.Bound | None,
+                  config: Settings) -> RetestProposal | None:
+    """The test to propose to the calibration in force, or None."""
+    if current is None:
+        return None
+    if bound is not None and current.vdot is not None and current.vdot_sd is not None:
+        top = current.vdot + config.band_sd * current.vdot_sd
+        if bound.vdot > top:
+            return RetestProposal(RetestReason.SESSIONS_ABOVE, bound.on, round(bound.vdot, 1),
+                                round(top, 1))
+    newest = max((effort.on for effort in efforts if effort.key in current.evidence),
+                 default=None)
+    minimum = config.estimate.break_min_days if config.estimate else None
+    after = [pause for pause in breaks if newest is not None and pause.ends_on > newest
+             and (minimum is None or pause.days >= minimum)]
+    if after:
+        return RetestProposal(RetestReason.BREAK, max(pause.ends_on for pause in after))
+    return None
+
+
+def references(found: Calibration | None, critical: critical_speed.Settings | None,
+               goal_speed_mps: float | None = None, hr_rest: int | None = None,
+               hr_max: int | None = None) -> References:
+    """What the calibration in force renders intensities against: its critical speed and
+    the first threshold at the rulebook's share of it."""
+    cs = found.cs_mps if found is not None else None
+    first = (cs * critical.first_threshold_pct / 100
+             if cs is not None and critical is not None else None)
+    return References(cs, first, goal_speed_mps, hr_rest, hr_max)

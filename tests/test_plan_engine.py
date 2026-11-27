@@ -235,7 +235,18 @@ def test_the_calibration_in_force_gives_the_critical_speed_and_its_domains(runs)
     assert "  VDOT 50,2 ± 1,1." in lines
     found = next(line for line in lines if line.startswith("  Vitesse critique"))
     assert found.startswith("  Vitesse critique : 4:10/km (14,4 km/h) (deux efforts")
-    assert any(line.startswith("  domaines : EF plus lente que") for line in lines)
+    domains = next(line for line in lines if line.startswith("  domaines : EF plus lente que"))
+    assert "ou sous 149 bpm (haut de la Z2)" in domains
+
+
+def test_a_break_after_the_calibration_s_newest_effort_proposes_a_test(runs):
+    store = Store(efforts=[{**_effort("t1200", dt.date(2030, 10, 1), 1.2, 4 * 60), "kind": "test"}],
+                  breaks=[{"break_key": "shin", "starts_on": dt.date(2030, 10, 5),
+                           "ends_on": dt.date(2030, 11, 4), "note": ""}],
+                  calibrations=[_calibration(evidence=["t1200"], vdot=50.0, vdot_sd=1.0)])
+    lines = plan_engine.report(store, TODAY)
+    assert any(line.startswith("  Une pause déclarée jusqu'au 04/11/2030 suit le dernier effort")
+               for line in lines)
 
 
 def test_without_a_calibration_the_coach_may_propose_the_test(runs):

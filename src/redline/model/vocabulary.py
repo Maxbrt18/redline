@@ -605,6 +605,14 @@ class CalibrationConfidence(StrEnum):
     MEASURED = "measured"
 
 
+class RetestReason(StrEnum):
+    """Why a test is proposed rather than a calibration adopted: a session proved more than
+    the calibration's band, or a declared break followed its newest effort."""
+
+    SESSIONS_ABOVE = "sessions_above"
+    BREAK = "break"
+
+
 #: Who adopts a calibration: the rule on a declared effort, or the athlete's request.
 CALIBRATION_DECIDERS = (Decider.RULE, Decider.REQUEST)
 
