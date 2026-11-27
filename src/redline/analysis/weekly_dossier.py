@@ -29,9 +29,10 @@ from redline.analysis import (
 from redline.coach.fr import debrief as debrief_text
 from redline.coach.fr import progression as progression_text
 from redline.coach.fr import weekly_dossier as text
-from redline.model import iso_week
+from redline.model import iso_week, plan_skeleton
 from redline.model import predictions as prediction_model
 from redline.model.errors import RedlineError
+from redline.model.plan_skeleton import Skeleton
 from redline.model.vocabulary import DeadlineStatus
 
 if TYPE_CHECKING:
@@ -41,16 +42,23 @@ if TYPE_CHECKING:
 MAX_LISTED = 12
 
 
-def _skeleton(store: OperationalStore, week: str, today: dt.date) -> list[str]:
-    """The bounds the chosen skeleton gives the week the review prepares."""
+def review_bound(store: OperationalStore,
+                 week: str) -> tuple[Skeleton, plan_skeleton.Week] | None:
+    """The chosen skeleton and its week after `week`, the one the review of `week`
+    prepares, as the review reads them; None without a chosen skeleton or that week."""
     upcoming = iso_week.shift(week, 1)
     try:
         skeleton = plan_engine.chosen(store, iso_week.monday(upcoming))
     except RedlineError:
-        return []
+        return None
     bound = skeleton.week(upcoming) if skeleton is not None else None
-    return [] if skeleton is None or bound is None else ["", plan_engine.bounds_line(skeleton,
-                                                                                   bound)]
+    return None if skeleton is None or bound is None else (skeleton, bound)
+
+
+def _skeleton(store: OperationalStore, week: str) -> list[str]:
+    """The bounds the chosen skeleton gives the week the review prepares."""
+    found = review_bound(store, week)
+    return [] if found is None else ["", plan_engine.bounds_line(*found)]
 
 
 def _progression(store: OperationalStore, root: Path, week: str, today: dt.date) -> list[str]:
@@ -119,7 +127,7 @@ def render(store: OperationalStore, root: Path, week: str, today: dt.date) -> st
         lines.extend(permit_lines)
 
     lines += ["", *feasibility.report(store, rows, today)]
-    lines += _skeleton(store, week, today)
+    lines += _skeleton(store, week)
     lines += ["", *_progression(store, root, week, today)]
 
     capabilities = store.latest_capabilities()
