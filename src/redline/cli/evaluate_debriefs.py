@@ -23,8 +23,11 @@ def main() -> int:
             ("unjustified", item.unjustified), ("missed", item.missed), ("other", item.other))
             if kinds)
         verdict = "" if item.verdict_matches else "verdict differs"
+        following = ("" if item.next_matches else
+                     f"next session: {item.next_move} instead of {item.next_expected}")
         status = "ok" if item.passed else "FAIL"
-        print(f"{status:4} {item.case_id}  {'; '.join(filter(None, (verdict, detail)))}")
+        print(f"{status:4} {item.case_id}  "
+              f"{'; '.join(filter(None, (verdict, detail, following)))}")
     unjustified = sum(len(item.unjustified) for item in outcomes)
     missed = sum(len(item.missed) for item in outcomes)
     print(f"{len(outcomes)} cases, {sum(item.passed for item in outcomes)} passed, "
