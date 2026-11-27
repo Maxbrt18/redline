@@ -25,6 +25,15 @@ CALIBRATION = "Calibration des prédictions typées par domaine (cite-la dans le
 
 NO_PREDICTION = "aucune prédiction typée"
 
+EFFECTS = ("Ce que la chaleur et la nuit ajoutent à ton RPE au-delà de la dose, calibré sur "
+           "tes sorties (appliqué au RPE attendu seulement quand c'est établi) : {effects}")
+
+EFFECT = "{condition} {value}{unit} ({sessions} sorties, {state})"
+
+EFFECT_UNITS = {"heat": " par °C de WBGT au-delà de {threshold:g}", "night": ""}
+
+EFFECT_STATES = {True: "établi", False: "pas établi"}
+
 DEADLINES_DUE = (
     "Échéances échues ({overdue}). Pour chacune qui dépend d'une action de l'athlète, "
     "donne-lui l'action prête à faire et une règle de repli datée :")

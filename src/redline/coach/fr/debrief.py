@@ -103,6 +103,10 @@ FINDINGS = {
 #: The RPE the dose should cost, computed on the athlete's history: never a target.
 EXPECTED_RUN = "RPE attendu pour la séance courue : {low}-{high} ({count} séances de calibration)"
 EXPECTED_PRESCRIBED = " ; pour la séance prescrite : {low}-{high}"
+#: The calibrated conditions a run met, added to its expected RPE.
+EXPECTED_ADJUSTED = " ; dont {parts}, calibré sur ton historique"
+ADJUSTMENT = "{condition} {value}"
+CONDITIONS = {"heat": "chaleur", "night": "nuit"}
 #: A declared RPE out of its range, by `FindingKind` slug and by what the signs allow.
 RPE_SIDES = {"rpe_above": "au-dessus", "rpe_below": "en dessous"}
 RPE_SIGNS = {

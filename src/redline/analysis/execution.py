@@ -404,6 +404,10 @@ def render(execution: Execution, cost: Cost | None = None) -> list[str]:
     if cost is not None and cost.run is not None:
         lines.append(text.EXPECTED_RUN.format(
             low=cost.run.low, high=cost.run.high, count=cost.run.sessions)
+            + ("" if not cost.run.adjustments else text.EXPECTED_ADJUSTED.format(
+                parts=", ".join(text.ADJUSTMENT.format(condition=text.CONDITIONS[condition],
+                                                       value=text.signed(value))
+                                for condition, value in cost.run.adjustments)))
             + ("" if cost.prescribed is None else text.EXPECTED_PRESCRIBED.format(
                 low=cost.prescribed.low, high=cost.prescribed.high)))
     for finding in execution.findings:

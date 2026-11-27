@@ -245,6 +245,15 @@ class OverrideReason(StrEnum):
     ATHLETE_CHOICE = "athlete_choice"
 
 
+class Condition(StrEnum):
+    """What a run's dose does not see and may still cost (`expected_rpe.Effect`)."""
+
+    #: WBGT degrees above the optimum for running.
+    HEAT = "heat"
+    #: At least half the run below civil twilight.
+    NIGHT = "night"
+
+
 class RpeSide(StrEnum):
     """Where a declared RPE falls against the range its dose expects
     (`redline.analysis.expected_rpe`)."""

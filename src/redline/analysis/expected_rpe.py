@@ -15,6 +15,17 @@ The dose of a session, by family:
 - a hike: its effort-kilometres;
 - any other session (bike, strength): its minutes.
 
+What the dose does not see: heat and night. Each run reads them
+(`Conditions`), and their effect on the RPE is calibrated on the athlete, never taken
+from a table (`calibrate`): the RPE residuals of the runs of the window, against the
+dose model, with and without the condition (per WBGT degree above `HEAT_FROM_WBGT_C` for
+heat). An effect shifts a run's expectation only once `rpe_model_settled_sessions` runs
+carry the condition and the effect stands more than `EFFECT_SIGNIFICANCE` standard
+errors from zero; until then it is reported and changes nothing. Published work gives a
+heat optimum, not an RPE cost per degree, and a darker run feeling harder without a
+usable size: the athlete's own history decides. A group is no condition: the pace it
+sets is already in the dose, and at a given pace it leaves the RPE about unchanged.
+
 The model, per kind (per routine for strength): RPE = a + b × ln(dose), fit by least
 squares on the sessions of the `rpe_model_weeks` weeks before, with a declared RPE and a
 dose. Each kilometre costs less than the previous one on a scale bounded at 10. Below
@@ -36,7 +47,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from redline.model import rulebook, session_kinds, terrain
-from redline.model.vocabulary import RpeSide
+from redline.model.vocabulary import Condition, RpeSide
 
 from . import easy_load
 from .ledger import Row, row_key
@@ -46,6 +57,12 @@ DPLUS_M_PER_KM = 100
 #: Below this spread of ln(dose), in standard deviation, the doses tell no slope.
 MIN_LOG_SPREAD = 0.05
 RPE_MAX = 10
+#: The WBGT above which heat counts: the optimum for marathon speed lies between 3.8 and
+#: 9.9 °C by level (El Helou et al., 2012), cool conditions being WBGT 5-10 °C (Ely et
+#: al., 2007).
+HEAT_FROM_WBGT_C = 10.0
+#: An effect is applied when it stands this many standard errors from zero.
+EFFECT_SIGNIFICANCE = 2.0
 
 
 @dataclass(frozen=True)
@@ -189,6 +206,64 @@ def _round(value: float) -> int:
 
 
 @dataclass(frozen=True)
+class Conditions:
+    """What a run met that its dose does not see; None: not known."""
+
+    #: WBGT degrees above `HEAT_FROM_WBGT_C`, 0 when cooler.
+    heat_c: float | None = None
+    night: bool | None = None
+
+    def amount(self, condition: Condition) -> float | None:
+        """The quantity an effect multiplies: degrees for heat, 0 or 1 for night."""
+        if condition is Condition.HEAT:
+            return self.heat_c
+        return None if self.night is None else float(self.night)
+
+
+NO_CONDITIONS = Conditions()
+
+
+@dataclass(frozen=True)
+class Effect:
+    """What a condition adds to the RPE: per WBGT degree for heat, per run otherwise."""
+
+    condition: Condition
+    value: float
+    #: Runs that carried the condition in the window.
+    sessions: int
+    supported: bool
+
+
+def _effect(condition: Condition, points: Sequence[tuple[float, float]],
+            min_sessions: int) -> Effect:
+    """The least-squares slope of the residual on the condition's amount, with its
+    standard error; for a 0/1 amount it is the difference of the two means."""
+    carried = sum(1 for amount, _ in points if amount > 0)
+    amounts = [amount for amount, _ in points]
+    if carried < min_sessions or len(points) - carried < min_sessions or len(points) < 3:
+        return Effect(condition, 0.0, carried, False)
+    mean_x = statistics.fmean(amounts)
+    mean_y = statistics.fmean(residual for _, residual in points)
+    spread = sum((x - mean_x) ** 2 for x in amounts)
+    if spread == 0:
+        return Effect(condition, 0.0, carried, False)
+    slope = sum((x - mean_x) * (y - mean_y) for x, y in points) / spread
+    intercept = mean_y - slope * mean_x
+    scatter = sum((y - intercept - slope * x) ** 2 for x, y in points) / (len(points) - 2)
+    error = math.sqrt(scatter / spread)
+    supported = error == 0 or abs(slope) > EFFECT_SIGNIFICANCE * error
+    return Effect(condition, slope, carried, supported)
+
+
+def calibrate(points: Sequence[tuple[Conditions, float]], min_sessions: int) -> tuple[Effect, ...]:
+    """The effect of each condition from runs' conditions and RPE residuals."""
+    return tuple(_effect(condition, [(amount, residual) for found, residual in points
+                                     if (amount := found.amount(condition)) is not None],
+                         min_sessions)
+                 for condition in Condition)
+
+
+@dataclass(frozen=True)
 class Expectation:
     """The RPE a dose should cost, its range and the history behind it."""
 
@@ -197,6 +272,8 @@ class Expectation:
     high: int
     sessions: int
     residual: float
+    #: The calibrated conditions the run met and what each added to `expected`.
+    adjustments: tuple[tuple[Condition, float], ...] = ()
 
     def side(self, rpe: float | None) -> RpeSide:
         if rpe is None:
@@ -212,12 +289,14 @@ class Expectation:
                 "sessions": self.sessions, "residual": round(self.residual, 2)}
 
 
-def expect(model: Model, dose: Dose, config: Settings) -> Expectation:
+def expect(model: Model, dose: Dose, config: Settings,
+           adjustments: tuple[tuple[Condition, float], ...] = ()) -> Expectation:
     width = config.width if model.sessions >= config.settled_sessions else config.width_unsettled
-    expected = model.expected(dose)
+    expected = min(max(model.expected(dose) + sum(value for _, value in adjustments), 0.0),
+                   float(RPE_MAX))
     low = max(_round(expected - width), 0)
     high = min(_round(expected + width), RPE_MAX)
-    return Expectation(expected, low, high, model.sessions, model.residual)
+    return Expectation(expected, low, high, model.sessions, model.residual, adjustments)
 
 
 def key_of(row: Row) -> tuple[str, str | None]:
@@ -227,6 +306,11 @@ def key_of(row: Row) -> tuple[str, str | None]:
 
 ProfileOf = Callable[[Row], "easy_load.Profile | None"]
 ReferenceOf = Callable[[dt.date], "float | None"]
+ConditionsOf = Callable[[Row], Conditions]
+
+
+def heat_of(row: Row) -> float | None:
+    return None if row.wbgt is None else max(row.wbgt - HEAT_FROM_WBGT_C, 0.0)
 
 
 class History:
@@ -237,11 +321,15 @@ class History:
     """
 
     def __init__(self, rows: Iterable[Row], profile_of: ProfileOf, reference_of: ReferenceOf,
-                 config: Settings):
+                 config: Settings, conditions_of: ConditionsOf | None = None):
         self.config = config
         self.rows = sorted(rows, key=lambda row: row.date)
         self._profile_of, self._reference_of = profile_of, reference_of
+        self._conditions_of = conditions_of or (lambda row: Conditions(heat_c=heat_of(row)))
         self._doses: dict[tuple, Dose | None] = {}
+        self._bases: dict[tuple, Expectation | None] = {}
+        self._effects: dict[dt.date, tuple[Effect, ...]] = {}
+        self._conditions: dict[tuple, Conditions] = {}
 
     def reference(self, day: dt.date) -> float | None:
         return self._reference_of(day)
@@ -266,11 +354,48 @@ class History:
                 points.append((dose.value, row.rpe))
         return fit(points, self.config)
 
+    def conditions(self, row: Row) -> Conditions:
+        key = (row.idempotency_key, row.date, row.type)
+        if key not in self._conditions:
+            self._conditions[key] = (self._conditions_of(row) if row.type in session_kinds.RUN
+                                     else NO_CONDITIONS)
+        return self._conditions[key]
+
+    def _base(self, row: Row) -> Expectation | None:
+        """The expectation of the dose alone, from the sessions before it."""
+        key = (row.idempotency_key, row.date, row.type, row.km, row.hours, row.dplus)
+        if key not in self._bases:
+            dose = self.dose(row)
+            found = self.model(key_of(row), row.date) if dose is not None else None
+            self._bases[key] = (None if found is None or dose is None
+                                else expect(found, dose, self.config))
+        return self._bases[key]
+
+    def effects(self, day: dt.date) -> tuple[Effect, ...]:
+        """Each condition's effect, calibrated on the runs of the window before `day`."""
+        if day not in self._effects:
+            since = day - dt.timedelta(weeks=self.config.weeks)
+            points = [(self.conditions(row), row.rpe - base.expected) for row in self.rows
+                      if since <= row.date < day and row.rpe is not None
+                      and row.type in session_kinds.RUN
+                      and (base := self._base(row)) is not None]
+            self._effects[day] = calibrate(points, self.config.settled_sessions)
+        return self._effects[day]
+
     def expectation(self, row: Row) -> Expectation | None:
-        """What a recorded session should have cost, from the sessions before it."""
+        """What a recorded session should have cost, from the sessions before it: its
+        dose, then each supported effect of the conditions it met."""
         dose = self.dose(row)
         found = self.model(key_of(row), row.date) if dose is not None else None
-        return None if found is None or dose is None else expect(found, dose, self.config)
+        if found is None or dose is None:
+            return None
+        met = self.conditions(row)
+        adjustments = tuple(
+            (effect.condition, round(effect.value * amount, 2))
+            for effect in (self.effects(row.date) if row.type in session_kinds.RUN else ())
+            if effect.supported and (amount := met.amount(effect.condition))
+            and round(effect.value * amount, 2))
+        return expect(found, dose, self.config, adjustments)
 
     def prescribed(self, session: dict, day: dt.date) -> Expectation | None:
         """What a planned easy or long run should cost as prescribed."""
@@ -340,7 +465,37 @@ def history(store: Any, rows: Iterable[Row], config: Settings) -> History:
             references[day] = easy_load.reference_mps(easy_load.samples(runs), day)
         return references[day]
 
-    return History(rows, profile_of, reference_of, config)
+    def conditions_of(row: Row) -> Conditions:
+        activity = easy_load.strava_id(row.idempotency_key)
+        if activity is None:
+            return Conditions(heat_c=heat_of(row))
+        return Conditions(heat_c=heat_of(row), night=night_of(store, activity))
+
+    return History(rows, profile_of, reference_of, config, conditions_of)
+
+
+def night_of(store: Any, activity: int) -> bool | None:
+    """Whether a captured run spent at least half its time below civil twilight; None
+    without its start, its route or a readable instance time zone. The run is read in the
+    instance's zone: the athlete's home."""
+    from redline.integrations.weather import decode_polyline
+    from redline.model import local_time
+    from redline.model.activity import Activity
+
+    from . import daylight
+
+    try:
+        found = Activity.from_json(store.strava_intake(activity)["distilled"])
+        start = dt.datetime.fromisoformat(found.start_local) if found.start_local else None
+        points = decode_polyline(found.route_polyline) if found.route_polyline else []
+        zone = local_time.zone()
+    except Exception:  # no capture, no route or no instance: the night stays unknown
+        return None
+    if start is None or not points:
+        return None
+    latitude, longitude = points[0]
+    seconds = found.elapsed_s or found.moving_s
+    return daylight.dark_share(latitude, longitude, start, seconds, zone) >= 0.5
 
 
 def above_range(store: Any, rows: Sequence[Row],
