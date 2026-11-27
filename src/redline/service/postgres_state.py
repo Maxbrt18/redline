@@ -32,6 +32,7 @@ from redline.model.vocabulary import (
 from redline.storage.database import Database
 from redline.storage.repository import ATHLETE, CORRECTION_ANNOUNCE_WINDOW, OperationalStore
 from redline.storage.schema import (
+    agent_calls,
     agent_sessions,
     agent_turns,
     athlete_activity_states,
@@ -65,7 +66,7 @@ from redline.storage.schema import (
 )
 
 from . import strength
-from .agent import TurnIdentity
+from .agent import AgentCall, TurnIdentity
 from .attachments import safe_conversation_label
 from .config import Config
 from .race_countdown import compile_deadline
@@ -109,6 +110,16 @@ class PostgresStateStore(StateStore):
                 rulebook_digest=identity.rulebook_digest,
                 engine_tree=identity.engine_tree,
             ).on_conflict_do_nothing())
+
+    def record_call(self, call: AgentCall) -> None:
+        with self.database.transaction() as connection:
+            connection.execute(agent_calls.insert().values(
+                id=uuid.uuid4(), turn_id=uuid.UUID(call.turn_id) if call.turn_id else None,
+                psid=call.psid or None, provider=call.provider, purpose=call.purpose.value,
+                model=call.model, cost_usd=call.cost_usd, input_tokens=call.input_tokens,
+                output_tokens=call.output_tokens, cache_read_tokens=call.cache_read_tokens,
+                cache_write_tokens=call.cache_write_tokens, duration_ms=call.duration_ms,
+            ))
 
     def session_id(self, psid: str, provider: str) -> str | None:
         with self.database.engine.connect() as connection:

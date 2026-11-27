@@ -14,11 +14,14 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from redline.model.vocabulary import CallPurpose
+
 from . import clock
 from .agent import (
     PROACTIVE_REPLY_SCHEMA,
     TRIAGE_SCHEMA,
     AgentActivity,
+    AgentCall,
     FailureKind,
     RunnerBase,
     RunResult,
@@ -88,6 +91,35 @@ AUTONOMOUS_PERMISSIONS = (
 )
 
 
+def _count(usage: dict, key: str) -> int:
+    value = usage.get(key)
+    return value if isinstance(value, int) and value >= 0 else 0
+
+
+def reported_call(payload: dict, purpose: CallPurpose, model: str | None, *,
+                  psid: str | None = None, turn_id: str | None = None) -> AgentCall | None:
+    """What a `claude -p` result says the call consumed; None when it reports nothing.
+
+    The result event of `--output-format json` and `stream-json` carries the same fields:
+    the whole invocation's token counts and its price at API rates.
+    """
+    usage = payload.get("usage")
+    cost = payload.get("total_cost_usd")
+    if not isinstance(usage, dict) and not isinstance(cost, int | float):
+        return None
+    usage = usage if isinstance(usage, dict) else {}
+    duration = payload.get("duration_ms")
+    return AgentCall(
+        provider="claude", purpose=purpose, model=model,
+        cost_usd=float(cost) if isinstance(cost, int | float) and cost >= 0 else None,
+        input_tokens=_count(usage, "input_tokens"),
+        output_tokens=_count(usage, "output_tokens"),
+        cache_read_tokens=_count(usage, "cache_read_input_tokens"),
+        cache_write_tokens=_count(usage, "cache_creation_input_tokens"),
+        duration_ms=duration if isinstance(duration, int) and duration >= 0 else None,
+        psid=psid, turn_id=turn_id)
+
+
 @dataclass
 class _Stream:
     """Terminal content extracted from the stream-json wire format."""
@@ -101,6 +133,8 @@ class _Stream:
     started: bool = False
     structured: object = None
     model: str | None = None
+    # The terminal result event, which carries what the call consumed.
+    result: dict | None = None
 
 
 class ClaudeCodeRunner(RunnerBase):
@@ -191,6 +225,10 @@ class ClaudeCodeRunner(RunnerBase):
                 self._runs.finish(psid, active)
             drainer.join(timeout=5)
             stderr = "".join(stderr_lines).strip()
+            if turn_id:
+                self._record_call(reported_call(parsed.result or {}, CallPurpose.TURN,
+                                                parsed.model or spec.model,
+                                                psid=psid, turn_id=turn_id))
 
             if parsed.session and not isolated and not fork_session:
                 self._state.set_session(psid, self.provider, parsed.session,
@@ -267,11 +305,17 @@ class ClaudeCodeRunner(RunnerBase):
         except (subprocess.TimeoutExpired, OSError) as exc:
             log.warning("Claude triage unavailable (%s); falling back to N1", exc)
             return Triage()
+        try:
+            payload = json.loads(proc.stdout or "{}")
+        except ValueError:
+            payload = {}
+        if isinstance(payload, dict):
+            self._record_call(reported_call(payload, CallPurpose.TRIAGE, candidate.model))
         if proc.returncode != 0:
             log.warning("Claude triage failed (code %d); falling back to N1", proc.returncode)
             return Triage()
         try:
-            return parse_triage(json.loads(proc.stdout or "{}")["structured_output"])
+            return parse_triage(payload["structured_output"])
         except (ValueError, TypeError, KeyError) as exc:
             log.warning("Claude triage unreadable (%s); falling back to N1", exc)
             return Triage()
@@ -311,6 +355,15 @@ class ClaudeCodeRunner(RunnerBase):
                 raise RuntimeError(f"{label}: no structured output")
             return json.dumps(structured, ensure_ascii=False)
         return str(payload.get("result") or "")
+
+    def _record_call(self, call: AgentCall | None) -> None:
+        """Register what a call consumed; a failure here never costs the reply."""
+        if call is None:
+            return
+        try:
+            self._state.record_call(call)
+        except Exception:
+            log.exception("Consumption of a %s call could not be recorded", call.purpose)
 
     def close(self) -> None:
         """Claude Code keeps no process between two turns."""
@@ -360,6 +413,7 @@ class ClaudeCodeRunner(RunnerBase):
                             separate = False
                         state.full += text
             elif kind == "result":
+                state.result = obj
                 state.result_text = obj.get("result")
                 state.is_error = bool(obj.get("is_error"))
                 state.structured = obj.get("structured_output")
