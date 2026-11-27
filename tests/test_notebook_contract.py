@@ -328,3 +328,43 @@ def test_the_request_to_the_coach_goes_out_and_a_bad_one_does_not(store, connect
     assert gone.status_code == 409
     assert client.post("/notebook-api/proposals/dismiss",
                        json={"week": SEEDED_WEEK}).status_code == 200
+
+
+@needs_database
+def test_the_plan_shows_the_cycle_in_force_and_the_athlete_takes_the_proposal(store, connect):
+    from redline.model import cycle_templates
+    from redline.model import plan_generator as generator
+    from redline.model.vocabulary import CycleCause, GeneralLevel
+    templates = cycle_templates.load(TEST_VAULT)
+    inputs = generator.Inputs("2026-W41", 30, 12, 40, 10, 10)
+    general = generator.general(templates.general_at(GeneralLevel.MAINTAIN), inputs)
+    seed_race_tab(store)
+    client, _, _ = connect(dt.datetime(2026, 10, 7, 8, 0, tzinfo=PARIS))
+    with store.database.transaction() as connection:
+        store.apply_transition_in(connection, general, CycleCause.MIGRATION,
+                                  level=GeneralLevel.MAINTAIN)
+    plan = served(client, "plan")
+    assert contract.problems(views.PlanView, plan) == []
+    assert plan["cycle"]["kind"] == "general" and plan["proposal"] is None
+    assert [week["state"] for week in plan["cycle"]["weeks"]][:2] == ["current", "upcoming"]
+    assert client.get("/notebook-api/plan/proposal").status_code == 404
+    template = templates.preparation_for(21.1, "road")
+    trame = generator.candidates(template, generator.Goal(dt.date(2026, 11, 26), 21.1),
+                                 generator.Inputs("2026-W42", 30, 12, 40, 10, 10))[0]
+    with store.database.transaction() as connection:
+        proposal = store.propose_cycle_in(
+            connection, trame, {"by": "judgment", "alternatives": [
+                {"option": "specific", "rejected_because": "trop tôt"}]},
+            "race-targetrace-2026", dt.datetime(2026, 10, 14, 21, tzinfo=dt.UTC))
+    plan = served(client, "plan")
+    assert plan["proposal"]["id"] == str(proposal.id)
+    shown = served(client, "plan/proposal")
+    assert contract.problems(views.CycleProposalView, shown) == []
+    assert shown["current"]["kind"] == "general"
+    assert shown["alternatives"] == [{"option": "specific", "rejected_because": "trop tôt"}]
+    taken = client.post("/notebook-api/plan/proposal/take", json={"id": str(proposal.id)})
+    assert taken.status_code == 200, taken.text
+    again = client.post("/notebook-api/plan/proposal/take", json={"id": str(proposal.id)})
+    assert again.status_code == 409
+    assert served(client, "plan")["cycle"]["kind"] == "preparation"
+    assert client.post("/notebook-api/plan/proposal/take", json={"id": "x"}).status_code == 400

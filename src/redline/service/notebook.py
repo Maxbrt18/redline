@@ -20,7 +20,7 @@ from redline.model.program import load
 from redline.storage.database import StorageError
 from redline.storage.notebook import NotebookStore
 
-from . import clock, race_plan, reorganize, session_detail, strength
+from . import clock, plan_view, race_plan, reorganize, session_detail, strength
 from .notebook_board import Board
 from .plans import PlanStatus, blocked_session_ids, strength_due
 from .strength_artifact import selection_for
@@ -144,6 +144,19 @@ class NotebookService:
         board = self.board()
         return race_plan.view(race_model.next_race(board.ops, board.today), board.root,
                               board.instance, board.today)
+
+    def plan(self) -> views.PlanView:
+        board = self.board()
+        return plan_view.view(board.ops, board.today, board.now)
+
+    def plan_proposal(self) -> views.CycleProposalView | None:
+        board = self.board()
+        return plan_view.proposal_view(board.ops, board.today, board.now)
+
+    def take_plan_proposal(self, version_id: str) -> bool:
+        """The athlete takes the proposal; False when it is no longer open."""
+        board = self.board()
+        return plan_view.take(board.ops, version_id, board.now)
 
     def connected(self, psid: str) -> bool:
         """Does the notebook collect the feelings? Unreadable database: no, Messenger

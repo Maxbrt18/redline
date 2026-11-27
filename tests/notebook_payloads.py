@@ -465,6 +465,75 @@ ENTRY_VIEW = {
 }
 
 
+def plan_key(position, workout, reps, rep_seconds, *, role="key", pace=None, rpe=None):
+    """A key session of a trame's week, as the Plan screen shows it."""
+    return {"position": position, "workout": workout, "role": role, "reps": reps,
+            "rep_seconds": rep_seconds, "recovery_seconds": 60 if reps else None,
+            "pace_s": pace, "rpe": rpe}
+
+
+#: A half on the road prepared over thirteen weeks: (week, phase, deload, km, long run,
+#: key sessions); the fifth is the current one.
+PREPARATION = [
+    ("2026-W37", "development", False, 30.0, 9.0, [plan_key(0, "test", None, None, role="test")]),
+    ("2026-W38", "development", False, 31.5, 9.4,
+     [plan_key(1, "threshold", 3, 480, pace=[264.0, 252.0])]),
+    ("2026-W39", "development", False, 31.5, 9.4,
+     [plan_key(1, "hills", 6, 45, rpe=[7.0, 8.0])]),
+    ("2026-W40", "development", False, 33.0, 9.9,
+     [plan_key(1, "threshold", 3, 600, pace=[264.0, 252.0])]),
+    (CURRENT_WEEK, "development", False, 33.0, 9.9,
+     [plan_key(1, "threshold", 3, 600, pace=[264.0, 252.0])]),
+    ("2026-W42", "development", True, 24.8, 7.4, [plan_key(1, "hills", 6, 45, rpe=[7.0, 8.0])]),
+    ("2026-W43", "specific", False, 33.0, 9.9,
+     [plan_key(1, "race-pace", 3, 600, pace=[258.0, 254.0])]),
+    ("2026-W44", "specific", False, 34.5, 10.9,
+     [plan_key(1, "race-pace", 4, 600, pace=[258.0, 254.0]),
+      plan_key(2, "threshold", 3, 720, pace=[264.0, 252.0])]),
+    ("2026-W45", "specific", False, 34.5, 10.9,
+     [plan_key(1, "race-pace", 3, 900, pace=[258.0, 254.0])]),
+    ("2026-W46", "specific", True, 25.9, 8.2, [plan_key(1, "race-pace", 3, 900, pace=[258.0, 254.0])]),
+    ("2026-W47", "specific", False, 36.0, 12.0,
+     [plan_key(1, "race-pace", 2, 1500, role="flagship", pace=[258.0, 254.0])]),
+    ("2026-W48", "taper", False, 21.2, 7.1, [plan_key(1, "race-pace", 3, 480, pace=[258.0, 254.0])]),
+    ("2026-W49", "taper", False, 14.4, 0.0, []),
+]
+MONDAYS = {"2026-W37": "2026-09-07", "2026-W38": "2026-09-14", "2026-W39": "2026-09-21",
+           "2026-W40": "2026-09-28", CURRENT_WEEK: "2026-10-05", "2026-W42": "2026-10-12",
+           "2026-W43": "2026-10-19", "2026-W44": "2026-10-26", "2026-W45": "2026-11-02",
+           "2026-W46": "2026-11-09", "2026-W47": "2026-11-16", "2026-W48": "2026-11-23",
+           "2026-W49": "2026-11-30"}
+
+
+def plan_week(week, phase, deload, volume, long_run, keys, *, current=CURRENT_WEEK):
+    return {"week": week, "monday": MONDAYS[week], "phase": phase, "deload": deload,
+            "volume_km": volume, "long_run_km": long_run, "qualities": len(keys),
+            "segment_km": 3.0 if phase == "specific" and not deload else None, "keys": keys,
+            "state": "done" if week < current else "current" if week == current else "upcoming",
+            "written": week in {CURRENT_WEEK, "2026-W42"}}
+
+
+TIME_BOUND = {"kind": "time_bound", "value": 36.0, "reference": 38.0, "workout": "",
+              "phase": None}
+HALF = {"name": "Semi des Berges", "date": "2026-12-06"}
+PLAN = {
+    "current_week": CURRENT_WEEK,
+    "cycle": {"kind": "preparation", "level": None, "version": 1, "candidate": "balanced",
+              "race": HALF, "weeks": [plan_week(*week) for week in PREPARATION],
+              "risks": [TIME_BOUND], "next": "recovery"},
+    "proposal": None,
+}
+CYCLE_PROPOSAL = {
+    "id": "6b1d6c2e-5c3a-4a8e-9f00-1f2a3b4c5d6e", "candidate": "balanced", "race": HALF,
+    "weeks": [plan_week(*week, current="2026-W36") for week in PREPARATION],
+    "peak_km": 36.0, "long_run_km": 12.0, "flagships": 1, "risks": [TIME_BOUND],
+    "current": {"kind": "general", "volume_km": 32.0, "qualities": 1},
+    "alternatives": [{"option": "cautious",
+                      "rejected_because": "4 semaines de spécifique laissent l’allure courte"}],
+    "proposed_on": "2026-08-30", "expires_on": "2026-09-06",
+}
+
+
 #: A write accepted, and one that made the week's next revision.
 DONE = {"status": "ok"}
 REVISED = {"status": "ok", "revision": 3}
@@ -481,6 +550,8 @@ SCREENS = {
     "race": (views.RaceView, RACE),
     "session": (views.SessionView, DETAIL),
     "race-plan": (views.RacePlanView, RACE_PLAN_VIEW),
+    "plan": (views.PlanView, PLAN),
+    "plan-proposal": (views.CycleProposalView, CYCLE_PROPOSAL),
     "reorganize": (views.ReorganizeView, REORGANIZE),
     "habits": (views.HabitsView, HABITS),
     "weather": (views.Forecast, WEATHER),

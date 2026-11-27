@@ -177,6 +177,27 @@ def register(app: Flask, notebook: NotebookService, psid: str, *,
             return jsonify(error=notebook_text.ERRORS["no_race_plan"]), 404
         return jsonify(view)
 
+    @app.get("/notebook-api/plan")
+    def notebook_plan():
+        return jsonify(notebook.plan())
+
+    @app.get("/notebook-api/plan/proposal")
+    def notebook_plan_proposal():
+        view = notebook.plan_proposal()
+        if view is None:
+            return jsonify(error=notebook_text.ERRORS["no_cycle_proposal"]), 404
+        return jsonify(view)
+
+    @app.post("/notebook-api/plan/proposal/take")
+    def notebook_take_plan_proposal():
+        body = request.get_json(silent=True)
+        if (not isinstance(body, dict) or set(body) != {"id"} or not isinstance(body["id"], str)
+                or not UUID.fullmatch(body["id"])):
+            return jsonify(error=notebook_text.ERRORS["bad_request"]), 400
+        if not notebook.take_plan_proposal(body["id"]):
+            return jsonify(error=notebook_text.ERRORS["cycle_proposal_gone"]), 409
+        return jsonify(views.Done(status="ok"))
+
     @app.get("/notebook-api/weather")
     def notebook_weather():
         day, start = request.args.get("date", ""), request.args.get("time") or None

@@ -89,6 +89,8 @@ ERRORS = {
     "bad_habit": "Habitude invalide.",
     "no_habit": "Habitude introuvable.",
     "proposal_gone": "Cette proposition n’est plus valable : la semaine a changé.",
+    "no_cycle_proposal": "Aucune proposition de préparation en attente.",
+    "cycle_proposal_gone": "Cette préparation n’est plus ouverte : rien ne change.",
     "coach_unreachable": "Le coach n’a pas pu être prévenu. Écris-lui dans Messenger.",
 }
 

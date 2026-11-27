@@ -5823,6 +5823,777 @@ public extension Notebook {
         }
     }
 
+    struct PlanKey: Codable, Hashable, Sendable {
+        public let position: Int
+        public let workout: String
+        public let role: Role
+        public let reps: Int?
+        public let repSeconds: Int?
+        public let recoverySeconds: Int?
+        public let paceS: [Double]?
+        public let rpe: [Double]?
+
+        public enum Role: Codable, Hashable, Sendable {
+            case key
+            case flagship
+            case test
+            /// A value this build does not know yet: the server is newer than the app.
+            case unknown(String)
+    
+            public init(rawValue: String) {
+                switch rawValue {
+                case "key": self = .key
+                case "flagship": self = .flagship
+                case "test": self = .test
+                default: self = .unknown(rawValue)
+                }
+            }
+    
+            public var rawValue: String {
+                switch self {
+                case .key: "key"
+                case .flagship: "flagship"
+                case .test: "test"
+                case .unknown(let rawValue): rawValue
+                }
+            }
+    
+            public init(from decoder: any Decoder) throws {
+                self.init(rawValue: try decoder.singleValueContainer().decode(String.self))
+            }
+    
+            public func encode(to encoder: any Encoder) throws {
+                var container = encoder.singleValueContainer()
+                try container.encode(rawValue)
+            }
+        }
+
+        public init(position: Int, workout: String, role: Role, reps: Int? = nil, repSeconds: Int? = nil, recoverySeconds: Int? = nil, paceS: [Double]? = nil, rpe: [Double]? = nil) {
+            self.position = position
+            self.workout = workout
+            self.role = role
+            self.reps = reps
+            self.repSeconds = repSeconds
+            self.recoverySeconds = recoverySeconds
+            self.paceS = paceS
+            self.rpe = rpe
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case position = "position"
+            case workout = "workout"
+            case role = "role"
+            case reps = "reps"
+            case repSeconds = "rep_seconds"
+            case recoverySeconds = "recovery_seconds"
+            case paceS = "pace_s"
+            case rpe = "rpe"
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            position = try container.decode(Int.self, forKey: .position)
+            workout = try container.decode(String.self, forKey: .workout)
+            role = try container.decode(Role.self, forKey: .role)
+            reps = try container.decode(Int?.self, forKey: .reps)
+            repSeconds = try container.decode(Int?.self, forKey: .repSeconds)
+            recoverySeconds = try container.decode(Int?.self, forKey: .recoverySeconds)
+            paceS = try container.decode([Double]?.self, forKey: .paceS)
+            rpe = try container.decode([Double]?.self, forKey: .rpe)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(position, forKey: .position)
+            try container.encode(workout, forKey: .workout)
+            try container.encode(role, forKey: .role)
+            try container.encode(reps, forKey: .reps)
+            try container.encode(repSeconds, forKey: .repSeconds)
+            try container.encode(recoverySeconds, forKey: .recoverySeconds)
+            try container.encode(paceS, forKey: .paceS)
+            try container.encode(rpe, forKey: .rpe)
+        }
+    }
+
+    struct PlanWeek: Codable, Hashable, Sendable {
+        public let week: String
+        public let monday: String
+        public let phase: Phase
+        public let deload: Bool
+        public let volumeKm: Double
+        public let longRunKm: Double
+        public let qualities: Int
+        public let segmentKm: Double?
+        public let keys: [PlanKey]
+        public let state: State
+        public let written: Bool
+
+        public enum Phase: Codable, Hashable, Sendable {
+            case recovery
+            case development
+            case specific
+            case taper
+            case general
+            case rebuild
+            /// A value this build does not know yet: the server is newer than the app.
+            case unknown(String)
+    
+            public init(rawValue: String) {
+                switch rawValue {
+                case "recovery": self = .recovery
+                case "development": self = .development
+                case "specific": self = .specific
+                case "taper": self = .taper
+                case "general": self = .general
+                case "rebuild": self = .rebuild
+                default: self = .unknown(rawValue)
+                }
+            }
+    
+            public var rawValue: String {
+                switch self {
+                case .recovery: "recovery"
+                case .development: "development"
+                case .specific: "specific"
+                case .taper: "taper"
+                case .general: "general"
+                case .rebuild: "rebuild"
+                case .unknown(let rawValue): rawValue
+                }
+            }
+    
+            public init(from decoder: any Decoder) throws {
+                self.init(rawValue: try decoder.singleValueContainer().decode(String.self))
+            }
+    
+            public func encode(to encoder: any Encoder) throws {
+                var container = encoder.singleValueContainer()
+                try container.encode(rawValue)
+            }
+        }
+
+        public enum State: Codable, Hashable, Sendable {
+            case done
+            case current
+            case upcoming
+            /// A value this build does not know yet: the server is newer than the app.
+            case unknown(String)
+    
+            public init(rawValue: String) {
+                switch rawValue {
+                case "done": self = .done
+                case "current": self = .current
+                case "upcoming": self = .upcoming
+                default: self = .unknown(rawValue)
+                }
+            }
+    
+            public var rawValue: String {
+                switch self {
+                case .done: "done"
+                case .current: "current"
+                case .upcoming: "upcoming"
+                case .unknown(let rawValue): rawValue
+                }
+            }
+    
+            public init(from decoder: any Decoder) throws {
+                self.init(rawValue: try decoder.singleValueContainer().decode(String.self))
+            }
+    
+            public func encode(to encoder: any Encoder) throws {
+                var container = encoder.singleValueContainer()
+                try container.encode(rawValue)
+            }
+        }
+
+        public init(week: String, monday: String, phase: Phase, deload: Bool, volumeKm: Double, longRunKm: Double, qualities: Int, segmentKm: Double? = nil, keys: [PlanKey], state: State, written: Bool) {
+            self.week = week
+            self.monday = monday
+            self.phase = phase
+            self.deload = deload
+            self.volumeKm = volumeKm
+            self.longRunKm = longRunKm
+            self.qualities = qualities
+            self.segmentKm = segmentKm
+            self.keys = keys
+            self.state = state
+            self.written = written
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case week = "week"
+            case monday = "monday"
+            case phase = "phase"
+            case deload = "deload"
+            case volumeKm = "volume_km"
+            case longRunKm = "long_run_km"
+            case qualities = "qualities"
+            case segmentKm = "segment_km"
+            case keys = "keys"
+            case state = "state"
+            case written = "written"
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            week = try container.decode(String.self, forKey: .week)
+            monday = try container.decode(String.self, forKey: .monday)
+            phase = try container.decode(Phase.self, forKey: .phase)
+            deload = try container.decode(Bool.self, forKey: .deload)
+            volumeKm = try container.decode(Double.self, forKey: .volumeKm)
+            longRunKm = try container.decode(Double.self, forKey: .longRunKm)
+            qualities = try container.decode(Int.self, forKey: .qualities)
+            segmentKm = try container.decode(Double?.self, forKey: .segmentKm)
+            keys = try container.decode([PlanKey].self, forKey: .keys)
+            state = try container.decode(State.self, forKey: .state)
+            written = try container.decode(Bool.self, forKey: .written)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(week, forKey: .week)
+            try container.encode(monday, forKey: .monday)
+            try container.encode(phase, forKey: .phase)
+            try container.encode(deload, forKey: .deload)
+            try container.encode(volumeKm, forKey: .volumeKm)
+            try container.encode(longRunKm, forKey: .longRunKm)
+            try container.encode(qualities, forKey: .qualities)
+            try container.encode(segmentKm, forKey: .segmentKm)
+            try container.encode(keys, forKey: .keys)
+            try container.encode(state, forKey: .state)
+            try container.encode(written, forKey: .written)
+        }
+    }
+
+    struct PlanRisk: Codable, Hashable, Sendable {
+        public let kind: Kind
+        public let value: Double
+        public let reference: Double
+        public let workout: String
+        public let phase: String?
+
+        public enum Kind: Codable, Hashable, Sendable {
+            case windowShort
+            case specificShort
+            case timeBound
+            case arrivalUnreached
+            case belowDomain
+            /// A value this build does not know yet: the server is newer than the app.
+            case unknown(String)
+    
+            public init(rawValue: String) {
+                switch rawValue {
+                case "window_short": self = .windowShort
+                case "specific_short": self = .specificShort
+                case "time_bound": self = .timeBound
+                case "arrival_unreached": self = .arrivalUnreached
+                case "below_domain": self = .belowDomain
+                default: self = .unknown(rawValue)
+                }
+            }
+    
+            public var rawValue: String {
+                switch self {
+                case .windowShort: "window_short"
+                case .specificShort: "specific_short"
+                case .timeBound: "time_bound"
+                case .arrivalUnreached: "arrival_unreached"
+                case .belowDomain: "below_domain"
+                case .unknown(let rawValue): rawValue
+                }
+            }
+    
+            public init(from decoder: any Decoder) throws {
+                self.init(rawValue: try decoder.singleValueContainer().decode(String.self))
+            }
+    
+            public func encode(to encoder: any Encoder) throws {
+                var container = encoder.singleValueContainer()
+                try container.encode(rawValue)
+            }
+        }
+
+        public init(kind: Kind, value: Double, reference: Double, workout: String, phase: String? = nil) {
+            self.kind = kind
+            self.value = value
+            self.reference = reference
+            self.workout = workout
+            self.phase = phase
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case kind = "kind"
+            case value = "value"
+            case reference = "reference"
+            case workout = "workout"
+            case phase = "phase"
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            kind = try container.decode(Kind.self, forKey: .kind)
+            value = try container.decode(Double.self, forKey: .value)
+            reference = try container.decode(Double.self, forKey: .reference)
+            workout = try container.decode(String.self, forKey: .workout)
+            phase = try container.decode(String?.self, forKey: .phase)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(kind, forKey: .kind)
+            try container.encode(value, forKey: .value)
+            try container.encode(reference, forKey: .reference)
+            try container.encode(workout, forKey: .workout)
+            try container.encode(phase, forKey: .phase)
+        }
+    }
+
+    struct PlanRace: Codable, Hashable, Sendable {
+        public let name: String
+        public let date: String
+
+        public init(name: String, date: String) {
+            self.name = name
+            self.date = date
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case name = "name"
+            case date = "date"
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            name = try container.decode(String.self, forKey: .name)
+            date = try container.decode(String.self, forKey: .date)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(name, forKey: .name)
+            try container.encode(date, forKey: .date)
+        }
+    }
+
+    struct PlanCycle: Codable, Hashable, Sendable {
+        public let kind: Kind
+        public let level: Level?
+        public let version: Int
+        public let candidate: String
+        public let race: PlanRace?
+        public let weeks: [PlanWeek]
+        public let risks: [PlanRisk]
+        public let next: Next
+
+        public enum Kind: Codable, Hashable, Sendable {
+            case preparation
+            case general
+            case recovery
+            case rebuild
+            /// A value this build does not know yet: the server is newer than the app.
+            case unknown(String)
+    
+            public init(rawValue: String) {
+                switch rawValue {
+                case "preparation": self = .preparation
+                case "general": self = .general
+                case "recovery": self = .recovery
+                case "rebuild": self = .rebuild
+                default: self = .unknown(rawValue)
+                }
+            }
+    
+            public var rawValue: String {
+                switch self {
+                case .preparation: "preparation"
+                case .general: "general"
+                case .recovery: "recovery"
+                case .rebuild: "rebuild"
+                case .unknown(let rawValue): rawValue
+                }
+            }
+    
+            public init(from decoder: any Decoder) throws {
+                self.init(rawValue: try decoder.singleValueContainer().decode(String.self))
+            }
+    
+            public func encode(to encoder: any Encoder) throws {
+                var container = encoder.singleValueContainer()
+                try container.encode(rawValue)
+            }
+        }
+
+        public enum Level: Codable, Hashable, Sendable {
+            case progress
+            case maintain
+            case light
+            /// A value this build does not know yet: the server is newer than the app.
+            case unknown(String)
+    
+            public init(rawValue: String) {
+                switch rawValue {
+                case "progress": self = .progress
+                case "maintain": self = .maintain
+                case "light": self = .light
+                default: self = .unknown(rawValue)
+                }
+            }
+    
+            public var rawValue: String {
+                switch self {
+                case .progress: "progress"
+                case .maintain: "maintain"
+                case .light: "light"
+                case .unknown(let rawValue): rawValue
+                }
+            }
+    
+            public init(from decoder: any Decoder) throws {
+                self.init(rawValue: try decoder.singleValueContainer().decode(String.self))
+            }
+    
+            public func encode(to encoder: any Encoder) throws {
+                var container = encoder.singleValueContainer()
+                try container.encode(rawValue)
+            }
+        }
+
+        public enum Next: Codable, Hashable, Sendable {
+            case block
+            case recovery
+            case general
+            /// A value this build does not know yet: the server is newer than the app.
+            case unknown(String)
+    
+            public init(rawValue: String) {
+                switch rawValue {
+                case "block": self = .block
+                case "recovery": self = .recovery
+                case "general": self = .general
+                default: self = .unknown(rawValue)
+                }
+            }
+    
+            public var rawValue: String {
+                switch self {
+                case .block: "block"
+                case .recovery: "recovery"
+                case .general: "general"
+                case .unknown(let rawValue): rawValue
+                }
+            }
+    
+            public init(from decoder: any Decoder) throws {
+                self.init(rawValue: try decoder.singleValueContainer().decode(String.self))
+            }
+    
+            public func encode(to encoder: any Encoder) throws {
+                var container = encoder.singleValueContainer()
+                try container.encode(rawValue)
+            }
+        }
+
+        public init(kind: Kind, level: Level? = nil, version: Int, candidate: String, race: PlanRace? = nil, weeks: [PlanWeek], risks: [PlanRisk], next: Next) {
+            self.kind = kind
+            self.level = level
+            self.version = version
+            self.candidate = candidate
+            self.race = race
+            self.weeks = weeks
+            self.risks = risks
+            self.next = next
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case kind = "kind"
+            case level = "level"
+            case version = "version"
+            case candidate = "candidate"
+            case race = "race"
+            case weeks = "weeks"
+            case risks = "risks"
+            case next = "next"
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            kind = try container.decode(Kind.self, forKey: .kind)
+            level = try container.decode(Level?.self, forKey: .level)
+            version = try container.decode(Int.self, forKey: .version)
+            candidate = try container.decode(String.self, forKey: .candidate)
+            race = try container.decode(PlanRace?.self, forKey: .race)
+            weeks = try container.decode([PlanWeek].self, forKey: .weeks)
+            risks = try container.decode([PlanRisk].self, forKey: .risks)
+            next = try container.decode(Next.self, forKey: .next)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(kind, forKey: .kind)
+            try container.encode(level, forKey: .level)
+            try container.encode(version, forKey: .version)
+            try container.encode(candidate, forKey: .candidate)
+            try container.encode(race, forKey: .race)
+            try container.encode(weeks, forKey: .weeks)
+            try container.encode(risks, forKey: .risks)
+            try container.encode(next, forKey: .next)
+        }
+    }
+
+    struct PlanProposalSummary: Codable, Hashable, Sendable {
+        public let id: String
+        public let race: PlanRace?
+        public let weeks: Int
+        public let startsOn: String
+        public let peakKm: Double
+        public let expiresOn: String
+
+        public init(id: String, race: PlanRace? = nil, weeks: Int, startsOn: String, peakKm: Double, expiresOn: String) {
+            self.id = id
+            self.race = race
+            self.weeks = weeks
+            self.startsOn = startsOn
+            self.peakKm = peakKm
+            self.expiresOn = expiresOn
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case id = "id"
+            case race = "race"
+            case weeks = "weeks"
+            case startsOn = "starts_on"
+            case peakKm = "peak_km"
+            case expiresOn = "expires_on"
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = try container.decode(String.self, forKey: .id)
+            race = try container.decode(PlanRace?.self, forKey: .race)
+            weeks = try container.decode(Int.self, forKey: .weeks)
+            startsOn = try container.decode(String.self, forKey: .startsOn)
+            peakKm = try container.decode(Double.self, forKey: .peakKm)
+            expiresOn = try container.decode(String.self, forKey: .expiresOn)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(id, forKey: .id)
+            try container.encode(race, forKey: .race)
+            try container.encode(weeks, forKey: .weeks)
+            try container.encode(startsOn, forKey: .startsOn)
+            try container.encode(peakKm, forKey: .peakKm)
+            try container.encode(expiresOn, forKey: .expiresOn)
+        }
+    }
+
+    struct PlanView: Codable, Hashable, Sendable {
+        public let currentWeek: String
+        public let cycle: PlanCycle?
+        public let proposal: PlanProposalSummary?
+
+        public init(currentWeek: String, cycle: PlanCycle? = nil, proposal: PlanProposalSummary? = nil) {
+            self.currentWeek = currentWeek
+            self.cycle = cycle
+            self.proposal = proposal
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case currentWeek = "current_week"
+            case cycle = "cycle"
+            case proposal = "proposal"
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            currentWeek = try container.decode(String.self, forKey: .currentWeek)
+            cycle = try container.decode(PlanCycle?.self, forKey: .cycle)
+            proposal = try container.decode(PlanProposalSummary?.self, forKey: .proposal)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(currentWeek, forKey: .currentWeek)
+            try container.encode(cycle, forKey: .cycle)
+            try container.encode(proposal, forKey: .proposal)
+        }
+    }
+
+    struct PlanAlternative: Codable, Hashable, Sendable {
+        public let option: String
+        public let rejectedBecause: String
+
+        public init(option: String, rejectedBecause: String) {
+            self.option = option
+            self.rejectedBecause = rejectedBecause
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case option = "option"
+            case rejectedBecause = "rejected_because"
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            option = try container.decode(String.self, forKey: .option)
+            rejectedBecause = try container.decode(String.self, forKey: .rejectedBecause)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(option, forKey: .option)
+            try container.encode(rejectedBecause, forKey: .rejectedBecause)
+        }
+    }
+
+    struct PlanChange: Codable, Hashable, Sendable {
+        public let kind: Kind?
+        public let volumeKm: Double?
+        public let qualities: Int?
+
+        public enum Kind: Codable, Hashable, Sendable {
+            case preparation
+            case general
+            case recovery
+            case rebuild
+            /// A value this build does not know yet: the server is newer than the app.
+            case unknown(String)
+    
+            public init(rawValue: String) {
+                switch rawValue {
+                case "preparation": self = .preparation
+                case "general": self = .general
+                case "recovery": self = .recovery
+                case "rebuild": self = .rebuild
+                default: self = .unknown(rawValue)
+                }
+            }
+    
+            public var rawValue: String {
+                switch self {
+                case .preparation: "preparation"
+                case .general: "general"
+                case .recovery: "recovery"
+                case .rebuild: "rebuild"
+                case .unknown(let rawValue): rawValue
+                }
+            }
+    
+            public init(from decoder: any Decoder) throws {
+                self.init(rawValue: try decoder.singleValueContainer().decode(String.self))
+            }
+    
+            public func encode(to encoder: any Encoder) throws {
+                var container = encoder.singleValueContainer()
+                try container.encode(rawValue)
+            }
+        }
+
+        public init(kind: Kind? = nil, volumeKm: Double? = nil, qualities: Int? = nil) {
+            self.kind = kind
+            self.volumeKm = volumeKm
+            self.qualities = qualities
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case kind = "kind"
+            case volumeKm = "volume_km"
+            case qualities = "qualities"
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            kind = try container.decode(Kind?.self, forKey: .kind)
+            volumeKm = try container.decode(Double?.self, forKey: .volumeKm)
+            qualities = try container.decode(Int?.self, forKey: .qualities)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(kind, forKey: .kind)
+            try container.encode(volumeKm, forKey: .volumeKm)
+            try container.encode(qualities, forKey: .qualities)
+        }
+    }
+
+    struct CycleProposalView: Codable, Hashable, Sendable {
+        public let id: String
+        public let candidate: String
+        public let race: PlanRace?
+        public let weeks: [PlanWeek]
+        public let peakKm: Double
+        public let longRunKm: Double
+        public let flagships: Int
+        public let risks: [PlanRisk]
+        public let current: PlanChange
+        public let alternatives: [PlanAlternative]
+        public let proposedOn: String
+        public let expiresOn: String
+
+        public init(id: String, candidate: String, race: PlanRace? = nil, weeks: [PlanWeek], peakKm: Double, longRunKm: Double, flagships: Int, risks: [PlanRisk], current: PlanChange, alternatives: [PlanAlternative], proposedOn: String, expiresOn: String) {
+            self.id = id
+            self.candidate = candidate
+            self.race = race
+            self.weeks = weeks
+            self.peakKm = peakKm
+            self.longRunKm = longRunKm
+            self.flagships = flagships
+            self.risks = risks
+            self.current = current
+            self.alternatives = alternatives
+            self.proposedOn = proposedOn
+            self.expiresOn = expiresOn
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case id = "id"
+            case candidate = "candidate"
+            case race = "race"
+            case weeks = "weeks"
+            case peakKm = "peak_km"
+            case longRunKm = "long_run_km"
+            case flagships = "flagships"
+            case risks = "risks"
+            case current = "current"
+            case alternatives = "alternatives"
+            case proposedOn = "proposed_on"
+            case expiresOn = "expires_on"
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = try container.decode(String.self, forKey: .id)
+            candidate = try container.decode(String.self, forKey: .candidate)
+            race = try container.decode(PlanRace?.self, forKey: .race)
+            weeks = try container.decode([PlanWeek].self, forKey: .weeks)
+            peakKm = try container.decode(Double.self, forKey: .peakKm)
+            longRunKm = try container.decode(Double.self, forKey: .longRunKm)
+            flagships = try container.decode(Int.self, forKey: .flagships)
+            risks = try container.decode([PlanRisk].self, forKey: .risks)
+            current = try container.decode(PlanChange.self, forKey: .current)
+            alternatives = try container.decode([PlanAlternative].self, forKey: .alternatives)
+            proposedOn = try container.decode(String.self, forKey: .proposedOn)
+            expiresOn = try container.decode(String.self, forKey: .expiresOn)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(id, forKey: .id)
+            try container.encode(candidate, forKey: .candidate)
+            try container.encode(race, forKey: .race)
+            try container.encode(weeks, forKey: .weeks)
+            try container.encode(peakKm, forKey: .peakKm)
+            try container.encode(longRunKm, forKey: .longRunKm)
+            try container.encode(flagships, forKey: .flagships)
+            try container.encode(risks, forKey: .risks)
+            try container.encode(current, forKey: .current)
+            try container.encode(alternatives, forKey: .alternatives)
+            try container.encode(proposedOn, forKey: .proposedOn)
+            try container.encode(expiresOn, forKey: .expiresOn)
+        }
+    }
+
     enum SessionFact: Codable, Hashable, Sendable {
         case fact(Fact)
         case strengthFact(StrengthFact)
