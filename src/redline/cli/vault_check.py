@@ -30,6 +30,7 @@ from redline.analysis.progression_strength import coverage
 from redline.coach.fr import vault_check as wording
 from redline.model import (
     correction_replay,
+    cycle_templates,
     entrypoint,
     iso_week,
     ledger,
@@ -557,6 +558,22 @@ def check_progression_lineages(vault: Vault, report: Report) -> None:
         report.ok(wording.LINEAGES, wording.LINEAGES_COUNT.format(count=len(declared.exercises)))
 
 
+def check_cycle_templates(vault: Vault, report: Report) -> None:
+    """The instance's cycle templates, read in full when it declares them: a file the
+    planner cannot read is refused here, before a cycle depends on it."""
+    try:
+        found = cycle_templates.load_instance(vault.root)
+    except cycle_templates.TemplateError as exc:
+        report.fail(wording.CYCLE_TEMPLATES, str(exc).splitlines())
+        return
+    if found is None:
+        report.skip(wording.CYCLE_TEMPLATES, wording.NO_CYCLE_TEMPLATES)
+        return
+    report.ok(wording.CYCLE_TEMPLATES, wording.CYCLE_TEMPLATES_COUNT.format(
+        preparation=len(found.preparation), general=len(found.general),
+        recovery=len(found.recovery)))
+
+
 def check_cockpit_freshness(vault: Vault, report: Report) -> None:
     """Checks the freshness of the PostgreSQL source of truth."""
     capabilities = _read_postgres(vault, report, wording.COCKPIT,
@@ -695,6 +712,7 @@ CHECKS = (
     check_prediction_debt,
     check_capability_notes,
     check_progression_lineages,
+    check_cycle_templates,
     check_cockpit_freshness,
     check_weekly_plans,
     check_corrections_replay,

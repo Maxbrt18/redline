@@ -134,3 +134,23 @@ def test_every_problem_is_reported_at_once():
     with pytest.raises(TemplateError) as raised:
         parse(broken)
     assert "min_held_km" in str(raised.value) and "'lazy' unknown" in str(raised.value)
+
+
+# ------------------------------------------------------------------ vault-check
+
+
+def _checked(root):
+    from conftest import load_script
+
+    vault_check = load_script("vault-check")
+    report = vault_check.Report(quiet=True)
+    vault_check.check_cycle_templates(vault_check.Vault(root=root, files={}), report)
+    return report
+
+
+def test_vault_check_reads_the_instance_templates(tmp_path):
+    assert _checked(TEST_VAULT).failed == 0
+    assert _checked(tmp_path).skipped == 1, "an instance without the file is skipped"
+    (tmp_path / cycle_templates.INSTANCE_NAME).write_text(TEXT.replace("version = 2",
+                                                                       "version = 1"))
+    assert _checked(tmp_path).failed == 1
