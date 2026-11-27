@@ -207,7 +207,7 @@ def test_an_unknown_rule_id_is_refused_by_the_schema():
      "distance cap lowered"),
     ({"distance_target_km": 12.0}, {"distance_target_km": 9.0}, "distance target lowered"),
     ({"duration_cap_min": 60}, {"duration_cap_min": 45}, "duration cap lowered"),
-    ({"workout": "long"}, {"workout": "easy"}, "long replaced by easy"),
+    ({"workout": "long"}, {"workout": "easy"}, "hard session replaced"),
     ({"strength": {}}, {"strength": {"drop": ["rdl"]}}, "exercise dropped from strength"),
     ({"strength": {}}, {"strength": {"half_dose": True}}, "strength at half dose"),
 ])

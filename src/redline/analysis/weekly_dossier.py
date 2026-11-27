@@ -1,7 +1,7 @@
 """The Sunday review dossier, computed by the service BEFORE the model's turn.
 
-Volume, gauge, pain, trajectory, signals, due predictions, deadlines and the strength
-progression proposals are computed once, by the same code as the CLIs
+Volume, gauge, pain, trajectory, signals, due predictions, the coach's cautious decisions
+with what followed, deadlines and the strength progression proposals are computed once, by the same code as the CLIs
 (`week_review.week_report`, `signals.signals`, `model.predictions`,
 `progression_strength.report`), and handed to the model as data. The model keeps what is
 its own: judging, deciding, writing. It reruns a CLI only to check a specific point.
@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from redline.analysis import (
+    caution_review,
     expected_rpe,
     feasibility,
     ledger,
@@ -84,6 +85,9 @@ def render(store: OperationalStore, root: Path, week: str, today: dt.date) -> st
     calibration = prediction_model.calibration_lines(every, today)
     lines += ["", text.CALIBRATION]
     lines.extend(calibration or [text.NO_PREDICTION])
+    cautious = caution_review.report(store, rows, week)
+    if cautious:
+        lines += ["", *cautious]
 
     overdue = [row for row in store.deadline_rows()
                if row.get("status") != DeadlineStatus.DONE and row["due_on"] < today]
