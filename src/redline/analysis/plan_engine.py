@@ -28,7 +28,7 @@ from . import critical_speed, expected_rpe, ledger, race_estimate, signals
 
 #: The closed weeks the starting volume is the mean of.
 START_WEEKS = 3
-#: A race run this close before the skeleton starts calls for a recovery first.
+#: A race run, or started, this close before the skeleton starts calls for a recovery first.
 RECOVERY_DAYS = 21
 #: The skeleton's figures are rounded to 0.1 km: a bound is met within this.
 EPSILON_KM = 0.05
@@ -153,7 +153,7 @@ def frame(store: Any, today: dt.date) -> Frame:
     taper_cut = (low + high) / 2 if low is not None and high is not None else 0.0
     first = iso_week.monday(iso_week.of(today))
     rows = ledger.parse_ledger(store)
-    recovering = any(other.on < race.on and other.status == DeadlineStatus.DONE
+    recovering = any(other.on < race.on and other.state in race_model.RECOVERED_FROM
                      and 0 <= (first - other.on).days <= RECOVERY_DAYS
                      for other in race_model.typed(store))
     quality = goal.quality_per_week

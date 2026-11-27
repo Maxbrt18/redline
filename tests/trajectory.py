@@ -20,7 +20,13 @@ from typing import Protocol
 
 from redline.analysis import weekly_dossier
 from redline.model import iso_week
-from redline.model.vocabulary import DeadlineKind, DeadlineStatus, PlanPhase
+from redline.model.vocabulary import (
+    DeadlineKind,
+    DeadlineStatus,
+    PlanPhase,
+    RacePriority,
+    RaceState,
+)
 from redline.service import plan_revision
 
 #: A preparation run from where its first week stands: a half on the road, its peaks, and
@@ -69,7 +75,8 @@ class Store:
 
     def deadline_rows(self) -> list[dict]:
         return [{"deadline_key": "race", "kind": DeadlineKind.RACE,
-                 "status": DeadlineStatus.SCHEDULED, "due_on": self.race_on, "item": "Race",
+                 "status": DeadlineStatus.SCHEDULED, "priority": RacePriority.A,
+                 "race_state": RaceState.ACTIVE, "due_on": self.race_on, "item": "Race",
                  "context": self.goal, "fact_owner": "athlete/goals.md", "blocks": None,
                  "completed_on": None, "starts_on": None, "ends_on": None,
                  "athlete_label": "Race"}]

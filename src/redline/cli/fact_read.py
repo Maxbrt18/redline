@@ -174,6 +174,9 @@ def deadlines(store: Any, include_done: bool) -> list[str]:
                                              blocked=blocked))
         if period:
             lines[-1] += period
+        if row.get("race_state"):
+            lines[-1] += wording.RACE.format(priority=row["priority"].upper(),
+                                             state=row["race_state"])
         if row.get("athlete_label"):
             lines[-1] += wording.NOTEBOOK_LABEL.format(athlete_label=row["athlete_label"])
     return lines

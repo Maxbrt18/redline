@@ -352,7 +352,8 @@ def test_the_race_and_only_alex_s_deadlines_reach_the_course_tab(store):
     write(store, commands.DEADLINE_UPSERT, {
         "deadline_key": "race-targetrace-2026", "due_on": dt.date(2026, 11, 26),
         "item": "TargetRace 45 km — course objectif", "fact_owner": "coaching/race.md",
-        "status": "scheduled", "kind": "race", "athlete_label": "TargetRace",
+        "status": "scheduled", "kind": "race", "priority": "a", "race_state": "active",
+        "athlete_label": "TargetRace",
         "context": {"start_time": "09:00", "distance_km": 42.2, "target": "<4 h 30"}})
     write(store, commands.DEADLINE_UPSERT, {
         "deadline_key": "frontale", "due_on": dt.date(2026, 10, 14),

@@ -9,7 +9,7 @@ from redline.model import iso_week, rulebook
 from redline.model import race as race_model
 
 RACE_ON = dt.date(2030, 11, 30)      # Saturday of 2030-W48: taper W46-W48
-RACE_ROW = {"kind": "race", "status": "scheduled", "due_on": RACE_ON.isoformat()}
+RACE_ROW = {"kind": "race", "status": "scheduled", "priority": "a", "race_state": "active", "due_on": RACE_ON.isoformat()}
 RACE = race_model.from_row(RACE_ROW)
 
 
@@ -174,7 +174,7 @@ def test_a_race_sets_its_own_taper_and_band():
 
 
 def test_each_race_of_the_season_keeps_its_own_taper():
-    spring = {"kind": "race", "status": "done", "due_on": "2030-04-13",
+    spring = {"kind": "race", "status": "done", "priority": "a", "race_state": "run", "due_on": "2030-04-13",
               "context": {"taper_weeks": 1}}
     store = Store(spring, RACE_ROW)
     assert taper.race_window(store, "2030-W15").weeks == ("2030-W15",)

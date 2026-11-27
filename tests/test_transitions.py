@@ -124,7 +124,7 @@ def test_rendered_text_avoids_banned_glyphs():
 
 class FakeStore(SimpleNamespace):
     def deadline_rows(self):
-        return [{"kind": "race", "status": "scheduled", "due_on": RACE}]
+        return [{"kind": "race", "status": "scheduled", "priority": "a", "race_state": "active", "due_on": RACE}]
 
     def active_plans(self):
         return self.plans

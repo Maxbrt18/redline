@@ -10,8 +10,9 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Connection
 
 from redline.coach.fr import gear as gear_text
+from redline.model import race as race_model
 from redline.model import vocabulary as voc
-from redline.model.vocabulary import JobStatus, ThreadStatus
+from redline.model.vocabulary import DeadlineKind, JobStatus, RacePriority, RaceState, ThreadStatus
 
 from ..database import StorageError
 from ..schema import (
@@ -102,11 +103,17 @@ class Facts(PainZones):
     def add_deadline_in(self, connection: Connection, row: dict,
                         *, actor: str = "application") -> None:
         deadline_id = _uuid(row.get("id"))
+        status = (self._race_status_in(connection, row) if row.get("kind") == DeadlineKind.RACE
+                  else row["status"])
+        if row.get("kind") != DeadlineKind.RACE and (row.get("priority") or row.get("race_state")):
+            raise StorageError(f"deadline {row['deadline_key']}: only a race carries a priority "
+                               "and a state")
         values = {
             "id": deadline_id, "athlete_id": self.athlete_id,
             "deadline_key": row["deadline_key"], "due_on": row["due_on"],
             "item": row["item"], "fact_owner": row["fact_owner"],
-            "blocks": row.get("blocks"), "status": row["status"],
+            "blocks": row.get("blocks"), "status": status,
+            "priority": row.get("priority"), "race_state": row.get("race_state"),
             "completed_on": row.get("completed_on"),
             "kind": row.get("kind") or "general", "starts_on": row.get("starts_on"),
             "ends_on": row.get("ends_on"), "context": row.get("context") or {},
@@ -117,6 +124,29 @@ class Facts(PainZones):
         ).returning(deadlines.c.id)).scalar_one()
         _audit(connection, actor, "deadline.upserted", "deadline", actual_id, _jsonable(values))
         _request_projection(connection)
+
+    def _race_status_in(self, connection: Connection, row: dict) -> str:
+        """A race's status, which follows its state, once its move is allowed and it leaves
+        at most one active goal."""
+        key = row["deadline_key"]
+        if not row.get("priority") or not row.get("race_state"):
+            raise StorageError(f"race {key}: a race carries its priority and its state")
+        state = RaceState(row["race_state"])
+        before = connection.execute(sa.select(deadlines.c.race_state).where(
+            deadlines.c.athlete_id == self.athlete_id,
+            deadlines.c.deadline_key == key)).scalar_one_or_none()
+        problem = race_model.move_error(None if before is None else RaceState(before), state)
+        if problem is not None:
+            raise StorageError(f"race {key}: {problem}")
+        if row["priority"] == RacePriority.A and state == RaceState.ACTIVE:
+            goal = connection.execute(sa.select(deadlines.c.deadline_key).where(
+                deadlines.c.athlete_id == self.athlete_id, deadlines.c.deadline_key != key,
+                deadlines.c.priority == RacePriority.A,
+                deadlines.c.race_state == RaceState.ACTIVE)).scalar_one_or_none()
+            if goal is not None:
+                raise StorageError(f"race {key}: {goal} is already the active goal (priority "
+                                   "a); lower it or close it first")
+        return race_model.status_of(state)
 
 
     def upsert_gear_in(self, connection: Connection, row: dict,

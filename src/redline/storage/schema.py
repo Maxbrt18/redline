@@ -845,6 +845,8 @@ deadlines = sa.Table(
     # Present = an athlete action, shown in the logbook under this short label.
     # Absent = a coach working deadline, which never leaves the vault.
     sa.Column("athlete_label", sa.Text),
+    sa.Column("priority", sa.Text),
+    sa.Column("race_state", sa.Text),
     sa.CheckConstraint(f"status IN ({voc.sql_values(voc.DeadlineStatus)})", name="ck_deadlines_status"),
     sa.CheckConstraint("athlete_label IS NULL OR char_length(athlete_label) BETWEEN 3 AND 80",
                        name="ck_deadlines_athlete_label"),
@@ -854,8 +856,25 @@ deadlines = sa.Table(
                        name="ck_deadlines_kind"),
     sa.CheckConstraint("starts_on IS NULL OR ends_on IS NULL OR starts_on <= ends_on",
                        name="ck_deadlines_range"),
+    # A race, and only a race, has a priority and a state; its status follows its state.
+    sa.CheckConstraint(f"priority IS NULL OR priority IN ({voc.sql_values(voc.RacePriority)})",
+                       name="ck_deadlines_priority"),
+    sa.CheckConstraint(
+        f"race_state IS NULL OR race_state IN ({voc.sql_values(voc.RaceState)})",
+        name="ck_deadlines_race_state"),
+    sa.CheckConstraint(
+        "(kind = 'race' AND priority IS NOT NULL AND race_state IS NOT NULL) OR "
+        "(kind <> 'race' AND priority IS NULL AND race_state IS NULL)",
+        name="ck_deadlines_race_fields"),
+    sa.CheckConstraint(
+        f"kind <> 'race' OR ((status = 'done') = "
+        f"(race_state IN ({voc.sql_values(voc.CLOSED_RACE_STATES)})))",
+        name="ck_deadlines_race_status"),
     sa.UniqueConstraint("athlete_id", "deadline_key", name="uq_deadlines_key"),
 )
+#: At most one goal: one race of priority A still active.
+sa.Index("ix_deadlines_active_goal", deadlines.c.athlete_id, unique=True,
+         postgresql_where=sa.text("priority = 'a' AND race_state = 'active'"))
 
 #: An effort the athlete declared run all out: a race or a test. Declared, never inferred
 #: from a session's kind or RPE; it may predate the ledger.

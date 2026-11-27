@@ -70,7 +70,7 @@ def test_the_payload_stays_complete_so_the_queue_keeps_its_contract():
     assert kind == "deadline.upsert"
     assert set(payload) == {"deadline_key", "due_on", "item", "fact_owner",
                             "blocks", "status", "completed_on", "kind", "starts_on",
-                            "ends_on", "context", "athlete_label"}
+                            "ends_on", "context", "athlete_label", "priority", "race_state"}
 
 
 def test_patch_on_a_thread_keeps_its_body():
@@ -221,3 +221,31 @@ def test_a_context_that_is_not_an_object_is_refused():
     args = parse("deadline", "--key", "d-1", "--patch", "--context", "[1, 2]")
     with pytest.raises(InputError, match="a JSON object"):
         fact_write.payload_of(args, deadline_row())
+
+
+def _new_race(*extra: str):
+    return parse("deadline", "--key", "half", "--due-on", "2031-04-06", "--item", "Semi",
+                 "--fact-owner", "athlete/goals.md", "--kind", "race", *extra)
+
+
+def test_a_race_is_written_with_its_priority_and_is_active_by_default():
+    with pytest.raises(InputError, match="--priority"):
+        fact_write.payload_of(_new_race(), None)
+    _, _, payload = fact_write.payload_of(_new_race("--priority", "a"), None)
+    assert (payload["priority"], payload["race_state"], payload["status"]) == (
+        "a", "active", "scheduled")
+
+
+def test_a_race_s_status_follows_its_state_and_is_never_written():
+    with pytest.raises(InputError, match="follows its --race-state"):
+        fact_write.payload_of(_new_race("--priority", "a", "--status", "done"), None)
+    existing = deadline_row(kind="race", priority="a", race_state="active", status="scheduled")
+    args = parse("deadline", "--key", "d-1", "--patch", "--race-state", "run")
+    _, _, payload = fact_write.payload_of(args, existing)
+    assert (payload["race_state"], payload["status"]) == ("run", "done")
+
+
+def test_only_a_race_carries_a_priority():
+    with pytest.raises(InputError, match="only a race"):
+        fact_write.payload_of(parse("deadline", "--key", "d-1", "--patch", "--priority", "b"),
+                              deadline_row())

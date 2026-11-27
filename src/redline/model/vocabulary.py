@@ -480,6 +480,33 @@ class DeadlineStatus(StrEnum):
     DONE = "done"
 
 
+class RacePriority(StrEnum):
+    """What a race weighs (`deadlines.priority`): the goal a preparation is built for, a
+    race that serves it, a race run for its own sake."""
+
+    A = "a"
+    B = "b"
+    C = "c"
+
+
+class RaceState(StrEnum):
+    """Where a race stands (`deadlines.race_state`). `abandoned`: started, not finished; a
+    race not started is `cancelled`."""
+
+    PROPOSED = "proposed"
+    ACTIVE = "active"
+    POSTPONED = "postponed"
+    CANCELLED = "cancelled"
+    RUN = "run"
+    ABANDONED = "abandoned"
+    DROPPED = "dropped"
+
+
+#: The states a race no longer leaves: its deadline is done.
+CLOSED_RACE_STATES = (RaceState.CANCELLED, RaceState.RUN, RaceState.ABANDONED,
+                      RaceState.DROPPED)
+
+
 class RaceTerrain(StrEnum):
     """Where a typed race is run (`context.terrain`): it picks the plan's template and the
     default climb intent."""

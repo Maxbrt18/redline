@@ -41,7 +41,7 @@ def _vault(tmp_path):
 
 def _race(**context):
     return race_model.from_row({
-        "kind": "race", "status": "scheduled", "due_on": "2030-11-30",
+        "kind": "race", "status": "scheduled", "priority": "a", "race_state": "active", "due_on": "2030-11-30",
         "context": {"route_gpx": "coaching/route.gpx", "start_time": "23:00",
                     "aid_stations": [{"km": 2, "name": "A"}, {"km": 3.5, "name": "B"}],
                     "stop_minutes": 2, "carbs_g_h": 60, **context}})

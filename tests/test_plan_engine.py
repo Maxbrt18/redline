@@ -30,7 +30,7 @@ class Store:
         return self.breaks
 
     def deadline_rows(self):
-        return [{"deadline_key": "half-2031", "kind": "race", "status": "scheduled",
+        return [{"deadline_key": "half-2031", "kind": "race", "status": "scheduled", "priority": "a", "race_state": "active",
                  "due_on": dt.date(2031, 4, 6), "item": "Semi", "context": self.context,
                  "fact_owner": "athlete/goals.md", "blocks": None, "completed_on": None,
                  "starts_on": None, "ends_on": None, "athlete_label": "Semi"}]
