@@ -16,7 +16,8 @@ class CallTally:
     """The calls of one purpose, route and model over a window.
 
     ``route`` is the route of the turn a call belongs to; None for a triage call, or for a
-    turn whose identity row is missing. ``cost_usd`` sums the calls that reported a price.
+    turn whose identity row is missing. ``cost_usd`` sums the calls that reported a price;
+    ``unpriced_calls`` counts the others (Codex reports none).
     """
 
     purpose: str
@@ -25,6 +26,7 @@ class CallTally:
     calls: int
     turns: int
     cost_usd: float
+    unpriced_calls: int
     input_tokens: int
     output_tokens: int
     cache_read_tokens: int
@@ -50,6 +52,7 @@ class AgentCalls(StoreBase):
             sa.func.count().label("calls"),
             sa.func.count(sa.distinct(agent_calls.c.turn_id)).label("turns"),
             sa.func.coalesce(sa.func.sum(agent_calls.c.cost_usd), 0).label("cost_usd"),
+            sa.func.count().filter(agent_calls.c.cost_usd.is_(None)).label("unpriced_calls"),
             sa.func.sum(agent_calls.c.input_tokens).label("input_tokens"),
             sa.func.sum(agent_calls.c.output_tokens).label("output_tokens"),
             sa.func.sum(agent_calls.c.cache_read_tokens).label("cache_read_tokens"),
@@ -65,6 +68,7 @@ class AgentCalls(StoreBase):
         return CallWindow(since=since, first_call=first_call, athletes=athletes, tallies=tuple(
             CallTally(purpose=row["purpose"], route=row["route"], model=row["model"],
                       calls=row["calls"], turns=row["turns"], cost_usd=float(row["cost_usd"]),
+                      unpriced_calls=row["unpriced_calls"],
                       input_tokens=int(row["input_tokens"]),
                       output_tokens=int(row["output_tokens"]),
                       cache_read_tokens=int(row["cache_read_tokens"]),

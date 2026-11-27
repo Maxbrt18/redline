@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import datetime as dt
 import json
 import math
@@ -116,9 +117,7 @@ class PostgresStateStore(StateStore):
             connection.execute(agent_calls.insert().values(
                 id=uuid.uuid4(), turn_id=uuid.UUID(call.turn_id) if call.turn_id else None,
                 psid=call.psid or None, provider=call.provider, purpose=call.purpose.value,
-                model=call.model, cost_usd=call.cost_usd, input_tokens=call.input_tokens,
-                output_tokens=call.output_tokens, cache_read_tokens=call.cache_read_tokens,
-                cache_write_tokens=call.cache_write_tokens, duration_ms=call.duration_ms,
+                **dataclasses.asdict(call.consumption),
             ))
 
     def session_id(self, psid: str, provider: str) -> str | None:

@@ -3014,7 +3014,7 @@ def test_a_stable_job_id_deduplicates_the_trigger(store):
 
 def test_every_call_is_recorded_and_summed_by_the_route_of_its_turn(store):
     from redline.model.vocabulary import CallPurpose
-    from redline.service.agent import AgentCall, TurnIdentity
+    from redline.service.agent import AgentCall, Consumption, TurnIdentity
     state = PostgresStateStore(store.database)
     turn_id = str(uuid.uuid4())
     state.record_turn(TurnIdentity(
@@ -3025,14 +3025,15 @@ def test_every_call_is_recorded_and_summed_by_the_route_of_its_turn(store):
                                 (CallPurpose.TURN, turn_id, 0.02),
                                 (CallPurpose.TRIAGE, None, None)):
         state.record_call(AgentCall(
-            provider="claude", purpose=purpose, model="sonnet", cost_usd=cost,
-            input_tokens=10, output_tokens=5, cache_read_tokens=100, cache_write_tokens=1,
-            duration_ms=900, psid="4242" if turn else None, turn_id=turn))
+            provider="claude", purpose=purpose, consumption=Consumption(
+                model="sonnet", cost_usd=cost, input_tokens=10, output_tokens=5,
+                cache_read_tokens=100, cache_write_tokens=1, duration_ms=900),
+            psid="4242" if turn else None, turn_id=turn))
 
     window = store.call_window(dt.datetime.now(dt.UTC) - dt.timedelta(days=1))
 
     by_route = {tally.route or tally.purpose: tally for tally in window.tallies}
     assert (by_route["n1"].calls, by_route["n1"].turns) == (2, 1)
     assert by_route["n1"].cost_usd == pytest.approx(0.07)
-    assert (by_route["triage"].calls, by_route["triage"].cost_usd) == (1, 0)
+    assert (by_route["triage"].calls, by_route["triage"].unpriced_calls) == (1, 1)
     assert window.athletes == 1
