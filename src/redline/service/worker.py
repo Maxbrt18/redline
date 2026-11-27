@@ -1945,6 +1945,11 @@ class TurnWorker:
         if job.kind == "weekly_repair":
             week = job.detail or current
             return prompt, None, (week,)
+        if job.kind == "plan_review":
+            for extra in (self._repo.coaching_context("N2"), self._repo.cycle_candidates()):
+                if isinstance(extra, str) and extra:
+                    prompt = extra + "\n\n" + prompt
+            return prompt, None, ()
         if job.kind not in {"morning", "weekly"}:
             return prompt, strength_session, required_weeks
 

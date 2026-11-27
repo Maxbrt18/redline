@@ -10,8 +10,9 @@ import pytest
 import trajectory
 
 from redline.analysis import cycle_choice
-from redline.model import iso_week
+from redline.model import cycle_transitions, iso_week
 from redline.model import plan_generator as generator
+from redline.model import race as race_model
 from redline.model.cycles import CycleVersion
 from redline.model.errors import InputError
 from redline.model.vocabulary import CycleCause, CycleVersionState, GeneralLevel
@@ -29,7 +30,7 @@ from redline.service.proactive_messages import (
 
 TEMPLATES = trajectory.TEMPLATES
 TEMPLATE = TEMPLATES.preparation_for(21.1, "road")
-STARTS = {"balanced": trajectory.window_start()}
+STARTS = generator.candidate_starts(TEMPLATE, trajectory.RACE_ON)
 
 
 def _store(general_level: GeneralLevel | None = None) -> trajectory.Store:
@@ -47,6 +48,11 @@ def _store(general_level: GeneralLevel | None = None) -> trajectory.Store:
 def _eve(week: str) -> dt.date:
     """The Sunday before `week`."""
     return iso_week.monday(week) - dt.timedelta(days=1)
+
+
+def test_each_candidate_starts_its_own_week_and_the_window_is_the_earliest():
+    assert generator.window_start(TEMPLATE, trajectory.RACE_ON) == min(STARTS.values())
+    assert len(set(STARTS.values())) > 1, "the candidates do not all start together"
 
 
 def test_a_candidate_is_proposed_on_its_week_never_before():
@@ -78,6 +84,31 @@ def test_a_level_is_the_general_preparation_s_and_changes_it():
         cycle_choice.level(_store(GeneralLevel.MAINTAIN), day, GeneralLevel.MAINTAIN)
     trame = cycle_choice.level(_store(GeneralLevel.MAINTAIN), day, GeneralLevel.PROGRESS)
     assert trame.template == GeneralLevel.PROGRESS and trame.weeks[0].label == trajectory.FIRST_WEEK
+
+
+def test_a_plan_review_is_due_when_a_candidate_can_start_next_week():
+    goal = race_model.typed(_store())[0]
+    general = _store(GeneralLevel.MAINTAIN).cycle
+
+    def due(week, **kwargs):
+        flags = {"proposal_open": False, "reviewed": True, **kwargs}
+        return cycle_transitions.review_week(general, goal, TEMPLATES, _eve(week), **flags)
+
+    first = min(STARTS.values())
+    assert due(iso_week.shift(first, -1), reviewed=False) is None, "the window is not open"
+    assert due(first, reviewed=False) == first
+    between = iso_week.shift(first, 1)
+    if between not in STARTS.values():
+        assert due(between) is None, "reviewed already, no new candidate starts"
+        assert due(between, reviewed=False) == between, "a goal set in an open window"
+    assert due(STARTS["balanced"]) == STARTS["balanced"]
+    assert due(STARTS["balanced"], proposal_open=True) is None
+    trame, _ = cycle_choice.proposal(_store(), _eve(STARTS["balanced"]), "balanced")
+    preparation = CycleVersion(uuid.uuid4(), uuid.uuid4(), 1, CycleVersionState.ACTIVE, trame,
+                               CycleCause.CREATE, race_key="race")
+    assert cycle_transitions.review_week(preparation, goal, TEMPLATES, _eve(STARTS["balanced"]),
+                                         proposal_open=False, reviewed=True) is None, \
+        "a preparation in force is the window taken"
 
 
 def test_the_proposal_message_carries_its_summary_and_the_two_answers():

@@ -269,10 +269,9 @@ def test_the_coach_proposes_and_the_athlete_is_sent_the_summary(store, monkeypat
     from redline.cli import cycle
     template = cycle_templates.load(VAULT_ROOT).preparation_for(21.1, "road")
     race_on = dt.date(2030, 6, 30)
-    week = generator.window_start(template, race_on)
-    candidate = next(slug for slug, levers in generator.candidate_levers(template).items()
-                     if generator.preparation(template, generator.Goal(race_on, 21.1), levers,
-                                              _inputs(week)).weeks[0].label == week)
+    starts = generator.candidate_starts(template, race_on)
+    week = min(starts.values())
+    candidate = next(slug for slug, start in starts.items() if start == week)
     sunday = (generator.iso_week.monday(week) - dt.timedelta(days=1)).isoformat()
     _goal(store, race_on)
     _apply(store, _general(generator.iso_week.shift(week, -4)), CycleCause.MIGRATION,
@@ -313,3 +312,22 @@ def test_the_coach_changes_the_level_and_the_athlete_is_told(store, monkeypatch)
     state = PostgresStateStore(store.database)
     assert [job["kind"] for job in state.proactive.jobs(active_only=True)] == [
         "cycle_transition"]
+
+
+def test_the_planner_asks_for_a_plan_review_once_a_candidate_can_start(store):
+    from conftest import VAULT_ROOT
+    template = cycle_templates.load(VAULT_ROOT).preparation_for(21.1, "road")
+    race_on = dt.date(2030, 6, 30)
+    week = generator.window_start(template, race_on)
+    _goal(store, race_on)
+    state = PostgresStateStore(store.database)
+    eve = dt.datetime.combine(generator.iso_week.monday(week) - dt.timedelta(days=1),
+                              dt.time(12), tzinfo=dt.UTC)
+    state.materialize_intelligence(eve - dt.timedelta(days=7))
+    assert not [job for job in state.proactive.jobs(active_only=True)
+                if job["kind"] == "plan_review"]
+    state.materialize_intelligence(eve)
+    state.materialize_intelligence(eve)
+    [job] = [job for job in state.proactive.jobs(active_only=True)
+             if job["kind"] == "plan_review"]
+    assert job["detail"] == "Semi"

@@ -893,6 +893,17 @@ class PostgresStateStore(StateStore):
                 actor="intelligence")
             if transition.cause != voc.CycleCause.MIGRATION:
                 created += int(store.announce_cycle_in(connection, version, utc))
+        goal = race_model.active_goal(store)
+        prefix = f"plan-review:{goal.key}:" if goal is not None else ""
+        reviewed = bool(prefix) and connection.execute(sa.select(sa.exists().where(
+            proactive_jobs.c.job_key.startswith(prefix, autoescape=True)))).scalar_one()
+        week = cycle_transitions.review_week(
+            store.active_cycle_in(connection), goal, templates, today,
+            proposal_open=store.open_cycle_proposal(utc) is not None, reviewed=reviewed)
+        if week is not None and goal is not None:
+            created += int(PostgresProactiveState._enqueue(
+                connection, prefix + week, voc.ProactiveKind.PLAN_REVIEW,
+                goal.name or goal.key, utc.timestamp()))
         return created
 
     @staticmethod

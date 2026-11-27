@@ -504,11 +504,18 @@ def candidate_levers(template: Preparation) -> dict[str, Levers]:
     return unique
 
 
+def candidate_starts(template: Preparation, race_on: dt.date) -> dict[str, str]:
+    """The first week of each candidate's window, by candidate: from it, the candidate can
+    be proposed."""
+    race_week = iso_week.of(race_on)
+    return {slug: iso_week.shift(race_week, 1 - _longest(template, levers))
+            for slug, levers in candidate_levers(template).items()}
+
+
 def window_start(template: Preparation, race_on: dt.date) -> str:
     """The first week of the longest window the candidates may ask: from it, the
     preparation can be taken."""
-    longest = max(_longest(template, levers) for levers in candidate_levers(template).values())
-    return iso_week.shift(iso_week.of(race_on), 1 - longest)
+    return min(candidate_starts(template, race_on).values())
 
 
 def candidates(template: Preparation, goal: Goal, inputs: Inputs) -> list[Trame]:
