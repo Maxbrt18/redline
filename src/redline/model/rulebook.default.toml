@@ -290,7 +290,7 @@ id = "n1"
 title = "Qualité"
 text = "{quality_sessions_per_week} par semaine au plus, introduites seulement porte ouverte."
 grade = "règle de coaching"
-owner = "coaching/current-plan.md"
+owner = "coaching/protocols.md"
 enforced_by = "redline week-plan revise (nombre de qualités de la semaine) ; le coach (porte ouverte)"
 
 [[rules]]
@@ -298,7 +298,7 @@ id = "n2"
 title = "Assimilation"
 text = "-25 à -30 % toutes les 3-4 semaines, fréquence gardée ; on n'y ajoute rien."
 grade = "règle de coaching"
-owner = "coaching/current-plan.md"
+owner = "coaching/protocols.md"
 enforced_by = "code : les décharges de la trame (gabarit de cycle), où aucune hausse de lignée ne passe ; le coach"
 
 [[rules]]
@@ -306,7 +306,7 @@ id = "n3"
 title = "Douleur"
 text = "plafond {pain_cap}/10 à l'effort, zone par zone ; au-dessus ou foulée modifiée : arrêt. Persistante > 48 h : -30 %, puis paliers 50/70/85 % et 2 semaines sans qualité."
 grade = "règle de coaching"
-owner = "coaching/current-plan.md"
+owner = "coaching/protocols.md"
 enforced_by = "code : trace au réveil persistante → qualité refusée {pain_no_quality_days} j, semaine déjà prévue -{pain_cut_pct} % (redline week-plan revise), sauf une révision qui ne fait que déplacer des séances. Coach : arrêt en séance, foulée modifiée, paliers 50/70/85 %"
 
 [[rules]]
@@ -314,7 +314,7 @@ id = "n4"
 title = "Sommeil et FC"
 text = "2-3 mauvaises nuits consécutives ou FC anormalement haute en footing : qualité supprimée, semaine traitée en assimilation."
 grade = "règle de coaching"
-owner = "coaching/current-plan.md"
+owner = "coaching/protocols.md"
 enforced_by = "code : {poor_nights_streak} mauvaises nuits de suite ou FC à allure haute → qualité refusée {alarm_no_quality_days} j (redline week-plan revise). Coach : 2 nuits, volume d'assimilation"
 
 [[rules]]
@@ -330,7 +330,7 @@ id = "n6"
 title = "Dernier intervalle"
 text = "une qualité finit avec une répétition en réserve ; un all-in final la rate. Le RPE se lit contre la fourchette que la dose attend, jamais contre une bande : il ne se commente qu'avec un second indice, et un écart d'exécution reçoit la correction, jamais le chiffre. Allures comparées au sein de la séance seulement."
 grade = "règle de coaching"
-owner = "coaching/current-plan.md"
+owner = "coaching/protocols.md"
 enforced_by = "code : RPE attendu, écart d'exécution et second indice (verdict du débrief). Coach : réserve, all-in final"
 
 [[rules]]
@@ -338,7 +338,7 @@ id = "n7"
 title = "Espacement"
 text = "jamais deux jours exigeants consécutifs (qualité, sortie longue, EF > {hard_min_hours} h). Une semaine à contrainte se réduit, elle ne se condense pas."
 grade = "règle de coaching"
-owner = "coaching/current-plan.md"
+owner = "coaching/protocols.md"
 enforced_by = "redline week-plan revise (champ demanding)"
 
 [[rules]]
@@ -346,7 +346,7 @@ id = "n8"
 title = "Transition"
 text = "séance dont la nature sort des {transition_lookback_days} derniers jours (1re qualité, 1er bloc descente, terrain neuf). {transitions_per_week} par semaine au plus, sous-dosée, plafond écrit avant."
 grade = "pari"
-owner = "coaching/current-plan.md"
+owner = "coaching/protocols.md"
 enforced_by = "redline week-plan revise (champ transition) ; redline feasibility (à rebours)"
 
 [[rules]]
@@ -354,7 +354,7 @@ id = "po"
 title = "Porte"
 text = "une hausse facile (palier de SL sans pourcentage fixe, EF allongée, sortie de plus) s'ajoute si le pic d'effort hebdo reste au plus {gate_effort_peak}/10 sans hausse sur {gate_trend_weeks} semaines, réveils à la base ; elles se cumulent. Case rouge : semaine suivante figée ; deux : un cran en arrière."
 grade = "règle de coaching"
-owner = "coaching/current-plan.md § La porte"
+owner = "coaching/protocols.md § La porte"
 enforced_by = "le coach ; écart aux 30 jours affiché par redline week-plan et redline ledger"
 
 [[rules]]
@@ -370,5 +370,5 @@ id = "f1"
 title = "Carburant"
 text = "cible au plus {carbs_cap_g_h} g/h ; au-delà de {carbs_mix_above_g_h} g/h, mélange glucose-fructose nommé sur la séance. Jamais de cible de boisson en mL/h."
 grade = "consensus (Plews et al. ; Martinez et al. pour l'entraînement digestif)"
-owner = "coaching/current-plan.md"
+owner = "coaching/protocols.md"
 enforced_by = "redline week-plan revise (champs carbs_target_g_h et carbs_mix)"

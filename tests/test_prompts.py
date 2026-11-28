@@ -280,7 +280,7 @@ def test_style_keeps_channel_and_decision_guardrails():
     assert "porte de sortie chiffrée" in STYLE_PROMPT
     assert "UN CHIFFRE NE SE CITE PAS" in STYLE_PROMPT
     assert f"{prompts.AGENT_CLI} ledger --week" in STYLE_PROMPT
-    assert "Vol. cible" in STYLE_PROMPT
+    assert "ni de la trame" in _flat(STYLE_PROMPT)
     assert "n'annonce pas leur arrivée" in STYLE_PROMPT
     assert f"{prompts.AGENT_CLI} fact-read corrections" in STYLE_PROMPT
     assert "Même incident = même clé" in STYLE_PROMPT

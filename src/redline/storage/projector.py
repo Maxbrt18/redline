@@ -13,6 +13,7 @@ from pathlib import Path
 import sqlalchemy as sa
 
 from redline.model import iso_week, strength_log, vault_layout, weekly_plan
+from redline.model.errors import StorageError
 from redline.model.views import apply as apply_view
 
 from .repository import OperationalStore
@@ -140,7 +141,9 @@ def plan_drift(store: OperationalStore, root: Path) -> list[str]:
 
 def project_cycle(store: OperationalStore, root: Path) -> None:
     """The cycle version in force, as `coaching/current-plan.md`; left as it is before the
-    first version."""
+    first version. A note written by hand there (one without the projection's header) is
+    kept aside first (`CURRENT_PLAN_KEPT`), never overwritten; with one kept already, the
+    projection waits for an operator."""
     from redline.coach.fr import cycle as text
     from redline.coach.fr import session_labels
     from redline.model import race as race_model
@@ -155,7 +158,13 @@ def project_cycle(store: OperationalStore, root: Path) -> None:
                   + (f" {key.dose}" if key.dose is not None else "")
                   for key in version.keys_of(week.label)))
              for week in version.trame.weeks]
-    _atomic(root / vault_layout.CURRENT_PLAN, text.note(
+    path, kept = root / vault_layout.CURRENT_PLAN, root / vault_layout.CURRENT_PLAN_KEPT
+    if path.is_file() and not path.read_text(encoding="utf-8").startswith(text.NOTE_HEADER):
+        if kept.exists():
+            raise StorageError(f"{vault_layout.CURRENT_PLAN} was written by hand and "
+                               f"{vault_layout.CURRENT_PLAN_KEPT} already exists: merge them")
+        os.replace(path, kept)
+    _atomic(path, text.note(
         str(version.kind), str(version.level or ""), version.version, str(version.cause),
         weeks, (race.name, race.on) if race is not None else None))
 

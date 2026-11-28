@@ -27,7 +27,7 @@ REPORT_WEEK = "Semaine {label}"
 REPORT_VOLUME = "Volume : {week_volume}"
 
 REPORT_VOLUME_SOURCE = (
-    "(le registre, pas le plan — `Vol. cible` de current-plan.md est une intention, pas "
+    "(le registre, pas le plan — le volume de la trame est un plafond, pas "
     "un fait)")
 
 REPORT_GAUGE = "Jauge : {h_eq:.2f} h-éq ({level}/100{over_level}) · ratio {ratio}{over_ratio}"
