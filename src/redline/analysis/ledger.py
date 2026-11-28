@@ -791,56 +791,6 @@ def long_run_stall(rows: list[Row], today: dt.date) -> Stall | None:
     return Stall(weeks=stalled, record_km=record, record_week=record_week)
 
 
-@dataclass
-class Projection:
-    """What the long run needs, from now to the taper, for a target."""
-
-    start_km: float
-    weeks: list[str]               # the weeks that can still carry an increase
-    race_on: dt.date
-    taper_from: str
-
-    def required_growth(self, target_km: float, lost: int = 0) -> float | None:
-        """The mean weekly growth needed, if `lost` weeks carry none.
-
-        None when no useful week remains; 1.0 when the target is already reached.
-        """
-        usable = len(self.weeks) - lost
-        if target_km <= self.start_km:
-            return 1.0
-        if usable <= 0:
-            return None
-        return (target_km / self.start_km) ** (1 / usable)
-
-
-def race_projection(rows: list[Row], today: dt.date, race_on: dt.date,
-                    taper_weeks: int | None = None) -> Projection | None:
-    """Backward planner: the pace a long-run target demands.
-
-    Starting point: the longest run of the last 30 days. Useful weeks run from the next
-    week up to the taper (which starts `taper_weeks` weeks before the race week,
-    inclusive). No rule is applied: the instrument does not say what is allowed, it says
-    what WOULD BE NEEDED, assimilation weeks and novelties included, so the gap to the
-    target is visible before the milestone. The decision belongs to the athlete and coach.
-    """
-    longest = longest_recent(rows, today)
-    if longest is None or race_on <= today:
-        return None
-    race_week = iso_week.monday(iso_week.of(race_on))
-    if taper_weeks is None:
-        taper_weeks = rulebook.current().parameters.taper_weeks
-    taper_start = race_week - dt.timedelta(weeks=taper_weeks - 1)
-    # The current week may already have had its long run: start from the next one, a
-    # cautious reading on a review day.
-    week = iso_week.monday(iso_week.of(today)) + dt.timedelta(weeks=1)
-    weeks = []
-    while week < taper_start:
-        weeks.append(iso_week.of(week))
-        week += dt.timedelta(weeks=1)
-    return Projection(start_km=longest, weeks=weeks, race_on=race_on,
-                      taper_from=iso_week.of(taper_start))
-
-
 def next_race_date(store: LedgerStore, today: dt.date) -> dt.date | None:
     """The day of the next active race, whatever its priority, never prose."""
     race = race_model.next_race(store, today)
@@ -869,23 +819,6 @@ def transition_notes(rows: list[Row], sessions: list[dict], today: dt.date) -> l
             continue
         notes.append(text.PLANNED_GAP.format(session=session["id"], planned=float(planned), gap=(float(planned) / longest - 1) * 100, longest=longest))
     return notes
-
-
-def projection_lines(projection: Projection, target_km: float | None = None) -> list[str]:
-    lines = [text.PROJECTION.format(race_on=projection.race_on, weeks=len(projection.weeks), taper_from=projection.taper_from, start_km=projection.start_km)]
-    if not target_km:
-        lines.append(text.PROJECTION_NO_TARGET)
-        return lines
-    parts = []
-    for lost in (0, 1, 2):
-        growth = projection.required_growth(target_km, lost)
-        label = (text.PROJECTION_EVERY_WEEK if not lost
-                 else text.PROJECTION_WEEKS_LOST.format(lost=lost))
-        parts.append(f"{label} : " + (text.PROJECTION_IMPOSSIBLE if growth is None
-                                      else text.PROJECTION_GROWTH.format(percent=(growth - 1) * 100)))
-    lines.append(text.PROJECTION_REQUIRED.format(target_km=target_km)
-                 + " ; ".join(parts) + text.PROJECTION_REQUIRED_NOTE)
-    return lines
 
 
 def _median(values: list[float]) -> float:

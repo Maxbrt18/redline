@@ -3,7 +3,8 @@
 The only reader of the store for the plan generator (`redline.model.plan_generator`): it
 gathers, for a cycle starting the week after `today`,
 - where the athlete stands: the mean weekly running volume of the closed weeks before,
-  the planned assimilation weeks left out, raised to the rebuild's floor, and the longest
+  the weeks a cycle planned low left out (all of them when every one was), raised to the
+  rebuild's floor, and the longest
   run of the last 30 days;
 - the highest weekly volume held over `cycle_held_weeks` closed weeks;
 - the minutes the athlete's weekly habits leave for running, when every running day
@@ -27,10 +28,11 @@ from redline.model import iso_week, rulebook, session_kinds, week_days
 from redline.model.cycle_templates import CycleTemplates
 from redline.model.cycle_transitions import Standing
 from redline.model.errors import ConfigError
+from redline.model.hypotheses import ClosedWeek
 from redline.model.plan_generator import Goal, Inputs
 from redline.model.progression import Dose
 from redline.model.race import Race
-from redline.model.vocabulary import CalibrationConfidence, DayKind
+from redline.model.vocabulary import CalibrationConfidence, DayKind, SessionStatus
 
 from . import ledger, progression_runs
 
@@ -89,7 +91,16 @@ def lineages(store: Any, book: rulebook.Rulebook, today: dt.date) -> tuple[tuple
 def goal(race: Race) -> Goal:
     """The goal a preparation is generated for, from a race whose goal is declared."""
     assert race.goal is not None
-    return Goal(race.on, race.goal.distance_km, race.goal.terrain, race.goal.goal_time_s)
+    return Goal(race.on, race.goal.distance_km, race.goal.terrain, race.goal.goal_time_s,
+                race.goal.firsts)
+
+
+def firsts_done(store: Any) -> frozenset[str]:
+    """The transition kinds already run: a session typed with one, done."""
+    return frozenset(session["transition"] for revision in store.active_plans().values()
+                     for session in revision["sessions"]
+                     if session.get("transition")
+                     and session.get("status") == SessionStatus.DONE)
 
 
 def declared() -> bool:
@@ -108,13 +119,10 @@ def _parameters() -> rulebook.Parameters:
     return parameters
 
 
-def _closed(today: dt.date, parameters: rulebook.Parameters) -> list[str]:
-    """The closed weeks the start reads, assimilation weeks left out."""
+def _closed(today: dt.date) -> list[str]:
+    """The closed weeks the start reads."""
     current = iso_week.of(today)
-    assimilation = set(parameters.assimilation_weeks)
-    return [week for week in (iso_week.shift(current, -offset)
-                              for offset in range(1, START_WEEKS + 1))
-            if week not in assimilation]
+    return [iso_week.shift(current, -offset) for offset in range(1, START_WEEKS + 1)]
 
 
 def _held(rows: list[ledger.Row], today: dt.date, parameters: rulebook.Parameters) -> float:
@@ -134,24 +142,28 @@ def standing(store: Any, templates: CycleTemplates, today: dt.date,
     """Where the athlete stands on `today`; `planned_low`: the weeks a cycle planned low."""
     parameters = _parameters()
     rows = ledger.parse_ledger(store)
-    closed = _closed(today, parameters)
+    closed = _closed(today)
     floor = _held(rows, today, parameters) * templates.rebuild.floor_pct / 100
     return Standing(round(_mean(rows, closed) or 0.0, 1),
                     _round(_mean(rows, [week for week in closed if week not in planned_low])),
                     round(floor, 1))
 
 
-def closed_volumes(store: Any, today: dt.date, planned_low: Collection[str],
-                   weeks: int) -> tuple[tuple[str, float], ...]:
-    """The running volume of each of the last `weeks` closed weeks before `today`, newest
-    first, the assimilation weeks and the weeks a cycle planned low left out."""
-    parameters = _parameters()
+def closed_weeks(store: Any, today: dt.date, planned_low: Collection[str],
+                 weeks: int) -> tuple[ClosedWeek, ...]:
+    """Each of the last `weeks` closed weeks before `today` as run, newest first, the
+    weeks a cycle planned low left out."""
     rows = ledger.parse_ledger(store)
     current = iso_week.of(today)
-    skipped = set(parameters.assimilation_weeks) | set(planned_low)
     labels = [week for week in (iso_week.shift(current, -offset)
-                                for offset in range(1, weeks + 1)) if week not in skipped]
-    return tuple(zip(labels, _volumes(rows, labels), strict=True))
+                                for offset in range(1, weeks + 1)) if week not in planned_low]
+    return tuple(ClosedWeek(label, km, _longest(rows, label))
+                 for label, km in zip(labels, _volumes(rows, labels), strict=True))
+
+
+def _longest(rows: list[ledger.Row], week: str) -> float:
+    return max((row.km or 0.0 for row in rows
+                if row.week == week and row.type in ledger.RUN_TYPES), default=0.0)
 
 
 def _round(value: float | None) -> float | None:
@@ -167,8 +179,10 @@ def inputs(store: Any, templates: CycleTemplates, today: dt.date) -> Inputs:
     rows = ledger.parse_ledger(store)
     current = iso_week.of(today)
     held = _held(rows, today, parameters)
-    start = max(_mean(rows, _closed(today, parameters)) or 0.0,
-                held * templates.rebuild.floor_pct / 100)
+    closed = _closed(today)
+    planned_low = store.planned_low_weeks()
+    start = max(_mean(rows, [week for week in closed if week not in planned_low] or closed)
+                or 0.0, held * templates.rebuild.floor_pct / 100)
     found = calibration_model.in_force(store.calibration_rows())
     fresh = parameters.calibration_fresh_weeks
     calibrated = (found is not None and found.confidence == CalibrationConfidence.MEASURED
@@ -179,4 +193,5 @@ def inputs(store: Any, templates: CycleTemplates, today: dt.date) -> Inputs:
                   parameters.skeleton_long_step_max_pct,
                   minutes(store, iso_week.monday(origin)), _easy_pace(rows, today),
                   calibrated, found.adopted_on if found else None,
-                  lineages(store, book, today), parameters.quality_sessions_per_week)
+                  lineages(store, book, today), parameters.quality_sessions_per_week,
+                  parameters.transitions_per_week)

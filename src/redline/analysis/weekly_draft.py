@@ -5,7 +5,8 @@ before the coach amends it.
 The draft is a whole revision (`weekly_plan.REVISION_SCHEMA`), from arguments only:
 - each key session of the week, linked by its position, at the trame's dose, or at the
   lineage's when the lineage stands lower (a veto, a step back), never above;
-- the long run at the week's long run; the race itself in the race's week;
+- the long run at the week's long run; the race itself in the race's week; the first
+  times the week carries (`cycles.firsts_due`) on its long run, then on its easy runs;
 - easy runs that bring the week to its volume, as many as the week before had;
 - the strength sessions of the week before, on the same weekdays;
 - every session placed on the athlete's days by the reorganisation's search
@@ -26,6 +27,7 @@ from typing import Any
 
 from redline.coach.fr import plan as text
 from redline.coach.fr import session_labels
+from redline.model import cycles as cycle_model
 from redline.model import iso_week, paths, rulebook, session_kinds, week_days
 from redline.model import program as strength_program
 from redline.model import race as race_model
@@ -72,6 +74,8 @@ class Frame:
     program: Program | None
     #: The race of the week: its day, its distance, its name.
     race: tuple[dt.date, float, str] | None = None
+    #: The transition kinds of the first times the week carries.
+    firsts: tuple[str, ...] = ()
 
 
 def _dose(key: Key, lineages: Mapping[str, Dose]) -> Dose | None:
@@ -109,7 +113,8 @@ def _sessions(frame: Frame) -> list[dict]:
     prefix = frame.week.lower()
     pace = frame.easy_pace_s or DEFAULT_PACE_S
     sessions: list[dict] = []
-    for index, key in enumerate(frame.keys):
+    keys = [key for key in frame.keys if key.role != KeyRole.FIRST]
+    for index, key in enumerate(keys):
         day = _day(frame.week, KEY_DAYS[index % len(KEY_DAYS)])
         if key.role == KeyRole.TEST:
             sessions.append({**_run(f"{prefix}-test", text.DRAFT_TEST, "test", day, AROUND_KEY_KM,
@@ -147,6 +152,10 @@ def _sessions(frame: Frame) -> list[dict]:
             sessions.append(_run(f"{prefix}-easy-{index + 1}", session_labels.name(session_kinds.EASY),
                                  session_kinds.EASY, _day(frame.week, EASY_DAYS[index]), each,
                                  demanding=False, priority=SessionPriority.SUPPORT))
+    carriers = [session for workout in (session_kinds.LONG, session_kinds.EASY)
+                for session in sessions if session["workout"] == workout]
+    for session, transition in zip(carriers, frame.firsts, strict=False):
+        session["transition"] = transition
     for session in frame.strength:
         moved = dt.date.fromisoformat(session["date"]) + dt.timedelta(days=7)
         sessions.append({key: value for key, value in session.items()
@@ -238,4 +247,5 @@ def frame(store: Any, week: str, today: dt.date) -> Frame | None:
                          sessions_per_day=parameters.sessions_per_day,
                          load_margin_pct=parameters.reorganize_load_margin_pct,
                          long_run_weekdays=parameters.long_run_weekdays),
-        _program(), race)
+        _program(), race,
+        cycle_model.firsts_due(version.trame, week, cycle_inputs.firsts_done(store)))

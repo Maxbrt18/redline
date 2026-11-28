@@ -30,6 +30,8 @@ RISK_TEXT = {
     "time_bound": "le temps disponible plafonne le pic à {value:g} km (la rampe "
                   "permettait {reference:g})",
     "arrival_unreached": "{workout} ({phase}) finit à {value:g} cran(s) de son arrivée",
+    "first_unplaced": "{workout} : aucune semaine de construction ne peut porter cette "
+                      "première fois avant l'affûtage",
     "below_domain": "plus haut volume tenu {value:g} km, sous le domaine du gabarit "
                     "({reference:g} km)",
 }
@@ -42,6 +44,7 @@ KEYS = " ; {keys}"
 KEY = "[{position}] {role}{workout} {dose} {intensity}"
 FLAGSHIP = "★ "
 TEST = "[0] test 1 200 m puis 3 600 m à fond (calibration)"
+FIRST = "[{position}] 1re fois : {label}, sur la SL"
 DOSE = "{reps} × {duration}, récup {recovery}"
 PACE = "à {fast}–{slow}/km"
 RPE = "RPE {low}–{high}"
@@ -79,8 +82,12 @@ OUTCOMES = {"replan": "replanification : une revue du plan propose une nouvelle 
 FALLEN_TEXT = {
     "volume_held": "volume : depuis le départ actuel, la rampe n'atteint que {value} km/sem "
                    "pour un pic de {reference} km/sem",
+    "long_run_held": "sortie longue : depuis la plus longue récente, le pas n'atteint que "
+                     "{value} km pour une SL de {reference} km",
     "lineage_position": "{workout} : {value} cran(s) de retard sur sa dernière dose, pour "
                         "{reference} exposition(s) qui progressent encore",
+    "firsts": "premières fois : {value} restent à faire pour {reference} place(s) sur les "
+              "semaines de construction",
     "availability": "temps disponible : {value} min/sem au lieu de {reference}, une semaine "
                     "restante n'y tient plus ou le pic plafonné pourrait monter",
     "goal_time": "chrono objectif changé",
@@ -88,7 +95,8 @@ FALLEN_TEXT = {
 }
 FALLEN_GOAL = {"on": "la date de la course a changé",
                "distance_km": "la distance de la course a changé",
-               "terrain": "le terrain de la course a changé"}
+               "terrain": "le terrain de la course a changé",
+               "firsts": "les premières fois que la course exige ont changé"}
 NO_LIMIT = "sans limite"
 NOTE_HEADER = ("# Plan en cours\n\n"
                "Projection de la version du cycle en cours, régénérée depuis PostgreSQL : ne "

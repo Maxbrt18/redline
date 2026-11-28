@@ -1055,12 +1055,16 @@ cycle_key_sessions = sa.Table(
     sa.Column("intensity_ref", sa.Text),
     sa.Column("intensity_low", sa.Numeric(5, 1)),
     sa.Column("intensity_high", sa.Numeric(5, 1)),
+    #: The transition kind a first time stands for; NULL for any other role.
+    sa.Column("transition", sa.Text),
     sa.ForeignKeyConstraint(["cycle_version_id", "iso_week"],
                             ["redline.cycle_weeks.cycle_version_id",
                              "redline.cycle_weeks.iso_week"],
                             name="fk_cycle_key_sessions_week"),
     sa.CheckConstraint(f"role IN ({voc.sql_values(voc.KeyRole)})",
                        name="ck_cycle_key_sessions_role"),
+    sa.CheckConstraint(f"(role = '{voc.KeyRole.FIRST}') = (transition IS NOT NULL)",
+                       name="ck_cycle_key_sessions_first"),
     sa.CheckConstraint(
         "(intensity_ref IS NULL) = (intensity_low IS NULL) AND "
         "(intensity_low IS NULL) = (intensity_high IS NULL)",

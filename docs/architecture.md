@@ -50,7 +50,7 @@ working tree or a delivery. The same web app serves the API of the athlete's iOS
 the notebook and the guided strength session.
 
 Around this core, `src/redline/analysis/` computes over the ledger (load, signals,
-descent, feasibility, progression, reviews), `src/redline/integrations/` talks to Strava,
+descent, cycles, progression, reviews), `src/redline/integrations/` talks to Strava,
 the weather, IGN altimetry and the speech-to-text provider of voice notes, and `src/redline/cards/` draws the PNG cards and charts.
 The layout table of [`AGENTS.md`](../AGENTS.md) lists every package.
 

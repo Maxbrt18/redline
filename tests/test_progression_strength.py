@@ -10,6 +10,7 @@ import datetime as dt
 import os
 import shutil
 import subprocess
+from types import SimpleNamespace
 
 import pytest
 from conftest import ENGINE_ROOT, TEST_VAULT, cli_command, load_script, reset_database
@@ -19,6 +20,7 @@ from redline.analysis import ledger, progression_strength, weekly_dossier
 from redline.coach.fr import progression as text
 from redline.model import program, rulebook
 from redline.model.dose import MEASURES
+from redline.model.plan_generator import Week
 from redline.model.progression import (
     STRENGTH_FAMILIES,
     Bound,
@@ -30,6 +32,7 @@ from redline.model.progression import (
     VetoKind,
     default,
 )
+from redline.model.vocabulary import CycleKind, PlanPhase
 
 TODAY = dt.date(2030, 3, 15)
 ZONE = "knee"
@@ -67,13 +70,15 @@ class Store:
     def strength_history(self):
         return self.history
 
+    def cycle_for_week(self, week):
+        return None
+
 
 @pytest.fixture
 def no_ledger(monkeypatch):
     """No run, one watched zone, no typed race: only the strength reports count."""
     monkeypatch.setattr(ledger, "parse_ledger", lambda store: [])
     monkeypatch.setattr(ledger, "pain_zones", lambda store: [ledger.PainZone(ZONE, "Genou")])
-    monkeypatch.setattr(progression_strength.race_model, "active_goal", lambda store: None)
 
 
 def by_lineage(found):
@@ -208,15 +213,17 @@ def test_a_group_rises_one_lineage_a_week(no_ledger):
     assert held.dose == Dose.of(reps=22)
 
 
-def test_a_rise_never_passes_the_taper(no_ledger, monkeypatch):
-    class Race:
-        on = TODAY + dt.timedelta(days=10)
-        taper_weeks = 3
+def test_a_rise_never_passes_the_taper(no_ledger):
+    class Tapering(Store):
+        """Every week is in the taper of the preparation that holds it."""
 
-    monkeypatch.setattr(progression_strength.race_model, "active_goal", lambda store: Race)
+        def cycle_for_week(self, week):
+            taper = Week(week, PlanPhase.TAPER, False, 20.0, 8.0, 1)
+            return SimpleNamespace(kind=CycleKind.PREPARATION, week=lambda label: taper)
+
     history = [report(TODAY - dt.timedelta(days=days), "calf-raise-bent", (15, 15))
                for days in (7, 3)]
-    calf = by_lineage(progression_strength.proposals(Store(history), TEST_VAULT, TODAY))[
+    calf = by_lineage(progression_strength.proposals(Tapering(history), TEST_VAULT, TODAY))[
         "calf-raise-bent"]
     assert calf.rule_move == Move.UP and calf.move == Move.HOLD
     assert [veto.kind for veto in calf.vetoes] == [VetoKind.TAPER]
@@ -389,3 +396,18 @@ def test_the_tally_reads_the_rises_of_an_exercise():
     assert review.lineage == "calf-raise-bent" and review.overrides == ()
     assert review.tally.tolerated == (TODAY - dt.timedelta(days=14),)
     assert review.tally.failed == (TODAY - dt.timedelta(days=7),), "14 reps asked, 13 done"
+
+
+def test_a_week_its_cycle_plans_low_vetoes_a_rise():
+    import trajectory
+
+    store = trajectory.simulate(through=trajectory.window_start()).store
+    weeks = store.cycle.trame.weeks
+    deload = next(week.label for week in weeks if week.deload)
+    build = next(week.label for week in weeks if not week.deload and week.phase != "taper")
+    book = rulebook.current()
+    today = dt.date(2031, 1, 1)
+    assert VetoKind.ASSIMILATION in {veto.kind for veto in
+                                     progression_strength.vetoes(store, book, deload, today)}
+    assert VetoKind.ASSIMILATION not in {veto.kind for veto in
+                                         progression_strength.vetoes(store, book, build, today)}

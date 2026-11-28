@@ -111,3 +111,26 @@ def test_the_review_reads_whether_the_preparation_s_hypotheses_hold():
     assert line.startswith("  Hypothèses tombées (replanification : ")
     assert "volume : depuis le départ actuel, la rampe n'atteint que" in line
     assert cycle_review.lines(_store(_general()), day) == [], "only a preparation is checked"
+
+
+def test_the_projection_keeps_a_hand_written_plan_aside_and_never_overwrites_it(tmp_path):
+    from redline.model import vault_layout
+    from redline.model.errors import StorageError
+    from redline.storage import projector
+
+    store = trajectory.simulate(through=trajectory.window_start()).store
+    written = tmp_path / vault_layout.CURRENT_PLAN
+    written.parent.mkdir(parents=True)
+    written.write_text("# Plan écrit à la main\n\nLes garde-fous et leurs raisons.\n",
+                       encoding="utf-8")
+    projector.project_cycle(store, tmp_path)
+    kept = tmp_path / vault_layout.CURRENT_PLAN_KEPT
+    assert kept.read_text(encoding="utf-8").startswith("# Plan écrit à la main")
+    assert written.read_text(encoding="utf-8").startswith("# Plan en cours")
+    projector.project_cycle(store, tmp_path)
+    assert kept.read_text(encoding="utf-8").startswith("# Plan écrit à la main"), \
+        "a projection replaces a projection, and the kept note stays"
+    written.write_text("# Encore à la main\n", encoding="utf-8")
+    with pytest.raises(StorageError, match="merge them"):
+        projector.project_cycle(store, tmp_path)
+    assert written.read_text(encoding="utf-8") == "# Encore à la main\n"

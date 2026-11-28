@@ -19,6 +19,8 @@ INSTRUMENTS_CSV = Path("athlete/instruments.csv")
 STRENGTH_LOG_CSV = Path("athlete/strength-log.csv")
 #: The cycle version in force, as the coach reads it in the vault.
 CURRENT_PLAN = Path("coaching/current-plan.md")
+#: Where a hand-written `current-plan.md` is kept when the projection first replaces it.
+CURRENT_PLAN_KEPT = Path("coaching/current-plan.written.md")
 PROJECTIONS = (DAILY_CSV, INSTRUMENTS_CSV, STRENGTH_LOG_CSV, CURRENT_PLAN)
 
 DECISIONS = Path("coaching/decisions.md")

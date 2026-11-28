@@ -1,34 +1,38 @@
 """The taper, measured: how much the weeks before a race really drop.
 
-`taper_weeks` places the taper; nothing checked that it happened. The reference is the
-mean running volume of the REFERENCE_WEEKS weeks before it, assimilation weeks skipped:
-an assimilation week already drops, and counting it would hide part of the cut. The
+The taper belongs to the preparation that holds the race: the weeks its trame places in
+the taper phase, the band of the template it was generated from. A race no preparation
+holds has no taper planned, so nothing to measure. The reference is the
+mean running volume of the REFERENCE_WEEKS weeks before it, the weeks a cycle planned low
+skipped: a deload already drops, and counting it would hide part of the cut. The
 race week counts the days before the race only, and never the race itself.
 
-The length and the band are the race's, the rulebook's when it leaves them unsaid
-(`model/race.py`): a drop of 41 to 60 % of the volume is where meta-analyses find the
-benefit (Bosquet et al. 2007, Wang et al. 2023). It bounds the taper as a whole, never a single week: a progressive taper
-drops little at first and a lot at the end. So a cut beyond the ceiling is judged as soon
+The band bounds the taper as a whole, never a single week: a progressive taper drops
+little at first and a lot at the end. So a cut beyond the ceiling is judged as soon
 as it shows, and a loose taper only once the race week is written or over.
 """
 
 from __future__ import annotations
 
 import datetime as dt
+from collections.abc import Collection
 from dataclasses import dataclass
+from typing import Any
 
 from redline.coach.fr import ledger as text
-from redline.model import iso_week, rulebook, session_kinds, transitions
+from redline.model import cycle_templates, iso_week, paths, session_kinds, transitions
 from redline.model import race as race_model
-from redline.model.vocabulary import Decider, RacePriority, RaceState, SessionStatus
+from redline.model.cycle_templates import Range
+from redline.model.plan_generator import Trame
+from redline.model.vocabulary import CycleKind, Decider, PlanPhase, RaceState, SessionStatus
 
 from . import ledger
 
 #: The states of a goal whose taper is read: ahead, or run.
 TAPERED = frozenset({RaceState.ACTIVE, RaceState.RUN})
 REFERENCE_WEEKS = 2
-#: Weeks searched back for the reference before giving up: a long block of assimilation
-#: weeks means no comparable load.
+#: Weeks searched back for the reference before giving up: a long block of weeks planned
+#: low means no comparable load.
 REFERENCE_SEARCH_WEEKS = 6
 #: Runs the taper may drop below the reference frequency, race week aside: the taper
 #: keeps its frequency and cuts each session.
@@ -40,6 +44,8 @@ class Window:
     race: race_model.Race
     weeks: tuple[str, ...]          # the taper, race week last
     reference: tuple[str, ...]      # the weeks it is compared with, oldest first
+    #: The drop of the taper's mean weekly volume its template allows, in %.
+    band: Range | None = None
 
     @property
     def race_on(self) -> dt.date:
@@ -50,11 +56,11 @@ class Window:
         return self.weeks[-1]
 
 
-def window(race: race_model.Race) -> Window:
-    race_week = iso_week.of(race.on)
-    weeks = tuple(iso_week.shift(race_week, -offset)
-                  for offset in reversed(range(race.taper_weeks)))
-    skipped = set(rulebook.current().parameters.assimilation_weeks)
+def window(race: race_model.Race, trame: Trame, band: Range | None,
+           planned_low: Collection[str] = ()) -> Window:
+    """The taper of the race's trame and the weeks before it that it is compared with."""
+    weeks = tuple(week.label for week in trame.weeks if week.phase == PlanPhase.TAPER)
+    skipped = set(planned_low) - set(weeks)
     reference: list[str] = []
     for back in range(1, REFERENCE_SEARCH_WEEKS + 1):
         week = iso_week.shift(weeks[0], -back)
@@ -62,19 +68,24 @@ def window(race: race_model.Race) -> Window:
             reference.insert(0, week)
         if len(reference) == REFERENCE_WEEKS:
             break
-    return Window(race=race, weeks=weeks, reference=tuple(reference))
+    return Window(race=race, weeks=weeks, reference=tuple(reference), band=band)
 
 
-def race_window(store: ledger.LedgerStore, week: str) -> Window | None:
-    """The goal whose taper holds `week`, run or still ahead: a race of priority A, active
-    or run. A race B or C, or one cancelled or abandoned, binds no taper band."""
-    for race in race_model.typed(store):
-        if race.priority != RacePriority.A or race.state not in TAPERED:
-            continue
-        found = window(race)
-        if week in found.weeks:
-            return found
-    return None
+def race_window(store: Any, week: str) -> Window | None:
+    """The taper that holds `week`: the taper phase of the preparation that holds the
+    week, its race run or still ahead. A race cancelled or abandoned binds no taper band."""
+    version = store.cycle_for_week(week)
+    held = version.week(week) if version is not None else None
+    if (version is None or held is None or version.kind != CycleKind.PREPARATION
+            or held.phase != PlanPhase.TAPER):
+        return None
+    race = next((race for race in race_model.typed(store)
+                 if race.key == version.race_key and race.state in TAPERED), None)
+    if race is None:
+        return None
+    template = cycle_templates.load(paths.vault_root()).preparation_named(version.trame.template)
+    return window(race, version.trame, template.taper_cut_pct if template else None,
+                  store.planned_low_weeks())
 
 
 def _before_race(rows: list[ledger.Row], week: str, race_on: dt.date) -> list[ledger.Row]:
@@ -137,11 +148,17 @@ def planned(rows: list[ledger.Row], frame: Window, week: str,
                weeks=(*(before.weeks if before else ()), (week, km)))
 
 
+def _bounds(frame: Window) -> tuple[int | None, int | None]:
+    if frame.band is None:
+        return None, None
+    return round(frame.band.low), round(frame.band.high)
+
+
 def plan_errors(rows: list[ledger.Row], frame: Window, week: str,
                 revision: dict, where: str = "revision") -> list[str]:
     """The band binds the coach's judgment. A rule (a pain cap) or the athlete's
     request may cut deeper or keep more; the readback still shows the drop."""
-    low, high = frame.race.taper_cut_min_pct, frame.race.taper_cut_max_pct
+    low, high = _bounds(frame)
     if (revision.get("decision") or {}).get("by") != Decider.JUDGMENT:
         return []
     cut = planned(rows, frame, week, revision.get("sessions") or [])
@@ -175,7 +192,7 @@ def _closed(frame: Window, week: str, today: dt.date, closing: str | None) -> bo
     return week == closing or iso_week.monday(week) + dt.timedelta(days=7) <= today
 
 
-def report_lines(store: ledger.LedgerStore, rows: list[ledger.Row], label: str,
+def report_lines(store: Any, rows: list[ledger.Row], label: str,
                  today: dt.date, closing: bool = False) -> list[str]:
     """The drop so far, for a week of the taper. Only closed weeks are judged: a week
     in progress is shown, never compared, since its first days would read as a deep
@@ -199,7 +216,7 @@ def report_lines(store: ledger.LedgerStore, rows: list[ledger.Row], label: str,
                                           weeks=weeks)]
     closed = Cut(reference_km=cut.reference_km, reference_runs=cut.reference_runs,
                  weeks=done)
-    low, high = frame.race.taper_cut_min_pct, frame.race.taper_cut_max_pct
+    low, high = _bounds(frame)
     band = text.TAPER_BAND.format(low=low, high=high) if low is not None and high is not None else ""
     lines = [text.TAPER.format(reference_km=cut.reference_km, span=span, weeks=weeks,
                                percent=closed.percent, band=band)]

@@ -19,7 +19,18 @@ from typing import Any
 
 from . import iso_week
 from .cycle_templates import Intensity, Range
-from .plan_generator import Goal, Inputs, Key, Levers, Risk, Segment, Trame, TrameRisk, Week
+from .plan_generator import (
+    BUILD_PHASES,
+    Goal,
+    Inputs,
+    Key,
+    Levers,
+    Risk,
+    Segment,
+    Trame,
+    TrameRisk,
+    Week,
+)
 from .progression import Dose
 from .vocabulary import (
     CycleCause,
@@ -31,6 +42,9 @@ from .vocabulary import (
     PlanPhase,
     RaceTerrain,
 )
+
+#: The kinds of cycle whose every week is planned low.
+LOW_KINDS = (CycleKind.RECOVERY, CycleKind.REBUILD)
 
 
 @dataclass(frozen=True)
@@ -99,7 +113,8 @@ def version_values(trame: Trame) -> dict:
             "second_quality": str(levers.second_quality), "peak_km": levers.peak_km},
         "goal": None if trame.goal is None else {
             "on": trame.goal.on.isoformat(), "distance_km": trame.goal.distance_km,
-            "terrain": trame.goal.terrain, "goal_time_s": trame.goal.goal_time_s},
+            "terrain": trame.goal.terrain, "goal_time_s": trame.goal.goal_time_s,
+            "firsts": list(trame.goal.firsts)},
         "hypotheses": hypotheses_of(trame.hypotheses),
         "risks": [{"kind": str(risk.kind), "value": risk.value, "reference": risk.reference,
                    "workout": risk.workout, "phase": str(risk.phase) if risk.phase else None}
@@ -129,7 +144,8 @@ def key_values(trame: Trame) -> list[dict]:
              "role": str(key.role), "dose": _dose(key.dose),
              "intensity_ref": str(key.intensity.ref) if key.intensity else None,
              "intensity_low": key.intensity.band.low if key.intensity else None,
-             "intensity_high": key.intensity.band.high if key.intensity else None}
+             "intensity_high": key.intensity.band.high if key.intensity else None,
+             "transition": key.transition}
             for key in trame.keys]
 
 
@@ -180,7 +196,8 @@ def _key(row: dict) -> Key:
     return Key(row["iso_week"], int(row["position"]), row["workout"], KeyRole(row["role"]),
                _read_dose(row.get("dose")),
                _intensity(row.get("intensity_ref"), row.get("intensity_low"),
-                          row.get("intensity_high")))
+                          row.get("intensity_high")),
+               row.get("transition"))
 
 
 def trame_of(version: dict, weeks: list[dict], keys: list[dict]) -> Trame:
@@ -203,7 +220,21 @@ def trame_of(version: dict, weeks: list[dict], keys: list[dict]) -> Trame:
         None if not goal else Goal(
             dt.date.fromisoformat(goal["on"]), float(goal["distance_km"]),
             RaceTerrain(goal["terrain"]) if goal.get("terrain") else None,
-            int(goal["goal_time_s"]) if goal.get("goal_time_s") is not None else None))
+            int(goal["goal_time_s"]) if goal.get("goal_time_s") is not None else None,
+            tuple(str(kind) for kind in goal.get("firsts") or ())))
+
+
+def firsts_due(trame: Trame, week: str, done: frozenset[str]) -> tuple[str, ...]:
+    """The first times `week` carries: the trame's own for that week, then the earlier
+    ones not done yet, while the week has room (rule n8). A week outside the build, or a
+    deload, carries none: a missed first time slides to the next week that can."""
+    held = trame.week(week)
+    if held is None or held.deload or held.phase not in BUILD_PHASES:
+        return ()
+    firsts = [key for key in trame.keys if key.role == KeyRole.FIRST and key.week <= week
+              and key.transition is not None and key.transition not in done]
+    ordered = sorted(firsts, key=lambda key: (key.week != week, key.week, key.position))
+    return tuple(str(key.transition) for key in ordered)[:trame.hypotheses.transitions_max]
 
 
 def announcement(version: CycleVersion) -> dict:

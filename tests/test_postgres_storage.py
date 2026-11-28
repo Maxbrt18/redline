@@ -2302,13 +2302,7 @@ def test_the_weekly_dossier_is_computed_from_the_same_functions_as_the_clis(stor
     assert "Plus longue des 30 j : 13.6 km" in text
     assert "verdict-cortex (due le 06/09)" in text and "bloque descente courue" in text
     assert "--reason optimistic" in text and "narrative" not in text
-    assert "Faisabilité à rebours : aucune course typée" in text
-    write(store, commands.DEADLINE_UPSERT, {"deadline_key": "targetrace", "due_on": dt.date(2026, 11, 26),
-                           "kind": "race", "priority": "a", "race_state": "active",
-                           "item": "TargetRace",
-                           "fact_owner": "athlete/goals.md", "status": "scheduled"})
-    text = weekly_dossier.render(store, VAULT_ROOT, "2026-W39", dt.date(2026, 9, 27))
-    assert "Faisabilité à rebours (règle n8, calculée) : course le 26/11" in text
+    assert "Faisabilité" not in text, "the trame places the first times, no solver"
 
 
 def test_the_weekly_dossier_does_not_flag_cadence_work_that_was_asked_for(store):

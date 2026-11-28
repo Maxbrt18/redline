@@ -14,7 +14,6 @@ from redline.model import (
     rulebook,
     session_kinds,
 )
-from redline.model import race as race_model
 from redline.model.vocabulary import WeekSleep
 
 from . import ledger, pain_rules, signals, taper
@@ -140,8 +139,7 @@ def gate(rows: list[ledger.Row], label: str, instr: ledger.Instruments,
 
 def week_report(store: ledger.LedgerStore, rows: list[ledger.Row], instruments: dict,
                 above: dict,
-                label: str, today: dt.date, *, target_km: float | None = None,
-                closing: bool = False) -> list[str]:
+                label: str, today: dt.date, *, closing: bool = False) -> list[str]:
     """A week's report: volume, gauge, pain, then the slope.
 
     ONE function for the CLI (`redline ledger --week`) and for the dossier the service
@@ -201,13 +199,6 @@ def week_report(store: ledger.LedgerStore, rows: list[ledger.Row], instruments: 
         longest = ledger.longest_recent(rows, reference)
         if longest is not None:
             lines.append(text.REPORT_LONGEST.format(longest=longest))
-        race = race_model.active_goal(store)
-        race = race if race is not None and race.on > today else None
-        projection = ledger.race_projection(rows, today, race.on, race.taper_weeks) if race else None
-        if projection:
-            lines.extend(ledger.projection_lines(projection, target_km))
-        elif race is None:
-            lines.append(text.REPORT_NO_RACE)
     # Imported here: the taper reads the ledger's volumes.
     lines.extend(taper.report_lines(store, rows, label, today, closing))
     return lines

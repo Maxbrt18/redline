@@ -49,9 +49,9 @@ Exactitude et décisions
   `holds`. Ne diffuse jamais son effet au reste de la semaine.
 - UN CHIFFRE NE SE CITE PAS, IL SE CALCULE. Volume, D+, jauge et douleur viennent de
   `redline ledger --week 2026-WNN` ou du dossier du service, pas d'un
-  résumé ni du Vol. cible.
+  résumé ni de la trame.
 - Prescription : plan PostgreSQL valide via `redline week-plan revise` puis `check`,
-  jamais le macro-plan. Révise seulement le futur ou une activité imprévue à arbitrer,
+  jamais la trame du cycle. Révise seulement le futur ou une activité imprévue à arbitrer,
   jamais pour marquer `done` : le réalisé appartient au cycle. Les programmes partent
   automatiquement, n'annonce pas leur arrivée.
 - Avant de déplacer, dégrader ou retirer une séance, lis sa fiche et rattache le

@@ -9,7 +9,7 @@ import pytest
 from test_progression_strength import PROGRESSION, book_with
 from test_weekly_plan import revision, session
 
-from redline.analysis import expected_rpe, ledger, progression_runs, progression_strength
+from redline.analysis import expected_rpe, ledger, progression_runs
 from redline.analysis.progression import StepTally, propose
 from redline.model import rulebook
 from redline.model.progression import (
@@ -55,6 +55,9 @@ class Store:
 
     def __init__(self, plans: dict[str, list[dict]], verdicts: dict[int, list[dict]]):
         self.plans, self.verdicts = plans, verdicts
+
+    def cycle_for_week(self, week):
+        return None
 
     def load_plan(self, week):
         sessions = self.plans.get(week)
@@ -165,7 +168,6 @@ def test_a_session_without_a_typed_dose_is_no_exposure_and_the_plan_gives_the_cu
 # ------------------------------------------------------------------ vetoes
 
 def test_a_gate_that_did_not_open_vetoes_a_rise(monkeypatch):
-    monkeypatch.setattr(progression_strength.race_model, "active_goal", lambda store: None)
     book = book_with(PROGRESSION + RUNS)
     monkeypatch.setattr(rulebook, "current", lambda: book)
     zones = [ledger.PainZone(ZONE, "Genou")]

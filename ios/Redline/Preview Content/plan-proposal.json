@@ -24,7 +24,8 @@
           "rep_seconds": null,
           "recovery_seconds": null,
           "pace_s": null,
-          "rpe": null
+          "rpe": null,
+          "transition": null
         }
       ],
       "state": "upcoming",
@@ -51,7 +52,8 @@
             264.0,
             252.0
           ],
-          "rpe": null
+          "rpe": null,
+          "transition": null
         }
       ],
       "state": "upcoming",
@@ -78,7 +80,8 @@
           "rpe": [
             7.0,
             8.0
-          ]
+          ],
+          "transition": null
         }
       ],
       "state": "upcoming",
@@ -91,7 +94,7 @@
       "deload": false,
       "volume_km": 33.0,
       "long_run_km": 9.9,
-      "qualities": 1,
+      "qualities": 2,
       "segment_km": null,
       "keys": [
         {
@@ -105,7 +108,19 @@
             264.0,
             252.0
           ],
-          "rpe": null
+          "rpe": null,
+          "transition": null
+        },
+        {
+          "position": 2,
+          "workout": "long",
+          "role": "first",
+          "reps": null,
+          "rep_seconds": null,
+          "recovery_seconds": null,
+          "pace_s": null,
+          "rpe": null,
+          "transition": "reconnaissance du tracé"
         }
       ],
       "state": "upcoming",
@@ -132,7 +147,8 @@
             264.0,
             252.0
           ],
-          "rpe": null
+          "rpe": null,
+          "transition": null
         }
       ],
       "state": "upcoming",
@@ -159,7 +175,8 @@
           "rpe": [
             7.0,
             8.0
-          ]
+          ],
+          "transition": null
         }
       ],
       "state": "upcoming",
@@ -186,7 +203,8 @@
             258.0,
             254.0
           ],
-          "rpe": null
+          "rpe": null,
+          "transition": null
         }
       ],
       "state": "upcoming",
@@ -213,7 +231,8 @@
             258.0,
             254.0
           ],
-          "rpe": null
+          "rpe": null,
+          "transition": null
         },
         {
           "position": 2,
@@ -226,7 +245,8 @@
             264.0,
             252.0
           ],
-          "rpe": null
+          "rpe": null,
+          "transition": null
         }
       ],
       "state": "upcoming",
@@ -253,7 +273,8 @@
             258.0,
             254.0
           ],
-          "rpe": null
+          "rpe": null,
+          "transition": null
         }
       ],
       "state": "upcoming",
@@ -280,7 +301,8 @@
             258.0,
             254.0
           ],
-          "rpe": null
+          "rpe": null,
+          "transition": null
         }
       ],
       "state": "upcoming",
@@ -307,7 +329,8 @@
             258.0,
             254.0
           ],
-          "rpe": null
+          "rpe": null,
+          "transition": null
         }
       ],
       "state": "upcoming",
@@ -334,7 +357,8 @@
             258.0,
             254.0
           ],
-          "rpe": null
+          "rpe": null,
+          "transition": null
         }
       ],
       "state": "upcoming",

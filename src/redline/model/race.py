@@ -1,20 +1,15 @@
-"""A typed race (`redline fact-write deadline --kind race`): its taper and its plan.
+"""A typed race (`redline fact-write deadline --kind race`): what its plan needs.
 
-A 10 km, a marathon and a 100-mile race do not taper alike, and one athlete may run all
-three. So a race tapers as the cycle template that serves its goal says (`taper_weeks`,
-`taper_cut_pct`), the template its preparation's trame was generated from; the rulebook
-only supplies the taper of a race no template serves. Every reader of the taper goes
-through `Race`, never the template or the rulebook.
-
-The race also carries what its plan needs (`route_gpx`, `aid_stations`, `stop_minutes`,
+The race carries what its plan needs (`route_gpx`, `aid_stations`, `stop_minutes`,
 `carbs_g_h`, `pace_s_per_km`): figures, typed, while the race sheet keeps the reasons. The
 pace is the one chosen with the coach, never a default: without it, the plan has no
 passages.
 
 And the goal the preparation is built backwards from (`Goal`): distance and terrain,
-which pick the cycle template and its taper; the climbing it asks, its time goal. The
-peaks, the levers and the taper of a preparation are its template's and its cycle
-version's (`redline.model.cycles`), never the race's.
+which pick the cycle template; the climbing it asks, its time goal, the first times it
+requires. The peaks, the levers and the taper of a preparation are its template's and its
+cycle version's (`redline.model.cycles`), never the race's: a race no preparation holds
+has no taper planned.
 """
 
 from __future__ import annotations
@@ -23,7 +18,7 @@ import datetime as dt
 from dataclasses import dataclass
 from typing import Protocol
 
-from . import cycle_templates, rulebook
+from . import formats, rulebook
 from .schema import Schema, field
 from .vocabulary import (
     CLOSED_RACE_STATES,
@@ -37,9 +32,14 @@ from .vocabulary import (
 
 
 def _goal_coherent(context: dict) -> list[str]:
+    problems = []
     if (context.get("goal_time_s") is None) != (context.get("goal_source") is None):
-        return ["goal_time_s and goal_source go together"]
-    return []
+        problems.append("goal_time_s and goal_source go together")
+    known = rulebook.current().kinds
+    problems += [f"firsts: {kind!r} is no transition kind of the rulebook "
+                 f"(expected: {', '.join(known)})"
+                 for kind in context.get("firsts") or () if kind not in known]
+    return problems
 
 
 AID_STATION_SCHEMA = Schema("aid station", [
@@ -69,6 +69,9 @@ CONTEXT_SCHEMA = Schema("race context", [
     field("goal_source", str, required=False, choices=tuple(GoalSource)),
     field("power_hike_from_pct", int, required=False, minimum=3, maximum=40,
           note="on a trail, the grade the long runs walk briskly from"),
+    field("firsts", list, required=False, maximum=6,
+          item=field("first", str, pattern=formats.SLUG),
+          note="the transition kinds the race requires a first time of before the taper"),
 ], extra=True, check=_goal_coherent)
 
 
@@ -91,6 +94,8 @@ class Goal:
     dplus_m: int | None = None
     goal_time_s: int | None = None
     goal_source: GoalSource | None = None
+    #: The transition kinds the race requires a first time of before the taper.
+    firsts: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -98,9 +103,6 @@ class Race:
     on: dt.date
     priority: RacePriority
     state: RaceState
-    taper_weeks: int
-    taper_cut_min_pct: int | None
-    taper_cut_max_pct: int | None
     name: str = ""
     start_time: dt.time | None = None
     route_gpx: str | None = None
@@ -123,16 +125,8 @@ def _goal(context: dict) -> Goal | None:
     return Goal(
         distance_km=float(context["distance_km"]), terrain=RaceTerrain(context["terrain"]),
         dplus_m=context.get("dplus_m"), goal_time_s=context.get("goal_time_s"),
-        goal_source=GoalSource(context["goal_source"]) if context.get("goal_source") else None)
-
-
-def template_of(goal: Goal | None) -> cycle_templates.Preparation | None:
-    """The preparation template that serves the race's goal, from the instance's cycle
-    templates or the engine's."""
-    if goal is None:
-        return None
-    vault = rulebook.current().source.parent
-    return cycle_templates.load(vault).preparation_for(goal.distance_km, goal.terrain)
+        goal_source=GoalSource(context["goal_source"]) if context.get("goal_source") else None,
+        firsts=tuple(context.get("firsts") or ()))
 
 
 def from_row(row: dict) -> Race:
@@ -145,19 +139,9 @@ def from_row(row: dict) -> Race:
         context = {spec.name: written[spec.name] for spec in CONTEXT_SCHEMA.fields
                    if spec.name in written
                    and not Schema("race context", [spec]).errors({spec.name: written[spec.name]})}
-    defaults = rulebook.current().parameters
     goal = _goal(context)
-    template = template_of(goal)
-
-    band = template.taper_cut_pct if template is not None else None
     return Race(on=due if isinstance(due, dt.date) else dt.date.fromisoformat(due),
                 priority=RacePriority(row["priority"]), state=RaceState(row["race_state"]),
-                taper_weeks=(template.taper_weeks if template is not None
-                             else defaults.taper_weeks),
-                taper_cut_min_pct=(round(band.low) if band is not None
-                                   else defaults.taper_cut_min_pct),
-                taper_cut_max_pct=(round(band.high) if band is not None
-                                   else defaults.taper_cut_max_pct),
                 name=str(row.get("athlete_label") or row.get("item") or ""),
                 start_time=_clock(context.get("start_time")),
                 route_gpx=context.get("route_gpx"),

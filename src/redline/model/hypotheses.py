@@ -11,16 +11,23 @@ can no longer be reached from where the athlete stands.
   leaves them; the hypothesis falls only when both fall short, so one poor week never
   does (a mean over several weeks would carry it for as many). Once the peak week has
   passed, nothing is checked.
+- Long run held: the same reading for the trame's longest long run, from the longest
+  run of each of those weeks, climbing at most `long_step_max_pct` a build week.
 - Lineage position: each key session reaches its last planned dose before the taper, one
   step per exposure left outside the deloads, from the dose its lineage allows next. Only
   the variables still behind count, in the direction the template moves them.
+- First times: the race's first times not done yet still find room on the build weeks
+  left outside the deloads, `transitions_max` a week (rule n8). A first time missed
+  slides to the next week that can hold it (`cycles.firsts_due`): only no room left
+  falls.
 - Availability: the minutes the habits leave for a week changed, and a week ahead no
   longer fits them at the frozen easy pace, or a peak the time capped could now climb.
   The days stated for one week are the draft's, never a hypothesis.
-- Goal: the race's day, distance or terrain changed.
+- Goal: the race's day, distance, terrain or first times changed.
 - Goal time, calibration: changed, they render the paces again; the trame holds.
 
-A fallen volume, lineage, availability or goal calls for a new version (`replan`); a goal
+A fallen volume, long run, lineage, first time, availability or goal calls for a new
+version (`replan`); a goal
 time or a calibration alone, for its paces rendered again (`recalibrate`); nothing fallen,
 the week's draft adapts within the bounds (`local`).
 
@@ -34,16 +41,18 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from . import iso_week
 from .cycle_templates import CycleTemplates, KeySession
 from .plan_generator import BUILD_PHASES, Goal, Trame, TrameRisk, Week
 from .progression import Dose
-from .vocabulary import CycleKind, HypothesisKind, HypothesisOutcome, PlanPhase
+from .vocabulary import CycleKind, HypothesisKind, HypothesisOutcome, KeyRole, PlanPhase
 
 #: The fallen hypotheses that call for a new version.
-REPLANNING = frozenset({HypothesisKind.VOLUME_HELD, HypothesisKind.LINEAGE_POSITION,
+REPLANNING = frozenset({HypothesisKind.VOLUME_HELD, HypothesisKind.LONG_RUN_HELD,
+                        HypothesisKind.LINEAGE_POSITION, HypothesisKind.FIRSTS,
                         HypothesisKind.AVAILABILITY, HypothesisKind.GOAL})
 #: A trame's volumes are rounded to 0.1 km: a reach within half of it reaches.
 ROUNDING_KM = 0.05
@@ -54,12 +63,21 @@ REVIEW_PREFIX = "plan-review:"
 
 
 @dataclass(frozen=True)
+class ClosedWeek:
+    """A closed week as run: its running volume and its longest run."""
+
+    label: str
+    km: float
+    long_km: float
+
+
+@dataclass(frozen=True)
 class Observed:
     """The real state a version is checked against, read on `today`."""
 
     today: dt.date
-    #: The running volume of the closed weeks not planned low, newest first, by week.
-    volumes: tuple[tuple[str, float], ...]
+    #: The closed weeks not planned low, newest first.
+    weeks: tuple[ClosedWeek, ...]
     #: The dose each run lineage allows next, by the workout it follows.
     lineages: tuple[tuple[str, Dose], ...]
     #: The minutes the habits leave for the week after `today`; None: no limit.
@@ -68,6 +86,8 @@ class Observed:
     calibration_on: dt.date | None
     #: The version's race as it stands, None when it is gone or its goal undeclared.
     goal: Goal | None
+    #: The transition kinds already run.
+    firsts_done: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -79,7 +99,7 @@ class Fallen:
     reference: float | None = None
     #: The key session's workout, for a lineage.
     workout: str = ""
-    #: The goal's field that changed: `on`, `distance_km` or `terrain`.
+    #: The goal's field that changed: `on`, `distance_km`, `terrain` or `firsts`.
     field: str = ""
 
 
@@ -109,26 +129,41 @@ def _build(week: Week) -> bool:
     return week.phase in BUILD_PHASES and not week.deload
 
 
-def _volume(trame: Trame, observed: Observed) -> Fallen | None:
+def _reach(trame: Trame, observed: Observed, kind: HypothesisKind,
+           planned: Callable[[Week], float], ran: Callable[[ClosedWeek], float],
+           step_pct: float) -> Fallen | None:
+    """Whether the trame's highest planned figure ahead is still reached from what each
+    of the last two closed weeks ran, climbing at most `step_pct` a build week."""
     current = iso_week.of(observed.today)
     builds = [week for week in trame.weeks if _build(week)]
     if not builds:
         return None
-    peak = max(week.volume_km for week in builds)
-    peak_week = next(week.label for week in builds if week.volume_km == peak)
-    read = [(label, km) for label, km in observed.volumes
-            if label < current and trame.week(label) is not None][:VOLUME_READINGS]
+    peak = max(planned(week) for week in builds)
+    peak_week = next(week.label for week in builds if planned(week) == peak)
+    read = [week for week in observed.weeks
+            if week.label < current and trame.week(week.label) is not None][:VOLUME_READINGS]
     if peak_week < current or len(read) < VOLUME_READINGS:
         return None
-    ramp = 1 + trame.hypotheses.ramp_max_pct / 100
+    step = 1 + step_pct / 100
     reaches = []
-    for label, km in read:
-        climbs = sum(1 for week in builds if label < week.label <= peak_week)
-        reach = km * ramp ** climbs
+    for closed in read:
+        climbs = sum(1 for week in builds if closed.label < week.label <= peak_week)
+        reach = ran(closed) * step ** climbs
         if reach >= peak - ROUNDING_KM:
             return None
         reaches.append(reach)
-    return Fallen(HypothesisKind.VOLUME_HELD, round(reaches[0], 1), peak)
+    return Fallen(kind, round(reaches[0], 1), peak)
+
+
+def _volume(trame: Trame, observed: Observed) -> Fallen | None:
+    return _reach(trame, observed, HypothesisKind.VOLUME_HELD, lambda week: week.volume_km,
+                  lambda closed: closed.km, trame.hypotheses.ramp_max_pct)
+
+
+def _long_run(trame: Trame, observed: Observed) -> Fallen | None:
+    return _reach(trame, observed, HypothesisKind.LONG_RUN_HELD,
+                  lambda week: week.long_run_km, lambda closed: closed.long_km,
+                  trame.hypotheses.long_step_max_pct)
 
 
 def _behind(dose: Dose, target: Dose, key: KeySession) -> float:
@@ -173,6 +208,19 @@ def _lineages(trame: Trame, observed: Observed, templates: CycleTemplates) -> li
     return fallen
 
 
+def _firsts(trame: Trame, observed: Observed) -> Fallen | None:
+    pending = [key for key in trame.keys if key.role == KeyRole.FIRST
+               and key.transition not in observed.firsts_done]
+    if not pending:
+        return None
+    current = iso_week.of(observed.today)
+    room = trame.hypotheses.transitions_max * sum(
+        1 for week in trame.weeks if week.label >= current and _build(week))
+    if len(pending) <= room:
+        return None
+    return Fallen(HypothesisKind.FIRSTS, float(len(pending)), float(room))
+
+
 def _capacity_km(minutes: int | None, pace_s: float) -> float | None:
     return None if minutes is None else minutes * 60 / pace_s
 
@@ -207,7 +255,8 @@ def _goal(trame: Trame, observed: Observed) -> list[Fallen]:
               for name, changed in (("on", now.on != frozen.on),
                                     ("distance_km", now.distance_km != frozen.distance_km),
                                     ("terrain", frozen.terrain is not None
-                                     and now.terrain != frozen.terrain))
+                                     and now.terrain != frozen.terrain),
+                                    ("firsts", set(now.firsts) != set(frozen.firsts)))
               if changed]
     if frozen.terrain is not None and now.goal_time_s != frozen.goal_time_s:
         fallen.append(Fallen(HypothesisKind.GOAL_TIME,
@@ -222,7 +271,8 @@ def check(trame: Trame, observed: Observed, templates: CycleTemplates) -> Review
     if trame.kind != CycleKind.PREPARATION:
         return HOLDS
     fallen: list[Fallen] = []
-    for found in (_volume(trame, observed), _availability(trame, observed)):
+    for found in (_volume(trame, observed), _long_run(trame, observed),
+                  _firsts(trame, observed), _availability(trame, observed)):
         if found is not None:
             fallen.append(found)
     fallen += _lineages(trame, observed, templates)

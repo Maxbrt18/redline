@@ -8,7 +8,6 @@ decisions-index
 descent
 fact-read
 fact-write
-feasibility
 knowledge-search
 ledger
 ledger-add

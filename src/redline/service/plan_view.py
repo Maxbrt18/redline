@@ -14,7 +14,7 @@ import uuid
 from typing import Any
 
 from redline.analysis import cycle_report
-from redline.model import intensity, iso_week
+from redline.model import intensity, iso_week, transitions
 from redline.model import notebook_views as views
 from redline.model import race as race_model
 from redline.model.cycles import CycleVersion
@@ -50,7 +50,8 @@ def _key(key: Key, refs: intensity.References) -> views.PlanKey:
             "reps": _int(dose.get("reps")) if dose else None,
             "rep_seconds": _int(dose.get("rep_seconds")) if dose else None,
             "recovery_seconds": _int(dose.get("recovery_seconds")) if dose else None,
-            "pace_s": pace, "rpe": rpe}
+            "pace_s": pace, "rpe": rpe,
+            "transition": transitions.label(key.transition) if key.transition else None}
 
 
 def _week(week: Week, trame: Trame, refs: intensity.References, current: str,

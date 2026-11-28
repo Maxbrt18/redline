@@ -29,7 +29,11 @@ block, taper (the weeks before the window are the general preparation):
   beyond the larger of the two doses' work; an arrival out of reach is a risk, not a
   steeper slope; the last exposures named `flagship` are the block's flagship sessions;
 - a test opens the window when the calibration is missing, provisional or stale;
-- no week carries more quality sessions than the rulebook allows (rule n1).
+- no week carries more quality sessions than the rulebook allows (rule n1);
+- each first time the race requires (`Goal.firsts`) is a key session of its own, on the
+  earliest build week that changes nothing else (neither the first build week nor one
+  adding a quality session, never a deload), at most `transitions_max` a week (rule n8):
+  it rides on that week's long run; a first time no week can hold is a risk.
 
 The general preparation is a block of `block_weeks` within its level's volume band, one
 key session a week; its deloads are triggered by signals, outside the trame. A recovery
@@ -44,7 +48,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
 
-from . import iso_week
+from . import iso_week, session_kinds
 from .cycle_templates import (
     General,
     Intensity,
@@ -76,6 +80,8 @@ class TrameRisk(StrEnum):
     TIME_BOUND = "time_bound"
     #: A key session cannot reach its arrival at one step per exposure.
     ARRIVAL_UNREACHED = "arrival_unreached"
+    #: A first time the race requires finds no build week to hold it.
+    FIRST_UNPLACED = "first_unplaced"
     #: The highest volume held is under the template's domain.
     BELOW_DOMAIN = "below_domain"
 
@@ -128,6 +134,8 @@ class Inputs:
     lineages: tuple[tuple[str, Dose], ...] = ()
     #: The most quality sessions a week the rulebook allows (rule n1); None: the template's.
     qualities_max: int | None = None
+    #: The most transitions a week the rulebook allows (rule n8).
+    transitions_max: int = 1
 
     def lineage(self, workout: str) -> Dose | None:
         return dict(self.lineages).get(workout)
@@ -143,6 +151,8 @@ class Goal:
     distance_km: float
     terrain: RaceTerrain | None = None
     goal_time_s: int | None = None
+    #: The transition kinds the race requires a first time of before the taper.
+    firsts: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -173,9 +183,11 @@ class Key:
     position: int
     workout: str
     role: KeyRole
-    #: None for a test, whose protocol is its own.
+    #: None for a test or a first time, whose protocol is their own.
     dose: Dose | None = None
     intensity: Intensity | None = None
+    #: The transition kind a first time stands for.
+    transition: str | None = None
 
 
 @dataclass(frozen=True)
@@ -485,8 +497,34 @@ def preparation(template: Preparation, goal: Goal, levers: Levers, inputs: Input
     if not inputs.calibrated and weeks:
         keys = [Key(weeks[0].label, 0, "test", KeyRole.TEST),
                 *(key for key in keys if not (key.week == weeks[0].label and key.position == 1))]
-    return Trame(CycleKind.PREPARATION, template.slug, candidate, tuple(weeks), tuple(keys),
-                 tuple(risks + key_risks), inputs, levers, goal)
+    firsts, first_risks = _firsts(goal, labels, turns, keys, inputs.transitions_max)
+    return Trame(CycleKind.PREPARATION, template.slug, candidate, tuple(weeks),
+                 tuple(sorted((*keys, *firsts), key=lambda key: (key.week, key.position))),
+                 tuple(risks + key_risks + first_risks), inputs, levers, goal)
+
+
+#: The turns of a week that changes nothing but its volume or its doses.
+QUIET_TURNS = frozenset({_Turn.VOLUME, _Turn.DOSES})
+
+
+def _firsts(goal: Goal, labels: Sequence[str], turns: Sequence[_Turn], keys: Sequence[Key],
+            per_week: int) -> tuple[list[Key], list[Risk]]:
+    """The race's first times, each on the earliest quiet build week with room left."""
+    room = {label: per_week for label, turn in zip(labels, turns, strict=True)
+            if turn in QUIET_TURNS}
+    placed: list[Key] = []
+    risks: list[Risk] = []
+    for transition in goal.firsts:
+        week = next((label for label in labels if room.get(label, 0) > 0), None)
+        if week is None:
+            risks.append(Risk(TrameRisk.FIRST_UNPLACED, 1.0, 0.0, transition))
+            continue
+        room[week] -= 1
+        position = max((key.position for key in (*keys, *placed) if key.week == week),
+                       default=0) + 1
+        placed.append(Key(week, position, session_kinds.LONG, KeyRole.FIRST,
+                          transition=transition))
+    return placed, risks
 
 
 def _distance(start: str, end: str) -> int:

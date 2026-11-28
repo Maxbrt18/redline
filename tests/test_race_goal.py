@@ -34,8 +34,12 @@ TEN = other("ten", dt.date(2031, 2, 9), "b", "active", distance_km=10, terrain="
 
 
 def test_a_race_b_before_the_goal_does_not_take_the_taper_over():
-    assert taper.race_window(store(TEN), iso_week.of(TEN["due_on"])) is None
-    assert taper.race_window(store(TEN), iso_week.of(trajectory.RACE_ON)) is not None
+    held = store(TEN)
+    trajectory.take(held, trajectory.window_start())
+    assert taper.race_window(held, iso_week.of(TEN["due_on"])) is None
+    assert taper.race_window(held, iso_week.of(trajectory.RACE_ON)) is not None
+    assert taper.race_window(store(TEN), iso_week.of(trajectory.RACE_ON)) is None, \
+        "no preparation holds the race: no taper is planned"
 
 
 def test_only_a_race_run_or_started_opens_a_recovery():

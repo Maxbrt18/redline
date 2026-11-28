@@ -12,8 +12,7 @@ partial merge would let two versions of the same rule coexist, the very fault th
 exists to prevent.
 
 It is the SINGLE SOURCE of the thresholds the code applies (`redline ledger`,
-`redline feasibility`, `transitions.py`) and of the transition kinds a program may
-carry. A threshold cited in a rule's text (`{pain_cap}`) is rendered from the same value:
+`transitions.py`) and of the transition kinds a program may carry. A threshold cited in a rule's text (`{pain_cap}`) is rendered from the same value:
 what the coach reads is what the code applies.
 
 It also declares the instance's pain scales (`[scales]`, `redline.model.pain_scales`):
@@ -38,7 +37,7 @@ from pathlib import Path
 
 from redline.coach.fr import rulebook as text
 
-from . import formats, iso_week, paths
+from . import formats, paths
 from .errors import ConfigError
 from .pain_scales import SCALES_SCHEMA, PainScales
 from .pain_scales import build as build_scales
@@ -93,7 +92,6 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
               note="on the effort-pain scale, at or below its cap"),
         field("gate_trend_weeks", int, minimum=1, maximum=8),
         field("hard_min_hours", float, minimum=0.25, maximum=6),
-        field("taper_weeks", int, minimum=1, maximum=6),
         field("stall_weeks", int, minimum=1, maximum=12),
         field("stall_tolerance_km", float, minimum=0, maximum=5),
         field("wake_trace_until", str, pattern=formats.TIME,
@@ -110,18 +108,12 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
               note="sessions missed within the window that raise a signal"),
         field("gear_alert_pct", int, minimum=50, maximum=100,
               note="share of its inspection distance at which a pair raises an alert, in %"),
-        field("assimilation_weeks", list, item=field("week", str, pattern=iso_week.PATTERN,
-                                                     note="ISO week, e.g. 2030-W35")),
         # Optional: an instance rulebook written before them states no fuelling ceiling,
         # and none applies until it declares one.
         field("carbs_cap_g_h", int, required=False, minimum=30, maximum=150,
               note="highest fuelling target a session may carry, in g/h"),
         field("carbs_mix_above_g_h", int, required=False, minimum=30, maximum=150,
               note="above this target, the session names a glucose-fructose mix"),
-        field("taper_cut_min_pct", int, required=False, minimum=0, maximum=100,
-              note="least drop of the taper's mean weekly volume, in %"),
-        field("taper_cut_max_pct", int, required=False, minimum=0, maximum=100,
-              note="largest drop of the taper's mean weekly volume, in %"),
         # Optional: absent, a reorganisation keeps one run and two sessions a day, does
         # not compare its load with the plan's, and lets the long run go any day.
         field("runs_per_day", int, required=False, minimum=1, maximum=3,
@@ -285,7 +277,6 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
         "transition", dict, schema=Schema("[[transitions]]", [
             field("slug", str, pattern=formats.SLUG),
             field("label", str, minimum=1, maximum=40),
-            field("race_first", bool, required=False),
             field("quality", bool, required=False),
         ]))),
     field("rules", list, minimum=1, maximum=20, item=field(
@@ -311,7 +302,6 @@ class Parameters:
     gate_effort_peak: float
     gate_trend_weeks: int
     hard_min_hours: float
-    taper_weeks: int
     stall_weeks: int
     stall_tolerance_km: float
     wake_trace_until: dt.time
@@ -321,11 +311,8 @@ class Parameters:
     low_desire_checkins: int
     missed_sessions_signal: int
     gear_alert_pct: int
-    assimilation_weeks: tuple[str, ...]
     carbs_cap_g_h: int | None = None
     carbs_mix_above_g_h: int | None = None
-    taper_cut_min_pct: int | None = None
-    taper_cut_max_pct: int | None = None
     runs_per_day: int = 1
     sessions_per_day: int = 2
     reorganize_load_margin_pct: int | None = None
@@ -395,7 +382,6 @@ class Parameters:
 class TransitionKind:
     slug: str
     label: str
-    race_first: bool = False
     quality: bool = False
 
 
@@ -426,10 +412,6 @@ class Rulebook:
     @property
     def kinds(self) -> tuple[str, ...]:
         return tuple(kind.slug for kind in self.transitions)
-
-    @property
-    def race_firsts(self) -> tuple[str, ...]:
-        return tuple(kind.slug for kind in self.transitions if kind.race_first)
 
     @property
     def quality_kinds(self) -> frozenset[str]:
@@ -473,7 +455,7 @@ def parse(text: str, source: Path) -> Rulebook:
         raise RulebookError(str(exc)) from None
     raw = payload["parameters"]
     parameters = Parameters(**{
-        **raw, "assimilation_weeks": tuple(raw["assimilation_weeks"]),
+        **raw,
         "long_run_weekdays": tuple(raw.get("long_run_weekdays") or ()),
         "wake_trace_until": dt.time.fromisoformat(raw["wake_trace_until"]),
         "missed_cutoff": dt.time.fromisoformat(raw["missed_cutoff"]),

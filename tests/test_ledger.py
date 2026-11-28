@@ -521,25 +521,6 @@ def test_a_week_without_any_run_is_not_progress():
     assert stall is not None and stall.weeks == 3        # W38 and W39 empty, W40 shorter
 
 
-def test_the_projection_says_what_a_target_would_require_not_what_is_allowed():
-    rows = _long_runs(SEPTEMBER)
-    projection = ledger.race_projection(rows, dt.date(2026, 9, 27), dt.date(2026, 11, 26))
-    assert projection is not None
-    assert projection.start_km == 11.53
-    # Six weeks ending before the taper, which starts two weeks before the race.
-    assert projection.weeks == [
-        "2026-W40", "2026-W41", "2026-W42", "2026-W43", "2026-W44", "2026-W45"]
-    assert projection.taper_from == "2026-W46"
-    assert round(projection.required_growth(30.0), 3) == round((30 / 11.53) ** (1 / 6), 3)
-    assert projection.required_growth(10.0) == 1.0
-    assert projection.required_growth(30.0, lost=6) is None
-    lines = ledger.projection_lines(projection, target_km=30.0)
-    assert any("+17 %/sem" in line and "+21 %/sem" in line for line in lines)
-    assert not any("10 %" in line for line in lines)
-    assert "--long-run-target" in ledger.projection_lines(projection)[-1]
-    assert ledger.race_projection(rows, dt.date(2026, 12, 1), dt.date(2026, 11, 26)) is None
-
-
 def test_the_race_date_comes_from_a_typed_race_deadline_only():
     class Store:
         def deadline_rows(self):

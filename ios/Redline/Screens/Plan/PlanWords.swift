@@ -85,6 +85,7 @@ enum PlanWords {
     static func key(_ key: Notebook.PlanKey, numbered: Bool = true, paces: Bool = true) -> String {
         let head = numbered ? "[\(key.position)] " : ""
         if key.role == .test { return head + "Test 1 200 m puis 3 600 m à fond" }
+        if key.role == .first { return head + "1re fois : \(key.transition ?? "nouveauté"), sur la sortie longue" }
         let star = key.role == .flagship ? "★ " : ""
         let name = Notebook.kinds[key.workout]?.name ?? key.workout
         var text = head + star + name
@@ -111,6 +112,7 @@ enum PlanWords {
         case .arrivalUnreached:
             let name = Notebook.kinds[risk.workout]?.name ?? risk.workout
             return "\(name) finit à \(value) cran\(risk.value > 1 ? "s" : "") de son arrivée."
+        case .firstUnplaced: return "Une première fois exigée par la course ne trouve aucune semaine de construction avant l’affûtage."
         case .belowDomain: return "Plus haut volume tenu \(value) km, sous le domaine du gabarit (\(reference) km)."
         case .unknown(let value): return value
         }

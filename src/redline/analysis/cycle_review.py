@@ -1,7 +1,7 @@
 """The state a preparation's hypotheses are checked against, read once from the store.
 
 `observed` gathers what `redline.model.hypotheses.check` compares with the version's
-frozen inputs: the volume of each closed week, the weeks planned low and the assimilation
+frozen inputs: the volume and the longest run of each closed week, the weeks planned low and the assimilation
 weeks left out as the generator's start leaves them, the dose each run lineage allows
 next, the minutes the habits leave for the week after today, the calibration in force and
 the version's race as it stands. `lines` renders the review
@@ -29,16 +29,16 @@ from . import cycle_inputs
 
 def observed(store: Any, version: CycleVersion, today: dt.date,
              planned_low: Collection[str]) -> Observed:
-    volumes = cycle_inputs.closed_volumes(store, today, planned_low,
-                                          len(version.trame.weeks))
+    weeks = cycle_inputs.closed_weeks(store, today, planned_low, len(version.trame.weeks))
     found = calibration_model.in_force(store.calibration_rows())
     race = next((race for race in race_model.typed(store)
                  if race.key == version.race_key and race.goal is not None), None)
     upcoming = iso_week.monday(iso_week.shift(iso_week.of(today), 1))
-    return Observed(today, volumes, cycle_inputs.lineages(store, rulebook.current(), today),
+    return Observed(today, weeks, cycle_inputs.lineages(store, rulebook.current(), today),
                     cycle_inputs.minutes(store, upcoming),
                     found.adopted_on if found is not None else None,
-                    cycle_inputs.goal(race) if race is not None else None)
+                    cycle_inputs.goal(race) if race is not None else None,
+                    cycle_inputs.firsts_done(store))
 
 
 def review(store: Any, templates: CycleTemplates, version: CycleVersion, today: dt.date,

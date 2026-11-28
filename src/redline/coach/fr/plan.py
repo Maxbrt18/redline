@@ -81,7 +81,7 @@ JOURNAL_SKELETON = """\
 """
 
 HOT_CACHE = ("- **Semaine en cours — {week} · plan typé r{revision}** : {sessions}. "
-             "PostgreSQL → `athlete/journal/{file}.md`. Macro-plan jamais prescriptible.")
+             "PostgreSQL → `athlete/journal/{file}.md`. Trame du cycle jamais prescriptible.")
 HOT_CACHE_CAP = " ≤{cap} km"
 
 #: One line per session a revision touched.

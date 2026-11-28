@@ -280,7 +280,7 @@ def test_style_keeps_channel_and_decision_guardrails():
     assert "porte de sortie chiffrée" in STYLE_PROMPT
     assert "UN CHIFFRE NE SE CITE PAS" in STYLE_PROMPT
     assert f"{prompts.AGENT_CLI} ledger --week" in STYLE_PROMPT
-    assert "Vol. cible" in STYLE_PROMPT
+    assert "ni de la trame" in _flat(STYLE_PROMPT)
     assert "n'annonce pas leur arrivée" in STYLE_PROMPT
     assert f"{prompts.AGENT_CLI} fact-read corrections" in STYLE_PROMPT
     assert "Même incident = même clé" in STYLE_PROMPT
@@ -754,7 +754,7 @@ def test_the_race_countdown_defers_to_the_plan():
 
 def test_monthly_judges_outcomes_not_only_the_process():
     monthly = " ".join(PROACTIVE_TRIGGERS["monthly"].split())
-    assert "Juge le RÉSULTAT" in monthly and "--long-run-target" in monthly
+    assert "Juge le RÉSULTAT" in monthly and "cycle show" in monthly
 
 
 def test_a_session_is_bound_to_the_instruction_files_it_actually_read(tmp_path):

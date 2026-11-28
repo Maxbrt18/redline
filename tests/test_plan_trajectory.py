@@ -151,3 +151,18 @@ def test_two_weeks_run_far_under_the_trame_replan_it_on_the_second_sunday():
 
 def test_two_weeks_run_a_little_under_the_trame_hold_it():
     assert _replanned(trajectory.simulate(short={2: 0.85, 3: 0.85}).weeks) == []
+
+
+def test_a_first_time_not_run_slides_and_replans_only_once_no_week_can_hold_it():
+    lived = trajectory.simulate(skip_firsts=True).weeks
+    replanned = _replanned(lived)
+    assert len(replanned) == 1, "the review asks once, when the last build week is gone"
+    [week] = [item for item in lived if item.week == replanned[0]]
+    assert [found.kind for found in week.review.fallen] == [HypothesisKind.FIRSTS]
+    builds = [item.week for item in lived if item.shown and item.shown.phase in BUILD_PHASES]
+    assert replanned[0] > builds[-1], "while a build week is left, the first slides"
+
+
+def test_an_athlete_who_runs_the_first_time_never_drops_it(followed):
+    assert not [item for item in followed
+                if HypothesisKind.FIRSTS in {found.kind for found in item.review.fallen}]
