@@ -108,6 +108,7 @@ class Plans(StoreBase):
                 cycle_versions.c.athlete_id == self.athlete_id,
                 cycle_versions.c.state == voc.CycleVersionState.ACTIVE).scalar_subquery(),
             cycle_overrides=revision.get("cycle_overrides"),
+            draft=revision.get("draft"),
         ))
         holding = self._holding_version_in(connection, week)
         cycle_inputs = []
@@ -317,7 +318,7 @@ class Plans(StoreBase):
             }
             if row["volume_target_km"] is not None:
                 revision["volume_target_km"] = float(row["volume_target_km"])
-            for name in ("decision", "state_snapshot", "cycle_overrides"):
+            for name in ("decision", "state_snapshot", "cycle_overrides", "draft"):
                 if row[name] is not None:
                     revision[name] = row[name]
             session_rows = connection.execute(sa.select(planned_sessions).where(

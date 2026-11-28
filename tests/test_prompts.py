@@ -731,7 +731,7 @@ def test_weekly_uses_the_dossier_and_closes_every_due_prediction():
     assert "--reason" in weekly and "decisions-index" not in weekly
     assert "protocole d'instruction des baisses" in weekly
     assert "action prête à faire" in weekly and "repli daté" in weekly
-    assert "Le service crée le journal" in weekly
+    assert "BROUILLON DU MOTEUR" in weekly and "week-plan draft" in weekly
 
 
 def test_the_weekly_commitment_is_gone():

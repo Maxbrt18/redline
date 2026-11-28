@@ -57,3 +57,8 @@ UNAVAILABLE = (
     "[DOSSIER DU BILAN indisponible : calcul en échec, voir les journaux. "
     "Relance toi-même redline ledger, redline signals et redline fact-read predictions --due.]")
 CYCLE_UNAVAILABLE = "Cycle en cours illisible : {reason}"
+DRAFT_UNAVAILABLE = "Brouillon illisible : {reason}"
+DRAFT = ("BROUILLON DU MOTEUR pour {week}, {volume:g} km : la base de la révision. Chaque "
+         "écart porte sa preuve ; le JSON entier par `redline week-plan draft --week {week}`.")
+DRAFT_SESSION = "  {day} {session} : {title}{key}, {km:g} km"
+DRAFT_KEY = " [{position}]"

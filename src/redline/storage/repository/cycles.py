@@ -36,7 +36,7 @@ from ..schema import (
     deadlines,
     proactive_jobs,
 )
-from ._common import StoreBase, _audit, _jsonable, _native, _uuid
+from ._common import StoreBase, _audit, _jsonable, _native, _request_projection, _uuid
 
 #: The kinds of cycle whose weeks are planned low: they are not a start.
 LOW_KINDS = (CycleKind.RECOVERY, CycleKind.REBUILD)
@@ -169,6 +169,7 @@ class Cycles(StoreBase):
         found = self._insert_in(connection, trame, values)
         _audit(connection, actor, "cycle.transition", "cycle_version", found.id,
                _jsonable(values))
+        _request_projection(connection)
         return found
 
     def propose_cycle_in(self, connection: Connection, trame: Trame, decision: dict,
@@ -222,6 +223,7 @@ class Cycles(StoreBase):
             state=CycleVersionState.ACTIVE, taken_at=now))
         _audit(connection, actor, "cycle.taken", "cycle_version", version_id,
                {"closed": str(active.id) if active is not None else None})
+        _request_projection(connection)
         return self._versions_in(connection, cycle_versions.c.id == version_id)[0]
 
     @staticmethod

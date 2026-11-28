@@ -17,7 +17,9 @@ JOURNAL = Path("athlete/journal")
 DAILY_CSV = Path("athlete/daily.csv")
 INSTRUMENTS_CSV = Path("athlete/instruments.csv")
 STRENGTH_LOG_CSV = Path("athlete/strength-log.csv")
-PROJECTIONS = (DAILY_CSV, INSTRUMENTS_CSV, STRENGTH_LOG_CSV)
+#: The cycle version in force, as the coach reads it in the vault.
+CURRENT_PLAN = Path("coaching/current-plan.md")
+PROJECTIONS = (DAILY_CSV, INSTRUMENTS_CSV, STRENGTH_LOG_CSV, CURRENT_PLAN)
 
 DECISIONS = Path("coaching/decisions.md")
 CORRECTIONS = Path("coaching/corrections.md")

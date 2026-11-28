@@ -75,7 +75,7 @@ savoir et les raisons.
 | Profil, blessures, zones, matériel | `athlete/athlete.md` · kilométrage du matériel via `redline gear-sync` |
 | Bilans + programme opérationnel révisionné | PostgreSQL via `redline week-plan revise` (append-only) |
 | Objectifs | `athlete/goals.md` |
-| Macro-plan non prescriptible | `coaching/current-plan.md` |
+| Plan en cours (projection de la version du cycle, jamais éditée) | `coaching/current-plan.md` · `redline cycle show` |
 | Décisions de coaching · échéances datées | `coaching/decisions.md` · PostgreSQL via `redline fact-write deadline` |
 | Méthodes (douleur, calibration, jauge) | `coaching/protocols.md` |
 | Renfo : exercices et séances | `coaching/exercises/` + `coaching/workouts/` |

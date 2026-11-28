@@ -85,6 +85,15 @@ class Store:
     def habits(self, on=None, until=None) -> list[dict]:
         return []
 
+    def stated_days(self, first: dt.date, last: dt.date) -> list[dict]:
+        return []
+
+    def pain_zones(self) -> list[dict]:
+        return []
+
+    def daily_rows(self) -> list[dict]:
+        return []
+
     def active_cycle(self) -> CycleVersion | None:
         return self.cycle
 

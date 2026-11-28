@@ -88,3 +88,13 @@ def test_the_version_in_force_is_shown_whole():
 @pytest.mark.parametrize("cause", list(CycleCause))
 def test_every_cause_has_its_words(cause):
     assert cycle_report.text.CAUSES[cause]
+
+
+def test_the_dossier_carries_the_engine_s_draft_of_the_week_it_prepares():
+    start = trajectory.window_start()
+    store = trajectory.simulate(through=start).store
+    week = iso_week.shift(start, 0)
+    lines = weekly_dossier._cycle(store, week, trajectory.review_day(iso_week.shift(week, 1)))
+    head = next(line for line in lines if line.startswith("BROUILLON DU MOTEUR"))
+    assert iso_week.shift(week, 1) in head
+    assert any("[1]" in line for line in lines), "the key session carries its number"

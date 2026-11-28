@@ -309,6 +309,9 @@ REVISION_SCHEMA = Schema("weekly revision", [
     field("state_snapshot", dict, required=False, schema=STATE_SNAPSHOT_SCHEMA),
     field("cycle_overrides", list, required=False, maximum=len(OverrideTarget) * 4,
           item=field("cycle override", dict, schema=CYCLE_OVERRIDE_SCHEMA)),
+    # The engine's draft the first revision was written against; the service's, never the
+    # model's (`redline.analysis.weekly_draft`).
+    field("draft", dict, required=False),
 ])
 
 #: What the coach proposes when the athlete asks for more than a reorganisation: one to
@@ -1229,6 +1232,48 @@ def change_evidence_errors(previous: dict | None, current: dict) -> list[str]:
     extras = sorted(set(by_session) - set(expected))
     if extras:
         problems.append("changes: no future change for " + ", ".join(extras) + ".")
+    return problems
+
+
+def draft_change_errors(draft: dict, current: dict, floor_km: float | None) -> list[str]:
+    """The first revision of a week against the engine's draft: each session that
+    differs names its evidence, as a change does; a cut while the week falls under its
+    floor, or a key session removed or cancelled, adds its typed restriction."""
+    as_of = str(current.get("computed_at") or now_stamp())[:10]
+    expected = _changed_session_fields(draft, current, as_of)
+    entries: dict[str, dict] = {str(entry.get("session_id")): entry
+                                for entry in current.get("changes") or []
+                                if isinstance(entry, dict)}
+    evidence = current.get("evidence") or []
+    volume = current.get("volume_target_km")
+    under = floor_km is not None and volume is not None and volume < floor_km - 0.05
+    before, after = _revision_index(draft), _revision_index(current)
+    problems: list[str] = []
+    for session_id, fields in sorted(expected.items()):
+        entry = entries.get(session_id)
+        if entry is None:
+            problems.append(f"changes: {session_id} differs from the draft "
+                            f"({', '.join(sorted(fields))}); name its evidence, the rule and "
+                            "the context (`redline week-plan draft`).")
+            continue
+        declared = set(entry.get("fields") or [])
+        if declared != fields:
+            problems.append(f"changes.{session_id}.fields: expected {sorted(fields)}, "
+                            f"got {sorted(declared)}.")
+        if (entry.get("trigger") or "") not in evidence:
+            problems.append(f"changes.{session_id}.trigger must copy an entry of evidence "
+                            "exactly.")
+        if not str(entry.get("rule") or "").strip() or not str(entry.get("context") or "").strip():
+            problems.append(f"changes.{session_id}: its rule and its context are required.")
+        old = before.get(session_id)
+        cuts = restrictions(old, after.get(session_id)) if old is not None else []
+        keyed = (old is not None and old.get("key_position") is not None
+                 and bool(set(cuts) & {Cut.REMOVED, Cut.CANCELLED}))
+        if cuts and (under or keyed):
+            problems += _restriction_errors(session_id, entry, cuts, evidence)
+    extras = sorted(set(entries) - set(expected))
+    if extras:
+        problems.append("changes: no difference from the draft for " + ", ".join(extras) + ".")
     return problems
 
 

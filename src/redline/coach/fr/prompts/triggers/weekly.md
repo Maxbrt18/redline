@@ -23,16 +23,12 @@ Fais le bilan du dimanche et prépare la semaine suivante.
    pas plus de fermeté. Clôture les fils sans objet. Une échéance échue qui dépend de ⟨athlète⟩
    (mail, nom de médicament, rendez-vous) reçoit l'action prête à faire et un repli
    daté, une fois par semaine au plus, jamais en reproche.
-4. Le service crée le journal de la semaine suivante ; place ses séances autour de
-   `redline week-plan days --week <suivante>`. Écris-y l'intention et une
-   révision complète (`volume_target_km` compris) via `redline week-plan
-   revise/check`. Sa `decision` dit ce qui a tranché (`by` : rule et son `rule`,
-   judgment ou request) et ses `alternatives`, options écartées et raison ; un
-   jugement en nomme une au moins. Une condition du jour va dans la `note` de sa séance (trace nette :
-   repos), jamais en `gate` ; au-delà,
-   `redline fact-write deadline` (`--athlete-label` si ⟨athlète⟩ agit). Renfo
-   selon `coaching/strength.md`. Une séance dont la nature sort des 30 derniers jours
-   porte `transition`, une par semaine ; une hausse facile passe par la porte.
+4. Le DOSSIER porte le BROUILLON DU MOTEUR de la semaine suivante (JSON :
+   `redline week-plan draft --week <suivante>`) : la base de la révision. Amende-le ;
+   une séance qui en diffère garde son `id` et porte son entrée `changes` ; une coupe
+   sous le plancher ou une séance clé retirée porte sa `restriction`. Écris la révision
+   via `redline week-plan revise/check`, sa `decision` (`by`, `rule`, `alternatives`).
+   Une condition du jour va dans la `note` de sa séance, jamais en `gate`.
    Chaque SL et chaque hausse de la porte reçoit sa prédiction `corps`, probabilité
    explicite : `redline fact-write prediction --domain corps --resolves wake-trace
    --resolves-on <lendemain> --success-if '<=1'`. Elle se solde seule.

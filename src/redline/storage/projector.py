@@ -138,6 +138,28 @@ def plan_drift(store: OperationalStore, root: Path) -> list[str]:
             if apply_view(path, weekly_plan.BLOCK, content, check=True)]
 
 
+def project_cycle(store: OperationalStore, root: Path) -> None:
+    """The cycle version in force, as `coaching/current-plan.md`; left as it is before the
+    first version."""
+    from redline.coach.fr import cycle as text
+    from redline.coach.fr import session_labels
+    from redline.model import race as race_model
+    version = store.active_cycle()
+    if version is None:
+        return
+    race = next((race for race in race_model.typed(store) if race.key == version.race_key),
+                None) if version.race_key else None
+    weeks = [(week.label, str(week.phase), week.deload, week.volume_km, week.long_run_km,
+              week.qualities, "; ".join(
+                  f"[{key.position}] {session_labels.name(key.workout)}"
+                  + (f" {key.dose}" if key.dose is not None else "")
+                  for key in version.keys_of(week.label)))
+             for week in version.trame.weeks]
+    _atomic(root / vault_layout.CURRENT_PLAN, text.note(
+        str(version.kind), str(version.level or ""), version.version, str(version.cause),
+        weeks, (race.name, race.on) if race is not None else None))
+
+
 def plan_view_count(store: OperationalStore, root: Path) -> int:
     """How many program blocks exist: the count a check is allowed to cite."""
     return sum(1 for _ in _plan_projections(store, root))
@@ -156,6 +178,7 @@ def project_all(store: OperationalStore, root: Path,
             project_instruments(store, root)
             project_strength(store, root)
             project_plans(store, root)
+            project_cycle(store, root)
             if finalize is not None:
                 finalize()
             store.mark_projected(token)
