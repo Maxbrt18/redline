@@ -28,7 +28,8 @@ block, taper (the weeks before the window are the general preparation):
   one step per exposure, never in a deload nor in a week whose volume rises, and never
   beyond the larger of the two doses' work; an arrival out of reach is a risk, not a
   steeper slope; the last exposures named `flagship` are the block's flagship sessions;
-- a test opens the window when the calibration is missing, provisional or stale.
+- a test opens the window when the calibration is missing, provisional or stale;
+- no week carries more quality sessions than the rulebook allows (rule n1).
 
 The general preparation is a block of `block_weeks` within its level's volume band, one
 key session a week; its deloads are triggered by signals, outside the trame. A recovery
@@ -125,6 +126,8 @@ class Inputs:
     calibration_on: dt.date | None = None
     #: The dose each run lineage stands at, by the workout it follows.
     lineages: tuple[tuple[str, Dose], ...] = ()
+    #: The most quality sessions a week the rulebook allows (rule n1); None: the template's.
+    qualities_max: int | None = None
 
     def lineage(self, workout: str) -> Dose | None:
         return dict(self.lineages).get(workout)
@@ -421,6 +424,8 @@ def preparation(template: Preparation, goal: Goal, levers: Levers, inputs: Input
     qualities: list[int] = []
     for index, phase in enumerate(phases):
         quality = _qualities(template, levers, phase)
+        if inputs.qualities_max is not None:
+            quality = min(quality, inputs.qualities_max)
         qualities.append(min(quality, qualities[-1]) if index in deloads and qualities
                          else quality)
     turns = _turns(phases, deloads, qualities)
@@ -541,6 +546,8 @@ def general(template: General, inputs: Inputs) -> Trame:
     volume = inputs.start_km
     weeks, keys = [], []
     dose = {key.workout: inputs.lineage(key.workout) or key.start for key in template.keys}
+    qualities = (template.qualities if inputs.qualities_max is None
+                 else min(template.qualities, inputs.qualities_max))
     for index, label in enumerate(_labels(inputs.origin, template.block_weeks)):
         # The progress level climbs to the top of its band; the others hold within it,
         # climbing to its bottom at the ramp, coming down to its top at once.
@@ -550,8 +557,8 @@ def general(template: General, inputs: Inputs) -> Trame:
         long_run = min(inputs.start_long_km * (1 + inputs.long_step_max_pct / 100) ** index,
                        volume * template.long_run_share_max)
         weeks.append(Week(label, PlanPhase.GENERAL, False, _km(volume), _km(long_run),
-                          template.qualities))
-        for position, key in enumerate(template.keys[:template.qualities], start=1):
+                          qualities))
+        for position, key in enumerate(template.keys[:qualities], start=1):
             if index:
                 dose[key.workout] = next_dose(dose[key.workout], key)
             keys.append(Key(label, position, key.workout, KeyRole.KEY, dose[key.workout],
