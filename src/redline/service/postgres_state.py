@@ -898,9 +898,8 @@ class PostgresStateStore(StateStore):
             if transition.cause != voc.CycleCause.MIGRATION:
                 created += int(store.announce_cycle_in(connection, version, utc))
         goal = race_model.active_goal(store)
-        prefix = f"plan-review:{goal.key}:" if goal is not None else ""
-        reviewed = bool(prefix) and connection.execute(sa.select(sa.exists().where(
-            proactive_jobs.c.job_key.startswith(prefix, autoescape=True)))).scalar_one()
+        prefix = f"{hypotheses.REVIEW_PREFIX}{goal.key}:" if goal is not None else ""
+        reviewed = bool(prefix) and PostgresStateStore._reviewed(connection, prefix)
         returned = (transition is not None and before is not None
                     and before.kind == voc.CycleKind.REBUILD)
         active = store.active_cycle_in(connection)
@@ -913,11 +912,31 @@ class PostgresStateStore(StateStore):
             created += int(PostgresProactiveState._enqueue(
                 connection, key, voc.ProactiveKind.PLAN_REVIEW, goal.name or goal.key,
                 utc.timestamp()))
+            PostgresStateStore._remember_review(connection, key)
         if (transition is None and active is not None and goal is not None
                 and active.race_key == goal.key and not proposal_open):
             created += PostgresStateStore._ask_replan(connection, store, templates, active,
                                                       goal, today, planned_low, utc)
         return created
+
+    @staticmethod
+    def _remember_review(connection, key: str) -> bool:
+        """A plan review asked, kept in a marker the purge never removes: finished jobs
+        are purged, the fact that the review was asked is not. False when it already was."""
+        return connection.execute(pg_insert(proactive_markers).values(
+            marker_key=key).on_conflict_do_nothing().returning(
+            proactive_markers.c.marker_key)).scalar_one_or_none() is not None
+
+    @staticmethod
+    def _reviewed(connection, prefix: str) -> bool:
+        """Whether a plan review was ever asked under `prefix`. The jobs still kept are
+        remembered first, so a review asked before the markers is not asked again once
+        its job is purged."""
+        for key in connection.execute(sa.select(proactive_jobs.c.job_key).where(
+                proactive_jobs.c.job_key.startswith(prefix, autoescape=True))).scalars():
+            PostgresStateStore._remember_review(connection, key)
+        return connection.execute(sa.select(sa.exists().where(
+            proactive_markers.c.marker_key.startswith(prefix, autoescape=True)))).scalar_one()
 
     @staticmethod
     def _ask_replan(connection, store: OperationalStore, templates, active, goal,
@@ -936,10 +955,7 @@ class PostgresStateStore(StateStore):
             proactive_jobs.c.status.in_(voc.LIVE_JOBS)))).scalar_one()
         if running:
             return 0
-        asked = connection.execute(pg_insert(proactive_markers).values(
-            marker_key=key).on_conflict_do_nothing().returning(
-            proactive_markers.c.marker_key)).scalar_one_or_none()
-        if asked is None:
+        if not PostgresStateStore._remember_review(connection, key):
             return 0
         return int(PostgresProactiveState._enqueue(
             connection, key, voc.ProactiveKind.PLAN_REVIEW, goal.name or goal.key,

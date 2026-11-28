@@ -114,9 +114,10 @@ class Maintenance(StoreBase):
     #: Deleting it would let an old command be queued again, even when a business
     #: constraint later blocked its second effect.
     #:
-    #: The markers of the plan reviews asked for a version's fallen hypotheses
-    #: (`REPLAN_MARKER`) do not expire either: they keep a replan left untaken from being
-    #: asked again, however long the preparation lasts.
+    #: The markers of the plan reviews asked (`REPLAN_MARKER`), for a goal's window or
+    #: for a version's fallen hypotheses, do not expire either: they keep a review already
+    #: asked, or a replan left untaken, from being asked again, however long the
+    #: preparation lasts.
     #:
     #: The audit log does not expire: the application can neither modify nor erase it.
     #: `projection_states` is not a log, only a durable bit.
