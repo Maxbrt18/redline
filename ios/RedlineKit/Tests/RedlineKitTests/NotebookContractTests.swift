@@ -33,6 +33,14 @@ struct NotebookContractTests {
         try expectRoundTrip(Notebook.RacePlanView.self, fixture: "race-plan")
     }
 
+    @Test func plan() throws {
+        try expectRoundTrip(Notebook.PlanView.self, fixture: "plan")
+    }
+
+    @Test func planProposal() throws {
+        try expectRoundTrip(Notebook.CycleProposalView.self, fixture: "plan-proposal")
+    }
+
     @Test func reorganize() throws {
         try expectRoundTrip(Notebook.ReorganizeView.self, fixture: "reorganize")
     }

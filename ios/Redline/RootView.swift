@@ -1,26 +1,28 @@
 import RedlineKit
 import SwiftUI
 
-/// The notebook's three sections, one question each: Today follows the time of day, Week
-/// judges the past and prescribes the rest, Race looks ahead.
+/// The notebook's four sections, one question each: Today follows the time of day, Week
+/// judges the past and prescribes the rest, Plan lays out the cycle, Race looks ahead.
 enum NotebookTab: Hashable, CaseIterable {
-    case today, week, race
+    case today, week, plan, race
 
     var title: LocalizedStringKey {
         switch self {
         case .today: "Aujourd’hui"
         case .week: "Semaine"
+        case .plan: "Plan"
         case .race: "Course"
         }
     }
 
     /// The tab's drawing in the asset catalogue: the notebook page for Today, the load rising
-    /// to its target for Week, the chequered flag for Race. Only Today has a filled form; the
-    /// two others keep one drawing and take the tint alone when selected.
+    /// to its target for Week, the folded map for Plan, the chequered flag for Race. Only Today
+    /// has a filled form; the others keep one drawing and take the tint alone when selected.
     func image(selected: Bool) -> String {
         switch self {
         case .today: selected ? "Tabs/today.fill" : "Tabs/today"
         case .week: "Tabs/week"
+        case .plan: "Tabs/plan"
         case .race: "Tabs/race"
         }
     }
@@ -65,10 +67,11 @@ struct RootView: View {
                         }
                         #if DEBUG
                         // `-RedlineStrength YES` with the demo opens its strength session at launch;
-                        // `-RedlineTab week|race` opens that tab.
+                        // `-RedlineTab week|plan|race` opens that tab.
                         .task {
                             switch UserDefaults.standard.string(forKey: "RedlineTab") {
                             case "week": selection = .week
+                            case "plan": selection = .plan
                             case "race": selection = .race
                             default: break
                             }
@@ -126,6 +129,7 @@ struct RootView: View {
                         switch tab {
                         case .today: TodayScreen(session: session) { selection = $0 }
                         case .week: WeekScreen(session: session)
+                        case .plan: PlanScreen(session: session)
                         case .race: RaceScreen(session: session)
                         }
                     }

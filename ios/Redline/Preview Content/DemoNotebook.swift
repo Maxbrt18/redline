@@ -42,6 +42,8 @@ struct DemoTransport: HTTPTransport {
             case "reorganize", "answer", "launch": path
             default: "done"
             }
+        } else if path == "plan/proposal" {
+            "plan-proposal"
         } else if parts.first == "entries" && parts.count > 1 {
             parts.count > 2 ? "card" : "entry"
         } else {
@@ -55,6 +57,7 @@ struct DemoTransport: HTTPTransport {
         try await Task.sleep(for: .milliseconds(300))
         var body = fixture.flatMap { try? Data(contentsOf: $0) } ?? Data(#"{"error": "Pas de démo pour cette page."}"#.utf8)
         if name == "today" { body = DemoDay.variant(of: body) }
+        if name == "plan" { body = DemoPlan.variant(of: body) }
         let response = HTTPURLResponse(url: request.url!, statusCode: fixture == nil ? 404 : 200,
                                        httpVersion: nil, headerFields: nil)!
         return (body, response)
@@ -120,3 +123,19 @@ private struct DemoTokenStore: DeviceTokenStore {
     func delete() {}
 }
 #endif
+
+/// `-RedlinePlan proposal` with the demo opens the Plan screen with the proposal fixture
+/// waiting to be taken.
+nonisolated enum DemoPlan {
+    static func variant(of data: Data) -> Data {
+        guard UserDefaults.standard.string(forKey: "RedlinePlan") == "proposal",
+              var plan = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let url = Bundle.main.url(forResource: "plan-proposal", withExtension: "json"),
+              let proposal = (try? JSONSerialization.jsonObject(with: Data(contentsOf: url))) as? [String: Any],
+              let weeks = proposal["weeks"] as? [[String: Any]] else { return data }
+        plan["proposal"] = ["id": proposal["id"] ?? "", "race": proposal["race"] ?? NSNull(),
+                            "weeks": weeks.count, "starts_on": weeks.first?["monday"] ?? "",
+                            "peak_km": proposal["peak_km"] ?? 0, "expires_on": proposal["expires_on"] ?? ""]
+        return (try? JSONSerialization.data(withJSONObject: plan)) ?? data
+    }
+}

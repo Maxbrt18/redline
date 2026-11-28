@@ -1032,3 +1032,106 @@ class Habit(DayState):
 
 class HabitsView(TypedDict):
     habits: list[Habit]
+
+
+class PlanKey(TypedDict):
+    """A key session of a trame's week: its number (what a session links to), its dose, and
+    its intensity rendered from today's calibration: a pace band in s/km (slowest first)
+    or an RPE band; neither when the reference is not known yet."""
+
+    position: int
+    workout: str
+    role: Literal["key", "flagship", "test"]
+    reps: int | None
+    rep_seconds: int | None
+    recovery_seconds: int | None
+    pace_s: list[float] | None
+    rpe: list[float] | None
+
+
+class PlanWeek(TypedDict):
+    week: str
+    monday: str
+    phase: Literal["recovery", "development", "specific", "taper", "general", "rebuild"]
+    deload: bool
+    volume_km: float
+    long_run_km: float
+    qualities: int
+    #: The long run's part at an intensity, in km; None without one.
+    segment_km: float | None
+    keys: list[PlanKey]
+    state: Literal["done", "current", "upcoming"]
+    #: The week's program is written: the Week screen opens it.
+    written: bool
+
+
+class PlanRisk(TypedDict):
+    kind: Literal["window_short", "specific_short", "time_bound", "arrival_unreached",
+                  "below_domain"]
+    value: float
+    reference: float
+    workout: str
+    phase: str | None
+
+
+class PlanRace(TypedDict):
+    name: str
+    date: str
+
+
+class PlanCycle(TypedDict):
+    kind: Literal["preparation", "general", "recovery", "rebuild"]
+    level: Literal["progress", "maintain", "light"] | None
+    version: int
+    candidate: str
+    race: PlanRace | None
+    weeks: list[PlanWeek]
+    risks: list[PlanRisk]
+    #: What follows the cycle: the next general block, the recovery after the race, the
+    #: general preparation after a recovery or a rebuild.
+    next: Literal["block", "recovery", "general"]
+
+
+class PlanProposalSummary(TypedDict):
+    id: str
+    race: PlanRace | None
+    weeks: int
+    starts_on: str
+    peak_km: float
+    expires_on: str
+
+
+class PlanView(TypedDict):
+    current_week: str
+    #: None before the planner writes the first version.
+    cycle: PlanCycle | None
+    proposal: PlanProposalSummary | None
+
+
+class PlanAlternative(TypedDict):
+    option: str
+    rejected_because: str
+
+
+class PlanChange(TypedDict):
+    """The cycle in force against the proposal: its kind, its highest weekly volume and its
+    most quality sessions a week; None without a cycle in force."""
+
+    kind: Literal["preparation", "general", "recovery", "rebuild"] | None
+    volume_km: float | None
+    qualities: int | None
+
+
+class CycleProposalView(TypedDict):
+    id: str
+    candidate: str
+    race: PlanRace | None
+    weeks: list[PlanWeek]
+    peak_km: float
+    long_run_km: float
+    flagships: int
+    risks: list[PlanRisk]
+    current: PlanChange
+    alternatives: list[PlanAlternative]
+    proposed_on: str
+    expires_on: str

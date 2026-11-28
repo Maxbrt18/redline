@@ -98,6 +98,13 @@ class Cycles(StoreBase):
                 cycle_versions.c.athlete_id == self.athlete_id,
                 cycle_versions.c.taken_at.is_not(None))).scalar_one_or_none()
 
+    def cycle_decision(self, version_id: uuid.UUID) -> dict | None:
+        """The typed decision a version was written with."""
+        with self.database.engine.connect() as connection:
+            return connection.execute(sa.select(cycle_versions.c.decision).where(
+                cycle_versions.c.athlete_id == self.athlete_id,
+                cycle_versions.c.id == version_id)).scalar_one_or_none()
+
     def has_cycle_in(self, connection: Connection) -> bool:
         """Whether the instance ever had a version."""
         return connection.execute(sa.select(sa.exists().where(

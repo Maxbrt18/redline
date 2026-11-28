@@ -1,0 +1,382 @@
+{
+  "id": "6b1d6c2e-5c3a-4a8e-9f00-1f2a3b4c5d6e",
+  "candidate": "balanced",
+  "race": {
+    "name": "Semi des Berges",
+    "date": "2026-12-06"
+  },
+  "weeks": [
+    {
+      "week": "2026-W37",
+      "monday": "2026-09-07",
+      "phase": "development",
+      "deload": false,
+      "volume_km": 30.0,
+      "long_run_km": 9.0,
+      "qualities": 1,
+      "segment_km": null,
+      "keys": [
+        {
+          "position": 0,
+          "workout": "test",
+          "role": "test",
+          "reps": null,
+          "rep_seconds": null,
+          "recovery_seconds": null,
+          "pace_s": null,
+          "rpe": null
+        }
+      ],
+      "state": "upcoming",
+      "written": false
+    },
+    {
+      "week": "2026-W38",
+      "monday": "2026-09-14",
+      "phase": "development",
+      "deload": false,
+      "volume_km": 31.5,
+      "long_run_km": 9.4,
+      "qualities": 1,
+      "segment_km": null,
+      "keys": [
+        {
+          "position": 1,
+          "workout": "threshold",
+          "role": "key",
+          "reps": 3,
+          "rep_seconds": 480,
+          "recovery_seconds": 60,
+          "pace_s": [
+            264.0,
+            252.0
+          ],
+          "rpe": null
+        }
+      ],
+      "state": "upcoming",
+      "written": false
+    },
+    {
+      "week": "2026-W39",
+      "monday": "2026-09-21",
+      "phase": "development",
+      "deload": false,
+      "volume_km": 31.5,
+      "long_run_km": 9.4,
+      "qualities": 1,
+      "segment_km": null,
+      "keys": [
+        {
+          "position": 1,
+          "workout": "hills",
+          "role": "key",
+          "reps": 6,
+          "rep_seconds": 45,
+          "recovery_seconds": 60,
+          "pace_s": null,
+          "rpe": [
+            7.0,
+            8.0
+          ]
+        }
+      ],
+      "state": "upcoming",
+      "written": false
+    },
+    {
+      "week": "2026-W40",
+      "monday": "2026-09-28",
+      "phase": "development",
+      "deload": false,
+      "volume_km": 33.0,
+      "long_run_km": 9.9,
+      "qualities": 1,
+      "segment_km": null,
+      "keys": [
+        {
+          "position": 1,
+          "workout": "threshold",
+          "role": "key",
+          "reps": 3,
+          "rep_seconds": 600,
+          "recovery_seconds": 60,
+          "pace_s": [
+            264.0,
+            252.0
+          ],
+          "rpe": null
+        }
+      ],
+      "state": "upcoming",
+      "written": false
+    },
+    {
+      "week": "2026-W41",
+      "monday": "2026-10-05",
+      "phase": "development",
+      "deload": false,
+      "volume_km": 33.0,
+      "long_run_km": 9.9,
+      "qualities": 1,
+      "segment_km": null,
+      "keys": [
+        {
+          "position": 1,
+          "workout": "threshold",
+          "role": "key",
+          "reps": 3,
+          "rep_seconds": 600,
+          "recovery_seconds": 60,
+          "pace_s": [
+            264.0,
+            252.0
+          ],
+          "rpe": null
+        }
+      ],
+      "state": "upcoming",
+      "written": true
+    },
+    {
+      "week": "2026-W42",
+      "monday": "2026-10-12",
+      "phase": "development",
+      "deload": true,
+      "volume_km": 24.8,
+      "long_run_km": 7.4,
+      "qualities": 1,
+      "segment_km": null,
+      "keys": [
+        {
+          "position": 1,
+          "workout": "hills",
+          "role": "key",
+          "reps": 6,
+          "rep_seconds": 45,
+          "recovery_seconds": 60,
+          "pace_s": null,
+          "rpe": [
+            7.0,
+            8.0
+          ]
+        }
+      ],
+      "state": "upcoming",
+      "written": true
+    },
+    {
+      "week": "2026-W43",
+      "monday": "2026-10-19",
+      "phase": "specific",
+      "deload": false,
+      "volume_km": 33.0,
+      "long_run_km": 9.9,
+      "qualities": 1,
+      "segment_km": 3.0,
+      "keys": [
+        {
+          "position": 1,
+          "workout": "race-pace",
+          "role": "key",
+          "reps": 3,
+          "rep_seconds": 600,
+          "recovery_seconds": 60,
+          "pace_s": [
+            258.0,
+            254.0
+          ],
+          "rpe": null
+        }
+      ],
+      "state": "upcoming",
+      "written": false
+    },
+    {
+      "week": "2026-W44",
+      "monday": "2026-10-26",
+      "phase": "specific",
+      "deload": false,
+      "volume_km": 34.5,
+      "long_run_km": 10.9,
+      "qualities": 2,
+      "segment_km": 3.0,
+      "keys": [
+        {
+          "position": 1,
+          "workout": "race-pace",
+          "role": "key",
+          "reps": 4,
+          "rep_seconds": 600,
+          "recovery_seconds": 60,
+          "pace_s": [
+            258.0,
+            254.0
+          ],
+          "rpe": null
+        },
+        {
+          "position": 2,
+          "workout": "threshold",
+          "role": "key",
+          "reps": 3,
+          "rep_seconds": 720,
+          "recovery_seconds": 60,
+          "pace_s": [
+            264.0,
+            252.0
+          ],
+          "rpe": null
+        }
+      ],
+      "state": "upcoming",
+      "written": false
+    },
+    {
+      "week": "2026-W45",
+      "monday": "2026-11-02",
+      "phase": "specific",
+      "deload": false,
+      "volume_km": 34.5,
+      "long_run_km": 10.9,
+      "qualities": 1,
+      "segment_km": 3.0,
+      "keys": [
+        {
+          "position": 1,
+          "workout": "race-pace",
+          "role": "key",
+          "reps": 3,
+          "rep_seconds": 900,
+          "recovery_seconds": 60,
+          "pace_s": [
+            258.0,
+            254.0
+          ],
+          "rpe": null
+        }
+      ],
+      "state": "upcoming",
+      "written": false
+    },
+    {
+      "week": "2026-W46",
+      "monday": "2026-11-09",
+      "phase": "specific",
+      "deload": true,
+      "volume_km": 25.9,
+      "long_run_km": 8.2,
+      "qualities": 1,
+      "segment_km": null,
+      "keys": [
+        {
+          "position": 1,
+          "workout": "race-pace",
+          "role": "key",
+          "reps": 3,
+          "rep_seconds": 900,
+          "recovery_seconds": 60,
+          "pace_s": [
+            258.0,
+            254.0
+          ],
+          "rpe": null
+        }
+      ],
+      "state": "upcoming",
+      "written": false
+    },
+    {
+      "week": "2026-W47",
+      "monday": "2026-11-16",
+      "phase": "specific",
+      "deload": false,
+      "volume_km": 36.0,
+      "long_run_km": 12.0,
+      "qualities": 1,
+      "segment_km": 3.0,
+      "keys": [
+        {
+          "position": 1,
+          "workout": "race-pace",
+          "role": "flagship",
+          "reps": 2,
+          "rep_seconds": 1500,
+          "recovery_seconds": 60,
+          "pace_s": [
+            258.0,
+            254.0
+          ],
+          "rpe": null
+        }
+      ],
+      "state": "upcoming",
+      "written": false
+    },
+    {
+      "week": "2026-W48",
+      "monday": "2026-11-23",
+      "phase": "taper",
+      "deload": false,
+      "volume_km": 21.2,
+      "long_run_km": 7.1,
+      "qualities": 1,
+      "segment_km": null,
+      "keys": [
+        {
+          "position": 1,
+          "workout": "race-pace",
+          "role": "key",
+          "reps": 3,
+          "rep_seconds": 480,
+          "recovery_seconds": 60,
+          "pace_s": [
+            258.0,
+            254.0
+          ],
+          "rpe": null
+        }
+      ],
+      "state": "upcoming",
+      "written": false
+    },
+    {
+      "week": "2026-W49",
+      "monday": "2026-11-30",
+      "phase": "taper",
+      "deload": false,
+      "volume_km": 14.4,
+      "long_run_km": 0.0,
+      "qualities": 0,
+      "segment_km": null,
+      "keys": [],
+      "state": "upcoming",
+      "written": false
+    }
+  ],
+  "peak_km": 36.0,
+  "long_run_km": 12.0,
+  "flagships": 1,
+  "risks": [
+    {
+      "kind": "time_bound",
+      "value": 36.0,
+      "reference": 38.0,
+      "workout": "",
+      "phase": null
+    }
+  ],
+  "current": {
+    "kind": "general",
+    "volume_km": 32.0,
+    "qualities": 1
+  },
+  "alternatives": [
+    {
+      "option": "cautious",
+      "rejected_because": "4 semaines de spécifique laissent l’allure courte"
+    }
+  ],
+  "proposed_on": "2026-08-30",
+  "expires_on": "2026-09-06"
+}
