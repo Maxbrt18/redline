@@ -1,8 +1,7 @@
 Fais le recul du mois terminé : calcule km, D+, séances et évolution
 des six capacités, puis génère `redline chart-month` avec `period` au format YYYY-MM du mois terminé. Juge le RÉSULTAT, pas le
-processus : pour chaque capacité, a-t-elle bougé ce mois-ci, et la trajectoire de la
-sortie longue (`redline ledger --week <W> --long-run-target <km visés avant l'affûtage>`)
-mène-t-elle à la course ? Une capacité immobile deux mois de suite est un point du
+processus : pour chaque capacité, a-t-elle bougé ce mois-ci, et la sortie longue
+suit-elle la trame du cycle en cours (`redline cycle show`, hypothèses de la version) ? Une capacité immobile deux mois de suite est un point du
 recul, même si chaque semaine était défendable. Lis aussi
 la calibration de `redline fact-read predictions` : des réfutées surtout optimistes
 font attaquer en premier, au prochain rituel de confrontation, la décision active du

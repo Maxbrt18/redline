@@ -79,6 +79,8 @@ OUTCOMES = {"replan": "replanification : une revue du plan propose une nouvelle 
 FALLEN_TEXT = {
     "volume_held": "volume : depuis le départ actuel, la rampe n'atteint que {value} km/sem "
                    "pour un pic de {reference} km/sem",
+    "long_run_held": "sortie longue : depuis la plus longue récente, le pas n'atteint que "
+                     "{value} km pour une SL de {reference} km",
     "lineage_position": "{workout} : {value} cran(s) de retard sur sa dernière dose, pour "
                         "{reference} exposition(s) qui progressent encore",
     "availability": "temps disponible : {value} min/sem au lieu de {reference}, une semaine "

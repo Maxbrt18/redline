@@ -8,7 +8,7 @@ import uuid
 
 from redline.model import cycle_templates, hypotheses, iso_week
 from redline.model import plan_generator as generator
-from redline.model.hypotheses import Fallen, Observed
+from redline.model.hypotheses import ClosedWeek, Fallen, Observed
 from redline.model.progression import Dose
 from redline.model.vocabulary import (
     GeneralLevel,
@@ -39,12 +39,17 @@ def _trame(inputs: generator.Inputs = INPUTS, goal: generator.Goal = GOAL) -> ge
                                  inputs, candidate="balanced")
 
 
-def _ran(trame: generator.Trame, today: dt.date) -> tuple[tuple[str, float], ...]:
+def _ran(trame: generator.Trame, today: dt.date) -> tuple[ClosedWeek, ...]:
     """Every closed week of the trame run as planned, deloads and taper left out, newest
     first."""
     current = iso_week.of(today)
-    return tuple((week.label, week.volume_km) for week in reversed(trame.weeks)
+    return tuple(ClosedWeek(week.label, week.volume_km, week.long_run_km)
+                 for week in reversed(trame.weeks)
                  if week.label < current and not week.deload and week.phase != PlanPhase.TAPER)
+
+
+def _weeks(*ran: tuple[str, float, float]) -> tuple[ClosedWeek, ...]:
+    return tuple(ClosedWeek(*week) for week in ran)
 
 
 def _observed(trame: generator.Trame, today: dt.date = SPECIFIC_DAY, **changes) -> Observed:
@@ -65,21 +70,21 @@ def test_a_preparation_run_as_planned_holds():
 
 def test_only_a_preparation_is_checked():
     general = generator.general(TEMPLATES.general_at(GeneralLevel.MAINTAIN), INPUTS)
-    assert hypotheses.check(general, _observed(_trame(), volumes=()), TEMPLATES) \
+    assert hypotheses.check(general, _observed(_trame(), weeks=()), TEMPLATES) \
         == hypotheses.HOLDS
 
 
 def test_one_short_week_never_drops_the_volume():
     trame = _trame()
-    volumes = (("2031-W09", 40.0), ("2031-W08", 48.4))
-    review = hypotheses.check(trame, _observed(trame, volumes=volumes), TEMPLATES)
+    weeks = _weeks(("2031-W09", 40.0, 16.0), ("2031-W08", 48.4, 14.5))
+    review = hypotheses.check(trame, _observed(trame, weeks=weeks), TEMPLATES)
     assert HypothesisKind.VOLUME_HELD not in _kinds(review)
 
 
 def test_two_short_weeks_from_which_the_ramp_misses_the_peak_drop_the_volume():
     trame = _trame()
-    volumes = (("2031-W09", 40.0), ("2031-W08", 40.0))
-    review = hypotheses.check(trame, _observed(trame, volumes=volumes), TEMPLATES)
+    weeks = _weeks(("2031-W09", 40.0, 16.0), ("2031-W08", 40.0, 14.5))
+    review = hypotheses.check(trame, _observed(trame, weeks=weeks), TEMPLATES)
     assert review.outcome == HypothesisOutcome.REPLAN
     # From 2031-W09, two build weeks climb to the peak of 2031-W12, the deload aside.
     assert review.fallen == (Fallen(HypothesisKind.VOLUME_HELD, round(40 * 1.1 ** 2, 1),
@@ -88,25 +93,37 @@ def test_two_short_weeks_from_which_the_ramp_misses_the_peak_drop_the_volume():
 
 def test_two_short_weeks_the_ramp_still_lifts_to_the_peak_hold():
     trame = _trame()
-    volumes = (("2031-W09", 50.0), ("2031-W08", 45.0))
-    review = hypotheses.check(trame, _observed(trame, volumes=volumes), TEMPLATES)
+    weeks = _weeks(("2031-W09", 50.0, 16.0), ("2031-W08", 45.0, 14.5))
+    review = hypotheses.check(trame, _observed(trame, weeks=weeks), TEMPLATES)
     assert review == hypotheses.HOLDS
 
 
 def test_the_volume_is_not_read_before_two_weeks_of_the_version_have_closed():
     trame = _trame()
     review = hypotheses.check(trame, _observed(trame, dt.date(2031, 1, 15),
-                                               volumes=(("2031-W02", 10.0),
-                                                        ("2031-W01", 10.0))), TEMPLATES)
+                                               weeks=_weeks(("2031-W02", 10.0, 5.0),
+                                                            ("2031-W01", 10.0, 5.0))),
+                              TEMPLATES)
     assert review == hypotheses.HOLDS
 
 
 def test_once_the_peak_has_passed_the_volume_is_not_checked():
     trame = _trame()
     day = dt.date(2031, 3, 26)
-    volumes = (("2031-W12", 20.0), ("2031-W10", 20.0))
-    review = hypotheses.check(trame, _observed(trame, day, volumes=volumes), TEMPLATES)
-    assert HypothesisKind.VOLUME_HELD not in _kinds(review)
+    weeks = _weeks(("2031-W12", 20.0, 8.0), ("2031-W10", 20.0, 8.0))
+    review = hypotheses.check(trame, _observed(trame, day, weeks=weeks), TEMPLATES)
+    assert not _kinds(review) & {HypothesisKind.VOLUME_HELD, HypothesisKind.LONG_RUN_HELD}
+
+
+def test_two_weeks_whose_long_runs_the_step_cannot_lift_drop_the_long_run():
+    trame = _trame()
+    short = _weeks(("2031-W09", 53.2, 12.0), ("2031-W08", 48.4, 11.0))
+    review = hypotheses.check(trame, _observed(trame, weeks=short), TEMPLATES)
+    # From 2031-W09, two build weeks lift the long run to the 17.6 km of 2031-W12.
+    assert review.fallen == (Fallen(HypothesisKind.LONG_RUN_HELD, round(12 * 1.1 ** 2, 1),
+                                    17.6),)
+    one = _weeks(("2031-W09", 53.2, 12.0), ("2031-W08", 48.4, 14.5))
+    assert hypotheses.check(trame, _observed(trame, weeks=one), TEMPLATES) == hypotheses.HOLDS
 
 
 def test_a_lineage_too_far_behind_its_last_planned_dose_drops_its_position():

@@ -22,10 +22,6 @@ STALL = (
     "{head}Plus longue sans nouveau record depuis {weeks} semaine(s) close(s) — record "
     "{record_km:.1f} km en {record_week}")
 
-PROJECTION = (
-    "Course du {race_on:%d/%m} : {weeks} semaine(s) utile(s) avant l'affûtage "
-    "({taper_from}), depuis {start_km:.1f} km (plus longue des 30 j).")
-
 REPORT_WEEK = "Semaine {label}"
 
 REPORT_VOLUME = "Volume : {week_volume}"
@@ -78,17 +74,6 @@ STALL_RULE_S9 = (
 
 PLANNED_GAP = "{session} {planned:.1f} km = {gap:+.0f} % de {longest:.1f} km (plus longue des 30 j)"
 
-PROJECTION_NO_TARGET = (
-    "Cible de sortie longue non fournie (--long-run-target KM) : rythme nécessaire non "
-    "calculé.")
-
-PROJECTION_EVERY_WEEK = "toutes les semaines"
-
-PROJECTION_WEEKS_LOST = "{lost} semaine(s) sans hausse"
-
-PROJECTION_REQUIRED_NOTE = (
-    ". Un rythme, pas une règle : il se juge sur la tolérance observée et l'historique.")
-
 REPORT_DESCENT = "D− de la semaine : {dminus} m — c'est LUI que compte la jauge"
 
 REPORT_ABOVE_RANGE = "⚠ au-dessus du RPE attendu — {overshoot}"
@@ -127,8 +112,6 @@ GATE_SLEEP = "sommeil {sleep}"
 
 PLANNED_NO_RECENT_RUN = "{session} {planned:.1f} km : aucune course dans les 30 j, écart non calculable"
 
-PROJECTION_REQUIRED = "Pour {target_km:.1f} km avant l'affûtage, il faut en moyenne "
-
 REPORT_PAIN = "Douleur {label} : {trend}"
 
 REPORT_ESCULIER = "⚠ Esculier {zone_prefix}{flag}"
@@ -148,14 +131,6 @@ ESCULIER_OVER_CAP = "AU-DESSUS DU PLAFOND"
 ESCULIER_OVER_CAP_DETAIL = "{type} à {pain}/10 > {esculier_cap} → réduction immédiate"
 
 GATE_HR_HIGH = "FC des footings haute : "
-
-PROJECTION_IMPOSSIBLE = "impossible"
-
-PROJECTION_GROWTH = "+{percent:.0f} %/sem"
-
-REPORT_NO_RACE = (
-    "Projection course : aucune course typée (redline fact-write deadline --kind race) — "
-    "rien à projeter.")
 
 TREND_NOTHING = "    rien à signaler"
 

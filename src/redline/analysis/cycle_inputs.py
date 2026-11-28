@@ -27,6 +27,7 @@ from redline.model import iso_week, rulebook, session_kinds, week_days
 from redline.model.cycle_templates import CycleTemplates
 from redline.model.cycle_transitions import Standing
 from redline.model.errors import ConfigError
+from redline.model.hypotheses import ClosedWeek
 from redline.model.plan_generator import Goal, Inputs
 from redline.model.progression import Dose
 from redline.model.race import Race
@@ -141,17 +142,23 @@ def standing(store: Any, templates: CycleTemplates, today: dt.date,
                     round(floor, 1))
 
 
-def closed_volumes(store: Any, today: dt.date, planned_low: Collection[str],
-                   weeks: int) -> tuple[tuple[str, float], ...]:
-    """The running volume of each of the last `weeks` closed weeks before `today`, newest
-    first, the assimilation weeks and the weeks a cycle planned low left out."""
+def closed_weeks(store: Any, today: dt.date, planned_low: Collection[str],
+                 weeks: int) -> tuple[ClosedWeek, ...]:
+    """Each of the last `weeks` closed weeks before `today` as run, newest first, the
+    assimilation weeks and the weeks a cycle planned low left out."""
     parameters = _parameters()
     rows = ledger.parse_ledger(store)
     current = iso_week.of(today)
     skipped = set(parameters.assimilation_weeks) | set(planned_low)
     labels = [week for week in (iso_week.shift(current, -offset)
                                 for offset in range(1, weeks + 1)) if week not in skipped]
-    return tuple(zip(labels, _volumes(rows, labels), strict=True))
+    return tuple(ClosedWeek(label, km, _longest(rows, label))
+                 for label, km in zip(labels, _volumes(rows, labels), strict=True))
+
+
+def _longest(rows: list[ledger.Row], week: str) -> float:
+    return max((row.km or 0.0 for row in rows
+                if row.week == week and row.type in ledger.RUN_TYPES), default=0.0)
 
 
 def _round(value: float | None) -> float | None:

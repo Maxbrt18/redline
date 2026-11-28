@@ -42,8 +42,6 @@ def main() -> int:
     parser.add_argument("--week", dest="week", help="e.g. 2030-W30")
     parser.add_argument("--pain-trend", dest="pain_weeks", type=int, metavar="N")
     parser.add_argument("--csv", action="store_true", help="normalised export on stdout")
-    parser.add_argument("--long-run-target", dest="target_km", type=float, metavar="KM",
-                        help="long-run distance to reach before the taper")
     args = parser.parse_args()
 
     store = open_store("ledger-gauge")
@@ -92,8 +90,8 @@ def main() -> int:
         label = max(per_week)
 
     print()
-    for line in week_review.week_report(store, rows, instruments, above, label, dt.date.today(),
-                            target_km=args.target_km):
+    for line in week_review.week_report(store, rows, instruments, above, label,
+                                        dt.date.today()):
         print(f"  {line}" if line else "")
     print()
     return 0

@@ -613,11 +613,12 @@ class CycleCause(StrEnum):
 
 class HypothesisKind(StrEnum):
     """What a preparation's version holds as long as it does (`redline.model.hypotheses`):
-    the peak its volume climbs to, the doses its key sessions reach, the time the habits
-    leave, the race it prepares, the goal time and the calibration its paces are rendered
-    from."""
+    the peak its volume and its long run climb to, the doses its key sessions reach, the
+    time the habits leave, the race it prepares, the goal time and the calibration its
+    paces are rendered from."""
 
     VOLUME_HELD = "volume_held"
+    LONG_RUN_HELD = "long_run_held"
     LINEAGE_POSITION = "lineage_position"
     AVAILABILITY = "availability"
     GOAL = "goal"
