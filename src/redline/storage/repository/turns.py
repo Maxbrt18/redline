@@ -390,7 +390,7 @@ class TurnCommands(StravaIntake, Strength, Proposals, Days, Cycles):
         expires = dt.datetime.fromisoformat(payload["expires_at"])
         version = self.propose_cycle_in(connection, cycle_model.from_payload(payload["trame"]),
                                         payload["decision"], payload["race_key"], expires,
-                                        actor=actor)
+                                        fallen=payload.get("fallen") or (), actor=actor)
         self.offer_cycle_in(connection, version, payload["race"], expires, now)
         return str(version.id)
 

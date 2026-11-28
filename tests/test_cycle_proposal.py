@@ -15,7 +15,12 @@ from redline.model import plan_generator as generator
 from redline.model import race as race_model
 from redline.model.cycles import CycleVersion
 from redline.model.errors import InputError
-from redline.model.vocabulary import CycleCause, CycleVersionState, GeneralLevel
+from redline.model.vocabulary import (
+    CycleCause,
+    CycleVersionState,
+    GeneralLevel,
+    HypothesisKind,
+)
 from redline.service.delivery import (
     EnvelopeBuilder,
     StoredDelivery,
@@ -74,6 +79,15 @@ def test_a_lower_peak_may_be_chosen_never_a_higher_one():
     assert lower.levers is not None and lower.levers.peak_km == proposed - 3
     with pytest.raises(InputError, match="never a higher one"):
         cycle_choice.proposal(_store(), day, "balanced", proposed + 1)
+
+
+def test_a_proposal_made_while_the_goal_s_preparation_is_in_force_carries_what_fell():
+    start = trajectory.window_start()
+    lived = trajectory.simulate(short={2: 0.6, 3: 0.6}, through=iso_week.shift(start, 4))
+    race = race_model.typed(lived.store)[0]
+    day = trajectory.review_day(iso_week.shift(start, 5))
+    assert cycle_choice.fallen(lived.store, day, race) == (HypothesisKind.VOLUME_HELD,)
+    assert cycle_choice.fallen(_store(), day, race) == (), "no preparation in force"
 
 
 def test_a_level_is_the_general_preparation_s_and_changes_it():

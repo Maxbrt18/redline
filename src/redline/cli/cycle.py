@@ -9,7 +9,8 @@ paces are rendered from the calibration in force (`redline.analysis.cycle_report
 
 `propose` writes a candidate of the goal's preparation as a proposal, open for the
 rulebook's `cycle_proposal_days`, a lower `--peak-km` if chosen: the athlete takes it,
-never the coach. `level` writes the general preparation at another level from next week.
+never the coach. Proposed while the goal's preparation is in force, it is its replanning,
+and carries the hypotheses that fell. `level` writes the general preparation at another level from next week.
 Both carry their typed decision (`--decision`, as a revision's).
 
     redline cycle show
@@ -105,7 +106,8 @@ def _write(store, args, today: dt.date) -> str:
                                       tzinfo=dt.UTC)
         kind, payload = commands.CYCLE_PROPOSE, {
             "trame": cycle_model.payload_of(trame), "decision": decision,
-            "race_key": race.key, "race": race.name, "expires_at": expires.isoformat()}
+            "race_key": race.key, "race": race.name, "expires_at": expires.isoformat(),
+            "fallen": [str(found) for found in cycle_choice.fallen(store, today, race)]}
         done = text.PROPOSED.format(candidate=args.candidate, race=race.name,
                                     on=expires.date())
     else:

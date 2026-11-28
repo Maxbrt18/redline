@@ -370,6 +370,26 @@ def _taken(store, on=dt.date(2030, 6, 30)):
         return store.take_cycle_in(connection, proposed.id, NOW)
 
 
+def _cause(store, version_id) -> dict:
+    with store.database.engine.connect() as connection:
+        return connection.execute(sa.select(cycle_versions.c.cause).where(
+            cycle_versions.c.id == version_id)).scalar_one()
+
+
+def test_a_replan_is_the_preparation_s_next_version_and_supersedes_it_once_taken(store):
+    first = _taken(store)
+    assert first.cause == CycleCause.CREATE and first.version == 1
+    with store.database.transaction() as connection:
+        replan = store.propose_cycle_in(connection, _proposal_trame(), {"by": "judgment"},
+                                        "half", NOW + dt.timedelta(days=7),
+                                        fallen=["volume_held", "goal"])
+        assert (replan.cycle_key, replan.version) == (first.cycle_key, 2)
+        taken = store.take_cycle_in(connection, replan.id, NOW)
+    assert taken is not None and taken.cause == CycleCause.REPLAN
+    assert _cause(store, replan.id) == {"kind": "replan", "fallen": ["goal", "volume_held"]}
+    assert store.cycle_version(first.id).state == "superseded"
+
+
 def test_the_planner_asks_once_for_the_review_a_moved_race_calls_for(store):
     taken = _taken(store)
     state = PostgresStateStore(store.database)
