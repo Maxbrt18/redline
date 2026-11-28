@@ -52,9 +52,9 @@ LEFT_UNRUN = frozenset({RaceState.CANCELLED, RaceState.DROPPED})
 class Standing:
     """Where the athlete stands, over the closed weeks the start reads.
 
-    `run_km`: the mean weekly running volume, assimilation weeks left out. `start_km`: the
-    same, the weeks a cycle planned low (recovery, rebuild) left out too, None when every
-    one is. `floor_km`: the rebuild's floor."""
+    `run_km`: the mean weekly running volume. `start_km`: the same, the weeks a cycle
+    planned low (a deload, a taper, a recovery, a rebuild) left out, None when every one
+    is. `floor_km`: the rebuild's floor."""
 
     run_km: float
     start_km: float | None

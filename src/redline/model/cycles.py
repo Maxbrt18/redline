@@ -43,6 +43,9 @@ from .vocabulary import (
     RaceTerrain,
 )
 
+#: The kinds of cycle whose every week is planned low.
+LOW_KINDS = (CycleKind.RECOVERY, CycleKind.REBUILD)
+
 
 @dataclass(frozen=True)
 class CycleVersion:

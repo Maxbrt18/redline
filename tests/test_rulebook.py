@@ -71,7 +71,7 @@ def test_the_wake_trace_cutoff_is_a_local_time():
     (("plafond {pain_cap}/10", "plafond {douleur_max}/10"), "unknown threshold douleur_max"),
     (('id = "n8"', 'id = "n9"'), "missing from the rulebook: n8"),
     (('slug = "terrain"', 'slug = "descent"'), "duplicate transition: descent"),
-    (("assimilation_weeks = []", 'assimilation_weeks = ["W35"]'), "ISO week"),
+    (("gear_alert_pct = 90\n", "gear_alert_pct = 90\nassimilation_weeks = []\n"), "unknown"),
     (('slug = "terrain"', 'slug = "Terrain neuf"'), "slug"),
     (('wake_trace_until = "14:00"', 'wake_trace_until = "14h"'), "HH:MM"),
     (("gear_alert_pct = 90\n", ""), "gear_alert_pct"),

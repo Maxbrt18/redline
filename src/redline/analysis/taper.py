@@ -1,8 +1,8 @@
 """The taper, measured: how much the weeks before a race really drop.
 
 `taper_weeks` places the taper; nothing checked that it happened. The reference is the
-mean running volume of the REFERENCE_WEEKS weeks before it, assimilation weeks skipped:
-an assimilation week already drops, and counting it would hide part of the cut. The
+mean running volume of the REFERENCE_WEEKS weeks before it, the weeks a cycle planned low
+skipped: a deload already drops, and counting it would hide part of the cut. The
 race week counts the days before the race only, and never the race itself.
 
 The length and the band are the race's, the rulebook's when it leaves them unsaid
@@ -15,10 +15,12 @@ as it shows, and a loose taper only once the race week is written or over.
 from __future__ import annotations
 
 import datetime as dt
+from collections.abc import Collection
 from dataclasses import dataclass
+from typing import Any
 
 from redline.coach.fr import ledger as text
-from redline.model import iso_week, rulebook, session_kinds, transitions
+from redline.model import iso_week, session_kinds, transitions
 from redline.model import race as race_model
 from redline.model.vocabulary import Decider, RacePriority, RaceState, SessionStatus
 
@@ -27,8 +29,8 @@ from . import ledger
 #: The states of a goal whose taper is read: ahead, or run.
 TAPERED = frozenset({RaceState.ACTIVE, RaceState.RUN})
 REFERENCE_WEEKS = 2
-#: Weeks searched back for the reference before giving up: a long block of assimilation
-#: weeks means no comparable load.
+#: Weeks searched back for the reference before giving up: a long block of weeks planned
+#: low means no comparable load.
 REFERENCE_SEARCH_WEEKS = 6
 #: Runs the taper may drop below the reference frequency, race week aside: the taper
 #: keeps its frequency and cuts each session.
@@ -50,11 +52,11 @@ class Window:
         return self.weeks[-1]
 
 
-def window(race: race_model.Race) -> Window:
+def window(race: race_model.Race, planned_low: Collection[str] = ()) -> Window:
     race_week = iso_week.of(race.on)
     weeks = tuple(iso_week.shift(race_week, -offset)
                   for offset in reversed(range(race.taper_weeks)))
-    skipped = set(rulebook.current().parameters.assimilation_weeks)
+    skipped = set(planned_low) - set(weeks)
     reference: list[str] = []
     for back in range(1, REFERENCE_SEARCH_WEEKS + 1):
         week = iso_week.shift(weeks[0], -back)
@@ -65,13 +67,13 @@ def window(race: race_model.Race) -> Window:
     return Window(race=race, weeks=weeks, reference=tuple(reference))
 
 
-def race_window(store: ledger.LedgerStore, week: str) -> Window | None:
+def race_window(store: Any, week: str) -> Window | None:
     """The goal whose taper holds `week`, run or still ahead: a race of priority A, active
     or run. A race B or C, or one cancelled or abandoned, binds no taper band."""
     for race in race_model.typed(store):
         if race.priority != RacePriority.A or race.state not in TAPERED:
             continue
-        found = window(race)
+        found = window(race, store.planned_low_weeks())
         if week in found.weeks:
             return found
     return None
@@ -175,7 +177,7 @@ def _closed(frame: Window, week: str, today: dt.date, closing: str | None) -> bo
     return week == closing or iso_week.monday(week) + dt.timedelta(days=7) <= today
 
 
-def report_lines(store: ledger.LedgerStore, rows: list[ledger.Row], label: str,
+def report_lines(store: Any, rows: list[ledger.Row], label: str,
                  today: dt.date, closing: bool = False) -> list[str]:
     """The drop so far, for a week of the taper. Only closed weeks are judged: a week
     in progress is shown, never compared, since its first days would read as a deep

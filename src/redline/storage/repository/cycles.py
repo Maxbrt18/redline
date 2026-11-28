@@ -17,7 +17,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Connection
 
 from redline.model import cycles as cycle_model
-from redline.model.cycles import CycleVersion
+from redline.model.cycles import LOW_KINDS, CycleVersion
 from redline.model.plan_generator import Trame
 from redline.model.vocabulary import (
     CycleCause,
@@ -38,8 +38,6 @@ from ..schema import (
 )
 from ._common import StoreBase, _audit, _jsonable, _native, _request_projection, _uuid
 
-#: The kinds of cycle whose weeks are planned low: they are not a start.
-LOW_KINDS = (CycleKind.RECOVERY, CycleKind.REBUILD)
 #: The causes that write a new version of the cycle in force rather than a new cycle.
 SAME_CYCLE = (CycleCause.BLOCK_END, CycleCause.LEVEL_CHANGE)
 

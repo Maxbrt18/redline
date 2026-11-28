@@ -3,7 +3,8 @@
 The only reader of the store for the plan generator (`redline.model.plan_generator`): it
 gathers, for a cycle starting the week after `today`,
 - where the athlete stands: the mean weekly running volume of the closed weeks before,
-  the planned assimilation weeks left out, raised to the rebuild's floor, and the longest
+  the weeks a cycle planned low left out (all of them when every one was), raised to the
+  rebuild's floor, and the longest
   run of the last 30 days;
 - the highest weekly volume held over `cycle_held_weeks` closed weeks;
 - the minutes the athlete's weekly habits leave for running, when every running day
@@ -118,13 +119,10 @@ def _parameters() -> rulebook.Parameters:
     return parameters
 
 
-def _closed(today: dt.date, parameters: rulebook.Parameters) -> list[str]:
-    """The closed weeks the start reads, assimilation weeks left out."""
+def _closed(today: dt.date) -> list[str]:
+    """The closed weeks the start reads."""
     current = iso_week.of(today)
-    assimilation = set(parameters.assimilation_weeks)
-    return [week for week in (iso_week.shift(current, -offset)
-                              for offset in range(1, START_WEEKS + 1))
-            if week not in assimilation]
+    return [iso_week.shift(current, -offset) for offset in range(1, START_WEEKS + 1)]
 
 
 def _held(rows: list[ledger.Row], today: dt.date, parameters: rulebook.Parameters) -> float:
@@ -144,7 +142,7 @@ def standing(store: Any, templates: CycleTemplates, today: dt.date,
     """Where the athlete stands on `today`; `planned_low`: the weeks a cycle planned low."""
     parameters = _parameters()
     rows = ledger.parse_ledger(store)
-    closed = _closed(today, parameters)
+    closed = _closed(today)
     floor = _held(rows, today, parameters) * templates.rebuild.floor_pct / 100
     return Standing(round(_mean(rows, closed) or 0.0, 1),
                     _round(_mean(rows, [week for week in closed if week not in planned_low])),
@@ -154,13 +152,11 @@ def standing(store: Any, templates: CycleTemplates, today: dt.date,
 def closed_weeks(store: Any, today: dt.date, planned_low: Collection[str],
                  weeks: int) -> tuple[ClosedWeek, ...]:
     """Each of the last `weeks` closed weeks before `today` as run, newest first, the
-    assimilation weeks and the weeks a cycle planned low left out."""
-    parameters = _parameters()
+    weeks a cycle planned low left out."""
     rows = ledger.parse_ledger(store)
     current = iso_week.of(today)
-    skipped = set(parameters.assimilation_weeks) | set(planned_low)
     labels = [week for week in (iso_week.shift(current, -offset)
-                                for offset in range(1, weeks + 1)) if week not in skipped]
+                                for offset in range(1, weeks + 1)) if week not in planned_low]
     return tuple(ClosedWeek(label, km, _longest(rows, label))
                  for label, km in zip(labels, _volumes(rows, labels), strict=True))
 
@@ -183,8 +179,10 @@ def inputs(store: Any, templates: CycleTemplates, today: dt.date) -> Inputs:
     rows = ledger.parse_ledger(store)
     current = iso_week.of(today)
     held = _held(rows, today, parameters)
-    start = max(_mean(rows, _closed(today, parameters)) or 0.0,
-                held * templates.rebuild.floor_pct / 100)
+    closed = _closed(today)
+    planned_low = store.planned_low_weeks()
+    start = max(_mean(rows, [week for week in closed if week not in planned_low] or closed)
+                or 0.0, held * templates.rebuild.floor_pct / 100)
     found = calibration_model.in_force(store.calibration_rows())
     fresh = parameters.calibration_fresh_weeks
     calibrated = (found is not None and found.confidence == CalibrationConfidence.MEASURED

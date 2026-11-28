@@ -146,7 +146,7 @@ class VetoKind(StrEnum):
     QUALITY_HOLD = "quality_hold"
     #: The weeks before a typed race.
     TAPER = "taper"
-    #: An assimilation week of the rulebook (rule n2).
+    #: A week its cycle plans low: a deload, a recovery or a rebuild (rule n2).
     ASSIMILATION = "assimilation"
     #: The week's rise budget is spent (rule n1, one change at a time in a routine).
     BUDGET = "budget"

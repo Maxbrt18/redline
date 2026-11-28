@@ -32,6 +32,9 @@ class Store:
     def deadline_rows(self):
         return self.rows
 
+    def planned_low_weeks(self):
+        return set()
+
 
 def _runs(week, km_each, runs, workout="easy"):
     monday = iso_week.monday(week)
@@ -44,15 +47,11 @@ def _revision(sessions, by="judgment"):
     return {"revision": 1, "sessions": sessions, "decision": {"by": by, "alternatives": []}}
 
 
-def test_the_reference_is_the_two_weeks_before_the_taper_without_assimilation(monkeypatch):
+def test_the_reference_is_the_two_weeks_before_the_taper_without_a_deload():
     frame = taper.window(RACE)
     assert frame.weeks == ("2030-W46", "2030-W47", "2030-W48")
     assert frame.reference == ("2030-W44", "2030-W45")
-    book = rulebook.current()
-    resting = replace(book, parameters=replace(book.parameters,
-                                               assimilation_weeks=("2030-W45",)))
-    monkeypatch.setattr(taper.rulebook, "current", lambda: resting)
-    assert taper.window(RACE).reference == ("2030-W43", "2030-W44")
+    assert taper.window(RACE, {"2030-W45"}).reference == ("2030-W43", "2030-W44")
 
 
 def test_the_drop_is_the_taper_mean_so_far_against_the_reference():
@@ -123,7 +122,7 @@ def test_a_band_the_rulebook_does_not_declare_does_not_apply(monkeypatch):
     book = rulebook.current()
     bare = replace(book, parameters=replace(book.parameters, taper_cut_min_pct=None,
                                             taper_cut_max_pct=None))
-    monkeypatch.setattr(taper.rulebook, "current", lambda: bare)
+    monkeypatch.setattr(rulebook, "current", lambda: bare)
     unbanded = taper.window(race_model.from_row(RACE_ROW))
     assert taper.plan_errors(_history(), unbanded, "2030-W46",
                              _revision(_runs("2030-W46", 3.0, 5))) == []

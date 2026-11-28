@@ -39,8 +39,6 @@ low_desire_checkins = 3
 missed_sessions_signal = 2
 # A pair of shoes raises an alert at this share of its inspection distance (%).
 gear_alert_pct = 90
-# Rule n2: the planned assimilation weeks (ISO weeks). Nothing new is placed in them.
-assimilation_weeks = []
 # Rule f1: no fuelling target above this ceiling (g/h): no gain is shown beyond it.
 carbs_cap_g_h = 90
 # Rule f1: above this target (g/h), the session names a glucose-fructose mix.
@@ -280,7 +278,7 @@ title = "Assimilation"
 text = "-25 à -30 % toutes les 3-4 semaines, fréquence gardée ; on n'y ajoute rien."
 grade = "règle de coaching"
 owner = "coaching/current-plan.md"
-enforced_by = "le coach ; redline feasibility (semaines d'assimilation)"
+enforced_by = "code : les décharges de la trame (gabarit de cycle), où aucune hausse de lignée ne passe ; le coach"
 
 [[rules]]
 id = "n3"

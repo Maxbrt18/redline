@@ -25,6 +25,7 @@ from typing import Any
 from redline.coach.fr import progression as text
 from redline.model import iso_week, program, rulebook
 from redline.model import race as race_model
+from redline.model.cycles import LOW_KINDS
 from redline.model.dose import Dose as SheetDose
 from redline.model.errors import ConfigError
 from redline.model.progression import (
@@ -127,8 +128,10 @@ def vetoes(store: Any, book: rulebook.Rulebook, week: str, today: dt.date) -> tu
         if week in taper:
             found.append(Veto(VetoKind.TAPER, "taper_weeks",
                               f"race {race.on.isoformat()}, taper from {min(taper)}"))
-    if week in book.parameters.assimilation_weeks:
-        found.append(Veto(VetoKind.ASSIMILATION, "n2", f"assimilation week {week}"))
+    version = store.cycle_for_week(week)
+    held = version.week(week) if version is not None else None
+    if held is not None and (held.deload or version.kind in LOW_KINDS):
+        found.append(Veto(VetoKind.ASSIMILATION, "n2", f"{week} planned low by its cycle"))
     return tuple(found)
 
 

@@ -37,7 +37,7 @@ from pathlib import Path
 
 from redline.coach.fr import rulebook as text
 
-from . import formats, iso_week, paths
+from . import formats, paths
 from .errors import ConfigError
 from .pain_scales import SCALES_SCHEMA, PainScales
 from .pain_scales import build as build_scales
@@ -109,8 +109,6 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
               note="sessions missed within the window that raise a signal"),
         field("gear_alert_pct", int, minimum=50, maximum=100,
               note="share of its inspection distance at which a pair raises an alert, in %"),
-        field("assimilation_weeks", list, item=field("week", str, pattern=iso_week.PATTERN,
-                                                     note="ISO week, e.g. 2030-W35")),
         # Optional: an instance rulebook written before them states no fuelling ceiling,
         # and none applies until it declares one.
         field("carbs_cap_g_h", int, required=False, minimum=30, maximum=150,
@@ -319,7 +317,6 @@ class Parameters:
     low_desire_checkins: int
     missed_sessions_signal: int
     gear_alert_pct: int
-    assimilation_weeks: tuple[str, ...]
     carbs_cap_g_h: int | None = None
     carbs_mix_above_g_h: int | None = None
     taper_cut_min_pct: int | None = None
@@ -466,7 +463,7 @@ def parse(text: str, source: Path) -> Rulebook:
         raise RulebookError(str(exc)) from None
     raw = payload["parameters"]
     parameters = Parameters(**{
-        **raw, "assimilation_weeks": tuple(raw["assimilation_weeks"]),
+        **raw,
         "long_run_weekdays": tuple(raw.get("long_run_weekdays") or ()),
         "wake_trace_until": dt.time.fromisoformat(raw["wake_trace_until"]),
         "missed_cutoff": dt.time.fromisoformat(raw["missed_cutoff"]),

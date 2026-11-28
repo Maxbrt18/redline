@@ -67,6 +67,9 @@ class Store:
     def strength_history(self):
         return self.history
 
+    def cycle_for_week(self, week):
+        return None
+
 
 @pytest.fixture
 def no_ledger(monkeypatch):
@@ -389,3 +392,18 @@ def test_the_tally_reads_the_rises_of_an_exercise():
     assert review.lineage == "calf-raise-bent" and review.overrides == ()
     assert review.tally.tolerated == (TODAY - dt.timedelta(days=14),)
     assert review.tally.failed == (TODAY - dt.timedelta(days=7),), "14 reps asked, 13 done"
+
+
+def test_a_week_its_cycle_plans_low_vetoes_a_rise():
+    import trajectory
+
+    store = trajectory.simulate(through=trajectory.window_start()).store
+    weeks = store.cycle.trame.weeks
+    deload = next(week.label for week in weeks if week.deload)
+    build = next(week.label for week in weeks if not week.deload and week.phase != "taper")
+    book = rulebook.current()
+    today = dt.date(2031, 1, 1)
+    assert VetoKind.ASSIMILATION in {veto.kind for veto in
+                                     progression_strength.vetoes(store, book, deload, today)}
+    assert VetoKind.ASSIMILATION not in {veto.kind for veto in
+                                         progression_strength.vetoes(store, book, build, today)}

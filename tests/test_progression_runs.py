@@ -56,6 +56,9 @@ class Store:
     def __init__(self, plans: dict[str, list[dict]], verdicts: dict[int, list[dict]]):
         self.plans, self.verdicts = plans, verdicts
 
+    def cycle_for_week(self, week):
+        return None
+
     def load_plan(self, week):
         sessions = self.plans.get(week)
         return None if sessions is None else {"week": week,
