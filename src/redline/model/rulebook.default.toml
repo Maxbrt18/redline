@@ -22,9 +22,6 @@ gate_effort_peak = 2
 gate_trend_weeks = 2
 # Rule n7: a session at least this long (in hours) counts as a hard day.
 hard_min_hours = 1.25
-# The taper covers the last N weeks, race week included. A typed race may set its own
-# (`taper_weeks` in its context): this is the length when it does not.
-taper_weeks = 3
 # A longest outing with no new record over this many CLOSED weeks opens the protocol that
 # investigates drops.
 stall_weeks = 3
@@ -49,11 +46,6 @@ gear_alert_pct = 90
 carbs_cap_g_h = 90
 # Rule f1: above this target (g/h), the session names a glucose-fructose mix.
 carbs_mix_above_g_h = 60
-# The taper's mean weekly running volume drops by at least this much (%) from the weeks
-# before it, unless the race sets its own band ...
-taper_cut_min_pct = 41
-# ... and by at most this much: the band where a meta-analysis finds the benefit.
-taper_cut_max_pct = 60
 # Rule n1: a week prescribes at most this many quality sessions, checked when the program
 # is written. Absent, the coach alone holds the number.
 quality_sessions_per_week = 2

@@ -411,13 +411,17 @@ class CycleTemplates:
     def general_at(self, level: GeneralLevel) -> General | None:
         return next((template for template in self.general if template.level == level), None)
 
+    def preparation_named(self, slug: str) -> Preparation | None:
+        """The preparation template a trame was generated from, by its slug."""
+        return next((item for item in self.preparation if item.slug == slug), None)
+
     def key_sessions(self, kind: CycleKind, template: str,
                      phase: PlanPhase) -> dict[str, KeySession]:
         """The key sessions a trame's week was generated from, by workout: a preparation's
         phase by its template's slug, the general level's; none for the other kinds."""
         keys: tuple[KeySession, ...] = ()
         if kind == CycleKind.PREPARATION:
-            found = next((item for item in self.preparation if item.slug == template), None)
+            found = self.preparation_named(template)
             spec = found.phase(phase) if found is not None else None
             keys = spec.keys if spec is not None else ()
         elif kind == CycleKind.GENERAL and template in tuple(GeneralLevel):

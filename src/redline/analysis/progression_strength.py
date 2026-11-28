@@ -24,7 +24,6 @@ from typing import Any
 
 from redline.coach.fr import progression as text
 from redline.model import iso_week, program, rulebook
-from redline.model import race as race_model
 from redline.model.cycles import LOW_KINDS
 from redline.model.dose import Dose as SheetDose
 from redline.model.errors import ConfigError
@@ -40,6 +39,7 @@ from redline.model.progression import (
     VetoKind,
     default,
 )
+from redline.model.vocabulary import PlanPhase
 
 from . import ledger
 from .progression import arbitrate, propose
@@ -121,15 +121,10 @@ def served_dose(session: dict, slug: str) -> Dose | None:
 def vetoes(store: Any, book: rulebook.Rulebook, week: str, today: dt.date) -> tuple[Veto, ...]:
     """The states outside the lineages that stop a rise in `week`."""
     found = []
-    race = race_model.active_goal(store)
-    if race is not None:
-        race_week = iso_week.of(race.on)
-        taper = [iso_week.shift(race_week, -offset) for offset in range(race.taper_weeks)]
-        if week in taper:
-            found.append(Veto(VetoKind.TAPER, "taper_weeks",
-                              f"race {race.on.isoformat()}, taper from {min(taper)}"))
     version = store.cycle_for_week(week)
     held = version.week(week) if version is not None else None
+    if held is not None and held.phase == PlanPhase.TAPER:
+        found.append(Veto(VetoKind.TAPER, "taper", f"{week} in the taper of its preparation"))
     if held is not None and (held.deload or version.kind in LOW_KINDS):
         found.append(Veto(VetoKind.ASSIMILATION, "n2", f"{week} planned low by its cycle"))
     return tuple(found)

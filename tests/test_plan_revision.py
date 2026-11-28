@@ -30,6 +30,8 @@ def _store(goal=trajectory.HALF):
     store = trajectory.Store(goal, trajectory.RACE_ON)
     for back in range(1, trajectory.HISTORY_WEEKS + 1):
         trajectory.run_week(store, iso_week.shift(WEEK, -back), 30, 14)
+    # The preparation that holds the goal: its taper is the one the gate reads.
+    trajectory.take(store, trajectory.window_start())
     return store
 
 
@@ -40,9 +42,10 @@ def _store(goal=trajectory.HALF):
 def test_an_unavailable_measurement_costs_the_check_with_a_warning(monkeypatch, failure):
     def broken(store):
         raise failure
+    store = _store()
     monkeypatch.setattr(ledger, "parse_ledger", broken)
     warned = []
-    assert plan_revision.taper_errors(_store(), TAPER_WEEK, _taper(), warned.append) == []
+    assert plan_revision.taper_errors(store, TAPER_WEEK, _taper(), warned.append) == []
     assert [type(failure).__name__ in message for message in warned] == [True]
 
 
@@ -67,9 +70,9 @@ def test_a_check_that_fails_on_a_defect_refuses_and_names_it(monkeypatch):
 def test_each_guard_closes_the_same_way(monkeypatch):
     def misconfigured(*args, **kwargs):
         raise InputError("unreadable")
+    store, revision = _store(), _revision()
     monkeypatch.setattr(ledger, "parse_ledger", misconfigured)
     monkeypatch.setattr(plan_revision, "pain_rule_errors", misconfigured)
-    store, revision = _store(), _revision()
     assert plan_revision.taper_errors(store, TAPER_WEEK, _taper(), print)
     assert plan_revision.pain_errors(store, WEEK, revision, None, print)
     monkeypatch.setattr("redline.analysis.progression_runs.override_errors", misconfigured)

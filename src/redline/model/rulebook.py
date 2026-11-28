@@ -92,7 +92,6 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
               note="on the effort-pain scale, at or below its cap"),
         field("gate_trend_weeks", int, minimum=1, maximum=8),
         field("hard_min_hours", float, minimum=0.25, maximum=6),
-        field("taper_weeks", int, minimum=1, maximum=6),
         field("stall_weeks", int, minimum=1, maximum=12),
         field("stall_tolerance_km", float, minimum=0, maximum=5),
         field("wake_trace_until", str, pattern=formats.TIME,
@@ -115,10 +114,6 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
               note="highest fuelling target a session may carry, in g/h"),
         field("carbs_mix_above_g_h", int, required=False, minimum=30, maximum=150,
               note="above this target, the session names a glucose-fructose mix"),
-        field("taper_cut_min_pct", int, required=False, minimum=0, maximum=100,
-              note="least drop of the taper's mean weekly volume, in %"),
-        field("taper_cut_max_pct", int, required=False, minimum=0, maximum=100,
-              note="largest drop of the taper's mean weekly volume, in %"),
         # Optional: absent, a reorganisation keeps one run and two sessions a day, does
         # not compare its load with the plan's, and lets the long run go any day.
         field("runs_per_day", int, required=False, minimum=1, maximum=3,
@@ -307,7 +302,6 @@ class Parameters:
     gate_effort_peak: float
     gate_trend_weeks: int
     hard_min_hours: float
-    taper_weeks: int
     stall_weeks: int
     stall_tolerance_km: float
     wake_trace_until: dt.time
@@ -319,8 +313,6 @@ class Parameters:
     gear_alert_pct: int
     carbs_cap_g_h: int | None = None
     carbs_mix_above_g_h: int | None = None
-    taper_cut_min_pct: int | None = None
-    taper_cut_max_pct: int | None = None
     runs_per_day: int = 1
     sessions_per_day: int = 2
     reorganize_load_margin_pct: int | None = None
