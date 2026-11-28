@@ -103,6 +103,9 @@ def test_a_plan_review_is_due_when_a_candidate_can_start_next_week():
         assert due(between, reviewed=False) == between, "a goal set in an open window"
     assert due(STARTS["balanced"]) == STARTS["balanced"]
     assert due(STARTS["balanced"], proposal_open=True) is None
+    after = iso_week.shift(max(STARTS.values()), 2)
+    assert due(after) is None, "reviewed already, every candidate's start has passed"
+    assert due(after, returned=True) == after, "a rebuild that ends reopens the review"
     trame, _ = cycle_choice.proposal(_store(), _eve(STARTS["balanced"]), "balanced")
     preparation = CycleVersion(uuid.uuid4(), uuid.uuid4(), 1, CycleVersionState.ACTIVE, trame,
                                CycleCause.CREATE, race_key="race")

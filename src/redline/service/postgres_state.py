@@ -872,17 +872,19 @@ class PostgresStateStore(StateStore):
                            utc: dt.datetime) -> int:
         """One cycle in force: the takeover of an instance without one, then the transition
         due, written and announced in the same transaction; the takeover is not announced.
-        Off while the rulebook declares no cycle thresholds."""
+        Then the plan review due: a goal's window that opens, or a rebuild that ends while
+        it is open. Off while the rulebook declares no cycle thresholds."""
         if not cycle_inputs.declared():
             return 0
         today = local.date()
         templates = cycle_templates.load(paths.vault_root())
         store.expire_cycle_proposals_in(connection, utc)
         created = 0
+        before = store.active_cycle_in(connection)
+        planned_low = store.planned_low_weeks_in(connection)
         transition = cycle_transitions.next_cycle(
-            store.active_cycle_in(connection), race_model.typed(store),
-            effort_model.breaks(store.break_rows()),
-            cycle_inputs.standing(store, templates, today, store.planned_low_weeks_in(connection)),
+            before, race_model.typed(store), effort_model.breaks(store.break_rows()),
+            cycle_inputs.standing(store, templates, today, planned_low),
             today, templates, first=not store.has_cycle_in(connection))
         if transition is not None:
             trame = cycle_transitions.trame(transition, templates,
@@ -897,13 +899,18 @@ class PostgresStateStore(StateStore):
         prefix = f"plan-review:{goal.key}:" if goal is not None else ""
         reviewed = bool(prefix) and connection.execute(sa.select(sa.exists().where(
             proactive_jobs.c.job_key.startswith(prefix, autoescape=True)))).scalar_one()
+        returned = (transition is not None and before is not None
+                    and before.kind == voc.CycleKind.REBUILD)
+        active = store.active_cycle_in(connection)
+        proposal_open = store.open_cycle_proposal(utc) is not None
         week = cycle_transitions.review_week(
-            store.active_cycle_in(connection), goal, templates, today,
-            proposal_open=store.open_cycle_proposal(utc) is not None, reviewed=reviewed)
+            active, goal, templates, today, proposal_open=proposal_open, reviewed=reviewed,
+            returned=returned)
         if week is not None and goal is not None:
+            key = prefix + week + (f":{before.id}" if returned and before is not None else "")
             created += int(PostgresProactiveState._enqueue(
-                connection, prefix + week, voc.ProactiveKind.PLAN_REVIEW,
-                goal.name or goal.key, utc.timestamp()))
+                connection, key, voc.ProactiveKind.PLAN_REVIEW, goal.name or goal.key,
+                utc.timestamp()))
         return created
 
     @staticmethod
