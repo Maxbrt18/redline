@@ -9,7 +9,8 @@ import uuid
 import pytest
 import trajectory
 
-from redline.analysis import cycle_report, weekly_dossier
+from redline.analysis import cycle_report, cycle_review, weekly_dossier
+from redline.coach.fr import cycle as text
 from redline.model import iso_week
 from redline.model import plan_generator as generator
 from redline.model.cycles import CycleVersion
@@ -98,3 +99,15 @@ def test_the_dossier_carries_the_engine_s_draft_of_the_week_it_prepares():
     head = next(line for line in lines if line.startswith("BROUILLON DU MOTEUR"))
     assert iso_week.shift(week, 1) in head
     assert any("[1]" in line for line in lines), "the key session carries its number"
+
+
+def test_the_review_reads_whether_the_preparation_s_hypotheses_hold():
+    start = trajectory.window_start()
+    through, day = iso_week.shift(start, 4), trajectory.review_day(iso_week.shift(start, 5))
+    held = trajectory.simulate(through=through).store
+    assert cycle_review.lines(held, day) == [text.HYPOTHESES_HOLD]
+    short = trajectory.simulate(short={2: 0.6, 3: 0.6}, through=through).store
+    [line] = cycle_review.lines(short, day)
+    assert line.startswith("  Hypothèses tombées (replanification : ")
+    assert "volume : depuis le départ actuel, la rampe n'atteint que" in line
+    assert cycle_review.lines(_store(_general()), day) == [], "only a preparation is checked"

@@ -284,6 +284,10 @@ def test_the_purge_removes_markers_but_keeps_command_idempotence(store):
             "VALUES ('tech:vieux:2026-01-01', now() - interval '200 days')"))
         connection.execute(sa.text(
             "INSERT INTO redline.proactive_markers(marker_key) VALUES ('tech:frais')"))
+        connection.execute(sa.text(
+            "INSERT INTO redline.proactive_markers(marker_key, created_at) "
+            "VALUES ('plan-review:3f1c25a0-6f4d-4a51-9b6a-1f2c3d4e5f60:goal', "
+            "now() - interval '200 days')"))
         # Age the traces already written by the commands above all at once.
         connection.execute(sa.text(
             "UPDATE redline.turn_commands SET applied_at = now() - interval '90 days' "
@@ -297,7 +301,7 @@ def test_the_purge_removes_markers_but_keeps_command_idempotence(store):
             "SELECT 'markers', count(*) FROM redline.proactive_markers "
             "UNION ALL SELECT 'commandes', count(*) FROM redline.turn_commands "
             "UNION ALL SELECT 'observations', count(*) FROM redline.observations")).all())
-    assert remaining["markers"] == 1        # the fresh one stays
+    assert remaining["markers"] == 2        # the fresh one and the replan asked stay
     assert remaining["commandes"] == 2      # applied or pending: both keys stay
     assert remaining["observations"] == 1   # no FACT is touched
     with pytest.raises(StorageError, match="idempotency collision"):

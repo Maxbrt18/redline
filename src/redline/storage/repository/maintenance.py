@@ -8,6 +8,7 @@ from typing import ClassVar
 import sqlalchemy as sa
 
 from redline.model import vocabulary as voc
+from redline.model.hypotheses import REVIEW_PREFIX as REPLAN_MARKER
 
 from ..schema import (
     agent_calls,
@@ -113,6 +114,10 @@ class Maintenance(StoreBase):
     #: Deleting it would let an old command be queued again, even when a business
     #: constraint later blocked its second effect.
     #:
+    #: The markers of the plan reviews asked for a version's fallen hypotheses
+    #: (`REPLAN_MARKER`) do not expire either: they keep a replan left untaken from being
+    #: asked again, however long the preparation lasts.
+    #:
     #: The audit log does not expire: the application can neither modify nor erase it.
     #: `projection_states` is not a log, only a durable bit.
     EXPIRY_DAYS: ClassVar[dict[str, int]] = {
@@ -131,7 +136,9 @@ class Maintenance(StoreBase):
         with self.database.transaction() as connection:
             for table, column, days, guards in (
                 (proactive_markers, proactive_markers.c.created_at,
-                 self.EXPIRY_DAYS["proactive_markers"], ()),
+                 self.EXPIRY_DAYS["proactive_markers"],
+                 (~proactive_markers.c.marker_key.startswith(REPLAN_MARKER,
+                                                             autoescape=True),)),
                 (inbound_messages, inbound_messages.c.received_at,
                  self.EXPIRY_DAYS["inbound_messages"],
                  (inbound_messages.c.status == voc.InboundStatus.DONE,)),

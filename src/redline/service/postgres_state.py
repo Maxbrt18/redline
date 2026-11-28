@@ -17,7 +17,7 @@ import sqlalchemy as sa
 from sqlalchemy import RowMapping
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from redline.analysis import calibration, cycle_inputs
+from redline.analysis import calibration, cycle_inputs, cycle_review
 from redline.analysis import signals as signal_model
 from redline.coach.fr import relationship as wording
 from redline.coach.fr import signals as signal_wording
@@ -26,6 +26,7 @@ from redline.model import (
     commands,
     cycle_templates,
     cycle_transitions,
+    hypotheses,
     iso_week,
     local_time,
     paths,
@@ -872,6 +873,8 @@ class PostgresStateStore(StateStore):
                            utc: dt.datetime) -> int:
         """One cycle in force: the takeover of an instance without one, then the transition
         due, written and announced in the same transaction; the takeover is not announced.
+        Then the plan review due: a goal's window that opens, a rebuild that ends while it
+        is open, or a preparation whose hypotheses fell (`redline.model.hypotheses`).
         Off while the rulebook declares no cycle thresholds."""
         if not cycle_inputs.declared():
             return 0
@@ -879,10 +882,11 @@ class PostgresStateStore(StateStore):
         templates = cycle_templates.load(paths.vault_root())
         store.expire_cycle_proposals_in(connection, utc)
         created = 0
+        before = store.active_cycle_in(connection)
+        planned_low = store.planned_low_weeks_in(connection)
         transition = cycle_transitions.next_cycle(
-            store.active_cycle_in(connection), race_model.typed(store),
-            effort_model.breaks(store.break_rows()),
-            cycle_inputs.standing(store, templates, today, store.planned_low_weeks_in(connection)),
+            before, race_model.typed(store), effort_model.breaks(store.break_rows()),
+            cycle_inputs.standing(store, templates, today, planned_low),
             today, templates, first=not store.has_cycle_in(connection))
         if transition is not None:
             trame = cycle_transitions.trame(transition, templates,
@@ -897,14 +901,49 @@ class PostgresStateStore(StateStore):
         prefix = f"plan-review:{goal.key}:" if goal is not None else ""
         reviewed = bool(prefix) and connection.execute(sa.select(sa.exists().where(
             proactive_jobs.c.job_key.startswith(prefix, autoescape=True)))).scalar_one()
+        returned = (transition is not None and before is not None
+                    and before.kind == voc.CycleKind.REBUILD)
+        active = store.active_cycle_in(connection)
+        proposal_open = store.open_cycle_proposal(utc) is not None
         week = cycle_transitions.review_week(
-            store.active_cycle_in(connection), goal, templates, today,
-            proposal_open=store.open_cycle_proposal(utc) is not None, reviewed=reviewed)
+            active, goal, templates, today, proposal_open=proposal_open, reviewed=reviewed,
+            returned=returned)
         if week is not None and goal is not None:
+            key = prefix + week + (f":{before.id}" if returned and before is not None else "")
             created += int(PostgresProactiveState._enqueue(
-                connection, prefix + week, voc.ProactiveKind.PLAN_REVIEW,
-                goal.name or goal.key, utc.timestamp()))
+                connection, key, voc.ProactiveKind.PLAN_REVIEW, goal.name or goal.key,
+                utc.timestamp()))
+        if (transition is None and active is not None and goal is not None
+                and active.race_key == goal.key and not proposal_open):
+            created += PostgresStateStore._ask_replan(connection, store, templates, active,
+                                                      goal, today, planned_low, utc)
         return created
+
+    @staticmethod
+    def _ask_replan(connection, store: OperationalStore, templates, active, goal,
+                    today: dt.date, planned_low: set[str], utc: dt.datetime) -> int:
+        """The plan review a preparation's fallen hypotheses ask for: one per version and
+        set of fallen kinds, none while a review of the version is still to run. A marker
+        remembers each set asked, as finished jobs are purged: a replan left untaken is
+        never asked again for the same set."""
+        key = hypotheses.review_key(active.id, cycle_review.review(
+            store, templates, active, today, planned_low))
+        if key is None:
+            return 0
+        running = connection.execute(sa.select(sa.exists().where(
+            proactive_jobs.c.job_key.startswith(f"{hypotheses.REVIEW_PREFIX}{active.id}:",
+                                                autoescape=True),
+            proactive_jobs.c.status.in_(voc.LIVE_JOBS)))).scalar_one()
+        if running:
+            return 0
+        asked = connection.execute(pg_insert(proactive_markers).values(
+            marker_key=key).on_conflict_do_nothing().returning(
+            proactive_markers.c.marker_key)).scalar_one_or_none()
+        if asked is None:
+            return 0
+        return int(PostgresProactiveState._enqueue(
+            connection, key, voc.ProactiveKind.PLAN_REVIEW, goal.name or goal.key,
+            utc.timestamp()))
 
     @staticmethod
     def _materialize_gear(connection, utc: dt.datetime) -> int:

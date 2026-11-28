@@ -4,8 +4,9 @@ the general preparation.
 A proposal is a candidate of the active goal's preparation, generated from the real state
 (`redline.analysis.cycle_inputs`), and starts the week after today: before its window
 opens there is nothing to propose, and the weeks between are the general preparation's. A
-lower peak may be chosen, never a higher one. A new level writes the next weeks of the
-general preparation in force at that level.
+lower peak may be chosen, never a higher one. Proposed while the goal's preparation is in
+force, it replans it, for the hypotheses that fell (`fallen`). A new level writes the next
+weeks of the general preparation in force at that level.
 """
 
 from __future__ import annotations
@@ -19,9 +20,9 @@ from redline.model import plan_generator as generator
 from redline.model import race as race_model
 from redline.model.errors import ConfigError, InputError
 from redline.model.plan_generator import Trame
-from redline.model.vocabulary import CycleKind, GeneralLevel
+from redline.model.vocabulary import CycleKind, GeneralLevel, HypothesisKind
 
-from . import cycle_inputs
+from . import cycle_inputs, cycle_review
 
 
 def proposal(store: Any, today: dt.date, candidate: str,
@@ -40,7 +41,7 @@ def proposal(store: Any, today: dt.date, candidate: str,
     if candidate not in options:
         raise InputError(f"no candidate {candidate} (candidates: {', '.join(options)})")
     inputs = cycle_inputs.inputs(store, templates, today)
-    goal = generator.Goal(race.on, race.goal.distance_km)
+    goal = cycle_inputs.goal(race)
     trame = generator.preparation(template, goal, options[candidate], inputs,
                                   candidate=candidate)
     starts = trame.weeks[0].label
@@ -56,6 +57,16 @@ def proposal(store: Any, today: dt.date, candidate: str,
                                       replace(options[candidate], peak_km=peak_km), inputs,
                                       candidate=candidate)
     return trame, race
+
+
+def fallen(store: Any, today: dt.date, race: race_model.Race) -> tuple[HypothesisKind, ...]:
+    """The hypotheses of the race's preparation in force that call for its replanning;
+    none without one."""
+    active = store.active_cycle()
+    if active is None or active.kind != CycleKind.PREPARATION or active.race_key != race.key:
+        return ()
+    return cycle_review.review(store, cycle_templates.load(paths.vault_root()), active, today,
+                               store.planned_low_weeks()).replanning
 
 
 def level(store: Any, today: dt.date, wanted: GeneralLevel) -> Trame:

@@ -15,7 +15,12 @@ from redline.model import plan_generator as generator
 from redline.model import race as race_model
 from redline.model.cycles import CycleVersion
 from redline.model.errors import InputError
-from redline.model.vocabulary import CycleCause, CycleVersionState, GeneralLevel
+from redline.model.vocabulary import (
+    CycleCause,
+    CycleVersionState,
+    GeneralLevel,
+    HypothesisKind,
+)
 from redline.service.delivery import (
     EnvelopeBuilder,
     StoredDelivery,
@@ -76,6 +81,15 @@ def test_a_lower_peak_may_be_chosen_never_a_higher_one():
         cycle_choice.proposal(_store(), day, "balanced", proposed + 1)
 
 
+def test_a_proposal_made_while_the_goal_s_preparation_is_in_force_carries_what_fell():
+    start = trajectory.window_start()
+    lived = trajectory.simulate(short={2: 0.6, 3: 0.6}, through=iso_week.shift(start, 4))
+    race = race_model.typed(lived.store)[0]
+    day = trajectory.review_day(iso_week.shift(start, 5))
+    assert cycle_choice.fallen(lived.store, day, race) == (HypothesisKind.VOLUME_HELD,)
+    assert cycle_choice.fallen(_store(), day, race) == (), "no preparation in force"
+
+
 def test_a_level_is_the_general_preparation_s_and_changes_it():
     day = _eve(trajectory.FIRST_WEEK)
     with pytest.raises(InputError, match="no general preparation in force"):
@@ -103,6 +117,9 @@ def test_a_plan_review_is_due_when_a_candidate_can_start_next_week():
         assert due(between, reviewed=False) == between, "a goal set in an open window"
     assert due(STARTS["balanced"]) == STARTS["balanced"]
     assert due(STARTS["balanced"], proposal_open=True) is None
+    after = iso_week.shift(max(STARTS.values()), 2)
+    assert due(after) is None, "reviewed already, every candidate's start has passed"
+    assert due(after, returned=True) == after, "a rebuild that ends reopens the review"
     trame, _ = cycle_choice.proposal(_store(), _eve(STARTS["balanced"]), "balanced")
     preparation = CycleVersion(uuid.uuid4(), uuid.uuid4(), 1, CycleVersionState.ACTIVE, trame,
                                CycleCause.CREATE, race_key="race")

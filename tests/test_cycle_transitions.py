@@ -95,6 +95,9 @@ def test_a_preparation_gives_way_to_a_recovery_once_its_race_is_run():
     assert following(preparation, [cancelled]).kind == CycleKind.GENERAL
     postponed = race("half", TODAY + dt.timedelta(weeks=12), "postponed", 21.1)
     assert following(preparation, [postponed]) is None, "a postponed race is replanned"
+    demoted = race("half", TODAY + dt.timedelta(weeks=12), "active", 21.1, priority="b")
+    assert following(preparation, [demoted]).kind == CycleKind.GENERAL, \
+        "a race no longer of priority A leaves no goal to prepare"
 
 
 def test_the_general_preparation_starts_its_next_block_in_its_last_week():

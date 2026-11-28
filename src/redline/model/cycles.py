@@ -29,6 +29,7 @@ from .vocabulary import (
     IntensityRef,
     KeyRole,
     PlanPhase,
+    RaceTerrain,
 )
 
 
@@ -97,7 +98,8 @@ def version_values(trame: Trame) -> dict:
             "specific_weeks": levers.specific_weeks, "deload_every": levers.deload_every,
             "second_quality": str(levers.second_quality), "peak_km": levers.peak_km},
         "goal": None if trame.goal is None else {
-            "on": trame.goal.on.isoformat(), "distance_km": trame.goal.distance_km},
+            "on": trame.goal.on.isoformat(), "distance_km": trame.goal.distance_km,
+            "terrain": trame.goal.terrain, "goal_time_s": trame.goal.goal_time_s},
         "hypotheses": hypotheses_of(trame.hypotheses),
         "risks": [{"kind": str(risk.kind), "value": risk.value, "reference": risk.reference,
                    "workout": risk.workout, "phase": str(risk.phase) if risk.phase else None}
@@ -198,8 +200,10 @@ def trame_of(version: dict, weeks: list[dict], keys: list[dict]) -> Trame:
             int(levers["specific_weeks"]), int(levers["deload_every"]),
             PlanPhase(levers["second_quality"]),
             float(levers["peak_km"]) if levers.get("peak_km") is not None else None),
-        None if not goal else Goal(dt.date.fromisoformat(goal["on"]),
-                                   float(goal["distance_km"])))
+        None if not goal else Goal(
+            dt.date.fromisoformat(goal["on"]), float(goal["distance_km"]),
+            RaceTerrain(goal["terrain"]) if goal.get("terrain") else None,
+            int(goal["goal_time_s"]) if goal.get("goal_time_s") is not None else None))
 
 
 def announcement(version: CycleVersion) -> dict:

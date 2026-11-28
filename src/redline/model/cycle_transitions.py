@@ -11,11 +11,16 @@ new cycle starts, of which kind and why. It reads arguments only.
   planned low (a taper, a deload, a recovery, a rebuild) are not a start, and a recovery
   reads no floor: the weeks around a race are low by design.
 - A preparation whose race is run or abandoned gives way to a recovery; one whose race is
-  cancelled or dropped, to the general preparation.
+  cancelled, dropped or no longer of priority A, to the general preparation: there is no
+  goal left to prepare, and the next goal's window asks its own review. A postponed race
+  keeps its preparation until its new day is set, which replans it
+  (`redline.model.hypotheses`).
 - The general preparation gives way to a recovery when a race is run after it was
   written, and to its next block on the last day of its block.
 - A recovery gives way to the general preparation on its last day; so does a rebuild,
-  or as soon as the volume held is run again.
+  or as soon as the volume held is run again. A rebuild's end asks for a plan review at
+  once when a goal's window is open (`review_week`, `returned`): the preparation it
+  interrupted, or the one it delayed, is replanned from where the athlete stands.
 
 A transition starts with the week after `today`: on a cycle's last day, the Sunday its
 review is written, the next cycle follows its last week. Entering a preparation is never
@@ -37,7 +42,7 @@ from .efforts import Break
 from .errors import ConfigError
 from .plan_generator import Inputs, Trame
 from .race import RECOVERED_FROM, Race
-from .vocabulary import CycleCause, CycleKind, GeneralLevel, RaceState
+from .vocabulary import CycleCause, CycleKind, GeneralLevel, RacePriority, RaceState
 
 #: The race states that end a preparation without a race run.
 LEFT_UNRUN = frozenset({RaceState.CANCELLED, RaceState.DROPPED})
@@ -120,7 +125,7 @@ def next_cycle(active: CycleVersion | None, races: Sequence[Race], breaks: Seque
         race = next((race for race in races if race.key == active.race_key), None)
         if race is not None and race.state in RECOVERED_FROM:
             return Transition(CycleKind.RECOVERY, CycleCause.TRANSITION, race=race)
-        if race is None or race.state in LEFT_UNRUN:
+        if race is None or race.state in LEFT_UNRUN or race.priority != RacePriority.A:
             return _general(templates)
         return None
     if active.kind == CycleKind.GENERAL:
@@ -135,11 +140,13 @@ def next_cycle(active: CycleVersion | None, races: Sequence[Race], breaks: Seque
 
 
 def review_week(active: CycleVersion | None, goal: Race | None, templates: CycleTemplates,
-                today: dt.date, *, proposal_open: bool, reviewed: bool) -> str | None:
+                today: dt.date, *, proposal_open: bool, reviewed: bool,
+                returned: bool = False) -> str | None:
     """The week a plan review is due for, or None. It is due when a candidate of the goal's
     preparation can start the week after today, while no preparation is in force nor
     proposed: on the first week a candidate starts, or at once for a goal whose window was
-    already open when no review had been asked yet (`reviewed`)."""
+    already open when no review had been asked yet (`reviewed`) or when a rebuild has just
+    ended (`returned`)."""
     if (goal is None or goal.goal is None or goal.on < today or proposal_open
             or (active is not None and active.kind == CycleKind.PREPARATION)):
         return None
@@ -150,7 +157,7 @@ def review_week(active: CycleVersion | None, goal: Race | None, templates: Cycle
     starts = set(generator.candidate_starts(template, goal.on).values())
     if upcoming < min(starts) or upcoming > iso_week.of(goal.on):
         return None
-    return upcoming if upcoming in starts or not reviewed else None
+    return upcoming if upcoming in starts or not reviewed or returned else None
 
 
 def trame(transition: Transition, templates: CycleTemplates, inputs: Inputs) -> Trame:

@@ -24,7 +24,7 @@ INPUTS = generator.Inputs("2030-W49", 42.3, 15.2, 55.0, 10, 10, minutes_per_week
 
 def _trames():
     template = TEMPLATES.preparation_for(42.2, RaceTerrain.ROAD)
-    goal = generator.Goal(dt.date(2031, 4, 13), 42.2)
+    goal = generator.Goal(dt.date(2031, 4, 13), 42.2, RaceTerrain.ROAD, 12600)
     return {
         "preparation": generator.candidates(template, goal, INPUTS)[1],
         "general": generator.general(TEMPLATES.general_at(GeneralLevel.PROGRESS), INPUTS),

@@ -18,7 +18,7 @@ from trajectory import Lived
 
 from redline.model import iso_week
 from redline.model.plan_generator import BUILD_PHASES
-from redline.model.vocabulary import Decider, PlanPhase
+from redline.model.vocabulary import Decider, HypothesisKind, HypothesisOutcome, PlanPhase
 from redline.service import plan_revision
 
 #: The order a preparation's phases come in.
@@ -126,3 +126,28 @@ def test_an_athlete_without_history_is_given_a_volume_to_run():
     lived = trajectory.simulate(start_km=0, start_long_km=0).weeks
     assert all(week.shown and week.shown.volume_km > 0 for week in lived), \
         [week.shown for week in lived]
+
+
+def _replanned(lived: tuple[Lived, ...]) -> list[str]:
+    return [week.week for week in lived if week.review.outcome == HypothesisOutcome.REPLAN]
+
+
+def test_an_athlete_who_follows_never_drops_a_hypothesis(followed):
+    assert [week.review.fallen for week in followed if week.review.fallen] == []
+
+
+def test_one_missed_week_never_replans_the_preparation():
+    for missed in range(3, 6):
+        assert _replanned(trajectory.simulate(missed={missed}).weeks) == [], missed
+
+
+def test_two_weeks_run_far_under_the_trame_replan_it_on_the_second_sunday():
+    lived = trajectory.simulate(short={2: 0.6, 3: 0.6}).weeks
+    replanned = _replanned(lived)
+    assert replanned == [lived[5].week], "once, at the first review after the second short week closed"
+    found = lived[5].review.fallen
+    assert [item.kind for item in found] == [HypothesisKind.VOLUME_HELD]
+
+
+def test_two_weeks_run_a_little_under_the_trame_hold_it():
+    assert _replanned(trajectory.simulate(short={2: 0.85, 3: 0.85}).weeks) == []

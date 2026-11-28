@@ -174,8 +174,7 @@ def candidates(store: Any, today: dt.date, kind: CycleKind | None,
         if template is None:
             raise ConfigError(f"no cycle template serves {goal.distance_km:g} km on "
                               f"{goal.terrain}")
-        trames = generator.candidates(template, generator.Goal(race.on, goal.distance_km),
-                                      inputs)
+        trames = generator.candidates(template, cycle_inputs.goal(race), inputs)
     elif kind == CycleKind.GENERAL:
         general = templates.general_at(level or templates.default_level)
         if general is None:

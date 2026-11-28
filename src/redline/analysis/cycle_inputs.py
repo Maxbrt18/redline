@@ -27,8 +27,9 @@ from redline.model import iso_week, rulebook, session_kinds, week_days
 from redline.model.cycle_templates import CycleTemplates
 from redline.model.cycle_transitions import Standing
 from redline.model.errors import ConfigError
-from redline.model.plan_generator import Inputs
+from redline.model.plan_generator import Goal, Inputs
 from redline.model.progression import Dose
+from redline.model.race import Race
 from redline.model.vocabulary import CalibrationConfidence, DayKind
 
 from . import ledger, progression_runs
@@ -46,7 +47,7 @@ def _volumes(rows: list[ledger.Row], weeks: list[str]) -> list[float]:
             for week in weeks]
 
 
-def _minutes(store: Any, first: dt.date) -> int | None:
+def minutes(store: Any, first: dt.date) -> int | None:
     """The minutes the habits leave for running in the week from `first`; None when a
     running day states no limit."""
     days = [first + dt.timedelta(days=offset) for offset in range(7)]
@@ -83,6 +84,12 @@ def lineages(store: Any, book: rulebook.Rulebook, today: dt.date) -> tuple[tuple
         if lineage is not None and lineage.workout and dose is not None:
             found.append((lineage.workout, dose))
     return tuple(found)
+
+
+def goal(race: Race) -> Goal:
+    """The goal a preparation is generated for, from a race whose goal is declared."""
+    assert race.goal is not None
+    return Goal(race.on, race.goal.distance_km, race.goal.terrain, race.goal.goal_time_s)
 
 
 def declared() -> bool:
@@ -134,6 +141,19 @@ def standing(store: Any, templates: CycleTemplates, today: dt.date,
                     round(floor, 1))
 
 
+def closed_volumes(store: Any, today: dt.date, planned_low: Collection[str],
+                   weeks: int) -> tuple[tuple[str, float], ...]:
+    """The running volume of each of the last `weeks` closed weeks before `today`, newest
+    first, the assimilation weeks and the weeks a cycle planned low left out."""
+    parameters = _parameters()
+    rows = ledger.parse_ledger(store)
+    current = iso_week.of(today)
+    skipped = set(parameters.assimilation_weeks) | set(planned_low)
+    labels = [week for week in (iso_week.shift(current, -offset)
+                                for offset in range(1, weeks + 1)) if week not in skipped]
+    return tuple(zip(labels, _volumes(rows, labels), strict=True))
+
+
 def _round(value: float | None) -> float | None:
     return None if value is None else round(value, 1)
 
@@ -157,6 +177,6 @@ def inputs(store: Any, templates: CycleTemplates, today: dt.date) -> Inputs:
     return Inputs(origin, round(start, 1), ledger.longest_recent(rows, today) or 0.0,
                   round(held, 1), parameters.skeleton_ramp_max_pct,
                   parameters.skeleton_long_step_max_pct,
-                  _minutes(store, iso_week.monday(origin)), _easy_pace(rows, today),
+                  minutes(store, iso_week.monday(origin)), _easy_pace(rows, today),
                   calibrated, found.adopted_on if found else None,
                   lineages(store, book, today), parameters.quality_sessions_per_week)

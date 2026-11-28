@@ -120,6 +120,10 @@ class Cycles(StoreBase):
             sa.or_(cycle_versions.c.kind.in_(LOW_KINDS), cycle_weeks.c.deload.is_(True),
                    cycle_weeks.c.phase == PlanPhase.TAPER))).scalars())
 
+    def planned_low_weeks(self) -> set[str]:
+        with self.database.engine.connect() as connection:
+            return self.planned_low_weeks_in(connection)
+
     def _race_id_in(self, connection: Connection, race_key: str | None) -> uuid.UUID | None:
         if not race_key:
             return None
@@ -174,9 +178,12 @@ class Cycles(StoreBase):
 
     def propose_cycle_in(self, connection: Connection, trame: Trame, decision: dict,
                          race_key: str, expires_at: dt.datetime, *,
+                         fallen: Iterable[str] = (),
                          actor: str = "application") -> CycleVersion:
         """A preparation proposed to the athlete, open until `expires_at`; it replaces the
-        proposal still open, and changes nothing in force until it is taken."""
+        proposal still open, and changes nothing in force until it is taken. Proposed
+        while a preparation of the same race is in force, it is that cycle's next version,
+        replanned for the hypotheses that fell (`fallen`); otherwise a new cycle."""
         self._lock_in(connection)
         now = dt.datetime.now(dt.UTC)
         connection.execute(cycle_versions.update().where(
@@ -186,8 +193,17 @@ class Cycles(StoreBase):
         race_id = self._race_id_in(connection, race_key)
         if race_id is None:
             raise StorageError(f"no race {race_key} to propose a preparation for")
-        values = {"cycle_key": _uuid(None), "version": 1, "race_id": race_id,
-                  "state": CycleVersionState.PROPOSED, "cause": {"kind": str(CycleCause.CREATE)},
+        active = self.active_cycle_in(connection)
+        if (active is not None and active.kind == CycleKind.PREPARATION
+                and active.race_key == race_key):
+            last = connection.execute(sa.select(sa.func.max(cycle_versions.c.version)).where(
+                cycle_versions.c.cycle_key == active.cycle_key)).scalar_one()
+            cycle_key, number = active.cycle_key, int(last) + 1
+            cause = {"kind": str(CycleCause.REPLAN), "fallen": sorted(fallen)}
+        else:
+            cycle_key, number, cause = _uuid(None), 1, {"kind": str(CycleCause.CREATE)}
+        values = {"cycle_key": cycle_key, "version": number, "race_id": race_id,
+                  "state": CycleVersionState.PROPOSED, "cause": cause,
                   "decision": decision, "expires_at": expires_at}
         found = self._insert_in(connection, trame, values)
         _audit(connection, actor, "cycle.proposed", "cycle_version", found.id,
@@ -205,9 +221,10 @@ class Cycles(StoreBase):
     def take_cycle_in(self, connection: Connection, version_id: uuid.UUID, now: dt.datetime, *,
                       actor: str = "application") -> CycleVersion | None:
         """The athlete takes a proposal still open: it is in force at once, the active
-        version closed in the same transaction. None when it is no longer open."""
+        version settled in the same transaction, superseded by its cycle's next version or
+        closed by a new cycle. None when it is no longer open."""
         self._lock_in(connection)
-        open_ = connection.execute(sa.select(cycle_versions.c.id).where(
+        open_ = connection.execute(sa.select(cycle_versions.c.cycle_key).where(
             cycle_versions.c.athlete_id == self.athlete_id, cycle_versions.c.id == version_id,
             cycle_versions.c.state == CycleVersionState.PROPOSED,
             cycle_versions.c.expires_at > now)).scalar_one_or_none()
@@ -217,7 +234,8 @@ class Cycles(StoreBase):
         if active is not None:
             connection.execute(cycle_versions.update().where(
                 cycle_versions.c.id == active.id).values(
-                state=CycleVersionState.CLOSED, settled_at=now))
+                state=(CycleVersionState.SUPERSEDED if active.cycle_key == open_
+                       else CycleVersionState.CLOSED), settled_at=now))
         connection.execute(cycle_versions.update().where(
             cycle_versions.c.id == version_id).values(
             state=CycleVersionState.ACTIVE, taken_at=now))
