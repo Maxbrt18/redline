@@ -49,7 +49,7 @@ REPLANNING = frozenset({HypothesisKind.VOLUME_HELD, HypothesisKind.LINEAGE_POSIT
 ROUNDING_KM = 0.05
 #: The closed weeks a fallen volume persists over.
 VOLUME_READINGS = 2
-#: What the key of a plan review asked for fallen hypotheses starts with.
+#: What the key of a plan review starts with, for fallen hypotheses as for a goal's window.
 REVIEW_PREFIX = "plan-review:"
 
 

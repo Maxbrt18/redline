@@ -333,6 +333,31 @@ def test_the_planner_asks_for_a_plan_review_once_a_candidate_can_start(store):
     assert job["detail"] == "Semi"
 
 
+def test_a_plan_review_asked_is_not_asked_again_once_its_job_is_purged(store):
+    from conftest import VAULT_ROOT
+    template = cycle_templates.load(VAULT_ROOT).preparation_for(21.1, "road")
+    race_on = dt.date(2030, 6, 30)
+    starts = generator.candidate_starts(template, race_on).values()
+    after = generator.iso_week.shift(max(starts), 1)
+    _goal(store, race_on)
+    state = PostgresStateStore(store.database)
+
+    def eve(week: str) -> dt.datetime:
+        return dt.datetime.combine(generator.iso_week.monday(week) - dt.timedelta(days=1),
+                                   dt.time(12), tzinfo=dt.UTC)
+
+    def reviews() -> list[dict]:
+        return [job for job in state.proactive.jobs() if job["kind"] == "plan_review"]
+
+    state.materialize_intelligence(eve(min(starts)))
+    [job] = reviews()
+    state.proactive.complete_job(job["id"])
+    with store.database.transaction() as connection:
+        connection.execute(sa.text("DELETE FROM redline.proactive_jobs"))
+    state.materialize_intelligence(eve(after))
+    assert reviews() == [], "the window's review was asked already"
+
+
 def test_a_first_revision_keeps_its_draft_and_the_vault_projects_the_version(store, tmp_path,
                                                                               monkeypatch,
                                                                               capsys):
