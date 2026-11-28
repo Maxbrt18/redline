@@ -174,6 +174,9 @@ cycle_held_weeks = 26
 # A proposed cycle version stays open this many days for the athlete to take; past it,
 # it expires and nothing changes.
 cycle_proposal_days = 7
+# Under this share of the week's volume (%), the first revision of a week cuts the draft
+# only with a typed restriction; above it, the coach's evidence is enough.
+cycle_floor_pct = 80
 # The climbs of an easy run read their HR against the athlete's easy HR at their grade
 # (median of the six weeks of solo easy runs before): more than this above it (bpm), with
 # the grade-adjusted pace, they are named.

@@ -452,6 +452,8 @@ plan_revisions = sa.Table(
     sa.Column("cycle_version_id", UUID_PK, sa.ForeignKey("redline.cycle_versions.id")),
     # One step beyond the week's version (`weekly_plan.CYCLE_OVERRIDE_SCHEMA`).
     sa.Column("cycle_overrides", JSONB),
+    # The engine's draft a week's first revision was written against.
+    sa.Column("draft", JSONB),
     sa.UniqueConstraint("plan_id", "revision", name="uq_plan_revisions_number"),
     sa.CheckConstraint("revision >= 1", name="ck_plan_revisions_number"),
     sa.CheckConstraint("calibration_target IS NULL OR calibration_target IN (0, 2, 3)",

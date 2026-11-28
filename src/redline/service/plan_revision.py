@@ -167,6 +167,26 @@ def cycle_errors(store, week: str, revision: dict, previous: dict | None,
     return _guarded("cycle", where, wording.CYCLE_UNREADABLE, warn, check)
 
 
+def draft_errors(store, week: str, current: dict, warn: Callable[[str], None]) -> list[str]:
+    """The first revision of a week against the engine's draft, which it keeps."""
+    from redline.analysis import weekly_draft
+    from redline.model import rulebook
+    from redline.model.weekly_plan import draft_change_errors
+    today = dt.date.fromisoformat(current["computed_at"][:10])
+
+    def check() -> list[str]:
+        found = weekly_draft.frame(store, week, today)
+        if found is None:
+            return []
+        draft = weekly_draft.draft(found, current["computed_at"])
+        current["draft"] = draft
+        floor_pct = rulebook.current().parameters.cycle_floor_pct
+        floor = found.bound.volume_km * floor_pct / 100 if floor_pct is not None else None
+        return draft_change_errors(draft, current, floor)
+
+    return _guarded("draft", _where(week, current), wording.DRAFT_UNREADABLE, warn, check)
+
+
 def checked(store, week: str, revision: dict, existing: dict | None, *, stamp: str,
             warn: Callable[[str], None]) -> tuple[dict | None, dict]:
     """The previous revision and the new one, stamped and measured, or SchemaError."""
@@ -182,6 +202,7 @@ def checked(store, week: str, revision: dict, existing: dict | None, *, stamp: s
     # What the coach could see is measured by the engine, at the same instant. A
     # measurement that fails costs the register one snapshot, never the prescription.
     current.pop("state_snapshot", None)
+    current.pop("draft", None)
     try:
         current["state_snapshot"] = decision_state.snapshot(
             store, dt.date.fromisoformat(current["computed_at"][:10]))
@@ -208,6 +229,7 @@ def checked(store, week: str, revision: dict, existing: dict | None, *, stamp: s
         *progression_errors(store, week, current, previous, warn),
         *gut_errors(store, week, current, warn),
         *cycle_errors(store, week, current, previous, warn),
+        *(draft_errors(store, week, current, warn) if existing is None else []),
     ]
     if mistakes:
         raise SchemaError(mistakes)

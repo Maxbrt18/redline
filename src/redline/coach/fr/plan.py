@@ -158,6 +158,9 @@ ACTIVE_MISSING = ("ABSENTE OU INVALIDE : ne prescris aucune séance. Une répara
 TAPER_UNREADABLE = ("Affûtage : lecture du registre impossible ({name}), la baisse du "
                     "volume n'est pas contrôlée pour cette révision.")
 
+DRAFT_UNREADABLE = ("Brouillon : lecture du registre impossible ({name}), la semaine n'est pas "
+                    "contrôlée contre lui.")
+
 CYCLE_UNREADABLE = ("Cycle : lecture du registre impossible ({name}), la semaine n'est pas "
                     "contrôlée contre sa version.")
 
@@ -169,3 +172,7 @@ GUT_UNREADABLE = ("Entraînement digestif : lecture du registre impossible ({nam
 
 PAIN_RULES_UNREADABLE = ("Règles n3 et n4 : lecture du registre impossible ({name}), la "
                          "qualité et le volume ne sont pas contrôlés pour cette révision.")
+
+DRAFT_TEST = "Test 1 200 m puis 3 600 m à fond"
+DRAFT_EVIDENCE = "draft:{week} écrit par le moteur depuis la version du cycle"
+DRAFT_REASON = "Brouillon du moteur pour {week}, dans les bornes de la version du cycle."

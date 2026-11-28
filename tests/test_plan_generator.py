@@ -221,3 +221,17 @@ def test_a_rebuild_climbs_from_its_floor_to_the_volume_held():
     assert volumes[0] == 25.0 and volumes[-1] == 50.0
     for before, week in itertools.pairwise(volumes):
         assert week <= before * 1.1 + ROUNDING_KM
+
+
+def test_no_week_carries_more_quality_sessions_than_rule_n1_allows():
+    template = TEMPLATES.preparation_for(21.1, RaceTerrain.ROAD)
+    goal = Goal(dt.date(2030, 11, 1), 21.1)
+    free = generator.candidates(template, goal, INPUTS)[2]
+    assert max(week.qualities for week in free.weeks) == 2
+    capped = generator.candidates(template, goal, dataclasses.replace(INPUTS, qualities_max=1))[2]
+    assert max(week.qualities for week in capped.weeks) == 1
+    assert all(len([key for key in capped.keys if key.week == week.label and key.role != "test"])
+               <= 1 for week in capped.weeks)
+    general = generator.general(TEMPLATES.general_at(GeneralLevel.MAINTAIN),
+                                dataclasses.replace(INPUTS, qualities_max=0))
+    assert not general.keys and all(week.qualities == 0 for week in general.weeks)

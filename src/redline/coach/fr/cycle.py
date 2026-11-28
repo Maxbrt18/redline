@@ -70,3 +70,29 @@ CANDIDATES_UNAVAILABLE = ("[CANDIDATS indisponibles : calcul en échec, voir les
                           "Relance toi-même `redline cycle candidates`.]")
 PROPOSAL_OPEN = ("Proposition « {candidate} » envoyée, en attente de l'athlète jusqu'au "
                  "{until:%d/%m/%Y}.")
+NOTE_HEADER = ("# Plan en cours\n\n"
+               "Projection de la version du cycle en cours, régénérée depuis PostgreSQL : ne "
+               "pas l'éditer. `redline cycle show` en donne les allures du jour.\n")
+NOTE_CYCLE = "\n{title}, version {version} ({cause}), de {start} à {end}.\n"
+NOTE_RACE = "Course : {race}, le {on:%d/%m/%Y}.\n"
+NOTE_TABLE = ("\n| Semaine | Phase | Volume au plus | SL au plus | Qualités | Séances clés |\n"
+              "|---|---|---|---|---|---|\n")
+NOTE_ROW = "| {week} | {phase}{deload} | {volume:g} km | {long_run} | {qualities} | {keys} |\n"
+
+
+def note(kind: str, level: str, version: int, cause: str, weeks: list[tuple],
+         race: tuple[str, object] | None) -> str:
+    """The vault's note of the version in force: `weeks` holds, for each week, its label,
+    phase, deload, volume, long run, qualities and key sessions in words."""
+    title = KINDS[kind] + (f" « {LEVELS[level]} »" if level else "")
+    text = NOTE_HEADER + NOTE_CYCLE.format(title=title, version=version, cause=CAUSES[cause],
+                                           start=weeks[0][0], end=weeks[-1][0])
+    if race is not None:
+        text += NOTE_RACE.format(race=race[0], on=race[1])
+    text += NOTE_TABLE
+    for week, phase, deload, volume, long_run, qualities, keys in weeks:
+        text += NOTE_ROW.format(week=week, phase=PHASES[phase], deload=DELOAD if deload else "",
+                                volume=volume,
+                                long_run=LONG_RUN.format(km=long_run) if long_run else RACE_WEEK,
+                                qualities=qualities, keys=keys or "—")
+    return text

@@ -15,6 +15,9 @@ Exit codes of `check` and `show`; the distinction carries everything else:
 `propose` checks one to three full revisions the athlete asked for from the notebook and
 keeps them as proposals: none prescribes anything until the athlete takes one.
 
+`draft` prints the engine's draft of the week (`redline.analysis.weekly_draft`), the first
+revision the coach amends with evidence; nothing is written.
+
 `variants` reads the athlete's days (`--input`, see `redline.model.week_days`) and prints the
 placements of the remaining sessions those days allow, best first. `days` prints the days
 already known for the week: habits and days stated ahead. Neither writes anything.
@@ -42,6 +45,7 @@ from redline.model import (
     entrypoint,
     iso_week,
 )
+from redline.model.errors import InputError
 from redline.model.notes import NoteError
 from redline.model.weekly_plan import (
     active,
@@ -225,11 +229,21 @@ def _database_command(store, command: str, week: str, optional: bool,
     return EXIT_OK
 
 
+def _draft(store, week: str) -> int:
+    """The engine's draft of `week`, as JSON."""
+    from redline.analysis import weekly_draft
+    found = weekly_draft.frame(store, week, dt.date.today())
+    if found is None:
+        raise InputError(f"{week}: no cycle version holds the week (`redline cycle show`)")
+    print(json.dumps(weekly_draft.draft(found, now_stamp()), ensure_ascii=False, indent=2))
+    return EXIT_OK
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command",
                         choices=("check", "show", "revise", "preview", "variants", "days",
-                                 "propose"))
+                                 "propose", "draft"))
     parser.add_argument("--week", type=_args.week, default=iso_week.of(dt.date.today()))
     parser.add_argument("--optional", action="store_true")
     parser.add_argument("--input", help="revise/preview JSON, or the days of variants "
@@ -246,6 +260,8 @@ def main() -> int:
         return EXIT_OK
     if args.command == "variants":
         return _variants(store, args.week, args.input, args.json)
+    if args.command == "draft":
+        return _draft(store, args.week)
     return _database_command(store, args.command, args.week, args.optional, args.input)
 
 if __name__ == "__main__":

@@ -25,7 +25,9 @@ from redline.analysis import (
     progression_strength,
     signals,
     week_review,
+    weekly_draft,
 )
+from redline.coach import dates
 from redline.coach.fr import debrief as debrief_text
 from redline.coach.fr import progression as progression_text
 from redline.coach.fr import weekly_dossier as text
@@ -42,12 +44,28 @@ MAX_LISTED = 12
 
 
 def _cycle(store: OperationalStore, week: str, today: dt.date) -> list[str]:
-    """The cycle in force and the week the review prepares within it; a refusal is
-    reported."""
+    """The cycle in force, the week the review prepares within it and the engine's draft
+    of that week; a refusal is reported."""
     try:
-        return ["", *cycle_report.review_lines(store, week, today)]
+        lines = ["", *cycle_report.review_lines(store, week, today)]
     except RedlineError as exc:
         return ["", text.CYCLE_UNAVAILABLE.format(reason=str(exc).replace("\n", " "))]
+    upcoming = iso_week.shift(week, 1)
+    try:
+        found = weekly_draft.frame(store, upcoming, today)
+    except RedlineError as exc:
+        return [*lines, text.DRAFT_UNAVAILABLE.format(reason=str(exc).replace("\n", " "))]
+    if found is None:
+        return lines
+    draft = weekly_draft.draft(found, f"{today.isoformat()}T00:00:00+00:00")
+    return [*lines, "", text.DRAFT.format(week=upcoming,
+                                          volume=draft.get("volume_target_km") or 0),
+            *(text.DRAFT_SESSION.format(day=dates.weekday(dt.date.fromisoformat(session["date"])),
+                                        session=session["id"], title=session["title"],
+                                        km=session.get("distance_target_km") or 0,
+                                        key=text.DRAFT_KEY.format(position=session["key_position"])
+                                        if session.get("key_position") is not None else "")
+              for session in draft["sessions"])]
 
 
 def _progression(store: OperationalStore, root: Path, week: str, today: dt.date) -> list[str]:

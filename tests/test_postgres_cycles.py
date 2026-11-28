@@ -331,3 +331,30 @@ def test_the_planner_asks_for_a_plan_review_once_a_candidate_can_start(store):
     [job] = [job for job in state.proactive.jobs(active_only=True)
              if job["kind"] == "plan_review"]
     assert job["detail"] == "Semi"
+
+
+def test_a_first_revision_keeps_its_draft_and_the_vault_projects_the_version(store, tmp_path,
+                                                                              monkeypatch,
+                                                                              capsys):
+    from test_weekly_plan import revision, session
+
+    from redline.cli import week_plan
+    from redline.storage import projector
+    _apply(store, _general(), CycleCause.MIGRATION, level=GeneralLevel.MAINTAIN)
+    kept = {"revision": 1, "sessions": []}
+    store.append_plan_revision("2030-W12", revision(
+        computed_at="2030-03-15T19:10:00+01:00", draft=kept,
+        sessions=[session("w12-mar-ef", date="2030-03-19")]))
+    assert store.load_plan("2030-W12")["revisions"][-1]["draft"] == kept
+    projector.project_cycle(store, tmp_path)
+    note = (tmp_path / "coaching" / "current-plan.md").read_text()
+    assert note.startswith("# Plan en cours") and "| 2030-W12 | générale |" in note
+    monkeypatch.setattr("redline.storage.open_store", lambda actor: store)
+    monkeypatch.setattr("sys.argv", ["week-plan", "draft", "--week", "2030-W13"])
+    assert week_plan.main() == 0
+    drafted = json.loads(capsys.readouterr().out)
+    assert drafted["revision"] == 1 and drafted["volume_target_km"] > 0
+    monkeypatch.setattr("sys.argv", ["week-plan", "draft", "--week", "2030-W40"])
+    from redline.model.errors import InputError
+    with pytest.raises(InputError, match="no cycle version holds"):
+        week_plan.main()

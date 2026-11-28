@@ -73,8 +73,9 @@ def _easy_pace(rows: list[ledger.Row], today: dt.date) -> float | None:
     return statistics.median(paces) if paces else None
 
 
-def _lineages(store: Any, book: rulebook.Rulebook, today: dt.date) -> tuple[tuple[str, Dose],
-                                                                           ...]:
+def lineages(store: Any, book: rulebook.Rulebook, today: dt.date) -> tuple[tuple[str, Dose],
+                                                                          ...]:
+    """The dose each run lineage stands at, by the workout it follows."""
     found = []
     for proposal in progression_runs.proposals(store, book, today):
         lineage = book.progression.of(proposal.lineage)
@@ -158,4 +159,4 @@ def inputs(store: Any, templates: CycleTemplates, today: dt.date) -> Inputs:
                   parameters.skeleton_long_step_max_pct,
                   _minutes(store, iso_week.monday(origin)), _easy_pace(rows, today),
                   calibrated, found.adopted_on if found else None,
-                  _lineages(store, book, today))
+                  lineages(store, book, today), parameters.quality_sessions_per_week)
