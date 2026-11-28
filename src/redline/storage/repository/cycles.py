@@ -120,6 +120,10 @@ class Cycles(StoreBase):
             sa.or_(cycle_versions.c.kind.in_(LOW_KINDS), cycle_weeks.c.deload.is_(True),
                    cycle_weeks.c.phase == PlanPhase.TAPER))).scalars())
 
+    def planned_low_weeks(self) -> set[str]:
+        with self.database.engine.connect() as connection:
+            return self.planned_low_weeks_in(connection)
+
     def _race_id_in(self, connection: Connection, race_key: str | None) -> uuid.UUID | None:
         if not race_key:
             return None

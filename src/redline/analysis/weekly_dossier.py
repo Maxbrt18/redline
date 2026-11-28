@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 from redline.analysis import (
     caution_review,
     cycle_report,
+    cycle_review,
     expected_rpe,
     feasibility,
     ledger,
@@ -44,10 +45,11 @@ MAX_LISTED = 12
 
 
 def _cycle(store: OperationalStore, week: str, today: dt.date) -> list[str]:
-    """The cycle in force, the week the review prepares within it and the engine's draft
-    of that week; a refusal is reported."""
+    """The cycle in force, the week the review prepares within it, the state of its
+    hypotheses and the engine's draft of that week; a refusal is reported."""
     try:
-        lines = ["", *cycle_report.review_lines(store, week, today)]
+        lines = ["", *cycle_report.review_lines(store, week, today),
+                 *cycle_review.lines(store, today)]
     except RedlineError as exc:
         return ["", text.CYCLE_UNAVAILABLE.format(reason=str(exc).replace("\n", " "))]
     upcoming = iso_week.shift(week, 1)

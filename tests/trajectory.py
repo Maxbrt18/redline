@@ -15,14 +15,15 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
-from collections.abc import Collection
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from typing import Protocol
 
-from redline.analysis import cycle_inputs, cycle_report
+from redline.analysis import cycle_inputs, cycle_report, cycle_review
 from redline.model import cycle_templates, iso_week
 from redline.model import plan_generator as generator
 from redline.model.cycles import CycleVersion
+from redline.model.hypotheses import Review
 from redline.model.vocabulary import (
     CycleCause,
     CycleVersionState,
@@ -108,6 +109,12 @@ class Store:
 
     def open_cycle_proposal(self, now: dt.datetime) -> CycleVersion | None:
         return None
+
+    def planned_low_weeks(self) -> set[str]:
+        if self.cycle is None:
+            return set()
+        return {week.label for week in self.cycle.trame.weeks
+                if week.deload or week.phase == PlanPhase.TAPER}
 
     def prediction_rows(self) -> list[dict]:
         return []
@@ -204,12 +211,13 @@ def ceiling(planner: Planner, store: Store, week: str, written_on: dt.date) -> f
 @dataclass(frozen=True)
 class Lived:
     """One week of the preparation: what the review showed, the most the gate accepted,
-    what the athlete ran."""
+    what the athlete ran, and the review of the version's hypotheses that Sunday."""
 
     week: str
     shown: Bound | None
     ceiling_km: float
     run_km: float
+    review: Review
 
 
 def run_week(store: Store, week: str, volume_km: float, long_run_km: float) -> None:
@@ -258,13 +266,14 @@ def take(store: Store, week: str) -> CycleVersion:
 
 
 def simulate(*, start_km: float = 30, start_long_km: float = 14,
-             missed: Collection[int] = (), through: str | None = None, goal: dict = HALF,
+             missed: Collection[int] = (), short: Mapping[int, float] | None = None,
+             through: str | None = None, goal: dict = HALF,
              first: str = FIRST_WEEK, race_on: dt.date = RACE_ON,
              planner: Planner | None = None) -> Preparation:
     """The preparation from its window's first week to the race week, or to `through`,
     lived by an athlete who ran `start_km` a week before it (`start_long_km` the long run),
-    took the balanced candidate the Sunday before, and misses the weeks whose index is in
-    `missed`."""
+    took the balanced candidate the Sunday before, misses the weeks whose index is in
+    `missed`, and runs only the share `short` gives of the weeks it names."""
     planner = planner or CyclePlanner()
     store = Store(goal, race_on)
     start = window_start(first, race_on)
@@ -277,8 +286,12 @@ def simulate(*, start_km: float = 30, start_long_km: float = 14,
     while week <= last:
         shown = planner.shown(store, week)
         most = ceiling(planner, store, week, review_day(week))
+        assert store.cycle is not None
+        review = cycle_review.review(store, TEMPLATES, store.cycle, review_day(week),
+                                     store.planned_low_weeks())
         run = 0.0 if index in missed or shown is None else min(shown.volume_km, most)
+        run = round(run * (short or {}).get(index, 1.0), 1)
         run_week(store, week, run, shown.long_run_km if shown else 0)
-        lived.append(Lived(week, shown, most, run))
+        lived.append(Lived(week, shown, most, run, review))
         week, index = iso_week.shift(week, 1), index + 1
     return Preparation(store, tuple(lived))

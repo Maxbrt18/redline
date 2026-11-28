@@ -611,6 +611,29 @@ class CycleCause(StrEnum):
     MIGRATION = "migration"
 
 
+class HypothesisKind(StrEnum):
+    """What a preparation's version holds as long as it does (`redline.model.hypotheses`):
+    the peak its volume climbs to, the doses its key sessions reach, the time the habits
+    leave, the race it prepares, the goal time and the calibration its paces are rendered
+    from."""
+
+    VOLUME_HELD = "volume_held"
+    LINEAGE_POSITION = "lineage_position"
+    AVAILABILITY = "availability"
+    GOAL = "goal"
+    GOAL_TIME = "goal_time"
+    CALIBRATION = "calibration"
+
+
+class HypothesisOutcome(StrEnum):
+    """What a version's fallen hypotheses call for: its paces rendered again from what
+    changed, the week's draft adapting within its bounds, or a new version."""
+
+    RECALIBRATE = "recalibrate"
+    LOCAL = "local"
+    REPLAN = "replan"
+
+
 class GeneralLevel(StrEnum):
     """How much the general preparation asks: to progress, to maintain what is held, or
     to train lightly."""

@@ -574,16 +574,19 @@ class VaultRepo:
         return render_context_packet(self._store, depth, clock.today())
 
     def cycle_candidates(self) -> str:
-        """The goal's candidates the plan review chooses among; a failure is reported,
-        never blocking: the model then reruns `redline cycle candidates` itself."""
+        """The goal's candidates the plan review chooses among, after the hypotheses of
+        the preparation in force; a failure is reported, never blocking: the model then
+        reruns `redline cycle candidates` itself."""
         if self._store is None:
             return ""
-        from redline.analysis import cycle_report
+        from redline.analysis import cycle_report, cycle_review
         from redline.coach.fr import cycle as wording
         from redline.model.vocabulary import CycleKind
         try:
-            return "\n".join(cycle_report.candidates(self._store, clock.today(),
-                                                     CycleKind.PREPARATION, None))
+            today = clock.today()
+            return "\n".join([*cycle_review.lines(self._store, today),
+                              *cycle_report.candidates(self._store, today,
+                                                       CycleKind.PREPARATION, None)])
         except Exception:  # the candidates are an aid, never a gate
             log.exception("Cycle candidates not computed")
             return wording.CANDIDATES_UNAVAILABLE

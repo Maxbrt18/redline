@@ -70,6 +70,26 @@ CANDIDATES_UNAVAILABLE = ("[CANDIDATS indisponibles : calcul en échec, voir les
                           "Relance toi-même `redline cycle candidates`.]")
 PROPOSAL_OPEN = ("Proposition « {candidate} » envoyée, en attente de l'athlète jusqu'au "
                  "{until:%d/%m/%Y}.")
+HYPOTHESES_HOLD = ("  Hypothèses de la préparation : toutes tiennent, le reste de la trame "
+                   "est atteignable.")
+HYPOTHESES_FALLEN = "  Hypothèses tombées ({outcome}) : {fallen}."
+OUTCOMES = {"replan": "replanification : une revue du plan propose une nouvelle version",
+            "recalibrate": "allures recalculées, la trame tient",
+            "local": "la semaine s'adapte dans ses bornes"}
+FALLEN_TEXT = {
+    "volume_held": "volume : depuis le départ actuel, la rampe n'atteint que {value} km/sem "
+                   "pour un pic de {reference} km/sem",
+    "lineage_position": "{workout} : {value} cran(s) de retard sur sa dernière dose, pour "
+                        "{reference} exposition(s) qui progressent encore",
+    "availability": "temps disponible : {value} min/sem au lieu de {reference}, une semaine "
+                    "restante n'y tient plus ou le pic plafonné pourrait monter",
+    "goal_time": "chrono objectif changé",
+    "calibration": "nouvelle calibration en vigueur",
+}
+FALLEN_GOAL = {"on": "la date de la course a changé",
+               "distance_km": "la distance de la course a changé",
+               "terrain": "le terrain de la course a changé"}
+NO_LIMIT = "sans limite"
 NOTE_HEADER = ("# Plan en cours\n\n"
                "Projection de la version du cycle en cours, régénérée depuis PostgreSQL : ne "
                "pas l'éditer. `redline cycle show` en donne les allures du jour.\n")

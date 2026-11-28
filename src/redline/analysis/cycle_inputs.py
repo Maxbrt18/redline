@@ -47,7 +47,7 @@ def _volumes(rows: list[ledger.Row], weeks: list[str]) -> list[float]:
             for week in weeks]
 
 
-def _minutes(store: Any, first: dt.date) -> int | None:
+def minutes(store: Any, first: dt.date) -> int | None:
     """The minutes the habits leave for running in the week from `first`; None when a
     running day states no limit."""
     days = [first + dt.timedelta(days=offset) for offset in range(7)]
@@ -141,6 +141,19 @@ def standing(store: Any, templates: CycleTemplates, today: dt.date,
                     round(floor, 1))
 
 
+def closed_volumes(store: Any, today: dt.date, planned_low: Collection[str],
+                   weeks: int) -> tuple[tuple[str, float], ...]:
+    """The running volume of each of the last `weeks` closed weeks before `today`, newest
+    first, the assimilation weeks and the weeks a cycle planned low left out."""
+    parameters = _parameters()
+    rows = ledger.parse_ledger(store)
+    current = iso_week.of(today)
+    skipped = set(parameters.assimilation_weeks) | set(planned_low)
+    labels = [week for week in (iso_week.shift(current, -offset)
+                                for offset in range(1, weeks + 1)) if week not in skipped]
+    return tuple(zip(labels, _volumes(rows, labels), strict=True))
+
+
 def _round(value: float | None) -> float | None:
     return None if value is None else round(value, 1)
 
@@ -164,6 +177,6 @@ def inputs(store: Any, templates: CycleTemplates, today: dt.date) -> Inputs:
     return Inputs(origin, round(start, 1), ledger.longest_recent(rows, today) or 0.0,
                   round(held, 1), parameters.skeleton_ramp_max_pct,
                   parameters.skeleton_long_step_max_pct,
-                  _minutes(store, iso_week.monday(origin)), _easy_pace(rows, today),
+                  minutes(store, iso_week.monday(origin)), _easy_pace(rows, today),
                   calibrated, found.adopted_on if found else None,
                   lineages(store, book, today), parameters.quality_sessions_per_week)

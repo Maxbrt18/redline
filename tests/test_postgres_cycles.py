@@ -358,3 +358,35 @@ def test_a_first_revision_keeps_its_draft_and_the_vault_projects_the_version(sto
     from redline.model.errors import InputError
     with pytest.raises(InputError, match="no cycle version holds"):
         week_plan.main()
+
+
+def _taken(store, on=dt.date(2030, 6, 30)):
+    """The goal, the general preparation, then a preparation proposed and taken."""
+    _goal(store, on)
+    _apply(store, _general("2030-W10"), CycleCause.MIGRATION, level=GeneralLevel.MAINTAIN)
+    with store.database.transaction() as connection:
+        proposed = store.propose_cycle_in(connection, _proposal_trame(), {"by": "judgment"},
+                                          "half", NOW + dt.timedelta(days=7))
+        return store.take_cycle_in(connection, proposed.id, NOW)
+
+
+def test_the_planner_asks_once_for_the_review_a_moved_race_calls_for(store):
+    taken = _taken(store)
+    state = PostgresStateStore(store.database)
+
+    def replans() -> list[dict]:
+        return [job for job in state.proactive.jobs()
+                if job["id"].startswith(f"plan-review:{taken.id}:")]
+
+    state.materialize_intelligence(NOW)
+    assert replans() == [], "a preparation whose hypotheses hold asks nothing"
+    _goal(store, dt.date(2030, 7, 7))
+    state.materialize_intelligence(NOW)
+    state.materialize_intelligence(NOW)
+    [job] = replans()
+    assert job["id"] == f"plan-review:{taken.id}:goal" and job["detail"] == "Semi"
+    state.proactive.complete_job(job["id"])
+    with store.database.transaction() as connection:
+        connection.execute(sa.text("DELETE FROM redline.proactive_jobs"))
+    state.materialize_intelligence(NOW + dt.timedelta(days=1))
+    assert replans() == [], "a replan reviewed is never asked again for the same set"
