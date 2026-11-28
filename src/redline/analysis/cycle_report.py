@@ -19,7 +19,7 @@ from typing import Any
 
 from redline.coach.fr import cycle as text
 from redline.model import calibration as calibration_model
-from redline.model import cycle_templates, instance, intensity, iso_week, paths
+from redline.model import cycle_templates, instance, intensity, iso_week, paths, transitions
 from redline.model import plan_generator as generator
 from redline.model import race as race_model
 from redline.model.cycle_templates import CycleTemplates, Intensity
@@ -65,6 +65,9 @@ def _intensity(found: Intensity | None, refs: intensity.References) -> str:
 def _key(key: Key, refs: intensity.References) -> str:
     if key.role == KeyRole.TEST:
         return text.TEST
+    if key.role == KeyRole.FIRST:
+        return text.FIRST.format(position=key.position,
+                                 label=transitions.label(key.transition or ""))
     return text.KEY.format(position=key.position,
                            role=text.FLAGSHIP if key.role == KeyRole.FLAGSHIP else "",
                            workout=key.workout, dose=_dose(key.dose),

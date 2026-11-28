@@ -1,32 +1,24 @@
-"""Computed guardrail no. 8: typed transitions and backward feasibility.
+"""Computed guardrail no. 8: typed transitions.
 
-1. **at most one transition per week** (`per_week_errors`, called by revision
-   validation);
-2. **a backward solver** that places the remaining first-time sessions on the weeks left
-   before the taper and, if no placement exists, says which waiver or relaxation would
-   make one possible.
+A transition is a session whose nature leaves the past weeks (a first quality, a first
+descent block, new terrain): the program types it (`transition`), and a week carries at
+most the rulebook's `transitions_per_week` (`per_week_errors`, called by revision
+validation). The first times a race requires are placed by its preparation's trame
+(`redline.model.plan_generator`), never by a solver of their own.
 
 Easy increases (long-run step, longer easy run, extra outing) are not transitions: they
 go through the observable gate (`rulebook.py`), read at the review.
-
-The solver DECIDES NOTHING. Its assumptions are printed with its verdict.
 """
 
 from __future__ import annotations
 
 import datetime as dt
-from dataclasses import dataclass, replace
-from itertools import combinations
+from dataclasses import dataclass
 
 from redline.coach.fr import transitions as text
 
 from . import iso_week, rulebook
 from .vocabulary import SessionStatus
-
-#: An untyped, derived novelty: a long outing beyond the longest of the last 30 days. It
-#: is not a transition but an easy increase, which goes through the observable gate and
-#: stacks with a transition.
-LONG_RUN_STEP = "long-run-step"
 
 
 def kinds() -> tuple[str, ...]:
@@ -35,8 +27,6 @@ def kinds() -> tuple[str, ...]:
 
 
 def label(kind: str) -> str:
-    if kind == LONG_RUN_STEP:
-        return text.LONG_RUN_STEP
     return rulebook.current().label(kind)
 
 
@@ -91,147 +81,3 @@ def per_week_errors(sessions: list[dict], where: str) -> list[str]:
         return problems
     names = ", ".join(f"{s['id']} ({s['transition']})" for s in typed)
     return [*problems, f"{where}: {len(typed)} transitions in the week ({names}), rule n8: {allowed} at most"]
-
-
-@dataclass(frozen=True)
-class Problem:
-    """The remaining weeks, what is already decided in them, and what is left to place."""
-
-    race_on: dt.date
-    weeks: tuple[str, ...]                       # current week up to the taper, excluded
-    assimilation: frozenset[str]                 # guardrail no. 2: nothing is added
-    taper: tuple[str, ...]                       # taper and race: no novelty
-    fixed: dict[str, tuple[str, ...]]            # novelties carried by an active revision
-    required: tuple[str, ...]                    # first times still to place
-    done: tuple[str, ...] = ()                   # first times already done
-
-
-@dataclass(frozen=True)
-class Rules:
-    per_week: int | None = None   # guardrail no. 8; None: the rulebook's
-    open_assimilation: bool = False
-
-
-@dataclass(frozen=True)
-class Schedule:
-    novelties: dict[str, tuple[str, ...]]
-
-    @property
-    def long_run_steps(self) -> int:
-        return sum(items.count(LONG_RUN_STEP) for items in self.novelties.values())
-
-    def line(self, weeks: tuple[str, ...]) -> str:
-        return " ; ".join(
-            f"{iso_week.short(week)} " + (" + ".join(label(item) for item in self.novelties[week])
-                                 or text.NOTHING_NEW)
-            for week in weeks)
-
-
-def solve(problem: Problem, rules: Rules | None = None) -> Schedule | None:
-    """The best placement, or None if there is none.
-
-    Best = all first times placed, then as many long-run steps as possible (a step does not
-    count as a transition: it is only excluded from assimilation), then transitions as
-    early as possible. Exhaustive search: the space is tiny.
-    """
-    rules = rules or Rules()
-    per_week = (rules.per_week if rules.per_week is not None
-                else rulebook.current().parameters.transitions_per_week)
-    best: tuple[tuple, Schedule] | None = None
-
-    def options(week: str, remaining: tuple[str, ...]) -> list[tuple[str, ...]]:
-        if week in problem.fixed:
-            return [problem.fixed[week]]
-        if week in problem.assimilation and not rules.open_assimilation:
-            return [()]
-        found: list[tuple[str, ...]] = []
-        for size in range(per_week + 1):
-            for kinds in combinations(remaining, size):
-                found.extend([(LONG_RUN_STEP, *kinds), kinds])
-        return found
-
-    def walk(index: int, remaining: tuple[str, ...], order: list[int],
-             novelties: dict[str, tuple[str, ...]]) -> None:
-        nonlocal best
-        if index == len(problem.weeks):
-            if remaining:
-                return
-            schedule = Schedule(dict(novelties))
-            score = (schedule.long_run_steps, [-i for i in order])
-            if best is None or score > best[0]:
-                best = (score, schedule)
-            return
-        week = problem.weeks[index]
-        for choice in options(week, remaining):
-            new = [item for item in choice if item != LONG_RUN_STEP]
-            left = tuple(kind for kind in remaining if kind not in new)
-            walk(index + 1, left, order + [index] * len(new), {**novelties, week: choice})
-
-    walk(0, tuple(k for k in problem.required
-                  if not any(k in items for items in problem.fixed.values())), [], {})
-    return best[1] if best else None
-
-
-@dataclass(frozen=True)
-class Option:
-    label: str
-    schedule: Schedule | None
-
-
-@dataclass(frozen=True)
-class Verdict:
-    problem: Problem
-    feasible: bool
-    options: tuple[Option, ...]
-
-
-def diagnose(problem: Problem) -> Verdict:
-    """The verdict under the current rules; if there is none, each lever in isolation."""
-    per_week = rulebook.current().parameters.transitions_per_week
-    current = Option(text.CURRENT_RULES, solve(problem))
-    if current.schedule is not None:
-        return Verdict(problem, True, (current,))
-    levers: list[Option] = []
-    for kind in problem.required:
-        reduced = replace(problem, required=tuple(k for k in problem.required if k != kind))
-        levers.append(Option(text.LEVER_WITHOUT.format(label=label(kind)), solve(reduced)))
-    levers.append(Option(text.LEVER_EXTRA_TRANSITION,
-                         solve(problem, Rules(per_week=per_week + 1))))
-    if problem.assimilation & set(problem.weeks):
-        levers.append(Option(text.LEVER_ASSIMILATION,
-                             solve(problem, Rules(open_assimilation=True))))
-    return Verdict(problem, False, tuple(levers))
-
-
-def _option_lines(option: Option, weeks: tuple[str, ...], prefix: str) -> list[str]:
-    if option.schedule is None:
-        return [text.OPTION_NOT_ENOUGH.format(prefix=prefix, label=option.label)]
-    return [text.OPTION_STEPS.format(prefix=prefix, label=option.label, long_run_steps=option.schedule.long_run_steps, line=option.schedule.line(weeks))]
-
-
-def render(verdict: Verdict) -> list[str]:
-    """The verdict as sent to the review: short, assumptions included."""
-    problem = verdict.problem
-    lines = [text.RENDER_HEADER.format(race_on=problem.race_on, taper_start=iso_week.short(problem.taper[0]), taper_end=iso_week.short(problem.taper[-1]))]
-    if not problem.weeks:
-        return [*lines, text.RENDER_NO_WEEK]
-    assimilation = [iso_week.short(w) for w in problem.weeks if w in problem.assimilation]
-    lines.append(
-        text.RENDER_WEEKS.format(first=iso_week.short(problem.weeks[0]), last=iso_week.short(problem.weeks[-1]))
-        + (text.RENDER_ASSIMILATION.format(weeks=", ".join(assimilation)) if assimilation else "")
-        + text.RENDER_FIRSTS
-        + (", ".join(label(k) for k in problem.required) or text.NO_FIRST)
-        + (text.RENDER_DONE + ", ".join(label(k) for k in problem.done)
-           if problem.done else "") + ".")
-    if problem.fixed:
-        lines.append(text.RENDER_FIXED + " ; ".join(
-            f"{iso_week.short(w)} " + (" + ".join(label(i) for i in items) or text.NOTHING_NEW)
-            for w, items in sorted(problem.fixed.items())) + ".")
-    lines.append(text.RENDER_ASSUMPTIONS.format(transitions_per_week=rulebook.current().parameters.transitions_per_week))
-    if verdict.feasible:
-        return [*lines, *_option_lines(verdict.options[0], problem.weeks, text.FEASIBLE)]
-    lines.append(text.INFEASIBLE)
-    for option in verdict.options:
-        lines.extend(_option_lines(option, problem.weeks, "- "))
-    lines.append(text.RENDER_NO_DECISION)
-    return lines

@@ -37,7 +37,8 @@ def observed(store: Any, version: CycleVersion, today: dt.date,
     return Observed(today, weeks, cycle_inputs.lineages(store, rulebook.current(), today),
                     cycle_inputs.minutes(store, upcoming),
                     found.adopted_on if found is not None else None,
-                    cycle_inputs.goal(race) if race is not None else None)
+                    cycle_inputs.goal(race) if race is not None else None,
+                    cycle_inputs.firsts_done(store))
 
 
 def review(store: Any, templates: CycleTemplates, version: CycleVersion, today: dt.date,

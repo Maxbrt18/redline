@@ -12,8 +12,7 @@ partial merge would let two versions of the same rule coexist, the very fault th
 exists to prevent.
 
 It is the SINGLE SOURCE of the thresholds the code applies (`redline ledger`,
-`redline feasibility`, `transitions.py`) and of the transition kinds a program may
-carry. A threshold cited in a rule's text (`{pain_cap}`) is rendered from the same value:
+`transitions.py`) and of the transition kinds a program may carry. A threshold cited in a rule's text (`{pain_cap}`) is rendered from the same value:
 what the coach reads is what the code applies.
 
 It also declares the instance's pain scales (`[scales]`, `redline.model.pain_scales`):
@@ -285,7 +284,6 @@ RULEBOOK_SCHEMA = Schema("rulebook.toml", [
         "transition", dict, schema=Schema("[[transitions]]", [
             field("slug", str, pattern=formats.SLUG),
             field("label", str, minimum=1, maximum=40),
-            field("race_first", bool, required=False),
             field("quality", bool, required=False),
         ]))),
     field("rules", list, minimum=1, maximum=20, item=field(
@@ -395,7 +393,6 @@ class Parameters:
 class TransitionKind:
     slug: str
     label: str
-    race_first: bool = False
     quality: bool = False
 
 
@@ -426,10 +423,6 @@ class Rulebook:
     @property
     def kinds(self) -> tuple[str, ...]:
         return tuple(kind.slug for kind in self.transitions)
-
-    @property
-    def race_firsts(self) -> tuple[str, ...]:
-        return tuple(kind.slug for kind in self.transitions if kind.race_first)
 
     @property
     def quality_kinds(self) -> frozenset[str]:

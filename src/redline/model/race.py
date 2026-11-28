@@ -23,7 +23,7 @@ import datetime as dt
 from dataclasses import dataclass
 from typing import Protocol
 
-from . import cycle_templates, rulebook
+from . import cycle_templates, formats, rulebook
 from .schema import Schema, field
 from .vocabulary import (
     CLOSED_RACE_STATES,
@@ -37,9 +37,14 @@ from .vocabulary import (
 
 
 def _goal_coherent(context: dict) -> list[str]:
+    problems = []
     if (context.get("goal_time_s") is None) != (context.get("goal_source") is None):
-        return ["goal_time_s and goal_source go together"]
-    return []
+        problems.append("goal_time_s and goal_source go together")
+    known = rulebook.current().kinds
+    problems += [f"firsts: {kind!r} is no transition kind of the rulebook "
+                 f"(expected: {', '.join(known)})"
+                 for kind in context.get("firsts") or () if kind not in known]
+    return problems
 
 
 AID_STATION_SCHEMA = Schema("aid station", [
@@ -69,6 +74,9 @@ CONTEXT_SCHEMA = Schema("race context", [
     field("goal_source", str, required=False, choices=tuple(GoalSource)),
     field("power_hike_from_pct", int, required=False, minimum=3, maximum=40,
           note="on a trail, the grade the long runs walk briskly from"),
+    field("firsts", list, required=False, maximum=6,
+          item=field("first", str, pattern=formats.SLUG),
+          note="the transition kinds the race requires a first time of before the taper"),
 ], extra=True, check=_goal_coherent)
 
 
@@ -91,6 +99,8 @@ class Goal:
     dplus_m: int | None = None
     goal_time_s: int | None = None
     goal_source: GoalSource | None = None
+    #: The transition kinds the race requires a first time of before the taper.
+    firsts: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -123,7 +133,8 @@ def _goal(context: dict) -> Goal | None:
     return Goal(
         distance_km=float(context["distance_km"]), terrain=RaceTerrain(context["terrain"]),
         dplus_m=context.get("dplus_m"), goal_time_s=context.get("goal_time_s"),
-        goal_source=GoalSource(context["goal_source"]) if context.get("goal_source") else None)
+        goal_source=GoalSource(context["goal_source"]) if context.get("goal_source") else None,
+        firsts=tuple(context.get("firsts") or ()))
 
 
 def template_of(goal: Goal | None) -> cycle_templates.Preparation | None:

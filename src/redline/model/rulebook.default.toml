@@ -260,9 +260,9 @@ carbs_g_h = { minimum = 0, maximum = 90, step = 15 }
 # ------------------------------------------------------------------ transitions
 
 # The session KINDS a transition may carry. The slug is what the program records; the
-# label, what the logbook and the review display. `race_first`: a first time the race
-# requires before the taper (the backward solver places it). `quality`: the session is
-# debriefed as a quality session, repetition by repetition.
+# label, what the logbook and the review display. A race declares the first times it
+# requires (`firsts` in its context), which its preparation's trame places. `quality`: the
+# session is debriefed as a quality session, repetition by repetition.
 [[transitions]]
 slug = "quality"
 label = "1re qualité"
@@ -283,7 +283,6 @@ label = "terrain neuf"
 [[transitions]]
 slug = "reconnaissance"
 label = "reconnaissance du tracé"
-race_first = true
 
 # ------------------------------------------------------------------ rules
 

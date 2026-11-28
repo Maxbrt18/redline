@@ -211,3 +211,19 @@ def test_two_causes_found_the_same_day_ask_for_one_review():
 
 def test_nothing_that_calls_for_a_new_version_asks_for_no_review():
     assert hypotheses.review_key(uuid.uuid4(), hypotheses.HOLDS) is None
+
+
+def test_first_times_left_with_no_room_on_the_build_weeks_left_replan():
+    goal = dataclasses.replace(GOAL, firsts=("night",))
+    trame = _trame(goal=goal)
+    assert any(key.role == "first" for key in trame.keys)
+    taper_day = dt.date(2031, 3, 26)
+    pending = hypotheses.check(trame, _observed(trame, taper_day, goal=goal), TEMPLATES)
+    assert pending.fallen == (Fallen(HypothesisKind.FIRSTS, 1.0, 0.0),)
+    done = hypotheses.check(trame, _observed(trame, taper_day, goal=goal,
+                                             firsts_done=frozenset({"night"})), TEMPLATES)
+    assert done == hypotheses.HOLDS
+    assert hypotheses.check(trame, _observed(trame, goal=goal), TEMPLATES) \
+        == hypotheses.HOLDS, "build weeks are left: the first slides"
+    changed = hypotheses.check(trame, _observed(trame, goal=GOAL), TEMPLATES)
+    assert changed.fallen == (Fallen(HypothesisKind.GOAL, field="firsts"),)

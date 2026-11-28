@@ -465,11 +465,12 @@ ENTRY_VIEW = {
 }
 
 
-def plan_key(position, workout, reps, rep_seconds, *, role="key", pace=None, rpe=None):
+def plan_key(position, workout, reps, rep_seconds, *, role="key", pace=None, rpe=None,
+             transition=None):
     """A key session of a trame's week, as the Plan screen shows it."""
     return {"position": position, "workout": workout, "role": role, "reps": reps,
             "rep_seconds": rep_seconds, "recovery_seconds": 60 if reps else None,
-            "pace_s": pace, "rpe": rpe}
+            "pace_s": pace, "rpe": rpe, "transition": transition}
 
 
 #: A half on the road prepared over thirteen weeks: (week, phase, deload, km, long run,
@@ -481,7 +482,8 @@ PREPARATION = [
     ("2026-W39", "development", False, 31.5, 9.4,
      [plan_key(1, "hills", 6, 45, rpe=[7.0, 8.0])]),
     ("2026-W40", "development", False, 33.0, 9.9,
-     [plan_key(1, "threshold", 3, 600, pace=[264.0, 252.0])]),
+     [plan_key(1, "threshold", 3, 600, pace=[264.0, 252.0]),
+      plan_key(2, "long", None, None, role="first", transition="reconnaissance du tracé")]),
     (CURRENT_WEEK, "development", False, 33.0, 9.9,
      [plan_key(1, "threshold", 3, 600, pace=[264.0, 252.0])]),
     ("2026-W42", "development", True, 24.8, 7.4, [plan_key(1, "hills", 6, 45, rpe=[7.0, 8.0])]),

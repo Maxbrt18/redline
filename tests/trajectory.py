@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from redline.analysis import cycle_inputs, cycle_report, cycle_review
-from redline.model import cycle_templates, iso_week
+from redline.model import cycle_templates, cycles, iso_week
 from redline.model import plan_generator as generator
 from redline.model.cycles import CycleVersion
 from redline.model.hypotheses import Review
@@ -32,11 +32,12 @@ from redline.model.vocabulary import (
     PlanPhase,
     RacePriority,
     RaceState,
+    SessionStatus,
 )
 from redline.service import plan_revision
 
 #: A preparation run from where its first week stands: a half on the road.
-HALF = {"distance_km": 21.1, "terrain": "road"}
+HALF = {"distance_km": 21.1, "terrain": "road", "firsts": ["reconnaissance"]}
 FIRST_WEEK = "2030-W48"
 RACE_ON = dt.date(2031, 4, 6)
 #: The candidate the athlete takes.
@@ -60,6 +61,8 @@ class Store:
     def __init__(self, goal: dict, race_on: dt.date, others: tuple[dict, ...] = ()) -> None:
         self.goal, self.race_on, self.others = goal, race_on, others
         self.observations: list[dict] = []
+        #: The first times run, each a session typed with its transition.
+        self.firsts: list[dict] = []
         self.cycle: CycleVersion | None = None
 
     def run(self, day: dt.date, kind: str, km: float) -> None:
@@ -109,6 +112,9 @@ class Store:
 
     def open_cycle_proposal(self, now: dt.datetime) -> CycleVersion | None:
         return None
+
+    def active_plans(self) -> dict[str, dict]:
+        return {"run": {"sessions": self.firsts}} if self.firsts else {}
 
     def planned_low_weeks(self) -> set[str]:
         if self.cycle is None:
@@ -246,9 +252,14 @@ def window_start(first: str = FIRST_WEEK, race_on: dt.date = RACE_ON) -> str:
     assert template is not None
     levers = generator.candidate_levers(template)[TAKEN]
     blank = generator.Inputs(first, 0, 0, 0, 10, 10)
-    trame = generator.preparation(template, generator.Goal(race_on, HALF["distance_km"]),
+    trame = generator.preparation(template, _goal(HALF, race_on),
                                   levers, blank)
     return trame.weeks[0].label
+
+
+def _goal(context: dict, race_on: dt.date) -> generator.Goal:
+    return generator.Goal(race_on, context["distance_km"],
+                          firsts=tuple(context.get("firsts") or ()))
 
 
 def take(store: Store, week: str) -> CycleVersion:
@@ -256,7 +267,7 @@ def take(store: Store, week: str) -> CycleVersion:
     template = TEMPLATES.preparation_for(HALF["distance_km"], HALF["terrain"])
     assert template is not None
     inputs = cycle_inputs.inputs(store, TEMPLATES, review_day(week))
-    trame = generator.preparation(template, generator.Goal(store.race_on, HALF["distance_km"]),
+    trame = generator.preparation(template, _goal(store.goal, store.race_on),
                                   generator.candidate_levers(template)[TAKEN], inputs,
                                   candidate=TAKEN)
     store.cycle = CycleVersion(uuid.uuid4(), uuid.uuid4(), 1, CycleVersionState.ACTIVE, trame,
@@ -267,13 +278,14 @@ def take(store: Store, week: str) -> CycleVersion:
 
 def simulate(*, start_km: float = 30, start_long_km: float = 14,
              missed: Collection[int] = (), short: Mapping[int, float] | None = None,
-             through: str | None = None, goal: dict = HALF,
+             skip_firsts: bool = False, through: str | None = None, goal: dict = HALF,
              first: str = FIRST_WEEK, race_on: dt.date = RACE_ON,
              planner: Planner | None = None) -> Preparation:
     """The preparation from its window's first week to the race week, or to `through`,
     lived by an athlete who ran `start_km` a week before it (`start_long_km` the long run),
     took the balanced candidate the Sunday before, misses the weeks whose index is in
-    `missed`, and runs only the share `short` gives of the weeks it names."""
+    `missed`, runs only the share `short` gives of the weeks it names, and runs the race's
+    first times on the weeks that carry them, unless `skip_firsts`."""
     planner = planner or CyclePlanner()
     store = Store(goal, race_on)
     start = window_start(first, race_on)
@@ -292,6 +304,11 @@ def simulate(*, start_km: float = 30, start_long_km: float = 14,
         run = 0.0 if index in missed or shown is None else min(shown.volume_km, most)
         run = round(run * (short or {}).get(index, 1.0), 1)
         run_week(store, week, run, shown.long_run_km if shown else 0)
+        if run and not skip_firsts:
+            done = cycle_inputs.firsts_done(store)
+            store.firsts.extend({"id": f"{week}-{kind}", "transition": kind,
+                                 "status": SessionStatus.DONE}
+                                for kind in cycles.firsts_due(store.cycle.trame, week, done))
         lived.append(Lived(week, shown, most, run, review))
         week, index = iso_week.shift(week, 1), index + 1
     return Preparation(store, tuple(lived))

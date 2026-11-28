@@ -10,7 +10,7 @@ instructions are not here: they live in each instance's vault (template:
 |---|---|
 | `src/redline/model/` | pure rules and typed data: workout kinds, activities, the weekly plan, the rulebook, errors |
 | `src/redline/storage/` | PostgreSQL: `schema.py`, one repository module per aggregate, projections |
-| `src/redline/analysis/` | computations over the ledger (load, signals, descent, feasibility) |
+| `src/redline/analysis/` | computations over the ledger (load, signals, descent, cycles) |
 | `src/redline/integrations/` | Strava and weather clients, speech-to-text providers (`speech/`) |
 | `src/redline/service/` | the Messenger service, agent runners, the notebook API the iOS app calls |
 | `src/redline/coach/fr/` | every athlete-facing text: prompts, messages, labels, scales |

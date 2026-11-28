@@ -149,3 +149,13 @@ def test_a_race_moves_only_along_its_life(before, after, allowed):
 def test_a_race_is_done_once_its_state_is_closed():
     assert [race.status_of(state) for state in RaceState] == [
         "scheduled", "scheduled", "scheduled", "done", "done", "done", "done"]
+
+
+def test_a_race_declares_the_first_times_it_requires_among_the_rulebook_s_kinds():
+    context = {**GOAL, "firsts": ["night", "reconnaissance"]}
+    race.CONTEXT_SCHEMA.validate(context)
+    typed = race.from_row({"kind": "race", "status": "scheduled", "priority": "a",
+                           "race_state": "active", "due_on": "2031-04-06", "context": context})
+    assert typed.goal is not None and typed.goal.firsts == ("night", "reconnaissance")
+    with pytest.raises(SchemaError, match="no transition kind of the rulebook"):
+        race.CONTEXT_SCHEMA.validate({**GOAL, "firsts": ["swim"]})

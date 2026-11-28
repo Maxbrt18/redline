@@ -11,7 +11,13 @@ import pytest
 from redline.model import cycle_templates, cycles, iso_week
 from redline.model import plan_generator as generator
 from redline.model.progression import Dose
-from redline.model.vocabulary import CycleCause, CycleVersionState, GeneralLevel, RaceTerrain
+from redline.model.vocabulary import (
+    CycleCause,
+    CycleVersionState,
+    GeneralLevel,
+    KeyRole,
+    RaceTerrain,
+)
 
 TEMPLATES = cycle_templates.parse(cycle_templates.DEFAULT.read_text(encoding="utf-8"),
                                   cycle_templates.DEFAULT)
@@ -24,7 +30,8 @@ INPUTS = generator.Inputs("2030-W49", 42.3, 15.2, 55.0, 10, 10, minutes_per_week
 
 def _trames():
     template = TEMPLATES.preparation_for(42.2, RaceTerrain.ROAD)
-    goal = generator.Goal(dt.date(2031, 4, 13), 42.2, RaceTerrain.ROAD, 12600)
+    goal = generator.Goal(dt.date(2031, 4, 13), 42.2, RaceTerrain.ROAD, 12600,
+                          ("night",))
     return {
         "preparation": generator.candidates(template, goal, INPUTS)[1],
         "general": generator.general(TEMPLATES.general_at(GeneralLevel.PROGRESS), INPUTS),
@@ -63,3 +70,21 @@ def test_a_version_spans_whole_weeks():
     assert values["hypotheses"]["calibration_on"] == "2030-09-01"
     assert values["hypotheses"]["lineages"] == [
         ["threshold", [["reps", 4], ["rep_seconds", 540], ["recovery_seconds", 60]]]]
+
+
+def test_a_week_carries_its_own_first_times_then_the_ones_missed_while_it_has_room():
+    trame = _trames()["preparation"]
+    firsts = [key for key in trame.keys if key.role == KeyRole.FIRST]
+    assert firsts, "the preparation places its race's first time"
+    first = firsts[0]
+    assert cycles.firsts_due(trame, first.week, frozenset()) == ("night",)
+    assert cycles.firsts_due(trame, first.week, frozenset({"night"})) == ()
+    later = [week for week in trame.weeks if week.label > first.week]
+    build = next(week for week in later if week.phase in generator.BUILD_PHASES
+                 and not week.deload)
+    assert cycles.firsts_due(trame, build.label, frozenset()) == ("night",), \
+        "missed, it slides to the next build week"
+    deload = next((week for week in later if week.deload), None)
+    if deload is not None:
+        assert cycles.firsts_due(trame, deload.label, frozenset()) == ()
+    assert cycles.firsts_due(trame, trame.weeks[-1].label, frozenset()) == (), "never in taper"

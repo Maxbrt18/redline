@@ -20,7 +20,6 @@ from redline.analysis import (
     cycle_report,
     cycle_review,
     expected_rpe,
-    feasibility,
     ledger,
     permit_report,
     progression_strength,
@@ -135,7 +134,6 @@ def render(store: OperationalStore, root: Path, week: str, today: dt.date) -> st
         lines += ["", text.PERMIT]
         lines.extend(permit_lines)
 
-    lines += ["", *feasibility.report(store, rows, today)]
     lines += _cycle(store, week, today)
     lines += ["", *_progression(store, root, week, today)]
 

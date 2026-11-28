@@ -5832,11 +5832,13 @@ public extension Notebook {
         public let recoverySeconds: Int?
         public let paceS: [Double]?
         public let rpe: [Double]?
+        public let transition: String?
 
         public enum Role: Codable, Hashable, Sendable {
             case key
             case flagship
             case test
+            case first
             /// A value this build does not know yet: the server is newer than the app.
             case unknown(String)
     
@@ -5845,6 +5847,7 @@ public extension Notebook {
                 case "key": self = .key
                 case "flagship": self = .flagship
                 case "test": self = .test
+                case "first": self = .first
                 default: self = .unknown(rawValue)
                 }
             }
@@ -5854,6 +5857,7 @@ public extension Notebook {
                 case .key: "key"
                 case .flagship: "flagship"
                 case .test: "test"
+                case .first: "first"
                 case .unknown(let rawValue): rawValue
                 }
             }
@@ -5868,7 +5872,7 @@ public extension Notebook {
             }
         }
 
-        public init(position: Int, workout: String, role: Role, reps: Int? = nil, repSeconds: Int? = nil, recoverySeconds: Int? = nil, paceS: [Double]? = nil, rpe: [Double]? = nil) {
+        public init(position: Int, workout: String, role: Role, reps: Int? = nil, repSeconds: Int? = nil, recoverySeconds: Int? = nil, paceS: [Double]? = nil, rpe: [Double]? = nil, transition: String? = nil) {
             self.position = position
             self.workout = workout
             self.role = role
@@ -5877,6 +5881,7 @@ public extension Notebook {
             self.recoverySeconds = recoverySeconds
             self.paceS = paceS
             self.rpe = rpe
+            self.transition = transition
         }
 
         enum CodingKeys: String, CodingKey {
@@ -5888,6 +5893,7 @@ public extension Notebook {
             case recoverySeconds = "recovery_seconds"
             case paceS = "pace_s"
             case rpe = "rpe"
+            case transition = "transition"
         }
 
         public init(from decoder: any Decoder) throws {
@@ -5900,6 +5906,7 @@ public extension Notebook {
             recoverySeconds = try container.decode(Int?.self, forKey: .recoverySeconds)
             paceS = try container.decode([Double]?.self, forKey: .paceS)
             rpe = try container.decode([Double]?.self, forKey: .rpe)
+            transition = try container.decode(String?.self, forKey: .transition)
         }
 
         public func encode(to encoder: any Encoder) throws {
@@ -5912,6 +5919,7 @@ public extension Notebook {
             try container.encode(recoverySeconds, forKey: .recoverySeconds)
             try container.encode(paceS, forKey: .paceS)
             try container.encode(rpe, forKey: .rpe)
+            try container.encode(transition, forKey: .transition)
         }
     }
 
@@ -6078,6 +6086,7 @@ public extension Notebook {
             case specificShort
             case timeBound
             case arrivalUnreached
+            case firstUnplaced
             case belowDomain
             /// A value this build does not know yet: the server is newer than the app.
             case unknown(String)
@@ -6088,6 +6097,7 @@ public extension Notebook {
                 case "specific_short": self = .specificShort
                 case "time_bound": self = .timeBound
                 case "arrival_unreached": self = .arrivalUnreached
+                case "first_unplaced": self = .firstUnplaced
                 case "below_domain": self = .belowDomain
                 default: self = .unknown(rawValue)
                 }
@@ -6099,6 +6109,7 @@ public extension Notebook {
                 case .specificShort: "specific_short"
                 case .timeBound: "time_bound"
                 case .arrivalUnreached: "arrival_unreached"
+                case .firstUnplaced: "first_unplaced"
                 case .belowDomain: "below_domain"
                 case .unknown(let rawValue): rawValue
                 }

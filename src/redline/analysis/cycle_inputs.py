@@ -31,7 +31,7 @@ from redline.model.hypotheses import ClosedWeek
 from redline.model.plan_generator import Goal, Inputs
 from redline.model.progression import Dose
 from redline.model.race import Race
-from redline.model.vocabulary import CalibrationConfidence, DayKind
+from redline.model.vocabulary import CalibrationConfidence, DayKind, SessionStatus
 
 from . import ledger, progression_runs
 
@@ -90,7 +90,16 @@ def lineages(store: Any, book: rulebook.Rulebook, today: dt.date) -> tuple[tuple
 def goal(race: Race) -> Goal:
     """The goal a preparation is generated for, from a race whose goal is declared."""
     assert race.goal is not None
-    return Goal(race.on, race.goal.distance_km, race.goal.terrain, race.goal.goal_time_s)
+    return Goal(race.on, race.goal.distance_km, race.goal.terrain, race.goal.goal_time_s,
+                race.goal.firsts)
+
+
+def firsts_done(store: Any) -> frozenset[str]:
+    """The transition kinds already run: a session typed with one, done."""
+    return frozenset(session["transition"] for revision in store.active_plans().values()
+                     for session in revision["sessions"]
+                     if session.get("transition")
+                     and session.get("status") == SessionStatus.DONE)
 
 
 def declared() -> bool:
@@ -186,4 +195,5 @@ def inputs(store: Any, templates: CycleTemplates, today: dt.date) -> Inputs:
                   parameters.skeleton_long_step_max_pct,
                   minutes(store, iso_week.monday(origin)), _easy_pace(rows, today),
                   calibrated, found.adopted_on if found else None,
-                  lineages(store, book, today), parameters.quality_sessions_per_week)
+                  lineages(store, book, today), parameters.quality_sessions_per_week,
+                  parameters.transitions_per_week)

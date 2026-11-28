@@ -16,13 +16,18 @@ can no longer be reached from where the athlete stands.
 - Lineage position: each key session reaches its last planned dose before the taper, one
   step per exposure left outside the deloads, from the dose its lineage allows next. Only
   the variables still behind count, in the direction the template moves them.
+- First times: the race's first times not done yet still find room on the build weeks
+  left outside the deloads, `transitions_max` a week (rule n8). A first time missed
+  slides to the next week that can hold it (`cycles.firsts_due`): only no room left
+  falls.
 - Availability: the minutes the habits leave for a week changed, and a week ahead no
   longer fits them at the frozen easy pace, or a peak the time capped could now climb.
   The days stated for one week are the draft's, never a hypothesis.
-- Goal: the race's day, distance or terrain changed.
+- Goal: the race's day, distance, terrain or first times changed.
 - Goal time, calibration: changed, they render the paces again; the trame holds.
 
-A fallen volume, long run, lineage, availability or goal calls for a new version (`replan`); a goal
+A fallen volume, long run, lineage, first time, availability or goal calls for a new
+version (`replan`); a goal
 time or a calibration alone, for its paces rendered again (`recalibrate`); nothing fallen,
 the week's draft adapts within the bounds (`local`).
 
@@ -43,12 +48,12 @@ from . import iso_week
 from .cycle_templates import CycleTemplates, KeySession
 from .plan_generator import BUILD_PHASES, Goal, Trame, TrameRisk, Week
 from .progression import Dose
-from .vocabulary import CycleKind, HypothesisKind, HypothesisOutcome, PlanPhase
+from .vocabulary import CycleKind, HypothesisKind, HypothesisOutcome, KeyRole, PlanPhase
 
 #: The fallen hypotheses that call for a new version.
 REPLANNING = frozenset({HypothesisKind.VOLUME_HELD, HypothesisKind.LONG_RUN_HELD,
-                        HypothesisKind.LINEAGE_POSITION, HypothesisKind.AVAILABILITY,
-                        HypothesisKind.GOAL})
+                        HypothesisKind.LINEAGE_POSITION, HypothesisKind.FIRSTS,
+                        HypothesisKind.AVAILABILITY, HypothesisKind.GOAL})
 #: A trame's volumes are rounded to 0.1 km: a reach within half of it reaches.
 ROUNDING_KM = 0.05
 #: The closed weeks a fallen volume persists over.
@@ -81,6 +86,8 @@ class Observed:
     calibration_on: dt.date | None
     #: The version's race as it stands, None when it is gone or its goal undeclared.
     goal: Goal | None
+    #: The transition kinds already run.
+    firsts_done: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -92,7 +99,7 @@ class Fallen:
     reference: float | None = None
     #: The key session's workout, for a lineage.
     workout: str = ""
-    #: The goal's field that changed: `on`, `distance_km` or `terrain`.
+    #: The goal's field that changed: `on`, `distance_km`, `terrain` or `firsts`.
     field: str = ""
 
 
@@ -201,6 +208,19 @@ def _lineages(trame: Trame, observed: Observed, templates: CycleTemplates) -> li
     return fallen
 
 
+def _firsts(trame: Trame, observed: Observed) -> Fallen | None:
+    pending = [key for key in trame.keys if key.role == KeyRole.FIRST
+               and key.transition not in observed.firsts_done]
+    if not pending:
+        return None
+    current = iso_week.of(observed.today)
+    room = trame.hypotheses.transitions_max * sum(
+        1 for week in trame.weeks if week.label >= current and _build(week))
+    if len(pending) <= room:
+        return None
+    return Fallen(HypothesisKind.FIRSTS, float(len(pending)), float(room))
+
+
 def _capacity_km(minutes: int | None, pace_s: float) -> float | None:
     return None if minutes is None else minutes * 60 / pace_s
 
@@ -235,7 +255,8 @@ def _goal(trame: Trame, observed: Observed) -> list[Fallen]:
               for name, changed in (("on", now.on != frozen.on),
                                     ("distance_km", now.distance_km != frozen.distance_km),
                                     ("terrain", frozen.terrain is not None
-                                     and now.terrain != frozen.terrain))
+                                     and now.terrain != frozen.terrain),
+                                    ("firsts", set(now.firsts) != set(frozen.firsts)))
               if changed]
     if frozen.terrain is not None and now.goal_time_s != frozen.goal_time_s:
         fallen.append(Fallen(HypothesisKind.GOAL_TIME,
@@ -251,7 +272,7 @@ def check(trame: Trame, observed: Observed, templates: CycleTemplates) -> Review
         return HOLDS
     fallen: list[Fallen] = []
     for found in (_volume(trame, observed), _long_run(trame, observed),
-                  _availability(trame, observed)):
+                  _firsts(trame, observed), _availability(trame, observed)):
         if found is not None:
             fallen.append(found)
     fallen += _lineages(trame, observed, templates)

@@ -150,3 +150,13 @@ def test_the_gate_keeps_the_draft_with_the_first_revision():
     _, current = plan_revision.checked(store, found.week, {**draft, "decision": JUDGMENT},
                                        None, stamp=STAMP, warn=print)
     assert current["draft"]["sessions"] == draft["sessions"]
+
+
+def test_the_week_of_a_first_time_carries_it_on_its_long_run():
+    store = _lived()
+    [first] = [key for key in store.cycle.trame.keys if key.role == "first"]
+    _, found = _frame(first.week)
+    assert found.firsts == ("reconnaissance",)
+    drafted = weekly_draft.draft(found, STAMP)
+    assert [(session["workout"], session["transition"]) for session in drafted["sessions"]
+            if session.get("transition")] == [("long", "reconnaissance")]

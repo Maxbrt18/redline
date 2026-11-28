@@ -32,9 +32,6 @@ Fais le bilan du dimanche et prépare la semaine suivante.
    Chaque SL et chaque hausse de la porte reçoit sa prédiction `corps`, probabilité
    explicite : `redline fact-write prediction --domain corps --resolves wake-trace
    --resolves-on <lendemain> --success-if '<=1'`. Elle se solde seule.
-   Faisabilité du dossier
-   INFAISABLE : présente ses leviers à ⟨athlète⟩, n'en choisis aucun en silence ;
-   `redline feasibility --unwritten <semaine>` explore.
    `start_time: HH:MM` si ⟨athlète⟩ a donné l'heure ; sinon laisse le champ absent.
 5. Une preuve datée d'endurance mentale va avec ses mots dans
    `coaching/mental-bank.md`. Lance `redline vault-check`, corrige, puis

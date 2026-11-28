@@ -31,6 +31,8 @@ INPUTS = Inputs("2030-W30", start_km=40, start_long_km=15, held_km=50, ramp_max_
                 long_step_max_pct=10, easy_pace_s=360, calibrated=True)
 #: A trame's figures are rounded to 0.1 km.
 ROUNDING_KM = 0.1
+#: The first times every generated race requires.
+FIRSTS = ("night", "reconnaissance")
 
 
 def _trames():
@@ -39,7 +41,8 @@ def _trames():
         template = TEMPLATES.preparation_for(distance, terrain)
         inputs = dataclasses.replace(INPUTS, origin=origin, start_km=start[0],
                                      start_long_km=start[1])
-        for trame in generator.candidates(template, Goal(RACE, distance), inputs):
+        for trame in generator.candidates(template, Goal(RACE, distance, firsts=FIRSTS),
+                                          inputs):
             yield pytest.param((template, trame),
                                id=f"{template.slug}-{trame.candidate}-{start[0]}km-{origin}")
 
@@ -117,6 +120,22 @@ def test_a_flagship_session_never_falls_in_a_deload(generated):
     for key in trame.keys:
         if key.role == KeyRole.FLAGSHIP:
             assert not trame.week(key.week).deload, key.week
+
+
+def test_each_first_time_is_placed_on_a_quiet_build_week_or_named_a_risk(generated):
+    _, trame = generated
+    weeks = {week.label: week for week in trame.weeks}
+    firsts = [key for key in trame.keys if key.role == KeyRole.FIRST]
+    unplaced = [risk.workout for risk in trame.risks if risk.kind == TrameRisk.FIRST_UNPLACED]
+    assert sorted([key.transition for key in firsts] + unplaced) == sorted(FIRSTS)
+    for key in firsts:
+        week = weeks[key.week]
+        assert week.phase in generator.BUILD_PHASES and not week.deload
+        assert key.week != _builds(trame)[0].label, "the first build week changes nothing else"
+    per_week = [key.week for key in firsts]
+    assert all(per_week.count(week) <= trame.hypotheses.transitions_max for week in per_week)
+    positions = [(key.week, key.position) for key in trame.keys]
+    assert len(positions) == len(set(positions))
 
 
 def test_the_same_inputs_give_the_same_trame(generated):
@@ -235,3 +254,13 @@ def test_no_week_carries_more_quality_sessions_than_rule_n1_allows():
     general = generator.general(TEMPLATES.general_at(GeneralLevel.MAINTAIN),
                                 dataclasses.replace(INPUTS, qualities_max=0))
     assert not general.keys and all(week.qualities == 0 for week in general.weeks)
+
+
+def test_a_first_time_no_quiet_week_can_hold_is_a_risk():
+    many = tuple(f"first-{index}" for index in range(40))
+    trame = generator.preparation(HALF, Goal(RACE, 21.1, firsts=many),
+                                  generator.candidate_levers(HALF)["balanced"], INPUTS)
+    placed = [key for key in trame.keys if key.role == KeyRole.FIRST]
+    assert placed and len(placed) < len(many)
+    assert [risk.workout for risk in trame.risks if risk.kind == TrameRisk.FIRST_UNPLACED] \
+        == list(many[len(placed):])

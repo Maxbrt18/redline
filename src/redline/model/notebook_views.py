@@ -1037,16 +1037,18 @@ class HabitsView(TypedDict):
 class PlanKey(TypedDict):
     """A key session of a trame's week: its number (what a session links to), its dose, and
     its intensity rendered from today's calibration: a pace band in s/km (slowest first)
-    or an RPE band; neither when the reference is not known yet."""
+    or an RPE band; neither when the reference is not known yet. A first time the race
+    requires carries its transition's label instead."""
 
     position: int
     workout: str
-    role: Literal["key", "flagship", "test"]
+    role: Literal["key", "flagship", "test", "first"]
     reps: int | None
     rep_seconds: int | None
     recovery_seconds: int | None
     pace_s: list[float] | None
     rpe: list[float] | None
+    transition: str | None
 
 
 class PlanWeek(TypedDict):
@@ -1067,7 +1069,7 @@ class PlanWeek(TypedDict):
 
 class PlanRisk(TypedDict):
     kind: Literal["window_short", "specific_short", "time_bound", "arrival_unreached",
-                  "below_domain"]
+                  "first_unplaced", "below_domain"]
     value: float
     reference: float
     workout: str
