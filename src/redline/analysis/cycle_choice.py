@@ -40,7 +40,7 @@ def proposal(store: Any, today: dt.date, candidate: str,
     if candidate not in options:
         raise InputError(f"no candidate {candidate} (candidates: {', '.join(options)})")
     inputs = cycle_inputs.inputs(store, templates, today)
-    goal = generator.Goal(race.on, race.goal.distance_km)
+    goal = cycle_inputs.goal(race)
     trame = generator.preparation(template, goal, options[candidate], inputs,
                                   candidate=candidate)
     starts = trame.weeks[0].label

@@ -27,8 +27,9 @@ from redline.model import iso_week, rulebook, session_kinds, week_days
 from redline.model.cycle_templates import CycleTemplates
 from redline.model.cycle_transitions import Standing
 from redline.model.errors import ConfigError
-from redline.model.plan_generator import Inputs
+from redline.model.plan_generator import Goal, Inputs
 from redline.model.progression import Dose
+from redline.model.race import Race
 from redline.model.vocabulary import CalibrationConfidence, DayKind
 
 from . import ledger, progression_runs
@@ -83,6 +84,12 @@ def lineages(store: Any, book: rulebook.Rulebook, today: dt.date) -> tuple[tuple
         if lineage is not None and lineage.workout and dose is not None:
             found.append((lineage.workout, dose))
     return tuple(found)
+
+
+def goal(race: Race) -> Goal:
+    """The goal a preparation is generated for, from a race whose goal is declared."""
+    assert race.goal is not None
+    return Goal(race.on, race.goal.distance_km, race.goal.terrain, race.goal.goal_time_s)
 
 
 def declared() -> bool:

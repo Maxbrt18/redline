@@ -55,7 +55,7 @@ from .cycle_templates import (
     Recovery,
 )
 from .progression import Dose
-from .vocabulary import CycleKind, KeyRole, PlanPhase
+from .vocabulary import CycleKind, KeyRole, PlanPhase, RaceTerrain
 
 #: A trame's figures are rounded to 0.1 km.
 ROUND_KM = 1
@@ -135,10 +135,14 @@ class Inputs:
 
 @dataclass(frozen=True)
 class Goal:
-    """The race a preparation is for."""
+    """The race a preparation is for. Its terrain and goal time shape no week: they are
+    frozen with the version for its hypotheses (`redline.model.hypotheses`). A terrain is
+    None in a version written before it was frozen."""
 
     on: dt.date
     distance_km: float
+    terrain: RaceTerrain | None = None
+    goal_time_s: int | None = None
 
 
 @dataclass(frozen=True)
